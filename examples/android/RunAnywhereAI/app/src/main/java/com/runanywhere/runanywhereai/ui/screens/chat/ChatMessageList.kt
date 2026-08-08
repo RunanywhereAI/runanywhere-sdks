@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.components.GlyphPlate
 import com.runanywhere.runanywhereai.ui.components.rememberBreath
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.BrandGradient
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.Neutral100
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
 import java.io.File
@@ -311,6 +313,16 @@ private fun EmptyChatHero(
     }
 }
 
+/**
+ * The user's own turn — the one surface in the app that paints the full logo gradient.
+ *
+ * The gradient, and white on it, is deliberate and matches iOS `ChatMessageComponents` and the
+ * web `--bubble-user-start`/`--bubble-user-end` pair exactly: DESIGN_GUIDELINE §5 keeps
+ * white-on-orange for the gradient CTA and large/bold brand moments, and this is the app's brand
+ * moment. It is NOT the solid `primary` fill it used to be — that path took its foreground from
+ * `onPrimary`, which is now ink for the filled buttons, and ink on the gradient would read as
+ * the assistant's voice rather than the reader's own.
+ */
 @Composable
 private fun UserBubble(message: ChatMessage, onToggleActions: () -> Unit = {}) {
     val dimens = LocalDimens.current
@@ -326,7 +338,7 @@ private fun UserBubble(message: ChatMessage, onToggleActions: () -> Unit = {}) {
                         bottomEnd = dimens.radiusSm,
                     )
                 )
-                .background(MaterialTheme.colorScheme.primary)
+                .background(BrandGradient)
                 .clickable(
                     onClickLabel = "Show message actions",
                     onClick = onToggleActions,
@@ -339,21 +351,22 @@ private fun UserBubble(message: ChatMessage, onToggleActions: () -> Unit = {}) {
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Neutral100,
                 )
             }
         }
     }
 }
 
+/** Only ever drawn inside [UserBubble], so its foreground is the bubble's white, not `onPrimary`. */
 @Composable
 private fun AttachmentCard(attachment: ChatAttachment) {
     val dimens = LocalDimens.current
     var showPreview by remember { mutableStateOf(false) }
     Surface(
         shape = RoundedCornerShape(dimens.radiusSm),
-        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f),
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        color = Neutral100.copy(alpha = 0.16f),
+        contentColor = Neutral100,
     ) {
         Row(
             modifier = Modifier
@@ -382,7 +395,7 @@ private fun AttachmentCard(attachment: ChatAttachment) {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                        color = Neutral100.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -481,6 +494,22 @@ private fun AssistantMessage(
             // anonymous dots: the gap to the first token is seconds long, and a reader
             // needs to know it is loading and roughly why.
             isWaiting -> PendingReplyIndicator()
+            // A failure report is the app speaking, not the model, so it is NOT run through
+            // MarkdownText: rendering it as model output would let an error string's own
+            // punctuation become bold or italic, and it would read in the same ink as a real
+            // reply. Danger colour plus a plain paragraph, matching iOS `assistantBody`,
+            // which paints `isError` turns in `AppColors.dangerText`.
+            message.isError && message.text.isNotEmpty() -> Text(
+                text = message.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable(
+                    interactionSource = null,
+                    indication = null,
+                    onClickLabel = "Show message actions",
+                    onClick = onToggleActions,
+                ),
+            )
             message.text.isNotEmpty() -> MarkdownText(
                 markdown = message.text,
                 style = MaterialTheme.typography.bodyLarge,

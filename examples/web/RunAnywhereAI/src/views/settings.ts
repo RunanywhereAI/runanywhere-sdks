@@ -182,6 +182,21 @@ export function getGenerationSettings(): GenerationSettings {
   };
 }
 
+/**
+ * Set reasoning on or off from outside the Settings tab.
+ *
+ * The chat composer carries the same toggle (reasoning changes what the next turn
+ * does, so it belongs where the turn is composed — iOS and Android both put it
+ * there). Both controls write this one persisted value rather than keeping their own
+ * copy, so they cannot disagree, and the Settings switch shows the composer's last
+ * choice because that view rebuilds its markup from `settings` on mount.
+ */
+export function setThinkingModeEnabled(enabled: boolean): void {
+  loadSettings();
+  settings.thinkingModeEnabled = enabled;
+  saveSettings();
+}
+
 export function initSettingsTab(el: HTMLElement): void {
   container = el;
   loadSettings();

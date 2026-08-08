@@ -614,7 +614,13 @@ private fun AddFromHuggingFaceRow(onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Search and download any GGUF model",
+                // A row's subtitle exists to tell a hesitant reader what is behind it, and
+                // "GGUF" is the one word that guarantees they stop — it names a container
+                // format nobody outside the field has heard of. The format constraint is
+                // real, so it is stated inside the search sheet as a consequence ("Only
+                // models this app can run are shown"), not as this row's promise. iOS and
+                // the web sheet carry the identical wording.
+                "Browse thousands of community chat models",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

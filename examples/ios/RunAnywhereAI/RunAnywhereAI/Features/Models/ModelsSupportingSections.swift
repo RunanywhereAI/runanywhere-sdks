@@ -100,7 +100,10 @@ struct ModelSearchBar: View {
             Text(filter.title)
                 .font(AppTypography.caption)
                 .fontWeight(.medium)
-                .foregroundColor(isSelected ? AppColors.textWhite : AppColors.textPrimary)
+                // `onBrand`, not white: caption/medium on the solid brand fill is small text
+                // by every measure, and white on #FF6900 is 2.89:1. Same pairing as
+                // `RAProminentButtonStyle`, the web `.btn-primary` and Android `onPrimary`.
+                .foregroundColor(isSelected ? AppColors.onBrand : AppColors.textPrimary)
                 .padding(.horizontal, AppSpacing.smallMedium)
                 .padding(.vertical, AppSpacing.xSmall)
                 .background(isSelected ? AppColors.primaryAccent : AppColors.backgroundSecondary)

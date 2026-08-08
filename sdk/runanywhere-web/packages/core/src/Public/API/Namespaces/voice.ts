@@ -11,7 +11,10 @@ import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
-import { VoiceAgentMicDriver } from '../../../Infrastructure/VoiceAgentMicDriver.js';
+import {
+  VoiceAgentMicDriver,
+  type VoiceAgentMicPhase,
+} from '../../../Infrastructure/VoiceAgentMicDriver.js';
 import {
   cleanupVoiceAgent,
   ensureDefaultVAD,
@@ -57,6 +60,12 @@ export interface VoiceSession {
   /** Close the session and release the microphone. */
   close(): Promise<void>;
 }
+
+const DRIVER_PHASE_STATES: Record<VoiceAgentMicPhase, AgentState> = {
+  listening: 'listening',
+  processing: 'thinking',
+  speaking: 'speaking',
+};
 
 const AGENT_STATES: Partial<Record<PipelineState, AgentState>> = {
   [PipelineState.PIPELINE_STATE_LISTENING]: 'listening',
@@ -144,9 +153,12 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
         silenceDurationMs: options.turnHandling?.endpointing?.minDelayMs,
         maxRecordingDurationMs: options.turnHandling?.endpointing?.maxDelayMs,
         speechThreshold: options.vad?.activationThreshold,
+        // The driver owns playout, so it is the only layer that can say
+        // "speaking" while sound is actually leaving the speaker. Mirrors
+        // Swift/Kotlin, where the same phase is merged into `session.events`.
         onPhase: (phase) => publish({
           type: 'agentStateChanged',
-          state: phase === 'listening' ? 'listening' : 'thinking',
+          state: DRIVER_PHASE_STATES[phase],
         }),
         onTurn: (turn) => {
           if (turn.userText) {

@@ -67,7 +67,9 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
 import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.BrandGradient
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.Neutral100
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
@@ -144,10 +146,22 @@ fun VoiceScreen() {
     }
 
     val components = listOf(
-        VoiceComponent("Listen", RACIcons.Outline.Brain, sttVm, sttModel),
-        VoiceComponent("Assistant", RACIcons.Outline.MessageCircle, llmVm, llmModel),
-        VoiceComponent("Speak", RACIcons.Outline.Robot, ttsVm, ttsModel),
-        VoiceComponent("Turn-taking", RACIcons.Outline.Pulse, vadVm, vadModel, optional = true),
+        // One slot vocabulary across all three apps — the same four labels the web view
+        // (src/views/voice.ts) and the iOS setup card (VoiceAISetupView) use, and each slot's
+        // canonical glyph from this app's own icon set. The labels name the *role* rather than
+        // the verb ("Speech-to-text", not "Listen") because a reader who learned the pipeline
+        // on one platform has to recognise it on another.
+        //
+        // Was Brain / MessageCircle / Robot / Pulse. Brain meant speech recognition here and
+        // the language model on iOS — opposite ends of the same pipeline — and it is also the
+        // chat composer's thinking-mode toggle, so one glyph carried two meanings inside this
+        // app. Brain now belongs to reasoning only. Waveform and Volume are the roles RACIcons
+        // already documents for "the sound" and "audio leaving the device"; neither was used
+        // here, so the card contradicted its own icon set.
+        VoiceComponent("Speech-to-text", RACIcons.Outline.Waveform, sttVm, sttModel),
+        VoiceComponent("Chat model", RACIcons.Outline.MessageCircle, llmVm, llmModel),
+        VoiceComponent("Text-to-speech", RACIcons.Outline.Volume, ttsVm, ttsModel),
+        VoiceComponent("Voice detection", RACIcons.Outline.Pulse, vadVm, vadModel, optional = true),
     )
 
     // Readiness: the co-resident agent path needs STT+LLM+TTS all loaded; the NPU per-turn-swap path
@@ -429,8 +443,15 @@ private fun StatusLine(text: String, hearing: Boolean) {
 @Composable
 private fun TurnBubble(turn: VoiceTurn) {
     val dimens = LocalDimens.current
-    val color = if (turn.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
-    val textColor = if (turn.isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    // The reader's own words carry the logo gradient, the same as chat and RAG — see
+    // [BrandGradient]. White reads on the gradient; a solid `primary` fill would need
+    // `onPrimary`'s ink instead, which would make the transcript's two voices look alike.
+    val fill = if (turn.isUser) {
+        Modifier.background(BrandGradient)
+    } else {
+        Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+    }
+    val textColor = if (turn.isUser) Neutral100 else MaterialTheme.colorScheme.onSurface
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = if (turn.isUser) Alignment.CenterEnd else Alignment.CenterStart,
@@ -439,7 +460,7 @@ private fun TurnBubble(turn: VoiceTurn) {
             modifier = Modifier
                 .widthIn(max = dimens.bubbleMaxWidth)
                 .clip(RoundedCornerShape(dimens.radiusLg))
-                .background(color)
+                .then(fill)
                 .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
         ) {
             Text(text = turn.text.ifBlank { "…" }, style = MaterialTheme.typography.bodyLarge, color = textColor)

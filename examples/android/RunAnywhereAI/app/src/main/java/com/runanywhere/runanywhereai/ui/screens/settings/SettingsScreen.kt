@@ -137,7 +137,11 @@ fun SettingsScreen(
             )
         }
 
-        Section("Storage") {
+        // "Downloads", the word the web app's nav row, Advanced-hub row and panel title all
+        // use for the same content — what is on this device and what it costs. This heading
+        // said "Storage", which names the resource rather than the thing the reader came
+        // here to manage, so one concept had two names across the apps.
+        Section("Downloads") {
             Text(
                 text = "Models ${formatModelSize(storage.modelsBytes).ifBlank { "0 B" }} · " +
                     "${formatModelSize(storage.freeBytes)} free",

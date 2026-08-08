@@ -42,7 +42,9 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Storage</div>
+      <!-- "Downloads": the one name the nav row, the Advanced-hub row and the tab
+           registry all use for this panel. It used to be the fourth name for it. -->
+      <div class="toolbar-title">Downloads</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="storage-clear-cache-btn" style="font-size: 0.8rem;">Clear Caches</button>
       </div>

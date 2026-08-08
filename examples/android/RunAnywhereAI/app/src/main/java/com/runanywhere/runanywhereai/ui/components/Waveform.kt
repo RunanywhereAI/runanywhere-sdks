@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -35,8 +36,10 @@ import kotlin.math.max
  * newest sample is at the right edge under the brand gradient; older samples fade back.
  *
  * Motion here is *data*, not decoration: bars move because audio arrived, so reduced motion
- * does not suppress it (§6.5 governs ambient loops). While the level holds at zero the
- * history drains to a resting hairline on its own.
+ * does not suppress it (§6.5 governs ambient loops). Each new level shifts the history one
+ * slot, so a quiet stretch walks in as hairlines and the shape of the last phrase drains off
+ * the left edge; an unchanging level parks the trace rather than animating a signal that is
+ * not there.
  */
 @Composable
 fun AudioWaveform(
@@ -52,9 +55,16 @@ fun AudioWaveform(
     // make individually observable, and it keeps the Canvas a pure function of its input.
     var history by remember { mutableStateOf(FloatArray(SAMPLE_COUNT)) }
 
+    // `level` is a plain Float parameter, so it has to be lifted into snapshot state before
+    // snapshotFlow can observe it: reading the parameter directly inside a LaunchedEffect(Unit)
+    // captures the value from the composition that started the effect and never sees another,
+    // which left the waveform frozen at its first sample for the whole recording — a level
+    // meter that in practice drew a flat hairline through several seconds of loud speech.
+    val latestLevel by rememberUpdatedState(level)
+
     // Driven off the level rather than a frame clock, so nothing redraws while the mic is idle.
     LaunchedEffect(Unit) {
-        snapshotFlow { level }.collect { next ->
+        snapshotFlow { latestLevel }.collect { next ->
             history = FloatArray(SAMPLE_COUNT).also { out ->
                 history.copyInto(out, destinationOffset = 0, startIndex = 1)
                 out[SAMPLE_COUNT - 1] = next.coerceIn(0f, 1f)

@@ -266,7 +266,12 @@ function renderView(): void {
 
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Voice AI</div>
+      <!-- "Talk", matching this panel's nav row and Android's drawer row. Every other
+           panel's title is its nav label; this one said "Voice AI", so the reader
+           arrived somewhere apparently different from what they clicked. The setup card
+           below still carries "Voice AI" as the feature's own name, which is what the
+           iOS and Android setup cards call it too. -->
+      <div class="toolbar-title">Talk</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="voice-refresh-btn">Refresh</button>
       </div>
@@ -614,7 +619,14 @@ function transcriptPlaceholder(): string {
     case 'connecting': return 'Getting ready…';
     case 'listening': return isSpeechDetected ? 'Listening…' : 'Go ahead — say something.';
     case 'processing': return 'Working out a reply…';
-    case 'speaking': return 'Speaking. Talk over it any time to interrupt.';
+    // Not "talk over it to interrupt": the agent is half-duplex by design — the
+    // mic driver drops every captured chunk while a reply is playing out
+    // (VoiceAgentMicDriver gates on `processing`, which spans playback), so
+    // speaking over the agent is neither heard nor acted on. The only affordance
+    // that actually cuts a reply short is the Stop-talking button beside it.
+    // "Take the turn back" is the phrase all four apps use for this moment; only
+    // the control differs, and each app names its own real one.
+    case 'speaking': return 'Speaking. Use “Stop talking” to take the turn back.';
     default: return 'Nothing heard yet.';
   }
 }

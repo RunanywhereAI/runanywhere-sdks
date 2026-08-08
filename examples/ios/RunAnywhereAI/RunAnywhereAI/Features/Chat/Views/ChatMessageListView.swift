@@ -203,7 +203,13 @@ struct ChatMessageListView: View {
 
 // MARK: - Starter Prompts
 
-/// The four things a consumer opens an on-device assistant to do. A value type
+/// The four things a consumer opens an on-device assistant to do.
+///
+/// `title` is the shared label — the same string Android's `generalSuggestions` and the web's
+/// `STARTER_PROMPTS` show — so the same chip is recognisable on all three. It used to be a
+/// single word ("Plan"), which made the four chips look like a different feature from the
+/// two-word set on the other two apps. `subtitle` is this platform's extra line and qualifies
+/// the label rather than repeating it. A value type
 /// rather than four hand-built call sites, so the grid stays one `ForEach` and
 /// the copy lives in one place.
 struct StarterPrompt: Identifiable {
@@ -217,28 +223,28 @@ struct StarterPrompt: Identifiable {
         StarterPrompt(
             id: "plan",
             icon: "list.bullet.clipboard",
-            title: "Plan",
+            title: "Plan my day",
             subtitle: "from messy notes",
             text: "Turn this messy list into a realistic plan with the top three priorities:"
         ),
         StarterPrompt(
             id: "rewrite",
             icon: "pencil.line",
-            title: "Rewrite",
-            subtitle: "clear and warm",
+            title: "Rewrite clearly",
+            subtitle: "warm and concise",
             text: "Rewrite this so it is clear, warm, and concise:"
         ),
         StarterPrompt(
             id: "compare",
             icon: "arrow.left.arrow.right",
-            title: "Compare",
-            subtitle: "weigh options",
+            title: "Compare options",
+            subtitle: "weigh the tradeoffs",
             text: "Compare these options, explain the tradeoffs, and recommend one:"
         ),
         StarterPrompt(
             id: "summarize",
             icon: "checklist",
-            title: "Summarize",
+            title: "Summarize notes",
             subtitle: "into next steps",
             text: "Summarize these notes into decisions, action items, and open questions:"
         )
@@ -446,7 +452,11 @@ struct ChatInputAreaView: View {
                 Button {
                     onComposerAction(.takePhoto)
                 } label: {
-                    Label("Live Camera", systemImage: "livephoto")
+                    // `eye` — looking through a live feed — and not `livephoto`, which
+                    // VLMCameraView already uses for the auto-streaming toggle. It is also
+                    // what `RAModelCategory.consumerCapabilityIcon` returns for vision, and
+                    // the glyph Android (`RACIcons.Outline.Eye`) and the web app draw here.
+                    Label("Live Camera", systemImage: "eye")
                 }
                 #endif
 
@@ -469,7 +479,10 @@ struct ChatInputAreaView: View {
                 .disabled(!viewModel.loadedModelSupportsThinking)
 
                 Toggle(isOn: $toolSettingsViewModel.toolCallingEnabled) {
-                    Label("Web Tools", systemImage: "safari")
+                    // `globe` — the network — rather than `safari`, one browser's mark
+                    // standing in for the web. Matches the web app's `globe` and Android's
+                    // new `RACIcons.Outline.Globe`.
+                    Label("Web Tools", systemImage: "globe")
                 }
             }
         } label: {
@@ -589,7 +602,7 @@ struct ChatInputAreaView: View {
             badges.append(
                 ComposerBadge(
                     id: "tools",
-                    icon: "safari",
+                    icon: "globe",
                     title: toolSettingsViewModel.registeredTools.isEmpty ? "Preparing tools…" : "Web tools",
                     tint: AppColors.primaryAccent,
                     action: nil

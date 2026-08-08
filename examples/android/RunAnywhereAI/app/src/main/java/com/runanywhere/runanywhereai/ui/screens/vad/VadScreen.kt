@@ -301,6 +301,15 @@ private fun ListenButton(listening: Boolean, enabled: Boolean, onClick: () -> Un
         listening -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    // Paired with the container rather than always `onPrimary`, the rule
+    // `VoiceScreen.MicButton` already follows: the glyph has to clear 3:1 against whichever
+    // of the three fills is showing, and no single foreground does that for a grey, a red
+    // and an orange. `onPrimary` is ink now, so on the red fill it would all but vanish.
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        listening -> MaterialTheme.colorScheme.onError
+        else -> MaterialTheme.colorScheme.onPrimary
+    }
     Box(
         modifier = Modifier
             .padding(top = 8.dp)
@@ -313,7 +322,7 @@ private fun ListenButton(listening: Boolean, enabled: Boolean, onClick: () -> Un
         Icon(
             imageVector = if (listening) RACIcons.Outline.PlayerStop else RACIcons.Outline.Microphone,
             contentDescription = if (listening) "Stop" else "Listen",
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = tint,
             modifier = Modifier.size(40.dp),
         )
     }

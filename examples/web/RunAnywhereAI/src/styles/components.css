@@ -224,10 +224,20 @@
 }
 
 .shell-icon-btn:hover,
-.composer-icon-btn:hover,
+.composer-icon-btn:hover:not(:disabled),
 .composer-icon-btn.active {
   color: var(--color-primary);
   background: var(--color-primary-light);
+}
+
+/* A composer control the loaded model cannot honour — reasoning on a model with no
+   thinking phase. Dimmed and inert rather than removed, so the affordance stays
+   where the reader expects it and its title says why it is unavailable; the hover
+   tint is suppressed because a control that lights up but does nothing reads as
+   broken rather than unavailable. */
+.composer-icon-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
 }
 
 .shell-icon-btn:active,
@@ -241,12 +251,14 @@
   height: 20px;
 }
 
+/* Ink label for the same reason `.btn-primary` uses it: base-size semibold on a
+   solid orange fill is small text, not a large brand moment (§5). */
 .consumer-new-chat {
   height: 42px;
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  color: var(--text-white);
+  color: var(--text-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -658,10 +670,18 @@
 .btn:active:not(:disabled) { transform: scale(0.98); }
 .btn:disabled { cursor: not-allowed; }
 
+/* Ink, not white. `.btn` sets base size / medium weight, so a primary label is
+   small text by WCAG's measure and white on #FF6900 is 2.89:1 — under AA and
+   under even the 3:1 large-text floor. DESIGN_GUIDELINE §5 keeps the
+   white-on-orange deviation for the *gradient* CTA and large/bold brand
+   moments only; a normal-weight button label is neither. Ink is 6.12:1 on
+   #FF6900 and 5.02:1 on the #E65E00 hover tone, so both states clear AA.
+   iOS `RAProminentButtonStyle` and Android's `onPrimary` token carry the same
+   ink, so the primary action reads identically on all four surfaces. */
 .btn-primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--text-white);
+  color: var(--text-on-primary);
 }
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
 
@@ -877,7 +897,11 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
   border: none;
-  color: white;
+  /* The arrow is a control glyph, so WCAG 1.4.11 asks 3:1 against the fill it
+     sits on: white on #FF6900 is 2.89:1 and misses even that floor. Ink is
+     6.12:1, and it is the same pairing Android's send button gets from its
+     `onPrimary` token, so the composer's send action matches across apps. */
+  color: var(--text-on-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -962,7 +986,7 @@
   background: transparent;
 }
 
-.chat-panel-consumer .composer-icon-btn:hover,
+.chat-panel-consumer .composer-icon-btn:hover:not(:disabled),
 .chat-panel-consumer .composer-icon-btn.active {
   background: var(--color-primary-light);
 }
@@ -1451,6 +1475,15 @@
   color: var(--text-tertiary);
 }
 
+/* A turn that failed. Colour is never the only carrier — the sentence itself starts
+   with "Error:" and the element is a live region — but the danger ink is what stops a
+   reader attributing the app's own failure report to the model. */
+.chat-error {
+  margin: 0;
+  color: var(--text-danger);
+  line-height: var(--line-height-relaxed);
+}
+
 .chat-attachment-card {
   display: flex;
   align-items: center;
@@ -1789,7 +1822,8 @@
 }
 .model-action-btn:not(:disabled):hover { filter: brightness(1.08); }
 .model-action-btn:not(:disabled):active { transform: scale(0.97); }
-.model-action-btn.download { background: var(--color-primary); color: white; box-shadow: 0 2px 10px var(--shadow-accent); }
+/* Small semibold label on a solid brand fill — ink, per §5 and `.btn-primary`. */
+.model-action-btn.download { background: var(--color-primary); color: var(--text-on-primary); box-shadow: 0 2px 10px var(--shadow-accent); }
 .model-action-btn.load { background: var(--badge-green); color: var(--color-green); }
 .model-action-btn.loaded { background: var(--badge-green); color: var(--color-green); cursor: pointer; }
 .model-action-btn--progress { background: var(--bg-tertiary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }

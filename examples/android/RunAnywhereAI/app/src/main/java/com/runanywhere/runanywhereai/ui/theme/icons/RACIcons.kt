@@ -378,10 +378,33 @@ object RACIcons {
             )
         }
 
+        /** A remote provider. Cloud routing and cloud credentials — never the open web. */
         val Cloud: ImageVector by lazy {
             racOutlineIcon(
                 "Cloud",
                 "M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878",
+            )
+        }
+
+        /**
+         * The network, and only the network: web search and tool calling.
+         *
+         * [Cloud] used to carry this too, while also standing for "Cloud providers" in the
+         * Advanced hub and for the hosted recognizer on the Transcribe screen — one shape,
+         * two meanings, which DESIGN_GUIDELINE §7 forbids and which left the composer's most
+         * consequential toggle looking like a settings row. The web app's icon registry
+         * already reserved `globe` for exactly this ("The network, and only the network"),
+         * and iOS drew a Safari mark, i.e. one browser's logo standing in for the web; all
+         * three now draw a globe.
+         */
+        val Globe: ImageVector by lazy {
+            racOutlineIcon(
+                "Globe",
+                "M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0",
+                "M3.6 9h16.8",
+                "M3.6 15h16.8",
+                "M11.5 3a17 17 0 0 0 0 18",
+                "M12.5 3a17 17 0 0 1 0 18",
             )
         }
 

@@ -213,6 +213,20 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState == .speaking && !isInterrupting
     }
 
+    /// The verb for pressing a control on this platform.
+    ///
+    /// The Mac build was showing "Click the microphone to start" and "Tap to
+    /// start conversation" about the same button on the same screen. One verb
+    /// per platform, resolved in one place, so a screen cannot disagree with
+    /// itself and iOS and macOS cannot drift apart.
+    static let pressVerb: String = {
+        #if os(macOS)
+        return "Click"
+        #else
+        return "Tap"
+        #endif
+    }()
+
     /// What the primary control does in the current state.
     ///
     /// This used to promise "Tap to send" while listening and "Tap to speak"
@@ -228,15 +242,19 @@ final class VoiceAgentViewModel: ObservableObject {
         case .processing:
             return "Working out a reply · hold to end"
         case .speaking:
-            return isInterrupting ? "Stopping…" : "Tap to interrupt · hold to end"
+            // "Take the turn back" is the phrase all four apps use for this
+            // moment. It also names the only thing that works: the agent is
+            // half-duplex (the mic is gated while TTS plays), so speaking over
+            // it is not heard — the control has to be used.
+            return isInterrupting ? "Stopping…" : "\(Self.pressVerb) to take the turn back · hold to end"
         case .connecting:
             return "Connecting…"
         case .connected:
             return "Ready · hold to end"
         case .error:
-            return "Tap to try again"
+            return "\(Self.pressVerb) to try again"
         case .disconnected:
-            return "Tap to start conversation"
+            return "\(Self.pressVerb) to start conversation"
         }
     }
 
@@ -251,7 +269,11 @@ final class VoiceAgentViewModel: ObservableObject {
         case .connecting: return "Getting ready…"
         case .listening: return isSpeechDetected ? "Listening…" : "Go ahead — say something."
         case .processing: return "Working out a reply…"
-        case .speaking: return "Speaking. Talk over it any time to interrupt."
+        // Was "Talk over it any time to interrupt", which the build cannot do:
+        // the mic is gated for the whole of playout, so speech during a reply is
+        // never captured. The instruction line beside this one names the control
+        // that does work; this pane just states the state, matching Android.
+        case .speaking: return "Speaking."
         case .connected: return "Ready when you are."
         case .disconnected, .error: return "Nothing heard yet."
         }
@@ -760,11 +782,14 @@ final class VoiceAgentViewModel: ObservableObject {
         guard let session, !isInterrupting else { return }
         isInterrupting = true
         await session.interrupt()
-        // `isInterrupting` is cleared by the agent leaving `speaking` (see
-        // `apply(_:)`), not here: the state change is what the reader is
-        // actually waiting on. Clear it anyway if the session already stopped
-        // speaking without emitting one, so the control can never stick.
-        if sessionState != .speaking { isInterrupting = false }
+        // Cleared here, unconditionally. It used to be cleared only by the agent
+        // leaving `speaking`, which meant a single missed state event left
+        // "Stopping…" on screen and `canInterrupt` false for the rest of the
+        // session — the primary barge-in control dead until the user restarted.
+        // `interrupt()` already awaits playout settlement, so by this line the
+        // reply really has stopped; `apply(_:)` still clears the flag too, as
+        // belt and braces for an interrupt that resolves out of order.
+        isInterrupting = false
     }
 
     /// Stop the current voice conversation.

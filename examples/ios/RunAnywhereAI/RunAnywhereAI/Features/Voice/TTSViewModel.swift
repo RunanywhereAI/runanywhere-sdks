@@ -26,9 +26,13 @@ class TTSViewModel: VoiceComponentViewModelBase {
     @Published private(set) var didSpeak = false
 
     // Voice Settings
+    //
+    // Speed is the whole control set, deliberately, and the same on all four
+    // apps. A `pitch` property lived here with no slider behind it, which read
+    // like a control that had gone missing rather than one that was never
+    // offered; iOS is the source of truth for that decision, so the property is
+    // gone and `TtsOptions` is passed speed only.
     @Published var speechRate: Double = 1.0
-    // While removed from the UI, the backend still supports pitch, so we keep it here.
-    @Published var pitch: Double = 1.0
 
     // MARK: - Initialization
 
@@ -69,13 +73,27 @@ class TTSViewModel: VoiceComponentViewModelBase {
         didRequestStop = false
 
         do {
-            // SDK handles everything - synthesis AND playback
-            try await RunAnywhere.tts.speak(
+            // `tts.speak` returns the moment playback *starts* — synthesis is
+            // awaited, playout is not (see its doc comment: "let handle = try
+            // await ...; await handle.waitForPlayout()"). Treating that return
+            // as "finished" flipped `isSpeaking` false while the speaker was
+            // still talking, which took the Stop control and the waveform off
+            // screen for the whole utterance and left the status line claiming
+            // the phrase had already been read. The handle is the only thing
+            // that knows when the sound actually ends.
+            let handle = try await RunAnywhere.tts.speak(
                 text,
-                options: TtsOptions(speed: Float(speechRate), pitch: Float(pitch))
+                options: TtsOptions(speed: Float(speechRate))
             )
-            didSpeak = true
-            logger.info("Speech generation complete")
+            activeSpeech = handle
+            await handle.waitForPlayout()
+            activeSpeech = nil
+            // A stopped utterance was never heard in full, so it must not leave
+            // the screen offering to play it "again".
+            if !handle.interrupted {
+                didSpeak = true
+            }
+            logger.info("Speech playback finished")
         } catch {
             // A user- or teardown-initiated stop surfaces here as
             // `.playbackInterrupted`; that is expected, not a failure to report.
@@ -85,6 +103,7 @@ class TTSViewModel: VoiceComponentViewModelBase {
             }
         }
 
+        activeSpeech = nil
         isSpeaking = false
     }
 
@@ -92,11 +111,21 @@ class TTSViewModel: VoiceComponentViewModelBase {
     /// `.playbackInterrupted` thrown back into `speak` isn't shown as an error.
     private var didRequestStop = false
 
+    /// The utterance currently playing out, if any.
+    private var activeSpeech: SpeechHandle?
+
     /// Stop current speech
     func stopSpeaking() async {
         logger.info("Stopping speech")
         didRequestStop = true
-        await RunAnywhere.tts.stop()
+        // Interrupt this utterance through its own handle rather than the
+        // deprecated whole-engine `tts.stop()`; it also resolves the
+        // `waitForPlayout()` above, so `speak` unwinds instead of hanging.
+        if let handle = activeSpeech {
+            await handle.interrupt()
+        } else {
+            await RunAnywhere.tts.stop()
+        }
         isSpeaking = false
     }
 
@@ -107,7 +136,15 @@ class TTSViewModel: VoiceComponentViewModelBase {
         // Stop any in-flight playback so speech doesn't keep playing after the
         // screen is dismissed (mirrors STT/VAD cleanup stopping capture).
         didRequestStop = true
-        Task { await RunAnywhere.tts.stop() }
+        let closing = activeSpeech
+        activeSpeech = nil
+        Task {
+            if let closing {
+                await closing.interrupt()
+            } else {
+                await RunAnywhere.tts.stop()
+            }
+        }
         cleanupBase()
     }
 

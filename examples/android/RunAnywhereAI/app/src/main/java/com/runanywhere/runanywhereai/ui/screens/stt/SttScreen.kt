@@ -166,9 +166,13 @@ fun SttScreen() {
             sttVm.transcript.isNotBlank() -> LabeledCard("Transcript") {
                 Text(text = sttVm.transcript, style = MaterialTheme.typography.bodyLarge)
             }
-            sttVm.metrics != null && !sttVm.isRecording && !sttVm.isTranscribing -> LabeledCard("Transcript") {
+            // Keyed off the view model's explicit no-speech state rather than
+            // "metrics exist", which live mode never sets — so a silent Live
+            // recording used to show nothing at all where Batch showed this.
+            // Same sentence as iOS `SpeechToTextView`.
+            sttVm.noSpeechDetected && !sttVm.isRecording && !sttVm.isTranscribing -> LabeledCard("Transcript") {
                 Text(
-                    text = "No speech recognized.",
+                    text = "No speech detected. Nothing was recognised in that recording.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -477,6 +481,15 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         recording -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    // Paired with the container rather than always `onPrimary`, the rule
+    // `VoiceScreen.MicButton` already follows: the glyph has to clear 3:1 against whichever
+    // of the three fills is showing, and no single foreground does that for a grey, a red
+    // and an orange. `onPrimary` is ink now, so on the red fill it would all but vanish.
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        recording -> MaterialTheme.colorScheme.onError
+        else -> MaterialTheme.colorScheme.onPrimary
+    }
     Box(
         modifier = Modifier
             .padding(top = 8.dp)
@@ -489,7 +502,7 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         Icon(
             imageVector = if (recording) RACIcons.Outline.PlayerStop else RACIcons.Outline.Microphone,
             contentDescription = if (recording) "Stop" else "Record",
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = tint,
             modifier = Modifier.size(40.dp),
         )
     }

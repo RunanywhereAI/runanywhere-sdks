@@ -98,11 +98,15 @@ function renderModal(): void {
     <div class="model-search">
       ${icon('search', { size: 16, className: 'model-search__icon' })}
       <input id="hf-search-input" class="model-search__input" type="search"
-        placeholder="Search GGUF models on Hugging Face…" aria-label="Search Hugging Face for GGUF models"
+        placeholder="Search Hugging Face for chat models…" aria-label="Search Hugging Face for chat models"
         autocomplete="off" spellcheck="false" />
     </div>
+    <!-- The format constraint is stated as a consequence of searching, not as the
+         promise on the row that opens this sheet: "GGUF" names a container format
+         nobody outside the field has heard of, and it used to be the first thing a
+         hesitant reader saw. Android and iOS word their entry rows the same way. -->
     <p class="text-tertiary hf-hint">
-      Searches public GGUF repositories. Pick a repo to choose a quantization to download.
+      Only models this app can run are shown. Pick a repo to choose a size to download.
     </p>
     <div id="hf-result-list"></div>
   `;
@@ -210,7 +214,7 @@ async function runSearch(query: string): Promise<void> {
 
 function renderRepoList(results: readonly HfModelSummary[]): void {
   if (results.length === 0) {
-    renderResults('<p class="text-tertiary hf-empty">No GGUF repositories match your search.</p>');
+    renderResults('<p class="text-tertiary hf-empty">No runnable models match your search.</p>');
     return;
   }
   const rows = results.map((repo) => {

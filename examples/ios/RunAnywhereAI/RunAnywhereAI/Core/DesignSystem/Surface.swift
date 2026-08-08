@@ -102,7 +102,17 @@ struct RAProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .appType(.cardTitle)
-            .foregroundStyle(AppColors.onBrandLarge)
+            // Ink, not white. `AppColors.onBrandLarge` is white and its own doc comment
+            // restricts it to "large or bold text only" — but white on #FF6900 is 2.89:1,
+            // which is under AA's 4.5:1 AND under the 3:1 large-text floor, so no size
+            // rescues it on a SOLID fill. (`.cardTitle` is 17pt semibold on iOS and only
+            // 13pt on the Mac, which is not large by any measure.) `onBrand` is the
+            // measured pair at ~6.1:1, and it is the same ink the web `.btn-primary` and
+            // Android's `onPrimary` token now carry, so the primary action reads
+            // identically on all four surfaces. `onBrandLarge` stays for the *gradient*
+            // brand moment, where the red stop reaches 3.8:1 and §5 documents the
+            // deviation — the user's chat bubble.
+            .foregroundStyle(AppColors.onBrand)
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.md)
             .background(AppColors.brand, in: RoundedRectangle(cornerRadius: radius, style: .continuous))

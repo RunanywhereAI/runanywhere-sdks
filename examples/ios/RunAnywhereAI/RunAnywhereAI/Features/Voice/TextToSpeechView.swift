@@ -311,11 +311,15 @@ struct TextToSpeechView: View {
                     },
                     label: {
                         HStack {
+                            // A button names the action it performs, not the
+                            // state it is in: while speaking, tapping this stops
+                            // playback, so it says Stop. "Speaking…" is a state
+                            // and lives in the status line below. Android's Read
+                            // aloud button already reads Stop here.
                             if viewModel.isSpeaking {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Speaking...")
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 20))
+                                Text("Stop")
                                     .fontWeight(.semibold)
                             } else {
                                 Image(systemName: "speaker.wave.2.fill")
@@ -346,11 +350,15 @@ struct TextToSpeechView: View {
                     },
                     label: {
                         HStack {
+                            // A button names the action it performs, not the
+                            // state it is in: while speaking, tapping this stops
+                            // playback, so it says Stop. "Speaking…" is a state
+                            // and lives in the status line below. Android's Read
+                            // aloud button already reads Stop here.
                             if viewModel.isSpeaking {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Speaking...")
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 20))
+                                Text("Stop")
                                     .fontWeight(.semibold)
                             } else {
                                 Image(systemName: "speaker.wave.2.fill")
@@ -389,7 +397,7 @@ struct TextToSpeechView: View {
         if viewModel.isSpeaking {
             return "Speaking..."
         } else if viewModel.didSpeak {
-            return "Tap Speak to hear it again"
+            return "\(VoiceAgentViewModel.pressVerb) Speak to hear it again"
         } else {
             return "Ready"
         }

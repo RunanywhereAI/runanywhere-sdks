@@ -122,7 +122,7 @@ struct VoiceActivityDetectionView: View {
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
 
-                    Text("Tap the mic to start detecting speech activity")
+                    Text("\(VoiceAgentViewModel.pressVerb) the mic to start detecting speech activity")
                         .font(.system(size: 15, weight: .regular))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -277,7 +277,9 @@ struct VoiceActivityDetectionView: View {
                 viewModel.selectedModelName == nil || viewModel.isProcessing ? 0.6 : 1.0
             )
 
-            Text(viewModel.isListening ? "Listening for speech..." : "Tap to start detection")
+            Text(viewModel.isListening
+                 ? "Listening for speech..."
+                 : "\(VoiceAgentViewModel.pressVerb) to start detection")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

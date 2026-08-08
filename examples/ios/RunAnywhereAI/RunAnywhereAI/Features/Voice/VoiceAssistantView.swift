@@ -177,7 +177,12 @@ extension VoiceAssistantView {
                         transcriptPane
                         replyPane.id("assistant")
                     } else {
-                        emptyStatePlaceholder(text: "Click the microphone to start")
+                        // One verb per platform, resolved centrally: this line
+                        // and the instruction under the button used to say
+                        // "Click" and "Tap" about the same control.
+                        emptyStatePlaceholder(
+                            text: "\(VoiceAgentViewModel.pressVerb) the microphone to start"
+                        )
                     }
                 }
                 .padding(.horizontal, AdaptiveSizing.contentPadding)
@@ -302,6 +307,26 @@ extension VoiceAssistantView {
                     .background(Color(.tertiarySystemBackground))
                     .clipShape(Circle())
             })
+            .accessibilityLabel("Voice models")
+
+            Spacer()
+
+            // The same status readout macOS, Android and Web all carry. iPhone
+            // had none: the only signal was the mic button's colour, so an idle
+            // screen and a screen whose event stream had died were
+            // indistinguishable — which is exactly what made the dead-panel
+            // failure so hard to see. The dot is decoration; the word beside it
+            // is the state, so colour is never the only carrier.
+            HStack(spacing: Space.sm) {
+                Circle()
+                    .fill(viewModel.statusColor.swiftUIColor)
+                    .frame(width: 8, height: 8)
+                Text(viewModel.statusLabel)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Voice session: \(viewModel.statusLabel)")
 
             Spacer()
 
@@ -595,13 +620,18 @@ extension VoiceAssistantView {
             scatterAmount = 0
         }
 
-        // Audio amplitude - reactive to both input (listening) and output (speaking)
+        // Amplitude while the session is active. Neither branch claims to be a
+        // level meter: `VoiceEvent` carries no audio-level arm, so nothing ever
+        // raises `viewModel.audioLevel` above zero. Reading it here made the
+        // ring decay to nothing the moment listening began and then sit still
+        // through an entire utterance — an indicator that looked live and was
+        // dead, which is worse than an honestly indeterminate one.
         if isListening {
-            // Use real audio level from microphone
-            let realAudioLevel = viewModel.audioLevel
-            // Smooth interpolation for natural movement
-            amplitude = amplitude * 0.7 + realAudioLevel * 0.3
-            // Clamp to reasonable range
+            // Indeterminate breathe on the continuous tier (1.6s period), the
+            // same treatment the other apps give a live-but-unmeasured mic.
+            let time = Float(Date().timeIntervalSinceReferenceDate)
+            let breathe = 0.28 + abs(sin(time * .pi / 0.8)) * 0.16
+            amplitude = amplitude * 0.85 + breathe * 0.15
             amplitude = max(0.0, min(1.0, amplitude))
         } else if isSpeaking {
             // TTS output - realistic speech-like pulse simulation

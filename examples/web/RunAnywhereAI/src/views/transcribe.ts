@@ -56,8 +56,26 @@ let isCapturing = false;
 let isProcessing = false;
 let selectedMode: STTMode = 'batch';
 let transcript = '';
+/** True while the on-screen transcript is a revisable hypothesis, not a result. */
+let isTranscriptPartial = false;
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeEngine: (() => void) | null = null;
+
+/**
+ * Push-queue bridging mic chunk callbacks into the SDK's audio iterable, the
+ * same shape `views/vad.ts` uses.
+ *
+ * Live mode used to record the whole utterance and then hand the finished
+ * buffer to `transcribeStream` as a single chunk, so a mode advertising "shows
+ * words as they are recognised" produced exactly one update, after the
+ * microphone had already closed. Feeding the session while capture is running
+ * is what makes the label true — and matches iOS/Android, where the mic pump
+ * and the streaming session run concurrently.
+ */
+let chunkQueue: Float32Array[] = [];
+let notifyChunk: (() => void) | null = null;
+let streamDone = false;
+let liveStreamTask: Promise<void> | null = null;
 
 export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   container = el;
@@ -85,6 +103,10 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
       audioCapture?.stop();
       audioCapture = null;
       isCapturing = false;
+      // Release the live session's chunk source too, or `micChunks` parks on a
+      // promise no capture will ever resolve and the session never closes.
+      streamDone = true;
+      notifyChunk?.();
       if (!container.isConnected) {
         unsubscribeState?.();
         unsubscribeState = null;
@@ -173,7 +195,7 @@ function renderTranscribe(): void {
         <h3>Transcript</h3>
         <div id="transcribe-status" class="docs-status" role="status" aria-live="polite">${isProcessing ? 'Transcribing…' : ''}</div>
         ${transcript
-          ? `<pre id="transcribe-output" class="docs-pre">${escapeHtml(transcript)}</pre>`
+          ? `<pre id="transcribe-output" class="docs-pre${isTranscriptPartial ? ' docs-pre--partial' : ''}">${escapeHtml(transcript)}</pre>`
           : `<div class="surface-empty" id="transcribe-output">
                ${icon('waveform', { size: 24 })}
                <p>Your transcript will appear here.</p>
@@ -193,6 +215,12 @@ function renderTranscribe(): void {
 
   for (const mode of ['batch', 'live'] as const) {
     container.querySelector(`#mode-${mode}-btn`)?.addEventListener('click', () => {
+      // Clear the previous mode's result: leaving it on screen under the new
+      // mode's description attributes one mode's output to another.
+      if (selectedMode !== mode) {
+        transcript = '';
+        isTranscriptPartial = false;
+      }
       selectedMode = mode;
       renderTranscribe();
     });
@@ -220,12 +248,29 @@ async function toggleMic(): Promise<void> {
 
 async function startMic(): Promise<void> {
   audioCapture = audioCapture ?? new AudioCapture({ sampleRate: 16000 });
+  const live = selectedMode === 'live';
+  chunkQueue = [];
+  streamDone = false;
   try {
-    await audioCapture.start();
+    // Live mode opens the streaming session alongside capture and pushes every
+    // mic chunk into it as it arrives; batch mode only accumulates and runs one
+    // pass on stop.
+    await audioCapture.start(live
+      ? (chunk) => {
+        chunkQueue.push(chunk);
+        notifyChunk?.();
+      }
+      : undefined);
     isCapturing = true;
     transcript = '';
+    isTranscriptPartial = false;
     renderTranscribe();
+    if (live) {
+      setStatus('Listening — words appear as they are recognised.');
+      liveStreamTask = runTranscribeStream();
+    }
   } catch (err) {
+    streamDone = true;
     setStatus(`Microphone error: ${formatError(err)}`);
   }
 }
@@ -235,28 +280,41 @@ async function stopMicAndTranscribe(): Promise<void> {
   const samples = audioCapture.getAudioBuffer();
   audioCapture.stop();
   isCapturing = false;
+
+  if (selectedMode === 'live') {
+    // Close the chunk source and let the session drain to its final result.
+    // `isProcessing` covers that window so the controls stay busy until the
+    // final has replaced the last partial, rather than re-enabling over a
+    // transcript that is still a hypothesis.
+    streamDone = true;
+    notifyChunk?.();
+    isProcessing = true;
+    setStatus('Finishing up…');
+    renderTranscribe();
+    await liveStreamTask;
+    liveStreamTask = null;
+    return;
+  }
+
   if (samples.length === 0) {
     setStatus('No audio captured.');
     renderTranscribe();
     return;
   }
-  if (selectedMode === 'live') {
-    await runTranscribeStream(samples);
-  } else {
-    await runTranscribe(samples);
-  }
+  await runTranscribe(samples);
 }
 
+/**
+ * A recording is always transcribed in one pass, whichever mode is selected:
+ * there is no live capture to follow, so streaming a finished buffer would be
+ * batch transcription wearing a streaming label.
+ */
 async function transcribeFile(file: File): Promise<void> {
   isProcessing = true;
   renderTranscribe();
   try {
     const decoded = await AudioFileLoader.toFloat32Array(file, 16000);
-    if (selectedMode === 'live') {
-      await runTranscribeStream(decoded.samples);
-    } else {
-      await runTranscribe(decoded.samples);
-    }
+    await runTranscribe(decoded.samples);
   } catch (err) {
     setStatus(`Failed to decode file: ${formatError(err)}`);
   } finally {
@@ -273,7 +331,10 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
   try {
     const output = await RunAnywhere.stt.transcribe(RunAnywhere.AudioInput.float32(samples));
     transcript = output.text;
-    setStatus('Done.');
+    // "Recorded, nothing recognised" is a different fact from "nothing recorded
+    // yet", and the empty pane alone cannot tell them apart. Same distinction
+    // iOS and Android draw.
+    setStatus(transcript ? 'Done.' : 'No speech detected in that recording.');
   } catch (err) {
     setStatus(`Transcribe failed: ${formatError(err)}`);
   } finally {
@@ -282,39 +343,60 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
   }
 }
 
-/**
- * Live mode — the streaming verb takes a chunk stream and emits `partial`
- * previews followed by the `final` transcription. Failures throw into this
- * loop rather than arriving as a terminal partial.
- */
-async function runTranscribeStream(samples: Float32Array): Promise<void> {
-  isProcessing = true;
-  renderTranscribe();
-  setStatus(`Streaming ${(samples.length / 16000).toFixed(2)}s of audio...`);
-
-  async function* chunks(): AsyncGenerator<AudioInput> {
-    yield RunAnywhere.AudioInput.float32(samples);
+/** Bridge the push-style mic callback into the SDK's pull-style iterable. */
+async function* micChunks(): AsyncGenerator<AudioInput> {
+  while (!streamDone) {
+    const next = chunkQueue.shift();
+    if (next) {
+      yield RunAnywhere.AudioInput.float32(next);
+      continue;
+    }
+    await new Promise<void>((resolve) => {
+      notifyChunk = resolve;
+    });
+    notifyChunk = null;
   }
+  // Drain whatever the microphone delivered between the stop and this point, so
+  // the tail of the utterance still reaches the session.
+  let tail = chunkQueue.shift();
+  while (tail) {
+    yield RunAnywhere.AudioInput.float32(tail);
+    tail = chunkQueue.shift();
+  }
+}
 
+/**
+ * Live mode — runs for the whole of capture, emitting `partial` hypotheses as
+ * words are recognised and a `transcriptFinal` that replaces them. Failures
+ * throw into this loop rather than arriving as a terminal partial.
+ *
+ * Partials are rendered in the revisable style so a guess on screen is never
+ * mistaken for a settled result; the final clears that marking.
+ */
+async function runTranscribeStream(): Promise<void> {
   try {
     transcript = '';
-    for await (const event of RunAnywhere.stt.transcribeStream(chunks())) {
+    isTranscriptPartial = false;
+    for await (const event of RunAnywhere.stt.transcribeStream(micChunks())) {
       if (event.type === 'partial') {
         const text = event.alternatives[0]?.text.trim();
         if (text) {
           transcript = text;
+          isTranscriptPartial = true;
           updateOutput();
         }
       } else if (event.type === 'transcriptFinal') {
         transcript = event.segment.text.trim();
+        isTranscriptPartial = false;
         updateOutput();
       }
     }
-    setStatus('Done.');
+    setStatus(transcript ? 'Done.' : 'No speech detected.');
   } catch (err) {
     setStatus(`Transcribe failed: ${formatError(err)}`);
   } finally {
     isProcessing = false;
+    isTranscriptPartial = false;
     renderTranscribe();
   }
 }
@@ -332,6 +414,9 @@ function updateOutput(): void {
   const pre = container.querySelector<HTMLPreElement>('pre#transcribe-output');
   if (pre) {
     pre.textContent = transcript;
+    // Same treatment the Talk panel gives a revisable hypothesis, so a partial
+    // reads as one on both screens instead of only on one of them.
+    pre.classList.toggle('docs-pre--partial', isTranscriptPartial);
     return;
   }
   renderTranscribe();

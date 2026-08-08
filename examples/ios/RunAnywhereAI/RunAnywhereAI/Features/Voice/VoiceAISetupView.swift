@@ -55,12 +55,20 @@ struct VoiceAISetupCard: View {
 
     // MARK: - Component card
 
+    /// The four pipeline slots.
+    ///
+    /// Titles and glyphs are the ones the Android voice screen and the web voice view use, so a
+    /// reader who learned the pipeline on one platform recognises it on another. Each glyph is
+    /// `RAModelCategory.consumerCapabilityIcon`'s value for that slot's category — this card used
+    /// to hardcode `brain` for the language model while the rest of the app drew `message` for
+    /// it, and Android drew a brain for *speech recognition*, i.e. the same picture meant two
+    /// opposite ends of one pipeline. Brain is reasoning only now, in all three apps.
     private var card: some View {
         VStack(spacing: 0) {
             componentRow(component: .init(
-                title: "Speech recognition",
+                title: "Speech-to-text",
                 subtitle: "Turns your voice into text",
-                icon: "waveform",
+                icon: RAModelCategory.speechRecognition.consumerCapabilityIcon,
                 color: AppColors.statusGreen,
                 name: viewModel.sttModel?.name.modelNameFromID(),
                 state: viewModel.sttModelState,
@@ -68,9 +76,9 @@ struct VoiceAISetupCard: View {
             ), onChange: onChangeSTT)
             divider
             componentRow(component: .init(
-                title: "Assistant",
+                title: "Chat model",
                 subtitle: "Understands and replies",
-                icon: "brain",
+                icon: RAModelCategory.language.consumerCapabilityIcon,
                 color: AppColors.primaryAccent,
                 name: viewModel.llmModel?.name.modelNameFromID(),
                 state: viewModel.llmModelState,
@@ -78,9 +86,9 @@ struct VoiceAISetupCard: View {
             ), onChange: onChangeLLM)
             divider
             componentRow(component: .init(
-                title: "Voice",
+                title: "Text-to-speech",
                 subtitle: "Speaks replies aloud",
-                icon: "speaker.wave.2",
+                icon: RAModelCategory.speechSynthesis.consumerCapabilityIcon,
                 color: AppColors.primaryPurple,
                 name: viewModel.ttsModel?.name.modelNameFromID(),
                 state: viewModel.ttsModelState,
@@ -198,7 +206,7 @@ struct VoiceAISetupCard: View {
 
     private var vadRow: some View {
         HStack(spacing: AppSpacing.mediumLarge) {
-            Image(systemName: "waveform.badge.mic")
+            Image(systemName: RAModelCategory.voiceActivityDetection.consumerCapabilityIcon)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(AppColors.statusBlue)
                 .frame(width: AppSpacing.iconMedium, height: AppSpacing.iconMedium)
@@ -206,7 +214,7 @@ struct VoiceAISetupCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge))
 
             VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                Text("Speech detection")
+                Text("Voice detection")
                     .font(AppTypography.subheadlineSemibold)
                     .foregroundColor(AppColors.textPrimary)
                 Text("Knows when you start and stop talking")
@@ -263,7 +271,7 @@ struct VoiceAISetupCard: View {
         HStack(spacing: AppSpacing.smallMedium) {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundColor(AppColors.statusGreen)
-            Text("Ready — tap the mic to talk")
+            Text("Ready — \(VoiceAgentViewModel.pressVerb.lowercased()) the mic to talk")
                 .font(AppTypography.subheadlineSemibold)
                 .foregroundColor(AppColors.statusGreen)
         }

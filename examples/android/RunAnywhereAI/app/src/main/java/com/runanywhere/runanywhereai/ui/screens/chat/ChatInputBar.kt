@@ -276,7 +276,9 @@ fun ChatInputBar(
                 ),
             ) {
                 Icon(
-                    imageVector = RACIcons.Outline.Cloud,
+                    // Globe, not Cloud: Cloud means "a hosted provider" in the Advanced hub
+                    // and on the Transcribe screen, and one glyph cannot mean two things (§7).
+                    imageVector = RACIcons.Outline.Globe,
                     contentDescription = when {
                         toolsEnabled -> "Disable web and tools"
                         toolsUnavailableMessage != null -> "Web and tools unavailable for current model"
@@ -621,7 +623,7 @@ private fun ToolStatusPill(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Cloud,
+                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Globe,
                 contentDescription = null,
                 modifier = Modifier.size(dimens.iconSm),
             )

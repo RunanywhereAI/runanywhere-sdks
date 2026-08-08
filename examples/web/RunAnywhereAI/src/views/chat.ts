@@ -41,7 +41,7 @@ import {
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
 import { icon, type IconName } from '../components/icons';
-import { getGenerationSettings } from './settings';
+import { getGenerationSettings, setThinkingModeEnabled } from './settings';
 import {
   answerDocumentAttachment,
   answerImageAttachment,
@@ -88,6 +88,17 @@ interface ChatMessage {
   toolCalls?: ChatToolCallInfo[];
   /** RAG citations for document attachments. */
   sources?: ChatSourceInfo[];
+  /**
+   * This turn is a failure report, not something the model said.
+   *
+   * Mirrors iOS `Message.isError`. Without it a failed turn was an ordinary assistant
+   * bubble — same ink, run through the markdown renderer — and
+   * `conversationHistoryForGeneration` filtered only on blank content, so the next
+   * request told the model it had previously said "Error: …". Persisted with the turn
+   * because the conversation is reloaded from IndexedDB, and a reload must not
+   * resurrect the error into history.
+   */
+  isError?: boolean;
 }
 
 interface ConversationGenerationContext {
@@ -142,7 +153,8 @@ function isChatMessage(value: unknown): value is ChatMessage {
     && (value.toolCalls === undefined
       || (Array.isArray(value.toolCalls) && value.toolCalls.every(isChatToolCallInfo)))
     && (value.sources === undefined
-      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)));
+      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)))
+    && (value.isError === undefined || typeof value.isError === 'boolean');
 }
 
 // Chat's picker is scoped to LLMs — iOS parity:
@@ -211,7 +223,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
               <span><strong>Image</strong><small>Ask about a photo</small></span>
             </button>
             <button type="button" data-action="live">
-              ${icon('device')}
+              ${icon('eye')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
           </div>
@@ -219,8 +231,17 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
           ${icon('globe')}
         </button>
+        <!-- Reasoning lives in the composer, next to web-and-tools, because it
+             changes what the NEXT turn does — the same place and the same brain
+             glyph Android's composer uses. It used to exist only as a switch in
+             the Settings tab, so a browser reader had to leave the conversation
+             to change how the reply would be produced, and had no way to see
+             from here whether reasoning was on. -->
+        <button class="composer-icon-btn" id="chat-thinking-btn" type="button" aria-label="Enable reasoning" title="Enable reasoning">
+          ${icon('brain')}
+        </button>
         <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk mode" title="Talk mode">
+        <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk" title="Talk">
           ${icon('mic')}
         </button>
         <button class="send-btn" id="chat-send-btn" disabled aria-label="Send message"></button>
@@ -253,6 +274,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;
   const toolsBtn = container.querySelector('#chat-tools-btn') as HTMLButtonElement;
   const toolsStatus = container.querySelector('#chat-tools-status') as HTMLElement;
+  const thinkingBtn = container.querySelector('#chat-thinking-btn') as HTMLButtonElement;
   const attachBtn = container.querySelector('#chat-attach-btn') as HTMLButtonElement;
   const attachMenu = container.querySelector('#chat-attach-menu') as HTMLElement;
   const attachmentPill = container.querySelector('#chat-attachment-pill') as HTMLElement;
@@ -298,10 +320,33 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         refreshSendButton();
       }, listenerOptions);
   };
+  /**
+   * The reasoning toggle's three honest states.
+   *
+   * A model with no thinking phase cannot be made to reason, so the control is
+   * disabled and says why rather than offering a switch that would change nothing —
+   * the same rule Android's composer applies via `thinkingSupported`.
+   */
+  const refreshThinkingButton = () => {
+    const supported = loadedModelSupportsThinking();
+    const on = supported && getGenerationSettings().thinkingModeEnabled;
+    thinkingBtn.disabled = !supported;
+    thinkingBtn.classList.toggle('active', on);
+    const label = !supported
+      ? 'Reasoning not supported by this model'
+      : on ? 'Disable reasoning' : 'Enable reasoning';
+    thinkingBtn.setAttribute('aria-label', label);
+    thinkingBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    thinkingBtn.title = label;
+  };
   refreshToolsButton();
+  refreshThinkingButton();
   refreshAttachmentPill();
 
   const refreshSendButton = () => {
+    // Reasoning availability depends on the loaded model, and this runs on every
+    // model-state change (see `onModelStateChange` below), so the toggle follows.
+    refreshThinkingButton();
     const hasInput = inputEl.value.trim().length > 0;
     const modelLoaded = isModelLoaded();
     const hasAttachment = pendingAttachment !== null;
@@ -380,6 +425,12 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     toolsEnabled = !toolsEnabled;
     saveToolsEnabled(toolsEnabled);
     refreshToolsButton();
+  }, listenerOptions);
+  thinkingBtn.addEventListener('click', () => {
+    // Writes through to the one persisted setting the Settings tab also edits, so
+    // the two controls can never disagree about whether reasoning is on.
+    setThinkingModeEnabled(!getGenerationSettings().thinkingModeEnabled);
+    refreshThinkingButton();
   }, listenerOptions);
   attachBtn.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -642,6 +693,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } catch (error) {
       if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
       assistantMsg.content = formatChatError(error);
+      assistantMsg.isError = true;
       renderLastMessage(messagesEl, assistantMsg, false);
     } finally {
       cancelGeneration = null;
@@ -721,7 +773,12 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       renderLastMessage(host, assistantMsg, false);
     } catch (error) {
       if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
-      assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
+      const cancelled = isAbortError(error);
+      assistantMsg.content = cancelled ? 'Cancelled.' : formatChatError(error);
+      // Only a real failure is flagged. A cancellation is the reader's own decision,
+      // so painting it in the danger colour would report their own action back to
+      // them as an error (DESIGN_GUIDELINE §9 keeps cancelled and error distinct).
+      assistantMsg.isError = !cancelled;
       renderLastMessage(host, assistantMsg, false);
     } finally {
       cancelGeneration = null;
@@ -1301,6 +1358,12 @@ export function conversationHistoryForGeneration(
 ): SDKChatMessage[] {
   return conversationMessages
     .filter(isChatMessage)
+    // A failed turn is the app's own report. Sending it back as a prior assistant
+    // message tells the model it said "Error: Backend not available for: llm", and it
+    // starts apologising for a failure it had no part in. iOS skips the same turns
+    // (LLMViewModel+Generation), and Android's `ChatRequestPolicy.toProtoMessage` now
+    // does too.
+    .filter(({ isError }) => isError !== true)
     .filter(({ content }) => content.trim().length > 0)
     .map((message) => ({
       role: message.role === 'user' ? ('user' as const) : ('assistant' as const),
@@ -1398,26 +1461,38 @@ function greeting(): string {
   return 'Good evening';
 }
 
+/**
+ * The four things a consumer opens an on-device assistant to do.
+ *
+ * Labels and prompt bodies are byte-identical to Android `generalSuggestions`
+ * (PromptSuggestions.kt) and iOS `StarterPrompt.all` (ChatMessageListView.swift) —
+ * the greeting above these chips is already shared across the three apps, so a
+ * different set of chips underneath it read as an accident.
+ *
+ * The bodies end in a colon on purpose: each is a *prefix* the reader completes with
+ * their own notes or options. The chip prefills the composer and focuses it rather
+ * than sending, which is what makes the trailing colon work.
+ */
 const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: IconName }> = [
   {
-    label: 'Draft a message',
-    prompt: 'Help me draft a short, friendly message to my team about shipping our next release this Friday.',
+    label: 'Plan my day',
+    prompt: 'Turn this messy list into a realistic plan with the top three priorities:',
+    icon: 'checklist',
+  },
+  {
+    label: 'Rewrite clearly',
+    prompt: 'Rewrite this so it is clear, warm, and concise:',
     icon: 'pencil',
   },
   {
-    label: 'Explain a topic',
-    prompt: 'Explain how on-device AI keeps my data private, in simple terms.',
-    icon: 'help',
-  },
-  {
     label: 'Compare options',
-    prompt: 'Help me compare two small local models for private chat.',
+    prompt: 'Compare these options, explain the tradeoffs, and recommend one:',
     icon: 'compare',
   },
   {
-    label: 'Make a checklist',
-    prompt: 'Draft a concise checklist for testing an on-device AI app.',
-    icon: 'checklist',
+    label: 'Summarize notes',
+    prompt: 'Summarize these notes into decisions, action items, and open questions:',
+    icon: 'condense',
   },
 ];
 
@@ -1543,6 +1618,17 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const cursor = streaming && msg.role === 'assistant'
     ? '<span class="chat-cursor" aria-hidden="true"></span>'
     : '';
+  // A failure report is the app speaking, not the model, so it is NOT run through the
+  // markdown renderer: an error string's own punctuation would become bold or italic,
+  // and it would read in the same ink as a real reply. Danger colour plus an escaped
+  // paragraph, matching iOS `assistantBody` (`AppColors.dangerText`) and Android's
+  // error branch. The `role="alert"` is what makes the failure reach a screen reader at
+  // all — the turn used to arrive as ordinary prose.
+  if (msg.isError === true && msg.content) {
+    const alert = `<p class="chat-error" role="alert">${escapeHtml(msg.content)}</p>`;
+    return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${alert}</div>`;
+  }
+
   const body = msg.content
     ? renderMarkdown(msg.content) + cursor
     : (streaming

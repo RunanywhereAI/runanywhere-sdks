@@ -260,6 +260,7 @@ suspend fun RunAnywhere.aggregateStream(
  * top-level `Double`. `TokenUsage.tokens_per_second` was renamed
  * `decode_tokens_per_second`.
  */
+
 /**
  * Batch-style backends (Maple/Bonsai) finish generate before dumping stream
  * chunks. Wall-to-first-token ≈ total, so "decode = total − ttft" is a few ms

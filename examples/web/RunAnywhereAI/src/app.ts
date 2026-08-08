@@ -103,15 +103,19 @@ const CHAT_SHEET_OPTIONS: OpenSheetOptions = {
 const TABS: TabDef[] = [
   // Top-level surfaces: these have their own sidebar entry, so no parent.
   { id: 'chat', label: 'Assistant', initializer: initChatTab },
+  // Talk is a destination, not a diagnostic. It used to sit inside the Advanced hub
+  // with `parent: 'advanced'`, while Android gave it the drawer's second row — so a
+  // reader who learned it on the phone could not find it in the browser. Same name in
+  // both apps now ("Talk"), at the same level of the navigation.
+  { id: 'voice', label: 'Talk', initializer: initVoiceTab },
   { id: 'advanced', label: 'Advanced', initializer: initAdvancedHub },
   { id: 'storage', label: 'Downloads', initializer: initStorageTab },
   { id: 'settings', label: 'Settings', initializer: (el) => { initSettingsTab(el); return undefined; } },
   // Drilled-into surfaces. `parent` is the surface a user most likely came from,
-  // and is only the fallback: switchTab records the actual origin, because some
-  // of these have two entrances (Talk Mode is both an Advanced row and the
-  // composer's mic button) and a hardcoded parent would send half of those
-  // visitors somewhere they had never been.
-  { id: 'voice', label: 'Talk Mode', initializer: initVoiceTab, parent: 'advanced' },
+  // and is only the fallback: switchTab records the actual origin, because some of
+  // these have two entrances (Image & Live is both an Advanced-adjacent surface and
+  // the composer's Live camera action) and a hardcoded parent would send half of
+  // those visitors somewhere they had never been.
   { id: 'vision', label: 'Image & Live', initializer: initVisionTab, parent: 'chat' },
   { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab, parent: 'advanced' },
   { id: 'documents', label: 'Documents', initializer: initDocumentsTab, parent: 'advanced' },
@@ -214,7 +218,7 @@ const NAV_TAB_IDS = new Set<TabId>(TABS.filter((tab) => tab.parent === undefined
 /**
  * Where each nested surface was actually opened from.
  *
- * Overrides TabDef.parent so Back retraces the user's own step: Talk Mode reached
+ * Overrides TabDef.parent so Back retraces the user's own step: Image & Live reached
  * from the composer returns to the assistant, and the same surface reached from
  * the Advanced hub returns there.
  */
@@ -249,7 +253,9 @@ const ICONS = {
   menu: 'menu',
   newChat: 'plus',
   model: 'model',
-  /** The nav's "Manage downloads" row — bytes arriving, not bytes at rest. */
+  /** Bytes ARRIVING, not bytes at rest — the Download action on a model row. The
+   * Downloads *destination* uses `storage`; a tray glyph on a bytes-at-rest screen
+   * mislabels it as an in-flight-transfer screen. */
   downloads: 'download',
   storage: 'storage',
   settings: 'settings',
@@ -340,6 +346,7 @@ function navSections(): NavSection[] {
       title: '',
       items: [
         navTab('assistant', 'Assistant', 'Private chat with local models', ICONS.sparkles, 'chat'),
+        navTab('talk', 'Talk', 'Hands-free voice assistant', ICONS.mic, 'voice'),
         {
           type: 'action',
           id: 'models',
@@ -348,7 +355,11 @@ function navSections(): NavSection[] {
           icon: ICONS.model,
           action: () => openSheet(CHAT_SHEET_OPTIONS),
         },
-        navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.downloads, 'storage'),
+        // "Downloads", not "Manage downloads", and the `storage` glyph, not the
+        // download tray: this row, the Advanced-hub row, the tab registry and the
+        // panel's own toolbar all name ONE destination, and they used to name it four
+        // different ways with two different glyphs.
+        navTab('downloads', 'Downloads', 'Models on this device, and space used', ICONS.storage, 'storage'),
       ],
     },
     {
@@ -849,25 +860,34 @@ function formatSavedDate(timestamp: number): string {
 function initAdvancedHub(el: HTMLElement): TabLifecycle {
   // One glyph per row, all distinct (DESIGN_GUIDELINE.md §7). Three pairs used to
   // collide here — waveform for both Transcribe and Voice Activity, mic for both
-  // Talk Mode and Diarization, image for both Segmentation and (elsewhere) photo
+  // Talk and Diarization, image for both Segmentation and (elsewhere) photo
   // attachments — so adjacent rows in the same list were visually identical and
   // the icon column carried no information at all.
+  //
+  // Every subtitle says what the reader gets, not which model does it. They used to
+  // read like release notes — "Semantic image segmentation (SegFormer)", "Full STT +
+  // LLM + TTS voice assistant" — and a parenthesised codename or a stack acronym is
+  // the one thing a reader deciding whether to tap cannot use. The model names live
+  // on the screens themselves, where a curious reader has already opted in. iOS
+  // `ConsumerAdvancedHubView` and Android `MoreScreen` carry the same rewrite.
   const hubItems: Array<{
     tab: TabId;
     icon: IconName;
     title: string;
     subtitle: string;
   }> = [
-    { tab: 'voice', icon: 'mic', title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
-    { tab: 'segmentation', icon: 'segments', title: 'Segmentation', subtitle: 'Semantic image segmentation (SegFormer)' },
-    { tab: 'documents', icon: 'file', title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
-    { tab: 'transcribe', icon: 'waveform', title: 'Transcribe', subtitle: 'Speech-to-text utility' },
-    { tab: 'speak', icon: 'speaker', title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
-    { tab: 'vad', icon: 'pulse', title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
-    { tab: 'diarization', icon: 'speakers', title: 'Diarization', subtitle: 'Speaker diarization — who spoke when (Sortformer)' },
-    { tab: 'storage', icon: 'storage', title: 'Storage', subtitle: 'Models, cache, and browser files' },
+    // Talk is deliberately absent: it is a primary nav row and the composer's mic
+    // button, so a third entrance filed under "Advanced" — where a reader looks for
+    // diagnostics — only said it was harder to reach than it is.
+    { tab: 'segmentation', icon: 'segments', title: 'Segmentation', subtitle: 'Split a photo into labelled regions' },
+    { tab: 'documents', icon: 'file', title: 'Documents', subtitle: 'Ask questions about your own files' },
+    { tab: 'transcribe', icon: 'waveform', title: 'Transcribe', subtitle: 'Turn a recording into text' },
+    { tab: 'speak', icon: 'speaker', title: 'Read Aloud', subtitle: 'Hear any text spoken on this device' },
+    { tab: 'vad', icon: 'pulse', title: 'Voice Activity', subtitle: 'See when speech starts and stops' },
+    { tab: 'diarization', icon: 'speakers', title: 'Diarization', subtitle: 'See who spoke when in a recording' },
+    { tab: 'storage', icon: 'storage', title: 'Downloads', subtitle: 'Models on this device, and space used' },
     { tab: 'benchmarks', icon: 'gauge', title: 'Benchmarks', subtitle: 'Measure local model performance' },
-    { tab: 'solutions', icon: 'stack', title: 'Solutions', subtitle: 'Run scripted SDK workflows' },
+    { tab: 'solutions', icon: 'stack', title: 'Solutions', subtitle: 'Run saved multi-step workflows' },
   ];
 
   el.innerHTML = `

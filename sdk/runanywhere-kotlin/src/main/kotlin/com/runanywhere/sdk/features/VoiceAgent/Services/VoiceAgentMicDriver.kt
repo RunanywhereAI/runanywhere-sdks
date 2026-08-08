@@ -21,10 +21,12 @@ import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.VoiceAgentAudioFrame
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
+import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackException
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
 import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.api.AgentState
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -44,6 +46,17 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 internal class VoiceAgentMicDriver(
     private val handle: Long,
+    /**
+     * Reports [AgentState.SPEAKING] when a reply becomes audible and
+     * [AgentState.LISTENING] when it stops. The core emits `PLAYING_TTS` *before*
+     * synthesis and hands the WAV back for this driver to play, so its pipeline
+     * states describe intent, not sound. Only this layer knows when audio is
+     * actually leaving the speaker, so only this layer can say "speaking"
+     * truthfully — and the interrupt affordance a UI mounts on that state is
+     * then reachable exactly while there is something to interrupt.
+     * Mirrors Swift `VoiceAgentMicDriver.onPlaybackPhase`.
+     */
+    private val onPlaybackPhase: (AgentState) -> Unit = {},
 ) {
     private val logger = SDKLogger("VoiceAgentMic")
     private val capture = AudioCaptureManager()
@@ -118,15 +131,38 @@ internal class VoiceAgentMicDriver(
         }
     }
 
+    /**
+     * Silence the reply playing out right now, if any.
+     *
+     * This driver plays agent replies through its *own* [AudioPlaybackManager], so the TTS
+     * namespace's stop — which only reaches the module-level playback singleton — cannot
+     * touch it. Barge-in therefore has to come through here, or the agent talks over the
+     * user to the end of its buffer. Safe to call from any thread and when nothing is
+     * playing: [AudioPlaybackManager.stop] is a no-op without a live track.
+     */
+    fun stopPlayback() {
+        playback.stop()
+    }
+
     private suspend fun playReply(wav: ByteArray) {
         if (wav.isEmpty()) return
+        // The listening report is in `finally` so an interrupted or failed playout
+        // still ends the speaking state — a panel that latches on "Speaking" over a
+        // silent speaker is the exact contradiction this signal exists to prevent.
+        onPlaybackPhase(AgentState.SPEAKING)
         try {
             playback.play(wav)
         } catch (e: CancellationException) {
             playback.stop()
             throw e
+        } catch (e: AudioPlaybackException.PlaybackInterrupted) {
+            // Barge-in, not a fault: the user took the turn back mid-utterance. Logged as
+            // the ordinary outcome it is so the log does not read as a playback failure.
+            logger.info("Agent reply interrupted")
         } catch (e: Exception) {
             logger.warning("Agent reply playback failed: ${e.message}")
+        } finally {
+            onPlaybackPhase(AgentState.LISTENING)
         }
     }
 

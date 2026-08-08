@@ -342,7 +342,6 @@ public sealed class DownloadEvent {
         /** Files in the plan. 1 for a single-file model. */
         val totalFiles: Int = 1,
     ) : DownloadEvent() {
-
         /**
          * Fraction of the whole download that is done, 0.0..1.0, or null when the size is unknown.
          *
@@ -353,8 +352,9 @@ public sealed class DownloadEvent {
          * indeterminate bar instead of one that looks stuck at the left edge.
          */
         public val fraction: Float?
-            get() = overallProgress
-                ?: bytesTotal.takeIf { it > 0 }?.let { (bytesDone.toFloat() / it).coerceIn(0f, 1f) }
+            get() =
+                overallProgress
+                    ?: bytesTotal.takeIf { it > 0 }?.let { (bytesDone.toFloat() / it).coerceIn(0f, 1f) }
     }
 
     /** Downloaded bytes are being checksummed/validated. */

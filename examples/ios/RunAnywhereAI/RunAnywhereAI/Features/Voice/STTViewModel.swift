@@ -43,10 +43,25 @@ class STTViewModel: VoiceComponentViewModelBase {
     @Published var hybridMinBattery: Double = 20
     @Published var hybridConfidenceThreshold = Double(RAHybridSTTConfidenceThreshold)
     @Published var hybridRouting: HybridRoutedMetadata?
+    /// A recording finished and the engine recognised nothing in it.
+    ///
+    /// Distinct from "nothing recorded yet": commons now publishes an engine's
+    /// own no-speech marker as empty text, so an honestly silent recording is
+    /// an empty transcript, and the screen has to say which of the two it is.
+    @Published private(set) var noSpeechDetected = false
     @Published var selectedMode: STTMode = .batch {
         didSet {
             // Stop any active recording/transcription when mode changes
             if oldValue != selectedMode {
+                // Drop the previous mode's result immediately. Leaving it under
+                // the new mode's description attributes one mode's output to
+                // another — a Batch "[ Silence ]" read as a Live result. Same
+                // reset `startRecording` already performs. Synchronous, so the
+                // stale text cannot survive even one frame.
+                transcription = ""
+                committedTranscription = ""
+                hybridRouting = nil
+                errorMessage = nil
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
                     if self.isRecording {
@@ -179,6 +194,7 @@ class STTViewModel: VoiceComponentViewModelBase {
         audioBuffer = Data()
         transcription = ""
         committedTranscription = ""
+        noSpeechDetected = false
 
         guard selectedModelId != nil else {
             errorMessage = "No STT model loaded"
@@ -236,6 +252,14 @@ class STTViewModel: VoiceComponentViewModelBase {
 
         isRecording = false
         audioLevel = 0.0
+        // "Recorded, and nothing was recognised" is a different fact from
+        // "nothing recorded yet", and the screen used to show the second for
+        // both — telling the user they never recorded when in fact seconds of
+        // audio were captured and came back empty. Live mode settles
+        // asynchronously, so it raises the flag from its own completion.
+        if selectedMode != .live {
+            noSpeechDetected = !audioBuffer.isEmpty && transcription.isEmpty && errorMessage == nil
+        }
     }
 
     // MARK: - Private Methods - Transcription
@@ -406,6 +430,12 @@ class STTViewModel: VoiceComponentViewModelBase {
                     self.handleTranscriptionEvent(event)
                 }
                 self?.logger.info("Live transcription stream ended")
+                // The live session settles after `stopRecording` has returned,
+                // so it raises the no-speech flag itself rather than leaving the
+                // screen on "nothing recorded yet" after a real recording.
+                if let self, !Task.isCancelled, self.errorMessage == nil {
+                    self.noSpeechDetected = self.transcription.isEmpty
+                }
             } catch {
                 guard let self, !Task.isCancelled else { return }
                 self.logger.error("Live transcription failed: \(error.localizedDescription)")

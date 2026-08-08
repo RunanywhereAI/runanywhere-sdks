@@ -26,10 +26,23 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
     private let playback = AudioPlaybackManager()
     private let logger = SDKLogger(category: "VoiceAgentMic")
 
+    /// Reports `.speaking` when a reply becomes audible and `.listening` when it
+    /// stops. The core emits `PLAYING_TTS` *before* synthesis and hands the WAV
+    /// back for this driver to play, so its pipeline states describe intent, not
+    /// sound. Only this layer knows when audio is actually leaving the speaker,
+    /// so only this layer can say "speaking" truthfully — and the interrupt
+    /// affordance a UI mounts on that state is then reachable exactly while
+    /// there is something to interrupt.
+    private let onPlaybackPhase: @Sendable (AgentState) -> Void
+
     private let chunkLock = OSAllocatedUnfairLock<[Data]>(initialState: [])
 
-    init(handle: CppBridge.VoiceAgentHandle) {
+    init(
+        handle: CppBridge.VoiceAgentHandle,
+        onPlaybackPhase: @escaping @Sendable (AgentState) -> Void = { _ in }
+    ) {
         self.handle = handle
+        self.onPlaybackPhase = onPlaybackPhase
     }
 
     /// Runs until the calling task is cancelled.
@@ -173,10 +186,31 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                 // full turn this call. `synthesizedAudio` is self-describing WAV.
                 if let reply = result?.synthesizedAudio, !reply.isEmpty {
                     logger.info("Playing agent reply (\(reply.count) WAV bytes)")
-                    try await playback.play(reply)
+                    await playReply(reply)
                     discardPendingChunks()
                 }
             }
+        }
+    }
+
+    /// Play one reply, bracketing it with the phase the UI renders.
+    ///
+    /// The `.listening` report is in a `defer` so an interrupted or failed
+    /// playout still ends the speaking state — a panel that latches on
+    /// "Speaking" over a silent speaker is the exact contradiction this
+    /// signal exists to prevent. Mirrors Kotlin `playReply`.
+    private func playReply(_ wav: Data) async {
+        onPlaybackPhase(.speaking)
+        defer { onPlaybackPhase(.listening) }
+        do {
+            try await playback.play(wav)
+        } catch is CancellationError {
+            // Session teardown; `defer` has already restored the listening phase.
+        } catch {
+            // Barge-in lands here too: the user took the turn back mid-utterance,
+            // which is the ordinary outcome of the interrupt control rather than
+            // a fault, so it is not logged as an error.
+            logger.info("Agent reply playout ended early: \(error.localizedDescription)")
         }
     }
 }

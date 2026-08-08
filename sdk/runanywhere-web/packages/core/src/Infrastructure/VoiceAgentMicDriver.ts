@@ -28,7 +28,14 @@ const MIN_SPEECH_MS = 300;
 const MAX_UTTERANCE_MS = 15_000;
 const PRE_ROLL_CHUNKS = 3;
 
-export type VoiceAgentMicPhase = 'listening' | 'processing';
+/**
+ * `speaking` is reported only while a reply is actually audible. The voice-agent
+ * provider emits `PLAYING_TTS` before synthesis even starts and hands the audio
+ * back for this driver to play, so its pipeline states describe intent, not
+ * sound; only this layer knows when audio is leaving the speaker. Mirrors
+ * Swift/Kotlin `VoiceAgentMicDriver.onPlaybackPhase`.
+ */
+export type VoiceAgentMicPhase = 'listening' | 'processing' | 'speaking';
 
 export interface VoiceAgentMicTurn {
   userText: string;
@@ -276,7 +283,15 @@ export class VoiceAgentMicDriver {
     // encoding fields are needed to play it back.
     const bytes = result.synthesizedAudio;
     if (!bytes || bytes.byteLength === 0) return;
-    await this.playback.playEncoded(bytes);
+    // The `finally` restores the processing phase even when playout is cut short
+    // by an interrupt, so the panel cannot latch on "Speaking" over a silent
+    // speaker; `processTurn`'s own `finally` then returns it to listening.
+    this.callbacks.onPhase?.('speaking');
+    try {
+      await this.playback.playEncoded(bytes);
+    } finally {
+      this.callbacks.onPhase?.('processing');
+    }
   }
 }
 

@@ -724,13 +724,11 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         },
       }));
 
-      this.emitState(
-        PipelineState.PIPELINE_STATE_PLAYING_TTS,
-        sessionId,
-        turnId,
-        transport,
-        lifecycleVersion,
-      );
+      // Deliberately NOT `PLAYING_TTS` here: synthesis has not run yet and the
+      // caller — not this provider — performs playout, so announcing "speaking"
+      // at this point puts the panel in a state the speaker contradicts, and
+      // leaves it there for the whole synthesis. The mic driver reports the real
+      // speaking phase when audio starts. Until then the turn is still thinking.
       const tts = await synthesize(assistantResponse, {
         voiceId: config.ttsVoiceId,
         languageCode: config.language ?? '',
@@ -757,13 +755,10 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         }));
       }
 
-      this.emitState(
-        PipelineState.PIPELINE_STATE_LISTENING,
-        sessionId,
-        turnId,
-        transport,
-        lifecycleVersion,
-      );
+      // No `LISTENING` here either: the reply audio has only just been produced
+      // and has not been played. The caller plays it and reports listening once
+      // playout ends, so emitting it now would say "listening" over an audible
+      // reply and hide any interrupt affordance mounted on the speaking state.
       return voiceTurnResult({
         speechDetected: vad.isSpeech,
         transcription,

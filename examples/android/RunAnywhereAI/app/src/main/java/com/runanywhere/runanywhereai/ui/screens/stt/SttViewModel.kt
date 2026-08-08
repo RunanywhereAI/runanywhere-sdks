@@ -63,6 +63,19 @@ class SttViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * A recording finished and the engine recognised nothing in it.
+     *
+     * Distinct from "nothing recorded yet". Commons now publishes an engine's own
+     * no-speech marker ("(wind)", "[Music]") as empty text, so an honestly silent
+     * recording is an empty transcript and the screen has to say which of the two
+     * it is. Previously only the batch path could show that, because it inferred
+     * the state from `metrics`, which live mode never sets. Mirrors iOS
+     * `STTViewModel.noSpeechDetected`.
+     */
+    var noSpeechDetected by mutableStateOf(false)
+        private set
+
     var requireNetwork by mutableStateOf(true)
         private set
     var minBattery by mutableFloatStateOf(20f)
@@ -99,8 +112,22 @@ class SttViewModel : ViewModel() {
     private var routerOfflineId: String? = null
     private var routerOnlineId: String? = null
 
+    /**
+     * Switch mode, clearing the previous mode's output.
+     *
+     * Leaving a Batch transcript (and its stats) on screen under the Live mode's
+     * description attributes one mode's result to another — the reader has no way
+     * to tell which mode produced what. Same reset [start] already performs.
+     */
     fun selectMode(value: SttMode) {
-        if (!isRecording && !isTranscribing) mode = value
+        if (isRecording || isTranscribing || value == mode) return
+        mode = value
+        transcript = ""
+        committed = ""
+        metrics = null
+        routing = null
+        error = null
+        noSpeechDetected = false
     }
 
     fun onNetworkChange(value: Boolean) {
@@ -141,6 +168,7 @@ class SttViewModel : ViewModel() {
         metrics = null
         routing = null
         error = null
+        noSpeechDetected = false
         synchronized(buffer) { buffer.reset() }
         audioLevel = 0f
         isRecording = true
@@ -240,6 +268,7 @@ class SttViewModel : ViewModel() {
                 } finally {
                     if (liveJob === active) liveJob = null
                     isTranscribing = false
+                    noSpeechDetected = transcript.isBlank() && error == null
                 }
             }
             return
@@ -258,6 +287,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            noSpeechDetected = transcript.isBlank() && error == null
                         }
                     }
                 }
@@ -272,6 +302,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            noSpeechDetected = transcript.isBlank() && error == null
                         }
                     }
                 }

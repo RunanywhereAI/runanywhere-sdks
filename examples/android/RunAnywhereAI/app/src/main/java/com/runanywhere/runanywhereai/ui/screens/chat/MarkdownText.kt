@@ -119,8 +119,14 @@ fun MarkdownText(
                         color = color.copy(alpha = 0.8f),
                     )
                 }
-                is MdBlock.Bullet -> ListRow("•", block.text, style, color, codeBackground, linkColor)
-                is MdBlock.Numbered -> ListRow("${block.number}.", block.text, style, color, codeBackground, linkColor)
+                is MdBlock.Bullet -> ListRow(
+                    bulletGlyph(block.depth), block.depth, block.text,
+                    style, color, codeBackground, linkColor,
+                )
+                is MdBlock.Numbered -> ListRow(
+                    "${block.number}.", block.depth, block.text,
+                    style, color, codeBackground, linkColor,
+                )
                 is MdBlock.Paragraph -> Text(
                     text = inline(block.text, codeBackground, linkColor),
                     style = style,
@@ -132,9 +138,18 @@ fun MarkdownText(
     }
 }
 
+/**
+ * One list row, indented by its nesting level.
+ *
+ * The indent is a start padding on the row rather than a gutter per level, so the markers of
+ * one level still line up with each other and a sublist reads as belonging to the row above it.
+ * One `spacingLg` step per level is the same visual relationship iOS gets from its shared
+ * gutter, without laying the whole list out as a grid.
+ */
 @Composable
 private fun ListRow(
     marker: String,
+    depth: Int,
     text: String,
     style: TextStyle,
     color: Color,
@@ -142,7 +157,13 @@ private fun ListRow(
     linkColor: Color,
 ) {
     val dimens = LocalDimens.current
-    Row(modifier = Modifier.padding(vertical = dimens.spacingXs / 2)) {
+    Row(
+        modifier = Modifier.padding(
+            start = dimens.spacingLg * depth,
+            top = dimens.spacingXs / 2,
+            bottom = dimens.spacingXs / 2,
+        ),
+    ) {
         Text(text = "$marker ", style = style, color = color.copy(alpha = 0.7f))
         Text(text = inline(text, codeBackground, linkColor), style = style, color = color)
     }
@@ -245,11 +266,56 @@ private fun headerStyle(level: Int): TextStyle = when (level) {
 private sealed interface MdBlock {
     data class Paragraph(val text: String) : MdBlock
     data class Header(val level: Int, val text: String) : MdBlock
-    data class Bullet(val text: String) : MdBlock
-    data class Numbered(val number: Int, val text: String) : MdBlock
+    /**
+     * A list row, with the nesting level the model wrote it at.
+     *
+     * [depth] used to not exist: the line was trimmed before the marker was matched, so a
+     * two-level outline — the shape a model reaches for whenever it answers with a plan or a
+     * spec — arrived as one flat run of siblings and the structure it encoded was silently
+     * discarded. iOS has carried a depth all along (`MarkdownListItem.depth`), so the same
+     * reply read correctly on one of three surfaces; this is the same field with the same rule.
+     */
+    data class Bullet(val depth: Int, val text: String) : MdBlock
+    data class Numbered(val depth: Int, val number: Int, val text: String) : MdBlock
     data class Quote(val text: String) : MdBlock
     data class Code(val code: String, val language: String?) : MdBlock
     data object Rule : MdBlock
+}
+
+/** Four tiers, matching iOS's four bullet glyphs. */
+private const val MAX_LIST_DEPTH = 3
+
+/**
+ * Leading whitespace → nesting level, clamped to four tiers.
+ *
+ * Two columns per level with a tab counting as two — iOS `MarkdownBlockParser.depth(of:)`
+ * verbatim, and the same rule the web `listDepth` uses. Both the 2-space and the 4-space
+ * convention a model might emit land on a sane level, and the clamp stops a deeply indented
+ * line from indenting off the right edge of a bubble.
+ */
+private fun listDepth(line: String): Int {
+    var columns = 0
+    for (c in line) {
+        when (c) {
+            ' ' -> columns++
+            '\t' -> columns += 2
+            else -> return minOf(columns / 2, MAX_LIST_DEPTH)
+        }
+    }
+    return minOf(columns / 2, MAX_LIST_DEPTH)
+}
+
+/**
+ * Bullet glyph by depth: filled → hollow → triangle → dot.
+ *
+ * Each level reads as subordinate to the one above at body size, and the sequence is iOS
+ * `MarkdownBlockParser.bullet(at:)` exactly, so the same reply shows the same tiers on both.
+ */
+private fun bulletGlyph(depth: Int): String = when (depth) {
+    0 -> "\u2022"
+    1 -> "\u25E6"
+    2 -> "\u2023"
+    else -> "\u00B7"
 }
 
 private val numberedRegex = Regex("""^(\d{1,9})[.)]\s+(.*)""")
@@ -322,12 +388,18 @@ private fun parseMarkdown(markdown: String): List<MdBlock> {
             }
             bulletRegex.matches(trimmed) -> {
                 flushParagraph()
-                blocks += MdBlock.Bullet(bulletRegex.find(trimmed)!!.groupValues[1])
+                // Depth comes from the RAW line: `trimmed` is what the marker is matched
+                // against, but the indentation in front of it is the only record of where
+                // the row sits in the outline.
+                blocks += MdBlock.Bullet(
+                    listDepth(line),
+                    bulletRegex.find(trimmed)!!.groupValues[1],
+                )
             }
             numberedRegex.matches(trimmed) -> {
                 flushParagraph()
                 val (number, content) = numberedRegex.find(trimmed)!!.destructured
-                blocks += MdBlock.Numbered(number.toInt(), content)
+                blocks += MdBlock.Numbered(listDepth(line), number.toInt(), content)
             }
             else -> {
                 if (paragraph.isNotEmpty()) paragraph.append("\n")

@@ -64,7 +64,10 @@ struct ConnectStatusBanner: View {
                 } label: {
                     Image(systemName: "link")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
+                        // A 14pt control glyph asks 3:1 against its fill (WCAG 1.4.11) and
+                        // white on #FF6900 is 2.89:1 — under even that floor. `onBrand` is
+                        // 6.12:1 and matches every other filled brand action.
+                        .foregroundStyle(AppColors.onBrand)
                         .frame(width: 34, height: 34)
                         .background(AppColors.primaryAccent, in: Circle())
                 }

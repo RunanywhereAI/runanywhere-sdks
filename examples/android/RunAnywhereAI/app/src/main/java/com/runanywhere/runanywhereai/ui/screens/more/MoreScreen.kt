@@ -53,6 +53,16 @@ private data class AdvancedEntry(
     val route: Any,
 )
 
+/**
+ * The Advanced hub.
+ *
+ * Every description says what the reader gets, never which model does it. They used to read
+ * like release notes — "(NVIDIA Sortformer)", "(SegFormer)", "(Cosmos3-Edge diffusion)", "Run
+ * YAML-driven SDK pipelines" — and a parenthesised codename or a serialisation format is the
+ * one thing a reader deciding whether to tap cannot use. The model names live on the screens
+ * themselves, where a curious reader has already opted in. iOS `ConsumerAdvancedHubView` and
+ * the web hub carry the same rewritten copy, so a row means the same thing in every app.
+ */
 @Composable
 fun MoreScreen(onNavigate: (Any) -> Unit) {
     val dimens = LocalDimens.current
@@ -60,15 +70,15 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
         AdvancedEntry("Settings", "Personalization, privacy, and account controls", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
         AdvancedEntry("Documents", "Inspect document Q&A setup and sources", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Documents),
         AdvancedEntry("Images & live", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision()),
-        AdvancedEntry("Document OCR", "Extract text from invoices and scans (Nemotron OCR)", RACIcons.Outline.ScanText, AdvancedGroup.ASSISTANT, Ocr),
-        AdvancedEntry("Segmentation", "Semantic image segmentation (SegFormer)", RACIcons.Outline.Layers, AdvancedGroup.ASSISTANT, Segmentation),
-        AdvancedEntry("Diarization", "Who spoke when (NVIDIA Sortformer)", RACIcons.Outline.Users, AdvancedGroup.SPEECH, Diarization),
-        AdvancedEntry("Image generation", "Text-to-image on the NPU (Cosmos3-Edge diffusion)", RACIcons.Outline.Sparkles, AdvancedGroup.ASSISTANT, Diffusion),
+        AdvancedEntry("Document OCR", "Extract text from invoices and scans", RACIcons.Outline.ScanText, AdvancedGroup.ASSISTANT, Ocr),
+        AdvancedEntry("Segmentation", "Split a photo into labelled regions", RACIcons.Outline.Layers, AdvancedGroup.ASSISTANT, Segmentation),
+        AdvancedEntry("Diarization", "See who spoke when in a recording", RACIcons.Outline.Users, AdvancedGroup.SPEECH, Diarization),
+        AdvancedEntry("Image generation", "Make a picture from a description", RACIcons.Outline.Sparkles, AdvancedGroup.ASSISTANT, Diffusion),
         AdvancedEntry("Read aloud", "Generate speech and preview voices", RACIcons.Outline.Volume, AdvancedGroup.SPEECH, Tts),
         AdvancedEntry("Transcription", HybridBetaCopy.TRANSCRIPTION_ENTRY_DESCRIPTION, RACIcons.Outline.Waveform, AdvancedGroup.SPEECH, Stt),
         AdvancedEntry("Voice activity", "Tune speech detection infrastructure", RACIcons.Outline.Pulse, AdvancedGroup.SPEECH, Vad),
         AdvancedEntry("Web & tools", "Inspect and control assistant tools", RACIcons.Outline.Tool, AdvancedGroup.DEVELOPER, Tools),
-        AdvancedEntry("Solutions", "Run YAML-driven SDK pipelines", RACIcons.Outline.Route, AdvancedGroup.DEVELOPER, Solutions),
+        AdvancedEntry("Solutions", "Run saved multi-step workflows", RACIcons.Outline.Route, AdvancedGroup.DEVELOPER, Solutions),
         AdvancedEntry("Cloud providers", HybridBetaCopy.CLOUD_PROVIDERS_ENTRY_DESCRIPTION, RACIcons.Outline.Cloud, AdvancedGroup.DEVELOPER, CloudProviders),
         AdvancedEntry("Benchmarks", "Measure speed, memory, and device behavior", RACIcons.Outline.Gauge, AdvancedGroup.DEVELOPER, Benchmarks),
     )

@@ -44,13 +44,23 @@
   --text-tertiary: #99938B;  /*  4.6:1 min */
   --text-white: #FFFFFF;
   /* Ink, not white. Per DESIGN_GUIDELINE.md §5, white on solid #FF6900 is
-   * 2.89:1 and fails AA; ink is 6.12:1. This token is for text sitting ON an
-   * orange fill, and its only use sites are 10px uppercase badges — small text,
-   * the case the guideline explicitly forbids white for. The white-on-orange
-   * deviation stays allowed for large/bold brand moments, which use
-   * --text-white on the gradient instead. Darkening #FF6900 is not an option:
-   * the hue is locked brand identity. */
+   * 2.89:1 and fails AA; ink is 6.12:1 (and 5.02:1 on the #E65E00 hover tone).
+   * Every label and control glyph sitting on a SOLID orange fill uses this —
+   * the primary button, the new-chat pill, the composer's send action, the
+   * model Download action — because all of them are small or normal-weight,
+   * the case the guideline explicitly forbids white for. It is the same hex as
+   * iOS `AppColors.onBrand` and Android's `OnBrandInk`, so the primary action
+   * reads identically on all four surfaces. The white-on-orange deviation
+   * stays allowed for large/bold brand moments, which use --text-white on the
+   * GRADIENT instead (the user's chat bubble). Darkening #FF6900 is not an
+   * option: the hue is locked brand identity. */
   --text-on-primary: #10182B;
+
+  /* Danger as TEXT. `--color-red` is a fill/glyph value: #EF4444 measures 4.7:1
+   * on `--bg-primary` in dark, which clears AA, but only 3.8:1 on paper. A failed
+   * chat turn is a whole paragraph of it, so light needs its own ink below. iOS
+   * models the identical split as `danger` vs `dangerText`. */
+  --text-danger: var(--color-red);
 
   /* ---- Background Colors (Dark, warm neutral) ---- */
   --bg-primary: #191817;
@@ -301,6 +311,9 @@
   /* See the token's definition above: brand orange is under the 3:1 floor on
      paper, the brand-strong tone clears it at the same hue. */
   --chart-accent: var(--color-primary-strong);
+  /* iOS `AppColors.dangerText`'s light value — the same hue one step of ink
+     darker: 5.6:1 on --bg-primary and 5.3:1 on --bg-secondary. */
+  --text-danger: #C4262A;
   --bubble-assistant-start: #EFECE8;
   --bubble-assistant-end: #F4F1ED;
 

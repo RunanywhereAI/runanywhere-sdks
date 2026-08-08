@@ -12,6 +12,7 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
+  type SpeechHandle,
 } from '@runanywhere/web';
 import {
   findLoadedModelForCategory,
@@ -35,9 +36,22 @@ const TTS_PICKER_FILTER: readonly ModelCategory[] = [
 let container: HTMLElement;
 let unmounted = false;
 let unsubscribeEngine: (() => void) | null = null;
-let isSynthesizing = false;
+/**
+ * True from the tap until the speaker actually falls silent.
+ *
+ * `tts.speak()` resolves as soon as it has handed back a `SpeechHandle` —
+ * synthesis and playout both happen behind it. Treating that resolution as "done"
+ * put the panel back into its idle state about a second before any sound came
+ * out, and left Stop disabled for the whole utterance, so nothing on screen could
+ * halt six seconds of audio. Playout, not the call, is what the user is waiting
+ * on, so the flag follows the handle.
+ */
+let isSpeaking = false;
+/** The utterance currently sounding, so Stop can interrupt that exact one. */
+let activeSpeech: SpeechHandle | null = null;
 let lastError: string | null = null;
-let lastDurationMs: number | null = null;
+/** How the previous utterance ended — a stop is a distinct outcome, not a failure. */
+let lastOutcome: 'finished' | 'stopped' | null = null;
 /** Speech rate 0.5 – 2.0 (iOS parity: TextToSpeechView.swift:244 slider). */
 let speechRate = 1.0;
 let unsubscribeState: (() => void) | null = null;
@@ -70,7 +84,7 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
     onDeactivate: () => {
       unmounted = true;
       // Stop any in-flight SDK playback when leaving the tab.
-      RunAnywhere.tts.stop();
+      void activeSpeech?.interrupt();
       if (!container.isConnected) {
         unsubscribeState?.();
         unsubscribeState = null;
@@ -113,7 +127,7 @@ function renderSpeak(): void {
         <h3>Turn text into speech</h3>
         <p class="text-secondary">Type anything and hear it spoken on this device. Nothing is sent to a server.</p>
         <textarea class="chat-input" id="speak-text" rows="3" aria-label="Text to read aloud" ${
-          isSynthesizing || blocked ? 'disabled' : ''
+          isSpeaking || blocked ? 'disabled' : ''
         }>${escapeHtml(DEFAULT_TEXT)}</textarea>
         <div class="speak-rate">
           <label class="speak-rate__label" for="speak-rate">Speed</label>
@@ -126,16 +140,16 @@ function renderSpeak(): void {
             step="0.1"
             value="${speechRate}"
             aria-describedby="speak-rate-label"
-            ${isSynthesizing || blocked ? 'disabled' : ''}
+            ${isSpeaking || blocked ? 'disabled' : ''}
           />
           <span class="speak-rate__value" id="speak-rate-label">${speechRate.toFixed(1)}×</span>
         </div>
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="speak-btn" ${
-            isSynthesizing || !canRunInference ? 'disabled' : ''
-          }>${isSynthesizing ? 'Speaking…' : 'Read aloud'}</button>
+            isSpeaking || !canRunInference ? 'disabled' : ''
+          }>${isSpeaking ? 'Speaking…' : 'Read aloud'}</button>
           <button class="btn btn-secondary" id="stop-btn" ${
-            isSynthesizing ? '' : 'disabled'
+            isSpeaking ? '' : 'disabled'
           }>Stop</button>
         </div>
         <div id="speak-status" class="docs-status" role="status">${
@@ -143,8 +157,13 @@ function renderSpeak(): void {
         }${
           lastError ? `Error: ${escapeHtml(lastError)}` : ''
         }${
-          lastDurationMs != null && !lastError && canRunInference
-            ? `Read ${(lastDurationMs / 1000).toFixed(2)}s of audio.`
+          // The old readout claimed "Read Xs of audio" from the wall-clock time
+          // of the speak() call, which returns before a single sample plays — it
+          // reported 0.00s over a six-second utterance. The SDK's speech handle
+          // exposes how the utterance ended but not its length, so report the
+          // outcome, which is both true and the thing that differs.
+          lastOutcome != null && !lastError && canRunInference
+            ? lastOutcome === 'stopped' ? 'Stopped.' : 'Finished reading.'
             : ''
         }</div>
       </div>
@@ -170,7 +189,9 @@ function renderSpeak(): void {
     void runSpeak();
   });
   container.querySelector('#stop-btn')?.addEventListener('click', () => {
-    RunAnywhere.tts.stop();
+    // Interrupt this utterance specifically, rather than the deprecated global
+    // stop that guesses at the most recent handle.
+    void activeSpeech?.interrupt();
   });
 }
 
@@ -179,20 +200,26 @@ async function runSpeak(): Promise<void> {
   const text = (textarea?.value ?? '').trim();
   if (!text) return;
 
-  isSynthesizing = true;
+  isSpeaking = true;
   lastError = null;
-  lastDurationMs = null;
+  lastOutcome = null;
   renderSpeak();
 
   try {
-    // One verb synthesizes and plays through the device.
-    const startedAt = performance.now();
-    await RunAnywhere.tts.speak(text, { speed: speechRate });
-    lastDurationMs = performance.now() - startedAt;
+    // One verb synthesizes and plays through the device; the handle is what
+    // tracks that playout and what Stop acts on.
+    const handle = await RunAnywhere.tts.speak(text, { speed: speechRate });
+    activeSpeech = handle;
+    renderSpeak();
+    await handle.waitForPlayout();
+    // Playout failures arrive on the handle, not as a throw.
+    if (handle.error) lastError = handle.error.message;
+    else lastOutcome = handle.interrupted ? 'stopped' : 'finished';
   } catch (err) {
     lastError = formatError(err);
   } finally {
-    isSynthesizing = false;
+    activeSpeech = null;
+    isSpeaking = false;
     if (!unmounted) renderSpeak();
   }
 }

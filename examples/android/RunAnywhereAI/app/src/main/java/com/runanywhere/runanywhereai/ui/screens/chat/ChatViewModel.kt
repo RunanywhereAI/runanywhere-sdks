@@ -458,7 +458,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("generation failed", e)
-                updateReply(request, replyIndex) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                updateReply(request, replyIndex) {
+                    it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                }
             } finally {
                 finishGeneration(request, replyIndex)
             }
@@ -545,9 +547,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 RACLog.e("image question failed", e)
                 val index = replyIndex
                 if (index != null) {
-                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                    updateReply(request, index) {
+                        it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                    }
                 } else if (generationOwnership.owns(request)) {
-                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                    messages += ChatMessage(errorReplyText(e.message), isUser = false, isError = true)
                 }
             } finally {
                 finishGeneration(request, replyIndex)
@@ -648,9 +652,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 RACLog.e("document question failed", e)
                 val index = replyIndex
                 if (index != null) {
-                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                    updateReply(request, index) {
+                        it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                    }
                 } else if (generationOwnership.owns(request)) {
-                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                    messages += ChatMessage(errorReplyText(e.message), isUser = false, isError = true)
                 }
             } finally {
                 finishGeneration(request, replyIndex)
@@ -812,7 +818,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }
@@ -854,7 +860,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }
@@ -909,7 +915,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }

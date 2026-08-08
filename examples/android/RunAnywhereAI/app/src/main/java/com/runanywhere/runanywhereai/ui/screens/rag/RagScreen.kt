@@ -55,7 +55,9 @@ import com.runanywhere.runanywhereai.ui.screens.chat.MarkdownText
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.theme.BrandGradient
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.Neutral100
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -651,10 +653,13 @@ private fun MessageBubble(message: RagMessage) {
                 modifier = Modifier
                     .widthIn(max = 320.dp)
                     .clip(RoundedCornerShape(dimens.radiusMd))
-                    .background(MaterialTheme.colorScheme.primary)
+                    // The reader's own words carry the logo gradient here exactly as they do
+                    // in chat and voice — see [BrandGradient]. White is only legible on the
+                    // gradient; a solid `primary` fill would need `onPrimary`'s ink.
+                    .background(BrandGradient)
                     .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
             ) {
-                Text(message.text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimary)
+                Text(message.text, style = MaterialTheme.typography.bodyLarge, color = Neutral100)
             }
         }
         return

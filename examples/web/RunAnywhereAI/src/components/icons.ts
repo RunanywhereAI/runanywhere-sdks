@@ -172,16 +172,41 @@ export const ICON_PATHS = {
     + '<polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>',
   /** Conversation. Chat, replies, answers. */
   message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-  /** A live camera feed, as opposed to a still `image`. */
-  device: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8v9H8z"/>'
-    + '<path d="M12 18h.01"/>',
+  /**
+   * Looking through a live feed. Live camera and the Vision destination only.
+   *
+   * `device` (a phone frame) used to carry this, which named the *hardware* rather
+   * than the act — and named it differently from Android (`RACIcons.Outline.Eye`,
+   * documented as "looking through a live feed") and iOS (`eye`, which is what
+   * `RAModelCategory.consumerCapabilityIcon` returns for vision). One concept,
+   * one shape, in all three apps.
+   */
+  eye: '<path d="M21 12c-2.4 4-5.4 6-9 6s-6.6-2-9-6c2.4-4 5.4-6 9-6s6.6 2 9 6z"/>'
+    + '<circle cx="12" cy="12" r="2.5"/>',
+  /**
+   * Reasoning. The thinking-mode toggle and the "Reasoning" state it produces.
+   *
+   * Reserved for reasoning and nothing else — Android freed the same glyph from its
+   * voice screen, where a brain had meant *speech recognition* while iOS drew a brain
+   * for the language model, so one shape meant two opposite ends of one pipeline.
+   */
+  brain: '<path d="M9.5 3.5A3.5 3.5 0 0 0 6 7v.5A3.5 3.5 0 0 0 4 10.7a3.4 3.4 0 0 0 1.5 2.8'
+    + 'A3.4 3.4 0 0 0 5 15.9 3.4 3.4 0 0 0 8.4 19.3c.4 0 .8 0 1.1-.2"/>'
+    + '<path d="M14.5 3.5A3.5 3.5 0 0 1 18 7v.5a3.5 3.5 0 0 1 2 3.2 3.4 3.4 0 0 1-1.5 2.8'
+    + 'A3.4 3.4 0 0 1 19 15.9a3.4 3.4 0 0 1-3.4 3.4c-.4 0-.8 0-1.1-.2"/>'
+    + '<path d="M12 4v16"/>',
 
   // ---- Suggestions (chat starters) ----------------------------------------
   /** Compose, draft, write. */
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-  /** Explain, clarify. A question, not an error. */
-  help: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/>'
-    + '<path d="M12 17h.01"/>',
+  /**
+   * Condense — long text in, short text out. The Summarize starter only.
+   *
+   * Deliberately not `checklist` (which the Plan starter uses) and not `file` (a
+   * corpus document): the lines getting shorter is the whole idea, and the four
+   * starters have to be four distinguishable shapes to be worth drawing at all.
+   */
+  condense: '<path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h10"/><path d="M4 20h5"/>',
   /** Compare, weigh options, expand out. */
   compare: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/>'
     + '<path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/>',

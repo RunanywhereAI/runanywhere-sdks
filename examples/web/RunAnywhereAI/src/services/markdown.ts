@@ -50,17 +50,71 @@ import { escapeHtml } from './escape-html';
 type Block =
   | { kind: 'paragraph'; text: string }
   | { kind: 'heading'; level: number; text: string }
-  | { kind: 'bullet'; items: string[] }
-  | { kind: 'numbered'; start: number; items: string[] }
+  | { kind: 'list'; items: ListItem[] }
   | { kind: 'quote'; text: string }
   | { kind: 'code'; code: string; language: string | null }
   | { kind: 'rule' };
+
+/**
+ * One row of a list, with the nesting level the model wrote it at.
+ *
+ * `depth` used to be thrown away: every line was trimmed before the marker was
+ * matched, so a two-level outline — the shape a model reaches for whenever it
+ * answers with a plan or a spec — arrived as one flat run of siblings and the
+ * structure the model encoded was silently lost. iOS has carried a depth all
+ * along (`MarkdownListItem.depth`), so the same reply read correctly on one of
+ * three surfaces. `ordered`/`number` are per item because a nested list can
+ * switch marker kind at any level, and because a numbered list that starts at 3
+ * is a continuation the renderer must not renumber.
+ */
+interface ListItem {
+  depth: number;
+  text: string;
+  ordered: boolean;
+  /** The model's own number for an ordered row; null for a bullet. */
+  number: number | null;
+}
 
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const NUMBERED = /^(\d{1,9})[.)]\s+(.*)$/;
 const BULLET = /^[-*+]\s+(.*)$/;
 const RULE = /^(?:-{3,}|\*{3,}|_{3,})$/;
 const FENCE = /^(?:```|~~~)(.*)$/;
+
+/**
+ * Leading whitespace → nesting level, clamped to four tiers.
+ *
+ * Two columns per level with a tab counting as two, which is iOS
+ * `MarkdownBlockParser.depth(of:)` verbatim — both the 2-space and the 4-space
+ * convention a model might emit land on a sane level, and the clamp stops a
+ * deeply indented line from indenting off the right edge of a bubble.
+ */
+function listDepth(line: string): number {
+  let columns = 0;
+  for (const character of line) {
+    if (character === ' ') columns += 1;
+    else if (character === '\t') columns += 2;
+    else break;
+  }
+  return Math.min(Math.floor(columns / 2), 3);
+}
+
+/** `- `, `* `, `+ `, `1. `, `1) ` — or null when the line is not a list row. */
+function parseListItem(line: string): ListItem | null {
+  const trimmed = line.trim();
+
+  const bullet = BULLET.exec(trimmed);
+  if (bullet) {
+    return { depth: listDepth(line), text: bullet[1], ordered: false, number: null };
+  }
+
+  const numbered = NUMBERED.exec(trimmed);
+  if (numbered) {
+    return { depth: listDepth(line), text: numbered[2], ordered: true, number: Number(numbered[1]) };
+  }
+
+  return null;
+}
 
 /**
  * Group lines into blocks.
@@ -136,33 +190,21 @@ function parseBlocks(markdown: string): Block[] {
       continue;
     }
 
-    const bullet = BULLET.exec(trimmed);
-    if (bullet) {
+    // Bulleted and numbered rows are collected into ONE run rather than one run
+    // per marker kind, because a nested list routinely switches kind — `1.` with
+    // `-` children — and splitting the run there would put the children in a
+    // sibling list instead of inside their parent item.
+    const item = parseListItem(line);
+    if (item) {
       flushParagraph();
-      const items = [bullet[1]];
+      const items = [item];
       while (i + 1 < lines.length) {
-        const next = BULLET.exec(lines[i + 1].trim());
+        const next = parseListItem(lines[i + 1]);
         if (!next) break;
         i += 1;
-        items.push(next[1]);
+        items.push(next);
       }
-      blocks.push({ kind: 'bullet', items });
-      continue;
-    }
-
-    const numbered = NUMBERED.exec(trimmed);
-    if (numbered) {
-      flushParagraph();
-      const items = [numbered[2]];
-      while (i + 1 < lines.length) {
-        const next = NUMBERED.exec(lines[i + 1].trim());
-        if (!next) break;
-        i += 1;
-        items.push(next[2]);
-      }
-      // Honour the model's first number: a list that starts at 3 is usually a
-      // continuation, and renumbering it from 1 silently rewrites the answer.
-      blocks.push({ kind: 'numbered', start: Number(numbered[1]), items });
+      blocks.push({ kind: 'list', items });
       continue;
     }
 
@@ -192,21 +234,48 @@ const isSpace = (ch: string | undefined): boolean => ch === undefined || /\s/.te
 const isWord = (ch: string | undefined): boolean => ch !== undefined && /[\p{L}\p{N}]/u.test(ch);
 
 /**
+ * Is a single `*` at `i` arithmetic rather than emphasis — a lone asterisk wedged
+ * between two alphanumerics, as in `2*3`?
+ *
+ * CommonMark says intra-word `*` is legal emphasis, so `2*3*4` italicises the `3`
+ * by the letter of the spec. That reading is almost always wrong for what these
+ * apps render: a model writing `2*3` in prose means multiplication, and the
+ * spec-correct reading also lets two unrelated asterisks pair up across a whole
+ * sentence. `_` has always been excluded for the same reason (`get_user_name`);
+ * this extends the identical treatment to the single asterisk, which is what
+ * Android's `isIntraWordAsterisk` (MarkdownText.kt) does and what iOS gets for
+ * free from CommonMark's left-flanking rule.
+ */
+function isIntraWordAsterisk(text: string, i: number, marker: string): boolean {
+  return marker === '*' && isWord(text[i - 1]) && isWord(text[i + 1]);
+}
+
+/**
  * Can a delimiter at `i` open an emphasis run?
  *
  * The rule that matters in practice: a marker followed by whitespace is not a
  * delimiter, it is punctuation the model typed. Without this check `a * b` reads
  * the `*` as an opening marker and everything after it becomes emphasised — the
- * bug that made a footnote marker or a shell glob italicise the rest of a line.
+ * bug that made a footnote marker italicise the rest of a line.
  *
- * `_` additionally may not open inside a word, so `snake_case_name` survives
- * intact. Asterisks are exempt from that restriction because `2*3*4` is
- * arithmetic to a human but valid emphasis to every markdown parser, and models
- * write `*` intra-word deliberately far more often than they write `_`.
+ * `_` may not open inside a word, so `snake_case_name` survives intact, and a
+ * single `*` is held to the same rule via `isIntraWordAsterisk`.
+ *
+ * The last clause is the glob guard. An asterisk followed by a dot or a slash is
+ * a file pattern — `*.txt`, a directory wildcard — never the start of emphasis,
+ * because emphasis opens on a word. Without it, `rm *.txt and a * b and 2*3`
+ * italicised everything from `.txt` to the `2`: the glob's asterisk opened a run
+ * and the multiplication's asterisk closed it, half a sentence away. Each
+ * fragment is handled correctly on its own, which is exactly why this only showed
+ * up on screen — the interaction needs them on one line, and a real model answer
+ * about shell commands puts them there. Android carries both guards already.
  */
 function opensEmphasis(text: string, i: number, marker: string): boolean {
   if (isSpace(text[i + marker.length])) return false;
   if (marker[0] === '_' && isWord(text[i - 1])) return false;
+  if (isIntraWordAsterisk(text, i, marker)) return false;
+  const after = text[i + marker.length];
+  if (marker === '*' && (after === '.' || after === '/')) return false;
   return true;
 }
 
@@ -228,6 +297,10 @@ function findCloser(text: string, start: number, marker: string): number {
     if (!text.startsWith(marker, j)) continue;
     if (isSpace(text[j - 1])) continue;
     if (marker[0] === '_' && isWord(text[j + marker.length])) continue;
+    // Mirrors `opensEmphasis`: the `*` in `2*3` must not close a run either, or
+    // the guard on the opening side just moves the runaway italics one marker
+    // along instead of removing them.
+    if (isIntraWordAsterisk(text, j, marker)) continue;
     return j;
   }
   return -1;
@@ -364,15 +437,8 @@ function renderBlock(block: Block): string {
       return `<h${Math.min(6, block.level + 2)} class="md-heading md-heading--${block.level}">`
         + `${renderInline(block.text)}</h${Math.min(6, block.level + 2)}>`;
 
-    case 'bullet':
-      return `<ul class="md-list">${block.items
-        .map((item) => `<li>${renderInline(item)}</li>`)
-        .join('')}</ul>`;
-
-    case 'numbered':
-      return `<ol class="md-list" start="${block.start}">${block.items
-        .map((item) => `<li>${renderInline(item)}</li>`)
-        .join('')}</ol>`;
+    case 'list':
+      return renderListRun(block.items);
 
     case 'quote':
       return `<blockquote class="md-quote">${renderInline(block.text)}</blockquote>`;
@@ -389,6 +455,71 @@ function renderBlock(block: Block): string {
       // Dropping them would join unrelated lines into one run-on sentence.
       return `<p class="md-p">${renderInline(block.text).replace(/\n/g, '<br />')}</p>`;
   }
+}
+
+/**
+ * Render one run of adjacent list rows as real nested `<ul>`/`<ol>` markup.
+ *
+ * A run can legitimately hold more than one top-level list — `- a` then `1. b`
+ * switches marker kind at depth 0 — so this drains the run one list at a time
+ * rather than assuming a single root.
+ */
+function renderListRun(items: ListItem[]): string {
+  let html = '';
+  let i = 0;
+  while (i < items.length) {
+    const level = renderListLevel(items, i, items[i].depth);
+    html += level.html;
+    i = level.next;
+  }
+  return html;
+}
+
+/**
+ * Render the items at `depth` starting at `from`, nesting anything deeper inside
+ * the item it follows, and return where the caller should resume.
+ *
+ * Nesting rather than one flat `<ul>` is what makes the indentation real: an
+ * `<li>` containing a `<ul>` is what a screen reader announces as a sublist, and
+ * `.md-list .md-list` in components.css has been waiting for exactly this shape.
+ * The list also ends when the marker kind changes at the same level, because
+ * `<ul>` and `<ol>` cannot share one element.
+ */
+function renderListLevel(
+  items: ListItem[],
+  from: number,
+  depth: number,
+): { html: string; next: number } {
+  const first = items[from];
+  const tag = first.ordered ? 'ol' : 'ul';
+  // Honour the model's first number: a list that starts at 3 is usually a
+  // continuation, and renumbering it from 1 silently rewrites the answer.
+  const start = first.ordered && first.number !== null ? ` start="${first.number}"` : '';
+  let html = `<${tag} class="md-list"${start}>`;
+  let i = from;
+
+  while (i < items.length && items[i].depth >= depth) {
+    // A row deeper than this level with no `<li>` before it at this level — a
+    // model that over-indented its first child. Nest it anyway rather than drop it.
+    if (items[i].depth > depth) {
+      const nested = renderListLevel(items, i, items[i].depth);
+      html += nested.html;
+      i = nested.next;
+      continue;
+    }
+    if (items[i].ordered !== first.ordered) break;
+
+    html += `<li>${renderInline(items[i].text)}`;
+    i += 1;
+    if (i < items.length && items[i].depth > depth) {
+      const nested = renderListLevel(items, i, items[i].depth);
+      html += nested.html;
+      i = nested.next;
+    }
+    html += '</li>';
+  }
+
+  return { html: `${html}</${tag}>`, next: i };
 }
 
 /**

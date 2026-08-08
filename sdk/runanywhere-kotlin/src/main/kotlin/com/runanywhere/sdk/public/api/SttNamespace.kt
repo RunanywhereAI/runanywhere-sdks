@@ -11,14 +11,16 @@ import ai.runanywhere.proto.v1.STTOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -98,12 +100,13 @@ private class KotlinSttStream(
 
     override fun pushFrame(frame: AudioFrame) {
         if (closed.get() || finished.get()) return
-        val normalized =
-            when (format.encoding) {
-                AudioEncoding.PCM16 -> AudioInput.pcm16(frame.samples, format.sampleRate, format.channels).normalizedBytes()
-                AudioEncoding.FLOAT32, AudioEncoding.CONTAINER -> frame.samples
-            }
-        frames.trySend(normalized)
+        // PCM16, exactly as `transcribe` sends it. This used to hand the native pass
+        // float32 (`normalizedBytes`), which sherpa reinterprets as int16 — see the
+        // contract on `AudioInput.pcm16Bytes`, "sending float32 here would be misread as
+        // int16 and transcribed as noise". It was: clear speech came back as "[Music]"
+        // and "(wind)" through every streaming path while batch transcribed the same
+        // microphone perfectly.
+        frames.trySend(AudioInput(frame.samples, format).pcm16Bytes())
     }
 
     override fun flush() {
@@ -166,28 +169,41 @@ public class SttNamespace internal constructor() {
         audio: Flow<AudioInput>,
         options: SttOptions? = null,
     ): Flow<TranscriptionEvent> =
-        flow {
+        channelFlow {
+            // Events are forwarded from the moment the stream exists, concurrently with the
+            // audio still arriving. The previous shape ran `audio.collect { … }` to
+            // completion and only then `emitAll(live.events)`, so nothing reached the
+            // caller until the microphone had already closed — a "live" transcription that
+            // could not emit a partial while the user was still talking.
             var stream: SttStream? = null
             var format: AudioFormatSpec? = null
-            audio.collect { chunk ->
-                if (format == null) {
-                    format = chunk.format
-                    if (format?.encoding == AudioEncoding.CONTAINER) {
+            var forwarder: Job? = null
+            try {
+                audio.collect { chunk ->
+                    if (stream == null) {
+                        if (chunk.format.encoding == AudioEncoding.CONTAINER) {
+                            throw SDKException.invalidConfiguration(
+                                "stt.transcribeStream needs raw PCM chunks; decode container audio before streaming it.",
+                            )
+                        }
+                        val opened = openStream(chunk.format, options)
+                        format = chunk.format
+                        stream = opened
+                        forwarder = launch { opened.events.collect { send(it) } }
+                    } else if (chunk.format != format) {
                         throw SDKException.invalidConfiguration(
-                            "stt.transcribeStream needs raw PCM chunks; decode container audio before streaming it.",
+                            "stt.transcribeStream requires every chunk to share one audio format.",
                         )
                     }
-                    stream = openStream(chunk.format, options)
-                } else if (chunk.format != format) {
-                    throw SDKException.invalidConfiguration(
-                        "stt.transcribeStream requires every chunk to share one audio format.",
-                    )
+                    stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
                 }
-                stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
+                // Upstream ended: let the native pass finalize and drain its last events
+                // (the terminal transcript) before this flow completes.
+                stream?.finish()
+                forwarder?.join()
+            } finally {
+                withContext(NonCancellable) { stream?.close() }
             }
-            val live = stream ?: return@flow
-            live.finish()
-            emitAll(live.events)
         }
 
     /** Readiness, model, and language coverage of the speech-recognition component. */

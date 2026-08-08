@@ -54,11 +54,21 @@ struct SpeechToTextView: View {
                                     EmptyStateMark(systemImage: "waveform", diameter: 96)
 
                                     VStack(spacing: Space.sm) {
-                                        Text("Ready to transcribe")
+                                        // "Recorded, nothing recognised" and
+                                        // "nothing recorded yet" are different
+                                        // facts; this pane used to show the
+                                        // second for both, telling the user
+                                        // they never recorded when in fact the
+                                        // audio came back with no speech in it.
+                                        Text(viewModel.noSpeechDetected
+                                             ? "No speech detected"
+                                             : "Ready to transcribe")
                                             .appType(.title)
                                             .foregroundStyle(AppColors.textPrimary)
 
-                                        Text(readyModeDescription)
+                                        Text(viewModel.noSpeechDetected
+                                             ? "Nothing was recognised in that recording. Check your input device, then try again."
+                                             : readyModeDescription)
                                             .appType(.secondary)
                                             .foregroundStyle(AppColors.textSecondary)
                                             .multilineTextAlignment(.center)

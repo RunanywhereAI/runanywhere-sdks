@@ -43,7 +43,12 @@ const ENGINES: Record<EngineId, { label: string; powers: string }> = {
   },
   onnx: {
     label: 'ONNX / Sherpa',
-    powers: 'speech recognition, speech synthesis, and voice detection',
+    // Document indexing belongs here too: the same artifact serves the ONNX
+    // embedding models the Documents tab and the Document Q&A solution index
+    // with. Naming only the speech modalities made those screens contradict
+    // themselves — a row reading "Embeddings … Unavailable" sat directly under a
+    // sentence promising that everything except speech still worked.
+    powers: 'speech recognition, speech synthesis, voice detection, and document indexing',
   },
 };
 

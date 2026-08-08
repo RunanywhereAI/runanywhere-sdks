@@ -44,6 +44,7 @@
 
 #include "features/common/rac_stream_registry_internal.h"
 #include "features/stt/rac_stt_stream_internal.h"
+#include "features/stt/stt_transcript_text.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/foundation/rac_proto_adapters.h"
@@ -385,9 +386,13 @@ struct StreamBridgeContext {
 
 void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque) {
     auto* context = static_cast<StreamBridgeContext*>(opaque);
+    // An engine's own no-speech marker ([ Silence ], [Music], (wind)) is not a
+    // transcription. Published as empty so every SDK renders its honest empty
+    // state instead of showing engine internals as words the speaker said.
+    const std::string spoken = rac::stt::transcript_for_display(text);
     runanywhere::v1::STTPartialResult partial;
     if (text) {
-        partial.set_text(text);
+        partial.set_text(spoken);
     }
     partial.set_is_final(is_final == RAC_TRUE);
     if (!context->language.empty()) {
@@ -397,7 +402,7 @@ void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque)
     if (is_final == RAC_TRUE) {
         runanywhere::v1::STTOutput final_output;
         if (text) {
-            final_output.set_text(text);
+            final_output.set_text(spoken);
         }
         if (!context->language.empty()) {
             final_output.set_language(context->language);
