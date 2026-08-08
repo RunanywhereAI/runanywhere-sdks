@@ -19,7 +19,12 @@ import RunAnywhere
 ///
 /// Serves on-device text generation on the Apple Neural Engine and image
 /// generation (diffusion) over CoreML. Import this module and register it to
-/// route `framework == .neurt` model loads through the commons plugin router.
+/// route `framework == .coreml` model loads through the commons plugin router.
+///
+/// The ENGINE id is `neurt` but the FRAMEWORK case is `.coreml`: the engine is
+/// named for the implementing runtime, not for Apple's framework. commons maps
+/// `INFERENCE_FRAMEWORK_COREML` to `RAC_ENGINE_ID_NEURT` in
+/// `engine_name_for_framework()`; there is no `.neurt` framework case.
 ///
 /// ## Registration
 ///
