@@ -139,6 +139,19 @@ class ChatRequestPolicyTest {
     }
 
     @Test
+    fun `stray tool-call salvage also covers the default tool_call form`() {
+        // Same shape as the LFM2.5 case above, in the DEFAULT `<tool_call>` syntax that
+        // `strayToolCall` also matches. The call body lands in the regex's second group,
+        // so reading only the first left the bubble blank.
+        val raw = """<tool_call>[ask_user("What would you like to do today, Aman?")]</tool_call>"""
+
+        val visible = ChatToolResultNormalizer.stripStrayToolCall(raw)
+
+        assertFalse("tool markers must not survive", visible.contains("tool_call"))
+        assertEquals("What would you like to do today, Aman?", visible)
+    }
+
+    @Test
     fun `stray tool-call stripping keeps surrounding prose and leaves clean replies untouched`() {
         val mixed = "Sure, here you go.<|tool_call_start|>[noop()]<|tool_call_end|>"
         assertEquals("Sure, here you go.", ChatToolResultNormalizer.stripStrayToolCall(mixed))
