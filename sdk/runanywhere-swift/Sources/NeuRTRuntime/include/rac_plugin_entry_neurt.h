@@ -10,7 +10,7 @@
  *
  * The shipped RABackendNeuRT.xcframework exports only `rac_plugin_entry_neurt`
  * (the `rac_backend_neurt_register` wrapper is not re-exported), so
- * `ANE.register()` calls `rac_plugin_register(rac_plugin_entry_neurt())`
+ * `NeuRT.register()` calls `rac_plugin_register(rac_plugin_entry_neurt())`
  * directly — the same pattern ONNXRuntime uses for Sherpa.
  */
 #ifndef RAC_PLUGIN_ENTRY_NEURT_H
@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 /* Forward-declare the engine vtable struct. Swift treats this as an opaque
- * pointer inside the ANEBackend module and casts to
+ * pointer inside the NeuRTBackend module and casts to
  * `UnsafePointer<rac_engine_vtable_t>` (imported from CRACommons) via
  * `withMemoryRebound` before handing it to `rac_plugin_register()`. A plain
  * forward declaration (rather than #include'ing the commons plugin header)

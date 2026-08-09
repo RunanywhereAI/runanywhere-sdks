@@ -4,7 +4,7 @@
 //
 //  End-to-end registration coverage for every shipped backend product —
 //  LlamaCPP (LLM), ONNX + Sherpa (embeddings / STT / TTS / VAD), MLX (Apple
-//  MLX LLM/VLM/embeddings/speech), and ANE / NeuRT (Apple Neural Engine LLM +
+//  MLX LLM/VLM/embeddings/speech), and NeuRT (Apple Neural Engine LLM +
 //  CoreML diffusion). These exercise the real commons plugin registry through
 //  each XCFramework, so they are the "does the whole Swift SDK still wire up"
 //  smoke test we run before a release.
@@ -27,8 +27,8 @@ import XCTest
 
 @testable import RunAnywhere
 
-import ANERuntime
 import LlamaCPPRuntime
+import NeuRTRuntime
 import ONNXRuntime
 
 // NOTE: MLXRuntime is intentionally NOT imported here. Its `MLXBackend`
@@ -86,24 +86,24 @@ final class BackendRegistrationTests: XCTestCase {
         }
     }
 
-    // MARK: - ANE / NeuRT (Apple Neural Engine LLM + CoreML diffusion)
+    // MARK: - NeuRT (Apple Neural Engine LLM + CoreML diffusion)
 
-    func testANERegistrationIsIdempotentAndUnregisters() throws {
+    func testNeuRTRegistrationIsIdempotentAndUnregisters() throws {
         let baseline = rac_plugin_count()
-        ANE.register()
+        NeuRT.register()
         let afterFirst = rac_plugin_count()
-        ANE.register() // idempotent — must not double-register
-        XCTAssertEqual(afterFirst, rac_plugin_count(), "re-registering ANE must not add a duplicate plugin")
+        NeuRT.register() // idempotent — must not double-register
+        XCTAssertEqual(afterFirst, rac_plugin_count(), "re-registering NeuRT must not add a duplicate plugin")
         XCTAssertGreaterThanOrEqual(afterFirst, baseline)
-        XCTAssertFalse(ANE.version.isEmpty, "ANE module must report a version")
+        XCTAssertFalse(NeuRT.version.isEmpty, "NeuRT module must report a version")
 
         // Teardown then re-register must be crash-free and keep the registry
         // consistent (verified via rac_plugin_count before/after each step).
-        ANE.unregister()
+        NeuRT.unregister()
         let afterUnregister = rac_plugin_count()
         XCTAssertLessThanOrEqual(afterUnregister, afterFirst, "unregister must not grow the registry")
 
-        ANE.register()
+        NeuRT.register()
         XCTAssertGreaterThanOrEqual(
             rac_plugin_count(),
             afterUnregister,
@@ -111,14 +111,14 @@ final class BackendRegistrationTests: XCTestCase {
         )
     }
 
-    func testANERoutesDiffusionWhenRoutable() throws {
-        ANE.register()
+    func testNeuRTRoutesDiffusionWhenRoutable() throws {
+        NeuRT.register()
         guard routes(RAC_PRIMITIVE_DIFFUSION, engine: "neurt") else {
-            throw XCTSkip("NeuRT is a stub on the linked binaries; ANE diffusion routing is validated by the routable release build")
+            throw XCTSkip("NeuRT is a stub on the linked binaries; NeuRT diffusion routing is validated by the routable release build")
         }
         XCTAssertNotNil(
             rac_plugin_find_for_engine(RAC_PRIMITIVE_DIFFUSION, "neurt"),
-            "the neurt engine must serve DIFFUSION once ANE is registered against routable binaries"
+            "the neurt engine must serve DIFFUSION once NeuRT is registered against routable binaries"
         )
     }
 
@@ -127,7 +127,7 @@ final class BackendRegistrationTests: XCTestCase {
     func testAllBackendsRegisterTogether() throws {
         LlamaCPP.register()
         ONNX.register()
-        ANE.register()
+        NeuRT.register()
 
         // At least one real backend must be present after wiring everything up.
         XCTAssertGreaterThan(

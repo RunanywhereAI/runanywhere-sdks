@@ -1,5 +1,5 @@
-module ANEBackend {
-    umbrella header "ANEBackend.h"
+module NeuRTBackend {
+    umbrella header "NeuRTBackend.h"
 
     export *
     module * { export * }
