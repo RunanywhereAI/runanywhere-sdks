@@ -334,7 +334,10 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             rac_backend_sherpa_register();  // STT / TTS (optional)
 #endif
 #ifdef RAC_HAVE_BACKEND_QHEXRT
-            rac_backend_qhexrt_register();  // Hexagon NPU when linked (not claimed for Win NPU yet)
+            // Hexagon NPU. Routable on Snapdragon Android and Windows on ARM64 when a
+            // matching prebuilt is linked; the not-routable shell otherwise, which
+            // registers and then declines every primitive.
+            rac_backend_qhexrt_register();
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
             rac_backend_mlx_register();
