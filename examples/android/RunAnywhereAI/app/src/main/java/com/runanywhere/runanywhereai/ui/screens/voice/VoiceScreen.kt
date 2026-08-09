@@ -508,7 +508,10 @@ private fun QuietMicHint(visible: Boolean) {
         exit = fadeOut(motionSpec { AppMotion.exit() }),
     ) {
         Text(
-            text = "Not hearing anything yet — try speaking up, or move closer to the mic.",
+            // "yet" would be a claim about the whole session, and this line also appears
+            // between turns — under a reply the agent just heard, understood and answered.
+            // What is true in both places is that nothing has come through since.
+            text = "Nothing heard for a while — try speaking up, or move closer to the mic.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

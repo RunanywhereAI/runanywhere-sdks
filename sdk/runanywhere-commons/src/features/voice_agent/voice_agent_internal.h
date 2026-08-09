@@ -129,6 +129,18 @@ struct rac_voice_agent_feed_state {
     /// True once the dead-input diagnostic has been reported for the current
     /// stretch, so it is said once instead of every frame.
     bool silent_input_reported{false};
+    /// Consecutive milliseconds the energy gate has stayed shut, and the
+    /// loudest frame seen during that stretch.
+    ///
+    /// Distinct from the dead-input counters above, and the gap between the two
+    /// is the whole point: an input can be delivering plenty of signal and still
+    /// never clear a gate set relative to it. That case reported nothing at all,
+    /// which made "the agent cannot hear me" over a live microphone
+    /// indistinguishable from a broken pipeline — twice. Reported once per shut
+    /// stretch, with the numbers, so the next time it is a measurement.
+    int64_t gate_shut_ms{0};
+    float gate_shut_peak{0.0f};
+    bool gate_shut_reported{false};
     /// Wall-clock instant the reply we last handed the SDK stops being audible,
     /// derived from that reply's own duration. 0 = no reply outstanding. A
     /// speech onset before this instant is the user talking over the agent,

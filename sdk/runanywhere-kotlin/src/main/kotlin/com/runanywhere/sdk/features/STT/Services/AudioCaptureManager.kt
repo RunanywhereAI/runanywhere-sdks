@@ -115,11 +115,13 @@ class AudioCaptureManager {
      * Open the microphone and deliver 100 ms PCM16 chunks to [onAudioData].
      *
      * @param echoCancelling ask the platform to keep the device's own loudspeaker out of the
-     *   captured signal — `VOICE_COMMUNICATION` plus [AcousticEchoCanceler] where the hardware
-     *   offers one. Only the voice agent needs it (it feeds the mic through its own playout, so
-     *   without cancellation the agent hears itself); plain recognition keeps the untouched
-     *   `MIC` source, whose signal is what the STT models were tuned on. Best effort by
-     *   construction: a device with no canceller still records, from the plain source.
+     *   captured signal — `VOICE_COMMUNICATION` plus [AcousticEchoCanceler]. Only the voice
+     *   agent needs it (it feeds the mic through its own playout, so without cancellation the
+     *   agent hears itself); plain recognition keeps the untouched `MIC` source, whose signal
+     *   is what the STT models were tuned on. Best effort by construction, and the two halves
+     *   travel together: a device with no canceller records from `MIC` as well, because the
+     *   communication source's own processing costs signal fidelity and, with no canceller
+     *   attached, would buy nothing back.
      */
     suspend fun startRecording(
         echoCancelling: Boolean = false,
@@ -174,19 +176,42 @@ class AudioCaptureManager {
             (sampleRate * AudioCaptureConstants.BYTES_PER_SAMPLE * AudioCaptureConstants.CHUNK_DURATION_MS) / 1000
         val recordBufferBytes = maxOf(minBufferBytes, chunkBytes * 2)
 
-        // VOICE_COMMUNICATION is the source the platform runs its echo canceller on; a device
-        // that cannot open it (or initialises it in a broken state) still has to record, so the
-        // plain MIC source is the fallback rather than a failure.
+        // VOICE_COMMUNICATION is the source the platform runs its echo canceller on — so it is
+        // only worth asking for on a device that HAS one. Leaving MIC is not free: the
+        // communication source is a processed capture (noise suppression, AGC, and on some
+        // HALs a noise gate), and the energy segmenters downstream decide speech by the RATIO
+        // of a frame to the room, which is exactly the quantity that processing flattens.
+        // Measured on the Android emulator, whose HAL reports no canceller: the voice agent
+        // opened VOICE_COMMUNICATION successfully and then never opened its energy gate on
+        // real speech, while the plain MIC source in the same room, same volume, drove Silero
+        // VAD and batch Whisper perfectly. Asking a device with no canceller for the
+        // communication source therefore trades the signal every model was tuned on for
+        // nothing at all.
+        val echoCancellerAvailable = echoCancelling && AcousticEchoCanceler.isAvailable()
+        if (echoCancelling && !echoCancellerAvailable) {
+            logger.info(
+                "No AcousticEchoCanceler on this device — recording from the plain MIC source " +
+                    "instead of VOICE_COMMUNICATION, which would only add capture processing",
+            )
+        }
+        // A device that cannot open the preferred source (or initialises it in a broken state)
+        // still has to record, so the plain MIC source is the fallback rather than a failure.
+        val preferredSource =
+            if (echoCancellerAvailable) {
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            } else {
+                MediaRecorder.AudioSource.MIC
+            }
         val preferred =
             openRecord(
-                if (echoCancelling) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.MIC,
+                preferredSource,
                 sampleRate,
                 channelConfig,
                 audioEncoding,
                 recordBufferBytes,
             )
         val fallback =
-            if (echoCancelling && preferred?.state != AudioRecord.STATE_INITIALIZED) {
+            if (echoCancellerAvailable && preferred?.state != AudioRecord.STATE_INITIALIZED) {
                 preferred.releaseQuietly()
                 logger.warning("VOICE_COMMUNICATION capture unavailable — falling back to the plain MIC source")
                 openRecord(
@@ -259,7 +284,7 @@ class AudioCaptureManager {
         }
 
         audioRecord = record
-        if (echoCancelling) attachEchoCanceler(record)
+        if (echoCancellerAvailable) attachEchoCanceler(record)
         recordingFlag.set(true)
 
         val scope = CoroutineScope(Dispatchers.IO)
@@ -288,7 +313,13 @@ class AudioCaptureManager {
                 }
             }
 
-        logger.info("Recording started (sampleRate=$sampleRate, chunkBytes=$chunkBytes)")
+        // The source is named because it decides what the segmenters downstream see, and it is
+        // otherwise invisible from outside — "recording started" on a source delivering a
+        // processed or dead stream reads exactly like a healthy capture.
+        logger.info(
+            "Recording started (source=${sourceName(record.audioSource)}, " +
+                "sampleRate=$sampleRate, chunkBytes=$chunkBytes)",
+        )
     }
 
     fun stopRecording() {
@@ -375,6 +406,14 @@ class AudioCaptureManager {
             // turned into a silent fallback.
             logger.warning("AudioRecord(source=$source) failed: ${e.message}")
             null
+        }
+
+    /** Human-readable name for the [MediaRecorder.AudioSource] a live record is reading. */
+    private fun sourceName(source: Int): String =
+        when (source) {
+            MediaRecorder.AudioSource.MIC -> "MIC"
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION -> "VOICE_COMMUNICATION"
+            else -> "source-$source"
         }
 
     /** Release without caring about the outcome — used on paths that are already failing. */

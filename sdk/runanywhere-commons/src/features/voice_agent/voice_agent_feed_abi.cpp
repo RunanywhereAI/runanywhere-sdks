@@ -116,22 +116,39 @@ constexpr float kNoiseFloorFall = 0.20f;
 // taken over a shorter window, or taken as the minimum of the window, learns
 // that ramp instead of the room.
 constexpr int kFloorWarmupFrames = 8;
-// There is deliberately no second, stricter energy bar here.
+// How far above the ambient floor a frame must sit to COUNT towards
+// kMinSpeechMs, as opposed to merely opening the gate.
 //
-// One was tried: frames had to clear the ambient floor by ~11 dB before they
-// counted towards kMinSpeechMs, on the theory that room transients cannot
-// sustain that margin but speech can. Measured on this Mac it rejected real
-// speech outright. With the agent holding the microphone the system runs its own
-// echo cancellation, and a sentence arrived at the mic at -39 to -45 dBFS
-// against a -48 dBFS room floor — 7 dB of headroom, comfortably under the bar,
-// so no utterance ever closed and the agent went deaf. Quiet talkers, distant
-// talkers and low-gain inputs all live in that same band.
+// The gate stays deliberately sensitive (x2.2) so a sentence's first syllable is
+// never clipped, but "loud enough to open" is far too weak a test for "a person
+// was talking", which is what kMinSpeechMs is really asking. Room transients — a
+// chair, a fan cycling, a door — clear 6.8 dB over their own floor all day.
 //
-// The lesson is that energy cannot answer "was that a person". It can only
-// answer "did something happen", which is what the gate above is for and all it
-// is asked to do. Whether an utterance contains speech is decided by the speech
-// detector, once, in d7_process_utterance — one question, one component that can
-// actually answer it.
+// 11 dB is not a guess; it is where the measurement puts the knee. Replaying
+// real captures of this machine's built-in microphone through this exact
+// segmenter, counting utterances that would have been handed to STT:
+//
+//   margin      quiet room, 100 s      a voice at the mic, 23 s
+//   ------      -----------------      ------------------------
+//   none                        4                             8
+//   8 dB                        3                             7
+//   11 dB                       1                             6
+//   14 dB                       1                             3
+//
+// So 11 dB removes three quarters of what the room produces while a voice is
+// still heard six times out of eight — and pushing further starts costing real
+// utterances without buying any more silence. The remaining one is why the VAD
+// veto in d7_process_utterance exists: energy narrows the problem, it does not
+// close it.
+//
+// Note for anyone re-measuring this on a Mac: do NOT use `say` through the
+// built-in speakers as the "voice" input while the agent is running. The system
+// echo-cancels its own output out of the capture stream, so that path arrives
+// ~25 dB down (measured -39 dBFS against a -48 dBFS floor) and lands under this
+// bar — correctly, because it is the agent's own loudspeaker, not a person. The
+// figures above use a capture taken with the agent stopped, where nothing is
+// being cancelled, which is what a human in the room actually looks like.
+constexpr float kSpeechConfirmMultiplier = 3.5f;
 constexpr int kEndOfUtteranceSilenceMs = 800;
 constexpr int kMinSpeechMs = 300;
 constexpr int kMaxUtteranceMs = 15000;
@@ -390,6 +407,12 @@ feed_outcome feed_segment(rac_voice_agent_feed_state& s, const void* data, size_
         }
 
         const bool is_speech = level >= threshold;
+        // Opening the gate and having been a voice are two different claims, and
+        // only the second one may end a turn. `threshold` answers the first;
+        // this answers the second. Never below the gate, so a barge-in still has
+        // to clear the echo estimate too.
+        const bool is_confirmed_speech =
+            level >= std::max(threshold, s.noise_floor * kSpeechConfirmMultiplier);
 
         // Measure how much of the loudspeaker this room returns to this
         // microphone, from the opening frames of the reply and then STOP.
@@ -459,9 +482,29 @@ feed_outcome feed_segment(rac_voice_agent_feed_state& s, const void* data, size_
             s.pre_roll.push_back(std::move(frame));
             if (s.pre_roll.size() > kPreRollFrames)
                 s.pre_roll.pop_front();
+            // Say what the gate is measuring when nothing has cleared it for a
+            // long time. See rac_voice_agent_feed_state::gate_shut_ms.
+            if (open_gate) {
+                s.gate_shut_ms = 0;
+                s.gate_shut_peak = 0.0f;
+                s.gate_shut_reported = false;
+            } else if (!reply_audible) {
+                s.gate_shut_ms += kFrameMs;
+                s.gate_shut_peak = std::max(s.gate_shut_peak, level);
+                if (!s.gate_shut_reported && s.gate_shut_ms >= kSilentInputWarnMs) {
+                    s.gate_shut_reported = true;
+                    RAC_LOG_INFO("VoiceAgent.Feed",
+                                 "no speech gate for %lld ms: loudest frame %.5f, floor "
+                                 "%.5f, gate %.5f",
+                                 static_cast<long long>(s.gate_shut_ms),
+                                 static_cast<double>(s.gate_shut_peak),
+                                 static_cast<double>(s.noise_floor),
+                                 static_cast<double>(threshold));
+                }
+            }
             if (open_gate) {
                 s.in_speech = true;
-                s.speech_ms = kFrameMs;
+                s.speech_ms = is_confirmed_speech ? kFrameMs : 0;
                 s.silence_ms = 0;
                 s.utterance.clear();
                 for (const auto& buffered : s.pre_roll)
@@ -482,12 +525,13 @@ feed_outcome feed_segment(rac_voice_agent_feed_state& s, const void* data, size_
         }
 
         s.utterance.append(reinterpret_cast<const char*>(frame.data()), frame.size());
-        if (is_speech) {
+        // Endpointing timing stays the gate's job — a pause between words is
+        // "not speaking" at the gate's sensitivity, and widening that would
+        // change how quickly turns end. Only what `speech_ms` counts changed.
+        if (is_confirmed_speech) {
             s.speech_ms += kFrameMs;
-            s.silence_ms = 0;
-        } else {
-            s.silence_ms += kFrameMs;
         }
+        s.silence_ms = is_speech ? 0 : s.silence_ms + kFrameMs;
 
         const int utterance_ms =
             static_cast<int>((s.utterance.size() / kBytesPerSample) * 1000 / kSampleRateHz);

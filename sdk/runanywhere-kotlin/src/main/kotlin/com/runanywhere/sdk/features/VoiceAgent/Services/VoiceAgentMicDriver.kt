@@ -67,10 +67,12 @@ import kotlin.coroutines.cancellation.CancellationException
  *     reply simply finishes, which is the safe way to be wrong.
  *  2. **Echo cancellation where the device has it.** [AudioCaptureManager] is
  *     asked for an echo-cancelling capture ([AudioCaptureManager.startRecording]'s
- *     `echoCancelling`), which opens `VOICE_COMMUNICATION` and attaches
- *     `AcousticEchoCanceler` when the platform offers one. It is an
- *     improvement, not a prerequisite — the margin above does the separating on
- *     devices (and emulators) that have no canceller.
+ *     `echoCancelling`). On a device that has a canceller, that opens
+ *     `VOICE_COMMUNICATION` with `AcousticEchoCanceler` attached; on one that
+ *     does not — most emulators — it records from the plain `MIC` source, since
+ *     the communication source's processing would cost signal without cancelling
+ *     anything. It is an improvement, not a prerequisite: the margin above does
+ *     the separating whenever there is no canceller.
  *
  * Only this layer can stop the speaker, so [stopPlayback] is the other half of
  * the handshake: `VoiceSession` watches the core's stream and calls it on a
@@ -123,7 +125,8 @@ internal class VoiceAgentMicDriver(
             // Ask for the echo-cancelling capture: the frames now keep flowing
             // while the agent is audible, so anything the platform can take out
             // of the mic signal is one less thing the core's echo margin has to
-            // separate.
+            // separate. Asking is not the same as getting — a device without a
+            // canceller stays on the plain MIC source; see startRecording.
             capture.startRecording(echoCancelling = true) { chunk -> queue.trySend(chunk) }
             logger.info("Voice-agent mic capture started")
             try {
