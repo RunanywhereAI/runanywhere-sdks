@@ -20,7 +20,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
-  s.version          = '0.20.13'
+  s.version          = '0.20.14'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
