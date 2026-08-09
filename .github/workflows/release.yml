@@ -653,9 +653,10 @@ jobs:
     runs-on: ubuntu-latest
     # The WASM build compiles Abseil + Protobuf from source (RAG/Solutions ON)
     # and is forced to --parallel 1 to dodge a zlib static-lib race, then builds
-    # a second time for WebGPU. 60m is no longer enough (was cancelled mid-build);
-    # 180m covers both serial builds. TODO: restore parallelism / add object cache.
-    timeout-minutes: 180
+    # again for each WebGPU variant. Three serial builds already ran 2h20m on a
+    # slow runner, so 180m no longer leaves headroom.
+    # TODO: restore parallelism / add object cache.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -670,8 +671,11 @@ jobs:
       - name: Build WASM (WebGPU llama.cpp)
         working-directory: sdk/runanywhere-web
         run: npm run build:wasm -- --webgpu
+      - name: Build WASM (WebGPU ONNX + Sherpa)
+        working-directory: sdk/runanywhere-web
+        run: npm run build:wasm -- --onnx-webgpu
       - name: Package Web/WASM outputs
-        # All four artifacts are required release inputs. Emscripten 5+ embeds
+        # All five artifacts are required release inputs. Emscripten 5+ embeds
         # pthread workers in the generated glue, so only the JS/WASM pairs are
         # portable publish requirements.
         working-directory: sdk/runanywhere-web
@@ -686,6 +690,8 @@ jobs:
             packages/llamacpp/wasm/racommons-llamacpp-webgpu.wasm
             packages/onnx/wasm/racommons-onnx-sherpa.js
             packages/onnx/wasm/racommons-onnx-sherpa.wasm
+            packages/onnx/wasm/racommons-onnx-sherpa-webgpu.js
+            packages/onnx/wasm/racommons-onnx-sherpa-webgpu.wasm
           )
           for artifact in "${required_files[@]}"; do
             if [ ! -s "$artifact" ]; then
