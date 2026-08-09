@@ -144,12 +144,21 @@ fun VadScreen() {
 
         Text(
             text = when {
+                // A dead input looks exactly like a quiet room from here, and
+                // only one of them is worth acting on. See
+                // `VadViewModel.micInputUnusable`.
+                vadVm.micInputUnusable ->
+                    "The microphone is returning a flat signal — check the selected input."
                 vadVm.isListening -> "Listening for speech…"
                 model != null -> "Tap to start detection"
                 else -> "Select a model to begin"
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (vadVm.micInputUnusable) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
 
         if (vadVm.activityLog.isNotEmpty()) {

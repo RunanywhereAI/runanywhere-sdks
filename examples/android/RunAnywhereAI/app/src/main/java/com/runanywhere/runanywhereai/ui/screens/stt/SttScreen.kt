@@ -172,7 +172,17 @@ fun SttScreen() {
             // Same sentence as iOS `SpeechToTextView`.
             sttVm.noSpeechDetected && !sttVm.isRecording && !sttVm.isTranscribing -> LabeledCard("Transcript") {
                 Text(
-                    text = "No speech detected. Nothing was recognised in that recording.",
+                    // A capture that carried no signal at all is a different
+                    // problem from a room that stayed quiet, and only one of
+                    // the two is the speaker's to fix. See
+                    // `SttViewModel.micInputUnusable`.
+                    text = if (sttVm.micInputUnusable) {
+                        "The microphone returned a flat signal, so there was nothing to " +
+                            "transcribe. Check that the right input is selected and that " +
+                            "nothing else is using it, then try again."
+                    } else {
+                        "No speech detected. Nothing was recognised in that recording."
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

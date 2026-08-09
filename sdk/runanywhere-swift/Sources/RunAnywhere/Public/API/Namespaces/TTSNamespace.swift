@@ -141,18 +141,37 @@ extension RunAnywhere {
     /// immediately — playback continues in the background and completes the
     /// handle when it finishes, is interrupted, or fails.
     internal static func speakAndTrack(text: String, options: RATTSOptions) async throws -> SpeechHandle {
-        let output = try await synthesizeProto(text: text, options: options)
-
-        let sampleRate = output.sampleRate > 0 ? output.sampleRate : options.sampleRate
-        let wavSampleRate = sampleRate > 0 ? sampleRate : Int32(RADefaults.AudioCapture.ttsSampleRateHz)
-        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: wavSampleRate)
-
+        // The handle is published BEFORE synthesis, not after it. A neural
+        // voice takes seconds to synthesize, and while it did there was no
+        // handle for this utterance: `tts.stop()` and `VoiceSession.interrupt()`
+        // resolve their target through `activeSpeechHandleSnapshot()`, which
+        // still held the *previous*, already-finished utterance. A Stop pressed
+        // during synthesis therefore interrupted a dead handle, this utterance
+        // went on to play in full, and the caller had already been told it was
+        // over. Registering first makes the whole utterance interruptible,
+        // synthesis included.
         let handle = SpeechHandle(interruptHandler: {
             await RunAnywhere.stopSpeech()
         })
         setActiveSpeechHandle(handle)
 
-        guard !wavData.isEmpty else {
+        let wavData: Data
+        do {
+            let output = try await synthesizeProto(text: text, options: options)
+            let sampleRate = output.sampleRate > 0 ? output.sampleRate : options.sampleRate
+            let wavSampleRate = sampleRate > 0 ? sampleRate : Int32(RADefaults.AudioCapture.ttsSampleRateHz)
+            wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: wavSampleRate)
+        } catch {
+            // The handle is already visible to interrupters and may have
+            // `waitForPlayout()` waiters, so it has to be resolved before the
+            // error leaves this function.
+            handle.complete(error: error)
+            throw error
+        }
+
+        // An interrupt that landed while the engine was synthesizing must not be
+        // overtaken by the audio it was meant to cancel.
+        guard !handle.interrupted, !wavData.isEmpty else {
             handle.complete()
             return handle
         }
@@ -162,6 +181,13 @@ extension RunAnywhere {
             // interrupt(); `handle.interrupted` already distinguishes the two,
             // so no synthetic error is attached here.
             handle.complete()
+        }
+        // `play` starts the player synchronously, so an interrupt that arrived
+        // between the guard above and this line would have stopped a player
+        // that did not exist yet. Re-checking here closes that window; `stop()`
+        // is a no-op when nothing is playing.
+        if handle.interrupted {
+            speechPlayback.stop()
         }
         return handle
     }

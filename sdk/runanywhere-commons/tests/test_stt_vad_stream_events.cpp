@@ -216,6 +216,50 @@ int test_stt_stream_events() {
     return 0;
 }
 
+// -----------------------------------------------------------------------------
+// Synthetic audio for the one-shot fallback segmenter.
+//
+// The segmenter in src/features/stt/rac_stt_stream.cpp decides speech by RATIO
+// to the room it has measured, not by an absolute level, so a fixture that hands
+// it speech and nothing else is not describing a stream — it is asking the
+// segmenter to judge a phrase against a room it was never given. A real capture
+// always supplies that room: the stream is armed when the user taps record, and
+// what arrives before they start talking is the room. These fixtures supply it
+// the same way, which is what makes the trailing-silence endpoint below a real
+// test rather than an accident of the buffer starting at zero.
+// -----------------------------------------------------------------------------
+
+// The segmenter's frame: 100 ms at 16 kHz (kFallbackFrameMs).
+constexpr size_t kFallbackFrameSamples = 1600;
+// Room tone, RMS 0.031 — the level measured in-app on the Android emulator, and
+// the room the 2.2x ambient multiplier was fitted against. It puts the gate at
+// 0.067, which the room itself sits well below: that is what lets trailing room
+// tone read as the silence that closes an utterance.
+constexpr int16_t kRoomToneAmplitude = 1000;
+// Speech, RMS 0.366 — some twelve times the room and far clear of that gate.
+constexpr int16_t kSpeechAmplitude = 12000;
+// Frames of room to hand over before expecting the gate to open at all. The
+// segmenter builds its estimate over the first kFallbackFloorWarmupFrames (8
+// today) and keeps the gate shut until then; feeding a few more than that keeps
+// these endpointing tests measuring endpointing, rather than turning red if that
+// window is ever retuned. Extra room frames are inert — once the estimate is
+// built they simply read as silence.
+constexpr int kFallbackWarmupFramesToFeed = 12;
+
+// Hand the segmenter the room it measures its gate from. Returns false if any
+// feed was rejected, so a caller can surface the whole warm-up as one CHECK.
+bool feed_fallback_room_warmup(uint64_t session_id) {
+    const std::vector<int16_t> room(kFallbackFrameSamples, kRoomToneAmplitude);
+    for (int i = 0; i < kFallbackWarmupFramesToFeed; ++i) {
+        if (rac_stt_stream_feed_audio_proto(session_id,
+                                            reinterpret_cast<const uint8_t*>(room.data()),
+                                            room.size() * sizeof(int16_t)) != RAC_SUCCESS) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     install_mock_stt_plugin();
     (void)rac_plugin_unregister("cpp-persistent-stream-stt");
@@ -248,7 +292,8 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "fallback stream session starts");
-    std::vector<int16_t> speech(1600, 12000);  // 100 ms at 16 kHz
+    CHECK(feed_fallback_room_warmup(session_id), "fallback stream session measures the room first");
+    std::vector<int16_t> speech(kFallbackFrameSamples, kSpeechAmplitude);  // 100 ms at 16 kHz
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -269,16 +314,22 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "fallback endpoint session starts");
+    CHECK(feed_fallback_room_warmup(session_id),
+          "fallback endpoint session measures the room first");
     for (int i = 0; i < 3; ++i) {
         (void)rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
                                               speech.size() * sizeof(int16_t));
     }
-    std::vector<int16_t> silence(1600, 0);
+    // The room, not digital silence: kFallbackEndSilenceMs of ordinary ambience
+    // has to read as the end of the phrase. Feeding true zeroes here would close
+    // the utterance even against a segmenter whose adaptive floor was broken,
+    // which is the failure this trailing window exists to catch.
+    std::vector<int16_t> trailing_room(kFallbackFrameSamples, kRoomToneAmplitude);
     for (int i = 0; i < 8; ++i) {
-        (void)rac_stt_stream_feed_audio_proto(session_id,
-                                              reinterpret_cast<const uint8_t*>(silence.data()),
-                                              silence.size() * sizeof(int16_t));
+        (void)rac_stt_stream_feed_audio_proto(
+            session_id, reinterpret_cast<const uint8_t*>(trailing_room.data()),
+            trailing_room.size() * sizeof(int16_t));
     }
     CHECK(g_fallback_transcribe_count == 1,
           "one-shot fallback infers once after the speech endpoint");
@@ -311,6 +362,8 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "cancel-before-flush fallback session starts");
+    CHECK(feed_fallback_room_warmup(session_id),
+          "cancel-before-flush session measures the room first");
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -376,7 +429,9 @@ int test_stt_fallback_reload_cancels_buffered_session() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &old_session_id) == RAC_SUCCESS,
           "reload-test fallback session starts on model A");
-    std::vector<int16_t> speech(1600, 12000);
+    CHECK(feed_fallback_room_warmup(old_session_id),
+          "reload-test model-A session measures the room first");
+    std::vector<int16_t> speech(kFallbackFrameSamples, kSpeechAmplitude);
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(old_session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -402,6 +457,8 @@ int test_stt_fallback_reload_cancels_buffered_session() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &new_session_id) == RAC_SUCCESS,
           "new fallback session starts after model reload");
+    CHECK(feed_fallback_room_warmup(new_session_id),
+          "reload-test model-B session measures the room first");
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(new_session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
