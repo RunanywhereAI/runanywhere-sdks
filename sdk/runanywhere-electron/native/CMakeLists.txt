@@ -50,7 +50,15 @@ if(RAC_BUILD_ELECTRON_ADDON)
         # build resolves these via cmake-js (CMAKE_JS_INC / CMAKE_JS_LIB) instead.
         set(RAC_NODE_DEV_DIR "$ENV{LOCALAPPDATA}/node-gyp/Cache/24.15.0"
             CACHE PATH "node-gyp dev files dir (contains include/node + <arch>/node.lib)")
-        set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/x64/node.lib"
+        # node-gyp keys the import library by target arch, so an ARM64 addon must
+        # link arm64/node.lib — x64/node.lib fails the link with LNK1112.
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$" OR
+           CMAKE_GENERATOR_PLATFORM MATCHES "^([Aa][Rr][Mm]64)$")
+            set(_ra_node_arch "arm64")
+        else()
+            set(_ra_node_arch "x64")
+        endif()
+        set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/${_ra_node_arch}/node.lib"
             CACHE FILEPATH "Windows node import library (node.lib)")
         if(NOT EXISTS "${RAC_NODE_LIB}")
             message(FATAL_ERROR
@@ -99,8 +107,11 @@ if(RAC_BUILD_ELECTRON_ADDON)
     # are present via RAC_HAVE_BACKEND_<X>. Default CPU build provides llamacpp +
     # onnx + sherpa. QHexRT / MLX / CoreML / cloud self-link when their upstream
     # RAC_BACKEND_* flag builds the target — no wrapper source change required.
-    # Do NOT claim Windows NPU readiness: qhexrt may link as a shell, but Snapdragon
-    # Windows packaging is a separate gate.
+    # RAC_HAVE_BACKEND_QHEXRT only says the target exists: on Windows x64 (and any
+    # non-ARM64 host) qhexrt links as the not-routable shell, and even on ARM64 it
+    # is routable only with a win-arm64 prebuilt staged. Actually RUNNING a model
+    # additionally needs the QAIRT DLLs + the v81 skel and its .cat staged flat
+    # beside the addon — see engines/qhexrt/CMakeLists.txt.
     set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
     set(_ra_linked_backends "")
     foreach(_ra_b IN LISTS _ra_backends)

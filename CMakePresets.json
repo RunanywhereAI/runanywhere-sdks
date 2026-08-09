@@ -259,6 +259,26 @@
                 "RAC_BUILD_SHARED": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "windows-arm64-release",
+            "displayName": "Windows ARM64 \u2014 Release (Snapdragon X/X2 Elite, experimental)",
+            "description": "Native ARM64 MSVC build for Snapdragon X / X2 Elite. Mirrors windows-release; only the generator platform differs, so the Electron addon links arm64/node.lib and the QHexRT engine looks for a lib/win-arm64 prebuilt. Add -DRAC_BACKEND_QHEXRT=ON (+ -DQHEXRT_ROOT=<path>) to link the NPU engine.",
+            "inherits": "base-release",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "ARM64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "windows-arm64-release-vs2026",
+            "displayName": "Windows ARM64 \u2014 Release on the VS 2026 toolset",
+            "description": "Identical to windows-arm64-release but pinned to Visual Studio 18 2026, for workstations that only have the newer toolset installed.",
+            "inherits": "windows-arm64-release",
+            "generator": "Visual Studio 18 2026"
         }
     ],
 
@@ -278,7 +298,9 @@
         { "name": "ios-simulator",    "configurePreset": "ios-simulator" },
         { "name": "wasm",             "configurePreset": "wasm" },
         { "name": "windows-debug",    "configurePreset": "windows-debug" },
-        { "name": "windows-release",  "configurePreset": "windows-release" }
+        { "name": "windows-release",  "configurePreset": "windows-release" },
+        { "name": "windows-arm64-release", "configurePreset": "windows-arm64-release", "configuration": "Release" },
+        { "name": "windows-arm64-release-vs2026", "configurePreset": "windows-arm64-release-vs2026", "configuration": "Release" }
     ],
 
     "testPresets": [
