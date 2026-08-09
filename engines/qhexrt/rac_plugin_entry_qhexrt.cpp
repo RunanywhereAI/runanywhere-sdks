@@ -24,7 +24,9 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(__ANDROID__) && defined(RAC_QHEXRT_ENGINE_AVAILABLE) && RAC_QHEXRT_ENGINE_AVAILABLE
+// RAC_QHEXRT_PLATFORM_SUPPORTED (qhexrt_backend.h) is Android or Windows-on-ARM64.
+#if RAC_QHEXRT_PLATFORM_SUPPORTED && defined(RAC_QHEXRT_ENGINE_AVAILABLE) && \
+    RAC_QHEXRT_ENGINE_AVAILABLE
 #define RAC_QHEXRT_ROUTABLE 1
 #else
 #define RAC_QHEXRT_ROUTABLE 0
@@ -44,16 +46,14 @@
 namespace {
 
 // capability_check runs during rac_plugin_register, before the plugin enters
-// the primitive tables. QHexRT targets Snapdragon Android only; off-platform
-// builds report UNSUPPORTED (silent), Android builds without the linked engine
-// report BACKEND_UNAVAILABLE. The 3-way decision is the shared helper.
+// the primitive tables. QHexRT targets Snapdragon Android and Windows on ARM64;
+// off-platform builds report UNSUPPORTED (silent), on-platform builds without
+// the linked engine report BACKEND_UNAVAILABLE. The 3-way decision is the
+// shared helper.
 rac_result_t qhexrt_capability_check(void) {
     return rac_engine_unavailable_capability(
-#if defined(__ANDROID__)
-        1, /* platform_supported: runtime targets Snapdragon Android */
-#else
-        0,
-#endif
+        /* platform_supported: Snapdragon Android or Windows on ARM64 */
+        RAC_QHEXRT_PLATFORM_SUPPORTED,
 #if defined(RAC_QHEXRT_ENGINE_AVAILABLE) && RAC_QHEXRT_ENGINE_AVAILABLE
         1 /* backend_present: prebuilt QHexRT archive linked */
 #else
