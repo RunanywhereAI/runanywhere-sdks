@@ -228,8 +228,15 @@ rac_result_t rac_qhexrt_probe_proto(rac_proto_buffer_t* out_capability) {
     capability.set_soc_id(info.soc_id);
     capability.set_hexagon_arch(
         static_cast<runanywhere::v1::HexagonArch>(static_cast<int32_t>(info.hexagon_arch)));
-    capability.set_qhexrt_supported(info.supported == RAC_TRUE);
-    capability.set_arch_name(rac_qhexrt_arch_name(info.hexagon_arch));
+    // `supported` is engine-agnostic in the IDL on purpose (a second NPU engine
+    // must not need a second boolean), and the arch has no string field — the
+    // readable name is derivable from hexagon_arch via rac_qhexrt_arch_name().
+    // What the message does carry is the vendor family, so a non-Qualcomm device
+    // gets a meaningful answer instead of an empty message.
+    capability.set_supported(info.supported == RAC_TRUE);
+    capability.set_npu(info.hexagon_arch == RAC_QHEXRT_HEXAGON_ARCH_UNKNOWN
+                           ? runanywhere::v1::NPU_CHIP_UNSPECIFIED
+                           : runanywhere::v1::NPU_CHIP_QUALCOMM_HEXAGON);
 
     std::vector<uint8_t> bytes(capability.ByteSizeLong());
     if (!bytes.empty() &&

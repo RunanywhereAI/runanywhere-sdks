@@ -21,9 +21,8 @@
 
 #include "qhexrt_session.h"
 
-#include <unistd.h>
-
-#include <cerrno>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -89,6 +88,24 @@ bool is_supported_encoded_image(const uint8_t* data, size_t size) {
     return png || jpeg;
 }
 
+// How many names to try before giving up on an exclusive create. Only a genuine
+// collision costs a retry, and the counter alone makes that impossible within a
+// process, so this is a bound on pathology, not a normal cost.
+constexpr unsigned kNameAttempts = 8;
+
+// Distinct per call within a process (the counter) and, with high probability,
+// across processes sharing one model directory (the clock). Unpredictability is
+// not the safety property here — the exclusive create is; this only has to stop
+// two live requests from proposing the same name.
+std::string unique_suffix() {
+    static std::atomic<unsigned long long> counter{0};
+    const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%llx-%llx", static_cast<unsigned long long>(now),
+                  counter.fetch_add(1, std::memory_order_relaxed));
+    return std::string(buf);
+}
+
 class ScopedEncodedFile {
    public:
     ~ScopedEncodedFile() {
@@ -96,31 +113,28 @@ class ScopedEncodedFile {
             std::remove(path_.c_str());
     }
 
+    // mkstemp()/write()/close() are POSIX-only, and this engine now also builds
+    // for Windows on ARM64 (Snapdragon X / X2 Elite), where <unistd.h> does not
+    // exist. std::fopen's C11 exclusive-create mode ("x") keeps the property that
+    // actually matters — the file is created only if it does not already exist,
+    // so two concurrent requests can never collide on one temp name — and is
+    // implemented by both the MSVC CRT and glibc.
     bool write(const std::string& directory, const char* stem, const uint8_t* data, size_t size) {
         if (directory.empty() || data == nullptr || size == 0)
             return false;
-        std::string pattern = directory + "/.qhexrt-" + stem + "-XXXXXX";
-        std::vector<char> writable(pattern.begin(), pattern.end());
-        writable.push_back('\0');
-        int fd = mkstemp(writable.data());
-        if (fd < 0)
-            return false;
-        path_ = writable.data();
-        size_t written = 0;
-        while (written < size) {
-            const ssize_t rc = ::write(fd, data + written, size - written);
-            if (rc > 0) {
-                written += static_cast<size_t>(rc);
-                continue;
-            }
-            if (rc < 0 && errno == EINTR)
-                continue;
-            ::close(fd);
-            return false;
+        std::FILE* file = nullptr;
+        std::string candidate;
+        for (unsigned attempt = 0; attempt < kNameAttempts && file == nullptr; ++attempt) {
+            candidate = directory + "/.qhexrt-" + stem + "-" + unique_suffix();
+            file = std::fopen(candidate.c_str(), "wbx");
         }
-        if (::close(fd) != 0)
+        if (file == nullptr)
             return false;
-        return true;
+        path_ = candidate;
+        const bool wrote = std::fwrite(data, 1, size, file) == size;
+        // A short write is reported by fwrite itself, but the bytes are not on
+        // disk until the close succeeds, so both have to pass.
+        return (std::fclose(file) == 0) && wrote;
     }
 
     const char* path() const { return path_.c_str(); }
