@@ -1824,10 +1824,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       # native_web was skipped, so RACommons-web-v*.tar.gz is absent from this
       # run. Pull it from the reused run or the asset assertion below fails.
-      # Not needed in publish-only mode: the step above already brought it, and
-      # downloading it twice would trip the flatten collision guard.
+      # This applies in publish-only mode too: a run that itself reused the WASM
+      # never held a native-web artifact, so republishing it needs the same
+      # source. Only pass reuse_native_web_run_id when the artifacts being
+      # published genuinely lack native-web, or flatten will report a collision.
       - name: Download reused Web natives
-        if: ${{ inputs.reuse_native_web_run_id != '' && inputs.publish_from_run_id == '' }}
+        if: ${{ inputs.reuse_native_web_run_id != '' }}
         uses: actions/download-artifact@v8
         with:
           name: native-web
