@@ -18,6 +18,8 @@
     "dist",
     "wasm/racommons-onnx-sherpa.js",
     "wasm/racommons-onnx-sherpa.wasm",
+    "wasm/racommons-onnx-sherpa-webgpu.js",
+    "wasm/racommons-onnx-sherpa-webgpu.wasm",
     "README.md",
     "LICENSE"
   ],
@@ -28,7 +30,7 @@
     "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons-onnx-sherpa.js wasm/racommons-onnx-sherpa.wasm",
+    "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons-onnx-sherpa.js wasm/racommons-onnx-sherpa.wasm wasm/racommons-onnx-sherpa-webgpu.js wasm/racommons-onnx-sherpa-webgpu.wasm",
     "prepack": "npm run build && npm run verify:package"
   },
   "keywords": [
