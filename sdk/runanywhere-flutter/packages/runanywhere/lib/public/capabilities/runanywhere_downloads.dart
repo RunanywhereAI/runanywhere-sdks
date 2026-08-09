@@ -281,12 +281,23 @@ class RunAnywhereDownloads {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final metrics = await list();
+    // Read the models through the result-bearing API rather than `list()`:
+    // `list()` reports a failed lookup as an empty list, which would become a
+    // delete request carrying no model ids. Commons no-ops on that and reports
+    // no error, so the caller is told a destructive operation succeeded when
+    // nothing was examined, let alone deleted.
+    final infoResult = await getStorageInfoResult(
+      StorageInfoRequest(includeModels: true),
+    );
+    if (infoResult.hasError()) {
+      return StorageDeleteResult(error: infoResult.error);
+    }
+
     // `delete_files` was renamed with an inverted polarity to
     // `keep_files_on_disk` (idl/storage_types.proto) — see [delete].
     return DartBridgeStorage.instance.deleteProto(
       StorageDeleteRequest(
-        modelIds: metrics.map((m) => m.modelId),
+        modelIds: infoResult.info.models.map((m) => m.modelId),
         clearRegistryPaths: true,
         unloadIfLoaded: true,
         allowPlatformDelete: true,
