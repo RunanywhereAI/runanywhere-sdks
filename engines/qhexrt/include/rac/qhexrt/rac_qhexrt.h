@@ -34,9 +34,14 @@ typedef enum rac_qhexrt_hexagon_arch {
 
 /** Result of rac_qhexrt_probe(). */
 typedef struct rac_qhexrt_device_info {
-    /** Android SoC model (for example "SM8850"); empty when unknown. */
+    /**
+     * Android SoC model (for example "SM8850"); empty when unknown. Always
+     * empty on Windows on ARM64: there is no SoC system property and QNN
+     * reports QNN_SOC_MODEL_DYNAMIC_SDM instead of a concrete id, so the
+     * Hexagon arch — not the SoC — is what identifies the device there.
+     */
     char soc_model[64];
-    /** /sys/devices/soc0/soc_id; -1 when unavailable. */
+    /** /sys/devices/soc0/soc_id; -1 when unavailable (always on Windows). */
     int32_t soc_id;
     /** Detected Hexagon architecture. */
     rac_qhexrt_hexagon_arch_t hexagon_arch;
@@ -51,8 +56,11 @@ RAC_API rac_bool_t rac_qhexrt_arch_is_supported(rac_qhexrt_hexagon_arch_t arch);
 RAC_API const char* rac_qhexrt_arch_name(rac_qhexrt_hexagon_arch_t arch);
 
 /**
- * Probe the Android SoC/Hexagon generation without loading QNN. Unknown and
- * unsupported devices are successful probe results with supported=false.
+ * Probe the SoC/Hexagon generation. On Android this reads system properties and
+ * never loads QNN; on Windows on ARM64 there is no such property, so the probe
+ * asks the linked QHexRT runtime (which brings QNN up once, process-wide).
+ * Unknown and unsupported devices are successful probe results with
+ * supported=false.
  */
 RAC_API rac_result_t rac_qhexrt_probe(rac_qhexrt_device_info_t* out);
 

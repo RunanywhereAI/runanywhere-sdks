@@ -5,12 +5,24 @@
 
 #include "rac/qhexrt/rac_qhexrt.h"
 
+#include "qhexrt_backend.h"
+
 #include <cstdio>
 #include <cstring>
 #include <vector>
 
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
+#elif RAC_QHEXRT_PLATFORM_SUPPORTED && defined(RAC_QHEXRT_ENGINE_AVAILABLE) && \
+    RAC_QHEXRT_ENGINE_AVAILABLE
+// Windows on ARM64 has no ro.soc.model and no /sys/devices/soc0 — QNN itself is
+// the only capability source, so the probe asks the linked runtime.
+#define RAC_QHEXRT_PROBE_VIA_QNN 1
+#include "qhexrt_session.h"
+#endif
+
+#if !defined(RAC_QHEXRT_PROBE_VIA_QNN)
+#define RAC_QHEXRT_PROBE_VIA_QNN 0
 #endif
 
 #if defined(RAC_QHEXRT_HAVE_PROTOBUF)
@@ -99,6 +111,27 @@ int32_t read_soc_id() {
 }
 #endif
 
+#if RAC_QHEXRT_PROBE_VIA_QNN
+// Inverse of rac_qhexrt_arch_name(): QNN's deviceGetPlatformInfo reports the DSP
+// generation as the same lowercase "v75"/"v79"/"v81" string QHexRT surfaces.
+rac_qhexrt_hexagon_arch_t arch_from_name(const char* name) {
+    if (name == nullptr || name[0] == '\0') {
+        return RAC_QHEXRT_HEXAGON_ARCH_UNKNOWN;
+    }
+    constexpr rac_qhexrt_hexagon_arch_t kArches[] = {
+        RAC_QHEXRT_HEXAGON_ARCH_V68, RAC_QHEXRT_HEXAGON_ARCH_V69,
+        RAC_QHEXRT_HEXAGON_ARCH_V73, RAC_QHEXRT_HEXAGON_ARCH_V75,
+        RAC_QHEXRT_HEXAGON_ARCH_V79, RAC_QHEXRT_HEXAGON_ARCH_V81,
+    };
+    for (const rac_qhexrt_hexagon_arch_t arch : kArches) {
+        if (std::strcmp(rac_qhexrt_arch_name(arch), name) == 0) {
+            return arch;
+        }
+    }
+    return RAC_QHEXRT_HEXAGON_ARCH_UNKNOWN;
+}
+#endif
+
 }  // namespace
 
 extern "C" {
@@ -164,6 +197,14 @@ rac_result_t rac_qhexrt_probe(rac_qhexrt_device_info_t* out) {
             out->hexagon_arch = lookup(kBoardArchTable,
                                        sizeof(kBoardArchTable) / sizeof(kBoardArchTable[0]), board);
         }
+    }
+#elif RAC_QHEXRT_PROBE_VIA_QNN
+    // Windows on ARM64: no SoC property, and QNN reports socModel as
+    // QNN_SOC_MODEL_DYNAMIC_SDM (INT_MAX) rather than a concrete id — so
+    // soc_model/soc_id stay unset and the reported arch alone decides support.
+    char arch[32] = {0};
+    if (qhexrt_engine::device_arch(arch, sizeof(arch))) {
+        out->hexagon_arch = arch_from_name(arch);
     }
 #endif
 
