@@ -5,7 +5,13 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { BACKEND_METHODS, rpcMethodFor } from '../api/backend';
-import { RpcErrorPayload, RpcRequest, STREAMING_METHODS } from './rpc';
+import {
+  DUPLEX_METHODS,
+  RpcCallReply,
+  RpcErrorPayload,
+  RpcRequest,
+  STREAMING_METHODS,
+} from './rpc';
 
 /** Minimal port surface dispatch needs (a subset of Electron's MessagePortMain). */
 export interface DispatchPort {
@@ -25,6 +31,57 @@ export interface DispatchDeps {
   loadRe?: RegExp;
   /** Override the allowed-method set (defaults to ALLOWED_RPC_METHODS). */
   allowedMethods?: Set<string>;
+  /** Override the duplex-method set (defaults to DUPLEX_METHODS). */
+  duplexMethods?: Set<string>;
+  /** Tracks host-initiated calls awaiting a client reply. Required for duplex methods. */
+  duplex?: DuplexCalls;
+}
+
+/**
+ * The host half of the reverse channel. A duplex method's injected callback
+ * posts `{ id, call }` and parks until the client answers with a matching
+ * `{ id, seq, ok }`; the caller on the other side of that promise is a native
+ * thread, so an unanswered call costs one blocked worker until it times out.
+ */
+export class DuplexCalls {
+  private seq = 0;
+  private readonly pending = new Map<
+    string,
+    { resolve: (value: unknown) => void; reject: (error: Error) => void }
+  >();
+
+  ask(port: DispatchPort, id: number, event: unknown): Promise<unknown> {
+    this.seq += 1;
+    const seq = this.seq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(`${id}:${seq}`, { resolve, reject });
+      port.postMessage({ id, call: { seq, event } });
+    });
+  }
+
+  settle(reply: RpcCallReply): void {
+    const key = `${reply.id}:${reply.seq}`;
+    const waiter = this.pending.get(key);
+    if (!waiter) return;
+    this.pending.delete(key);
+    if (reply.ok) {
+      waiter.resolve(reply.result);
+      return;
+    }
+    const error = reply.error;
+    waiter.reject(
+      new Error(typeof error === 'string' ? error : error?.message ?? 'duplex call failed')
+    );
+  }
+
+  /** Fail anything still outstanding once its request has settled. */
+  release(id: number): void {
+    for (const [key, waiter] of [...this.pending]) {
+      if (!key.startsWith(`${id}:`)) continue;
+      this.pending.delete(key);
+      waiter.reject(new Error('request finished before the executor replied'));
+    }
+  }
 }
 
 const DEFAULT_LOAD_RE = /^load(Model|VlmModel|EmbeddingModel|SttModel|TtsVoice)$/;
@@ -152,6 +209,20 @@ export function dispatch(port: DispatchPort, req: RpcRequest, deps: DispatchDeps
         ok: false,
         error: `unknown RPC method: '${method}'`,
       });
+      return;
+    }
+    const duplexMethods = deps.duplexMethods ?? DUPLEX_METHODS;
+    if (duplexMethods.has(method)) {
+      const duplex = deps.duplex;
+      if (!duplex) {
+        port.postMessage({ id, ok: false, error: `no duplex channel for '${method}'` });
+        return;
+      }
+      const onEvent = (event: unknown) => duplex.ask(port, id, event);
+      (api[method](...args, onEvent) as Promise<unknown>)
+        .then((result) => port.postMessage({ id, ok: true, result }))
+        .catch((e) => port.postMessage({ id, ok: false, error: rpcError(e) }))
+        .then(() => duplex.release(id));
       return;
     }
     if (streaming.has(method)) {

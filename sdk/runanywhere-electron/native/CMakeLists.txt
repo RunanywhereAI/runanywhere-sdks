@@ -67,7 +67,9 @@ if(RAC_BUILD_ELECTRON_ADDON)
         set(_ra_addon_platform_srcs posix_platform_adapter.cpp)
     endif()
 
-    add_library(runanywhere_native SHARED addon.cpp ${_ra_addon_platform_srcs})
+    add_library(runanywhere_native SHARED
+        addon.cpp proto_bridge.cpp model_bridge.cpp llm_bridge.cpp tool_bridge.cpp vlm_bridge.cpp speech_bridge.cpp voice_bridge.cpp data_bridge.cpp lora_bridge.cpp download_bridge.cpp
+        ${_ra_addon_platform_srcs})
     set_target_properties(runanywhere_native PROPERTIES PREFIX "" SUFFIX ".node")
 
     target_include_directories(runanywhere_native PRIVATE

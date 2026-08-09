@@ -32,10 +32,8 @@ const std::string& device_model();
 const std::string& os_version_string();
 
 /**
- * Install the CLI's rac_device_callbacks_t: device info gathered from the
- * desktop platform adapter, the rac_state persistent device id, an in-process
- * registration flag, and an HTTP POST that routes through the registered curl
- * transport (Bearer token attached when the request requires auth).
+ * Install the desktop rac_device_callbacks_t from commons
+ * (rac_desktop_device_callbacks_register) and warn if it fails.
  * Idempotent; called from bootstrap().
  */
 void register_device_callbacks();

@@ -1412,6 +1412,95 @@ namespace {
 // (proto_bytes_valid / proto_parse_data / copy_proto_message). compute_rms_energy
 // is NOT re-declared here — the component section above already defines it in
 // this same TU's anonymous namespace and it is reused below.
+
+// The lifecycle path's energy-VAD fallback.
+//
+// The component path is documented as VAD's dual-backend special case: a
+// plugin-provided model VAD when one is loaded, and the component-owned energy
+// detector when none is. The lifecycle path had only the first half, so
+// rac_vad_process_lifecycle_proto failed outright on a device with no VAD model
+// while rac_vad_component_process happily detected speech on the same audio.
+// Every SDK that migrated its VAD onto the handle-free ABI hit that as
+// "Component or service has not been initialized".
+//
+// One detector per process, created on first use and reconfigured in place, so
+// a caller alternating threshold values does not churn allocations. Guarded by
+// its own mutex because the lifecycle entry points take no handle and therefore
+// carry no other serialization.
+std::mutex& fallback_vad_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+// Peek at (nullptr, nullptr) or build/reconfigure. One detector per process.
+rac_energy_vad_handle_t fallback_vad_slot(const float* want_threshold,
+                                          const int32_t* want_rate) {
+    static rac_energy_vad_handle_t handle = nullptr;
+    static float configured_threshold = -1.0f;
+    static int32_t configured_rate = -1;
+    if (want_threshold == nullptr || want_rate == nullptr) {
+        return handle;
+    }
+    const float threshold = *want_threshold;
+    const int32_t sample_rate = *want_rate;
+    if (handle != nullptr && configured_threshold == threshold && configured_rate == sample_rate) {
+        // Already built at these settings. Re-arm rather than rebuild: a
+        // rebuild would discard the debounce history the caller is mid-way
+        // through, and a detector that was stopped stays stopped otherwise.
+        (void)rac_energy_vad_start(handle);
+        return handle;
+    }
+    if (handle != nullptr) {
+        rac_energy_vad_destroy(handle);
+        handle = nullptr;
+    }
+    rac_energy_vad_config_t config = RAC_ENERGY_VAD_CONFIG_DEFAULT;
+    config.energy_threshold = threshold;
+    config.sample_rate = sample_rate;
+    if (rac_energy_vad_create(&config, &handle) != RAC_SUCCESS) {
+        handle = nullptr;
+        return nullptr;
+    }
+    if (rac_energy_vad_initialize(handle) != RAC_SUCCESS ||
+        rac_energy_vad_start(handle) != RAC_SUCCESS) {
+        rac_energy_vad_destroy(handle);
+        handle = nullptr;
+        return nullptr;
+    }
+    configured_threshold = threshold;
+    configured_rate = sample_rate;
+    return handle;
+}
+
+rac_energy_vad_handle_t fallback_vad(float threshold, int32_t sample_rate) {
+    return fallback_vad_slot(&threshold, &sample_rate);
+}
+
+// The detector already built by a previous configure/start, or null when none
+// exists yet. stop/reset must not mint one just to tear it down, and must not
+// mint one at the DEFAULT threshold when configure armed it at another: that
+// would rebuild it and throw away the state they were asked to clear.
+rac_energy_vad_handle_t fallback_vad_existing() {
+    return fallback_vad_slot(nullptr, nullptr);
+}
+
+void fallback_vad_stop() {
+    std::lock_guard<std::mutex> lock(fallback_vad_mutex());
+    rac_energy_vad_handle_t handle = fallback_vad_existing();
+    if (handle == nullptr)
+        return;
+    (void)rac_energy_vad_stop(handle);
+    (void)rac_energy_vad_reset(handle);
+}
+
+void fallback_vad_reset() {
+    std::lock_guard<std::mutex> lock(fallback_vad_mutex());
+    rac_energy_vad_handle_t handle = fallback_vad_existing();
+    if (handle != nullptr) {
+        (void)rac_energy_vad_reset(handle);
+    }
+}
+
 bool valid_bytes(const uint8_t* bytes, size_t size) {
     return rac::proto::bytes_valid(bytes, size);
 }
@@ -1546,38 +1635,53 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
                                           "VADProcessRequest decoded no samples");
     }
 
-    rac::lifecycle::LifecycleVadRef ref;
-    rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
-    }
-
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     if (request.has_options() && request.options().activation_threshold() > 0.0f) {
         threshold = request.options().activation_threshold();
-        if (ref.ops->set_threshold) {
+    }
+    const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
+                                                                  : RAC_VAD_DEFAULT_SAMPLE_RATE;
+
+    rac::lifecycle::LifecycleVadRef ref;
+    const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
+    rac_bool_t is_speech = RAC_FALSE;
+
+    if (have_model) {
+        if (ref.ops->set_threshold && request.has_options() &&
+            request.options().activation_threshold() > 0.0f) {
             (void)ref.ops->set_threshold(ref.impl, threshold);
+        }
+        if (!ref.ops->process) {
+            rac::lifecycle::release_lifecycle_vad(&ref);
+            return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                              "VAD backend does not implement process");
+        }
+        rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+        if (rc != RAC_SUCCESS) {
+            // Record the failure to telemetry — the handle-less path otherwise
+            // dropped failures silently (publish_vad_pipeline_event marks the
+            // event EVENT_CATEGORY_FAILURE with the error code/message).
+            publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
+            rac::lifecycle::release_lifecycle_vad(&ref);
+            return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+        }
+    } else {
+        // No VAD model loaded: fall back to the built-in energy detector, which
+        // is what the component path does. See fallback_vad above.
+        std::lock_guard<std::mutex> lock(fallback_vad_mutex());
+        rac_energy_vad_handle_t energy = fallback_vad(threshold, sample_rate);
+        if (energy == nullptr) {
+            return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
+                                              "no VAD model is loaded and the built-in "
+                                              "energy detector could not be created");
+        }
+        rc = rac_energy_vad_process_audio(energy, samples.data(), samples.size(), &is_speech);
+        if (rc != RAC_SUCCESS) {
+            publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
+            return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
         }
     }
 
-    rac_bool_t is_speech = RAC_FALSE;
-    if (!ref.ops->process) {
-        rac::lifecycle::release_lifecycle_vad(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
-                                          "VAD backend does not implement process");
-    }
-    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
-    if (rc != RAC_SUCCESS) {
-        // Record the failure to telemetry — the handle-less path otherwise
-        // dropped failures silently (publish_vad_pipeline_event marks the event
-        // EVENT_CATEGORY_FAILURE with the error code/message).
-        publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
-        rac::lifecycle::release_lifecycle_vad(&ref);
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-    }
-
-    const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
-                                                                  : RAC_VAD_DEFAULT_SAMPLE_RATE;
     const float energy = compute_rms_energy(samples.data(), samples.size());
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
@@ -1597,10 +1701,12 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     // (started/ended with speech/silence duration + segment count). Without
     // this, standalone VAD via processLifecycle never reached telemetry.
     emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.probability(), energy,
-                                 duration_ms, ref.model_id);
+                                 duration_ms, have_model ? ref.model_id : nullptr);
 
     rc = copy_proto(result, out_result);
-    rac::lifecycle::release_lifecycle_vad(&ref);
+    if (have_model) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+    }
     return rc;
 #endif
 }
@@ -1628,12 +1734,6 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
         return parse_error(out_result, "failed to parse VADConfiguration");
     }
 
-    rac::lifecycle::LifecycleVadRef ref;
-    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
-    }
-
     const int32_t sample_rate =
         proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
     const int32_t frame_length_ms =
@@ -1642,13 +1742,27 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
     const float threshold =
         proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
 
+    rac::lifecycle::LifecycleVadRef ref;
+    const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
     rac_result_t op_rc = RAC_SUCCESS;
-    if (ref.ops && ref.ops->set_threshold) {
-        op_rc = ref.ops->set_threshold(ref.impl, threshold);
+    if (have_model) {
+        if (ref.ops && ref.ops->set_threshold) {
+            op_rc = ref.ops->set_threshold(ref.impl, threshold);
+        }
+    } else {
+        // Configuring with no model loaded arms the built-in energy detector at
+        // the requested threshold, matching the component path.
+        std::lock_guard<std::mutex> lock(fallback_vad_mutex());
+        if (fallback_vad(threshold, sample_rate) == nullptr) {
+            op_rc = RAC_ERROR_NOT_INITIALIZED;
+        }
     }
 
-    rc = emit_vad_service_state(ref, op_rc, threshold, sample_rate, frame_length_ms, out_result);
-    rac::lifecycle::release_lifecycle_vad(&ref);
+    rac_result_t rc =
+        emit_vad_service_state(ref, op_rc, threshold, sample_rate, frame_length_ms, out_result);
+    if (have_model) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+    }
     return rc == RAC_SUCCESS ? op_rc : rc;
 #endif
 }
@@ -1660,14 +1774,21 @@ rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
     return feature_unavailable_lifecycle(out_result);
 #else
     rac::lifecycle::LifecycleVadRef ref;
-    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
-    }
+    const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
 
     rac_result_t op_rc = RAC_SUCCESS;
-    if (ref.ops && ref.ops->start) {
-        op_rc = ref.ops->start(ref.impl);
+    if (have_model) {
+        if (ref.ops && ref.ops->start) {
+            op_rc = ref.ops->start(ref.impl);
+        }
+    } else {
+        // No model: drive the built-in energy detector, the same one
+        // rac_vad_process_lifecycle_proto falls back to.
+        std::lock_guard<std::mutex> lock(fallback_vad_mutex());
+        if (fallback_vad(RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE) ==
+            nullptr) {
+            op_rc = RAC_ERROR_NOT_INITIALIZED;
+        }
     }
     if (op_rc == RAC_SUCCESS) {
         // The lifecycle-proto start path (Android/JNI bridge) drives ref.ops->start
@@ -1679,10 +1800,12 @@ rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
                              runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
     }
 
-    rc = emit_vad_service_state(
+    const rac_result_t rc = emit_vad_service_state(
         ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
         static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
-    rac::lifecycle::release_lifecycle_vad(&ref);
+    if (have_model) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+    }
     return rc == RAC_SUCCESS ? op_rc : rc;
 #endif
 }
@@ -1694,14 +1817,17 @@ rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
     return feature_unavailable_lifecycle(out_result);
 #else
     rac::lifecycle::LifecycleVadRef ref;
-    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
-    }
+    const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
 
     rac_result_t op_rc = RAC_SUCCESS;
-    if (ref.ops && ref.ops->stop) {
-        op_rc = ref.ops->stop(ref.impl);
+    if (have_model) {
+        if (ref.ops && ref.ops->stop) {
+            op_rc = ref.ops->stop(ref.impl);
+        }
+    } else {
+        // No model: drive the built-in energy detector, the same one
+        // rac_vad_process_lifecycle_proto falls back to.
+        fallback_vad_stop();
     }
     if (op_rc == RAC_SUCCESS) {
         // Mirror rac_vad_start_lifecycle_proto: the lifecycle path bypasses
@@ -1712,10 +1838,12 @@ rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
                              runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
     }
 
-    rc = emit_vad_service_state(
+    const rac_result_t rc = emit_vad_service_state(
         ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
         static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
-    rac::lifecycle::release_lifecycle_vad(&ref);
+    if (have_model) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+    }
     return rc == RAC_SUCCESS ? op_rc : rc;
 #endif
 }
@@ -1732,20 +1860,25 @@ rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result) {
     forget_vad_utterance_state(lifecycle_vad_key());
 
     rac::lifecycle::LifecycleVadRef ref;
-    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
-    }
+    const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
 
     rac_result_t op_rc = RAC_SUCCESS;
-    if (ref.ops && ref.ops->reset) {
-        op_rc = ref.ops->reset(ref.impl);
+    if (have_model) {
+        if (ref.ops && ref.ops->reset) {
+            op_rc = ref.ops->reset(ref.impl);
+        }
+    } else {
+        // No model: drive the built-in energy detector, the same one
+        // rac_vad_process_lifecycle_proto falls back to.
+        fallback_vad_reset();
     }
 
-    rc = emit_vad_service_state(
+    const rac_result_t rc = emit_vad_service_state(
         ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
         static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
-    rac::lifecycle::release_lifecycle_vad(&ref);
+    if (have_model) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+    }
     return rc == RAC_SUCCESS ? op_rc : rc;
 #endif
 }

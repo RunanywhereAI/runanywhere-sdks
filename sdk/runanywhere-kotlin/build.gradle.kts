@@ -215,6 +215,17 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn(generateRunAnywhereLicenseResource)
 }
 
+// Gradle's default console prints only "AssertionError at Foo.kt:12" for a
+// failed test, which on CI leaves the assertion's own message unreadable
+// without downloading the HTML report.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+    }
+}
+
 kotlin {
     jvmToolchain(17)
     compilerOptions {

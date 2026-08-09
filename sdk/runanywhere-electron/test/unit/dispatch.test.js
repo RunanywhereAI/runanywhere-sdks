@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const os = require('os');
 const path = require('path');
 
-const { dispatch, ALLOWED_RPC_METHODS } = require('../../dist/process/dispatch');
+const { dispatch, ALLOWED_RPC_METHODS, DuplexCalls } = require('../../dist/process/dispatch');
 const { STREAMING_METHODS } = require('../../dist/process/rpc');
 
 // A fake port that records every posted message.
@@ -489,4 +489,100 @@ test('unknown RPC method is rejected before calling api', async () => {
   assert.deepEqual(port.posts, [
     { id: 99, ok: false, error: "unknown RPC method: '__not_a_real_method__'" },
   ]);
+});
+
+// ---- DUPLEX (the tool-calling run loop) ---------------------------------
+
+test('duplex method posts each call and resolves it from the client reply', async () => {
+  const port = makePort();
+  const duplex = new DuplexCalls();
+  let answers = null;
+  const deps = makeDeps({
+    duplex,
+    api: {
+      'v3.toolRunLoop': async (_bytes, onEvent) => {
+        answers = [await onEvent({ handle: 12 }), await onEvent({ toolCall: 'call-bytes' })];
+        return 'result-bytes';
+      },
+    },
+  });
+
+  dispatch(port, { id: 3, method: 'v3.toolRunLoop', args: ['request-bytes'] }, deps);
+  await tick();
+
+  assert.deepEqual(port.posts[0], { id: 3, call: { seq: 1, event: { handle: 12 } } });
+  duplex.settle({ id: 3, seq: 1, ok: true, result: undefined });
+  await tick();
+
+  assert.deepEqual(port.posts[1], { id: 3, call: { seq: 2, event: { toolCall: 'call-bytes' } } });
+  duplex.settle({ id: 3, seq: 2, ok: true, result: 'tool-result-bytes' });
+  await tick();
+
+  assert.deepEqual(answers, [undefined, 'tool-result-bytes']);
+  assert.deepEqual(port.posts[2], { id: 3, ok: true, result: 'result-bytes' });
+});
+
+test('a rejected duplex reply surfaces inside the run loop rather than hanging', async () => {
+  const port = makePort();
+  const duplex = new DuplexCalls();
+  let raised = null;
+  const deps = makeDeps({
+    duplex,
+    api: {
+      'v3.toolRunLoop': async (_bytes, onEvent) => {
+        try {
+          await onEvent({ toolCall: 'call-bytes' });
+        } catch (e) {
+          raised = e.message;
+        }
+        return 'result-bytes';
+      },
+    },
+  });
+
+  dispatch(port, { id: 4, method: 'v3.toolRunLoop', args: ['request-bytes'] }, deps);
+  await tick();
+  duplex.settle({ id: 4, seq: 1, ok: false, error: 'executor blew up' });
+  await tick();
+
+  assert.equal(raised, 'executor blew up');
+  assert.deepEqual(port.posts[1], { id: 4, ok: true, result: 'result-bytes' });
+});
+
+test('a duplex method without a channel fails instead of calling the api', async () => {
+  const port = makePort();
+  let called = false;
+  const deps = makeDeps({ api: { 'v3.toolRunLoop': () => { called = true; } } });
+
+  dispatch(port, { id: 5, method: 'v3.toolRunLoop', args: [] }, deps);
+  await tick();
+
+  assert.equal(called, false);
+  assert.deepEqual(port.posts, [
+    { id: 5, ok: false, error: "no duplex channel for 'v3.toolRunLoop'" },
+  ]);
+});
+
+test('an unanswered duplex call is failed once its request settles', async () => {
+  const port = makePort();
+  const duplex = new DuplexCalls();
+  let raised = null;
+  const deps = makeDeps({
+    duplex,
+    api: {
+      'v3.toolRunLoop': (_bytes, onEvent) => {
+        onEvent({ toolCall: 'call-bytes' }).catch((e) => {
+          raised = e.message;
+        });
+        return Promise.resolve('result-bytes');
+      },
+    },
+  });
+
+  dispatch(port, { id: 6, method: 'v3.toolRunLoop', args: ['request-bytes'] }, deps);
+  await tick();
+  await tick();
+  await tick();
+
+  assert.equal(raised, 'request finished before the executor replied');
 });

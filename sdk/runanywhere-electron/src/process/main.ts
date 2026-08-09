@@ -14,6 +14,13 @@ export interface RunAnywhereMainOptions {
   hostPath?: string;
   /** Value for RUNANYWHERE_NATIVE_PATH inside the utility (locates the .node). */
   nativePath?: string;
+  /**
+   * A CommonJS module exporting `{ CATALOG }`, required by the utility host at
+   * startup and staged with `registerCatalog`. Catalog registration is per
+   * process and the host is the one that resolves and downloads models, so
+   * without this the host cannot turn a catalog id into files.
+   */
+  catalogPath?: string;
   /** Called when the utility exits (crash or intentional). */
   onExit?: (code: number) => void;
 }
@@ -23,11 +30,13 @@ export class RunAnywhereMain {
   private readonly connected = new Set<WebContents>();
   private readonly hostPath: string;
   private readonly nativePath?: string;
+  private readonly catalogPath?: string;
   private readonly onExit?: (code: number) => void;
 
   constructor(opts: RunAnywhereMainOptions = {}) {
     this.hostPath = opts.hostPath ?? path.join(__dirname, 'host.js');
     this.nativePath = opts.nativePath;
+    this.catalogPath = opts.catalogPath;
     this.onExit = opts.onExit;
   }
 
@@ -56,6 +65,7 @@ export class RunAnywhereMain {
     if (this.child) return this.child;
     const env: Record<string, string | undefined> = { ...process.env };
     if (this.nativePath) env.RUNANYWHERE_NATIVE_PATH = this.nativePath;
+    if (this.catalogPath) env.RUNANYWHERE_CATALOG_PATH = this.catalogPath;
     const child = utilityProcess.fork(this.hostPath, [], { env, stdio: 'inherit' });
     child.on('exit', (code) => {
       // Only clear if THIS child is still current — a kill() + connect() may have

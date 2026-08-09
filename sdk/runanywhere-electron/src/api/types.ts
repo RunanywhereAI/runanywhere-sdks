@@ -260,8 +260,25 @@ export const ragDocument = {
 // Tools
 // ---------------------------------------------------------------------------
 
-/** JSON Schema subset the SDK can turn into a decoding grammar. */
-export type { JsonSchema } from '../grammar';
+/**
+ * JSON Schema subset commons turns into decoding constraints. It travels as a
+ * JSON document on `StructuredOutputOptions.schema`, so anything commons'
+ * schema reader accepts is valid here; these fields are the ones the SDK's own
+ * helpers build.
+ */
+export interface JsonSchema {
+  type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null';
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  items?: JsonSchema;
+  enum?: Array<string | number | boolean>;
+  /** Fixed literal value (JSON const). */
+  const?: string | number | boolean;
+  /** Union: the value must match one of these schemas. */
+  anyOf?: JsonSchema[];
+  /** Upper bound on array length, for `type: 'array'`. */
+  maxItems?: number;
+}
 
 /** A tool the model may call. */
 export interface ToolDefinition {
@@ -467,6 +484,9 @@ export interface ModelsState {
   loaded: Partial<Record<ModelCategory, ModelInfo>>;
   storageUsedBytes: number;
   storageFreeBytes: number;
+  /** Physical RAM as the platform reports it. Zero when the platform cannot say. */
+  memoryTotalBytes: number;
+  memoryAvailableBytes: number;
 }
 
 /** One adapter currently applied to the loaded LLM. */
@@ -620,6 +640,8 @@ export interface ModelRegistration {
   /** A model already on disk. */
   path?: string;
   name?: string;
+  /** Engine to pin. Left to commons' format detection when omitted. */
+  framework?: InferenceFramework;
 }
 
 // ---------------------------------------------------------------------------
@@ -686,6 +708,26 @@ export type SdkEvent =
   | { type: 'ready' }
   | { type: 'modelLoaded'; id: string; category: ModelCategory; actualBackend?: InferenceFramework }
   | { type: 'modelUnloaded'; id: string }
+  /**
+   * A load asked for more memory than the machine reports free. Carries what
+   * the residency policy released trying to make room, and commons' reasons
+   * when it still does not fit — the load is attempted either way, because a
+   * registry row's memory figure is an estimate, not a measurement.
+   */
+  | {
+      type: 'memoryPressure';
+      id: string;
+      requiredBytes: number;
+      availableBytes: number;
+      evicted: string[];
+      reasons: string[];
+    }
+  /**
+   * The control plane did not authenticate. Local inference is unaffected; this
+   * is the breadcrumb an app needs to show "working offline" instead of
+   * pretending everything is fine. `offline` is worth retrying, `rejected` is not.
+   */
+  | { type: 'authFailed'; status: 'offline' | 'rejected'; message: string }
   | { type: 'error'; message: string; recoverable: boolean };
 
 /** Speech-detection deltas over a chunk stream (`vad.openStream`, and `vad.detectStream` over it). */

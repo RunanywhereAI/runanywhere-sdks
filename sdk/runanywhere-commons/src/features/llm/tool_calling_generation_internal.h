@@ -407,7 +407,8 @@ inline bool run_generate_once(GenerationState& generation,
 
     rac_llm_result_t raw{};
     const std::string effective_prompt =
-        apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name);
+        apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name,
+                                 ref.supports_thinking);
     rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {

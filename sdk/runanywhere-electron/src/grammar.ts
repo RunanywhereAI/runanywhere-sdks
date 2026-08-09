@@ -3,24 +3,10 @@
 // parseable output, not prompt-and-hope). Supports object/array/string/number/
 // integer/boolean/null/enum and nesting — enough for structured extraction.
 
-export interface JsonSchema {
-  type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null';
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  items?: JsonSchema;
-  enum?: Array<string | number | boolean>;
-  /** Fixed literal value (JSON const) — matches exactly this value. */
-  const?: string | number | boolean;
-  /** Union: the value must match one of these schemas (alternation). */
-  anyOf?: JsonSchema[];
-  /**
-   * Upper bound on array length. The grammar itself enforces it — so a small
-   * model that would otherwise ramble into an unbounded list is forced to close
-   * the array within the token budget (keeps the JSON parseable). Only applies
-   * to `type: 'array'`.
-   */
-  maxItems?: number;
-}
+// The schema shape itself is the public one; this file is only the GBNF
+// translation of it.
+export type { JsonSchema } from './api/types';
+import type { JsonSchema } from './api/types';
 
 const PRIMITIVES: Record<string, string> = {
   ws: 'ws ::= [ \\t\\n]*',

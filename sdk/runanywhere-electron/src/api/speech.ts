@@ -8,17 +8,35 @@ import * as fs from 'fs';
 
 import { decodeWav, downsample, pcm16Bytes, pcm16ToFloat32 } from '../audio';
 import { SDKException, asSDKException } from '../errors';
-import type { LoadSlot, RaBackend } from './backend';
+import { createModelsNamespace } from './assets';
+import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { AsyncQueue, bridgeStream } from './iter';
+import { DataAbi, toDiarizationRequest } from './data-abi';
 import {
-  STT_DEFAULTS,
+  VoiceAgentAbi,
+  missingComponents,
+  toAudioFrame,
+  toComposeConfig,
+  toPublicVoiceEvent,
+} from './voice-abi';
+import {
+  SttAbi,
+  STTStreamEventKind,
+  TtsAbi,
+  TTSStreamEventKind,
+  VadAbi,
+  toFloatSamples,
+  toSttRequest,
+  toTtsRequest,
+  toVadConfiguration,
+  toVadRequest,
+} from './speech-abi';
+import type { STTOutput } from './speech-abi';
+import {
   TTS_DEFAULTS,
   VAD_DEFAULTS,
   audioFormatFromOrdinal,
-  toNativeDiarizationOptions,
-  toNativeSttOptions,
-  toNativeTtsOptions,
   toNativeVadConfig,
 } from './options';
 import type {
@@ -210,24 +228,23 @@ export interface SttNamespace {
   state(): Promise<SttState>;
 }
 
-/** Shape a native transcription result into the public grammar. */
-function buildTranscription(
-  native: Awaited<ReturnType<RaBackend['sttTranscribe']>>,
-  durationMs: number
-): Transcription {
+/** Shape an `STTOutput` into the public grammar. */
+function buildTranscription(native: STTOutput, durationMs: number): Transcription {
   return {
     text: native.text,
     language: native.language,
     confidence: native.confidence,
     words: native.words.map(
       (w): Word => ({
-        text: w.text,
+        text: w.word,
         startMs: w.startMs,
         endMs: w.endMs,
         confidence: w.confidence,
       })
     ),
-    durationMs,
+    // Commons measures the audio it actually decoded; the caller's byte count
+    // is the fallback for a backend that reports none.
+    durationMs: native.durationMs || durationMs,
   };
 }
 
@@ -241,6 +258,7 @@ function buildTranscription(
  * that native pass; nothing here fabricates a successful `completed`.
  */
 function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: SttOptions = {}): SttStream {
+  const stt = new SttAbi(deps.backend);
   const requestId = newRequestId('stt');
   const events = new AsyncQueue<TranscriptionEvent>();
   const chunks: Float32Array[] = [];
@@ -276,32 +294,56 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
         offset += c.length;
       }
       const pcm = pcm16Bytes(merged);
-      const nativeOptions = toNativeSttOptions(options, STT_SAMPLE_RATE);
+      // One native pass now, not two. The STTStreamEvent envelope carries the
+      // partials AND the final STTOutput with its word timings, so the second
+      // non-streaming pass the component ABI needed is gone.
       let lastPartial = '';
-      await deps.backend.sttTranscribeStream(pcm, nativeOptions, (p) => {
-        if (closed || p.isFinal || p.text === lastPartial) return;
-        lastPartial = p.text;
+      let sawFinal = false;
+      for await (const event of stt.transcribeStream(toSttRequest(pcm, options, requestId))) {
+        if (closed) return;
+        if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL) {
+          const text = event.partial?.text ?? '';
+          if (!text || text === lastPartial) continue;
+          lastPartial = text;
+          sequence += 1;
+          events.push({
+            type: 'partial',
+            requestId,
+            sequence,
+            segmentId: '0',
+            revision: sequence,
+            alternatives: [{ text }],
+          });
+        } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
+          if (!event.finalOutput) continue;
+          sawFinal = true;
+          sequence += 1;
+          events.push({
+            type: 'transcriptFinal',
+            requestId,
+            sequence,
+            segment: buildTranscription(event.finalOutput, durationMsOf(merged.length)),
+          });
+        } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+          if (event.error) throw SDKException.fromProto(event.error);
+        }
+      }
+      if (closed) return;
+      // A backend that streams partials but never a FINAL still owes the caller
+      // a transcript; one non-streaming pass supplies it rather than the stream
+      // ending on a partial.
+      if (!sawFinal) {
         sequence += 1;
         events.push({
-          type: 'partial',
+          type: 'transcriptFinal',
           requestId,
           sequence,
-          segmentId: '0',
-          revision: sequence,
-          alternatives: [{ text: p.text }],
+          segment: buildTranscription(
+            await stt.transcribe(toSttRequest(pcm, options, requestId)),
+            durationMsOf(merged.length)
+          ),
         });
-      });
-      if (closed) return;
-      // The streaming callback carries text only, so the final transcript (with word
-      // timings) comes from one non-streaming pass over the same buffer.
-      const native = await deps.backend.sttTranscribe(pcm, nativeOptions);
-      sequence += 1;
-      events.push({
-        type: 'transcriptFinal',
-        requestId,
-        sequence,
-        segment: buildTranscription(native, durationMsOf(merged.length)),
-      });
+      }
       events.push({ type: 'completed', requestId });
     } catch (e) {
       events.push({ type: 'failed', requestId, error: asSDKException(e) });
@@ -344,27 +386,27 @@ function parseLanguages(json?: string): string[] {
   }
 }
 
-async function requireSlot(
-  deps: SpeechDeps,
-  slot: LoadSlot,
-  category: ModelCategory,
-  requested: string | undefined
-): Promise<void> {
-  const current = await deps.backend.loaded(slot);
-  if (requested && (!current || current.id !== requested)) {
-    const loaded = await deps.backend.ensure(slot, requested);
-    deps.hub.emit({ type: 'modelLoaded', id: loaded.id, category });
-    return;
-  }
-  if (!current) {
+/**
+ * Readiness for a category commons holds in its lifecycle store. There is no
+ * slot to look in any more: the component's own state ABI is the answer, and it
+ * succeeds with is_ready=false rather than failing when nothing is loaded.
+ */
+async function requireLifecycle(deps: SpeechDeps, category: ModelCategory): Promise<void> {
+  const ready =
+    category === ModelCategory.SPEECH_TO_TEXT
+      ? (await new SttAbi(deps.backend).state()).isReady
+      : (await new TtsAbi(deps.backend).state()).isReady;
+  if (!ready) {
     throw SDKException.invalidState(
-      `no ${slot} model is loaded — call models.load() first`
+      `no ${category === ModelCategory.SPEECH_TO_TEXT ? 'stt' : 'tts'} model is loaded — call models.load() first`
     );
   }
 }
 
 /** Build the `stt` namespace over a backend. */
 export function createSttNamespace(deps: SpeechDeps): SttNamespace {
+  const stt = new SttAbi(deps.backend);
+
   async function transcribe(input: AudioInput, options: SttOptions = {}): Promise<Transcription> {
     deps.requireReady();
     if (options.translateToEnglish) {
@@ -373,19 +415,18 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
         'stt translateToEnglish (commons rac_stt_options_t exposes no translate field)'
       );
     }
-    await requireSlot(deps, 'stt', ModelCategory.SPEECH_TO_TEXT, undefined);
+    await requireLifecycle(deps, ModelCategory.SPEECH_TO_TEXT);
     const pcm = toPcm16At16k(input);
-    const native = await deps.backend.sttTranscribe(
-      pcm,
-      toNativeSttOptions(options, STT_SAMPLE_RATE)
+    return buildTranscription(
+      await stt.transcribe(toSttRequest(pcm, options)),
+      durationMsOf(pcm.byteLength / 2)
     );
-    return buildTranscription(native, durationMsOf(pcm.byteLength / 2));
   }
 
   async function openStream(format: AudioFormatSpec, options: SttOptions = {}): Promise<SttStream> {
     deps.requireReady();
     rejectContainerFormat(format, 'stt.openStream', 'stt.transcribe');
-    await requireSlot(deps, 'stt', ModelCategory.SPEECH_TO_TEXT, undefined);
+    await requireLifecycle(deps, ModelCategory.SPEECH_TO_TEXT);
     return createSttStream(deps, format, options);
   }
 
@@ -421,12 +462,12 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
   }
 
   async function state(): Promise<SttState> {
-    const info = await deps.backend.sttInfo();
+    const native = await stt.state();
     return {
-      isReady: info.isReady,
-      modelId: info.modelId,
-      supportsStreaming: info.supportsStreaming,
-      languages: parseLanguages(info.languagesJson),
+      isReady: native.isReady,
+      modelId: native.currentModel,
+      supportsStreaming: native.supportsStreaming,
+      languages: native.supportedLanguageCodes,
     };
   }
 
@@ -532,19 +573,21 @@ export interface TtsNamespace {
 
 /** Build the `tts` namespace over a backend. */
 export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
+  const tts = new TtsAbi(deps.backend);
   const playback = new Playback();
   // The most recently created `speak()` handle, for the deprecated `stop()` adapter.
   let latestHandle: SpeechHandle | null = null;
 
   async function synthesize(text: string, options: TtsOptions = {}): Promise<Audio> {
     deps.requireReady();
-    await requireSlot(deps, 'tts', ModelCategory.TEXT_TO_SPEECH, undefined);
-    const native = await deps.backend.ttsSynthesize(text, toNativeTtsOptions(options));
+    await requireLifecycle(deps, ModelCategory.TEXT_TO_SPEECH);
+    const native = await tts.synthesize(toTtsRequest(text, options));
+    const samples = toFloatSamples(native);
     return {
-      data: native.samples,
+      data: samples,
       sampleRate: native.sampleRate,
       format: audioFormatFromOrdinal(native.audioFormat),
-      durationMs: native.durationMs || durationMsOf(native.samples.length, native.sampleRate),
+      durationMs: native.durationMs || durationMsOf(samples.length, native.sampleRate),
     };
   }
 
@@ -555,14 +598,20 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
     deps.requireReady();
     return bridgeStream<AudioChunk>(
       async (sink) => {
-        await requireSlot(deps, 'tts', ModelCategory.TEXT_TO_SPEECH, undefined);
+        await requireLifecycle(deps, ModelCategory.TEXT_TO_SPEECH);
         let index = 0;
-        await deps.backend.ttsSynthesizeStream(text, toNativeTtsOptions(options), (chunk) => {
-          sink.push({ data: chunk.samples, index: index++, isFinal: false });
-        });
+        for await (const event of tts.synthesizeStream(toTtsRequest(text, options))) {
+          if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK) {
+            if (event.output) {
+              sink.push({ data: toFloatSamples(event.output), index: index++, isFinal: false });
+            }
+          } else if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
+            if (event.error) throw SDKException.fromProto(event.error);
+          }
+        }
         sink.push({ data: new Float32Array(0), index, isFinal: true });
       },
-      () => deps.backend.ttsStop()
+      () => tts.stop().then(() => undefined)
     );
   }
 
@@ -586,7 +635,7 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
       async interrupt() {
         interrupted = true;
         playback.stop();
-        await deps.backend.ttsStop();
+        await tts.stop();
         await settled;
       },
       async waitForPlayout() {
@@ -621,18 +670,27 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
       return;
     }
     playback.stop();
-    await deps.backend.ttsStop();
+    await tts.stop();
   }
 
   async function voices(): Promise<Voice[]> {
-    const info = await deps.backend.ttsInfo();
-    if (!info.voiceId) return [];
-    const languages = parseLanguages(info.languagesJson);
+    // Commons enumerates what the loaded voice/model actually offers, so this
+    // is no longer "the one voice id the handle happened to carry".
+    const listed = await tts.voices();
+    if (listed.voices.length) {
+      return listed.voices.map((v) => ({
+        id: v.id,
+        name: v.displayName || v.id,
+        language: v.languageCode || TTS_DEFAULTS.language,
+      }));
+    }
+    const state = await tts.state();
+    if (!state.currentVoice) return [];
     return [
       {
-        id: info.voiceId,
-        name: info.voiceId,
-        language: languages[0] ?? TTS_DEFAULTS.language,
+        id: state.currentVoice,
+        name: state.currentVoice,
+        language: state.supportedLanguageCodes[0] ?? TTS_DEFAULTS.language,
       },
     ];
   }
@@ -674,6 +732,12 @@ export interface VadNamespace {
     input: AsyncIterable<AudioInput>,
     options?: VadOptions
   ): AsyncIterableIterator<VadEvent>;
+  /**
+   * Clear the detector's rolling state between unrelated recordings.
+   *
+   * @throws SDKException when the SDK is not initialized.
+   */
+  reset(): Promise<void>;
 }
 
 /**
@@ -763,6 +827,7 @@ function* frames(samples: Float32Array, size: number): Generator<Float32Array> {
  * the persistent native detector in push order.
  */
 function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: VadOptions = {}): VadStream {
+  const vad = new VadAbi(deps.backend);
   const events = new AsyncQueue<VadEvent>();
   const tracker = new SegmentTracker(options);
   const rate = format.sampleRate || STT_SAMPLE_RATE;
@@ -785,13 +850,19 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
       const frame = pending.slice(0, VAD_FRAME_SAMPLES);
       pending = pending.slice(VAD_FRAME_SAMPLES);
       const frameMs = durationMsOf(VAD_FRAME_SAMPLES);
-      const isSpeech = await deps.backend.vadProcess(frame);
+      const result = await vad.process(toVadRequest(frame, options, atMs));
       if (closed) return;
-      for (const t of tracker.push(isSpeech, atMs, frameMs)) {
+      for (const t of tracker.push(result.isSpeech, atMs, frameMs)) {
         if ('ended' in t) events.push({ type: 'speechEnded', timestampMs: t.ended.endMs });
         else if (t.started !== undefined) events.push({ type: 'speechStarted', timestampMs: t.started });
       }
-      events.push({ type: 'activity', isSpeech, probability: isSpeech ? 1 : 0, timestampMs: atMs });
+      // The detector's own score, not a boolean widened to 0/1.
+      events.push({
+        type: 'activity',
+        isSpeech: result.isSpeech,
+        probability: result.probability,
+        timestampMs: atMs,
+      });
       atMs += frameMs;
     }
   }
@@ -826,30 +897,39 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
     async close() {
       if (closed) return;
       closed = true;
-      await deps.backend.vadClose();
+      await vad.stop();
       events.complete();
     },
   };
 }
 
-/** Build the `vad` namespace over a backend. */
+/** Build the `vad` namespace over the commons lifecycle VAD ABI. */
 export function createVadNamespace(deps: SpeechDeps): VadNamespace {
+  const vad = new VadAbi(deps.backend);
+
+  // Configure carries the turn-taking dials the component ABI had no field
+  // for; start arms the session they apply to. Both work with no VAD model
+  // loaded, because the lifecycle path falls back to the built-in energy
+  // detector the same way the component path always has.
+  async function arm(options: VadOptions): Promise<void> {
+    await vad.configure(toVadConfiguration(options));
+    await vad.start();
+  }
+
   async function detect(input: AudioInput, options: VadOptions = {}): Promise<VadResult> {
     deps.requireReady();
     const samples = toMono16k(input);
-    await deps.backend.vadOpen(toNativeVadConfig(options, { sampleRate: STT_SAMPLE_RATE }));
+    await arm(options);
     const tracker = new SegmentTracker(options);
     const segments: Segment[] = [];
-    let speechFrames = 0;
-    let totalFrames = 0;
+    let probability = 0;
     let atMs = 0;
     try {
       for (const frame of frames(samples, VAD_FRAME_SAMPLES)) {
         const frameMs = durationMsOf(frame.length);
-        const isSpeech = await deps.backend.vadProcess(new Float32Array(frame));
-        totalFrames += 1;
-        if (isSpeech) speechFrames += 1;
-        for (const t of tracker.push(isSpeech, atMs, frameMs)) {
+        const result = await vad.process(toVadRequest(new Float32Array(frame), options, atMs));
+        probability = Math.max(probability, result.probability);
+        for (const t of tracker.push(result.isSpeech, atMs, frameMs)) {
           if ('ended' in t) segments.push(t.ended);
         }
         atMs += frameMs;
@@ -857,13 +937,14 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
       const open = tracker.finish();
       if (open) segments.push(open);
     } finally {
-      await deps.backend.vadClose();
+      await vad.stop();
     }
     return {
       isSpeech: segments.length > 0,
-      // The energy VAD reports a boolean per frame, so the speech-frame ratio is
-      // the only probability available; a model-backed VAD would give a real score.
-      probability: totalFrames ? speechFrames / totalFrames : 0,
+      // The peak frame score, which is what "was there speech in this clip"
+      // asks. The old speech-frame ratio answered a different question, and
+      // could only ever be a ratio because the component ABI returned a bool.
+      probability,
       segments,
     };
   }
@@ -871,7 +952,7 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
   async function openStream(format: AudioFormatSpec, options: VadOptions = {}): Promise<VadStream> {
     deps.requireReady();
     rejectContainerFormat(format, 'vad.openStream', 'vad.detect');
-    await deps.backend.vadOpen(toNativeVadConfig(options, { sampleRate: STT_SAMPLE_RATE }));
+    await arm(options);
     return createVadStream(deps, format, options);
   }
 
@@ -906,7 +987,14 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
     });
   }
 
-  return { detect, openStream, detectStream };
+  async function reset(): Promise<void> {
+    deps.requireReady();
+    // Commons owns the detector's rolling state; this clears the debounce and
+    // the segment history so an unrelated recording does not inherit them.
+    await vad.reset();
+  }
+
+  return { detect, openStream, detectStream, reset };
 }
 
 // ---------------------------------------------------------------------------
@@ -928,13 +1016,15 @@ export interface DiarizationNamespace {
 
 /** Build the `diarization` namespace over a backend. */
 export function createDiarizationNamespace(deps: SpeechDeps): DiarizationNamespace {
+  const data = new DataAbi(deps.backend);
   return {
     async diarize(input, options = {}) {
       deps.requireReady();
-      await requireSlot(deps, 'diarization', ModelCategory.DIARIZATION, undefined);
-      const native = await deps.backend.diarize(
-        toMono16k(input),
-        toNativeDiarizationOptions(options, STT_SAMPLE_RATE)
+      // Commons resolves the resident diarization model; 16 kHz is the only
+      // rate it accepts and it does not resample, which is why the input is
+      // brought to that rate here first.
+      const native = await data.diarize(
+        toDiarizationRequest(toMono16k(input), options, STT_SAMPLE_RATE)
       );
       return {
         segments: native.segments.map((s) => ({
@@ -951,6 +1041,12 @@ export function createDiarizationNamespace(deps: SpeechDeps): DiarizationNamespa
 // ---------------------------------------------------------------------------
 // voice
 // ---------------------------------------------------------------------------
+//
+// The turn loop is commons' now. It frames the audio this file captures, decides
+// where the utterance ends, and runs VAD -> STT -> LLM -> TTS over it while
+// walking the eight `rac_audio_pipeline_state_t` states, including the 800 ms
+// cooldown that stops the microphone re-hearing the reply. What is left here is
+// the microphone and the speaker.
 
 /** Arguments for {@link VoiceNamespace.createSession}. */
 export interface VoiceSessionConfig {
@@ -1032,16 +1128,50 @@ class FrameCapture {
 
 /** What a voice session needs from the facade. */
 export interface VoiceDeps extends SpeechDeps {
-  stt: SttNamespace;
   tts: TtsNamespace;
-  generate(prompt: string, options?: LlmOptions): AsyncIterableIterator<
-    { type: 'token'; text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT } | { type: string }
+  // Accepted and no longer read. Transcription, generation, and cancellation
+  // all happen inside the commons turn now, so the session only needs `tts` for
+  // `say()`. The facade still passes these, so they stay declared here rather
+  // than making that one call site an exception.
+  stt?: SttNamespace;
+  generate?: (
+    prompt: string,
+    options?: LlmOptions
+  ) => AsyncIterableIterator<
+    | { type: 'token'; text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }
+    | { type: string }
   >;
-  llmCancel(): Promise<void>;
+  llmCancel?: () => Promise<void>;
 }
+
+/** Categories a voice session needs resident at once, so no load evicts another. */
+const VOICE_CATEGORIES: ModelCategory[] = [
+  ModelCategory.SPEECH_TO_TEXT,
+  ModelCategory.LANGUAGE,
+  ModelCategory.TEXT_TO_SPEECH,
+];
+
+/**
+ * How many captured frames may wait to be fed. The cap only matters while a
+ * turn is running, and those frames are the device hearing its own reply, so
+ * the oldest are the ones to drop.
+ */
+const VOICE_FRAME_BACKLOG = 64;
+
+/** How long the feed loop idles when the microphone has produced nothing. */
+const VOICE_IDLE_POLL_MS = 20;
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Build the `voice` namespace over a backend. */
 export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
+  // The facade builds `voice` without the models namespace, and a session owns
+  // its prerequisites, so it constructs one over the same deps. That is cheaper
+  // than repeating what `models.load` does — resolve the artifact, point the
+  // registry row at it, admit it against the machine's memory, then run the
+  // lifecycle load that is the only store the voice pipeline reads from.
+  const models = createModelsNamespace(deps);
+
   return {
     async createSession(config: VoiceSessionConfig): Promise<VoiceSession> {
       deps.requireReady();
@@ -1051,159 +1181,132 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           message: 'stt, llm, and tts model refs are all required',
         });
       }
-      if (config.downloadIfNeeded === false) {
-        for (const [slot, ref] of [
-          ['stt', config.stt],
-          ['llm', config.llm],
-          ['tts', config.tts],
-        ] as Array<[LoadSlot, ModelRef]>) {
-          const current = await deps.backend.loaded(slot);
-          if (!current || current.id !== ref.id) {
-            throw SDKException.invalidState(
-              `downloadIfNeeded is false but ${ref.id} is not loaded in the ${slot} slot`
-            );
-          }
-        }
-      } else {
-        // The session owns its prerequisites: load every model before wiring up.
-        for (const [slot, ref, category] of [
-          ['stt', config.stt, ModelCategory.SPEECH_TO_TEXT],
-          ['llm', config.llm, ModelCategory.LANGUAGE],
-          ['tts', config.tts, ModelCategory.TEXT_TO_SPEECH],
-        ] as Array<[LoadSlot, ModelRef, ModelCategory]>) {
-          const loaded = await deps.backend.ensure(slot, ref.id);
-          deps.hub.emit({ type: 'modelLoaded', id: loaded.id, category });
+      if (config.downloadIfNeeded !== false) {
+        for (const id of [config.stt.id, config.llm.id, config.tts.id]) {
+          await models.load(id, { keepResident: VOICE_CATEGORIES });
         }
       }
 
-      const vadOptions = config.vad ?? {};
-      const turn = config.turnHandling ?? {};
-      const minSilenceMs = Math.max(
-        vadOptions.minSilenceMs ?? VAD_DEFAULTS.minSilenceMs,
-        turn.endpointing?.minDelayMs ?? 500
-      );
-      const maxUtteranceMs = turn.endpointing?.maxDelayMs ?? 3000;
-      const interruptEnabled = turn.interruption?.enabled ?? true;
+      const session = await deps.backend.voiceOpen(new Uint8Array(0));
+      const agent = new VoiceAgentAbi(deps.backend, session);
+      const states = await agent
+        .initialize(
+          toComposeConfig({
+            sttModelId: config.stt.id,
+            llmModelId: config.llm.id,
+            ttsVoiceId: config.tts.voice,
+            vad: config.vad,
+            turnHandling: config.turnHandling,
+            generation: config.generation,
+          })
+        )
+        .catch(async (e) => {
+          await deps.backend.voiceClose(session).catch(() => undefined);
+          throw e;
+        });
+      // Commons is the authority on which components it found, so readiness is
+      // read back from its own snapshot rather than tracked separately here.
+      const missing = missingComponents(states);
+      if (missing.length) {
+        await deps.backend.voiceClose(session).catch(() => undefined);
+        throw SDKException.invalidState(
+          `voice session is missing ${missing.join(', ')} — call models.load() first` +
+            (config.downloadIfNeeded === false ? ' (downloadIfNeeded is false)' : '')
+        );
+      }
 
+      const ttsOptions: TtsOptions = config.tts.voice ? { voice: config.tts.voice } : {};
       const subscribers = new Set<{ push(e: VoiceEvent): void }>();
       const emit = (event: VoiceEvent): void => {
         for (const s of [...subscribers]) s.push(event);
       };
+      const emitError = (e: unknown, recoverable: boolean): void => {
+        emit({ type: 'error', message: asSDKException(e).message, recoverable });
+      };
 
       const capture = new FrameCapture();
-      let closed = false;
+      const playback = new Playback();
+      let pending: Uint8Array[] = [];
       let running = false;
-      let speaking = false;
-      let utterance: Float32Array[] = [];
-      let silenceMs = 0;
-      let speechMs = 0;
-      let turnInFlight = false;
+      let closed = false;
+      let loop: Promise<void> | null = null;
       let lastSpeechHandle: SpeechHandle | null = null;
+      // The cancellation key for the turn in flight. The feed path leaves the
+      // request id empty, so commons generates the turn id and reports it on
+      // every event of that turn; that is the id `cancel_turn_proto` matches.
+      let currentTurnId = '';
 
-      const runTurn = async (samples: Float32Array): Promise<void> => {
-        turnInFlight = true;
+      void (async () => {
         try {
-          emit({ type: 'agentStateChanged', state: AgentState.THINKING });
-          const transcription = await deps.stt.transcribe({
-            samples,
-            format: { encoding: AudioEncoding.PCM_F32_LE, sampleRate: STT_SAMPLE_RATE, channels: 1 },
-          });
-          const heard = transcription.text.trim();
-          emit({ type: 'userTranscribed', text: heard, isFinal: true });
-          if (!heard) {
-            emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
-            return;
+          for await (const raw of agent.events()) {
+            if (raw.turnId) currentTurnId = raw.turnId;
+            const mapped = toPublicVoiceEvent(raw);
+            if (mapped) emit(mapped);
           }
-          let reply = '';
-          for await (const event of deps.generate(heard, config.generation)) {
-            if (event.type === 'token') {
-              const token = event as { text: string; kind: string };
-              if (token.kind === TokenKind.TEXT) reply += token.text;
-            }
-          }
-          reply = reply.trim();
-          emit({ type: 'agentResponse', text: reply });
-          if (reply) {
-            emit({ type: 'agentStateChanged', state: AgentState.SPEAKING });
-            const handle = await deps.tts.speak(reply, config.tts.voice ? { voice: config.tts.voice } : {});
-            lastSpeechHandle = handle;
-            await handle.waitForPlayout();
-          }
-          emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
         } catch (e) {
-          emit({
-            type: 'error',
-            message: e instanceof Error ? e.message : String(e),
-            recoverable: true,
-          });
-          emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
-        } finally {
-          turnInFlight = false;
+          if (!closed) emitError(e, false);
         }
-      };
+      })();
 
       const onFrame = (frame: Float32Array, rate: number): void => {
         if (!running || closed) return;
         const mono = rate === STT_SAMPLE_RATE ? frame : downsample(frame, rate, STT_SAMPLE_RATE);
-        const frameMs = durationMsOf(mono.length);
-        void deps.backend
-          .vadProcess(new Float32Array(mono))
-          .then((isSpeech) => {
-            if (!running || closed) return;
-            if (isSpeech) {
-              if (!speaking) {
-                speaking = true;
-                speechMs = 0;
-                utterance = [];
-                emit({ type: 'speechStarted' });
-                // A barge-in cuts the agent off so the user is heard immediately.
-                if (interruptEnabled && turnInFlight) void interrupt();
-              }
-              silenceMs = 0;
-              speechMs += frameMs;
-              utterance.push(mono);
-              if (speechMs >= maxUtteranceMs) endUtterance();
-              return;
-            }
-            if (!speaking) return;
-            utterance.push(mono);
-            silenceMs += frameMs;
-            if (silenceMs >= minSilenceMs) endUtterance();
-          })
-          .catch((e) => {
-            emit({
-              type: 'error',
-              message: e instanceof Error ? e.message : String(e),
-              recoverable: true,
-            });
-          });
+        pending.push(pcm16Bytes(mono));
+        if (pending.length > VOICE_FRAME_BACKLOG) {
+          pending.splice(0, pending.length - VOICE_FRAME_BACKLOG);
+        }
       };
 
-      const endUtterance = (): void => {
-        speaking = false;
-        emit({ type: 'speechEnded' });
-        let total = 0;
-        for (const c of utterance) total += c.length;
-        const merged = new Float32Array(total);
-        let offset = 0;
-        for (const c of utterance) {
-          merged.set(c, offset);
-          offset += c.length;
+      async function feedLoop(): Promise<void> {
+        while (running && !closed) {
+          const chunks = pending;
+          pending = [];
+          if (!chunks.length) {
+            await delay(VOICE_IDLE_POLL_MS);
+            continue;
+          }
+          for (const chunk of chunks) {
+            if (!running || closed) return;
+            let reply: Uint8Array | undefined;
+            try {
+              // This blocks for the whole turn when the utterance closes, and
+              // comes back with the synthesized reply as self-describing WAV.
+              reply = (await agent.feed(toAudioFrame(chunk))).synthesizedAudio;
+            } catch (e) {
+              emitError(e, true);
+              continue;
+            }
+            if (!reply?.byteLength || closed) continue;
+            try {
+              const decoded = decodeWav(reply);
+              await playback.play(decoded.samples, decoded.sampleRate);
+            } catch (e) {
+              emitError(e, true);
+            }
+            // Whatever the microphone picked up during the turn is the device
+            // hearing itself. Commons drops its own backlog for the same reason
+            // (`voice_agent_feed_abi.cpp:150`); this drops ours.
+            pending = [];
+          }
         }
-        utterance = [];
-        silenceMs = 0;
-        speechMs = 0;
-        if (total) void runTurn(merged);
-      };
+      }
 
       async function interrupt(): Promise<void> {
-        const settling: Promise<void>[] = [deps.llmCancel()];
-        if (lastSpeechHandle && !lastSpeechHandle.interrupted) settling.push(lastSpeechHandle.interrupt());
-        else settling.push(deps.tts.stop());
+        playback.stop();
+        pending = [];
+        const settling: Promise<void>[] = [];
+        if (currentTurnId) {
+          settling.push(agent.cancel(currentTurnId).catch(() => undefined));
+        }
+        if (lastSpeechHandle && !lastSpeechHandle.interrupted) {
+          settling.push(lastSpeechHandle.interrupt());
+        } else {
+          settling.push(deps.tts.stop());
+        }
         await Promise.all(settling);
       }
 
-      const session: VoiceSession = {
+      return {
         get events(): AsyncIterableIterator<VoiceEvent> {
           let registered: { push(e: VoiceEvent): void } | null = null;
           return bridgeStream<VoiceEvent>(
@@ -1219,22 +1322,20 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
         async start(): Promise<void> {
           if (closed) throw SDKException.invalidState('voice session is closed');
           if (running) return;
-          await deps.backend.vadOpen(
-            toNativeVadConfig(vadOptions, { sampleRate: STT_SAMPLE_RATE })
-          );
           await capture.start(onFrame);
           running = true;
+          // Commons reports every later state transition; the microphone being
+          // open before the first frame arrives is this layer's own fact.
           emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
+          loop = feedLoop();
         },
         async say(text: string): Promise<SpeechHandle> {
           if (closed) throw SDKException.invalidState('voice session is closed');
           emit({ type: 'agentStateChanged', state: AgentState.SPEAKING });
-          const handle = await deps.tts.speak(text, config.tts.voice ? { voice: config.tts.voice } : {});
+          const handle = await deps.tts.speak(text, ttsOptions);
           lastSpeechHandle = handle;
           void handle.waitForPlayout().then(() => {
-            if (!closed) {
-              emit({ type: 'agentStateChanged', state: running ? AgentState.LISTENING : AgentState.THINKING });
-            }
+            if (!closed) emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
           });
           return handle;
         },
@@ -1244,12 +1345,15 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           closed = true;
           running = false;
           capture.stop();
-          await deps.tts.stop();
-          await deps.backend.vadClose();
+          playback.close();
+          // The loop may be parked inside a turn; the destroy below waits on the
+          // same work, so draining here keeps the two from racing.
+          await loop?.catch(() => undefined);
+          await deps.tts.stop().catch(() => undefined);
+          await deps.backend.voiceClose(session);
           subscribers.clear();
         },
       };
-      return session;
     },
   };
 }

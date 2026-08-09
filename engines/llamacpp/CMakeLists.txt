@@ -62,6 +62,37 @@ set(LLAMA_HTTPLIB OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
 
+# ggml-vulkan's own CMakeLists runs `find_package(Vulkan COMPONENTS glslc
+# REQUIRED)` and `find_package(SPIRV-Headers CONFIG REQUIRED)`, so handing it
+# GGML_VULKAN=ON on a host without the Vulkan SDK aborts the configure instead
+# of degrading. Probe the same two packages first and only enable the backend
+# when both would resolve; otherwise report it and stay on CPU.
+function(rac_llamacpp_select_vulkan platform_label)
+    if(NOT RAC_GPU_VULKAN)
+        set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        message(STATUS "llama.cpp ${platform_label}: Vulkan off (RAC_GPU_VULKAN=OFF)")
+        return()
+    endif()
+
+    if(DEFINED ENV{VULKAN_SDK})
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{VULKAN_SDK}")
+    endif()
+    find_package(Vulkan QUIET COMPONENTS glslc)
+    find_package(SPIRV-Headers CONFIG QUIET)
+
+    if(Vulkan_FOUND AND Vulkan_glslc_FOUND AND "${SPIRV-Headers_FOUND}")
+        set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+        message(STATUS "llama.cpp ${platform_label}: Vulkan GPU backend ON "
+                       "(loader ${Vulkan_VERSION}, glslc ${Vulkan_GLSLC_EXECUTABLE})")
+    else()
+        set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        message(STATUS "llama.cpp ${platform_label}: Vulkan SDK incomplete "
+                       "(loader=${Vulkan_FOUND} glslc=${Vulkan_glslc_FOUND} "
+                       "SPIRV-Headers=${SPIRV-Headers_FOUND}); building CPU-only. "
+                       "Install the LunarG Vulkan SDK or set VULKAN_SDK for GPU.")
+    endif()
+endfunction()
+
 # Platform-specific optimizations
 if(RAC_PLATFORM_IOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
@@ -126,10 +157,11 @@ elseif(RAC_PLATFORM_MACOS)
     # Linux/Android keep their existing behavior.
     set(LLAMA_OPENSSL OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_LINUX)
-    # Disable GPU backends not typically available on Linux ARM
+    # Vulkan is the cross-vendor GPU path here (AMD / Intel / NVIDIA). CUDA is
+    # not wired on Linux; RAC_GPU_CUDA is a Windows/MSVC opt-in only.
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
     set(GGML_CUDA OFF CACHE BOOL "" FORCE)
-    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    rac_llamacpp_select_vulkan("Linux")
     set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
     set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
     set(GGML_SYCL OFF CACHE BOOL "" FORCE)
@@ -140,11 +172,13 @@ elseif(RAC_PLATFORM_LINUX)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
 elseif(RAC_PLATFORM_WINDOWS)
-    # Windows: CPU-only by default. Opt into the CUDA (NVIDIA) GPU backend with
-    # -DRAC_GPU_CUDA=ON (requires the CUDA toolkit + MSVC). llama.cpp's common_fit
-    # then auto-offloads layers to fit VRAM; nothing else changes.
+    # Windows: Vulkan is the default GPU backend (AMD / Intel / NVIDIA) and
+    # degrades to CPU when the SDK is absent. CUDA remains a separate opt-in
+    # (-DRAC_GPU_CUDA=ON, requires the CUDA toolkit + MSVC); the two flags are
+    # independent, so a CUDA-only build passes -DRAC_GPU_VULKAN=OFF. Either way
+    # llama.cpp's common_fit auto-offloads layers to fit VRAM.
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
-    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    rac_llamacpp_select_vulkan("Windows")
     set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
     set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
     set(GGML_SYCL OFF CACHE BOOL "" FORCE)
@@ -160,7 +194,7 @@ elseif(RAC_PLATFORM_WINDOWS)
         message(STATUS "Configuring llama.cpp for Windows (CUDA / GPU, arch ${CMAKE_CUDA_ARCHITECTURES})")
     else()
         set(GGML_CUDA OFF CACHE BOOL "" FORCE)
-        message(STATUS "Configuring llama.cpp for Windows (CPU-only)")
+        message(STATUS "Configuring llama.cpp for Windows (no CUDA; Vulkan=${GGML_VULKAN})")
     endif()
 endif()
 
@@ -440,3 +474,4 @@ endif()
 message(STATUS "LlamaCPP Backend Configuration:")
 message(STATUS "  llama.cpp version: ${RAC_LLAMACPP_VERSION}")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
+message(STATUS "  GPU backends: Metal=${GGML_METAL} Vulkan=${GGML_VULKAN} CUDA=${GGML_CUDA}")

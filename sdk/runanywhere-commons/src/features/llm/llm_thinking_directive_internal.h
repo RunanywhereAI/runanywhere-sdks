@@ -49,8 +49,19 @@ inline bool engine_handles_disable_thinking_natively(const char* framework_name)
  */
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking,
-                                            const char* framework_name) {
+                                            const char* framework_name,
+                                            bool model_supports_thinking) {
     if (disable_thinking == RAC_FALSE) {
+        return prompt;
+    }
+    // A model that does not reason has nothing to suppress, and "/no_think" is
+    // a Qwen control token rather than a universal one: a model outside that
+    // family reads it as prompt text. Measured on LFM2.5-230M, which answers
+    // the injected directive with "\n\n" and stops, so a caller that merely
+    // asked not to see reasoning got a one-token empty reply. Swift never had
+    // this problem because its MLX runtime passes enable_thinking=false as
+    // chat-template context (MLX.swift:1371) instead of editing the prompt.
+    if (!model_supports_thinking) {
         return prompt;
     }
     if (engine_handles_disable_thinking_natively(framework_name)) {
@@ -68,7 +79,9 @@ inline std::string apply_no_think_directive(const std::string& prompt,
  */
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking) {
-    return apply_no_think_directive(prompt, disable_thinking, nullptr);
+    // Model identity unknown at this call site, so assume it reasons and keep
+    // the historical behaviour; the lifecycle paths below pass the real flag.
+    return apply_no_think_directive(prompt, disable_thinking, nullptr, true);
 }
 
 }  // namespace rac::llm

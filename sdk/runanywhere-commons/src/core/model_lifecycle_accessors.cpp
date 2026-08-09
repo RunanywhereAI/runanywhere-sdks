@@ -66,6 +66,10 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         // in the tool-calling loop is a no-op for llama.cpp/onnx/cloud.
         out_ref->supports_grammar =
             (*token)->framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+        // Declared capability, normalized at the registry boundary
+        // (normalize_thinking_capability, model_registry.cpp): a row that says
+        // it reasons also carries the tag pair the splitter uses.
+        out_ref->supports_thinking = (*token)->model.supports_thinking();
     }
     out_ref->opaque = token.release();
     return RAC_SUCCESS;

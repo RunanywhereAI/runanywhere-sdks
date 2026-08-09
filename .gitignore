@@ -463,3 +463,4 @@ tests/streaming/perf_bench/README.md
 
 # QHexRT — PRIVATE prebuilt engine archive (never commit; staged via QHEXRT_ROOT)
 engines/qhexrt/prebuilt/
+/.idea/noctule.xml

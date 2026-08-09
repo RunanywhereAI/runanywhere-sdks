@@ -81,13 +81,19 @@ extern "C" {
 /* Declares which runtimes + model formats this plugin serves. This is advisory
  * metadata: it is validated for consistency at registration but NOT used for
  * engine selection (selection is plain priority order via rac_plugin_find).
- * Each GPU runtime is still gated on the matching ggml backend macro that
- * llama.cpp's CMake actually defines for this build, so the advertised runtimes
- * honestly reflect the linked llama.cpp (advertising one it was not compiled
- * with would misinform tooling/telemetry). Cf. get_device_type() in
- * llamacpp_backend.cpp which checks the same macros. */
+ * Each GPU runtime is gated on the matching ggml backend macro that llama.cpp's
+ * CMake actually defines for this build, so the advertised runtimes honestly
+ * reflect the linked llama.cpp (advertising one it was not compiled with would
+ * misinform tooling/telemetry). Cf. get_device_type() in llamacpp_backend.cpp
+ * which checks the same macros.
+ *
+ * Order matters: commons reads runtimes[0] as the engine's device kind
+ * (device_kind_for_vtable in model_lifecycle_translation.cpp, surfaced as
+ * ModelLoadResult.actual_device_kind), so the linked accelerator must lead and
+ * CPU trail as the always-present fallback. That reports what the build LINKED,
+ * not a device probe: a Vulkan build on a machine with no Vulkan device still
+ * reports a GPU kind while ggml falls back to its CPU backend. */
 static const rac_runtime_id_t k_llamacpp_runtimes[] = {
-    RAC_RUNTIME_CPU,
 #if defined(GGML_USE_METAL)
     RAC_RUNTIME_METAL,
 #endif
@@ -97,6 +103,7 @@ static const rac_runtime_id_t k_llamacpp_runtimes[] = {
 #if defined(GGML_USE_VULKAN)
     RAC_RUNTIME_VULKAN,
 #endif
+    RAC_RUNTIME_CPU,
 };
 
 /* GGUF for LLM/VLM weights, GGML for legacy LLM, BIN for VLM mmproj files. */

@@ -1,20 +1,42 @@
-// catalog.ts — the catalog REGISTRY, not a catalog.
+// catalog.ts — the app's model table, staged for the commons registry.
 //
-// The SDK owns the entry SHAPE and the lookup surface; the APP owns WHICH models
-// it offers. That split matches every other platform in this repo (iOS
-// `ModelCatalogBootstrap.swift`, Android `ModelCatalog.kt`, web
-// `model-catalog.ts` — all in `examples/`, none in an SDK), and it is what lets
-// two apps ship different model lists against one SDK build.
+// The SDK owns the entry SHAPE; the APP owns WHICH models it offers. That split
+// matches every other platform in this repo (iOS `ModelCatalogBootstrap.swift`,
+// Android `ModelCatalog.kt`, web `model-catalog.ts` — all in `examples/`, none in
+// an SDK), and it is what lets two apps ship different model lists against one
+// SDK build.
 //
-// An app registers its table once per PROCESS, and there are two: the renderer
-// preload (which exposes `catalog()` to the page) and the forked utility host
-// (which downloads and resolves). See `examples/electron/RunAnywhereAI/`:
-// `preload.js` and `host.js` each register before loading the SDK entry point.
+// What this file is NOT is the model database. `RunAnywhere.initialize()` seeds
+// every staged entry into the commons model registry (`catalogModelInfo` below),
+// and from then on `models.list`/`get`/`load` read commons, not this map.
+// Registration is buffered here because an app registers before the native addon
+// exists — `preload.js` and `host.js` in `examples/electron/RunAnywhereAI/` both
+// register at module load.
 //
 // Callers can also pass a HuggingFace repo id, a direct URL, or a local path, so
 // an app that registers nothing still resolves those.
 
-export type ModelType = 'llm' | 'vlm' | 'embedder' | 'stt' | 'tts';
+import * as path from 'path';
+
+import {
+  ArchiveType,
+  InferenceFramework,
+  ModelCategory,
+  ModelFileRole,
+  ModelFormat,
+  ModelInfo,
+  ModelRegistryStatus,
+  ModelSource,
+} from './proto/model_types';
+
+export type ModelType =
+  | 'llm'
+  | 'vlm'
+  | 'embedder'
+  | 'stt'
+  | 'tts'
+  | 'diarization'
+  | 'segmentation';
 
 export interface CatalogFile {
   url: string;
@@ -88,4 +110,88 @@ export function catalogEntry(id: string): CatalogEntry | undefined {
 
 export function isCatalogId(idOrPath: string): boolean {
   return Object.prototype.hasOwnProperty.call(registry, idOrPath);
+}
+
+const CATEGORY_OF_TYPE: Record<ModelType, ModelCategory> = {
+  llm: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  vlm: ModelCategory.MODEL_CATEGORY_VISION,
+  embedder: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+  stt: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  tts: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  diarization: ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION,
+  segmentation: ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
+};
+
+const FRAMEWORK_OF_TYPE: Record<ModelType, InferenceFramework> = {
+  llm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  vlm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  embedder: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  stt: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  tts: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  diarization: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  segmentation: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+};
+
+function formatOf(entry: CatalogEntry): ModelFormat {
+  if (entry.archive) return ModelFormat.MODEL_FORMAT_FOLDER;
+  if (/\.gguf$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_GGUF;
+  if (/\.onnx$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_ONNX;
+  if (/\.ort$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_ORT;
+  if (/\.bin$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_BIN;
+  return ModelFormat.MODEL_FORMAT_FOLDER;
+}
+
+/**
+ * A staged entry as the `runanywhere.v1.ModelInfo` the commons registry stores.
+ *
+ * `localPath` is the primary FILE for a plain single-file entry and the model's
+ * DIRECTORY for anything else. That is not cosmetic: commons' artifact resolver
+ * trusts a declared single-file path verbatim and only scans (applying
+ * `infer_file_role`) when the entry is an archive, multi-file, or a
+ * directory-based framework — the scan is what recovers a VLM's mmproj and the
+ * inner directory of an extracted sherpa archive.
+ */
+export function catalogModelInfo(id: string, entry: CatalogEntry, root: string): ModelInfo {
+  const dir = path.join(root, id);
+  const files = entry.files.map((f) => ({
+    url: f.url,
+    filename: f.as,
+    isOptional: false,
+    relativePath: f.as,
+    localPath: path.join(dir, f.as),
+    role:
+      f.as === entry.primary
+        ? ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+        : f.as === entry.mmproj
+          ? ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR
+          : ModelFileRole.MODEL_FILE_ROLE_COMPANION,
+  }));
+  const scanned = Boolean(entry.archive) || files.length > 1 || Boolean(entry.mmproj);
+  return {
+    id,
+    name: entry.label ?? id,
+    category: CATEGORY_OF_TYPE[entry.type],
+    format: formatOf(entry),
+    framework: FRAMEWORK_OF_TYPE[entry.type],
+    downloadUrl: entry.files[0]?.url ?? '',
+    localPath: scanned ? dir : path.join(dir, entry.primary),
+    downloadSizeBytes: entry.sizeMB ? entry.sizeMB * 1_000_000 : 0,
+    contextLength: 0,
+    supportsThinking: false,
+    supportsLora: entry.type === 'llm',
+    source: ModelSource.MODEL_SOURCE_REMOTE,
+    createdAtUnixMs: 0,
+    updatedAtUnixMs: 0,
+    registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED,
+    ...(entry.archive
+      ? {
+          archive: {
+            type: ArchiveType.ARCHIVE_TYPE_TAR_BZ2,
+            structure: 0,
+          },
+        }
+      : {}),
+    ...(files.length > 1 ? { multiFile: { files } } : {}),
+    ...(entry.license ? { metadata: { description: '', author: '', license: entry.license, tags: [], version: '' } } : {}),
+  };
 }

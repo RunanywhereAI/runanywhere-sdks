@@ -2313,7 +2313,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     // set (proto LLMGenerationOptions.disable_thinking). Telemetry/events below
     // keep the original prompt; only the engine sees the directive.
     const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name);
+        rac::llm::apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name,
+                                           ref.supports_thinking);
     const int64_t started = now_ms();
     rc = (ref.ops && ref.ops->generate)
              ? ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw)
@@ -2456,7 +2457,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // as an opaque `WebAssembly.Exception` (no `.message`) in JS; on native
     // SDKs it would be undefined behaviour through a C ABI return.
     const std::string effective_prompt = rac::llm::apply_no_think_directive(
-        prompt, options.disable_thinking, ref.framework_name);
+        prompt, options.disable_thinking, ref.framework_name, ref.supports_thinking);
     // See rac_llm_stream_reset_final_signal() in rac_llm_service.h: reset
     // right before the call the same way rac_llm_generate_stream() does,
     // since this path calls ref.ops->generate_stream() directly rather than

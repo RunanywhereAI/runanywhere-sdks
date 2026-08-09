@@ -398,7 +398,11 @@ _rac_bundle_policy_unregister
 # Desktop host bootstrap used by the standalone CLI.
 _rac_desktop_adapter_init
 _rac_desktop_default_base_dir
+_rac_desktop_device_callbacks_register
+_rac_desktop_device_model
 _rac_desktop_http_transport_register
+_rac_desktop_os_version
+_rac_desktop_platform_name
 
 # Runtime registry — L1 runtime plugin lifecycle (CPU, Metal, CoreML, ONNX,
 # CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.

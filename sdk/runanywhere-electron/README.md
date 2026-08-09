@@ -118,8 +118,8 @@ const r = await RunAnywhere.llm.generate([
 throws: no diffusion backend is linked and `rac_diffusion_generate_proto` is not
 bound in the addon.
 
-The pre-v3 surface (`loadLLM`, `createChat`, `generateWithTools`, handle objects)
-still works and is deprecated for one release.
+The pre-v3 surface (`RunAnywhere.loadLLM`, `Chat`, `VoiceAgent`, `EventBus`,
+handle objects) has been removed. `createRunAnywhere` is the whole API.
 
 ## Electron (utility-process isolation)
 
@@ -163,7 +163,7 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 
 ## Model catalog
 
-`loadLLM`, `loadVLM`, `loadEmbedder`, `loadSTT`, and `loadTTS` accept a catalog id (auto-downloaded on first use) or a local path. Built-in ids include `smollm2-135m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, and `piper-lessac`.
+`models.load(id)` and the `model:` option on a generation accept a catalog id (downloaded on first use) or a registered local path. Built-in ids include `smollm2-135m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, and `piper-lessac`.
 
 ## Example application
 

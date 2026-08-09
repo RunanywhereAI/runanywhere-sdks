@@ -1,6 +1,12 @@
 // App preload: loads the SDK preload (which exposes window.runanywhere over the
 // MessagePort), then adds this app's own local store — conversations, settings,
 // and custom models, persisted as JSON in userData by the main process.
+// This app's catalog, staged before anything resolves a model id. Registration
+// is per process: main.js hands the same file to the utility host, which is the
+// process that downloads.
+const { registerCatalog } = require('../../../sdk/runanywhere-electron/dist/catalog');
+const { CATALOG } = require('./model-catalog');
+registerCatalog(CATALOG);
 require('../../../sdk/runanywhere-electron/dist/process/preload');
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { migrateSettings } = require('./store');

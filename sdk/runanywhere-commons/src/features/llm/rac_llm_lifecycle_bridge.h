@@ -19,6 +19,12 @@ struct LifecycleLlmRef {
     // Defaults false so every non-grammar engine (llama.cpp/onnx/cloud) is
     // unaffected; only backends that actually consume options.grammar set it true.
     bool supports_grammar = false;
+    /**
+     * Whether the registry row says this model reasons. Gates the "/no_think"
+     * directive: suppressing thinking on a model that cannot think is not a
+     * no-op, it is unexplained text in the prompt.
+     */
+    bool supports_thinking = false;
     void* opaque = nullptr;
 };
 

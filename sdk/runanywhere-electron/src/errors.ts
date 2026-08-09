@@ -9,7 +9,7 @@
 // table are replicated here — exactly as the RN and Web SDKs replicate them.
 // Keep them in sync with idl/errors.proto if the canonical mapping changes.
 
-import type { SDKError } from './proto/errors';
+import { SDKError } from './proto/errors';
 
 export enum ErrorCode {
   UNSPECIFIED = 0,
@@ -191,7 +191,24 @@ type ErrorLike = {
   category?: unknown;
   nestedMessage?: unknown;
   fieldPath?: unknown;
+  /** Serialized `runanywhere.v1.SDKError` attached by the addon's proto error path. */
+  sdkError?: unknown;
 };
+
+/**
+ * Decode the `SDKError` bytes the addon attaches to every proto-path failure.
+ * This is the authoritative mapping — commons produced it via
+ * `rac_result_to_proto_error`, so when it is present the local `categoryForCode`
+ * table is not consulted at all.
+ */
+function fromSerializedSdkError(value: unknown): SDKException | null {
+  if (!(value instanceof Uint8Array) || value.length === 0) return null;
+  try {
+    return SDKException.fromProto(SDKError.decode(value));
+  } catch {
+    return null;
+  }
+}
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -261,6 +278,8 @@ export function asSDKException(error: unknown): SDKException {
   if (error instanceof SDKException) return error;
   if (error && typeof error === 'object') {
     const candidate = error as ErrorLike;
+    const structured = fromSerializedSdkError(candidate.sdkError);
+    if (structured) return structured;
     const message =
       stringValue(candidate.message) ??
       (error instanceof Error ? error.message : undefined) ??

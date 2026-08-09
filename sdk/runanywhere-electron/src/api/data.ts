@@ -20,8 +20,9 @@ import {
 import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
+import { DataAbi, toEmbeddingsRequest, toRerankRequest } from './data-abi';
 import { RAC_CATEGORY, RAC_FRAMEWORK } from './native-backend';
-import { LLM_DEFAULTS, RAG_DEFAULTS, toNativeEmbedOptions } from './options';
+import { RAG_DEFAULTS, toNativeEmbedOptions } from './options';
 import type { EmbedOptions, LlmOptions, RagConfig } from './options';
 import { ModelCategory, TokenKind, newRequestId } from './types';
 import type {
@@ -61,6 +62,7 @@ export interface EmbeddingsNamespace {
 
 /** Build the `embeddings` namespace over a backend. */
 export function createEmbeddingsNamespace(deps: DataDeps): EmbeddingsNamespace {
+  const data = new DataAbi(deps.backend);
   return {
     async embed(texts, options = {}) {
       deps.requireReady();
@@ -71,14 +73,15 @@ export function createEmbeddingsNamespace(deps: DataDeps): EmbeddingsNamespace {
         });
       }
       if (!texts.length) return [];
-      const loaded = await deps.backend.loaded('embedder');
-      if (!loaded) {
-        throw SDKException.invalidState(
-          'no embedding model is loaded — call models.load() first'
-        );
-      }
-      const vectors = await deps.backend.embed(texts, toNativeEmbedOptions(options));
-      return vectors.map((vector, index) => ({ index, vector }));
+      // Commons resolves the resident embeddings model itself; a missing one
+      // comes back as a typed error from the call rather than a slot lookup.
+      const result = await data.embed(toEmbeddingsRequest(texts, options));
+      // `input_index` is set on every entry including zero, so the batch order
+      // is commons' rather than something reconstructed from array position.
+      return result.vectors.map((v) => ({
+        index: v.inputIndex,
+        vector: Float32Array.from(v.values),
+      }));
     },
   };
 }
@@ -102,6 +105,7 @@ export interface RerankNamespace {
 
 /** Build the `rerank` namespace over a backend. */
 export function createRerankNamespace(deps: DataDeps): RerankNamespace {
+  const data = new DataAbi(deps.backend);
   return {
     async rerank(query, documents, topN) {
       deps.requireReady();
@@ -110,11 +114,13 @@ export function createRerankNamespace(deps: DataDeps): RerankNamespace {
       if (!loaded) {
         throw SDKException.invalidState('no rerank model is loaded — call models.load() first');
       }
-      const scored = await deps.backend.rerank(query, documents, topN);
-      return scored
-        .slice()
-        .sort((a, b) => a.rank - b.rank)
-        .map((s) => ({ index: s.index, relevanceScore: s.score }));
+      // RerankResult.items is already sorted best-first and truncated to
+      // top_n, so the SDK-side re-sort by rank is gone.
+      const result = await data.rerank(toRerankRequest(query, documents, topN));
+      return result.items.map((i) => ({
+        index: i.index,
+        relevanceScore: i.relevanceScore,
+      }));
     },
   };
 }
@@ -187,25 +193,25 @@ function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRa
 }
 
 // Only the sampling knobs commons' RAG pipeline reads; tools and structured output
-// are not part of a grounded-answer request.
+// are not part of a grounded-answer request. An unset knob stays absent so
+// commons applies its own `rac_default`, the same contract the LLM path uses.
 function toRagGeneration(options: LlmOptions = {}): {
-  maxOutputTokens: number;
-  temperature: number;
-  topP: number;
+  maxOutputTokens?: number;
+  temperature?: number;
+  topP?: number;
   topK?: number;
   systemPrompt?: string;
 } {
-  const out = {
-    maxOutputTokens: options.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-    temperature: options.temperature ?? LLM_DEFAULTS.temperature,
-    topP: options.topP ?? LLM_DEFAULTS.topP,
-  } as {
-    maxOutputTokens: number;
-    temperature: number;
-    topP: number;
+  const out: {
+    maxOutputTokens?: number;
+    temperature?: number;
+    topP?: number;
     topK?: number;
     systemPrompt?: string;
-  };
+  } = {};
+  if (options.maxOutputTokens !== undefined) out.maxOutputTokens = options.maxOutputTokens;
+  if (options.temperature !== undefined) out.temperature = options.temperature;
+  if (options.topP !== undefined) out.topP = options.topP;
   if (options.topK !== undefined) out.topK = options.topK;
   if (options.systemPrompt !== undefined) out.systemPrompt = options.systemPrompt;
   return out;
@@ -282,7 +288,7 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
           topK: config.topK ?? RAG_DEFAULTS.topK,
           chunkSize: config.chunkSize ?? RAG_DEFAULTS.chunkSize,
           chunkOverlap: config.chunkOverlap ?? RAG_DEFAULTS.chunkOverlap,
-          scoreThreshold: config.scoreThreshold,
+          scoreThreshold: config.similarityThreshold,
         })
       ).finish();
 
@@ -299,7 +305,7 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
           RAGQueryOptions.fromPartial({
             query: question,
             generation: toRagGeneration(options),
-            retrieval: { topK, scoreThreshold: config.scoreThreshold },
+            retrieval: { topK, scoreThreshold: config.similarityThreshold },
           })
         ).finish();
 
@@ -318,7 +324,7 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
             RAGSearchRequest.encode(
               RAGSearchRequest.fromPartial({
                 query,
-                retrieval: { topK: topK ?? defaultTopK, scoreThreshold: config.scoreThreshold },
+                retrieval: { topK: topK ?? defaultTopK, scoreThreshold: config.similarityThreshold },
               })
             ).finish()
           );
