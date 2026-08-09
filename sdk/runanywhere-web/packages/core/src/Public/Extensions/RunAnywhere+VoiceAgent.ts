@@ -1071,7 +1071,7 @@ function ttsAudioToSelfDescribing(
     && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
     return bytes;
   }
-  const rate = sampleRate > 0 ? sampleRate : 22050;
+  const rate = sampleRate > 0 ? sampleRate : audioCaptureDefaults.ttsSampleRateHz;
   if (format === AudioFormat.AUDIO_FORMAT_PCM_S16LE) {
     // Copy out of the (possibly shared) WASM heap into a plain ArrayBuffer.
     const pcm = new Uint8Array(bytes.byteLength);
