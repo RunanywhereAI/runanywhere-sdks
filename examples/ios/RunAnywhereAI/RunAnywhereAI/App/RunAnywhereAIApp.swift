@@ -11,6 +11,9 @@ import RunAnywhere
 import LlamaCPPRuntime
 #endif
 import MLXRuntime
+#if canImport(NeuRTRuntime)
+import NeuRTRuntime
+#endif
 #if canImport(ONNXRuntime)
 import ONNXRuntime
 #endif
@@ -112,6 +115,9 @@ struct RunAnywhereAIApp: App {
             let mlxRegistered = MLX.register(priority: 100)
             #if canImport(ONNXRuntime)
             ONNX.register(priority: 100)
+            #endif
+            #if canImport(NeuRTRuntime)
+            NeuRT.register(priority: 100)
             #endif
 
             await MainActor.run { initializationError = nil }

@@ -1,21 +1,21 @@
 //
-//  ANE.swift
-//  ANERuntime Module
+//  NeuRT.swift
+//  NeuRTRuntime Module
 //
-//  Thin wrapper that registers the Apple NeuRT engine (Apple Neural Engine LLM
-//  + CoreML diffusion) with the commons plugin registry. Mirrors ONNX.swift's
-//  Sherpa registration: the shipped RABackendNeuRT.xcframework exports only the
-//  `rac_plugin_entry_neurt` entry symbol, so we register by handing its vtable
-//  to `rac_plugin_register(...)` directly.
+//  Thin wrapper that registers the NeuRT engine (Apple Neural Engine text
+//  generation + CoreML diffusion) with the commons plugin registry. Mirrors
+//  ONNX.swift's Sherpa registration: the shipped RABackendNeuRT.xcframework
+//  exports only the `rac_plugin_entry_neurt` entry symbol, so we register by
+//  handing its vtable to `rac_plugin_register(...)`.
 //
 
-import ANEBackend
 import CRACommons
+import NeuRTBackend
 import RunAnywhere
 
-// MARK: - ANE Module
+// MARK: - NeuRT Module
 
-/// Apple Neural Engine (NeuRT) backend module.
+/// NeuRT backend module — Apple Neural Engine inference.
 ///
 /// Serves on-device text generation on the Apple Neural Engine and image
 /// generation (diffusion) over CoreML. Import this module and register it to
@@ -24,17 +24,17 @@ import RunAnywhere
 /// ## Registration
 ///
 /// ```swift
-/// import ANERuntime
+/// import NeuRTRuntime
 ///
 /// // Register the backend (also happens automatically via `autoRegister`).
-/// ANE.register()
+/// NeuRT.register()
 /// ```
-public enum ANE {
-    private static let logger = SDKLogger(category: "ANE")
+public enum NeuRT {
+    private static let logger = SDKLogger(category: "NeuRT")
 
     // MARK: - Module Info
 
-    /// Current version of the ANE Runtime module.
+    /// Current version of the NeuRT Runtime module.
     public static let version = "1.0.0"
 
     // MARK: - Registration State
@@ -52,7 +52,7 @@ public enum ANE {
     @MainActor
     public static func register(priority _: Int = 100) {
         guard !isRegistered else {
-            logger.debug("ANE already registered, returning")
+            logger.debug("NeuRT already registered, returning")
             return
         }
 
@@ -71,13 +71,16 @@ public enum ANE {
 
         if registerResult == RAC_SUCCESS {
             // This module registered the plugin, so it owns teardown.
+            // warning level (matching ONNX's Sherpa registration) so backend
+            // wiring is visible at early boot, when the logger is still on its
+            // production .warning default.
             isRegistered = true
-            logger.info("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
+            logger.warning("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
         } else if registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
             // Already present (e.g. the commons static bootstrap registered it):
             // available, but not owned here, so teardown is left to whoever
             // registered it first. Deliberately do NOT set isRegistered.
-            logger.debug("NeuRT engine plugin already registered; leaving ownership with the existing registrant")
+            logger.warning("NeuRT engine plugin already registered; leaving ownership with the existing registrant")
         } else {
             let errorMsg = String(cString: rac_error_message(registerResult))
             logger.error("NeuRT plugin registration failed: \(errorMsg)")
@@ -108,12 +111,12 @@ public enum ANE {
 
 // MARK: - Auto-Registration
 
-extension ANE {
+extension NeuRT {
     /// Enable auto-registration for this module.
     /// Access this property to trigger backend registration.
     public static let autoRegister: Void = {
         Task { @MainActor in
-            ANE.register()
+            NeuRT.register()
         }
     }()
 }

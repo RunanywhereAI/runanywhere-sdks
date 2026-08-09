@@ -160,12 +160,12 @@ let package = Package(
         ),
 
         // =================================================================
-        // ANE Backend — Apple Neural Engine LLM + CoreML diffusion (NeuRT)
+        // NeuRT Backend — Apple Neural Engine LLM + CoreML diffusion
         // =================================================================
         .library(
-            name: "RunAnywhereANE",
+            name: "RunAnywhereNeuRT",
             type: .static,
-            targets: ["ANERuntime"]
+            targets: ["NeuRTRuntime"]
         ),
 
         // =================================================================
@@ -268,15 +268,15 @@ let package = Package(
         ),
 
         // =================================================================
-        // C Bridge Module - ANE (NeuRT) Backend Headers
+        // C Bridge Module - NeuRT Backend Headers
         // =================================================================
         .target(
-            name: "ANEBackend",
+            name: "NeuRTBackend",
             dependencies: [
                 "CRACommons",
                 "RABackendNeuRTBinary",
             ],
-            path: "sdk/runanywhere-swift/Sources/ANERuntime/include",
+            path: "sdk/runanywhere-swift/Sources/NeuRTRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -372,21 +372,21 @@ let package = Package(
         ),
 
         // =================================================================
-        // ANE Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
+        // NeuRT Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
         //
         // Links RABackendNeuRTBinary and registers the `neurt` engine plugin
-        // via `ANE.register()`. NeuRT is also bundled into ONNXRuntime (so
+        // via `NeuRT.register()`. NeuRT is also bundled into ONNXRuntime (so
         // existing ONNX/diffusion consumers are unaffected); this standalone
-        // product lets consumers opt into ANE directly.
+        // product lets consumers opt into NeuRT directly.
         // =================================================================
         .target(
-            name: "ANERuntime",
+            name: "NeuRTRuntime",
             dependencies: [
                 "RunAnywhere",
-                "ANEBackend",
+                "NeuRTBackend",
                 "RABackendNeuRTBinary",
             ],
-            path: "sdk/runanywhere-swift/Sources/ANERuntime",
+            path: "sdk/runanywhere-swift/Sources/NeuRTRuntime",
             exclude: ["include"],
             linkerSettings: [
                 .linkedLibrary("c++"),
@@ -592,7 +592,7 @@ let package = Package(
                 // xcframework, which clangs against CRACommons in one module.
                 "LlamaCPPRuntime",
                 "ONNXRuntime",
-                "ANERuntime",
+                "NeuRTRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests",
