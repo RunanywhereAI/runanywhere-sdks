@@ -1614,8 +1614,8 @@ int test_disable_thinking_directive_is_engine_gated() {
         if (captures.size() == 1) {
             CHECK(captures[0].disable_thinking,
                   "disable_thinking flag still reaches a non-thinking model");
-            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0,
-                  "a model that does not reason skips the /no_think directive");
+            CHECK(captures[0].prompt.find(kNoThink) == std::string::npos,
+                  "a model that does not reason receives no /no_think directive");
         }
         rac_proto_buffer_free(&out);
     }
