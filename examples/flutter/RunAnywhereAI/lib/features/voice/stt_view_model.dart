@@ -63,6 +63,8 @@ class STTViewModel extends VoiceComponentViewModelBase {
   // transcription session (RunAnywhere.transcribeStream), which owns
   // endpointing/segmentation natively. No app-side silence detection.
   StreamSubscription<sdk.TranscriptionEvent>? _liveSubscription;
+  StreamSubscription<Uint8List>? _liveChunkSubscription;
+  sdk.SttStream? _liveStream;
   String _committedTranscription = '';
 
   // Hybrid mode: router cached on the config tuple (mirrors iOS
@@ -442,9 +444,24 @@ class STTViewModel extends VoiceComponentViewModelBase {
 
     _subscribeToAudioLevels();
 
-    _liveSubscription = sdk.RunAnywhere.stt
-        .transcribeStream(chunks.map(sdk.AudioInput.pcm16))
-        .listen(
+    // Open the session once with the capture format, then push each mic chunk
+    // as a frame. The format is established at open time, so it is not
+    // re-derived per chunk the way the deprecated adapter had to.
+    final stream = await sdk.RunAnywhere.stt.openStream(
+      const sdk.AudioFormatSpec(
+        encoding: sdk.AudioEncoding.pcm16,
+        sampleRate: 16000,
+      ),
+    );
+    _liveStream = stream;
+    _liveChunkSubscription = chunks.listen(
+      (bytes) => stream.pushFrame(
+        sdk.AudioFrame(samples: bytes, sampleCount: bytes.length),
+      ),
+      onDone: stream.finish,
+    );
+
+    _liveSubscription = stream.events.listen(
       (event) {
         switch (event) {
           case sdk.TranscriptionPartial(:final text):
@@ -493,8 +510,13 @@ class STTViewModel extends VoiceComponentViewModelBase {
 
   /// Stop live transcription resources (called when mode changes).
   void _stopLiveTranscription() {
+    unawaited(_liveChunkSubscription?.cancel());
+    _liveChunkSubscription = null;
     unawaited(_liveSubscription?.cancel());
     _liveSubscription = null;
+    final stream = _liveStream;
+    _liveStream = null;
+    if (stream != null) unawaited(stream.close());
   }
 
   // --- Transcript actions --------------------------------------------------------------

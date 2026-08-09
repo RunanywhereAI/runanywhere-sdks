@@ -32,6 +32,10 @@ on:
       version:
         description: 'Version to release (e.g. 1.2.3 — no leading v)'
         required: true
+      validate_external_starters:
+        description: 'Also build the external Swift/RN starter repos (advisory; they version-lag the SDK)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -878,6 +882,12 @@ jobs:
   # ---------------------------------------------------------------------------
 
   validate_consumer_swift:
+    # Off by default. This builds RunanywhereAI/swift-starter-example, an
+    # external repo that tracks the SDK API on its own schedule, so its drift
+    # is not evidence about this release. It never gated publish (see the
+    # ADVISORY note there); running it only produced a red job nobody could
+    # act on from this repo. Opt in with validate_external_starters.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
     # native_ios produces the iOS artifact this job downloads. Do NOT add
     # sdk_kotlin here — the Swift consumer doesn't touch Kotlin artifacts
     # and serializing Swift validation behind ubuntu Kotlin
@@ -1480,6 +1490,9 @@ jobs:
           flutter build ios --simulator --no-codesign
 
   validate_consumer_react_native:
+    # Off by default, same reasoning as validate_consumer_swift: this builds
+    # RunanywhereAI/react-native-starter-app, an external repo.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
     needs: [validate, sdk_react_native]
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -1724,6 +1737,11 @@ jobs:
     #     must NOT block the SDK release; the starters are updated to the published
     #     packages out-of-band. The IN-REPO example consumers (web, flutter) stay
     #     hard gates because they ship with the SDK.
+    #     swift and react_native are now skipped unless the
+    #     validate_external_starters input is set: they stay in `needs` so the
+    #     opt-in run still waits for them, and a skipped job does not block
+    #     publish because `!cancelled()` tolerates it and neither appears in the
+    #     success checks below.
     if: >-
       !cancelled() &&
       needs.validate.result == 'success' &&
