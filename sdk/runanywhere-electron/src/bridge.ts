@@ -346,6 +346,14 @@ function resolveAddon(): NativeAddon {
       'runanywhere_native.node'
     ),
     // Local dev build (repo build dir): dist -> electron -> sdk -> repo root.
+    // Windows has one build tree per architecture; try the one matching this
+    // process before the x64 default.
+    ...(process.arch === 'arm64'
+      ? [path.resolve(
+          __dirname, '..', '..', '..', 'build', 'windows-arm64-release', 'sdk',
+          'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
+        )]
+      : []),
     path.resolve(
       __dirname, '..', '..', '..', 'build', 'windows-release', 'sdk',
       'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
