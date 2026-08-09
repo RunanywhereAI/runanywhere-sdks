@@ -71,13 +71,16 @@ public enum NeuRT {
 
         if registerResult == RAC_SUCCESS {
             // This module registered the plugin, so it owns teardown.
+            // warning level (matching ONNX's Sherpa registration) so backend
+            // wiring is visible at early boot, when the logger is still on its
+            // production .warning default.
             isRegistered = true
-            logger.info("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
+            logger.warning("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
         } else if registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
             // Already present (e.g. the commons static bootstrap registered it):
             // available, but not owned here, so teardown is left to whoever
             // registered it first. Deliberately do NOT set isRegistered.
-            logger.debug("NeuRT engine plugin already registered; leaving ownership with the existing registrant")
+            logger.warning("NeuRT engine plugin already registered; leaving ownership with the existing registrant")
         } else {
             let errorMsg = String(cString: rac_error_message(registerResult))
             logger.error("NeuRT plugin registration failed: \(errorMsg)")
