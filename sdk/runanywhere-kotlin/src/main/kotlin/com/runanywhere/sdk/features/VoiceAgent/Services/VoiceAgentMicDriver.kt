@@ -106,6 +106,16 @@ internal class VoiceAgentMicDriver(
     private var playoutJob: Job? = null
 
     /**
+     * Generation that owns the live playout.
+     *
+     * Both the retiring and the incoming job share one [AudioPlaybackManager] and one
+     * phase callback, so without this a cancelled job could stop the track its successor
+     * had just started, and report LISTENING over its successor's SPEAKING — leaving the
+     * panel idle while the reply was audible. Guarded by [playoutLock].
+     */
+    private var playoutGeneration = 0L
+
+    /**
      * The live mic queue, published so [stopPlayback] can drop what is behind a
      * tap on the interrupt control. Null between sessions.
      */
@@ -243,15 +253,29 @@ internal class VoiceAgentMicDriver(
      * over the speaker.
      */
     private fun startPlayout(scope: CoroutineScope, wav: ByteArray) {
-        val job = scope.launch { playReply(wav) }
-        val stale =
-            synchronized(playoutLock) {
-                val previous = playoutJob
-                playoutJob = job
-                previous
-            }
-        stale?.cancel()
+        // The new job used to be launched — and so allowed to start playing — before the
+        // stale one was cancelled. Cancelling the stale job runs its `playback.stop()`,
+        // which silenced the track the new reply had just started, while the panel still
+        // said SPEAKING. The feed loop deliberately keeps running during playout, so that
+        // overlap is reachable rather than theoretical.
+        synchronized(playoutLock) {
+            val generation = ++playoutGeneration
+            val previous = playoutJob
+            previous?.cancel()
+            playoutJob =
+                scope.launch {
+                    // Joining the cancelled job — not merely cancelling it — is what orders
+                    // its stop() before this job's play().
+                    previous?.join()
+                    if (!isCurrentPlayout(generation)) return@launch
+                    playReply(wav, generation)
+                }
+        }
     }
+
+    /** Whether [generation] is still the playout the driver considers live. */
+    private fun isCurrentPlayout(generation: Long): Boolean =
+        synchronized(playoutLock) { playoutGeneration == generation }
 
     /** Stop whatever is playing and let the playout job report LISTENING. */
     private fun cancelPlayout() {
@@ -259,6 +283,9 @@ internal class VoiceAgentMicDriver(
             synchronized(playoutLock) {
                 val live = playoutJob
                 playoutJob = null
+                // Retires the live job's right to report a phase, so a playout cancelled
+                // here cannot publish LISTENING on top of whatever the caller does next.
+                playoutGeneration++
                 live
             }
         job?.cancel()
@@ -268,7 +295,7 @@ internal class VoiceAgentMicDriver(
         playback.stop()
     }
 
-    private suspend fun playReply(wav: ByteArray) {
+    private suspend fun playReply(wav: ByteArray, generation: Long) {
         if (wav.isEmpty()) return
         // The listening report is in `finally` so an interrupted or failed playout
         // still ends the speaking state — a panel that latches on "Speaking" over a
@@ -286,7 +313,9 @@ internal class VoiceAgentMicDriver(
         } catch (e: Exception) {
             logger.warning("Agent reply playback failed: ${e.message}")
         } finally {
-            onPlaybackPhase(AgentState.LISTENING)
+            // Only the current generation may hand the UI back to LISTENING; a job retired
+            // mid-playout would otherwise contradict its successor.
+            if (isCurrentPlayout(generation)) onPlaybackPhase(AgentState.LISTENING)
         }
     }
 

@@ -49,7 +49,19 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
     /// The reply currently coming out of the speaker, held so it can be cut off
     /// from outside the feed loop — which is the whole point of not awaiting it
     /// inline any more.
-    private let playoutLock = OSAllocatedUnfairLock<Task<Void, Never>?>(initialState: nil)
+    /// The live playout task plus the generation that owns it.
+    ///
+    /// The generation is what makes a stale task harmless. Both tasks share one
+    /// `AudioPlaybackManager` and one phase callback, so without it a retiring
+    /// task could stop the player its successor had just started, and report
+    /// `.listening` over its successor's `.speaking` — leaving the panel idle
+    /// while the reply was audible.
+    private struct PlayoutState {
+        var task: Task<Void, Never>?
+        var generation: UInt64 = 0
+    }
+
+    private let playoutLock = OSAllocatedUnfairLock<PlayoutState>(initialState: PlayoutState())
 
     init(
         handle: CppBridge.VoiceAgentHandle,
@@ -262,37 +274,63 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
     /// "Speaking" over a silent speaker is the exact contradiction this signal
     /// exists to prevent.
     private func startPlayout(_ wav: Data) {
-        let task = Task { [weak self] in
-            guard let self else { return }
-            self.onPlaybackPhase(.speaking)
-            defer { self.onPlaybackPhase(.listening) }
-            do {
-                try await self.playback.play(wav)
-            } catch is CancellationError {
-                // Session teardown or barge-in; `defer` restored the phase.
-            } catch {
-                // A cut-off playout lands here too — the ordinary outcome of the
-                // interrupt control or of the user talking over the reply, not a
-                // fault, so it is not logged as an error.
-                self.logger.info("Agent reply playout ended early: \(error.localizedDescription)")
+        // Claim a generation, take custody of the outgoing task, and install the
+        // new one — all under one lock, so two rapid replies cannot both believe
+        // they are current.
+        //
+        // The new task used to be created (and so allowed to start playing)
+        // before the stale one was cancelled. Cancelling the stale task runs its
+        // `play(_:)` cancellation handler, which stops the shared player — the one
+        // the new reply had just started. The reply went silent while the panel
+        // said Speaking. The feed loop deliberately keeps running during playout,
+        // so that overlap is reachable, not theoretical.
+        playoutLock.withLock { state in
+            state.generation += 1
+            let generation = state.generation
+            let previous = state.task
+            previous?.cancel()
+            state.task = Task { [weak self] in
+                guard let self else { return }
+                // Let the cancelled playout finish its teardown before this one
+                // touches the player. Awaiting the task — not just cancelling it —
+                // is what orders the stale `stop()` before the new `play()`.
+                await previous?.value
+                guard self.isCurrentPlayout(generation) else { return }
+                self.onPlaybackPhase(.speaking)
+                // Only the current generation may hand the UI back to `.listening`;
+                // a task retired mid-playout would otherwise contradict its
+                // successor.
+                defer {
+                    if self.isCurrentPlayout(generation) { self.onPlaybackPhase(.listening) }
+                }
+                do {
+                    try await self.playback.play(wav)
+                } catch is CancellationError {
+                    // Session teardown or barge-in; `defer` restored the phase.
+                } catch {
+                    // A cut-off playout lands here too — the ordinary outcome of the
+                    // interrupt control or of the user talking over the reply, not a
+                    // fault, so it is not logged as an error.
+                    self.logger.info("Agent reply playout ended early: \(error.localizedDescription)")
+                }
             }
         }
-        // Replies are strictly sequential (the core runs one turn per feed call),
-        // so a live task here can only be a stale one; cancel it rather than
-        // leaving two players fighting over the speaker.
-        let previous = playoutLock.withLock { current -> Task<Void, Never>? in
-            let stale = current
-            current = task
-            return stale
-        }
-        previous?.cancel()
+    }
+
+    /// Whether `generation` is still the playout the driver considers live.
+    private func isCurrentPlayout(_ generation: UInt64) -> Bool {
+        !Task.isCancelled && playoutLock.withLock { $0.generation == generation }
     }
 
     /// Stop whatever is playing and let the playout task report `.listening`.
     private func cancelPlayout() {
-        let task = playoutLock.withLock { current -> Task<Void, Never>? in
-            let live = current
-            current = nil
+        // Bumping the generation retires the live task's right to report a phase,
+        // so a playout cancelled here cannot publish `.listening` on top of
+        // whatever the caller does next.
+        let task = playoutLock.withLock { state -> Task<Void, Never>? in
+            let live = state.task
+            state.task = nil
+            state.generation += 1
             return live
         }
         task?.cancel()

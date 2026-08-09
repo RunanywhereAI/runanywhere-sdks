@@ -74,15 +74,22 @@ public extension RunAnywhere {
         }
 
         /// Synthesize text and play it through the device speakers, returning a
-        /// handle to the utterance immediately — playback continues in the
-        /// background. Interrupt it with `handle.interrupt()`.
+        /// handle to the utterance immediately — synthesis *and* playback continue
+        /// in the background. Interrupt it with `handle.interrupt()`, which is
+        /// effective from the moment this returns, including during the seconds a
+        /// neural voice spends synthesizing.
         ///
         /// ```swift
         /// let handle = try await RunAnywhere.tts.speak("Hello there")
         /// await handle.waitForPlayout()
+        /// if let failure = handle.error { /* synthesis or playback failed */ }
         /// ```
         ///
-        /// - Throws: `SDKException` when no voice is loaded or synthesis fails.
+        /// - Throws: `SDKException` when the SDK is not ready or no voice is
+        ///   loaded — both are known before any work starts. A synthesis or
+        ///   playback failure cannot be thrown here, because this call returns
+        ///   before either happens; it arrives on `handle.error` once
+        ///   `waitForPlayout()` resolves.
         @discardableResult
         public func speak(_ text: String, options: TtsOptions? = nil) async throws -> SpeechHandle {
             try await RunAnywhere.speakAndTrack(
@@ -141,6 +148,11 @@ extension RunAnywhere {
     /// immediately — playback continues in the background and completes the
     /// handle when it finishes, is interrupted, or fails.
     internal static func speakAndTrack(text: String, options: RATTSOptions) async throws -> SpeechHandle {
+        // Preflight synchronously so "SDK not ready" / "no voice loaded" still
+        // reach the caller as a thrown error rather than as a handle that fails
+        // later. Only synthesis and playback are deferred below.
+        _ = try requireTTSVoice()
+
         // The handle is published BEFORE synthesis, not after it. A neural
         // voice takes seconds to synthesize, and while it did there was no
         // handle for this utterance: `tts.stop()` and `VoiceSession.interrupt()`
@@ -155,6 +167,32 @@ extension RunAnywhere {
         })
         setActiveSpeechHandle(handle)
 
+        // ...and returned before synthesis too, which is the other half of the
+        // same problem. Registering the handle internally fixed the *global*
+        // `tts.stop()`, but this function still awaited synthesis before handing
+        // the handle back, so the documented per-utterance
+        // `handle.interrupt()` was impossible during the only window that
+        // actually needs it: the caller could not hold the handle until the
+        // seconds of synthesis it wanted to cancel were already over.
+        //
+        // Synthesis and playback therefore run on a task the handle owns.
+        // Failures are delivered asynchronously: `await handle.waitForPlayout()`
+        // then read `handle.error`.
+        Task.detached(priority: .userInitiated) {
+            await performTrackedSpeech(text: text, options: options, handle: handle)
+        }
+        return handle
+    }
+
+    /// Synthesize and play one utterance, resolving `handle` however it ends.
+    ///
+    /// Never throws: this runs detached, so an escaping error would be lost. The
+    /// handle is the only channel back to the caller.
+    private static func performTrackedSpeech(
+        text: String,
+        options: RATTSOptions,
+        handle: SpeechHandle
+    ) async {
         let wavData: Data
         do {
             let output = try await synthesizeProto(text: text, options: options)
@@ -163,17 +201,16 @@ extension RunAnywhere {
             wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: wavSampleRate)
         } catch {
             // The handle is already visible to interrupters and may have
-            // `waitForPlayout()` waiters, so it has to be resolved before the
-            // error leaves this function.
+            // `waitForPlayout()` waiters, so it has to be resolved here.
             handle.complete(error: error)
-            throw error
+            return
         }
 
         // An interrupt that landed while the engine was synthesizing must not be
         // overtaken by the audio it was meant to cancel.
         guard !handle.interrupted, !wavData.isEmpty else {
             handle.complete()
-            return handle
+            return
         }
 
         speechPlayback.play(wavData) { _ in
@@ -189,7 +226,6 @@ extension RunAnywhere {
         if handle.interrupted {
             speechPlayback.stop()
         }
-        return handle
     }
 
     internal static func requireTTSVoice() throws -> RACurrentModelResult {

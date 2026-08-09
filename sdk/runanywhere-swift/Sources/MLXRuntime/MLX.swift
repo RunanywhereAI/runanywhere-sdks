@@ -442,10 +442,23 @@ private struct MLXSTTOptionsSnapshot: Sendable {
 private struct MLXTTSOptionsSnapshot: Sendable {
     let voice: String?
     let language: String?
+    /// `rac_tts_options_t.rate` — 1.0 is normal tempo.
+    ///
+    /// Read here because the MLX speech models cannot honour it themselves:
+    /// `generateSamplesStream` takes only sampling parameters, so a 0.5x and a
+    /// 2.0x request emit identical audio. This snapshot used to drop the field,
+    /// which is what made the rate control inert on this runtime — accepted by
+    /// the UI, carried the whole way down the C ABI, then discarded. The runtime
+    /// applies it to the produced samples instead (`MLXSpeechRateScaler`).
+    let rate: Float
 
     init(_ options: UnsafePointer<rac_tts_options_t>?) {
         voice = string(from: options?.pointee.voice)
         language = string(from: options?.pointee.language)
+        // 0 means "unset" across the C ABI's float options; treat it as normal
+        // tempo rather than as a request to stretch the audio infinitely.
+        let requested = options?.pointee.rate ?? 1.0
+        rate = requested > 0 ? requested : 1.0
     }
 }
 
@@ -1187,8 +1200,15 @@ private final class MLXSession: @unchecked Sendable {
         if isCancelled {
             throw CancellationError()
         }
+        // Apply the requested tempo to the samples the model produced, since the
+        // model itself ignored it. Time-axis only, so pitch is unchanged.
+        let paced = MLXSpeechRateScaler.scaled(
+            samples,
+            rate: options.rate,
+            sampleRate: model.sampleRate
+        )
         let elapsedMs = Int64(Date().timeIntervalSince(started) * 1000)
-        return (samples, model.sampleRate, elapsedMs)
+        return (paced, model.sampleRate, elapsedMs)
         #else
         throw MLXRuntimeError.mlxAudioUnavailable
         #endif
@@ -1221,14 +1241,29 @@ private final class MLXSession: @unchecked Sendable {
             language: options.language,
             generationParameters: model.defaultGenerationParameters
         )
-        for try await chunk in stream {
-            if isCancelled {
-                break
-            }
-            let data = floatPCMData(from: chunk)
+        // Same tempo correction as the batch path, run incrementally so the
+        // stream keeps streaming: the scaler holds back only the half-frame
+        // overlap it needs to align the next frame, and `finish()` releases it.
+        var pacer = MLXSpeechRateScaler(rate: options.rate, sampleRate: model.sampleRate)
+        func emit(_ samples: [Float]) {
+            guard !samples.isEmpty else { return }
+            let data = floatPCMData(from: samples)
             data.withUnsafeBytes { rawBuffer in
                 callback?(rawBuffer.baseAddress, rawBuffer.count, userData.rawValue)
             }
+        }
+        var cancelledMidStream = false
+        for try await chunk in stream {
+            if isCancelled {
+                cancelledMidStream = true
+                break
+            }
+            emit(pacer.consume(chunk))
+        }
+        // Don't flush a cancelled utterance — the trailing overlap belongs to
+        // audio the caller just asked to stop.
+        if !cancelledMidStream && !isCancelled {
+            emit(pacer.finish())
         }
         #else
         throw MLXRuntimeError.mlxAudioUnavailable

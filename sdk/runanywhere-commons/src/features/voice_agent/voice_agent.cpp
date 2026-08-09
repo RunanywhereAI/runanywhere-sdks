@@ -120,8 +120,16 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         return;
     }
 
-    // Signal shutdown and wait for all in-flight operations (including lock-free ones)
-    handle->is_shutting_down.store(true, std::memory_order_release);
+    // Signal shutdown and wait for all in-flight operations (including lock-free ones).
+    //
+    // The flag is published under admission_mutex so it cannot interleave with an
+    // InFlightGuard's test-and-increment. Without that, an entrant already past
+    // its flag read but not yet incremented was invisible to the drain below,
+    // and its increment landed after `delete handle`.
+    {
+        std::lock_guard<std::mutex> admission(handle->admission_mutex);
+        handle->is_shutting_down.store(true, std::memory_order_release);
+    }
     handle->is_configured.store(false, std::memory_order_release);
 
     // Wait for in-flight lock-free ops (e.g. detect_speech)

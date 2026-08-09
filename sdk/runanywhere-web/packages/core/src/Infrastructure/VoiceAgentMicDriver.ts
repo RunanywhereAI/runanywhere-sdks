@@ -140,8 +140,17 @@ export class VoiceAgentMicDriver {
   private bargeMs = 0;
   private bargeInFired = false;
   private bargeFrames: Float32Array[] = [];
-  /** Confirmed barge-in speech, handed to the next utterance's pre-roll. */
+  /** Confirmed barge-in speech, handed to the next utterance. */
   private pendingBargePreRoll: Float32Array[] = [];
+  /**
+   * How much confirmed speech the barge-in gate measured before firing.
+   *
+   * Carried separately from the frames because the two differ: the gate counts
+   * every qualifying frame, while only the last `PRE_ROLL_CHUNKS` are retained.
+   * The next utterance needs the measurement, not the retained duration — it is
+   * what tells `MIN_SPEECH_MS` this turn was real speech and not room noise.
+   */
+  private pendingBargeSpeechMs = 0;
 
   get isRunning(): boolean {
     return !this.stopped && this.capture.isCapturing;
@@ -320,11 +329,12 @@ export class VoiceAgentMicDriver {
       + `(level=${level.toFixed(4)}, threshold=${threshold.toFixed(4)})`,
     );
     // The frames that cleared the gate are the user's own voice by
-    // construction, so carry them into the next utterance's pre-roll: without
-    // them the words that took the turn back would be missing from the
-    // transcript. Handed over through `resetSegmentation`, which runs after
-    // this turn unwinds and would otherwise clear the pre-roll.
+    // construction, so carry them into the next utterance: without them the
+    // words that took the turn back would be missing from the transcript.
+    // Handed over through `resetSegmentation`, which runs after this turn
+    // unwinds and would otherwise clear them.
     this.pendingBargePreRoll = this.bargeFrames;
+    this.pendingBargeSpeechMs = this.bargeMs;
     this.bargeFrames = [];
     // Stop playout synchronously so the speaker goes quiet on this frame; the
     // turn's own `finally` restores the listening phase.
@@ -365,16 +375,43 @@ export class VoiceAgentMicDriver {
   }
 
   private resetSegmentation(): void {
-    // A barge-in's confirmed speech survives the reset that follows the
-    // interrupted turn — it is the opening of the next utterance, not stale
-    // state from the previous one.
-    this.preRoll = this.pendingBargePreRoll;
+    const carriedBarge = this.pendingBargePreRoll;
+    const carriedBargeMs = this.pendingBargeSpeechMs;
     this.pendingBargePreRoll = [];
+    this.pendingBargeSpeechMs = 0;
+    this.preRoll = [];
+    this.silenceMs = 0;
+
+    if (carriedBarge.length > 0) {
+      // A barge-in's confirmed speech opens the next utterance outright — it does
+      // not go back to being a candidate.
+      //
+      // These frames used to be handed to `preRoll` with `inSpeech` left false,
+      // which lost them two different ways. If the user fell silent after
+      // interrupting, nothing ever promoted the pre-roll and the words that took
+      // the turn back were discarded — the reply was cut for a turn that then
+      // went unprocessed. If the user kept talking, the next frame pushed the
+      // pre-roll past `PRE_ROLL_CHUNKS` and shifted the oldest confirmed frame
+      // out, docking the first 100 ms off the front of their sentence.
+      //
+      // Seeding the utterance directly fixes both: `utterance` has no cap to
+      // truncate against, and being in-speech means ordinary silence accounting
+      // closes the turn on its own.
+      this.utterance = carriedBarge;
+      this.utteranceSamples = carriedBarge.reduce((sum, item) => sum + item.length, 0);
+      this.inSpeech = true;
+      // The gate's own measurement, not the retained frames' duration: the gate
+      // required BARGE_IN_MIN_SPEECH_MS of speech to fire at all, so this turn
+      // has already proven it clears MIN_SPEECH_MS and must not be dropped as
+      // noise just because only the tail frames were kept.
+      this.speechMs = carriedBargeMs;
+      return;
+    }
+
     this.utterance = [];
     this.utteranceSamples = 0;
     this.inSpeech = false;
     this.speechMs = 0;
-    this.silenceMs = 0;
   }
 
   private async processTurn(audio: Float32Array): Promise<void> {

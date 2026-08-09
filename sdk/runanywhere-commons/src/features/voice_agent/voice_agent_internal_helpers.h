@@ -56,18 +56,32 @@ rac_result_t validate_voice_response(const VoiceResponseParts& response);
 
 // RAII admission guard for every long-running voice-agent entry
 // point (process_voice_turn{,_proto}, process_stream, process_turn_proto,
-// transcribe_proto, synthesize_speech_proto, detect_speech). Implements the
-// canonical TOCTOU-safe sequence the lock-free design relies on:
-//   1. check handle->is_shutting_down before incrementing,
-//   2. increment handle->in_flight,
-//   3. re-check handle->is_shutting_down (publish-before-check race with
-//      rac_voice_agent_destroy, which sets the flag then drains the counter),
+// transcribe_proto, synthesize_speech_proto, detect_speech). Admission is:
+//   1. take handle->admission_mutex,
+//   2. reject if handle->is_shutting_down,
+//   3. otherwise increment handle->in_flight and release the lock,
 //   4. RAII-decrement on scope exit.
+//
+// Step 1 is what makes the rest sound. This used to be a lock-free
+// check → increment → re-check, on the theory that the trailing re-check closed
+// the publish-before-check race with rac_voice_agent_destroy. It did not: an
+// entrant preempted between the first check and the increment was invisible to
+// destroy's drain, so destroy saw a zero counter, deleted the handle, and the
+// increment then wrote to freed memory. The re-check could never fire, because
+// the step before it was already the use-after-free. Sharing a lock with the
+// flag's publisher collapses the window: an entrant is either rejected or
+// counted before destroy can read the counter.
+//
 // `rac_voice_agent_destroy` spin-waits on handle->in_flight > 0, so wrapping
 // each entry point in this guard makes the shutdown barrier cover them all
 // instead of only detect_speech. Mirrors VlmInFlightGuard (rac_vlm_proto_abi)
 // and SDKEventInFlightGuard (event_publisher), but scoped per-handle because
 // the voice-agent counter/flag live on the rac_voice_agent struct.
+//
+// Still the caller's contract, and not fixable here: calling any entry point
+// after rac_voice_agent_destroy has *returned* is use-after-free on the handle
+// itself, before this guard runs at all. This closes the concurrent race, not
+// the sequential misuse.
 struct InFlightGuard {
     explicit InFlightGuard(rac_voice_agent_handle_t handle);
     ~InFlightGuard();

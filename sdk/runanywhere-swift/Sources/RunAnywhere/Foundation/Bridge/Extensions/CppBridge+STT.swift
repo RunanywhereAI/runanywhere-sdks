@@ -97,10 +97,10 @@ private final class STTStreamSessionContext: @unchecked Sendable {
     }
 
     private let state = OSAllocatedUnfairLock<State>(initialState: State())
-    private let continuation: AsyncStream<RASTTPartialResult>.Continuation
+    private let continuation: AsyncThrowingStream<RASTTPartialResult, Error>.Continuation
     private let logger = SDKLogger(category: "CppBridge.STT.SessionStream")
 
-    init(_ continuation: AsyncStream<RASTTPartialResult>.Continuation) {
+    init(_ continuation: AsyncThrowingStream<RASTTPartialResult, Error>.Continuation) {
         self.continuation = continuation
     }
 
@@ -129,20 +129,25 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         }
     }
 
-    /// `RASTTPartialResult` collapsed to `text`/`isFinal`/`language`
-    /// (idl/stt_options.proto): `finalOutput`/`hasFinalOutput` no longer
-    /// exist, so a synthetic failure now carries its message on `text`
-    /// alone. The error itself is still reported to the stream consumer
-    /// via `SDKException` at the call sites that read `yieldFailure`'s
-    /// side effects (see `STTNamespace.swift`'s `.failed` mapping), which
-    /// derives its own `SDKException` rather than reading it off the
-    /// partial.
+    /// End the stream with the failure, instead of dressing the message up as
+    /// speech.
+    ///
+    /// This used to yield `RASTTPartialResult(isFinal: true, text: message)`,
+    /// because the stream could only carry partials. Nothing downstream could
+    /// tell that apart from a recognized utterance, so "STT stream feed failed"
+    /// arrived as the user's own words — and, because it was marked final, was
+    /// followed by a successful `completed`. A failure reported as a transcript
+    /// is worse than a failure reported as nothing.
+    ///
+    /// The stream throws now, so the error travels as an error. The code is
+    /// mapped through `rac_result_to_proto_error`, keeping one error vocabulary
+    /// across the ABI rather than inventing a Swift-side category here.
     func yieldFailure(_ message: String, code: rac_result_t = RAC_ERROR_STREAM_CANCELLED) {
         guard !isCancelled else { return }
-        var partial = RASTTPartialResult()
-        partial.isFinal = true
-        partial.text = message
-        continuation.yield(partial)
+        let failure = SDKException.from(rcResult: code)
+            ?? SDKException(code: .processingFailed, message: message, category: .component)
+        logger.warning("STT session stream failed: \(message)")
+        continuation.finish(throwing: failure)
     }
 
     private func yield(_ event: RASTTStreamEvent) {
@@ -308,7 +313,7 @@ extension CppBridge {
             audio: AsyncStream<Data>,
             options: RASTTOptions,
             loadedModel: RACurrentModelResult
-        ) async throws -> AsyncStream<RASTTPartialResult> {
+        ) async throws -> AsyncThrowingStream<RASTTPartialResult, Error> {
             let handle = try await prepareStreamingHandle(from: loadedModel)
             guard STTStreamSessionABI.resolve() != nil else {
                 throw SDKException(
@@ -319,7 +324,7 @@ extension CppBridge {
             }
 
             let optionsData = try options.serializedData()
-            return AsyncStream { continuation in
+            return AsyncThrowingStream { continuation in
                 let context = STTStreamSessionContext(continuation)
                 let contextPtr = STTStreamingContextPointer(
                     rawValue: Unmanaged.passRetained(context).toOpaque()

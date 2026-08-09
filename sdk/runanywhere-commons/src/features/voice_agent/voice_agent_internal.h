@@ -192,6 +192,23 @@ struct rac_voice_agent {
     std::atomic<bool> is_shutting_down{false};
     std::atomic<int> in_flight{0};
 
+    /// Serializes in-flight admission against the shutdown transition.
+    ///
+    /// The flag and the counter cannot close the destroy race between them, no
+    /// matter how they are ordered. An entrant that reads `is_shutting_down` as
+    /// false can be preempted before it increments; destroy then flips the flag,
+    /// observes a counter still at zero, drains instantly, and frees the handle —
+    /// so the entrant's increment lands on released storage, and no re-check
+    /// afterwards can undo that. The two operations have to be one transition.
+    ///
+    /// Admission takes this lock around {test flag, bump counter}; destroy takes
+    /// it around {set flag}. That leaves exactly two outcomes for any entrant:
+    /// rejected, or counted before destroy can read the counter.
+    ///
+    /// Held only across those few instructions — never across a turn, and never
+    /// together with `mutex` — so it imposes no ordering against the lock below.
+    std::mutex admission_mutex;
+
     rac_handle_t llm_handle{nullptr};
     rac_handle_t stt_handle{nullptr};
     rac_handle_t tts_handle{nullptr};

@@ -54,6 +54,12 @@ private class KotlinSttStream(
         sttStreamScope.launch {
             var sawTerminal = false
             try {
+                // Preflight before any audio is accepted. `transcribeStream` answers
+                // an uninitialized SDK or an unloaded model by closing its flow
+                // without emitting, which the generic "ended before a final result"
+                // path below would report as a mystery. This names the actual
+                // precondition, matching Swift's `requireSTTModel()`.
+                legacyRequireSttModel()
                 legacyTranscribeStream(frames.consumeAsFlow(), options.orDefault().toProto()).collect { partial ->
                     announceStarted()
                     if (partial.is_final) {
