@@ -396,7 +396,7 @@ async function installLlamaCppBackendWorker(
   }
 
   const factory = options.backendWorkerFactory
-    ?? (() => new Worker(new URL('./backendWorker.ts', import.meta.url), {
+    ?? (() => new Worker(new URL('./backendWorker.js', import.meta.url), {
       type: 'module',
       name: 'runanywhere-llamacpp-backend',
     }));
@@ -471,7 +471,7 @@ async function installLlamaCppStreamWorker(useWebGPU: boolean): Promise<void> {
     throw new Error(`Failed to fetch stream-worker WASM (${wasmResponse.status}): ${wasmName}`);
   }
   const wasmBytes = await wasmResponse.arrayBuffer();
-  setStreamWorkerFactory(() => new Worker(new URL('./streamWorker.ts', import.meta.url), {
+  setStreamWorkerFactory(() => new Worker(new URL('./streamWorker.js', import.meta.url), {
     type: 'module',
     name: 'runanywhere-llamacpp-stream',
   }));

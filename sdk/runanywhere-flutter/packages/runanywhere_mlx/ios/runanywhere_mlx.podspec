@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => 'f0b8fc7d428d5404064bce2bd3c3bcff192a21bc42a654034eeb301f14b4cfbf',
-  'RunAnywhereMLXRuntime' => 'e092306b4f6bba6987e5827456847b34357f40810de818a87127618325d30007',
+  'RunAnywhereMLXRuntime' => 'a5011899d5288e6ed4d68c46bac5204cc758727998c3e4792bcf831b0cb11cce',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => '70de4c70143b4544204b2c0e8af296546bc31ccf3ffda2f7b813fffb5b720ae9'
 }.freeze
@@ -25,7 +25,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.13'
+  s.version          = '0.20.14'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

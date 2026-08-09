@@ -215,7 +215,7 @@ async function installONNXBackendWorker(options: ONNXRegisterOptions): Promise<v
   }
 
   const factory = options.backendWorkerFactory
-    ?? (() => new Worker(new URL('./backendWorker.ts', import.meta.url), {
+    ?? (() => new Worker(new URL('./backendWorker.js', import.meta.url), {
       type: 'module',
       name: 'runanywhere-onnx-backend',
     }));

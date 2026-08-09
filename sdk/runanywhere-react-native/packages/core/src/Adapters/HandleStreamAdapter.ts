@@ -125,6 +125,10 @@ class HandleFanOut<Event> {
         this.subscribers.delete(s);
       }
     }
+    if (this.subscribers.size === 0) {
+      this.tearDown();
+      return;
+    }
     // Deterministic teardown on terminal events (Swift
     // LLMStreamAdapter.swift:63 finishes on `event.isFinal` instead of
     // waiting for the native onDone).

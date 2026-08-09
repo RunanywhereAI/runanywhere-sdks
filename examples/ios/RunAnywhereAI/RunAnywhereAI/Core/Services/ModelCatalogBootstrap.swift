@@ -1376,7 +1376,13 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 1_583_349_760,
             supportsThinking: true
         )
+        // Only the ANE and MLX registrations above are unconditional; the CPU one
+        // is compiled out when LlamaCPPRuntime is not linked, so do not claim it.
+        #if canImport(LlamaCPPRuntime)
         logger.info("LFM2.5-2.6B registered on all three accelerators")
+        #else
+        logger.info("LFM2.5-2.6B registered on ANE and GPU/MLX; CPU (llama.cpp) not linked")
+        #endif
 
         // --- LoRA adapters ------------------------------------------------------
         // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.

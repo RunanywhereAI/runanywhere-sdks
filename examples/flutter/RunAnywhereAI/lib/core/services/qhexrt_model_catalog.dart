@@ -98,32 +98,13 @@ abstract final class QHexRTModelCatalog {
   /// Kept in lockstep with Android's `ModelCatalog.npuCatalog`.
   static const List<QHexRTCatalogModel> models = [
     QHexRTCatalogModel(
-      id: 'lfm2_5_230m',
-      name: 'LFM2.5 230M (HNPU)',
+      id: 'qwen3_0_6b',
+      name: 'Qwen3 0.6B (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
+          'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
       category: _language,
-      memoryBytes: 538771163,
-      contextLength: 512,
-    ),
-    QHexRTCatalogModel(
-      id: 'lfm2_5_350m',
-      name: 'LFM2.5 350M (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
-      category: _language,
-      memoryBytes: 1441493515,
-      contextLength: 2048,
-    ),
-    QHexRTCatalogModel(
-      id: 'lfm2_5_2_6b',
-      name: 'LFM2.5 2.6B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU/lfm2-5-2.6b.json',
-      category: _language,
-      memoryBytes: 3259942826,
-      contextLength: 512,
-      supportsThinking: true,
+      memoryBytes: 1823248798,
+      contextLength: 1024,
     ),
     QHexRTCatalogModel(
       id: 'qwen3_5_0_8b',
@@ -154,13 +135,41 @@ abstract final class QHexRTModelCatalog {
       contextLength: 1024,
     ),
     QHexRTCatalogModel(
-      id: 'qwen3_0_6b',
-      name: 'Qwen3 0.6B (HNPU)',
+      id: 'qwen3_vl_2b_text',
+      name: 'Qwen3-VL 2B Text (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
+          'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
       category: _language,
-      memoryBytes: 1823248798,
-      contextLength: 1024,
+      memoryBytes: 2364667194,
+      contextLength: 512,
+    ),
+    QHexRTCatalogModel(
+      id: 'lfm2_5_230m',
+      name: 'LFM2.5 230M (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
+      category: _language,
+      memoryBytes: 538771163,
+      contextLength: 512,
+    ),
+    QHexRTCatalogModel(
+      id: 'lfm2_5_350m',
+      name: 'LFM2.5 350M (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
+      category: _language,
+      memoryBytes: 1441493515,
+      contextLength: 2048,
+    ),
+    QHexRTCatalogModel(
+      id: 'lfm2_5_2_6b',
+      name: 'LFM2.5 2.6B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU/lfm2-5-2.6b.json',
+      category: _language,
+      memoryBytes: 3259942826,
+      contextLength: 512,
+      supportsThinking: true,
     ),
     QHexRTCatalogModel(
       id: 'llama3_2_1b',
@@ -171,8 +180,61 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 3023821212,
       contextLength: 512,
     ),
-    // v81 ships the fully-on-NPU TRUE-TERNARY {-1,0,+1} decoder (no int8 fallback), not the older
-    // QNN W8A16 build — smaller download (~1.12 GB vs ~2.37 GB). v75/v79 are unchanged (W8A16).
+    QHexRTCatalogModel(
+      id: 'phi_tiny_moe',
+      name: 'Phi Tiny MoE (HNPU)',
+      url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
+      category: _language,
+      memoryBytes: 4721494520,
+    ),
+    QHexRTCatalogModel(
+      id: 'gemma3n_e4b',
+      name: 'Gemma 3n E4B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
+      category: _language,
+      memoryBytes: 10929816419,
+    ),
+    QHexRTCatalogModel(
+      id: 'gemma4_e2b',
+      name: 'Gemma 4 E2B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
+      category: _language,
+      memoryBytes: 9252275672,
+    ),
+    QHexRTCatalogModel(
+      id: 'gemma4_e4b',
+      name: 'Gemma 4 E4B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
+      category: _language,
+      memoryBytes: 13435056195,
+    ),
+    QHexRTCatalogModel(
+      id: 'nemotron_nano_8b',
+      name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
+      category: _language,
+      memoryBytes: 8609694487,
+    ),
+    QHexRTCatalogModel(
+      id: 'nemoguard_content_8b',
+      name: 'NemoGuard 8B Content Safety (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
+      category: _language,
+      memoryBytes: 8610354023,
+    ),
+    QHexRTCatalogModel(
+      id: 'nemoguard_topic_8b',
+      name: 'NemoGuard 8B Topic Control (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
+      category: _language,
+      memoryBytes: 8609694527,
+    ),
     QHexRTCatalogModel(
       id: 'ternary_bonsai_1_7b',
       name: 'Ternary Bonsai 1.7B (HNPU)',
@@ -222,69 +284,13 @@ abstract final class QHexRTModelCatalog {
       supportsThinking: true,
     ),
     QHexRTCatalogModel(
-      id: 'phi_tiny_moe',
-      name: 'Phi Tiny MoE (HNPU)',
-      url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
-      category: _language,
-      memoryBytes: 4721494520,
-    ),
-    QHexRTCatalogModel(
-      id: 'embeddinggemma_300m',
-      name: 'EmbeddingGemma 300M (HNPU)',
-      url: 'https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU',
-      category: _embedding,
-      memoryBytes: 566263339,
-    ),
-    QHexRTCatalogModel(
-      id: 'gemma3n_e4b',
-      name: 'Gemma 3n E4B (HNPU)',
+      id: 'cosmos3_edge_text',
+      name: 'Cosmos3-Edge Text (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
+          'https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-text.manifest.json',
       category: _language,
-      memoryBytes: 10929816419,
-    ),
-    QHexRTCatalogModel(
-      id: 'gemma4_e2b',
-      name: 'Gemma 4 E2B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
-      category: _language,
-      memoryBytes: 9252275672,
-    ),
-    QHexRTCatalogModel(
-      id: 'gemma4_e4b',
-      name: 'Gemma 4 E4B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
-      category: _language,
-      memoryBytes: 13435056195,
-    ),
-    QHexRTCatalogModel(
-      id: 'llama_embed_nemotron_8b',
-      name: 'Llama Embed Nemotron 8B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU',
-      category: _embedding,
-      memoryBytes: 8079101598,
-    ),
-    QHexRTCatalogModel(
-      id: 'nv_embedcode_7b',
-      name: 'NV-EmbedCode 7B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU',
-      category: _embedding,
-      memoryBytes: 7276868122,
-    ),
-    QHexRTCatalogModel(
-      id: 'nv_embedqa_1b',
-      name: 'NV-EmbedQA 1B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU',
-      category: _embedding,
-      memoryBytes: 2493026133,
-    ),
-    QHexRTCatalogModel(
-      id: 'nv_rerankqa_1b',
-      name: 'NV-RerankQA 1B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU',
-      category: _embedding,
-      memoryBytes: 2494254905,
+      memoryBytes: 2513105364,
+      contextLength: 2048,
     ),
     QHexRTCatalogModel(
       id: 'deepseek_r1_distill_qwen_1_5b',
@@ -305,53 +311,12 @@ abstract final class QHexRTModelCatalog {
       supportsThinking: true,
     ),
     QHexRTCatalogModel(
-      id: 'nemotron_nano_8b',
-      name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
-      category: _language,
-      memoryBytes: 8609694487,
-    ),
-    QHexRTCatalogModel(
-      id: 'nemoguard_content_8b',
-      name: 'NemoGuard 8B Content Safety (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
-      category: _language,
-      memoryBytes: 8610354023,
-    ),
-    QHexRTCatalogModel(
-      id: 'nemoguard_topic_8b',
-      name: 'NemoGuard 8B Topic Control (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
-      category: _language,
-      memoryBytes: 8609694527,
-    ),
-    QHexRTCatalogModel(
-      id: 'qwen3_vl_2b_text',
-      name: 'Qwen3-VL 2B Text (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
-      category: _language,
-      memoryBytes: 2364667194,
-      contextLength: 512,
-    ),
-    QHexRTCatalogModel(
       id: 'qwen3_vl',
       name: 'Qwen3-VL 2B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
       category: _multimodal,
       memoryBytes: 3220398168,
-      contextLength: 512,
-    ),
-    QHexRTCatalogModel(
-      id: 'internvl3_5_1b',
-      name: 'InternVL3.5 1B (HNPU)',
-      url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
-      category: _multimodal,
-      memoryBytes: 3067933894,
       contextLength: 512,
     ),
     QHexRTCatalogModel(
@@ -369,21 +334,6 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json',
       category: _multimodal,
       memoryBytes: 13435056195,
-    ),
-    QHexRTCatalogModel(
-      id: 'nemotron_nano_vl_8b',
-      name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
-      category: _multimodal,
-      memoryBytes: 10057258051,
-    ),
-    QHexRTCatalogModel(
-      id: 'lama_dilated',
-      name: 'LaMa Dilated (HNPU)',
-      url: 'https://huggingface.co/runanywhere/lama_dilated_HNPU',
-      category: _imageGeneration,
-      memoryBytes: 98509597,
     ),
     QHexRTCatalogModel(
       id: 'nemotron_ocr',
@@ -407,6 +357,74 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 1995206253,
     ),
     QHexRTCatalogModel(
+      id: 'nemotron_nano_vl_8b',
+      name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
+      category: _multimodal,
+      memoryBytes: 10057258051,
+    ),
+    QHexRTCatalogModel(
+      id: 'cosmos3_edge_vlm',
+      name: 'Cosmos3-Edge Vision (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-vlm.json',
+      category: _multimodal,
+      memoryBytes: 3505000000,
+      contextLength: 2048,
+    ),
+    QHexRTCatalogModel(
+      id: 'internvl3_5_1b',
+      name: 'InternVL3.5 1B (HNPU)',
+      url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
+      category: _multimodal,
+      memoryBytes: 3067933894,
+      contextLength: 512,
+    ),
+    QHexRTCatalogModel(
+      id: 'embeddinggemma_300m',
+      name: 'EmbeddingGemma 300M (HNPU)',
+      url: 'https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU',
+      category: _embedding,
+      memoryBytes: 566263339,
+    ),
+    QHexRTCatalogModel(
+      id: 'nemotron_3_embed_1b',
+      name: 'Nemotron-3-Embed 1B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemotron_3_embed_1b_HNPU/nemotron-3-embed-1b.json',
+      category: _embedding,
+      memoryBytes: 2302290226,
+    ),
+    QHexRTCatalogModel(
+      id: 'nv_embedqa_1b',
+      name: 'NV-EmbedQA 1B (HNPU)',
+      url: 'https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU',
+      category: _embedding,
+      memoryBytes: 2493026133,
+    ),
+    QHexRTCatalogModel(
+      id: 'nv_rerankqa_1b',
+      name: 'NV-RerankQA 1B (HNPU)',
+      url: 'https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU',
+      category: _embedding,
+      memoryBytes: 2494254905,
+    ),
+    QHexRTCatalogModel(
+      id: 'nv_embedcode_7b',
+      name: 'NV-EmbedCode 7B (HNPU)',
+      url: 'https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU',
+      category: _embedding,
+      memoryBytes: 7276868122,
+    ),
+    QHexRTCatalogModel(
+      id: 'llama_embed_nemotron_8b',
+      name: 'Llama Embed Nemotron 8B (HNPU)',
+      url: 'https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU',
+      category: _embedding,
+      memoryBytes: 8079101598,
+    ),
+    QHexRTCatalogModel(
       id: 'siglip2_base',
       name: 'SigLIP2 Base (HNPU)',
       url: 'https://huggingface.co/runanywhere/siglip2_base_HNPU',
@@ -414,20 +432,28 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 789101244,
     ),
     QHexRTCatalogModel(
-      id: 'whisper_base',
-      name: 'Whisper Base (HNPU)',
+      id: 'canary_180m_flash',
+      name: 'Canary 180M Flash (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
+          'https://huggingface.co/runanywhere/canary_180m_flash_HNPU/canary-180m-flash.json',
       category: _stt,
-      memoryBytes: 221522616,
+      memoryBytes: 401629133,
     ),
     QHexRTCatalogModel(
-      id: 'whisper_small',
-      name: 'Whisper Small (HNPU)',
+      id: 'canary_1b_flash',
+      name: 'Canary-1B-flash (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
+          'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
       category: _stt,
-      memoryBytes: 676713240,
+      memoryBytes: 1835592227,
+    ),
+    QHexRTCatalogModel(
+      id: 'canary_qwen_2_5b',
+      name: 'Canary Qwen 2.5B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
+      category: _stt,
+      memoryBytes: 5491333979,
     ),
     QHexRTCatalogModel(
       id: 'moonshine_tiny',
@@ -446,6 +472,14 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 167310675,
     ),
     QHexRTCatalogModel(
+      id: 'nemotron_asr_streaming',
+      name: 'Nemotron ASR Streaming 0.6B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
+      category: _stt,
+      memoryBytes: 1361283432,
+    ),
+    QHexRTCatalogModel(
       id: 'parakeet_tdt_0_6b_v2',
       name: 'Parakeet TDT 0.6B v2 (HNPU)',
       url:
@@ -462,6 +496,14 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 1317902802,
     ),
     QHexRTCatalogModel(
+      id: 'parakeet_ctc_1_1b',
+      name: 'Parakeet CTC 1.1B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/parakeet_ctc_1.1b_HNPU/parakeet-ctc-1.1b.json',
+      category: _stt,
+      memoryBytes: 2179021370,
+    ),
+    QHexRTCatalogModel(
       id: 'parakeet_rnnt_1_1b',
       name: 'Parakeet RNNT 1.1B (HNPU)',
       url:
@@ -470,42 +512,20 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 2211659923,
     ),
     QHexRTCatalogModel(
-      id: 'canary_qwen_2_5b',
-      name: 'Canary Qwen 2.5B (HNPU)',
+      id: 'whisper_base',
+      name: 'Whisper Base (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
+          'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
       category: _stt,
-      memoryBytes: 5491333979,
+      memoryBytes: 221522616,
     ),
     QHexRTCatalogModel(
-      id: 'canary_1b_flash',
-      name: 'Canary-1B-flash (HNPU)',
+      id: 'whisper_small',
+      name: 'Whisper Small (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
+          'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
       category: _stt,
-      memoryBytes: 1835592227,
-    ),
-    QHexRTCatalogModel(
-      id: 'nemotron_asr_streaming',
-      name: 'Nemotron ASR Streaming 0.6B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
-      category: _stt,
-      memoryBytes: 1361283432,
-    ),
-    QHexRTCatalogModel(
-      id: 'melotts_en',
-      name: 'MeloTTS EN (HNPU)',
-      url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
-      category: _tts,
-      memoryBytes: 120439053,
-    ),
-    QHexRTCatalogModel(
-      id: 'kokoro_en',
-      name: 'Kokoro-82M EN (HNPU)',
-      url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
-      category: _tts,
-      memoryBytes: 470739484,
+      memoryBytes: 676713240,
     ),
     QHexRTCatalogModel(
       id: 'kitten_nano_0_8',
@@ -516,6 +536,14 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 44135896,
     ),
     QHexRTCatalogModel(
+      id: 'kitten_micro_0_8',
+      name: 'Kitten-micro-0.8 (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
+      category: _tts,
+      memoryBytes: 103930338,
+    ),
+    QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
       name: 'Kitten-mini-0.8 (HNPU)',
       url:
@@ -524,12 +552,41 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 184334815,
     ),
     QHexRTCatalogModel(
-      id: 'kitten_micro_0_8',
-      name: 'Kitten-micro-0.8 (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
+      id: 'kokoro_en',
+      name: 'Kokoro-82M EN (HNPU)',
+      url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
       category: _tts,
-      memoryBytes: 103930338,
+      memoryBytes: 470739484,
+    ),
+    QHexRTCatalogModel(
+      id: 'magpie_tts_357m',
+      name: 'Magpie-TTS Multilingual 357M (HNPU)',
+      url: 'https://huggingface.co/runanywhere/magpie_tts_357m_HNPU',
+      category: _tts,
+      memoryBytes: 749093186,
+    ),
+    QHexRTCatalogModel(
+      id: 'melotts_en',
+      name: 'MeloTTS EN (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
+      category: _tts,
+      memoryBytes: 120439053,
+    ),
+    QHexRTCatalogModel(
+      id: 'cosmos3_edge_diffusion',
+      name: 'Cosmos3-Edge Image (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/cosmos3_edge_image_HNPU/cosmos3-edge-diffusion.json',
+      category: _imageGeneration,
+      memoryBytes: 4450000000,
+    ),
+    QHexRTCatalogModel(
+      id: 'lama_dilated',
+      name: 'LaMa Dilated (HNPU)',
+      url: 'https://huggingface.co/runanywhere/lama_dilated_HNPU',
+      category: _imageGeneration,
+      memoryBytes: 98509597,
     ),
   ];
 

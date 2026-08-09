@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-onnx",
-  "version": "0.20.13",
+  "version": "0.20.14",
   "description": "RunAnywhere Web SDK - ONNX backend for STT, TTS, and VAD via sherpa-onnx",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,6 +18,8 @@
     "dist",
     "wasm/racommons-onnx-sherpa.js",
     "wasm/racommons-onnx-sherpa.wasm",
+    "wasm/racommons-onnx-sherpa-webgpu.js",
+    "wasm/racommons-onnx-sherpa-webgpu.wasm",
     "README.md",
     "LICENSE"
   ],
@@ -28,7 +30,7 @@
     "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons-onnx-sherpa.js wasm/racommons-onnx-sherpa.wasm",
+    "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons-onnx-sherpa.js wasm/racommons-onnx-sherpa.wasm wasm/racommons-onnx-sherpa-webgpu.js wasm/racommons-onnx-sherpa-webgpu.wasm",
     "prepack": "npm run build && npm run verify:package"
   },
   "keywords": [
@@ -62,7 +64,7 @@
     "node": ">=22.12.0"
   },
   "peerDependencies": {
-    "@runanywhere/web": ">=0.20.13 <1"
+    "@runanywhere/web": ">=0.20.14 <1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
