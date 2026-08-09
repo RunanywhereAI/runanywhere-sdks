@@ -69,12 +69,26 @@ object DocumentExtractor {
         }
     }
 
-    /** True when the stream opens with the PDF signature, whatever the provider claims. */
+    /**
+     * True when the stream opens with the PDF signature, whatever the provider claims.
+     *
+     * The header is read in a loop rather than with a single `read(header)`: a stream is free to
+     * hand back fewer bytes than the buffer holds while more are still coming, and a
+     * content-provider stream over a pipe routinely does. Treating that short read as "not a PDF"
+     * sends the file down the plain-text path and decodes its binary header as UTF-8 — the exact
+     * outcome this probe exists to prevent. Only a genuine EOF ends the loop short.
+     */
     private fun looksLikePdf(context: Context, uri: Uri): Boolean =
         runCatching {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 val header = ByteArray(PDF_SIGNATURE.size)
-                stream.read(header) == header.size && header.contentEquals(PDF_SIGNATURE)
+                var filled = 0
+                while (filled < header.size) {
+                    val read = stream.read(header, filled, header.size - filled)
+                    if (read < 0) break
+                    filled += read
+                }
+                filled == header.size && header.contentEquals(PDF_SIGNATURE)
             } ?: false
         }.getOrDefault(false)
 

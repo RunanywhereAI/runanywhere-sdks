@@ -225,9 +225,13 @@ fun String.asSentence(): String = trim().trimEnd('.').replaceFirstChar { it.uppe
  * The SDK's own message is preferred because it names the actual cause, but it is blank often
  * enough — a native worker that settles with no text — that a fallback is needed; "Download failed"
  * with no reason is still better than an empty error dialog.
+ *
+ * Normalised here rather than at each surface, because not every surface remembered to: the
+ * Hugging Face sheet assigns this straight to its error banner, and showed the raw fragment
+ * ("network error") the notification path had already learned to capitalise.
  */
 private fun SDKException.stoppedMessage(): String =
-    error.message.ifBlank { recoverySuggestion ?: "Download failed" }
+    error.message.ifBlank { recoverySuggestion ?: "Download failed" }.asSentence()
 
 /**
  * Binary-prefix size with one decimal above a megabyte.

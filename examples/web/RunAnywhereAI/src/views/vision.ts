@@ -89,34 +89,48 @@ let status = '';
 let cameraStatus = '';
 let isAnalyzing = false;
 let cancelAnalyze: (() => void) | null = null;
-let unsubscribeState: (() => void) | null = null;
-let unsubscribeEngine: (() => void) | null = null;
+/**
+ * Drops the previous tab instance's subscriptions.
+ *
+ * Per-instance rather than the pair of module-globals every observer used to
+ * read: a second `initVisionTab` overwrote those globals, so the older
+ * observer's teardown cancelled the *live* tab's subscriptions and left the
+ * replaced ones running — engine and model changes then re-rendered a detached
+ * panel and stopped reaching this one. Cleared here on re-init as well, because
+ * the shell rebuild that causes it (`buildAppShell` empties `#app`) mutates
+ * neither observed parent, so the old observer never fires at all.
+ */
+let disposeSubscriptions: (() => void) | null = null;
 let cameraStartGeneration = 0;
 
 export function initVisionTab(el: HTMLElement): TabLifecycle {
+  disposeSubscriptions?.();
   container = el;
 
   renderView();
 
   // Re-render when the shared model state changes so the "Load model"
   // button reflects real state without manual refresh.
-  unsubscribeState = onModelStateChange(() => renderView());
+  const unsubscribeState = onModelStateChange(() => renderView());
   // A successful engine retry has to restore this tab in place, or the notice
   // stays up over controls that would now work.
-  unsubscribeEngine = onEngineStateChange(() => renderView());
+  const unsubscribeEngine = onEngineStateChange(() => renderView());
+  const dispose = (): void => {
+    unsubscribeState();
+    unsubscribeEngine();
+  };
+  disposeSubscriptions = dispose;
 
-  // Tear down the subscriptions if the panel element ever detaches (e.g. a full
-  // app-shell re-render).
-  const rootParent = container.parentElement;
+  // Tear down this instance's subscriptions if its panel element ever detaches
+  // (e.g. a full app-shell re-render). `el`, not the shared `container`, so a
+  // stale observer cannot judge a newer tab's element.
+  const rootParent = el.parentElement;
   if (typeof MutationObserver !== 'undefined' && rootParent) {
     const disposeObserver = new MutationObserver(() => {
-      if (!container.isConnected) {
-        disposeObserver.disconnect();
-        unsubscribeState?.();
-        unsubscribeState = null;
-        unsubscribeEngine?.();
-        unsubscribeEngine = null;
-      }
+      if (el.isConnected) return;
+      disposeObserver.disconnect();
+      dispose();
+      if (disposeSubscriptions === dispose) disposeSubscriptions = null;
     });
     disposeObserver.observe(rootParent, { childList: true });
   }
@@ -517,12 +531,20 @@ function grabCameraFrame(): RgbFrame | null {
  *
  * Re-adopting the frame already held is a no-op rather than a second canvas
  * round-trip, so asking twice about the same still does not re-encode it.
+ *
+ * A different frame drops the previous answer and its status line. They
+ * describe the picture that was just replaced, and leaving them under the new
+ * still's metadata reads as an answer about the new picture — the one mistake
+ * this pane must not invite. Every caller re-renders after adopting, so the
+ * cleared state reaches the screen with the new preview.
  */
 function adoptFrame(frame: RgbFrame, source: FrameSource, previewUrl?: string): void {
   if (frame === latestFrame && framePreviewUrl) return;
   latestFrame = frame;
   frameSource = source;
   framePreviewUrl = previewUrl ?? rgbFrameToDataUrl(frame);
+  lastResult = null;
+  status = '';
 }
 
 // ---------------------------------------------------------------------------

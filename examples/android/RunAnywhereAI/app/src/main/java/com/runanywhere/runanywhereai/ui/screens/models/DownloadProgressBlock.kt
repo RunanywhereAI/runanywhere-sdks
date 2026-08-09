@@ -27,9 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadInterruption
+import com.runanywhere.runanywhereai.download.DownloadInterruptionState
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
-import com.runanywhere.runanywhereai.download.ModelDownloadService
-import com.runanywhere.runanywhereai.download.asSentence
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -111,53 +111,33 @@ internal fun DownloadProgressBlock(progress: DownloadProgressInfo?, modifier: Mo
 }
 
 /**
- * Why a half-finished download is sitting there, from the reader's point of view.
- *
- * The two cases look identical in the data — bytes on disk, no transfer running — but they are
- * opposite events: one is a fault, one is the user's own decision. Colouring a deliberate cancel in
- * error red, or offering "Retry" for something that never failed, reads as the app having lost track
- * of what happened.
- */
-enum class DownloadInterruption { FAILED, PAUSED }
-
-/**
- * Which of the two an interruption record is. One mapping, next to the enum, so a new row type
- * cannot invent a third reading of `cancelled`.
- */
-internal fun ModelDownloadService.Interrupted?.kind(): DownloadInterruption? = when {
-    this == null -> null
-    cancelled -> DownloadInterruption.PAUSED
-    else -> DownloadInterruption.FAILED
-}
-
-/**
  * The note under an interrupted row.
  *
  * Both variants say the bytes are kept, because the reasonable fear with a half-finished
  * multi-gigabyte download is that starting again means starting from zero. It does not: the SDK
  * cancels with `delete_partial_bytes = false`, and a re-issued download continues from the partial
- * file on disk. [kept] is the amount that survived, which turns that promise into a number.
+ * file on disk. [DownloadInterruptionState.kept] is the amount that survived, which turns that
+ * promise into a number.
  *
- * [detail] is the SDK's own account of a failure — "Insufficient storage", a server status — and is
- * shown ahead of the generic line, because a reader who cannot see *why* it failed has no way to
- * judge whether retrying will do anything.
+ * [DownloadInterruptionState.detail] is the failure's own account of itself — "Insufficient
+ * storage", a server status — and is shown ahead of the generic line, because a reader who cannot
+ * see *why* it failed has no way to judge whether retrying will do anything.
  */
 @Composable
 internal fun DownloadInterruptionNote(
-    kind: DownloadInterruption,
+    state: DownloadInterruptionState,
     modifier: Modifier = Modifier,
-    detail: String? = null,
-    kept: String? = null,
 ) {
     val dimens = LocalDimens.current
-    val failed = kind == DownloadInterruption.FAILED
+    val failed = state.isFailure
     val tint = if (failed) {
         MaterialTheme.colorScheme.error
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val kept = state.kept
     val headline = when {
-        failed -> detail?.takeIf { it.isNotBlank() }?.asSentence() ?: "Download failed"
+        failed -> state.detail ?: "Download failed"
         else -> "Paused"
     }
     val continuation = when {

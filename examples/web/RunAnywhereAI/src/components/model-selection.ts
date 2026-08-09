@@ -1472,6 +1472,26 @@ export async function cancelModelDownload(modelId: string): Promise<void> {
 }
 
 /**
+ * Whether a Cancel offered for this model would actually stop something.
+ *
+ * Two conditions, both of which a surface outside this module cannot see: an
+ * iterator has to exist (the plan/quota preflight runs before there is one, so
+ * a `queued` row can still have nothing to break out of), and bytes have to
+ * still be arriving — `verifying`, `extracting` and an in-flight `cancelling`
+ * are local wind-down phases a Cancel would simply miss.
+ *
+ * Exported so the Downloads tab and the picker cannot disagree about whether
+ * the same transfer can still be stopped; the picker applies the same rule
+ * inline because it also has to name the phase on the disabled button.
+ */
+export function isDownloadCancellable(modelId: string): boolean {
+  if (!activeDownloads.has(modelId)) return false;
+  const state = rowStates.get(modelId);
+  return state?.status === 'downloading'
+    && (state.phase === 'queued' || state.phase === 'transferring');
+}
+
+/**
  * The size a finished transfer measured, for the phases that follow it.
  *
  * `verifying` / `extracting` / `cancelling` carry no byte counts of their own,

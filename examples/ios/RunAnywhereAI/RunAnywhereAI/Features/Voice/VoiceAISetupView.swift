@@ -235,7 +235,12 @@ struct VoiceAISetupCard: View {
         Button(action: onChange) {
             Text("Change")
                 .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryAccent)
+                // Derived, not fixed: `.plain` hands the label its color
+                // verbatim and does not dim it for `.disabled`, so during setup
+                // three accent-orange buttons looked tappable and did nothing.
+                .foregroundColor(viewModel.isSettingUpPipeline
+                    ? AppColors.textSecondary
+                    : AppColors.primaryAccent)
                 .padding(.horizontal, AppSpacing.smallMedium)
                 // The padding lives inside the label on purpose: a Button
                 // hit-tests its label, so padding applied outside the Button

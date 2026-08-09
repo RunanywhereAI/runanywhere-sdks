@@ -55,6 +55,16 @@ let lastError: string | null = null;
 let activityLog: ActivityLogEntry[] = [];
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeEngine: (() => void) | null = null;
+/**
+ * Wall clock of the first frame of this listening session.
+ *
+ * `VADResult.timestampMs` is commons' `rac_get_current_time_ms()` — a Unix
+ * epoch, which this view was printing verbatim under a heading that reads
+ * "Position". "1786231282799 ms" is not a position in anything the reader can
+ * see. Anchoring on the first frame turns it into what the label promises:
+ * how far into the session this reading is.
+ */
+let sessionOriginMs: number | null = null;
 
 /** Push-queue bridging mic chunk callbacks into the SDK's audio iterable. */
 let chunkQueue: Float32Array[] = [];
@@ -152,7 +162,7 @@ function renderVad(): void {
           </div>
           <div class="metric-grid__cell">
             <dt>Position</dt>
-            <dd id="vad-frame">${lastResult ? `${lastResult.timestampMs} ms` : '—'}</dd>
+            <dd id="vad-frame">${lastResult ? formatPosition(lastResult.timestampMs) : '—'}</dd>
           </div>
         </dl>
       </div>
@@ -216,6 +226,7 @@ async function startListening(): Promise<void> {
 
   chunkQueue = [];
   streamDone = false;
+  sessionOriginMs = null; // Each session's readings are measured from its own first frame.
 
   try {
     audioCapture = new AudioCapture({ sampleRate: 16000, channels: 1 });
@@ -317,6 +328,16 @@ function updateStatusRegions(): void {
     const conf = container.querySelector('#vad-confidence');
     if (conf) conf.textContent = lastResult.probability.toFixed(3);
     const frame = container.querySelector('#vad-frame');
-    if (frame) frame.textContent = `${lastResult.timestampMs} ms`;
+    if (frame) frame.textContent = formatPosition(lastResult.timestampMs);
   }
+}
+
+/** How far into this listening session the reading sits, as `m:ss.d`. */
+function formatPosition(timestampMs: number | undefined): string {
+  if (!timestampMs) return '—';
+  sessionOriginMs ??= timestampMs;
+  const elapsedMs = Math.max(0, timestampMs - sessionOriginMs);
+  const minutes = Math.floor(elapsedMs / 60_000);
+  const seconds = (elapsedMs % 60_000) / 1000;
+  return `${minutes}:${seconds.toFixed(1).padStart(4, '0')}`;
 }

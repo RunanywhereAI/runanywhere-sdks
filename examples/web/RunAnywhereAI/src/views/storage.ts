@@ -19,6 +19,7 @@ import type { ModelsState } from '@runanywhere/web';
 import {
   cancelModelDownload,
   getModelStatus,
+  isDownloadCancellable,
   onModelStateChange,
   openSheet as openModelSheet,
   patchDownloadProgress,
@@ -362,7 +363,12 @@ function renderModelList(): void {
 
   host.innerHTML = catalog.map((entry) => {
     const status = getModelStatus(entry.id);
-    const isDownloading = status.status === 'downloading';
+    // Not "is downloading": the wind-down phases are still `downloading`, and a
+    // Cancel there is a live-looking button with nothing left to stop — the row
+    // rendered one throughout the cancel it had just started. The picker decides
+    // this from the same predicate, so one transfer cannot be offered a Cancel
+    // on one screen and refused it on the other.
+    const canCancel = isDownloadCancellable(entry.id);
     const hasArtifacts = status.status === 'downloaded' || status.status === 'loaded';
     // A paused or failed transfer left partial bytes on disk. Delete is the only
     // way to reclaim them, so the row that says they exist also offers it.
@@ -386,7 +392,7 @@ function renderModelList(): void {
             ? `<div class="model-row-error error">${escapeHtml(status.error ?? 'Download failed')}</div>`
             : ''}
         </div>
-        ${isDownloading
+        ${canCancel
           ? `<button class="btn btn-secondary btn-sm storage-cancel-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Cancel</button>`
           : ''}
         ${hasArtifacts || hasPartials

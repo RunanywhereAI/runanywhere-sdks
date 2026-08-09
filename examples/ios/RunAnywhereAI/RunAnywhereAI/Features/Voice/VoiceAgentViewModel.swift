@@ -139,6 +139,23 @@ final class VoiceAgentViewModel: ObservableObject {
     /// The in-flight one-tap setup, held so Cancel has something to cancel.
     private var setupTask: Task<Void, Never>?
 
+    /// A cancelled setup that has not finished unwinding yet.
+    ///
+    /// `Task.cancel()` only asks: `downloadAndLoadAll` checks between stages and
+    /// `ensureDownloaded`'s `for try await` runs until the SDK's sequence
+    /// terminates. Until that task actually returns it still owns
+    /// `isSettingUpPipeline` and `pipelineSetupStatus` through its `defer`, so a
+    /// setup resumed in that window would have both cleared out from under it —
+    /// the card showing the idle "Resume setup" button over a live download,
+    /// with two sequences working the same models. A resume queues behind this
+    /// instead.
+    private var cancellingSetupTask: Task<Void, Never>?
+
+    /// Which setup run owns `setupTask`. A cancelled run finishes *after* the
+    /// resume that replaced it, and `Task` identity alone cannot tell the
+    /// stale completion from the live one.
+    private var setupGeneration = 0
+
     // MARK: - Computed Properties (for View)
 
     /// Whether all required models are loaded
@@ -360,6 +377,15 @@ final class VoiceAgentViewModel: ObservableObject {
     /// True while `stopConversation` is tearing down the SDK voice agent. Blocks a
     /// restart until cleanup completes so we never run two mic drivers at once.
     private var isStopping = false
+    /// The teardown of a session this view model has already stopped referencing.
+    ///
+    /// `stopConversation` can await `close()` inline because the user is waiting
+    /// on it; `releaseFailedSession` and `cleanup()` are called from synchronous
+    /// paths and cannot. Dropping the reference does not stop the mic driver, so
+    /// the task is kept here and `startConversation` awaits it — otherwise a user
+    /// who presses the mic straight after a fatal error finds `session == nil`
+    /// and opens a second capture engine on top of one still shutting down.
+    private var sessionCloseTask: Task<Void, Never>?
 
     // MARK: - Initialization State (for idempotency)
 
@@ -673,10 +699,30 @@ final class VoiceAgentViewModel: ObservableObject {
     /// out. Owning the task is what makes Cancel possible.
     func startPipelineSetup() {
         guard setupTask == nil else { return }
+        setupGeneration += 1
+        let generation = setupGeneration
+        // Queue behind a cancelled run that is still unwinding, so this one
+        // cannot be started against models the last one is still downloading.
+        let cancelling = cancellingSetupTask
         setupTask = Task { [weak self] in
-            await self?.downloadAndLoadAll()
-            await MainActor.run { self?.setupTask = nil }
+            await cancelling?.value
+            // Awaiting a non-throwing task ignores our own cancellation, so a
+            // resume cancelled again while it queued would otherwise go on to
+            // clear `didCancelSetup` and start the sequence it was told not to.
+            if !Task.isCancelled {
+                await self?.downloadAndLoadAll()
+            }
+            await MainActor.run { self?.finishPipelineSetup(generation: generation) }
         }
+    }
+
+    /// Release the setup handles, but only for the run that still owns them: a
+    /// cancelled run returns after the resume that replaced it, and clearing the
+    /// handle then would let a third setup start on top of the second.
+    private func finishPipelineSetup(generation: Int) {
+        guard generation == setupGeneration else { return }
+        setupTask = nil
+        cancellingSetupTask = nil
     }
 
     /// Abandon the in-flight setup. Whatever already landed on disk stays there,
@@ -685,6 +731,8 @@ final class VoiceAgentViewModel: ObservableObject {
         guard let task = setupTask else { return }
         logger.info("Cancelling voice pipeline setup")
         setupTask = nil
+        // Kept, not dropped: `task.cancel()` returns long before the task does.
+        cancellingSetupTask = task
         task.cancel()
         isSettingUpPipeline = false
         pipelineSetupStatus = nil
@@ -803,7 +851,14 @@ final class VoiceAgentViewModel: ObservableObject {
                 }
             }
         } catch {
-            outcome = .failed(error.localizedDescription)
+            // Cancelling the consuming Task makes `for try await` throw
+            // `CancellationError`, which is not a download failure. Reported as
+            // one it reached `setup()`, which set "Couldn't download …" beside
+            // the card's own "Setup cancelled" line — one press, two contradicting
+            // accounts of it.
+            outcome = (error is CancellationError || Task.isCancelled)
+                ? .cancelled
+                : .failed(error.localizedDescription)
         }
         if case .failed(let reason) = outcome {
             logger.error(
@@ -881,6 +936,14 @@ final class VoiceAgentViewModel: ObservableObject {
         // and the Mac's menu-bar mic indicator lit while the panel said "Error".
         // Close whatever survived before building anything, exactly as
         // stopConversation does, so "try again" can never stack sessions.
+        //
+        // The detached close first: `releaseFailedSession` drops the reference
+        // the instant the error lands, so a mic pressed straight afterwards
+        // finds `session == nil` while that driver is still shutting down.
+        if let closing = sessionCloseTask {
+            sessionCloseTask = nil
+            await closing.value
+        }
         if let stale = session {
             session = nil
             await stale.close()
@@ -1052,7 +1115,7 @@ final class VoiceAgentViewModel: ObservableObject {
         audioLevel = 0.0
         guard let closing = session else { return }
         session = nil
-        Task { await closing.close() }
+        sessionCloseTask = Task { await closing.close() }
     }
 
     private func apply(_ state: AgentState) {
@@ -1096,8 +1159,14 @@ final class VoiceAgentViewModel: ObservableObject {
     func cleanup() {
         eventTask?.cancel()
         eventTask = nil
-        setupTask?.cancel()
-        setupTask = nil
+        if let setup = setupTask {
+            // Same reason as `cancelPipelineSetup`: cancelling asks, it does not
+            // stop. A setup started after the tab is re-entered has to queue
+            // behind this one rather than race it.
+            cancellingSetupTask = setup
+            setup.cancel()
+            setupTask = nil
+        }
         isSettingUpPipeline = false
         pipelineSetupStatus = nil
         cancellables.removeAll()
@@ -1126,7 +1195,7 @@ final class VoiceAgentViewModel: ObservableObject {
         // equivalent (`onCleared()` → `stop()`) also releases the agent here.
         let closing = session
         session = nil
-        Task {
+        sessionCloseTask = Task {
             await closing?.close()
         }
         logger.info("VoiceAgentViewModel cleanup completed")

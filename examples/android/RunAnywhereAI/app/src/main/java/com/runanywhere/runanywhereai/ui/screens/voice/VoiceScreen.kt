@@ -235,10 +235,20 @@ fun VoiceScreen() {
     // so. Reset by any state change, any new turn, and by the detector actually firing, so the
     // hint only ever describes the silence in front of it.
     var quietMic by remember { mutableStateOf(false) }
-    LaunchedEffect(voiceVm.state, voiceVm.turns.size, voiceVm.isSpeechDetected, voiceVm.partialTranscript) {
+    LaunchedEffect(
+        voiceVm.state,
+        voiceVm.turns.size,
+        voiceVm.isSpeechDetected,
+        voiceVm.partialTranscript,
+        // Suppressed while the pipeline has its own notice up. The core reports a mic delivering
+        // dead air in exact terms ("digital silence … for 8s"); printing "try speaking up" under
+        // that gives the reader two explanations for one silence, and the generic one is the
+        // wrong advice — nothing said louder reaches a mic that is handing over zeros.
+        voiceVm.error,
+    ) {
         quietMic = false
         if (voiceVm.state == VoiceState.LISTENING && !voiceVm.isSpeechDetected &&
-            voiceVm.partialTranscript == null && !isNpuSwap
+            voiceVm.partialTranscript == null && !isNpuSwap && voiceVm.error == null
         ) {
             delay(QUIET_MIC_HINT_DELAY_MS)
             quietMic = true
@@ -260,12 +270,14 @@ fun VoiceScreen() {
         verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
         ScreenLede(
-            // "Between turns", not a flat "hands-free conversation": the agent is half-duplex, so
-            // the loop of speak -> pause -> answer needs no tap, but talking *over* a reply is not
-            // heard at all. A bare hands-free claim invites exactly the one thing that does not
-            // work; the status line names the paused mic when it matters.
-            "Hands-free between turns: speak, pause, and it answers. We picked the best voice " +
-                "models for your device — tap once to set them up.",
+            // The turn loop is what this promises, and all of it is true: nothing is tapped
+            // between turns. The mic now also stays open through the reply, but whether a voice
+            // arriving over the loudspeaker is recognised as an interruption depends on the
+            // device's speaker-to-mic coupling (VoiceAgentMicDriver's barge-in note), so no
+            // label here promises it — iOS `VoiceAgentViewModel.instructionText` settled on the
+            // same rule, and the two apps have to make the same promise.
+            "Hands-free: speak, pause, and it answers — no tapping between turns. We picked the " +
+                "best voice models for your device; tap once to set them up.",
         )
 
         VoiceSetupCard(
@@ -407,12 +419,13 @@ private fun statusText(state: VoiceState, ready: Boolean, pushToTalk: Boolean): 
         if (pushToTalk) "Recording — tap when you're done" else "Listening… speak, then pause"
     VoiceState.TRANSCRIBING -> "Transcribing…"
     VoiceState.THINKING -> "Thinking…"
-    // "Mic paused" is the fact a listener cannot otherwise discover. The agent takes turns: while a
-    // reply plays, captured frames are dropped rather than fed to the recognizer (see
-    // VoiceAgentMicDriver's half-duplex note), so someone who simply talks over the assistant is
-    // silently ignored. Naming the pause is what makes the tap read as the way to take the floor
-    // rather than as one option among two.
-    VoiceState.SPEAKING -> "Speaking — mic paused, tap to take the turn back"
+    // Was "mic paused", which stopped being true when the driver started feeding through
+    // playout. What replaces it names only the control, not the barge-in: the core decides
+    // whether a voice over the reply is an interruption or the mic hearing the loudspeaker, and
+    // that needs the user to arrive meaningfully louder than the speaker — a property of the
+    // device, not something a label can promise. "Take the turn back" is the phrase all four
+    // apps use for this moment; each names its own control.
+    VoiceState.SPEAKING -> "Speaking — tap to take the turn back"
     // The session is gone and the microphone with it, so this cannot read "Ready to talk" — the
     // reader has to know the conversation ended on its own before the error line beneath explains
     // why. "Tap to start again" is the recovery, and it really is one tap.
@@ -429,7 +442,10 @@ private fun emptyTranscriptText(state: VoiceState, ready: Boolean): String = whe
     VoiceState.LISTENING -> "Go ahead — say something."
     VoiceState.TRANSCRIBING -> "Working out what you said…"
     VoiceState.THINKING -> "Working out a reply…"
-    VoiceState.SPEAKING -> "Speaking. Tap the button to take the turn back."
+    // States the state and nothing else — the status line directly below it already names the
+    // control, and printing the instruction twice on one screen reads as a rendering bug.
+    // Mirrors iOS `transcriptPlaceholder`, which settled here for the same reason.
+    VoiceState.SPEAKING -> "Speaking."
     VoiceState.FAILED -> "That didn't work out. Tap the mic to try again."
 }
 

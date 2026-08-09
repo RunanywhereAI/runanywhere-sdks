@@ -374,6 +374,16 @@ export const stt = {
       try {
         yield* stream.events;
       } finally {
+        // Closing the event stream does not end the pump: it is parked on
+        // `chunks.next()`, which for a live microphone only settles when the
+        // next frame arrives — so a consumer that breaks early would leave the
+        // capture source running with nobody reading it. Ending the source is
+        // what stops the pump. Deliberately not awaited: an iterator defers its
+        // `return()` behind the pending `next()`, and awaiting that here would
+        // make the consumer's `break` block on the next microphone frame.
+        void Promise.resolve(chunks.return?.()).catch(() => {
+          // Source cleanup is best-effort; the consumer has already left.
+        });
         await stream.close();
       }
       await pump;

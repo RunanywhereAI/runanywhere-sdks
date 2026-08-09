@@ -122,6 +122,11 @@ export function formatTransferBytes(bytes: number): string {
  * an hour, where they are noise. Same rule as iOS/Android `formatDuration`.
  */
 export function formatDuration(seconds: number): string {
+  // A derived ETA can arrive as NaN or Infinity, and both survive the arithmetic
+  // below to render as a label ("NaNs", "Infinityh NaNm"). Callers that cannot
+  // measure a remaining time should omit the part entirely — this floor only
+  // guarantees the helper never emits one of those.
+  if (!Number.isFinite(seconds)) return '0s';
   const total = Math.max(0, Math.round(seconds));
   if (total >= 3600) return `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m`;
   if (total >= 60) return `${Math.floor(total / 60)}m ${total % 60}s`;
@@ -162,7 +167,9 @@ export function transferDetailLine(transfer: TransferSnapshot): string {
   if (bytesPerSecond !== undefined && bytesPerSecond > 0) {
     parts.push(`${formatTransferBytes(bytesPerSecond)}/s`);
   }
-  if (etaSeconds !== undefined && etaSeconds >= 1) {
+  // `>= 1` alone lets `Infinity` through — an unmeasurable ETA belongs in the
+  // same bucket as an absent one, which this line drops rather than renders.
+  if (etaSeconds !== undefined && Number.isFinite(etaSeconds) && etaSeconds >= 1) {
     parts.push(`${formatDuration(etaSeconds)} left`);
   }
 

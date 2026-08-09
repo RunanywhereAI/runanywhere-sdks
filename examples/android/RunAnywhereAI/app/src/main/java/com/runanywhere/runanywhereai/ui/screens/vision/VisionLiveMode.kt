@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
@@ -78,6 +81,9 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
     val liveVm: VisionLiveViewModel = viewModel()
 
     val deviceHasCamera = remember(context) { context.hasAnyCamera() }
+    // Deliberately `remember`, not `rememberSaveable`: the grant is a fact about the system, so
+    // re-reading it on every recomposition is what keeps it true. A saved copy would survive a
+    // grant made in Android settings and keep the live view shut over a permission the app has.
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -86,7 +92,11 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
     }
     // Distinguishes "we have not asked yet" from "the user said no", which the single
     // hasPermission flag could not: both rendered the same refusal copy.
-    var permissionRefused by remember { mutableStateOf(false) }
+    //
+    // Saveable because the refusal has to outlive a rotation. Reset to false it would look like
+    // "not asked yet" again, and the effect below would re-fire the request the user just
+    // declined — a second system dialog, or on Android 11+ an instant silent denial.
+    var permissionRefused by rememberSaveable { mutableStateOf(false) }
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -94,16 +104,32 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
         permissionRefused = !granted
     }
 
+    // The recovery card sends the user to Android settings, so the answer can change while this
+    // screen is merely paused rather than recreated. Re-read it on the way back, or a permission
+    // granted out there leaves the card sitting over a camera the app is now allowed to open.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+            hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+            if (hasPermission) permissionRefused = false
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val cameraProvider = remember { AtomicReference<ProcessCameraProvider?>(null) }
     val cameraBindingActive = remember { AtomicBoolean(true) }
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
-    LaunchedEffect(deviceHasCamera, hasPermission) {
+    // Asks once. After a refusal the recovery card is the affordance, so re-launching the request
+    // here would either stack a second dialog on it or be denied silently with nothing to show.
+    LaunchedEffect(deviceHasCamera, hasPermission, permissionRefused) {
         when {
             !deviceHasCamera -> liveVm.onCameraUnavailable(
                 "This device has no camera. Attach a photo from the Photo tab instead.",
             )
-            !hasPermission -> permLauncher.launch(Manifest.permission.CAMERA)
+            !hasPermission && !permissionRefused -> permLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 

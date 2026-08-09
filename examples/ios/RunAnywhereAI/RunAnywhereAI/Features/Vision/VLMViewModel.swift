@@ -149,6 +149,18 @@ final class VLMViewModel: NSObject {
     /// `setupCamera()` leaked a queue every time the model was swapped.
     private let frameQueue = DispatchQueue(label: "com.runanywhere.vlm.camera")
 
+    /// True from the moment `startCameraIfPossible()` begins building a session
+    /// until it has one (or has given up).
+    ///
+    /// `authorizeCamera()` suspends on the system permission prompt, and this
+    /// screen calls `startCameraIfPossible()` from four places — `.task`, the
+    /// scene-phase change, the model-loaded transition and the picker's
+    /// completion. On a first run they arrive together, so without this flag two
+    /// of them clear the `captureSession == nil` check across that suspension and
+    /// build two sessions; the loser is dropped while still running, holding the
+    /// device and the platform's camera indicator.
+    private var isStartingCamera = false
+
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VLM")
     private var lifecycleCancellable: AnyCancellable?
     private var generationTask: Task<Void, Never>?
@@ -250,8 +262,13 @@ final class VLMViewModel: NSObject {
         // "choose a vision model" screen with nothing to feed, and the
         // permission prompt arrives before the user has asked for anything.
         guard isModelLoaded else { return }
+        // A second caller joins rather than races: the one already in flight is
+        // building the session both of them want.
+        guard !isStartingCamera else { return }
 
         if captureSession == nil {
+            isStartingCamera = true
+            defer { isStartingCamera = false }
             guard await authorizeCamera(), configureSession() else { return }
         }
         startCamera()
@@ -260,6 +277,11 @@ final class VLMViewModel: NSObject {
     /// Drop a failed/refused session so the next attempt genuinely re-asks
     /// rather than short-circuiting on a stale status.
     func retryCamera() async {
+        // Stop before dropping the reference. Releasing a running
+        // `AVCaptureSession` does not stop it — it keeps the capture device
+        // claimed and the camera indicator lit, and the next `configureSession()`
+        // then fails at `canAddInput` and blames "another app" for us.
+        stopCamera()
         captureSession = nil
         cameraStatus = .idle
         await startCameraIfPossible()
@@ -433,6 +455,12 @@ final class VLMViewModel: NSObject {
     /// Ask one question about the current subject.
     func ask() {
         guard !isProcessing else { return }
+        // `isProcessing` is raised inside the task body, which does not start
+        // synchronously, so two calls in one run-loop turn both clear the guard
+        // above. Without this the second assignment orphans the first task and
+        // `cancel()` can no longer reach it — two runs then write the same
+        // answer pane and status line.
+        generationTask?.cancel()
         generationTask = Task { @MainActor [weak self] in
             await self?.run(maxTokens: Self.singleShotMaxTokens, clearOnFirstToken: false)
         }

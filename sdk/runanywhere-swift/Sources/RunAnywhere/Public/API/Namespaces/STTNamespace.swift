@@ -77,6 +77,16 @@ public extension RunAnywhere {
                         return sequence
                     }
 
+                    // A FINAL ends an UTTERANCE, not the session. commons closes
+                    // a window on ~800 ms of trailing silence and publishes one
+                    // FINAL for it (rac_stt_stream.cpp), then keeps the session
+                    // open for the next phrase. This loop used to `break` on the
+                    // first one and report `.completed`, so a live session went
+                    // deaf the moment the speaker drew breath: measured on the
+                    // simulator, a 16 s recording of four spaced sentences
+                    // transcribed the first and silently discarded the other
+                    // three while the panel still said RECORDING. Every final is
+                    // forwarded now; the session ends when the audio source does.
                     for await partial in partials {
                         if Task.isCancelled { break }
                         if partial.isFinal {
@@ -85,9 +95,8 @@ public extension RunAnywhere {
                                 sequence: nextSequence(),
                                 transcription: RunAnywhere.transcription(from: partial)
                             ))
-                            continuation.yield(.completed(requestId: requestId))
                             sawTerminal = true
-                            break
+                            continue
                         }
                         continuation.yield(.partial(
                             requestId: requestId,
@@ -101,19 +110,19 @@ public extension RunAnywhere {
                     // The grammar ends in `completed`/`failed`/`cancelled` —
                     // never a fabricated `transcriptFinal`/`completed` when the
                     // producer never reported one.
-                    if !sawTerminal {
-                        if Task.isCancelled {
-                            continuation.yield(.cancelled(requestId: requestId))
-                        } else {
-                            continuation.yield(.failed(
-                                requestId: requestId,
-                                error: SDKException(
-                                    code: .streamCancelled,
-                                    message: "Transcription stream ended before a final result",
-                                    category: .component
-                                )
-                            ))
-                        }
+                    if Task.isCancelled {
+                        continuation.yield(.cancelled(requestId: requestId))
+                    } else if sawTerminal {
+                        continuation.yield(.completed(requestId: requestId))
+                    } else {
+                        continuation.yield(.failed(
+                            requestId: requestId,
+                            error: SDKException(
+                                code: .streamCancelled,
+                                message: "Transcription stream ended before a final result",
+                                category: .component
+                            )
+                        ))
                     }
                     continuation.finish()
                 }

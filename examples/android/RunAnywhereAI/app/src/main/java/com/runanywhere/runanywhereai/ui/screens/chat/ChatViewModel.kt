@@ -1030,7 +1030,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         messages.removeRange(questionIndex + 1, messages.size)
         persist()
 
-        val turn = ChatRequestPolicy.snapshot(prompt, messages)
+        // History stops *before* the question, because the question is the prompt. Snapshotting the
+        // whole trimmed transcript would hand the model the question twice — once as the last
+        // history turn and again as the prompt — which is not the conversation the original turn
+        // saw, and the duplicate spends context budget in windowHistory. send() gets this for free
+        // by snapshotting before it appends the user message; here the question is already in place.
+        val turn = ChatRequestPolicy.snapshot(prompt, messages.take(questionIndex))
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
         activeReplyIndex = replyIndex

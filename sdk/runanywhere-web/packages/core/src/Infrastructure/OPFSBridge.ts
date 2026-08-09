@@ -575,9 +575,19 @@ export class OPFSBridge {
     return modules.filter((module) => getFS(module) !== null);
   }
 
-  /** FS-bearing modules whose private MEMFS does not contain the artifact. */
+  /**
+   * FS-bearing modules whose private MEMFS does not contain the artifact.
+   *
+   * A size stub counts as missing even though it stats non-zero: it holds no
+   * bytes (see `isEmptyMemfsSizeStub`), so a module carrying one cannot open
+   * the model any more than an empty module can.
+   */
   private static modulesMissingPath(modules: ModuleLike[], path: string): ModuleLike[] {
-    return modules.filter((module) => OPFSBridge.memfsFileSize(module, path) === 0);
+    return modules.filter((module) => {
+      if (OPFSBridge.memfsFileSize(module, path) === 0) return true;
+      const fs = getFS(module);
+      return fs !== null && isEmptyMemfsSizeStub(fs, path);
+    });
   }
 
   /**
@@ -1071,12 +1081,20 @@ export class OPFSBridge {
       if (fs.analyzePath?.(path)?.exists) {
         try {
           const size = fs.stat(path).size;
-          if (size > 0) {
+          // Same trap as the single-module restore above: an OPFS-direct
+          // download leaves a stub that stats at the artifact's full length
+          // while holding no bytes, so size alone cannot prove the module is
+          // hydrated. Skipping on it would hand the loader a run of zeros.
+          const emptyStub = isEmptyMemfsSizeStub(fs, path);
+          if (size > 0 && !emptyStub) {
             logger.debug(
               `restoreToMemfsAll: '${path}' already in MEMFS (${size} bytes); skipping module`,
             );
             if (size > maxWritten) maxWritten = size;
             continue;
+          }
+          if (emptyStub) {
+            try { fs.unlink?.(path); } catch { /* the write below rebuilds it */ }
           }
         } catch {
           // stat failed — fall through and rewrite from OPFS bytes.

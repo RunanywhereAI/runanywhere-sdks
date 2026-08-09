@@ -179,8 +179,17 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
             } finally {
                 // The native call has unwound by the time this runs, so this — and not stop() —
                 // is where the busy guard may finally come down.
-                watchdog?.cancel()
-                if (status is VisionRunStatus.Stopping) status = VisionRunStatus.Cancelled
+                //
+                // Only for the run that is still the current one, though: a native stream can take
+                // long enough to unwind that a superseded run lands here after its replacement has
+                // already staged an image and started, and both fields it touches belong to that
+                // replacement by then — cancelling `watchdog` would disarm the live run's timeout,
+                // leaving a wedged engine with no backstop at all. The temp file is this run's own,
+                // so it is deleted either way.
+                if (job === coroutineContext[Job]) {
+                    watchdog?.cancel()
+                    if (status is VisionRunStatus.Stopping) status = VisionRunStatus.Cancelled
+                }
                 file?.delete()
             }
         }

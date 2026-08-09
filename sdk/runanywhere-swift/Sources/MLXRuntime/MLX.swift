@@ -873,24 +873,40 @@ private final class MLXSession: @unchecked Sendable {
         mlxRuntimeLogger.debug(
             "MLX VLM image resize=\(resizeTarget) native=\(nativeSize) contextLength=\(contextLength) model=\(modelID)"
         )
-        // MLX renders the chat template itself, so the system prompt has to be
-        // handed to the session as `instructions` — passing only `prompt` drops
-        // it. Computer-use agents ship their whole contract (the tool schema and
-        // the <tool_call> output format) in the system prompt, so losing it
-        // silently produces plain prose instead of a parseable action.
-        let session = ChatSession(
-            container,
-            instructions: instructions,
-            generateParameters: parameters,
+        // MLX renders the chat template itself, so the system prompt has to be a
+        // `.system` message — passing only `prompt` drops it. Computer-use agents
+        // ship their whole contract (the tool schema and the <tool_call> output
+        // format) in the system prompt, so losing it silently produces plain
+        // prose instead of a parseable action.
+        var chat: [Chat.Message] = []
+        if let instructions {
+            chat.append(.system(instructions))
+        }
+        chat.append(.user(prompt, images: [image]))
+
+        // The same two calls the text path uses (`stream`), and for the same
+        // reason: a turn here is one-shot — commons owns the conversation and
+        // re-sends it — so a `ChatSession`, whose whole purpose is to carry a KV
+        // cache across turns, has nothing to carry. One generation path for both
+        // modalities instead of two that can drift.
+        //
+        // Not a bug fix, and worth saying so: this was tried as one while
+        // chasing MLX Qwen2-VL answering with its opening token repeated, and it
+        // changed nothing — the same prompt still came back "The The The". The
+        // cause is the model on this runtime (see the note on the VLM entries in
+        // the example app's ModelRecommendation), not the session object.
+        let input = UserInput(
+            chat: chat,
             processing: UserInput.Processing(resize: resizeTarget)
         )
-        let events = session.streamDetails(to: prompt, images: [image])
+        let prepared = try await container.prepare(input: input)
+        let events = try await container.generate(input: prepared, parameters: parameters)
         var metrics = MLXGenerationMetrics()
         var repetitionGuard = RepetitionRunGuard()
         var shouldFlushHeldTokens = true
         let started = Date()
 
-        generationLoop: for try await event in events {
+        generationLoop: for await event in events {
             if isCancelled {
                 throw CancellationError()
             }
@@ -914,6 +930,14 @@ private final class MLXSession: @unchecked Sendable {
                     break generationLoop
                 }
             case .info(let info):
+                // Prompt vs generated token counts, which is what separates "the
+                // image never reached the model" from "the model decoded badly":
+                // a Qwen2-VL turn that answered with one token repeated 23 times
+                // still showed a correctly sized 418-token prompt here, and that
+                // is what ruled the image pipeline out.
+                mlxRuntimeLogger.debug(
+                    "MLX VLM turn: prompt=\(info.promptTokenCount) generated=\(info.generationTokenCount)"
+                )
                 metrics.promptTokens = info.promptTokenCount
                 metrics.completionTokens = info.generationTokenCount
                 metrics.tokensPerSecond = Float(info.tokensPerSecond)

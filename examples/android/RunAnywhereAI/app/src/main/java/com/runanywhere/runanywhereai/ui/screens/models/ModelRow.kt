@@ -25,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadInterruptionState
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
-import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -50,8 +50,9 @@ fun ModelRow(
     onCancel: (() -> Unit)? = null,
     // Non-null when this model has bytes on disk from a transfer that stopped — failed, or
     // cancelled by the user. The trailing verb becomes Retry or Resume accordingly, both of which
-    // continue from those bytes instead of starting the transfer over.
-    interruption: ModelDownloadService.Interrupted? = null,
+    // continue from those bytes instead of starting the transfer over. Already the reader's view of
+    // it, so this row never has to interpret a download-service record.
+    interruption: DownloadInterruptionState? = null,
     highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +60,6 @@ fun ModelRow(
     val brand = model.brand()
     val hasHfToken = SettingsRepository.settings.hfToken.isNotBlank()
     val isHighlighted = highlightLabel != null
-    val interruptionKind = interruption.kind()
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -134,12 +134,8 @@ fun ModelRow(
                 }
                 if (progress != null) {
                     DownloadProgressBlock(progress)
-                } else if (!isBusy && interruptionKind != null) {
-                    DownloadInterruptionNote(
-                        kind = interruptionKind,
-                        detail = interruption?.message,
-                        kept = interruption?.progress?.keptLabel,
-                    )
+                } else if (!isBusy && interruption != null) {
+                    DownloadInterruptionNote(interruption)
                 }
             }
 
@@ -150,7 +146,7 @@ fun ModelRow(
                     isCurrent = isCurrent,
                     isReady = isReady,
                     isBusy = isBusy,
-                    interruption = interruptionKind,
+                    interruption = interruption?.kind,
                     onDownload = onDownload,
                     onCancel = onCancel,
                 )

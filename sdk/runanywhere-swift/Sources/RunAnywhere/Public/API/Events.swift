@@ -123,13 +123,28 @@ public enum VoiceEvent: Sendable {
             }
             return .error(message: error.message, recoverable: error.recoverable)
         case .turnLifecycle(let turn):
-            if turn.kind == .agentResponseStarted {
+            switch turn.kind {
+            case .agentResponseStarted:
                 return .agentStateChanged(.speaking)
-            }
-            if turn.kind == .failed, turn.hasError {
+            // The core's in-feed segmenter reports the moment the energy gate
+            // opens (voice_agent_feed_abi.cpp → USER_SPEECH_STARTED), which is
+            // the only signal that arrives *while* the user is still talking.
+            // Swift used to drop both of these and derive `.speechStarted`
+            // solely from the `vad` arm, which the turn pipeline emits once,
+            // after the utterance has already closed — and only when a VAD
+            // model answered. With no VAD resident it never arrived at all, so
+            // "I can't hear you" stayed on screen through a transcript and a
+            // spoken reply. Kotlin has always mapped these two (VoiceSession.kt);
+            // this is Swift catching up.
+            case .userSpeechStarted:
+                return .speechStarted
+            case .userSpeechEnded:
+                return .speechEnded
+            case .failed where turn.hasError:
                 return .error(message: turn.error.message, recoverable: turn.error.recoverable)
+            default:
+                return nil
             }
-            return nil
         default:
             return nil
         }

@@ -215,6 +215,11 @@ class HuggingFaceSearchViewModel : ViewModel() {
      *
      * The progress mirror is a child job rather than a `takeWhile`, so the wait for the terminal
      * state and the drawing of the bar cannot disagree about which snapshot was the last one.
+     *
+     * The ending comes from the outcome [ModelDownloadService.awaitFinish] returns rather than from
+     * sampling the interruption map afterwards: the record is written by the job that owned the
+     * transfer, and sampling raced it — a transfer preempted by a second start had not recorded
+     * anything yet, so the sheet announced an abandoned download as an added model.
      */
     private suspend fun awaitForegroundDownload(modelId: String): ModelDownloadService.Interrupted? =
         coroutineScope {
@@ -225,9 +230,9 @@ class HuggingFaceSearchViewModel : ViewModel() {
                     }
                 }
             }
-            ModelDownloadService.awaitFinish(modelId)
+            val outcome = ModelDownloadService.awaitFinish(modelId)
             mirror.cancel()
-            ModelDownloadService.interrupted.value[modelId]
+            (outcome as? ModelDownloadService.Outcome.Stopped)?.record
         }
 
     /**

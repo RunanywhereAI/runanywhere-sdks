@@ -31,8 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadInterruptionState
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
-import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
@@ -181,14 +181,13 @@ private fun OrgModelRow(
     isReady: Boolean,
     isBusy: Boolean,
     progress: DownloadProgressInfo?,
-    interruption: ModelDownloadService.Interrupted?,
+    interruption: DownloadInterruptionState?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
-    val interruptionKind = interruption.kind()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -238,12 +237,8 @@ private fun OrgModelRow(
             // different layout of the same transfer, not a different amount of information.
             if (progress != null) {
                 DownloadProgressBlock(progress)
-            } else if (!isBusy && interruptionKind != null) {
-                DownloadInterruptionNote(
-                    kind = interruptionKind,
-                    detail = interruption?.message,
-                    kept = interruption?.progress?.keptLabel,
-                )
+            } else if (!isBusy && interruption != null) {
+                DownloadInterruptionNote(interruption)
             }
         }
         Spacer(Modifier.width(dimens.spacingSm))
@@ -253,7 +248,7 @@ private fun OrgModelRow(
                 isCurrent = isCurrent,
                 isReady = isReady,
                 isBusy = isBusy,
-                interruption = interruptionKind,
+                interruption = interruption?.kind,
                 onDownload = onDownload,
                 onCancel = onCancel,
             )

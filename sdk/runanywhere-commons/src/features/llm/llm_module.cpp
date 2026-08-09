@@ -692,6 +692,11 @@ struct llm_stream_context {
     std::string full_text;
     int32_t prompt_tokens;
 
+    // Per-stream sentinel filter. Stateful on purpose: a backend may split
+    // `<|im_end|>` across two callbacks, and neither half is recognisable on
+    // its own.
+    rac::tokens::StreamFilter filter;
+
     // Analytics event data
     std::string generation_id;
     const char* model_id;
@@ -717,8 +722,8 @@ struct llm_stream_context {
 /**
  * Internal token callback that wraps user callback and tracks metrics.
  *
- * Every emitted token is run through
- * `rac::tokens::strip_special_tokens()` before it reaches the user callback or the
+ * Every emitted token is run through the per-stream
+ * `rac::tokens::StreamFilter` before it reaches the user callback or the
  * proto stream dispatcher. Backends occasionally leak EOS sentinels
  * (`<|im_end|>`, `<|eot_id|>`, `<end_of_utterance>`, …) which the example
  * apps used to strip locally; the regex-based example workaround in
@@ -738,21 +743,22 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
         if (finish_reason != nullptr && finish_reason[0] != '\0') {
             ctx->producer_finish_reason = finish_reason;
         }
-        // Terminal event may carry empty text; the component synthesizes its
-        // own proto terminal after generate_stream returns. Do not forward
-        // empty finals to the user token callback.
-        if (token == nullptr || token[0] == '\0') {
-            return RAC_TRUE;
-        }
     }
 
     // Strip tokenizer-internal sentinels before any caller observes the
-    // chunk. The stack-allocated buffer comfortably fits a single decoded
-    // token; backends emit at most a few dozen bytes per callback.
-    char cleaned_buf[512];
-    const char* cleaned =
-        rac::tokens::strip_special_tokens(token, cleaned_buf, sizeof(cleaned_buf));
-    const bool cleaned_empty = (cleaned[0] == '\0');
+    // chunk. The filter carries per-stream state because a sentinel a backend
+    // splits over two callbacks (`"<|im_"` then `"end|>"`) is only
+    // recognisable once the halves are joined; the unresolved prefix is held
+    // here rather than delivered as the angle-bracket artifact. The terminal
+    // releases whatever is still held — with nothing more coming, an
+    // unfinished prefix is ordinary text. That released tail is why an empty
+    // terminal is no longer short-circuited above: every delivery below is
+    // already guarded on `cleaned`, so an empty final still forwards nothing.
+    std::string cleaned = ctx->filter.feed(token);
+    if (is_final) {
+        cleaned += ctx->filter.flush();
+    }
+    const bool cleaned_empty = cleaned.empty();
 
     // Track first token time and emit first token event only for the first
     // non-empty cleaned chunk so TTFT does not get charged to a leading
@@ -797,7 +803,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     // to filter empty events themselves.
     if (!cleaned_empty) {
         rac::llm::LLMStreamEventParams event;
-        event.token = cleaned;
+        event.token = cleaned.c_str();
         event.kind = 1;  // ANSWER
         rac::llm::dispatch_llm_stream_event(ctx->component_handle, event);
     }
@@ -805,7 +811,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     // Forward only non-empty cleaned tokens to the user callback so the
     // example/SDK rendering layer never has to strip these sentinels.
     if (!cleaned_empty && ctx->token_callback) {
-        return ctx->token_callback(cleaned, ctx->user_data);
+        return ctx->token_callback(cleaned.c_str(), ctx->user_data);
     }
 
     return RAC_TRUE;  // Continue by default
@@ -1768,6 +1774,12 @@ struct ProtoStreamContext {
     rac_llm_stream_proto_callback_fn callback = nullptr;
     void* user_data = nullptr;
     rac::llm::LifecycleLlmRef* ref = nullptr;
+    // Same per-stream sentinel filter the handle-based path (llm_stream_context)
+    // has carried for a while. This context backs the handle-LESS lifecycle ABI
+    // — the one every SDK that is not iOS actually calls (Web/WASM, Kotlin JNI,
+    // Flutter FFI, React Native) — so without it `<|im_end|>` reached chat
+    // bubbles and TTS on four platforms while iOS was clean.
+    rac::tokens::StreamFilter filter;
     uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
@@ -2171,13 +2183,25 @@ rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const c
         if (finish_reason != nullptr && finish_reason[0] != '\0') {
             ctx->producer_finish_reason = finish_reason;
         }
-        if (token == nullptr || token[0] == '\0') {
-            return RAC_TRUE;
-        }
     }
 
-    const char* safe_token = token ? token : "";
-    consume_thinking_aware_text(ctx, safe_token);
+    // Strip tokenizer-internal sentinels before the thinking splitter, the
+    // accumulated answer, or the caller ever sees the chunk. The filter is
+    // stateful because a backend is free to split `<|im_end|>` across two
+    // callbacks and neither half is recognisable alone; `flush()` on the
+    // terminal releases a held prefix that turned out to be ordinary text.
+    // An empty final still has to reach the flush, so this runs before the
+    // old "empty final, nothing to do" short-circuit — every delivery below
+    // is already guarded on the cleaned text being non-empty.
+    std::string cleaned = ctx->filter.feed(token ? token : "");
+    if (is_final) {
+        cleaned += ctx->filter.flush();
+    }
+    if (cleaned.empty()) {
+        return RAC_TRUE;
+    }
+
+    consume_thinking_aware_text(ctx, cleaned.c_str());
     return RAC_TRUE;
 }
 
@@ -2280,7 +2304,13 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    const char* raw_text = raw.text ? raw.text : "";
+    // Sentinel-free before the thinking splitter runs, matching the streaming
+    // sibling. A leaked `<|im_end|>` here is not cosmetic: this text is what
+    // the non-streaming SDK verbs return and what the voice agent hands to
+    // TTS, so the artifact was rendered *and* spoken on every SDK that calls
+    // the handle-less ABI.
+    const std::string clean_text = rac::tokens::strip_special_tokens(raw.text ? raw.text : "");
+    const char* raw_text = clean_text.c_str();
     std::string thinking_open_tag;
     std::string thinking_close_tag;
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
@@ -2603,7 +2633,13 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    const char* raw_text = raw.text ? raw.text : "";
+    // Sentinel-free before the thinking splitter runs, matching the streaming
+    // sibling. A leaked `<|im_end|>` here is not cosmetic: this text is what
+    // the non-streaming SDK verbs return and what the voice agent hands to
+    // TTS, so the artifact was rendered *and* spoken on every SDK that calls
+    // the handle-less ABI.
+    const std::string clean_text = rac::tokens::strip_special_tokens(raw.text ? raw.text : "");
+    const char* raw_text = clean_text.c_str();
     std::string thinking_open_tag;
     std::string thinking_close_tag;
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);

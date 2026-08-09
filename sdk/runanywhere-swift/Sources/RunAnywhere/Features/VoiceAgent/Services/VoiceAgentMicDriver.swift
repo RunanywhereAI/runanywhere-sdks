@@ -121,12 +121,25 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let session = AVAudioSession.sharedInstance()
-                    // `.default` (not `.voiceChat`): the agent is half-duplex — the
-                    // mic is gated while TTS plays, so we don't need voice-processing
-                    // echo cancellation. `.voiceChat` forces the telephony I/O path,
-                    // which attenuates speaker output to call levels (quiet replies)
-                    // and runs an AGC that suppresses the mic after a long playout,
-                    // breaking endpointing on every turn after the first.
+                    // `.default`, not `.voiceChat`. The agent is full-duplex (see
+                    // the file header), so this is NOT "we don't need echo
+                    // cancellation" — it is a measured trade. `.voiceChat` forces
+                    // the telephony I/O path, which attenuates speaker output to
+                    // call levels (quiet replies) and runs an AGC that suppresses
+                    // the mic after a long playout, breaking endpointing on every
+                    // turn after the first; both were observed, and a pipeline that
+                    // stops hearing anything after turn one is worse than one that
+                    // occasionally misses an interruption.
+                    //
+                    // What pays for that choice is the core's echo estimate
+                    // (voice_agent_feed_abi.cpp): with no canceller, a voice over
+                    // the reply has to arrive ~8 dB above what the loudspeaker puts
+                    // into this same microphone. Measured on the simulator against a
+                    // 0 dB-coupled loopback — the pathological case, where the
+                    // agent's own voice reaches the mic at full level — playout
+                    // truncated on every interruption that cleared that margin and
+                    // on none that did not. Real speaker-to-mic coupling loses far
+                    // more than 0 dB, which is what makes the margin reachable.
                     try session.setCategory(
                         .playAndRecord,
                         mode: .default,

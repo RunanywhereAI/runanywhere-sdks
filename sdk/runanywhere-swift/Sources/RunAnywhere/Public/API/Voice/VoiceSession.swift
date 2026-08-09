@@ -179,6 +179,13 @@ public final class VoiceSession: @unchecked Sendable {
         guard torn.2 else { return }
         torn.1?.cancel()
         torn.0?.cancel()
+        // Both tasks are awaited, not just the mic: `cancel()` is cooperative, and
+        // the barge-in task holds a subscription on the adapter's event stream.
+        // Leaving the loop is what fires the stream's `onTermination`, which
+        // deregisters the native proto callback and quiesces it. Returning before
+        // that has happened lets the deregistration land after
+        // `rac_voice_agent_cleanup` has already torn the pipeline down.
+        await torn.1?.value
         await torn.0?.value
         await CppBridge.VoiceAgent.shared.cleanup()
     }

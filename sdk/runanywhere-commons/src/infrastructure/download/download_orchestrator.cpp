@@ -3254,13 +3254,21 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
         // Access was denied, not merely unsized. Worth refusing on every
         // platform: the download itself is going to fail the same way, and the
         // caller has something actionable to do about it.
+        //
+        // failure_reason stays UNSPECIFIED: DownloadFailureReason has no
+        // authentication value, and every one it does have is a storage or
+        // partial-bytes condition. Borrowing INSUFFICIENT_STORAGE here would be
+        // read literally downstream — the Web SDK maps that reason to a
+        // retryable storage error, so a denied token would render as "free up
+        // space" beside a Retry that reproduces the denial exactly. With the
+        // field unset the SDKs fall back to the RAC_ERROR_AUTHENTICATION_FAILED
+        // code and this message, which name the real cause and the real fix.
         result.set_can_start(false);
         rac::foundation::populate_sdk_error(result.mutable_error(),
                                             RAC_ERROR_AUTHENTICATION_FAILED);
         result.mutable_error()->set_message(
             "authentication failed while checking the download — check your Hugging Face "
             "token / repo access, then try again.");
-        result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
     } else if (unsized_nonarchive_file && require_plain_file_size) {
         // A plain (non-archive) file has an unknown size — on a device we cannot
         // size the storage gate for it, so refuse rather than risk filling the

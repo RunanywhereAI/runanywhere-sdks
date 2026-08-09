@@ -10,9 +10,11 @@ import com.runanywhere.runanywhereai.data.BackendAvailability
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadInterruptionState
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.download.DownloadUpdate
 import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.download.asState
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
@@ -46,10 +48,11 @@ data class ModelSelectionState(
 
     /**
      * The stopped transfer for [modelId], or null when there is nothing on disk to continue.
-     * Handed to the row whole so the note and the trailing verb are read from one record and
-     * cannot disagree about what happened.
+     * Handed to the row already interpreted, so the note and the trailing verb are read from one
+     * value and cannot disagree about what happened — and no list layout has to know what a
+     * download-service record means.
      */
-    fun interruptionFor(modelId: String): ModelDownloadService.Interrupted? = interruptions[modelId]
+    fun interruptionFor(modelId: String): DownloadInterruptionState? = interruptions[modelId]?.asState()
 }
 
 class ModelSelectionViewModel(

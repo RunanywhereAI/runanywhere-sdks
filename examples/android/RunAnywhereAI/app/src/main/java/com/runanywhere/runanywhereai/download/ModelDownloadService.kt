@@ -36,6 +36,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -69,15 +71,6 @@ class ModelDownloadService : Service() {
 
     private var lastNotifiedAt = 0L
     private var lastNotifiedPhase: DownloadPhase? = null
-
-    /** How a transfer ended, from this service's point of view. */
-    private sealed interface Outcome {
-        /** Every byte is on disk and the model is registered. */
-        data object Finished : Outcome
-
-        /** It stopped short; [record] is what the picker rows will say about it. */
-        data class Stopped(val record: Interrupted) : Outcome
-    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -236,34 +229,32 @@ class ModelDownloadService : Service() {
     private fun settle(generation: Long, model: RAModelInfo, outcome: Outcome) {
         val name = model.displayTitle()
         // Clearing the live snapshot is the one part a preempted job must not do — its replacement
-        // already owns that field. The per-model record and the report are keyed to *this* model, so
-        // they are still this job's to write: a transfer that was pushed aside by another still left
-        // bytes on disk, and the row for it has to say so.
+        // already owns that field. The outcome and the report are keyed to *this* model, so they are
+        // still this job's to write: a transfer that was pushed aside by another still left bytes on
+        // disk, and both the row for it and whoever is waiting on it have to say so.
         val ownsLiveState = generation == generations.get()
+        publishOutcome(model.id, outcome)
+        if (ownsLiveState) _active.value = null
         when (outcome) {
-            Outcome.Finished -> {
-                _interrupted.update { it - model.id }
-                if (ownsLiveState) _active.value = null
+            Outcome.Finished ->
                 postOutcome("$name is ready", "Downloaded and available on this device.")
-            }
-            is Outcome.Stopped -> {
-                recordInterruption(model.id, outcome.record)
-                if (ownsLiveState) _active.value = null
+            is Outcome.Stopped ->
                 if (outcome.record.cancelled) {
                     postOutcome(
                         "$name download paused",
                         "The bytes already transferred are kept — resume picks up where it stopped.",
                     )
                 } else {
+                    // Still normalised here: an [Interrupted] raised from a bare exception carries
+                    // that exception's own text, which never passed through the SDK's sentence path.
                     val why = outcome.record.message?.takeIf { it.isNotBlank() }?.let { "${it.asSentence()}. " }
                     postOutcome("$name download failed", "${why.orEmpty()}Retry resumes from the bytes already on disk.")
                 }
-            }
         }
     }
 
     private fun recordInterruption(modelId: String, record: Interrupted) {
-        _interrupted.update { it + (modelId to record) }
+        publishOutcome(modelId, Outcome.Stopped(record))
     }
 
     private suspend fun freeResidentModelsForDownload() {
@@ -494,6 +485,22 @@ class ModelDownloadService : Service() {
         val progress: DownloadProgressInfo? = null,
     )
 
+    /**
+     * How a transfer ended — written by the job that owned it, read by whoever is waiting.
+     *
+     * [awaitFinish] used to infer this from [active] no longer naming the model, which is also what
+     * a second start does: the preempted job had not yet written its record when the waiter woke,
+     * so it read no interruption and reported an abandoned transfer as a completed one. A terminal
+     * value leaves nothing to infer.
+     */
+    sealed interface Outcome {
+        /** Every byte is on disk and the model is registered. */
+        data object Finished : Outcome
+
+        /** It stopped short; [record] is what the picker rows will say about it. */
+        data class Stopped(val record: Interrupted) : Outcome
+    }
+
     companion object {
         private const val CHANNEL_ID = "model_downloads"
         private const val NOTIFICATION_ID = 4801
@@ -536,6 +543,27 @@ class ModelDownloadService : Service() {
          */
         val interrupted: StateFlow<Map<String, Interrupted>> = _interrupted
 
+        /**
+         * The last terminal [Outcome] per model id — what [awaitFinish] suspends on.
+         *
+         * Retained rather than consumed, so a waiter that subscribes a beat late still reads the
+         * ending instead of hanging. It is only ever overwritten by the next transfer of the same
+         * model, which [start] announces by clearing the stale entry first.
+         */
+        private val _settled = MutableStateFlow<Map<String, Outcome>>(emptyMap())
+
+        /**
+         * Publish how [modelId] ended: the record the picker rows read, and the terminal outcome a
+         * waiter suspends on. One writer for both, so the two can never describe different endings.
+         */
+        private fun publishOutcome(modelId: String, outcome: Outcome) {
+            when (outcome) {
+                Outcome.Finished -> _interrupted.update { it - modelId }
+                is Outcome.Stopped -> _interrupted.update { it + (modelId to outcome.record) }
+            }
+            _settled.update { it + (modelId to outcome) }
+        }
+
         @Volatile
         private var downloadJob: Job? = null
 
@@ -568,7 +596,10 @@ class ModelDownloadService : Service() {
                 ContextCompat.startForegroundService(ctx, intent)
                 // Publish synchronously so a picker reads "downloading" on the same frame as the
                 // tap, rather than whenever the service's IO coroutine happens to be scheduled.
+                // The previous ending goes with it: this model is in flight again, so the last one
+                // is no longer how its transfer stands.
                 _interrupted.update { it - model.id }
+                _settled.update { it - model.id }
                 _active.value = Active(model.id, DownloadProgressInfo())
                 true
             } catch (e: Exception) {
@@ -601,15 +632,21 @@ class ModelDownloadService : Service() {
         }
 
         /**
-         * Suspend until [modelId] is no longer the running transfer.
+         * Suspend until the transfer of [modelId] has ended, and report how.
          *
-         * For the flows that stage a model before using it (the Voice AI pipeline card), which need
-         * the same wake-lock/foreground guarantees as a picker download but cannot continue until
-         * the bytes are there.
+         * For the flows that stage a model before using it (the Voice AI pipeline card, the Hugging
+         * Face sheet), which need the same wake-lock/foreground guarantees as a picker download but
+         * cannot continue until the bytes are there.
+         *
+         * Both conditions are needed. The [Outcome] alone would let a re-started model answer with
+         * the ending of the run that was just preempted; "[active] no longer names it" alone was
+         * the original bug — a second start clears that field too, before the displaced job has
+         * settled, so an abandoned transfer read as a completed one.
          */
-        suspend fun awaitFinish(modelId: String) {
-            active.first { it?.modelId != modelId }
-        }
+        suspend fun awaitFinish(modelId: String): Outcome =
+            combine(_settled, _active) { settled, running ->
+                settled[modelId]?.takeIf { running?.modelId != modelId }
+            }.filterNotNull().first()
 
         /**
          * Forget that [modelId] was ever interrupted — it is on disk now, or its files were deleted,
@@ -633,7 +670,7 @@ class ModelDownloadService : Service() {
             message: String? = null,
             progress: DownloadProgressInfo? = null,
         ) {
-            _interrupted.update { it + (modelId to Interrupted(cancelled, message, progress)) }
+            publishOutcome(modelId, Outcome.Stopped(Interrupted(cancelled, message, progress)))
         }
 
         internal fun installContext(context: Context) {

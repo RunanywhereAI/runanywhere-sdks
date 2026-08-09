@@ -13,6 +13,12 @@
  * capture -> feed -> play loop with NO SDK-side VAD; turn VoiceEvents fan out
  * to the handle callback, so `RunAnywhere.streamVoiceAgent()` collectors
  * observe them without extra wiring.
+ *
+ * Playout runs CONCURRENTLY with the feed loop. It used to be awaited inline,
+ * which stopped the feed for the whole of a reply and then dropped everything
+ * captured during it — so speaking over the agent could not be heard at all and
+ * the only way to take the turn back was the on-screen control. Mirrors Swift
+ * `VoiceAgentMicDriver`, which made the same move for the same reason.
  */
 
 package com.runanywhere.sdk.features.VoiceAgent.Services
@@ -27,10 +33,14 @@ import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.api.AgentState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import okio.ByteString.Companion.toByteString
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -42,39 +52,30 @@ import kotlin.coroutines.cancellation.CancellationException
  * Segmentation/endpointing lives in the C core, which re-runs its own VAD over
  * each utterance.
  *
- * ## Why this loop is half-duplex, and what it would take to change
+ * ## Talking over the agent
  *
- * The agent takes turns: while a reply is playing out, captured frames are
- * dropped instead of fed. Interruption is therefore an explicit control
- * ([stopPlayback]) and never something the user can do by simply talking over
- * the agent — which is why every UI mounted on this driver has to say so rather
- * than imply the mic is still listening. Swift `VoiceAgentMicDriver` is the
- * same shape for the same reasons, so the two platforms make the same promise.
+ * The frames keep flowing while a reply is audible, so the core can hear the
+ * user interrupt. Two things make that safe:
  *
- * Two things are needed for hands-free barge-in. The core now supplies the
- * first; the second is a device capability this checkout cannot assume:
+ *  1. **The core decides, not this layer.** `voice_agent_feed_abi.cpp` reports
+ *     the segmenter's speech *onset* on the frame that opens the energy gate,
+ *     and only calls it `INTERRUPT_REASON_USER_BARGE_IN` when the onset lands
+ *     inside the window where the reply is still audible AND clears the echo
+ *     estimate it learned from the reply's own first frames. A voice arriving
+ *     on top of the loudspeaker is louder than the loudspeaker; the agent's own
+ *     words are not, so they cannot cut it off. Failing that test means the
+ *     reply simply finishes, which is the safe way to be wrong.
+ *  2. **Echo cancellation where the device has it.** [AudioCaptureManager] is
+ *     asked for an echo-cancelling capture ([AudioCaptureManager.startRecording]'s
+ *     `echoCancelling`), which opens `VOICE_COMMUNICATION` and attaches
+ *     `AcousticEchoCanceler` when the platform offers one. It is an
+ *     improvement, not a prerequisite — the margin above does the separating on
+ *     devices (and emulators) that have no canceller.
  *
- *  1. **A speech signal during playout — now available.**
- *     `voice_agent_feed_abi.cpp` reports the segmenter's speech *onset* on the
- *     frame that opens the energy gate, and raises `INTERRUPT_REASON_USER_BARGE_IN`
- *     when that onset lands inside the window where the reply it just handed
- *     back is still audible. Feeding through the playout would therefore be
- *     answered in ~100 ms rather than after a whole replacement turn.
- *  2. **Echo cancellation on the capture path — still missing.** Feeding while
- *     the speaker is live re-feeds the device's own reply, which the core hears
- *     as a voice: it would raise a barge-in against the agent's own words, cut
- *     the reply, segment the echo as an utterance and answer it. Suppressing
- *     that is `AcousticEchoCanceler` on a `VOICE_COMMUNICATION` capture, which
- *     not every device — and not the emulator's audio HAL, where this pipeline
- *     is validated — provides. [AudioCaptureManager] opens a plain
- *     `MediaRecorder.AudioSource.MIC` today, so there is none.
- *
- * Until the capture path can cancel the device's own output, dropping the
- * frames is the honest behaviour: the bounded channel bounds memory and keeps
- * the device's own TTS out of the next turn. Swift `VoiceAgentMicDriver` is the
- * same shape (and its `configureVoiceAudioSession` explains why it, too, keeps
- * away from the voice-processing I/O path), so the two platforms make the same
- * promise and every UI mounted on either has to say so.
+ * Only this layer can stop the speaker, so [stopPlayback] is the other half of
+ * the handshake: `VoiceSession` watches the core's stream and calls it on a
+ * barge-in. Swift `VoiceAgentMicDriver` has exactly this shape, so the two
+ * platforms make the same promise and every UI mounted on either can, too.
  */
 internal class VoiceAgentMicDriver(
     private val handle: Long,
@@ -94,25 +95,53 @@ internal class VoiceAgentMicDriver(
     private val capture = AudioCaptureManager()
     private val playback = AudioPlaybackManager()
 
+    /**
+     * The reply coming out of the speaker right now, held so it can be cut off
+     * from outside the feed loop — which is the whole point of not awaiting it
+     * inline any more.
+     */
+    private val playoutLock = Any()
+    private var playoutJob: Job? = null
+
+    /**
+     * The live mic queue, published so [stopPlayback] can drop what is behind a
+     * tap on the interrupt control. Null between sessions.
+     */
+    @Volatile
+    private var chunks: Channel<ByteArray>? = null
+
     suspend fun run() {
-        val chunks =
-            Channel<ByteArray>(
-                capacity = MIC_CHANNEL_CAPACITY,
-                onBufferOverflow = BufferOverflow.DROP_OLDEST,
-            )
-        capture.startRecording { chunk -> chunks.trySend(chunk) }
-        logger.info("Voice-agent mic capture started")
-        try {
-            feedLoop(chunks)
-        } finally {
-            capture.stopRecording()
-            playback.stop()
-            chunks.close()
-            logger.info("Voice-agent mic capture stopped")
+        // Playout is launched into this scope, so it is a child of the caller's job: cancelling
+        // the session cancels a reply in flight, and run() does not return until it has.
+        coroutineScope {
+            val queue =
+                Channel<ByteArray>(
+                    capacity = MIC_CHANNEL_CAPACITY,
+                    onBufferOverflow = BufferOverflow.DROP_OLDEST,
+                )
+            chunks = queue
+            // Ask for the echo-cancelling capture: the frames now keep flowing
+            // while the agent is audible, so anything the platform can take out
+            // of the mic signal is one less thing the core's echo margin has to
+            // separate.
+            capture.startRecording(echoCancelling = true) { chunk -> queue.trySend(chunk) }
+            logger.info("Voice-agent mic capture started")
+            try {
+                feedLoop(queue, this)
+            } finally {
+                capture.stopRecording()
+                // Cancelling the playout job is what restores the LISTENING
+                // phase for a subscriber; playback.stop() alone would leave a UI
+                // latched on "Speaking" over a silent speaker.
+                cancelPlayout()
+                queue.close()
+                chunks = null
+                logger.info("Voice-agent mic capture stopped")
+            }
         }
     }
 
-    private suspend fun feedLoop(chunks: Channel<ByteArray>) {
+    private suspend fun feedLoop(chunks: Channel<ByteArray>, scope: CoroutineScope) {
         while (currentCoroutineContext().isActive) {
             val chunk = chunks.receive()
 
@@ -163,18 +192,22 @@ internal class VoiceAgentMicDriver(
             val reply = result.synthesized_audio
             if (reply != null && reply.size > 0) {
                 logger.info("Playing agent reply (${reply.size} WAV bytes)")
-                playReply(reply.toByteArray())
+                // The feed call blocked for the whole turn, so the queue now
+                // holds whatever the mic heard while the reply was being
+                // computed. Those frames predate playout: they are not part of
+                // the turn that just closed and they are not the user talking
+                // over a reply that had not started. Feeding them would seed the
+                // core's echo estimate from pre-playout quiet and let the
+                // reply's own onset clear the bar it set — the agent
+                // interrupting itself. The core drops its own partial frame the
+                // same way; this drops the driver's.
                 discardBacklog(chunks)
+                startPlayout(scope, reply.toByteArray())
             }
         }
     }
 
-    /**
-     * Drop everything captured while the last turn was running.
-     *
-     * See the half-duplex note on the class: without echo cancellation those frames are mostly the
-     * device's own reply, so feeding them back would have the agent answer itself.
-     */
+    /** Drop everything captured while the last turn was being computed. */
     private fun discardBacklog(chunks: Channel<ByteArray>) {
         while (chunks.tryReceive().isSuccess) Unit
     }
@@ -187,8 +220,48 @@ internal class VoiceAgentMicDriver(
      * touch it. Barge-in therefore has to come through here, or the agent talks over the
      * user to the end of its buffer. Safe to call from any thread and when nothing is
      * playing: [AudioPlaybackManager.stop] is a no-op without a live track.
+     *
+     * @param discardPendingInput `true` for the on-screen interrupt control, where the frames
+     *   queued behind the tap are the tail of the agent's own playout and belong to nobody.
+     *   `false` for a voice barge-in, where those same frames are the first syllables of the
+     *   user's sentence — dropping them would clip the very turn that caused the interrupt.
+     *   Mirrors Swift `VoiceAgentMicDriver.stopPlayback(discardPendingInput:)`.
      */
-    fun stopPlayback() {
+    fun stopPlayback(discardPendingInput: Boolean) {
+        cancelPlayout()
+        if (discardPendingInput) chunks?.let(::discardBacklog)
+    }
+
+    /**
+     * Begin one reply without blocking the feed loop.
+     *
+     * Replies are strictly sequential (the core runs one turn per feed call), so a job still
+     * live here can only be a stale one; cancel it rather than leaving two players fighting
+     * over the speaker.
+     */
+    private fun startPlayout(scope: CoroutineScope, wav: ByteArray) {
+        val job = scope.launch { playReply(wav) }
+        val stale =
+            synchronized(playoutLock) {
+                val previous = playoutJob
+                playoutJob = job
+                previous
+            }
+        stale?.cancel()
+    }
+
+    /** Stop whatever is playing and let the playout job report LISTENING. */
+    private fun cancelPlayout() {
+        val job =
+            synchronized(playoutLock) {
+                val live = playoutJob
+                playoutJob = null
+                live
+            }
+        job?.cancel()
+        // The job's cancellation resumes play() with PlaybackInterrupted, but a job that has
+        // not reached play() yet has no track to interrupt; stopping directly makes the
+        // silence immediate either way.
         playback.stop()
     }
 
@@ -219,10 +292,12 @@ internal class VoiceAgentMicDriver(
 
         /**
          * Bounded mic ingress buffer. The capture callback trySends while the
-         * consumer pauses for the duration of each turn, so an unbounded channel
-         * could grow without limit on long turns. DROP_OLDEST bounds memory;
-         * frames captured mid-turn are discarded anyway (the class note explains
-         * what hands-free barge-in would need first).
+         * consumer is inside one blocking feed call for the whole of a turn, so
+         * an unbounded channel could grow without limit on long turns.
+         * DROP_OLDEST bounds memory; frames captured while the turn was being
+         * computed are dropped when the reply comes back anyway. Playout no
+         * longer blocks the consumer, so nothing is dropped once the reply is
+         * audible — that is the window a barge-in has to be heard in.
          */
         const val MIC_CHANNEL_CAPACITY = RADefaults.AudioCapture.MIC_CHANNEL_CAPACITY
     }

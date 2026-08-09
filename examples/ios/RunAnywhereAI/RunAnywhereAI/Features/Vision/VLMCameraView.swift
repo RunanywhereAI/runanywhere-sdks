@@ -143,7 +143,7 @@ struct VLMCameraView: View {
                 .appType(.secondary)
                 .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 380)
+                .frame(maxWidth: Measure.prose)
         }
         .padding(Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -207,7 +207,7 @@ extension VLMCameraView {
         // A 4:3 well rather than a fraction of `UIScreen.main.bounds`, which is
         // the wrong number in a Slide Over, in Stage Manager, and on the Mac.
         .aspectRatio(4.0 / 3.0, contentMode: .fit)
-        .frame(maxHeight: 440)
+        .frame(maxHeight: Measure.viewfinder)
         .clipped()
         .overlay { dropCue }
         // Mac-native, and harmless on iOS where dragging a photo out of Photos
@@ -275,7 +275,7 @@ extension VLMCameraView {
             } else {
                 Image(systemName: cameraStateGlyph)
                     .symbolRenderingMode(.hierarchical)
-                    .font(.system(size: 34, weight: .medium))
+                    .font(.system(size: Control.glyphLarge, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
 
@@ -288,7 +288,7 @@ extension VLMCameraView {
                 .appType(.secondary)
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
+                .frame(maxWidth: Measure.prose)
 
             HStack(spacing: Space.md) {
                 ForEach(cameraStateActions, id: \.title) { action in
@@ -429,7 +429,7 @@ extension VLMCameraView {
                 HStack(spacing: Space.xs) {
                     Circle()
                         .fill(AppColors.statusGreen)
-                        .frame(width: 8, height: 8)
+                        .frame(width: Control.dot, height: Control.dot)
                     Text("LIVE")
                         .appType(.chip)
                         .foregroundStyle(.white)
@@ -637,10 +637,10 @@ extension VLMCameraView {
                 ZStack {
                     Circle()
                         .fill(isStopping ? AppColors.danger : AppColors.brand)
-                        .frame(width: 60, height: 60)
+                        .frame(width: Control.primaryCircle, height: Control.primaryCircle)
 
                     Image(systemName: isStopping ? "stop.fill" : "sparkles")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: Control.glyphMedium, weight: .semibold))
                         // Ink on orange (6.1:1); white on the red stop reads at
                         // 3.9:1, which large/bold glyph work is allowed.
                         .foregroundStyle(isStopping ? AppColors.onBrandLarge : AppColors.onBrand)
@@ -882,14 +882,16 @@ private struct VLMSecondaryControl: View {
         Button(action: action) {
             VStack(spacing: Space.xs) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: Control.glyphSmall, weight: .medium))
                 Text(title)
                     .appType(.caption)
             }
             .foregroundStyle(tint)
-            // 44pt under a coarse pointer, 28 on the Mac — the shared token, so
+            // 44pt under a coarse pointer, 28 on the Mac — the shared tokens, so
             // one control cannot drift below the floor the rest of the app holds.
-            .frame(minWidth: Measure.hitTarget, minHeight: Measure.hitTarget + 10)
+            // The taller minimum is the glyph-over-caption stack: two lines do
+            // not fit the bare target.
+            .frame(minWidth: Measure.hitTarget, minHeight: Control.labelledHitTarget)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -863,6 +863,23 @@ async function assertBrowserStorageQuota(
   }
 }
 
+/**
+ * Whether a download that had already begun transferring and then stopped is
+ * worth retrying. It is: the causes at that stage are a dropped connection, a
+ * 5xx, or a cancel, and commons keeps the partial bytes, so Retry resumes
+ * instead of replaying an identical refusal.
+ *
+ * The verdict has to be decided here rather than read off the failure, because
+ * commons leaves `SDKError.retryable` at its proto default on every download
+ * error (`populate_sdk_error` never sets it) — `false` there means "nobody
+ * answered", not "permanent". The permanent refusals are the plan-stage ones,
+ * and those carry their own verdict from `describePlanRejection`.
+ *
+ * Shared with `models.download()` so the promise API and the event API cannot
+ * give a caller two different answers about the same failure.
+ */
+export const DOWNLOAD_TRANSFER_FAILURE_RETRYABLE = true;
+
 /** Map a failed download plan/start/terminal state to a storage or download error. */
 function throwDownloadFailure(
   feature: string,
@@ -907,22 +924,22 @@ function describePlanRejection(
     };
   }
 
+  // The structured reason decides the verdict, and only then does the wording
+  // get chosen. Reading `error.message` first — as this did — meant the
+  // partial-download branch below never ran: commons sets BOTH the message
+  // ("existing partial bytes exceed expected byte count") and the reason on
+  // that refusal, so the jargon won and the remedy was never shown.
   const reason = plan.failureReason;
   const detail = plan.error?.message?.trim();
-  if (detail) {
-    // Commons wrote a cause; keep its words and only add the retry verdict.
-    return {
-      message: detail,
-      reason,
-      retryable: reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE,
-    };
-  }
 
   switch (reason) {
     case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
       return {
-        message: `Not enough browser storage to download '${modelId}'. Free some space — `
-          + 'the Storage screen can delete models you no longer need — then try again.',
+        // Commons quotes the real figures ("needs about 2.1 GB but only 900 MB
+        // is free"), which beats any sentence written without them.
+        message: detail
+          ?? `Not enough browser storage to download '${modelId}'. Free some space — `
+            + 'the Storage screen can delete models you no longer need — then try again.',
         reason,
         retryable: true,
       };
@@ -931,6 +948,8 @@ function describePlanRejection(
     case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET:
     case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME:
       return {
+        // Deliberately not the commons text here: it names the mismatch in
+        // byte-counting terms and stops. This names the remedy.
         message: `A partial download of '${modelId}' left behind bytes that no longer match the file `
           + 'on the server, so it cannot be resumed. Delete the partial download from the Storage '
           + 'screen and start it again.',
@@ -939,6 +958,13 @@ function describePlanRejection(
       };
     default:
       break;
+  }
+
+  if (detail) {
+    // A refusal this SDK has no branch for. Commons' words are still the best
+    // available description; the verdict is the conservative one, because a
+    // plan is computed from settled inputs — replaying it reproduces it.
+    return { message: detail, reason, retryable: false };
   }
 
   if (plan.files.length === 0) {
@@ -1745,6 +1771,8 @@ export const SDKCore = {
       throwDownloadFailure(
         'downloadModel',
         lastProgress.error?.message || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
+        undefined,
+        DOWNLOAD_TRANSFER_FAILURE_RETRYABLE,
       );
     }
 

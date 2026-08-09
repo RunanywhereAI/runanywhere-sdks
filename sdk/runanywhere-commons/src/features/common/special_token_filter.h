@@ -24,6 +24,24 @@
  *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`, `<endoftext>`,
  *      `<eos>`. Only the explicit allowlist is stripped so legitimate user
  *      content containing `<` is preserved.
+ *
+ * Two entry points, because a stream and a finished answer are different
+ * problems:
+ *   - `strip_special_tokens(const std::string&)` for the non-streaming verbs,
+ *     which hand back one complete answer.
+ *   - `StreamFilter` for the streaming callbacks. A sentinel is a property of
+ *     the *text*, not of one callback: a backend is free to split `<|im_end|>`
+ *     across two invocations, and neither half is recognisable alone. The
+ *     filter therefore holds an unresolved prefix until the next chunk either
+ *     completes it (strip both halves) or disproves it (emit both halves).
+ *     Filtering each chunk independently could only ever emit the `<` and then
+ *     fail to match the remainder, which is the artifact this file exists to
+ *     remove.
+ *
+ * Neither entry point has a fixed output capacity: a decoded chunk is whatever
+ * the backend hands over — llama.cpp emits a piece at a time, but a batched or
+ * detokenise-on-flush runtime can deliver hundreds of bytes in one call — and
+ * an output buffer that silently drops the suffix would corrupt the answer.
  */
 
 #ifndef RAC_FEATURES_COMMON_SPECIAL_TOKEN_FILTER_H
@@ -35,27 +53,30 @@
 
 namespace rac::tokens {
 
-/**
- * Strip tokenizer-internal special tokens from a generated token or chunk
- * before the value reaches user callbacks or downstream proto subscribers.
- *
- * The cleaned output is written to @p buf and is guaranteed NUL-terminated
- * provided @p buf_size >= 1. Returns @p buf for convenience — if the entire
- * token was a sentinel, @p buf points at the empty string.
- */
-inline const char* strip_special_tokens(const char* token, char* buf, size_t buf_size) {
-    if (!buf || buf_size == 0) {
-        return buf;
-    }
-    if (!token) {
-        buf[0] = '\0';
-        return buf;
-    }
+namespace detail {
 
+// A `<` is only worth holding back while it could still become a sentinel.
+// `<end_of_utterance>` (18 bytes) is the longest form in the wild; past this
+// bound the `<` belongs to ordinary text — a comparison, a code block, an HTML
+// snippet — and holding it would stall the stream on content that will never
+// resolve.
+constexpr size_t kMaxHeldBytes = 64;
+
+/**
+ * Copy @p len bytes of @p text into @p out with sentinels removed; return how
+ * many input bytes were consumed.
+ *
+ * With @p hold_partial the scan stops at a tail that could still grow into a
+ * sentinel (`"<"`, `"<|im_"`, `"<end_of_utter"`) and leaves it unconsumed for
+ * the caller to carry into the next chunk. Without it every such tail is
+ * emitted literally, which is the honest answer for a string with nothing more
+ * coming: an unfinished prefix at that point is just text.
+ */
+inline size_t scan(const char* text, size_t len, std::string& out, bool hold_partial) {
     // Bare-form sentinels matched as exact substrings. Keep the list short:
     // every additional entry costs an O(n*m) scan per token. Patterns must
     // not overlap (`<eos>` is a prefix of `<eos_id>` — not in this list).
-    static const char* kBareSentinels[] = {
+    static const char* const kBareSentinels[] = {
         "<end_of_utterance>",
         "<endoftext>",
         "<eot>",
@@ -63,68 +84,134 @@ inline const char* strip_special_tokens(const char* token, char* buf, size_t buf
     };
     constexpr size_t kBareCount = sizeof(kBareSentinels) / sizeof(kBareSentinels[0]);
 
-    size_t out = 0;
     size_t i = 0;
-    while (token[i] != '\0' && out + 1 < buf_size) {
-        if (token[i] == '<' && token[i + 1] == '|') {
-            // Pipe-wrapped form: skip everything through the next |> .
+    while (i < len) {
+        if (text[i] != '<') {
+            out.push_back(text[i++]);
+            continue;
+        }
+
+        // A trailing `<` could still open either family on the next chunk.
+        if (i + 1 == len) {
+            if (hold_partial) {
+                return i;
+            }
+            out.push_back(text[i++]);
+            continue;
+        }
+
+        if (text[i + 1] == '|') {
+            // Pipe-wrapped form: skip everything through the next `|>`.
             size_t end = i + 2;
-            while (token[end] != '\0') {
-                if (token[end] == '|' && token[end + 1] == '>') {
-                    i = end + 2;
+            bool closed = false;
+            while (end + 1 < len) {
+                if (text[end] == '|' && text[end + 1] == '>') {
+                    closed = true;
                     break;
                 }
                 ++end;
             }
-            if (token[end] == '\0') {
-                // No closing |> in this chunk — copy `<` literally and
-                // continue so a multi-chunk sentinel surfacing across two
-                // callback invocations still appears (downstream gets one
-                // partial chunk; this never produced the angle-bracket
-                // artifact observed in the reports because the runtime
-                // emits the full sentinel as a single token).
-                buf[out++] = token[i++];
+            if (closed) {
+                i = end + 2;
+                continue;
             }
+            if (hold_partial && len - i <= kMaxHeldBytes) {
+                return i;
+            }
+            // Never a sentinel: emit the `<` literally and rescan from the
+            // next byte so anything nested inside is still examined.
+            out.push_back(text[i++]);
             continue;
         }
 
-        if (token[i] == '<') {
-            bool stripped = false;
-            for (size_t k = 0; k < kBareCount; ++k) {
-                const char* needle = kBareSentinels[k];
-                const size_t needle_len = std::strlen(needle);
-                if (std::strncmp(token + i, needle, needle_len) == 0) {
+        bool stripped = false;
+        bool could_complete = false;
+        for (size_t k = 0; k < kBareCount; ++k) {
+            const char* needle = kBareSentinels[k];
+            const size_t needle_len = std::strlen(needle);
+            const size_t avail = len - i;
+            if (avail >= needle_len) {
+                if (std::memcmp(text + i, needle, needle_len) == 0) {
                     i += needle_len;
                     stripped = true;
                     break;
                 }
-            }
-            if (stripped) {
-                continue;
+            } else if (std::memcmp(text + i, needle, avail) == 0) {
+                // The chunk ends mid-needle; the rest may be in the next one.
+                could_complete = true;
             }
         }
-
-        buf[out++] = token[i++];
+        if (stripped) {
+            continue;
+        }
+        if (could_complete && hold_partial) {
+            return i;
+        }
+        out.push_back(text[i++]);
     }
-    buf[out] = '\0';
-    return buf;
+    return len;
+}
+
+}  // namespace detail
+
+/**
+ * Strip tokenizer-internal special tokens from a complete string, for the
+ * non-streaming verbs which hand back one whole answer.
+ */
+inline std::string strip_special_tokens(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    detail::scan(text.data(), text.size(), out, /*hold_partial=*/false);
+    return out;
 }
 
 /**
- * Whole-string overload for the non-streaming verbs, which hand back one
- * complete answer rather than a sequence of short tokens (a fixed stack buffer
- * would truncate a caption). Stripping only ever shortens, so the input length
- * is always a sufficient bound.
+ * Per-stream sentinel filter: one instance per generation, living in the
+ * stream context beside the accumulated text.
+ *
+ * `feed()` returns the text that is safe to deliver *now*; a tail that could
+ * still turn out to be a sentinel is held until the next chunk decides it.
+ * `flush()` releases whatever is still held and must be called once when the
+ * stream ends, or a `<` that happened to arrive as the final byte would be
+ * silently dropped from the answer.
+ *
+ * Both return a reference to a buffer owned by the filter (reused across
+ * chunks so a token stream does not allocate per token); it stays valid until
+ * the next `feed()` / `flush()` on the same instance.
  */
-inline std::string strip_special_tokens(const std::string& text) {
-    if (text.empty()) {
-        return text;
+class StreamFilter {
+   public:
+    const std::string& feed(const char* chunk) {
+        out_.clear();
+        if (chunk == nullptr || chunk[0] == '\0') {
+            return out_;
+        }
+        if (pending_.empty()) {
+            const size_t len = std::strlen(chunk);
+            const size_t consumed = detail::scan(chunk, len, out_, /*hold_partial=*/true);
+            pending_.assign(chunk + consumed, len - consumed);
+        } else {
+            pending_.append(chunk);
+            const size_t consumed =
+                detail::scan(pending_.data(), pending_.size(), out_, /*hold_partial=*/true);
+            pending_.erase(0, consumed);
+        }
+        return out_;
     }
-    std::string buf(text.size() + 1, '\0');
-    strip_special_tokens(text.c_str(), buf.data(), buf.size());
-    buf.resize(std::strlen(buf.c_str()));
-    return buf;
-}
+
+    const std::string& flush() {
+        out_.clear();
+        if (!pending_.empty()) {
+            detail::scan(pending_.data(), pending_.size(), out_, /*hold_partial=*/false);
+            pending_.clear();
+        }
+        return out_;
+    }
+
+   private:
+    std::string pending_;
+    std::string out_;
+};
 
 }  // namespace rac::tokens
 

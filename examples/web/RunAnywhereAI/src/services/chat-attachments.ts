@@ -166,8 +166,13 @@ export async function imageAttachmentThumbnail(file: File): Promise<string | nul
 }
 
 export function cancelActiveImageAttachmentAnswer(): void {
-  if (!activeImageStream) return;
+  // Recorded before the stream check, not after it. Stop is offered from the
+  // moment the turn starts, but the stream only exists once the image has
+  // finished decoding — a press inside that window used to set nothing and
+  // abandon nothing, so the answer ran to completion and was presented as
+  // finished rather than stopped.
   imageAnswerCancelled = true;
+  if (!activeImageStream) return;
   // Abandoning the iterator is the cancellation contract for every v3 stream.
   void activeImageStream.return?.();
   activeImageStream = null;
@@ -190,6 +195,14 @@ export async function answerImageAttachment(
   onProgress({ content: 'Reading the image…' });
 
   const frame = await decodeImageFileToRgbFrame(file, CAPTURE_DIMENSION);
+  // The decode is the only suspension before the stream exists, so honouring the
+  // flag here closes the window in which Stop had nothing to act on. Thrown as
+  // an AbortError because that is what `chat.ts` reads as "Stopped." — mirroring
+  // the document path's `throwIfDocumentCancelled`.
+  if (imageAnswerCancelled) {
+    imageAnswerCancelled = false;
+    throw new DOMException('Image answer cancelled', 'AbortError');
+  }
   const image = RunAnywhere.ImageInput.rawRgb(frame.rgbPixels, frame.width, frame.height);
 
   let content = '';

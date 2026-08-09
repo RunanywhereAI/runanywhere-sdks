@@ -116,12 +116,23 @@ enum Elevation {
 /// Mac window an un-capped composer or paragraph spans the whole display, which
 /// is the single most "this is a phone app" tell in the current Mac build.
 enum Measure {
+    /// Max width for a short centred paragraph: an empty state's explanation, a
+    /// refused permission, a loading note. Narrower than `text` because three
+    /// centred sentences set to a full reading measure read as a banner rather
+    /// than as a paragraph, and centred text needs the shorter line to stay
+    /// scannable at all.
+    static let prose: CGFloat = 380
     /// Max width for running prose and the composer.
     static let text: CGFloat = 720
     /// Max width for a content column that includes cards and controls.
     static let content: CGFloat = 960
     /// Max width for a wide dashboard/grid surface.
     static let wide: CGFloat = 1280
+
+    /// Max height of a live viewfinder well. The pane keeps its aspect ratio, so
+    /// this is what stops a landscape window handing the camera the whole screen
+    /// and pushing the question and the answer off the bottom.
+    static let viewfinder: CGFloat = 440
 
     /// Minimum comfortable hit target. 44pt on iOS (HIG), 28pt on Mac where
     /// the pointer is precise and 44pt rows read as a phone list.
@@ -130,6 +141,32 @@ enum Measure {
     #else
     static let hitTarget: CGFloat = 44
     #endif
+}
+
+/// How big a control is *drawn*, as opposed to `Measure.hitTarget`, which is the
+/// area it has to respond in — a 20pt glyph and a 60pt circle can both sit
+/// inside one target.
+///
+/// Only stand-alone glyphs belong here. A symbol set beside text takes that
+/// text's role (`.appType(.caption)` and the two match by construction); these
+/// are the ones with no neighbour to inherit from, where a raw
+/// `.font(.system(size:))` at the call site is the drift `AppType` exists to
+/// stop.
+enum Control {
+    /// A status dot. Never alone: always beside the word it qualifies, because a
+    /// coloured circle is not a state anyone can read.
+    static let dot: CGFloat = 8
+    /// Glyph inside a small labelled control — an icon over its own caption.
+    static let glyphSmall: CGFloat = 20
+    /// Glyph inside a primary circular action.
+    static let glyphMedium: CGFloat = 22
+    /// A state's headline mark, standing alone above its title.
+    static let glyphLarge: CGFloat = 34
+    /// The circular primary action of a workbench (Ask/Stop, record).
+    static let primaryCircle: CGFloat = 60
+    /// A hit target carrying a caption under its glyph: two stacked lines need
+    /// the height the bare minimum does not budget for.
+    static let labelledHitTarget: CGFloat = Measure.hitTarget + 10
 }
 
 extension View {

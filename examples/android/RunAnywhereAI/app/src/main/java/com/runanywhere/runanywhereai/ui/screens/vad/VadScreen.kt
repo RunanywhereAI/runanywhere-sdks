@@ -241,7 +241,15 @@ private fun SpeechIndicator(isListening: Boolean, isSpeechDetected: Boolean, aud
         }
 
         Text(
-            text = if (isSpeechDetected) "Speech Detected" else "Silence",
+            // "Silence" is a measurement, so it may only be shown while something is measuring.
+            // Before the detector is running there is no signal to call silent — the same mark
+            // over a closed microphone claimed the room was quiet when nothing had listened to
+            // it, which is the one thing this screen exists to report.
+            text = when {
+                isSpeechDetected -> "Speech Detected"
+                isListening -> "Silence"
+                else -> "Not listening"
+            },
             style = MaterialTheme.typography.titleMedium,
             color = if (isSpeechDetected) primaryGreen else MaterialTheme.colorScheme.onSurfaceVariant,
         )

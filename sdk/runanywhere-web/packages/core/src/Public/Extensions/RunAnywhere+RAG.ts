@@ -939,8 +939,10 @@ class CrossWasmRAGProvider implements RAGProvider {
       yield ragStreamCompleted({ ...prepared.result, requestId }, requestId);
       return;
     }
-    // Retrieval-only terminal for a retrieval-only session: without an answer
-    // model there is nothing to stream, and the chunks are the whole result.
+    // Retrieval, announced before a single token exists, so the caller can put
+    // the sources on screen while generation is still running. Carried on a
+    // TOKEN event with an empty token because the stream has no separate
+    // retrieval kind; the answer tokens and the completed event still follow.
     yield {
       timestampUs: nowUs(),
       requestId,
@@ -960,6 +962,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     const generationStarted = nowMs();
     const streaming = await TextGeneration.generateStream(prepared.request);
     let answer = '';
+    let nativeStreamDone = false;
     try {
       for await (const token of streaming.stream) {
         if (!token) continue;
@@ -971,9 +974,22 @@ class CrossWasmRAGProvider implements RAGProvider {
           token,
         };
       }
+      nativeStreamDone = true;
     } catch (error) {
-      streaming.cancel();
+      // Producer self-terminated — the native stream is already over, so
+      // cancelling it would be a lie. Swallow the duplicate rejection the
+      // result promise carries before rethrowing the original error.
+      nativeStreamDone = true;
+      void streaming.result.catch(() => undefined);
       throw error;
+    } finally {
+      // Only reachable with the stream still live when the consumer abandoned
+      // the generator — a `break`, an early `return`, a view that unmounted.
+      // JavaScript resumes the suspended `yield` with a return completion,
+      // which runs no `catch`, so without this the backend would keep
+      // generating tokens into a stream nobody is reading. Mirrors
+      // `generateStructuredStream`'s cancellation contract.
+      if (!nativeStreamDone) streaming.cancel();
     }
     const generated = await streaming.result;
     this.assertCurrent(prepared.version, 'RAG.queryStream');
@@ -1722,17 +1738,40 @@ export function ragQueryStream(
   options?: RAGQueryOverrides,
 ): AsyncIterable<RAGStreamEvent> {
   const provider = requireProvider('RAG.queryStream');
-  if (!provider.ragQueryStream) {
-    throw SDKException.backendNotAvailable(
-      'RAG.queryStream',
-      'Streaming RAG is not available on this provider.',
-    );
-  }
+  let question: string;
+  let overrides: RAGQueryOverrides | undefined;
   if (typeof questionOrOptions === 'string') {
-    return provider.ragQueryStream(questionOrOptions, options);
+    question = questionOrOptions;
+    overrides = options;
+  } else {
+    // RAGQueryOptions.question was renamed `query` (idl/rag.proto).
+    const { query, ...rest } = questionOrOptions;
+    question = query;
+    overrides = rest;
   }
-  const { query, ...overrides } = questionOrOptions;
-  return provider.ragQueryStream(query, overrides);
+  if (provider.ragQueryStream) {
+    return provider.ragQueryStream(question, overrides);
+  }
+  // A provider without a token stream still has a grounded answer to give.
+  // Refusing outright dead-ended chat-with-document on "Streaming RAG is not
+  // available on this provider" — a sentence about our own plumbing, offered
+  // to a reader with no way forward. `ragQuery` is the same retrieval and the
+  // same model; only the delivery differs, so replay it as the one COMPLETED
+  // event the stream contract already defines.
+  return nonStreamingRAGFallback(provider, question, overrides);
+}
+
+async function* nonStreamingRAGFallback(
+  provider: RAGProvider,
+  question: string,
+  overrides?: RAGQueryOverrides,
+): AsyncIterable<RAGStreamEvent> {
+  const requestId = createId('rag-query');
+  const result = await provider.ragQuery(question, overrides);
+  // A failed grounded answer must reach the caller as a failure, not as a
+  // COMPLETED event carrying an empty answer and an error nobody reads.
+  if (result.error) throw new SDKException(result.error);
+  yield ragStreamCompleted({ ...result, requestId }, requestId);
 }
 
 // ---------------------------------------------------------------------------

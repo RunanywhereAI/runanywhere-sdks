@@ -21,7 +21,7 @@ import {
   registerModelMultiFile,
   type RegisterModelFile,
 } from '../../Extensions/RunAnywhere+Storage.js';
-import { SDKCore } from '../../SDKCore.js';
+import { DOWNLOAD_TRANSFER_FAILURE_RETRYABLE, SDKCore } from '../../SDKCore.js';
 import type { AcceleratorPolicy, BackendPreference, LoadOptions, ModelFilter, ModelRegistration } from '../Options.js';
 import { backendToFramework, frameworkToBackend } from '../Mapping.js';
 import type { DownloadEvent } from '../Events.js';
@@ -251,15 +251,21 @@ export const models = {
             type: 'failed',
             operationId,
             sequence: sequence++,
-            error: progress.error ?? {
-              category: 0,
-              code: 0,
-              message: `Download of '${id}' failed.`,
-              timestampMs: Date.now(),
-              severity: 0,
-              component: 'storage',
-              retryable: false,
-              requestId: '',
+            error: {
+              ...(progress.error ?? {
+                category: 0,
+                code: 0,
+                message: `Download of '${id}' failed.`,
+                timestampMs: Date.now(),
+                severity: 0,
+                component: 'storage',
+                requestId: '',
+              }),
+              // The transfer had already started, so this is the resumable kind
+              // of failure. Overrides whatever the commons error carries because
+              // commons never fills that field in — see
+              // DOWNLOAD_TRANSFER_FAILURE_RETRYABLE.
+              retryable: DOWNLOAD_TRANSFER_FAILURE_RETRYABLE,
             },
           };
           return;
