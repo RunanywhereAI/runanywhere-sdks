@@ -887,8 +887,17 @@ export const ToolCalling = {
         typeof module._rac_tool_calling_session_cancel_proto === 'function'
       ) {
         try {
-          module._rac_tool_calling_session_cancel_proto(sessionHandle);
-          cancelDispatched = true;
+          // The export returns rac_result_t (0 = success). Latching
+          // `cancelDispatched` on a non-zero code would record a cancel that
+          // never happened and stop every later abort from retrying it.
+          const rc = module._rac_tool_calling_session_cancel_proto(sessionHandle);
+          if (rc === 0) {
+            cancelDispatched = true;
+          } else {
+            logger.warning(
+              `session_cancel_proto returned ${rc}; leaving the cancel undispatched so a later abort can retry`,
+            );
+          }
         } catch (err) {
           logger.warning(
             `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
