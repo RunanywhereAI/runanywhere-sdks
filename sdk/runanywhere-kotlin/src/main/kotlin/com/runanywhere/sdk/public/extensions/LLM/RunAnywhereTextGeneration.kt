@@ -306,6 +306,13 @@ internal suspend fun aggregateLLMStream(
 
     val totalLatencyMs = (nowMillis() - startTimeMs).toDouble()
     val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs) }
+    // Decode-only denominator, matching commons' llm_module.cpp: prefill (TTFT) in
+    // the denominator systematically understates the rate, and the field this feeds
+    // is decode_tokens_per_second. Falls back to the full span when TTFT is unknown
+    // or not strictly inside it.
+    val decodeMs =
+        ttftMs?.toDouble()?.takeIf { it > 0 && it < totalLatencyMs }?.let { totalLatencyMs - it }
+            ?: totalLatencyMs
     val modelIdentity = resolveModelIdentity()
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
@@ -316,7 +323,7 @@ internal suspend fun aggregateLLMStream(
     val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
     val decodeTokensPerSecond =
         final?.usage?.decode_tokens_per_second
-            ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0
+            ?: if (decodeMs > 0) tokenCount / (decodeMs / 1000.0) else 0.0
     val ttftFromFinal = final?.usage?.ttft_ms?.takeIf { it > 0L }
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
