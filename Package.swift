@@ -683,7 +683,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "4e3f1af792a78120afae1685a7295db5caa4c62a00071955bdb01ec79ab02f9a"
+                checksum: "f0c591e153606b8ad44c74e5053a1e83bbe581f7e54639f6364e776be17b6c80"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
@@ -708,7 +708,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "fd2c207a6edf5b5a0948e54f340bd8f449217107c85918fc8f69c522acd4e67d"
+                checksum: "b3f3a1bd166d39e0b74e9e9d495f502e6c96b2dce4eca920c527a715c382181e"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
