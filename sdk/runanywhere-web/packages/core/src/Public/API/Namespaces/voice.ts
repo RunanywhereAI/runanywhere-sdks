@@ -55,6 +55,11 @@ export interface VoiceSession {
   /**
    * Stop the agent mid-utterance. Awaitable: resolves once the interrupted
    * `say()`/turn-loop response, its tools, and its playout have all settled.
+   *
+   * This is the deterministic path, not the only one: the session also cuts an
+   * audible reply on its own when the user speaks over it, publishing
+   * `speechStarted` as it does. Call this when the interrupt must not depend on
+   * clearing an acoustic threshold — a UI button, a hotword, a timeout.
    */
   interrupt(): Promise<void>;
   /** Close the session and release the microphone. */

@@ -134,12 +134,22 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                     // What pays for that choice is the core's echo estimate
                     // (voice_agent_feed_abi.cpp): with no canceller, a voice over
                     // the reply has to arrive ~8 dB above what the loudspeaker puts
-                    // into this same microphone. Measured on the simulator against a
-                    // 0 dB-coupled loopback — the pathological case, where the
-                    // agent's own voice reaches the mic at full level — playout
-                    // truncated on every interruption that cleared that margin and
-                    // on none that did not. Real speaker-to-mic coupling loses far
-                    // more than 0 dB, which is what makes the margin reachable.
+                    // into this same microphone.
+                    //
+                    // An earlier version of this comment cited a simulator run over
+                    // a 0 dB-coupled loopback as evidence that this worked. It is
+                    // not evidence of anything: a loopback returns the agent's own
+                    // voice to the microphone at full level and returns nothing
+                    // else, so it exercises neither the coupling a room has nor the
+                    // advantage a nearby talker has. Replaying real recordings made
+                    // over an actual speaker -> room -> microphone path through the
+                    // same decision showed it firing on NONE of six interruptions,
+                    // including ones 24 dB louder than the agent, because the echo
+                    // estimate was a running maximum that absorbed the interrupting
+                    // voice itself. That is fixed in the core, where the estimate is
+                    // now predicted from the reply's own waveform; on the same
+                    // recordings it fires from about 6 dB of advantage upwards and
+                    // still never on the agent alone.
                     try session.setCategory(
                         .playAndRecord,
                         mode: .default,

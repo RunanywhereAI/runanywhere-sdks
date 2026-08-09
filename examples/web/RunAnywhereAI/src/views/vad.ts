@@ -337,7 +337,11 @@ function formatPosition(timestampMs: number | undefined): string {
   if (!timestampMs) return '—';
   sessionOriginMs ??= timestampMs;
   const elapsedMs = Math.max(0, timestampMs - sessionOriginMs);
-  const minutes = Math.floor(elapsedMs / 60_000);
-  const seconds = (elapsedMs % 60_000) / 1000;
+  // Round to the tenth that is actually displayed *before* splitting the minute off,
+  // or 59.95–59.999 s renders as `0:60.0` — `toFixed(1)` rounds up to 60.0 while the
+  // minute count still reads the unrounded value. Same defect at every minute boundary.
+  const elapsedDeciseconds = Math.round(elapsedMs / 100);
+  const minutes = Math.floor(elapsedDeciseconds / 600);
+  const seconds = (elapsedDeciseconds % 600) / 10;
   return `${minutes}:${seconds.toFixed(1).padStart(4, '0')}`;
 }

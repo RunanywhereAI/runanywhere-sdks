@@ -18,9 +18,9 @@
  *
  * Two pattern families are recognised:
  *   1. `<|TOKEN|>` — Qwen / Llama-3 / GPT-style pipe-wrapped sentinels. The
- *      scanner consumes everything between `<|` and the next `|>`, which
- *      naturally covers `im_end`, `eot_id`, `endoftext`, `im_start`,
- *      `vision_start`, `vision_end`, etc.
+ *      scanner consumes everything between `<|` and the next `|>` *within one
+ *      sentinel's worth of bytes*, which naturally covers `im_end`, `eot_id`,
+ *      `endoftext`, `im_start`, `vision_start`, `vision_end`, etc.
  *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`, `<endoftext>`,
  *      `<eos>`. Only the explicit allowlist is stripped so legitimate user
  *      content containing `<` is preserved.
@@ -47,6 +47,7 @@
 #ifndef RAC_FEATURES_COMMON_SPECIAL_TOKEN_FILTER_H
 #define RAC_FEATURES_COMMON_SPECIAL_TOKEN_FILTER_H
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -101,10 +102,18 @@ inline size_t scan(const char* text, size_t len, std::string& out, bool hold_par
         }
 
         if (text[i + 1] == '|') {
-            // Pipe-wrapped form: skip everything through the next `|>`.
+            // Pipe-wrapped form: skip everything through the next `|>`, searched
+            // only as far as a sentinel could plausibly reach. An unbounded search
+            // makes a stray `<|` in ordinary output — a markdown table, a shell
+            // pipe, a code fragment, all of which produce both markers — delete
+            // every byte up to the next `|>` however far away it is, which can be
+            // most of the answer. Past `kMaxHeldBytes` a `|>` is a coincidence,
+            // not the close of a token, and the same bound already decides how
+            // long an unresolved `<` may be held.
             size_t end = i + 2;
             bool closed = false;
-            while (end + 1 < len) {
+            const size_t limit = std::min(len, i + kMaxHeldBytes);
+            while (end + 1 < limit) {
                 if (text[end] == '|' && text[end + 1] == '>') {
                     closed = true;
                     break;

@@ -115,10 +115,16 @@ public extension RunAnywhere {
                     } else if sawTerminal {
                         continuation.yield(.completed(requestId: requestId))
                     } else {
+                        // `.processingFailed`, not `.streamCancelled`: this branch is
+                        // reached precisely when the task was *not* cancelled, so a
+                        // cancellation code would tell a consumer that branches on the
+                        // code the opposite of what happened — and `.streamCancelled` is
+                        // classified as expected, which would also suppress the log for a
+                        // producer that died without ever reporting a transcript.
                         continuation.yield(.failed(
                             requestId: requestId,
                             error: SDKException(
-                                code: .streamCancelled,
+                                code: .processingFailed,
                                 message: "Transcription stream ended before a final result",
                                 category: .component
                             )

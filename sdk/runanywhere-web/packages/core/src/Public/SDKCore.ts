@@ -936,9 +936,12 @@ function describePlanRejection(
     case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
       return {
         // Commons quotes the real figures ("needs about 2.1 GB but only 900 MB
-        // is free"), which beats any sentence written without them.
+        // is free"), which beats any sentence written without them. Truthiness,
+        // not `??`: the `trim()` above turns a whitespace-only commons message
+        // into `''`, which `??` would happily pass through as the user-facing
+        // text — an insufficient-storage error with nothing written on it.
         message: detail
-          ?? `Not enough browser storage to download '${modelId}'. Free some space — `
+          || `Not enough browser storage to download '${modelId}'. Free some space — `
             + 'the Storage screen can delete models you no longer need — then try again.',
         reason,
         retryable: true,

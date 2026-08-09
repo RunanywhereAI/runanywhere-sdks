@@ -121,15 +121,24 @@ void emit_generated_voice_event(
 // Build + emit a component-state-changed VoiceEvent for `handle`.
 void emit_component_states(rac_voice_agent_handle_t handle);
 
-// Build + emit a turn lifecycle VoiceEvent.
+// Build + emit a turn lifecycle VoiceEvent. `error_recoverable` is only read
+// when `error` is set; it is the same claim `emit_component_failure` makes and
+// has to agree with it, because a frontend sees both events for one failure.
 void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind,
                          const char* transcript = nullptr, const char* response = nullptr,
-                         const char* error = nullptr);
+                         const char* error = nullptr, bool error_recoverable = false);
 
 // Build + emit a session-error VoiceEvent + publish an SDKEvent failure.
+//
+// `recoverable` is a claim about the SESSION, not the turn: true means the
+// pipeline is still running and the next utterance will be tried, so a frontend
+// should show the message and keep listening. Every SDK folds a non-recoverable
+// session error onto its terminal path — the iOS panel, for one, latches a red
+// "Error" pill AND releases the microphone — so a per-turn stage failure that
+// leaves the session perfectly healthy must not be reported with the default.
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
-                            rac_result_t code, const char* message);
+                            rac_result_t code, const char* message, bool recoverable = false);
 
 // Publish a per-turn MetricsEvent (kMetrics) so the turn is recorded to
 // telemetry under the "voice" modality. telemetry_records() only records

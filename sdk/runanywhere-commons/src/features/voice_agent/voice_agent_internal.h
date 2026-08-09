@@ -73,28 +73,49 @@ struct rac_voice_agent_feed_state {
     bool in_speech{false};
     int speech_ms{0};
     int silence_ms{0};
-    /// Adaptive ambient floor. Seeded to zero — "nothing observed yet" — so the
-    /// first frames are judged against the absolute floor-of-the-floor and the
-    /// floor then rises to whatever this room/mic actually delivers. It used to
-    /// be seeded to the old absolute 0.015 gate, which made the effective
-    /// threshold 0.033 (-29.6 dBFS) until a quieter frame arrived. Never reset
-    /// across turns; only adapted while idle.
+    /// Adaptive ambient floor, learned from this room and this microphone.
+    /// Seeded from the first warm-up frames rather than from a constant: a
+    /// constant is either above a quiet mic (deaf) or below a normal room
+    /// (opens on ambience), and both were shipped at different times. Never
+    /// reset across turns; only adapted while idle.
     float noise_floor{0.0f};
+    /// Analysis frames observed since capture started, capped at the warm-up
+    /// length. While below it the gate stays shut and `noise_floor` is being
+    /// established — judging a room against an estimate of zero is what made
+    /// the first utterance of every session open on ambience.
+    int warmup_frames{0};
     /// Consecutive analysis frames whose level cleared the (boosted) gate while
     /// the agent's own reply was still audible. A barge-in has to survive a few
     /// frames because the mic is hearing the loudspeaker at the same time.
     int barge_in_frames{0};
-    /// Frames observed since the current reply became audible. The barge-in
-    /// detector stays disarmed for the first few of them while `echo_floor`
-    /// learns how loud the agent is to its own microphone — arming immediately
-    /// would let the reply's own onset, which arrives after a device-dependent
-    /// output latency, read as an interruption.
+    /// Analysis frames elapsed since the current reply became audible. Doubles
+    /// as the index into `reply_envelope`, so it says both "how long has the
+    /// agent been talking" and "which part of the reply is being heard now".
     int echo_frames{0};
-    /// Echo level observed while the agent's reply is audible. During that
-    /// window the mic signal is dominated by the device's own loudspeaker, so
-    /// this is a running estimate of "the agent hearing itself" — the thing a
-    /// user's voice has to rise above for a barge-in to be real rather than
-    /// feedback. Reset when the audible window closes.
+    /// Frames of the reply that have actually been heard and used to measure
+    /// `echo_gain`. The barge-in detector stays disarmed until this reaches its
+    /// settling count. Counted in frames carrying signal rather than in elapsed
+    /// frames because the platform player starts a device-dependent beat after
+    /// the core hands the bytes over; arming on elapsed time would meet the
+    /// reply's own onset already armed.
+    int echo_learn_frames{0};
+    /// Per-analysis-frame RMS of the reply currently coming out of the
+    /// loudspeaker, in the same normalized units as the microphone frames.
+    ///
+    /// The core synthesized this audio, so it knows exactly what its own echo
+    /// should look like over time. That prediction is what lets the barge-in
+    /// threshold rise with the agent's loud syllables and fall again in the
+    /// pauses between its sentences — which is where people actually interrupt.
+    /// Empty means "no prediction available" and leaves the detector unarmed.
+    std::vector<float> reply_envelope;
+    /// How much of the loudspeaker this room returns to this microphone:
+    /// measured microphone level divided by the reply's own level at the same
+    /// instant. The one quantity that genuinely has to be learned per device and
+    /// per room; everything else about the echo is already known.
+    float echo_gain{0.0f};
+    /// The predicted echo level for the frame just judged (`echo_gain` times the
+    /// reply's own level there). Kept as state only so the barge-in threshold and
+    /// any diagnostics read the same number.
     float echo_floor{0.0f};
     /// Consecutive milliseconds of frames whose level did not even reach the
     /// absolute floor-of-the-floor, i.e. the input is delivering essentially no

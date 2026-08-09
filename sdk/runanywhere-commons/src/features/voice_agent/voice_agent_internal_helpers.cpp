@@ -357,7 +357,7 @@ void emit_component_states(rac_voice_agent_handle_t handle) {
 
 void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind, const char* transcript,
-                         const char* response, const char* error) {
+                         const char* response, const char* error, bool error_recoverable) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(error ? runanywhere::v1::EVENT_CATEGORY_ERROR
@@ -378,6 +378,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
         auto* turn_error = turn->mutable_error();
         turn_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
         turn_error->set_message(error);
+        turn_error->set_recoverable(error_recoverable);
     }
     emit_generated_voice_event(handle, event,
                                error ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -385,7 +386,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
 }
 
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
-                            rac_result_t code, const char* message) {
+                            rac_result_t code, const char* message, bool recoverable) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
@@ -395,12 +396,13 @@ void emit_component_failure(rac_voice_agent_handle_t handle, const char* compone
     // VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
     session_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
     session_error->set_message(message ? message : rac_error_message(code));
+    session_error->set_recoverable(recoverable);
     if (component) {
         session_error->set_failed_component(component);
     }
     emit_generated_voice_event(handle, event, runanywhere::v1::ERROR_SEVERITY_ERROR);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_FAILED, nullptr, nullptr,
-                        message ? message : rac_error_message(code));
+                        message ? message : rac_error_message(code), recoverable);
     (void)rac_sdk_event_publish_failure(code, message, component ? component : "voice_agent",
                                         "processVoiceTurn", RAC_TRUE);
 }

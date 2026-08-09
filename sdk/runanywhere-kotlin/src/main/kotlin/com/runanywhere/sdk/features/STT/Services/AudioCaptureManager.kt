@@ -312,8 +312,8 @@ class AudioCaptureManager {
         // what leaks the underlying native effect slot on some devices.
         try {
             canceler?.release()
-        } catch (t: Throwable) {
-            logger.warning("AcousticEchoCanceler.release threw: ${t.message}")
+        } catch (e: Exception) {
+            logger.warning("AcousticEchoCanceler.release threw: ${e.message}")
         }
 
         try {
@@ -368,8 +368,12 @@ class AudioCaptureManager {
     ): AudioRecord? =
         try {
             AudioRecord(source, sampleRate, channelConfig, audioEncoding, bufferBytes)
-        } catch (t: Throwable) {
-            logger.warning("AudioRecord(source=$source) failed: ${t.message}")
+        } catch (e: Exception) {
+            // `Exception`, not `Throwable`: an unsupported source throws
+            // IllegalArgumentException/UnsupportedOperationException, while a JVM `Error`
+            // (OutOfMemoryError and friends) says nothing about this source and must not be
+            // turned into a silent fallback.
+            logger.warning("AudioRecord(source=$source) failed: ${e.message}")
             null
         }
 
@@ -377,7 +381,7 @@ class AudioCaptureManager {
     private fun AudioRecord?.releaseQuietly() {
         try {
             this?.release()
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             // ignored
         }
     }
@@ -397,15 +401,32 @@ class AudioCaptureManager {
         val canceler =
             try {
                 AcousticEchoCanceler.create(record.audioSessionId)
-            } catch (t: Throwable) {
-                logger.warning("AcousticEchoCanceler.create failed: ${t.message}")
+            } catch (e: Exception) {
+                logger.warning("AcousticEchoCanceler.create failed: ${e.message}")
                 null
             }
         if (canceler == null) {
             logger.info("AcousticEchoCanceler unavailable for this session — capture keeps the speaker's echo")
             return
         }
-        canceler.enabled = true
+        // Best effort by contract, so the enable is guarded: `setEnabled` throws
+        // IllegalStateException when the effect is not in a controllable state, and this runs
+        // after `audioRecord = record` but before `recordingFlag.set(true)` — a throw escaping
+        // here would leave startRecording failed with the microphone open and stopRecording
+        // returning early on the flag, i.e. a leaked AudioRecord. An effect that cannot be
+        // enabled is also released rather than stored, so nothing holds a native effect slot
+        // that stopRecording would otherwise be responsible for.
+        try {
+            canceler.enabled = true
+        } catch (e: Exception) {
+            logger.warning("AcousticEchoCanceler.setEnabled failed: ${e.message} — capture keeps the speaker's echo")
+            try {
+                canceler.release()
+            } catch (_: Exception) {
+                // ignored
+            }
+            return
+        }
         echoCanceler = canceler
         logger.info("AcousticEchoCanceler enabled (enabled=${canceler.enabled})")
     }

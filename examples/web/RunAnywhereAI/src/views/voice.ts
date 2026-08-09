@@ -292,15 +292,20 @@ function renderView(): void {
           >${isActive ? 'Conversation active' : 'Start conversation'}</button>
           ${
             /*
-             * Barge-in. `session.interrupt()` cuts the agent off mid-utterance
-             * and hands the turn back, which is the single most-used control in
-             * a real voice conversation — a person who has heard enough talks
-             * over the assistant rather than ending the call. The SDK has always
-             * exposed it and this view never called it, so the only way to stop
-             * a long-winded reply was Stop, which closes the session and
-             * releases the microphone. It replaces Stop while the agent is
-             * speaking because those are the same intent at that moment, and two
-             * adjacent stop-shaped buttons would be a coin toss.
+             * The deterministic half of taking the turn back. `session.interrupt()`
+             * cuts the agent off mid-utterance and keeps the session open, which
+             * is what a person who has heard enough actually wants — not ending
+             * the call. The SDK has always exposed it and this view never called
+             * it, so the only way to stop a long-winded reply was Stop, which
+             * closes the session and releases the microphone. It replaces Stop
+             * while the agent is speaking because those are the same intent at
+             * that moment, and two adjacent stop-shaped buttons would be a coin
+             * toss.
+             *
+             * The other half is acoustic: the mic driver's barge-in gate cuts the
+             * same reply when the user simply speaks over it. The button is not a
+             * substitute for a missing capability — it is the version that works
+             * without having to out-shout the speaker, so it stays.
              */
             sessionState === 'speaking'
               ? `<button class="btn btn-secondary" id="voice-interrupt-btn" ${interrupting ? 'disabled' : ''}>
@@ -619,14 +624,19 @@ function transcriptPlaceholder(): string {
     case 'connecting': return 'Getting ready…';
     case 'listening': return isSpeechDetected ? 'Listening…' : 'Go ahead — say something.';
     case 'processing': return 'Working out a reply…';
-    // Not "talk over it to interrupt": the agent is half-duplex by design — the
-    // mic driver drops every captured chunk while a reply is playing out
-    // (VoiceAgentMicDriver gates on `processing`, which spans playback), so
-    // speaking over the agent is neither heard nor acted on. The only affordance
-    // that actually cuts a reply short is the Stop-talking button beside it.
-    // "Take the turn back" is the phrase all four apps use for this moment; only
-    // the control differs, and each app names its own real one.
-    case 'speaking': return 'Speaking. Use “Stop talking” to take the turn back.';
+    // Both affordances are real, so both are named. `VoiceAgentMicDriver.onChunk`
+    // tests `replyAudible` *before* the segmenter's `processing` gate and hands
+    // the frame to `evaluateBargeIn`, which stops playout and publishes
+    // `speechStarted` — talking over the reply genuinely takes the turn back.
+    // This line used to deny that, because the Stop-talking button landed one
+    // commit before the barge-in gate existed and the copy was never revisited;
+    // a placeholder that hides a working affordance is as untrue as one that
+    // promises a missing one. The button is still worth naming because the gate
+    // is deliberately hard to trip — it wants 3x ordinary speech level and 2.5x
+    // the reply's own measured echo, precisely so the agent can never interrupt
+    // itself — whereas a press is unconditional. "Take the turn back" is the
+    // phrase all four apps use for this moment.
+    case 'speaking': return 'Speaking. Talk over it to take the turn back, or use “Stop talking”.';
     default: return 'Nothing heard yet.';
   }
 }

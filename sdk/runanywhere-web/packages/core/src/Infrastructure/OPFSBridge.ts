@@ -821,7 +821,17 @@ export class OPFSBridge {
         } catch {
           // Missing from this module's MEMFS — restore below.
         }
-        if (currentSize !== file.size) {
+        // The same trap the single-file restores guard against, one level down:
+        // a child left behind by an OPFS-direct download stats at the artifact's
+        // full length while holding no bytes, so `currentSize === file.size` is
+        // true for a file that reads back as a run of zeros. Treat a stub as
+        // missing, and unlink it first so the write rebuilds the backing store
+        // rather than filling the empty placeholder in place.
+        const emptyStub = isEmptyMemfsSizeStub(fs, childPath);
+        if (emptyStub || currentSize !== file.size) {
+          if (emptyStub) {
+            try { fs.unlink?.(childPath); } catch { /* the write below rebuilds it */ }
+          }
           const bytes = new Uint8Array(await file.arrayBuffer());
           const parent = childPath.slice(0, childPath.lastIndexOf('/')) || '/';
           ensureMemfsDirectory(fs, parent);

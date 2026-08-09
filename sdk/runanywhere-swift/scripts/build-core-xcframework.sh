@@ -430,12 +430,31 @@ collect_protobuf_static_deps() {
                 protobuf_archives+=("${dep}")
                 ;;
         esac
+    # Skip stale Debug output. Everything above builds `--config Release`, but the
+    # iOS build roots use the multi-config Xcode generator, which keeps
+    # `Debug-iphoneos*` directories from any earlier Debug build alongside the
+    # Release ones — and nothing ever cleans them.
+    #
+    # protobuf survives that by accident: its debug archive is `libprotobufd.a`,
+    # so the exact names above already exclude it. abseil has no such suffix, so
+    # `libabsl*.a` matched BOTH configurations and every absl object was merged
+    # into the slice twice. The archive links fine on its own and then fails the
+    # consuming app with ~1200 "duplicate symbol" errors naming two members of the
+    # same archive — a symptom that reads like a corrupted build rather than a
+    # glob one predicate short.
+    #
+    # This EXCLUDES Debug rather than allow-listing Release, because the two build
+    # roots are laid out differently and an allow-list silently drops one of them:
+    #   iOS   (multi-config): _deps/absl-build/absl/base/Release-iphoneos/libabsl_base.a
+    #   macOS (single-config): _deps/absl-build/absl/base/libabsl_base.a
+    # A `-path "*/Release-*/*"` filter matches the first and misses the second
+    # entirely, which trips the "no vendored protobuf/abseil archives" guard below.
     done < <(find "${build_root}/_deps" -type f \( \
         -name "libprotobuf.a" -o \
         -name "libprotobuf-lite.a" -o \
         -name "libabsl*.a" -o \
         -name "libutf8*.a" \
-    \) | sort)
+    \) ! -path "*/Debug/*" ! -path "*/Debug-*/*" | sort)
 
     if [ "${DRY_RUN}" != "1" ] && [ "${#RAC_PROTO_STATIC_DEPS[@]}" -eq 0 ]; then
         echo "error: no vendored protobuf/abseil static archives found under ${build_root}/_deps" >&2
