@@ -15,6 +15,63 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB');
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
+// Arithmetic for the `calculate` tool — a hand-written recursive descent over
+// `+ - * / % ( )`, precedence and all.
+//
+// The obvious one-liner is `Function("return (" + src + ")")`, and that is what
+// this used to be. It cannot work HERE: index.html sets `script-src 'self'`, so
+// the Function constructor is refused by the page's own CSP and every call threw
+// EvalError — the tool reported "could not evaluate" for input as ordinary as
+// `(37 + 5) * 3`, and the model then apologised for a failure that was the app's.
+// Nothing was caught earlier because the failure needs a model that actually
+// emits a tool call to appear at all.
+function evalArithmetic(src) {
+  let i = 0;
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  const eat = (ch) => { ws(); if (src[i] === ch) { i++; return true; } return false; };
+  const expr = () => {
+    let value = term();
+    for (;;) {
+      if (eat('+')) value += term();
+      else if (eat('-')) value -= term();
+      else return value;
+    }
+  };
+  const term = () => {
+    let value = unary();
+    for (;;) {
+      if (eat('*')) value *= unary();
+      else if (eat('/')) value /= unary();
+      else if (eat('%')) value %= unary();
+      else return value;
+    }
+  };
+  const unary = () => {
+    if (eat('-')) return -unary();
+    if (eat('+')) return unary();
+    return atom();
+  };
+  const atom = () => {
+    ws();
+    if (eat('(')) {
+      const value = expr();
+      if (!eat(')')) throw new Error('missing )');
+      return value;
+    }
+    const start = i;
+    while (i < src.length && /[\d.]/.test(src[i])) i++;
+    if (i === start) throw new Error('expected a number at ' + start);
+    const value = Number(src.slice(start, i));
+    if (!Number.isFinite(value)) throw new Error('not a number: ' + src.slice(start, i));
+    return value;
+  };
+  const result = expr();
+  ws();
+  if (i !== src.length) throw new Error('unexpected input at ' + i);
+  if (!Number.isFinite(result)) throw new Error('result is not finite');
+  return result;
+}
+
 // Built-in tools the model can call. Every one answers from something this
 // machine actually knows — the clock, the runtime, the battery, arithmetic — so
 // a tool call that succeeds is never a fabricated answer dressed as a lookup.
@@ -69,8 +126,8 @@ const TOOLS = [
       const src = String(expression || '');
       // Arithmetic only — never eval() model output.
       if (!/^[\d\s+\-*/().%]+$/.test(src)) return { error: 'unsupported expression (digits and + - * / ( ) only)' };
-      try { return { result: String(Function(`"use strict";return (${src})`)()) }; }
-      catch { return { error: `could not evaluate '${src}'` }; }
+      try { return { result: String(evalArithmetic(src)) }; }
+      catch (e) { return { error: `could not evaluate '${src}': ${e.message}` }; }
     },
   },
 ];
@@ -150,8 +207,14 @@ async function selectModel(modality, id) {
 // not there yet, so this is also the download path for those three.
 async function loadSelected(modality, options) {
   const id = selectedModel(modality);
+  // A custom entry that named its engine names it again on the load, so the
+  // router pins that engine instead of inferring one from the artifact.
+  const custom = customModels.find((m) => m.id === id);
+  const opts = custom && custom.engine ? { framework: custom.engine, ...options } : options;
   setStatus(`loading ${id}…`);
-  try { await ra.models.load(id, options); } finally { setStatus('ready'); }
+  let loaded;
+  try { loaded = await ra.models.load(id, opts); } finally { setStatus('ready'); }
+  applyEngineUi(loaded && loaded.actualBackend);
   return id;
 }
 
@@ -492,12 +555,18 @@ async function renderModels() {
     for (const m of customModels) {
       // Downloaded state comes off the registry row, which commons reconciles
       // against the store — not from a flag the app persisted and could not
-      // notice going stale when the files were deleted underneath it.
+      // notice going stale when the files were deleted underneath it. A model
+      // added by LOCAL PATH is the exception: its bytes were never downloaded
+      // into the store, so the row says `downloaded: false` forever, and the
+      // card would offer a Download that commons then refuses to plan ("failed
+      // to compute model storage path") — with no way to reach Load at all.
       const st = byId.get(m.id) || { downloaded: false, sizeBytes: 0 };
+      const present = st.downloaded || !looksRemote(m.source);
       const bits = [TYPE_LABEL[m.type] || m.type];
+      if (m.engine === 'QHEXRT') bits.push('Hexagon NPU');
       if (st.downloaded && st.sizeBytes) bits.push(fmtSize(st.sizeBytes));
       const sub = `${bits.join(' · ')} · <span class="muted">${escapeHtml(m.source)}</span>`;
-      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, downloaded: st.downloaded, loaded: loaded.has(m.id), custom: true }));
+      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, downloaded: present, loaded: loaded.has(m.id), custom: true }));
     }
   }
 }
@@ -513,6 +582,7 @@ async function registerCustomModels() {
         id: m.id,
         name: m.label || m.id,
         category: MODALITY_CATEGORY[m.type],
+        ...(m.engine ? { framework: m.engine } : {}),
         ...(remote ? { url: m.source } : { path: m.source }),
       });
     } catch (e) { console.error('could not register', m.id, e); }
@@ -546,6 +616,20 @@ function applyDeviceUi() {
   const note = $('devicenote');
   if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.';
 }
+// The header pill above is a BUILD-time claim — which prebuild main.js resolved.
+// Which engine actually ran a model is a LOAD-time fact and can differ: on a
+// Snapdragon, a Hexagon bundle routes to the NPU while the very same build still
+// serves GGUF on the CPU. Correct the pill from what commons reports it routed
+// to, so the header can never say CPU while decode is happening on the NPU.
+function applyEngineUi(engine) {
+  if (engine !== 'QHEXRT') return;
+  const label = $('devicelabel');
+  if (label) label.textContent = 'NPU · Hexagon';
+  const pill = $('devicepill');
+  if (pill) pill.title = 'Inference runs on the Qualcomm Hexagon NPU (QHexRT).';
+  const note = $('devicenote');
+  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">Qualcomm Hexagon NPU</b> — QHexRT executes the prebuilt QNN context binaries on the DSP.';
+}
 function wireModels() {
   const hintEl = $('addhint');
   const hintHtml = hintEl.innerHTML;
@@ -555,6 +639,10 @@ function wireModels() {
     if (!raw) return flash('Enter a HuggingFace repo, URL, or file path.');
     const source = raw.replace(/[\\/]+$/, ''); // normalize so owner/repo and owner/repo/ don't double
     const type = $('addtype').value;
+    // '' = Auto: let commons infer the engine from the artifact, which works for
+    // anything with a telling file extension. A Hexagon NPU bundle is a folder of
+    // QNN context binaries — there is nothing to sniff — so the engine is named.
+    const engine = $('addengine') ? $('addengine').value : '';
     // The remote resolver is GGUF/single-file-only; speech/embedding models need a
     // directory or ONNX+vocab, so the SDK rejects remote STT/TTS/embedder. Block it
     // here too instead of letting the user download bytes that won't load.
@@ -563,12 +651,13 @@ function wireModels() {
     }
     const id = 'custom:' + source;
     if (customModels.some((m) => m.id === id)) return flash('That model is already in your list.');
-    const entry = { id, source, type, label: deriveLabel(source) };
+    const entry = { id, source, type, label: deriveLabel(source), ...(engine ? { engine } : {}) };
     try {
       await ra.models.register({
         id,
         name: entry.label,
         category: MODALITY_CATEGORY[type],
+        ...(engine ? { framework: engine } : {}),
         ...(looksRemote(source) ? { url: source } : { path: source }),
       });
     } catch (e) { return flash('Could not add that model: ' + e.message); }

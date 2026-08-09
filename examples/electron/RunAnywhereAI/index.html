@@ -187,7 +187,7 @@
       .card .label { margin: 0 0 7px; }
       .cardtitle { font-size: 14px; font-weight: 620; letter-spacing: -.005em; color: var(--fg); margin: 0 0 3px; }
       /* Referenced by the Models + Vision markup - restored after the restyle. */
-      .addgrid { display: grid; grid-template-columns: 1fr 190px auto; gap: 10px; align-items: end; }
+      .addgrid { display: grid; grid-template-columns: 1fr 170px 170px auto; gap: 10px; align-items: end; }
       .addgrid .label { margin-top: 0; }
       .addgrid .btn { height: 41px; padding: 0 20px; margin-top: 0; }
       .filepick { display: flex; align-items: center; gap: 12px; }
@@ -502,6 +502,17 @@
                     <option value="embedder">Embeddings</option>
                     <option value="stt">Speech-to-text</option>
                     <option value="tts">Text-to-speech</option>
+                  </select>
+                </div>
+                <div>
+                  <div class="label">Engine</div>
+                  <!-- A file extension names the engine for GGUF/ONNX, but an NPU
+                       bundle is a FOLDER of QNN context binaries with nothing to
+                       sniff, so it has to be said out loud. Auto covers every
+                       other row. -->
+                  <select id="addengine">
+                    <option value="">Auto</option>
+                    <option value="QHEXRT">Hexagon NPU</option>
                   </select>
                 </div>
                 <button class="btn" id="addgo" style="height:44px">Add</button>
