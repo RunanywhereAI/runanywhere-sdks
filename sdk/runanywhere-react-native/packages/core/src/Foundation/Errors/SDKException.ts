@@ -445,7 +445,7 @@ function categoryForCode(code: ErrorCodeProto): ErrorCategoryProto {
     return ErrorCategoryProto.ERROR_CATEGORY_CONFIGURATION;
   if (code >= 110 && code <= 129) return ErrorCategoryProto.ERROR_CATEGORY_MODEL;
   if (code >= 130 && code <= 149)
-    return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
+    return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
   if (code >= 150 && code <= 179)
     return ErrorCategoryProto.ERROR_CATEGORY_NETWORK;
   if ((code >= 180 && code <= 219) || (code >= 280 && code <= 299)) {

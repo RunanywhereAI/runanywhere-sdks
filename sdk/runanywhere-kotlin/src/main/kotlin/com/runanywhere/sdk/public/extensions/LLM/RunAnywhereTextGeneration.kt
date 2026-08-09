@@ -353,6 +353,9 @@ internal suspend fun aggregateLLMStream(
 
     val totalLatencyMs = (nowMillis() - startTimeMs).toDouble()
     val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs) }
+    // The decode-only denominator that used to be computed here now lives inside
+    // `sanitizeStreamMetrics`, which needs it anyway to decide whether a backend is
+    // batch-buffered. Computing it twice invited the two copies to drift.
     val modelIdentity = resolveModelIdentity()
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
@@ -362,6 +365,17 @@ internal suspend fun aggregateLLMStream(
     val inputTokens = final?.usage?.input_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
     val generationTimeMs = final?.generation_time_ms?.takeIf { it > 0.0 } ?: totalLatencyMs
+    // Merge note (origin/main #634 "measure fallback tokens/sec over decode time,
+    // not the whole span"): that fix and this one solve the same problem, and this
+    // path is the stricter of the two, so it is kept rather than replaced.
+    // `sanitizeStreamMetrics` already derives the fallback rate over the decode
+    // window only (`decodeWindowMs = totalMs - ttft`) and divides by
+    // `outputTokens - 1`, because the first token is prefill output and charging it
+    // to decode understates the rate by one token. It additionally guards the
+    // batch-buffered backends (Maple/Bonsai), where the first streamed token only
+    // arrives after the whole generate finishes, so the post-TTFT window collapses
+    // to a few milliseconds and a decode-only denominator would report an absurd
+    // rate — those fall back to wall-clock deliberately.
     val metrics =
         sanitizeStreamMetrics(
             totalMs = generationTimeMs,

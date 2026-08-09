@@ -68,6 +68,7 @@ let package = Package(
         .library(name: "RunAnywhereLlamaCPP", type: .static, targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", type: .static, targets: ["ONNXRuntime"]),
         .library(name: "RunAnywhereMLX", type: .static, targets: ["MLXRuntime"]),
+        .library(name: "RunAnywhereNeuRT", type: .static, targets: ["NeuRTRuntime"]),
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -143,6 +144,19 @@ let package = Package(
                 "RABackendSherpaBinary",
             ],
             path: "Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // -------------------------------------------------------------------
+        // C Bridge Module — NeuRT Backend Headers
+        // -------------------------------------------------------------------
+        .target(
+            name: "NeuRTBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendNeuRTBinary",
+            ],
+            path: "Sources/NeuRTRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -276,6 +290,31 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
+        // NeuRT Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
+        //
+        // Links RABackendNeuRTBinary and registers the `neurt` engine plugin
+        // via `NeuRT.register()`. NeuRT stays bundled in ONNXRuntime too, so
+        // existing ONNX/diffusion consumers are unaffected; this standalone
+        // product lets the example apps and external consumers opt into NeuRT
+        // directly.
+        // -------------------------------------------------------------------
+        .target(
+            name: "NeuRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "NeuRTBackend",
+                "RABackendNeuRTBinary",
+            ],
+            path: "Sources/NeuRTRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
+            ]
+        ),
+
+        // -------------------------------------------------------------------
         // MLX Runtime Backend
         // -------------------------------------------------------------------
         .target(
@@ -318,6 +357,14 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
+                // Backend runtimes so BackendRegistrationTests can exercise the
+                // real plugin registry through each shipped XCFramework. MLX is
+                // omitted: its MLXBackend module re-exposes commons headers whose
+                // rac_vlm_result has drifted in the shipped RABackendMLX
+                // xcframework, which clangs against CRACommons in one module.
+                "LlamaCPPRuntime",
+                "ONNXRuntime",
+                "NeuRTRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "Tests/RunAnywhereTests",

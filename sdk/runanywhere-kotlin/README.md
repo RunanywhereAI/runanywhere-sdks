@@ -26,13 +26,13 @@ Add dependencies to your app module's `build.gradle.kts`:
 ```kotlin
 dependencies {
     // Core SDK (required)
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.12")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.14")
 
     // LLM support via llama.cpp (~34 MB)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.12")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.14")
 
     // Optional: STT, TTS, VAD via ONNX/Sherpa (~25 MB)
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.12")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.14")
 }
 ```
 

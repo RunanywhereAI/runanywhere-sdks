@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.12")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.14")
 //   No environment override is needed. SPM downloads the checksum-verified
 //   XCFramework archives from the GitHub release by default.
 //
@@ -89,7 +89,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.12"
+let sdkVersion = "0.20.14"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -157,6 +157,15 @@ let package = Package(
             name: "RunAnywhereMLX",
             type: .static,
             targets: ["MLXRuntime"]
+        ),
+
+        // =================================================================
+        // NeuRT Backend — Apple Neural Engine LLM + CoreML diffusion
+        // =================================================================
+        .library(
+            name: "RunAnywhereNeuRT",
+            type: .static,
+            targets: ["NeuRTRuntime"]
         ),
 
         // =================================================================
@@ -259,6 +268,19 @@ let package = Package(
         ),
 
         // =================================================================
+        // C Bridge Module - NeuRT Backend Headers
+        // =================================================================
+        .target(
+            name: "NeuRTBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendNeuRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/NeuRTRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
         // C Bridge Module - MLX Backend Headers
         // =================================================================
         .target(
@@ -346,6 +368,30 @@ let package = Package(
                 .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
+            ]
+        ),
+
+        // =================================================================
+        // NeuRT Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
+        //
+        // Links RABackendNeuRTBinary and registers the `neurt` engine plugin
+        // via `NeuRT.register()`. NeuRT is also bundled into ONNXRuntime (so
+        // existing ONNX/diffusion consumers are unaffected); this standalone
+        // product lets consumers opt into NeuRT directly.
+        // =================================================================
+        .target(
+            name: "NeuRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "NeuRTBackend",
+                "RABackendNeuRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/NeuRTRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
             ]
         ),
 
@@ -539,6 +585,14 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
+                // Backend runtimes so BackendRegistrationTests can exercise the
+                // real plugin registry through each shipped XCFramework. MLX is
+                // omitted: its MLXBackend module re-exposes commons headers whose
+                // rac_vlm_result has drifted in the shipped RABackendMLX
+                // xcframework, which clangs against CRACommons in one module.
+                "LlamaCPPRuntime",
+                "ONNXRuntime",
+                "NeuRTRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests",
@@ -629,12 +683,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "595e034e5ceb9425c0d2ae1ddb3797a2891a5df62083a866c6df7a843fc7f8d2"
+                checksum: "4e3f1af792a78120afae1685a7295db5caa4c62a00071955bdb01ec79ab02f9a"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "38edbe3f56be8f05a012e0132f59db0667bf33ad8b5e019aa011c9a2293d0d95"
+                checksum: "dac3e52b02c35ce7ce1eab358cedb0d39b9ccbc83943f12fce292cc421d58d7f"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
@@ -654,12 +708,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "c3dee3f17fd86c2b6e15e4373894efbfd39ec4e87b09511fa88f478ce4db752a"
+                checksum: "fd2c207a6edf5b5a0948e54f340bd8f449217107c85918fc8f69c522acd4e67d"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
-                checksum: "1db4d3458c4bbd7529d03e13b571d89fdef7e0ead78b150b862ab61a4bb816c6"
+                checksum: "f0b8fc7d428d5404064bce2bd3c3bcff192a21bc42a654034eeb301f14b4cfbf"
             ),
         ]
     }

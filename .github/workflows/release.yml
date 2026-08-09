@@ -32,6 +32,10 @@ on:
       version:
         description: 'Version to release (e.g. 1.2.3 — no leading v)'
         required: true
+      validate_external_starters:
+        description: 'Also build the external Swift/RN starter repos (advisory; they version-lag the SDK)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -131,6 +135,19 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
+      # The NeuRT (Apple ANE) engine is implemented in the sibling private
+      # `neurun` repo. Unlike pr-build.yml (which sets RAC_ALLOW_NEURT_STUB=1 to
+      # prove compile/link), the release must build the REAL engine, so we check
+      # neurun out here and point NEURT_ROOT at it. Pinned to a commit so the
+      # published binaries stay reproducible and match the committed checksums.
+      # Requires a NEURUN_TOKEN secret (PAT/app token with read on RunanywhereAI/neurun).
+      - name: Checkout neurun (NeuRT engine source)
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/neurun
+          ref: 1c44fd150c84976dea1ab4c894f2f03ebcdcee04
+          token: ${{ secrets.NEURUN_TOKEN }}
+          path: neurun
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -148,6 +165,8 @@ jobs:
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          # Build the real NeuRT engine from the checked-out neurun source.
+          NEURT_ROOT: ${{ github.workspace }}/neurun
         run: bash sdk/runanywhere-commons/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7
@@ -638,9 +657,10 @@ jobs:
     runs-on: ubuntu-latest
     # The WASM build compiles Abseil + Protobuf from source (RAG/Solutions ON)
     # and is forced to --parallel 1 to dodge a zlib static-lib race, then builds
-    # a second time for WebGPU. 60m is no longer enough (was cancelled mid-build);
-    # 180m covers both serial builds. TODO: restore parallelism / add object cache.
-    timeout-minutes: 180
+    # again for each WebGPU variant. Three serial builds already ran 2h20m on a
+    # slow runner, so 180m no longer leaves headroom.
+    # TODO: restore parallelism / add object cache.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -655,8 +675,11 @@ jobs:
       - name: Build WASM (WebGPU llama.cpp)
         working-directory: sdk/runanywhere-web
         run: npm run build:wasm -- --webgpu
+      - name: Build WASM (WebGPU ONNX + Sherpa)
+        working-directory: sdk/runanywhere-web
+        run: npm run build:wasm -- --onnx-webgpu
       - name: Package Web/WASM outputs
-        # All four artifacts are required release inputs. Emscripten 5+ embeds
+        # All five artifacts are required release inputs. Emscripten 5+ embeds
         # pthread workers in the generated glue, so only the JS/WASM pairs are
         # portable publish requirements.
         working-directory: sdk/runanywhere-web
@@ -671,6 +694,8 @@ jobs:
             packages/llamacpp/wasm/racommons-llamacpp-webgpu.wasm
             packages/onnx/wasm/racommons-onnx-sherpa.js
             packages/onnx/wasm/racommons-onnx-sherpa.wasm
+            packages/onnx/wasm/racommons-onnx-sherpa-webgpu.js
+            packages/onnx/wasm/racommons-onnx-sherpa-webgpu.wasm
           )
           for artifact in "${required_files[@]}"; do
             if [ ! -s "$artifact" ]; then
@@ -857,6 +882,12 @@ jobs:
   # ---------------------------------------------------------------------------
 
   validate_consumer_swift:
+    # Off by default. This builds RunanywhereAI/swift-starter-example, an
+    # external repo that tracks the SDK API on its own schedule, so its drift
+    # is not evidence about this release. It never gated publish (see the
+    # ADVISORY note there); running it only produced a red job nobody could
+    # act on from this repo. Opt in with validate_external_starters.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
     # native_ios produces the iOS artifact this job downloads. Do NOT add
     # sdk_kotlin here — the Swift consumer doesn't touch Kotlin artifacts
     # and serializing Swift validation behind ubuntu Kotlin
@@ -1459,6 +1490,9 @@ jobs:
           flutter build ios --simulator --no-codesign
 
   validate_consumer_react_native:
+    # Off by default, same reasoning as validate_consumer_swift: this builds
+    # RunanywhereAI/react-native-starter-app, an external repo.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
     needs: [validate, sdk_react_native]
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -1703,6 +1737,11 @@ jobs:
     #     must NOT block the SDK release; the starters are updated to the published
     #     packages out-of-band. The IN-REPO example consumers (web, flutter) stay
     #     hard gates because they ship with the SDK.
+    #     swift and react_native are now skipped unless the
+    #     validate_external_starters input is set: they stay in `needs` so the
+    #     opt-in run still waits for them, and a skipped job does not block
+    #     publish because `!cancelled()` tolerates it and neither appears in the
+    #     success checks below.
     if: >-
       !cancelled() &&
       needs.validate.result == 'success' &&
