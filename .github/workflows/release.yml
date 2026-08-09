@@ -1328,6 +1328,12 @@ jobs:
 
   validate_consumer_web:
     needs: [validate, sdk_web]
+    # Explicit, because a skipped native_web propagates through sdk_web to here:
+    # GitHub only stops that cascade at a job that states its own condition.
+    if: >-
+      !cancelled() &&
+      needs.validate.result == 'success' &&
+      needs.sdk_web.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
