@@ -72,4 +72,35 @@ if (copied < required) {
   console.error(`bundled ${copied}/${required} required files — build the addon first (see README).`);
   process.exit(1);
 }
+
+// The QAIRT/QNN runtime for the Hexagon NPU, when one has been staged. Opt-in via
+// RA_QNN_RUNTIME_DIR because QAIRT is a licensed vendor SDK that is not in this
+// repo and is absent on every CI host — a build without it simply ships no NPU
+// runtime and the engine reports the device as unavailable.
+//
+// This copies a FLAT directory verbatim: on Windows the HTP stub finds the per-arch
+// skel and its .cat through its own directory (there is no ADSP_LIBRARY_PATH), so
+// splitting the set across directories breaks it with an opaque signature error.
+// Anything else already staged there (a second arch's skel) comes along.
+const qnnDir = process.env.RA_QNN_RUNTIME_DIR;
+if (qnnDir) {
+  if (!fs.existsSync(qnnDir)) {
+    console.error('  MISSING: RA_QNN_RUNTIME_DIR does not exist:', qnnDir);
+    process.exit(1);
+  }
+  let qnnFiles = 0;
+  let qnnBytes = 0;
+  for (const entry of fs.readdirSync(qnnDir, { withFileTypes: true })) {
+    // Flat set only. The staging dir also holds QHexRT's own CLI tools, which the
+    // app has no use for.
+    if (!entry.isFile() || /\.exe$/i.test(entry.name)) continue;
+    const src = path.join(qnnDir, entry.name);
+    fs.copyFileSync(src, path.join(outDir, entry.name));
+    qnnBytes += fs.statSync(src).size;
+    qnnFiles++;
+  }
+  bytes += qnnBytes;
+  console.log(`  + QNN runtime: ${qnnFiles} files, ${(qnnBytes / 1e6).toFixed(1)} MB (from ${qnnDir})`);
+}
+
 console.log(`native bundle (${(bytes / 1e6).toFixed(1)} MB) -> ${outDir}`);

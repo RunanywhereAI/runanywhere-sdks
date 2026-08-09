@@ -124,6 +124,15 @@ if(RAC_BUILD_ELECTRON_ADDON)
     endforeach()
     message(STATUS "runanywhere-electron: engine backends -> ${_ra_linked_backends}")
 
+    # RAG. Commons only defines the rac_rag_*_proto C ABI when RAC_BACKEND_RAG is
+    # on, so without this the addon would fail to LINK (not merely lose a feature)
+    # on any preset that turns RAG off — which windows-arm64-release does.
+    if(RAC_BACKEND_RAG)
+        target_compile_definitions(runanywhere_native PRIVATE RAC_ELECTRON_HAVE_RAG)
+    else()
+        message(STATUS "runanywhere-electron: RAG OFF — the rag* exports report FEATURE_NOT_AVAILABLE")
+    endif()
+
     # Desktop control plane (telemetry + auth). When the desktop adapter is built
     # into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport
     # that auth/model-assignments/telemetry POST through; commons links CURL::libcurl

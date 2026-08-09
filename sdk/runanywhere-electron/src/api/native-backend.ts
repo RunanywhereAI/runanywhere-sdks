@@ -66,11 +66,18 @@ export const RAC_CATEGORY = {
   UNKNOWN: 99,
 } as const;
 
-/** rac_inference_framework_t ordinals, for registry registration. */
+/**
+ * rac_inference_framework_t ordinals, for registry registration.
+ *
+ * These are the C enum's values, NOT the proto's — `runanywhere.v1.InferenceFramework`
+ * numbers the same engines differently (QHexRT is 13 here and 24 there), so the two
+ * maps in this repo are deliberately not interchangeable.
+ */
 export const RAC_FRAMEWORK = {
   ONNX: 0,
   LLAMACPP: 1,
   SHERPA: 12,
+  QHEXRT: 13,
   UNKNOWN: 99,
 } as const;
 
@@ -79,6 +86,7 @@ const RAC_FRAMEWORK_OF: Record<string, number> = {
   LLAMA_CPP: RAC_FRAMEWORK.LLAMACPP,
   ONNX: RAC_FRAMEWORK.ONNX,
   SHERPA: RAC_FRAMEWORK.SHERPA,
+  QHEXRT: RAC_FRAMEWORK.QHEXRT,
 };
 
 // Which slots reject a URL / HuggingFace source (the remote resolver is

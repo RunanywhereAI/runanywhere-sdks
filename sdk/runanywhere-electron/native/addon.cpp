@@ -2439,8 +2439,13 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
                     }
                     return true;
                 });
+#ifdef RAC_ELECTRON_HAVE_RAG
+                // Without the RAG pipeline no session can ever have been created,
+                // so the map is empty and there is nothing to destroy — but the
+                // destroy symbol itself would not exist to link against.
                 for (auto& kv : g_rag_handles)
                     rac_rag_session_destroy_proto(kv.second);
+#endif
                 for (auto& kv : g_llm_handles)
                     rac_llm_component_destroy(kv.second);
                 for (auto& kv : g_vlm_handles)
@@ -3204,6 +3209,21 @@ static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const c
     return out;
 }
 
+// =============================================================================
+// RAG. Optional, exactly like the desktop control plane above: commons only
+// defines the `rac_rag_*_proto` C ABI when it is built with RAC_BACKEND_RAG,
+// so a build without it (Windows on ARM64 today — the preset turns RAG off
+// because its dependency chain cannot configure there) would fail to LINK on
+// these symbols rather than merely lose a feature. The JNI host already treats
+// this symbol set as optional at RUNTIME (optionalNativeSymbol); a statically
+// linked addon expresses the same thing at compile time.
+//
+// The export names stay present either way, so the RPC allowlist and the TS
+// `NativeAddon` surface do not change shape between builds — calling one just
+// reports FEATURE_NOT_AVAILABLE instead of vanishing as an undefined method.
+// =============================================================================
+#ifdef RAC_ELECTRON_HAVE_RAG
+
 // rac_rag_ingest_proto / rac_rag_query_proto run a full embedding / LLM
 // generation and can take seconds, so run them on a worker thread and resolve a
 // Promise (parity with generate()). A synchronous call would block the entire
@@ -3324,10 +3344,14 @@ static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, c
     return promise;
 }
 
+#endif  // RAC_ELECTRON_HAVE_RAG
+
 // Register a downloaded model in commons' global registry (id -> local_path) so
-// RAG session-create can resolve embedding/LLM model ids to on-disk paths. The
+// session-create can resolve embedding/LLM model ids to on-disk paths. The
 // Electron SDK otherwise loads models by explicit path and never populates the
-// registry, so RAG needs this bridge. rac_register_model deep-copies the struct.
+// registry. rac_register_model deep-copies the struct. Outside the RAG guard
+// above: RAG was the first caller, but `models.register` is the general path and
+// a build without RAG still needs it.
 static char* rag_dup_cstr(const std::string& s) {
     char* p = static_cast<char*>(std::malloc(s.size() + 1));
     if (p)
@@ -3367,6 +3391,8 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     }
     return env.Undefined();
 }
+
+#ifdef RAC_ELECTRON_HAVE_RAG
 
 // Async (worker-thread) — session create resolves model ids and loads embedding
 // (+ optional LLM) services, which can take seconds. A sync call would block the
@@ -3619,6 +3645,20 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
+#else  // !RAC_ELECTRON_HAVE_RAG
+
+// One handler behind every rag* export. Typed, so the TS layer recovers an
+// SDKException with a real ErrorCode instead of parsing a string (and instead of
+// a bare TypeError from calling an undefined method).
+Napi::Value RagUnavailable(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    throw_rac_error(env, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                    "rag (this build has no RAG pipeline)");
+    return env.Undefined();
+}
+
+#endif  // RAC_ELECTRON_HAVE_RAG
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     rac_electron::RegisterModelBridge(env, exports);
     rac_electron::RegisterLlmBridge(env, exports);
@@ -3691,6 +3731,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("segment", Napi::Function::New(env, Segment));
     exports.Set("unloadSegmentationModel", Napi::Function::New(env, UnloadSegmentationModel));
     exports.Set("registerModel", Napi::Function::New(env, RegisterModel));
+#ifdef RAC_ELECTRON_HAVE_RAG
     exports.Set("ragCreateSession", Napi::Function::New(env, RagCreateSession));
     exports.Set("ragIngest", Napi::Function::New(env, RagIngest));
     exports.Set("ragQuery", Napi::Function::New(env, RagQuery));
@@ -3700,6 +3741,13 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("ragClear", Napi::Function::New(env, RagClear));
     exports.Set("ragStats", Napi::Function::New(env, RagStats));
     exports.Set("ragDestroySession", Napi::Function::New(env, RagDestroySession));
+#else
+    for (const char* name : {"ragCreateSession", "ragIngest", "ragQuery", "ragSearch",
+                             "ragQueryStream", "ragCancel", "ragClear", "ragStats",
+                             "ragDestroySession"}) {
+        exports.Set(name, Napi::Function::New(env, RagUnavailable));
+    }
+#endif
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;

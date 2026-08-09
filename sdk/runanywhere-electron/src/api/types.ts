@@ -90,6 +90,13 @@ export const InferenceFramework = {
   LLAMA_CPP: 'LLAMA_CPP',
   ONNX: 'ONNX',
   SHERPA: 'SHERPA',
+  /**
+   * QHexRT — the Qualcomm Hexagon NPU runtime, which runs prebuilt QNN context
+   * bundles. Nameable because a machine can carry BOTH an NPU bundle and a GGUF
+   * of the same model, and only an explicit preference decides between them;
+   * with a single engine built in, the router picks it without this.
+   */
+  QHEXRT: 'QHEXRT',
 } as const;
 export type InferenceFramework =
   (typeof InferenceFramework)[keyof typeof InferenceFramework];

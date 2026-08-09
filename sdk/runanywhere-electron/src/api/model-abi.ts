@@ -66,6 +66,7 @@ const FRAMEWORK_TO_PROTO: Record<InferenceFramework, ProtoFramework> = {
   [InferenceFramework.LLAMA_CPP]: ProtoFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   [InferenceFramework.ONNX]: ProtoFramework.INFERENCE_FRAMEWORK_ONNX,
   [InferenceFramework.SHERPA]: ProtoFramework.INFERENCE_FRAMEWORK_SHERPA,
+  [InferenceFramework.QHEXRT]: ProtoFramework.INFERENCE_FRAMEWORK_QHEXRT,
 };
 
 const FRAMEWORK_FROM_PROTO = new Map<ProtoFramework, InferenceFramework>(

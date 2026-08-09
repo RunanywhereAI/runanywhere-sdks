@@ -1,7 +1,8 @@
 // bridge.ts — loads the native N-API addon and adapts its callback-based
 // streaming into an AsyncIterable. The addon is resolved from (in order): the
 // RUNANYWHERE_NATIVE_PATH env var, the local dev build output, or the packaged
-// location. Sidecar DLLs (onnxruntime, sherpa) must sit next to the .node.
+// location. Sidecar DLLs (onnxruntime, sherpa, the QAIRT/QNN runtime) must sit
+// next to the .node; on Windows that directory is put on PATH before the load.
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -337,6 +338,34 @@ export interface NativeAddon {
   loraStateProto(stateBytes: Uint8Array): Promise<Uint8Array>;
 }
 
+/**
+ * Make the addon's own directory reachable by the Windows loader.
+ *
+ * The .node's STATIC imports (onnxruntime.dll, sherpa) already resolve from
+ * beside it — the loader searches a module's own directory for its dependents.
+ * A dependency the engine opens at RUNTIME by bare name does not: QHexRT calls
+ * `LoadLibraryW("QnnHtp.dll")`, which takes the standard search order (the
+ * EXECUTABLE's directory, the system dirs, then PATH) and never looks beside the
+ * .node. In an Electron app that executable is electron.exe, buried in
+ * node_modules — so a QAIRT runtime staged next to the addon would be invisible
+ * and the NPU would silently look absent.
+ *
+ * PATH is the only entry in that order a library can move. Prepend, so a staged
+ * runtime beats a differently-versioned QAIRT already on the machine's PATH; the
+ * whole flat set (QnnHtp/QnnSystem/QnnHtpPrepare/QnnHtpV<arch>Stub plus the skel
+ * and its .cat) then resolves out of that one directory, which is the invariant
+ * the Hexagon stack requires on Windows (there is no ADSP_LIBRARY_PATH here).
+ */
+function addSidecarDirToDllSearch(dir: string): void {
+  if (process.platform !== 'win32') return;
+  const current = process.env.PATH ?? '';
+  const already = current
+    .split(path.delimiter)
+    .some((entry) => entry && path.resolve(entry).toLowerCase() === dir.toLowerCase());
+  if (already) return;
+  process.env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
+}
+
 function resolveAddon(): NativeAddon {
   const candidates = [
     process.env.RUNANYWHERE_NATIVE_PATH,
@@ -364,6 +393,7 @@ function resolveAddon(): NativeAddon {
 
   for (const p of candidates) {
     if (fs.existsSync(p)) {
+      addSidecarDirToDllSearch(path.dirname(p));
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       return require(p) as NativeAddon;
     }
