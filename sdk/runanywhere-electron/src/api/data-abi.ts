@@ -9,20 +9,20 @@
 import {
   DiarizationRequest,
   DiarizationResult,
-} from '../proto/diarization';
+} from '@runanywhere/proto-ts/diarization';
 import {
   EmbeddingsInputType,
   EmbeddingsPoolingStrategy,
   EmbeddingsRequest,
   EmbeddingsResult,
-} from '../proto/embeddings_options';
-import { AudioEncoding } from '../proto/model_types';
-import { RerankRequest, RerankResult } from '../proto/rerank';
+} from '@runanywhere/proto-ts/embeddings_options';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
+import { RerankRequest, RerankResult } from '@runanywhere/proto-ts/rerank';
 import {
   SegmentationPixelFormat,
   SegmentationRequest,
   SegmentationResult,
-} from '../proto/segmentation';
+} from '@runanywhere/proto-ts/segmentation';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
 import type { DiarizationOptions, EmbedOptions, SegmentationOptions } from './options';

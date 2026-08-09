@@ -19,7 +19,7 @@ import {
   StorageDeleteResult,
   StorageInfoRequest,
   StorageInfoResult,
-} from '../proto/storage_types';
+} from '@runanywhere/proto-ts/storage_types';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
 

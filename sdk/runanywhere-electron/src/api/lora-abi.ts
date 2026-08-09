@@ -9,7 +9,7 @@ import {
   LoraApplyResult,
   LoraRemoveRequest,
   LoraState,
-} from '../proto/lora_options';
+} from '@runanywhere/proto-ts/lora_options';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
 import { newRequestId } from './types';

@@ -16,14 +16,14 @@ import {
   FinishReason as ProtoFinishReason,
   LLMGenerationOptions,
   LLMGenerationResult,
-} from '../proto/llm_options';
-import { LLMGenerateRequest, LLMStreamEvent, LLMStreamEventKind } from '../proto/llm_service';
-import { ChatMessage as ProtoChatMessage, MessageRole } from '../proto/chat';
+} from '@runanywhere/proto-ts/llm_options';
+import { LLMGenerateRequest, LLMStreamEvent, LLMStreamEventKind } from '@runanywhere/proto-ts/llm_service';
+import { ChatMessage as ProtoChatMessage, MessageRole } from '@runanywhere/proto-ts/chat';
 import {
   StructuredOutputParseRequest,
   StructuredOutputResult,
-} from '../proto/structured_output';
-import { ReasoningMode as ProtoReasoningMode } from '../proto/thinking_tag_pattern';
+} from '@runanywhere/proto-ts/structured_output';
+import { ReasoningMode as ProtoReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';

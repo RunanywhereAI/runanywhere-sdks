@@ -8,14 +8,14 @@
 // dials — which is the point of the migration.
 
 import { SDKException } from '../errors';
-import { AudioEncoding, AudioFormat } from '../proto/model_types';
+import { AudioEncoding, AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
   STTOutput,
   STTStreamEvent,
   STTStreamEventKind,
   STTServiceState,
   STTTranscriptionRequest,
-} from '../proto/stt_options';
+} from '@runanywhere/proto-ts/stt_options';
 import {
   TTSOutput,
   TTSServiceState,
@@ -23,13 +23,13 @@ import {
   TTSStreamEventKind,
   TTSSynthesisRequest,
   TTSVoiceList,
-} from '../proto/tts_options';
+} from '@runanywhere/proto-ts/tts_options';
 import {
   VADConfiguration,
   VADProcessRequest,
   VADResult,
   VADServiceState,
-} from '../proto/vad_options';
+} from '@runanywhere/proto-ts/vad_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';

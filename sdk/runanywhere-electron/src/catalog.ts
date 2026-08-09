@@ -27,7 +27,7 @@ import {
   ModelInfo,
   ModelRegistryStatus,
   ModelSource,
-} from './proto/model_types';
+} from '@runanywhere/proto-ts/model_types';
 
 export type ModelType =
   | 'llm'

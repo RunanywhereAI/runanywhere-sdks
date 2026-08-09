@@ -44,12 +44,12 @@ import type {
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
 import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
-import { SDKEnvironment } from '../proto/model_types';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import {
   SdkInitPhase1Request,
   SdkInitPhase2Request,
   SdkInitResult,
-} from '../proto/sdk_init';
+} from '@runanywhere/proto-ts/sdk_init';
 import type { SDKCapabilities, SdkEvent, UnavailableCapability } from './types';
 
 /** Everything {@link RunAnywhereApi.initialize} accepts. */

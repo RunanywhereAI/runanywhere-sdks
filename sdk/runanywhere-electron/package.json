@@ -58,7 +58,8 @@
     "test:feature": "node --test \"test/feature/**/*.test.js\""
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.1"
+    "@bufbuild/protobuf": "^2.12.1",
+    "@runanywhere/proto-ts": "file:../shared/proto-ts"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

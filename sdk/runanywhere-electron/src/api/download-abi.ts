@@ -24,7 +24,7 @@ import {
   DownloadStartResult,
   DownloadState,
   DownloadSubscribeRequest,
-} from '../proto/download_service';
+} from '@runanywhere/proto-ts/download_service';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
 

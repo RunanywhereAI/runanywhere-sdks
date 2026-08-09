@@ -43,9 +43,9 @@ import {
 import type { ToolRun } from './tool-abi';
 import { LLM_DEFAULTS } from './options';
 import type { LlmOptions } from './options';
-import type { ChatMessage as ProtoChatMessage } from '../proto/chat';
-import { MessageRole } from '../proto/chat';
-import { ModelCategory as ProtoModelCategory } from '../proto/model_types';
+import type { ChatMessage as ProtoChatMessage } from '@runanywhere/proto-ts/chat';
+import { MessageRole } from '@runanywhere/proto-ts/chat';
+import { ModelCategory as ProtoModelCategory } from '@runanywhere/proto-ts/model_types';
 import { FinishReason, ReasoningMode, TokenKind, newRequestId } from './types';
 import type {
   ChatMessage,

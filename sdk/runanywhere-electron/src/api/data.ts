@@ -16,7 +16,7 @@ import {
   RAGStatistics,
   RAGStreamEvent,
   RAGStreamEventKind,
-} from '../proto/rag';
+} from '@runanywhere/proto-ts/rag';
 import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';

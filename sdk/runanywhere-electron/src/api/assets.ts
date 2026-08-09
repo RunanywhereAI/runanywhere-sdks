@@ -10,7 +10,7 @@ import {
   DownloadStartRequest,
   DownloadState,
   DownloadSubscribeRequest,
-} from '../proto/download_service';
+} from '@runanywhere/proto-ts/download_service';
 import { DownloadAbi, isTerminalState, percentOf } from './download-abi';
 import type { LoadSlot, RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
@@ -35,8 +35,8 @@ import {
   ModelRegistryStatus,
   ModelSource,
   ModelInfo as ProtoModelInfo,
-} from '../proto/model_types';
-import type { ModelLoadResult } from '../proto/model_types';
+} from '@runanywhere/proto-ts/model_types';
+import type { ModelLoadResult } from '@runanywhere/proto-ts/model_types';
 import { DevicePlacement, InferenceFramework, ModelCategory, requireOneOf } from './types';
 import type {
   DownloadEvent,

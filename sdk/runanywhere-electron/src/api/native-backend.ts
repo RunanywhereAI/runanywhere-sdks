@@ -18,7 +18,7 @@ import {
   resolveModel,
 } from '../download';
 import type { DownloadProgress, ModelKind, ResolvedModel } from '../download';
-import { StorageDeleteRequest, StorageInfoRequest } from '../proto/storage_types';
+import { StorageDeleteRequest, StorageInfoRequest } from '@runanywhere/proto-ts/storage_types';
 import { StorageAbi } from './storage-abi';
 import type {
   NativeDiarizationOptions,

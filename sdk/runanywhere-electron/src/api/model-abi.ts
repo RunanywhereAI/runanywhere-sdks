@@ -32,8 +32,8 @@ import {
   ModelUnloadResult,
   RegisterModelFromUrlRequest,
   RegisterMultiFileModelRequest,
-} from '../proto/model_types';
-import type { SDKError } from '../proto/errors';
+} from '@runanywhere/proto-ts/model_types';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
 import { InferenceFramework, ModelCategory } from './types';

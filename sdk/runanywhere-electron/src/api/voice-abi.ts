@@ -12,8 +12,8 @@
 // session id, the same shape RAG uses.
 
 import { SDKException } from '../errors';
-import { ComponentLifecycleState } from '../proto/component_types';
-import { AudioEncoding } from '../proto/model_types';
+import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   VoiceAgentAudioFrame,
   VoiceAgentComposeConfig,
@@ -21,14 +21,14 @@ import {
   VoiceAgentTurnRequest,
   TurnDetection,
   TurnDetection_Type,
-} from '../proto/voice_agent_service';
+} from '@runanywhere/proto-ts/voice_agent_service';
 import {
   PipelineState,
   TokenKind as ProtoTokenKind,
   VoiceAgentComponentStates,
   VoiceEvent as ProtoVoiceEvent,
-} from '../proto/voice_events';
-import { VADStreamEventKind } from '../proto/vad_options';
+} from '@runanywhere/proto-ts/voice_events';
+import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { TURN_DEFAULTS, VAD_DEFAULTS } from './options';

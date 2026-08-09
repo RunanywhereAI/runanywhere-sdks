@@ -17,7 +17,7 @@ import {
   VLMResult,
   VLMStreamEvent,
   VLMStreamEventKind,
-} from '../proto/vlm_options';
+} from '@runanywhere/proto-ts/vlm_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';

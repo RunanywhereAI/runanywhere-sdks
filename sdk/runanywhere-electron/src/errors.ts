@@ -9,7 +9,7 @@
 // table are replicated here — exactly as the RN and Web SDKs replicate them.
 // Keep them in sync with idl/errors.proto if the canonical mapping changes.
 
-import { SDKError } from './proto/errors';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 
 export enum ErrorCode {
   UNSPECIFIED = 0,

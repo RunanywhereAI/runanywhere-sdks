@@ -17,7 +17,7 @@ import {
   ToolChoiceMode,
   ToolDefinition as ProtoToolDefinition,
   ToolResult as ProtoToolResult,
-} from '../proto/tool_calling';
+} from '@runanywhere/proto-ts/tool_calling';
 import type { RaBackend, ToolRunLoopEvent } from './backend';
 import { ToolChoice } from './types';
 import type { ToolCall, ToolDefinition } from './types';
