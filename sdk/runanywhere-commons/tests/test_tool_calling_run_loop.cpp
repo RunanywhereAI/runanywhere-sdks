@@ -255,7 +255,8 @@ std::vector<GenerationCapture> generation_captures() {
 }
 
 runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework framework =
-                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
+                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+                                           bool supports_thinking = true) {
     runanywhere::v1::ModelInfo model;
     model.set_id("toolloop.llm");
     model.set_name("ToolLoop LLM");
@@ -271,6 +272,10 @@ runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework f
     // is now the single downloaded-ness signal (idl/model_types.proto).
     model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
+    // The no-think directive is gated on this as well as on the engine: there is
+    // nothing to suppress on a model that does not reason, and "/no_think" is a
+    // Qwen control token that anything outside that family reads as prompt text.
+    model.set_supports_thinking(supports_thinking);
     return model;
 }
 
@@ -285,7 +290,8 @@ void cleanup_environment() {
 }
 
 bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
-                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
+                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+                   bool supports_thinking = true) {
     cleanup_environment();
     // Register the mock engine under the id that actually matches the
     // requested framework so rac_model_lifecycle_load_proto's engine pin
@@ -303,7 +309,7 @@ bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
     }
 
     std::vector<uint8_t> model_bytes;
-    auto model = build_llm_model(framework);
+    auto model = build_llm_model(framework, supports_thinking);
     if (!serialize(model, &model_bytes) ||
         rac_model_registry_register_proto(g_registry, model_bytes.data(), model_bytes.size()) !=
             RAC_SUCCESS) {
@@ -1580,6 +1586,36 @@ int test_disable_thinking_directive_is_engine_gated() {
             CHECK(captures[0].disable_thinking, "disable_thinking flag still reaches QHexRT");
             CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0,
                   "QHexRT skips the /no_think directive (native suppression)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // D) A model that does not reason + disable → flag set but directive
+    // SKIPPED. "/no_think" is the Qwen control token; a model outside that
+    // family has no thinking to suppress and reads it as prompt text.
+    // Measured on LFM2.5-230M, which answers the injected directive with "\n\n"
+    // and stops, turning a caller who only asked not to see reasoning into a
+    // one-token empty reply.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+                       /*supports_thinking=*/false))
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        request.mutable_options()->set_disable_thinking(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "disable+non-thinking model generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].disable_thinking,
+                  "disable_thinking flag still reaches a non-thinking model");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0,
+                  "a model that does not reason skips the /no_think directive");
         }
         rac_proto_buffer_free(&out);
     }

@@ -77,10 +77,20 @@ inline std::string apply_no_think_directive(const std::string& prompt,
  * thinking natively — is harmlessly stripped, whereas a MISSING one on
  * llama.cpp/onnx would leave thinking on despite disable_thinking).
  */
+/**
+ * Framework known, model capability not. Assumes the model reasons, which keeps
+ * the pre-existing behaviour for call sites that cannot see the registry row.
+ */
+inline std::string apply_no_think_directive(const std::string& prompt,
+                                            rac_bool_t disable_thinking,
+                                            const char* framework_name) {
+    return apply_no_think_directive(prompt, disable_thinking, framework_name, true);
+}
+
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking) {
-    // Model identity unknown at this call site, so assume it reasons and keep
-    // the historical behaviour; the lifecycle paths below pass the real flag.
+    // Neither framework nor model identity in scope, so assume it reasons and
+    // keep the historical behaviour; the lifecycle paths pass the real flag.
     return apply_no_think_directive(prompt, disable_thinking, nullptr, true);
 }
 
