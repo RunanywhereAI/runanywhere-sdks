@@ -948,18 +948,31 @@ private final class MLXSession: @unchecked Sendable {
         }
 
         if shouldFlushHeldTokens {
-            for token in repetitionGuard.flushHeldTokens() where !token.isEmpty {
-                if !onToken(token) {
-                    cancel()
-                    break
-                }
-            }
+            flushHeldTokens(from: &repetitionGuard, onToken: onToken)
         }
 
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
         }
         return metrics
+    }
+
+    /// Emit whatever the repetition guard was still holding when generation ended.
+    ///
+    /// The guard withholds a run of identical tokens until it can tell a genuine
+    /// repeat from a runaway, so a turn that ends mid-run leaves real output
+    /// buffered. Skipped when generation stopped *because* of a runaway or a
+    /// consumer cancel — flushing there would emit the very tokens that tripped it.
+    private func flushHeldTokens(
+        from repetitionGuard: inout RepetitionRunGuard,
+        onToken: (String) -> Bool
+    ) {
+        for token in repetitionGuard.flushHeldTokens() where !token.isEmpty {
+            if !onToken(token) {
+                cancel()
+                break
+            }
+        }
     }
 
     private func stream(

@@ -31,6 +31,17 @@
 //  the file restarts from zero.
 //
 
+// swiftlint:disable file_length
+//
+// The obvious split — moving the `URLSessionDownloadDelegate` conformance to a
+// `+URLSessionDelegate.swift` — is not available here. That extension reaches 20
+// of the coordinator's `private` members (`stateQueue`, `transfers`, `session`,
+// `failTransfer`, `decode`, …) plus the file-private `BackgroundDownloadFile`,
+// and Swift scopes `private` to the file. Splitting would mean widening the
+// coordinator's entire internal surface to `internal` to satisfy a line count,
+// which trades real encapsulation for a lint number. Same reasoning, and the
+// same directive, as `MLXRuntime/MLX.swift`.
+
 import CryptoKit
 import Foundation
 import os
