@@ -212,8 +212,17 @@ export const vad = {
         // pump and release the native session, not leave audio being fed into
         // a stream nobody reads. `source.return()` is how a caller's own
         // generator learns to shut its microphone pump down.
+        //
+        // Deliberately not awaited, matching `stt.detectStream`: an async
+        // iterator defers its `return()` behind the pending `next()`, and for a
+        // live microphone that `next()` only settles when the next frame
+        // arrives. Awaiting here would make the consumer's `break` — and the
+        // `stream.close()` that releases the native session — block on a frame
+        // that may never come if capture has already stopped.
         stopped = true;
-        await source.return?.(undefined);
+        void Promise.resolve(source.return?.(undefined)).catch(() => {
+          // Source cleanup is best-effort; the consumer has already left.
+        });
         await stream.close();
       }
       if (pumpError) throw pumpError;

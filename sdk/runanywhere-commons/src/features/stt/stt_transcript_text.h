@@ -18,10 +18,13 @@
  * Web are all fixed at once, instead of five near-identical marker lists
  * drifting apart.
  *
- * Deliberately conservative: a transcript is cleared only when *every*
- * non-whitespace character belongs to a bracketed or parenthesised span. Real
- * speech that merely contains an aside — "the answer (I think) is Paris" — has
- * words outside the span and is left exactly as the engine produced it.
+ * Deliberately conservative on two axes. A transcript is cleared only when
+ * *every* non-whitespace character sits inside a bracketed span — real speech
+ * that merely contains an aside ("the answer (I think) is Paris") has words
+ * outside the span and is left exactly as the engine produced it. And every one
+ * of those spans must name a marker this file recognises, so "(hello)",
+ * "[test]", and a transcript truncated mid-bracket survive as the speech they
+ * are. See `span_is_known_marker` for why that allowlist stays narrow.
  */
 
 #ifndef RAC_FEATURES_STT_TRANSCRIPT_TEXT_H
@@ -33,8 +36,68 @@
 namespace rac::stt {
 
 /**
- * Whether @p text carries no speech — it is empty, or consists only of
- * bracketed/parenthesised engine markers.
+ * Whether a bracketed span's contents name a known engine "no speech" marker.
+ *
+ * The span is normalised before comparison — lowercased, with everything that is
+ * not a letter or digit dropped — so `[ Silence ]`, `[SILENCE]` and `[_silence_]`
+ * all match the single `silence` entry.
+ *
+ * This is an ALLOWLIST on purpose, and the reason matters. The first version of
+ * this predicate treated EVERY bracketed or parenthesised span as non-speech.
+ * That is true of an engine marker, and equally true of a user who says
+ * "(hello)", of a transcript that legitimately reads "[test]", and of any
+ * transcript truncated mid-bracket — all of which were silently erased for every
+ * native consumer.
+ *
+ * Erasing real speech is the worse failure. An unrecognised marker that slips
+ * through is visible, reportable, and cosmetic; a sentence emptied on its way to
+ * the user (or to the LLM, as the user's own turn) is gone with no trace. So a
+ * backend emitting a marker missing from this list should have it ADDED here,
+ * with the literal string it emits recorded alongside — rather than the list
+ * being widened back into "anything in brackets".
+ */
+inline bool span_is_known_marker(const char* begin, const char* end) {
+    std::string key;
+    key.reserve(static_cast<size_t>(end - begin));
+    for (const char* cursor = begin; cursor != end; ++cursor) {
+        const unsigned char ch = static_cast<unsigned char>(*cursor);
+        if (std::isalnum(ch) != 0) {
+            key.push_back(static_cast<char>(std::tolower(ch)));
+        }
+    }
+    if (key.empty()) {
+        // "[]" or "(   )" names nothing, and carries no speech either.
+        return true;
+    }
+    // Observed from Whisper (and the Sherpa/QHexRT wrappers around it) and from
+    // Piper/Silero-adjacent pipelines. Keep additions literal and evidenced.
+    static const char* const kMarkers[] = {
+        "blankaudio",  // [BLANK_AUDIO]
+        "silence",     // [ Silence ], [SILENCE], [_silence_]
+        "silent",
+        "nospeech",  // <|nospeech|> once the pipe/angle wrapper is stripped
+        "music",     // [Music], [MUSIC]
+        "noise",
+        "backgroundnoise",
+        "inaudible",
+        "unintelligible",
+        "wind",  // (wind)
+        "laughter",
+        "laughs",
+        "applause",
+        "beep",
+    };
+    for (const char* marker : kMarkers) {
+        if (key == marker) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Whether @p text carries no speech — it is empty, whitespace, or consists only
+ * of recognised engine markers (see `span_is_known_marker`).
  */
 inline bool transcript_is_non_speech(const char* text) {
     if (text == nullptr) {
@@ -47,20 +110,27 @@ inline bool transcript_is_non_speech(const char* text) {
         }
         const char closer = (*cursor == '[') ? ']' : (*cursor == '(') ? ')' : '\0';
         if (closer == '\0') {
-            // A character outside any marker span: this is real transcript text.
+            // A character outside any span: this is real transcript text.
             return false;
         }
-        // Skip to the closing bracket. An unterminated span runs to the end of
-        // the string, which is still no speech (a truncated marker).
-        while (*cursor != '\0' && *cursor != closer) {
-            ++cursor;
+        const char* const content = cursor + 1;
+        const char* scan = content;
+        while (*scan != '\0' && *scan != closer) {
+            ++scan;
         }
-        if (*cursor == '\0') {
-            break;
+        if (*scan == '\0') {
+            // Unterminated. Previously treated as a truncated marker and erased;
+            // a transcript cut mid-phrase ("[spoken words") is the likelier
+            // reading, and guessing wrong here costs the whole utterance.
+            return false;
         }
+        if (!span_is_known_marker(content, scan)) {
+            return false;
+        }
+        cursor = scan;  // the loop's ++cursor then steps past the closer
     }
-    // Nothing outside a marker span. An all-whitespace or empty string lands
-    // here too, which is the same answer for every caller.
+    // Nothing but whitespace and recognised markers. An empty string lands here
+    // too, which is the same answer for every caller.
     return true;
 }
 
@@ -70,9 +140,9 @@ inline bool transcript_is_non_speech(const char* text) {
  */
 inline std::string transcript_for_display(const char* text) {
     if (transcript_is_non_speech(text)) {
-        return std::string();
+        return {};
     }
-    return std::string(text);
+    return {text};
 }
 
 }  // namespace rac::stt

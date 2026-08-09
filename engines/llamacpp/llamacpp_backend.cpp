@@ -793,7 +793,13 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     // end-of-turn token: the model ran straight past its answer and the raw
     // continuation ("...\nuser: /no_think") was rendered and spoken verbatim.
     // Re-query at the exact size so long templates are read whole.
-    if (template_len > static_cast<int32_t>(model_template.size())) {
+    //
+    // `>=`, not `>`: the buffer holds size() bytes INCLUDING the NUL, so a
+    // template whose reported length is exactly size() had its last character
+    // overwritten by the terminator. That one dropped character is enough to cut
+    // a closing marker in half and send the detector back to UNKNOWN — the same
+    // failure as a badly truncated template, just harder to spot.
+    if (template_len >= static_cast<int32_t>(model_template.size())) {
         model_template.resize(static_cast<size_t>(template_len) + 1);
         template_len = llama_model_meta_val_str(model_, "tokenizer.chat_template",
                                                 model_template.data(), model_template.size());

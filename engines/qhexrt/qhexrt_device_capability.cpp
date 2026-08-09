@@ -190,7 +190,15 @@ rac_result_t rac_qhexrt_probe_proto(rac_proto_buffer_t* out_capability) {
     capability.set_hexagon_arch(
         static_cast<runanywhere::v1::HexagonArch>(static_cast<int32_t>(info.hexagon_arch)));
     capability.set_supported(info.supported == RAC_TRUE);
-    capability.set_npu(runanywhere::v1::NPU_CHIP_QUALCOMM_HEXAGON);
+    // Only claim the chip when the probe actually recognised one. An UNKNOWN arch
+    // means neither the SoC table nor the board table matched, which includes
+    // every non-Qualcomm device the plugin gets probed on — asserting
+    // QUALCOMM_HEXAGON there tells the caller a Hexagon NPU is present and merely
+    // unsupported, when there is no Hexagon at all. Leaving `npu` unset says the
+    // true thing: nothing was identified.
+    if (info.hexagon_arch != RAC_QHEXRT_HEXAGON_ARCH_UNKNOWN) {
+        capability.set_npu(runanywhere::v1::NPU_CHIP_QUALCOMM_HEXAGON);
+    }
 
     std::vector<uint8_t> bytes(capability.ByteSizeLong());
     if (!bytes.empty() &&

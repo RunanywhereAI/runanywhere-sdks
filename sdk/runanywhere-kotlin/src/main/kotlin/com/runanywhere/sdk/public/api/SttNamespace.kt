@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.STTOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,10 +52,22 @@ private class KotlinSttStream(
 
     init {
         sttStreamScope.launch {
+            var sawTerminal = false
             try {
                 legacyTranscribeStream(frames.consumeAsFlow(), options.orDefault().toProto()).collect { partial ->
                     announceStarted()
                     if (partial.is_final) {
+                        // A FINAL ends an UTTERANCE, not the session. commons closes a
+                        // window on ~800 ms of trailing silence and publishes one FINAL
+                        // for it (rac_stt_stream.cpp), then keeps the session open for
+                        // the next phrase. Emitting `Completed` right here — as this
+                        // used to — told the consumer the whole session was over at the
+                        // speaker's first pause, so a recording of several spaced
+                        // sentences delivered the first and silently dropped the rest.
+                        // Forward every final; the session ends when the audio does.
+                        // This is the port of the same fix already made in Swift's
+                        // `STTNamespace.openStream`.
+                        //
                         // `STTPartialResult` collapsed to `text`/`is_final`/`language`
                         // (idl/stt_options.proto): `final_output`/`confidence`/
                         // `audio_start_ms`/`audio_end_ms` no longer exist on it, so
@@ -68,7 +81,7 @@ private class KotlinSttStream(
                         outbox.trySend(
                             TranscriptionEvent.TranscriptFinal(requestId, sequence++, synthesized.toTranscription()),
                         )
-                        outbox.trySend(TranscriptionEvent.Completed(requestId))
+                        sawTerminal = true
                     } else if (partial.text.isNotEmpty()) {
                         outbox.trySend(
                             TranscriptionEvent.Partial(
@@ -81,8 +94,27 @@ private class KotlinSttStream(
                         )
                     }
                 }
-                // The native pass ended without a final/error envelope. Stop
-                // silently rather than fabricating a successful `completed`.
+                // Exactly one terminal event, decided once the native pass has ended
+                // — not one per utterance. The grammar closes with
+                // `Completed`/`Failed`/`Cancelled`, and a pass that ended without ever
+                // reporting a final is a failure, not a silent success: a consumer
+                // awaiting a terminal event would otherwise wait forever on a stream
+                // whose producer had already died.
+                if (sawTerminal) {
+                    outbox.trySend(TranscriptionEvent.Completed(requestId))
+                } else {
+                    announceStarted()
+                    outbox.trySend(
+                        TranscriptionEvent.Failed(
+                            requestId,
+                            SDKException.stt("Transcription stream ended before a final result"),
+                        ),
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                announceStarted()
+                outbox.trySend(TranscriptionEvent.Cancelled(requestId))
+                throw cancellation
             } catch (error: SDKException) {
                 announceStarted()
                 outbox.trySend(TranscriptionEvent.Failed(requestId, error))

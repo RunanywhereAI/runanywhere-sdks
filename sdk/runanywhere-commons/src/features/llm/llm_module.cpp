@@ -130,6 +130,15 @@ struct StreamTimingMetrics {
     int64_t ttft_ms = 0;
     int64_t prompt_eval_ms = 0;
     double tokens_per_second = 0.0;
+    /// The backend buffered the whole generate and then dumped the chunks, so the
+    /// post-TTFT window is an artifact and every rate must be taken over the full
+    /// wall time instead.
+    ///
+    /// Reported explicitly because it is not recoverable from the other fields:
+    /// `ttft_ms` carries the real first-token time in both modes, so a caller
+    /// trying to detect this from `ttft_ms == 0` is testing a state that cannot
+    /// occur, and silently gets the non-buffered arithmetic.
+    bool batch_buffered = false;
 };
 
 static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64_t raw_ttft_ms,
@@ -140,11 +149,10 @@ static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64
     }
     const int64_t decode_window =
         (raw_ttft_ms > 0 && raw_ttft_ms < total_ms) ? (total_ms - raw_ttft_ms) : total_ms;
-    const bool batch_buffered =
-        raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
+    m.batch_buffered = raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
     m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
     m.prompt_eval_ms = m.ttft_ms;
-    if (batch_buffered) {
+    if (m.batch_buffered) {
         m.tokens_per_second = static_cast<double>(completion_tokens) /
                               (static_cast<double>(total_ms) / 1000.0);
         return m;
@@ -2143,7 +2151,14 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     }
     // When the stream was batch-buffered, decode_time_ms is the full wall
     // generate (there is no separate post-TTFT decode window to report).
-    if (timing.ttft_ms == 0 && total_time_ms > 0 && raw_ttft_ms > 0) {
+    //
+    // Keyed off the flag, not off `timing.ttft_ms == 0`: that test could never
+    // pass alongside `raw_ttft_ms > 0` in the same condition, so buffered streams
+    // fell through to `total − ttft` below and reported a decode window of a few
+    // milliseconds — while `decode_tokens_per_second`, computed inside the helper,
+    // had already used the full wall time. The two numbers disagreed by the same
+    // factor that made the rate look absurd in the first place.
+    if (timing.batch_buffered && total_time_ms > 0) {
         final_result.set_decode_time_ms(total_time_ms);
     } else if (timing.ttft_ms > 0 && timing.ttft_ms < total_time_ms) {
         final_result.set_decode_time_ms(total_time_ms - timing.ttft_ms);
