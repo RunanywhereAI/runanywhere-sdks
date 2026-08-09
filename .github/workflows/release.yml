@@ -36,6 +36,13 @@ on:
         description: 'Also build the external Swift/RN starter repos (advisory; they version-lag the SDK)'
         type: boolean
         default: false
+      reuse_native_web_run_id:
+        description: >-
+          Run id whose native-web artifact to reuse instead of rebuilding (skips native_web).
+          Only safe when nothing under sdk/runanywhere-web/wasm, engines, or commons changed
+          since that run; a packaging-only re-release is the intended case.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -654,6 +661,9 @@ jobs:
 
   native_web:
     needs: validate
+    # Skipped when reusing a prior run's WASM. sdk_web and publish both tolerate
+    # the resulting 'skipped' only while reuse_native_web_run_id is set.
+    if: ${{ !inputs.reuse_native_web_run_id }}
     runs-on: ubuntu-latest
     # The WASM build compiles Abseil + Protobuf from source (RAG/Solutions ON)
     # and is forced to --parallel 1 to dodge a zlib static-lib race, then builds
@@ -762,8 +772,17 @@ jobs:
 
   sdk_web:
     needs: [validate, native_web]
+    if: >-
+      !cancelled() &&
+      needs.validate.result == 'success' &&
+      (needs.native_web.result == 'success' ||
+       (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      # Cross-run artifact download needs actions:read; harmless otherwise.
+      actions: read
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -774,6 +793,8 @@ jobs:
         with:
           name: native-web
           path: native-web-staging
+          run-id: ${{ inputs.reuse_native_web_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Package Web SDK (npm tarballs + checksums)
         # Unified packaging contract: extract the WASM tarball into the npm
         # workspaces → npm install + build:ts → npm pack each package → checksum.
@@ -1751,7 +1772,8 @@ jobs:
       needs.native_rcli_macos.result == 'success' &&
       needs.native_rcli_linux.result == 'success' &&
       needs.native_rcli_windows.result == 'success' &&
-      needs.native_web.result == 'success' &&
+      (needs.native_web.result == 'success' ||
+       (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
       needs.sdk_react_native.result == 'success' &&
@@ -1760,12 +1782,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Cross-run artifact download needs actions:read; harmless otherwise.
+      actions: read
     steps:
       - uses: actions/checkout@v7
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
+      # native_web was skipped, so RACommons-web-v*.tar.gz is absent from this
+      # run. Pull it from the reused run or the asset assertion below fails.
+      - name: Download reused Web natives
+        if: ${{ inputs.reuse_native_web_run_id != '' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: native-web
+          path: release-artifacts/native-web
+          run-id: ${{ inputs.reuse_native_web_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Flatten + index assets
         # Collision-detecting flatten. The previous `find ... -exec cp` form
         # silently overwrote same-basename files coming from different artifact
