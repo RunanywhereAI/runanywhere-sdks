@@ -263,13 +263,22 @@
         {
             "name": "windows-arm64-release",
             "displayName": "Windows ARM64 \u2014 Release (Snapdragon X/X2 Elite, experimental)",
-            "description": "Native ARM64 MSVC build for Snapdragon X / X2 Elite. Mirrors windows-release; only the generator platform differs, so the Electron addon links arm64/node.lib and the QHexRT engine looks for a lib/win-arm64 prebuilt. Add -DRAC_BACKEND_QHEXRT=ON (+ -DQHEXRT_ROOT=<path>) to link the NPU engine.",
+            "description": "Native ARM64 MSVC build for Snapdragon X / X2 Elite. The Electron addon links arm64/node.lib and the QHexRT engine looks for a lib/win-arm64 prebuilt. Add -DRAC_BACKEND_QHEXRT=ON (+ -DQHEXRT_ROOT=<path>) to link the NPU engine. The four backends turned OFF below CANNOT build on Windows ARM64 today and each fails at CONFIGURE time, so leaving them on would make this preset unusable rather than merely feature-poor — see the per-option comments. Re-enable one only after its upstream blocker is fixed, and MEASURE it.",
             "inherits": "base-release",
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "ARM64", "strategy": "set" },
             "cacheVariables": {
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_BUILD_SHARED": "OFF"
+                "RAC_BUILD_SHARED": "OFF",
+                "_comment_llamacpp": "ggml hard-errors 'MSVC is not supported for ARM, use clang' (ggml-cpu/CMakeLists.txt). Switching the toolset to ClangCL clears that but then Abseil fails instead (AbseilDll.cmake:745), so neither toolset builds it here yet.",
+                "RAC_BACKEND_LLAMACPP": "OFF",
+                "_comment_onnx": "cmake/FetchONNXRuntime.cmake selects its download by CMAKE_SIZEOF_VOID_P==8, which is TRUE on ARM64, so it would fetch the x64 ONNX Runtime and fail at link with LNK1112 (module machine type mismatch). There is no win-arm64 URL in it yet.",
+                "RAC_BACKEND_ONNX": "OFF",
+                "RAC_RUNTIME_ONNXRT": "OFF",
+                "RAC_BACKEND_SHERPA": "OFF",
+                "_comment_rag": "Pulls protobuf + Abseil, which is the same Abseil that fails above.",
+                "RAC_BACKEND_RAG": "OFF",
+                "RAC_BUILD_SERVER": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
