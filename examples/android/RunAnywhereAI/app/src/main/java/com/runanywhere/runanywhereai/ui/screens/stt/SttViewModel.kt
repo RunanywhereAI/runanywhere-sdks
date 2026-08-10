@@ -63,6 +63,44 @@ class SttViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * A recording finished and the engine recognised nothing in it.
+     *
+     * Distinct from "nothing recorded yet". Commons now publishes an engine's own
+     * no-speech marker ("(wind)", "[Music]") as empty text, so an honestly silent
+     * recording is an empty transcript and the screen has to say which of the two
+     * it is. Previously only the batch path could show that, because it inferred
+     * the state from `metrics`, which live mode never sets. Mirrors iOS
+     * `STTViewModel.noSpeechDetected`.
+     */
+    var noSpeechDetected by mutableStateOf(false)
+        private set
+
+    /**
+     * The recording that produced [noSpeechDetected] carried no usable signal —
+     * the input never varied, so there was nothing in it to recognise.
+     *
+     * "No speech detected" is the right answer to a room that stayed quiet and
+     * the wrong answer to a microphone that was muted, held by another app, or
+     * wired to nothing. Both of those are indistinguishable from silence to the
+     * recognizer, and telling them apart by hand costs hours — so the screen
+     * says which one it was, from evidence already in hand: [AudioRecorder]
+     * reports a normalised level per chunk, and *acoustic* audio always jitters
+     * frame to frame. A capture whose level never moved across
+     * [UNUSABLE_MIN_FRAMES] is not a quiet room; it is a dead input — whether it
+     * sat at the floor (muted, disconnected) or pinned at the ceiling (a stuck
+     * or synthetic source). Judging the range rather than the level alone is
+     * what catches both.
+     */
+    var micInputUnusable by mutableStateOf(false)
+        private set
+
+    // Level range observed across the capture in progress, and how many chunks
+    // it spans. See [micInputUnusable].
+    private var micPeakLevel = 0f
+    private var micFloorLevel = 1f
+    private var micFrames = 0
+
     var requireNetwork by mutableStateOf(true)
         private set
     var minBattery by mutableFloatStateOf(20f)
@@ -99,8 +137,23 @@ class SttViewModel : ViewModel() {
     private var routerOfflineId: String? = null
     private var routerOnlineId: String? = null
 
+    /**
+     * Switch mode, clearing the previous mode's output.
+     *
+     * Leaving a Batch transcript (and its stats) on screen under the Live mode's
+     * description attributes one mode's result to another — the reader has no way
+     * to tell which mode produced what. Same reset [start] already performs.
+     */
     fun selectMode(value: SttMode) {
-        if (!isRecording && !isTranscribing) mode = value
+        if (isRecording || isTranscribing || value == mode) return
+        mode = value
+        transcript = ""
+        committed = ""
+        metrics = null
+        routing = null
+        error = null
+        noSpeechDetected = false
+        micInputUnusable = false
     }
 
     fun onNetworkChange(value: Boolean) {
@@ -141,13 +194,24 @@ class SttViewModel : ViewModel() {
         metrics = null
         routing = null
         error = null
+        noSpeechDetected = false
+        micInputUnusable = false
         synchronized(buffer) { buffer.reset() }
         audioLevel = 0f
         isRecording = true
+        micPeakLevel = 0f
+        micFloorLevel = 1f
+        micFrames = 0
         if (mode == SttMode.LIVE) startLive()
         try {
             recorder.start(
                 onChunk = { chunk, level ->
+                    // Level range across the capture, so an empty result can say
+                    // whether the input carried anything at all. See
+                    // [micInputUnusable].
+                    if (level > micPeakLevel) micPeakLevel = level
+                    if (level < micFloorLevel) micFloorLevel = level
+                    micFrames += 1
                     // Batch/hybrid buffer locally; live feeds the SDK streaming session.
                     if (mode == SttMode.LIVE) {
                         liveAudio?.trySend(AudioInput.pcm16(chunk, AudioRecorder.SAMPLE_RATE))
@@ -177,9 +241,18 @@ class SttViewModel : ViewModel() {
     }
 
     private fun startLive() {
-        // A native fallback recognizer can spend seconds finalizing an
-        // utterance. Bound mic ingress so navigation/stop never leaves minutes
-        // of 100 ms chunks queued behind one blocking JNI call.
+        // Bound mic ingress so navigation/stop never leaves minutes of 100 ms
+        // chunks queued behind one blocking JNI call — but bound it by MEMORY,
+        // not by one flush. The session's native side is not ready when the mic
+        // opens: `transcribeStream` only resolves the model and loads the
+        // recognizer once it starts collecting this flow, and a cold load is
+        // seconds. Measured on the emulator, the first Live run of a session
+        // logged "STT model loaded" ~20 s after the record button — with the
+        // old 8-chunk (800 ms) bound, every chunk in between was dropped and
+        // the user's whole first sentence was gone before the recognizer
+        // existed to hear it. LIVE_CHANNEL_CAPACITY now holds
+        // LIVE_INGRESS_SECONDS of audio (~1 MB), which covers a cold start and
+        // still refuses to grow without limit.
         val channel = Channel<AudioInput>(
             capacity = LIVE_CHANNEL_CAPACITY,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -232,15 +305,18 @@ class SttViewModel : ViewModel() {
             isTranscribing = true
             val active = liveJob
             viewModelScope.launch {
-                try {
-                    // The native flush can wedge; bound the wait so the record
-                    // button can't stay disabled forever. On timeout the job is
-                    // left to finish on its own — we just stop blocking the UI.
-                    withTimeoutOrNull(LIVE_FLUSH_TIMEOUT_MS) { active?.join() }
-                } finally {
-                    if (liveJob === active) liveJob = null
-                    isTranscribing = false
-                }
+                // The native flush can wedge; bound the wait so the record
+                // button can't stay disabled forever. On timeout the job is
+                // left to finish on its own — we just stop blocking the UI.
+                val finished = withTimeoutOrNull(LIVE_FLUSH_TIMEOUT_MS) { active?.join() } != null
+                if (liveJob === active) liveJob = null
+                isTranscribing = false
+                // Only a flush we actually saw finish can testify that nothing
+                // was recognised. Measured: a final arrived 5.4 s after stop —
+                // past this timeout — so asserting "no speech" on the timeout
+                // told the user their recording was empty while its transcript
+                // was still on its way.
+                if (finished) reportSilenceIfEmpty()
             }
             return
         }
@@ -258,6 +334,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            reportSilenceIfEmpty()
                         }
                     }
                 }
@@ -272,6 +349,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            reportSilenceIfEmpty()
                         }
                     }
                 }
@@ -383,6 +461,19 @@ class SttViewModel : ViewModel() {
         null
     }
 
+    /**
+     * Publish the empty-result state once an operation has genuinely finished,
+     * naming whichever of the two empty cases actually happened. See
+     * [micInputUnusable].
+     */
+    private fun reportSilenceIfEmpty() {
+        val empty = transcript.isBlank() && error == null
+        noSpeechDetected = empty
+        micInputUnusable = empty &&
+            micFrames >= UNUSABLE_MIN_FRAMES &&
+            micPeakLevel - micFloorLevel < UNUSABLE_LEVEL_RANGE
+    }
+
     // Committed utterances stack as lines, mirroring iOS STTViewModel.
     private fun join(a: String, b: String): String =
         listOf(a.trim(), b.trim()).filter { it.isNotEmpty() }.joinToString("\n")
@@ -417,7 +508,23 @@ class SttViewModel : ViewModel() {
 
     private companion object {
         const val MIN_BYTES = 16000
-        const val LIVE_CHANNEL_CAPACITY = 8
+
+        // Mic ingress held for the live session, as seconds of 100 ms chunks.
+        // Sized to outlast a cold recognizer load rather than one flush — see
+        // the note in [startLive]. 30 s is ~1 MB of PCM.
+        const val LIVE_INGRESS_SECONDS = 30
+        const val LIVE_CHANNEL_CAPACITY = LIVE_INGRESS_SECONDS * 1000 / AudioRecorder.CHUNK_MS
+
         const val LIVE_FLUSH_TIMEOUT_MS = 5000L
+
+        // How still a capture's level has to be, on AudioRecorder's normalised
+        // 0..1 dB scale, before it reads as a dead input rather than a quiet
+        // room — and how many chunks that has to hold for. Measured on this
+        // emulator: a silent room still swung 0.36..0.48 chunk to chunk, while
+        // a disconnected input sat at a flat 0.950 for 126 consecutive chunks.
+        // 0.02 over 2 s sits far below the former and far above the latter.
+        // See [micInputUnusable].
+        const val UNUSABLE_LEVEL_RANGE = 0.02f
+        const val UNUSABLE_MIN_FRAMES = 2000 / AudioRecorder.CHUNK_MS
     }
 }

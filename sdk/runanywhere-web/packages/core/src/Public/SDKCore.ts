@@ -18,6 +18,7 @@ import {
 import {
   DownloadFailureReason,
   DownloadState,
+  downloadFailureReasonToJSON,
   type DownloadPlanRequest,
   type DownloadPlanResult,
   type DownloadProgress,
@@ -786,7 +787,7 @@ async function planDownloadWithSelfHeal(
   modelId: string,
   request: DownloadPlanRequest,
 ): Promise<DownloadPlanResult | null> {
-  const plan = DownloadsCapability.plan(request);
+  const plan = await DownloadsCapability.plan(request);
   if (
     !plan ||
     plan.canStart ||
@@ -862,17 +863,134 @@ async function assertBrowserStorageQuota(
   }
 }
 
+/**
+ * Whether a download that had already begun transferring and then stopped is
+ * worth retrying. It is: the causes at that stage are a dropped connection, a
+ * 5xx, or a cancel, and commons keeps the partial bytes, so Retry resumes
+ * instead of replaying an identical refusal.
+ *
+ * The verdict has to be decided here rather than read off the failure, because
+ * commons leaves `SDKError.retryable` at its proto default on every download
+ * error (`populate_sdk_error` never sets it) — `false` there means "nobody
+ * answered", not "permanent". The permanent refusals are the plan-stage ones,
+ * and those carry their own verdict from `describePlanRejection`.
+ *
+ * Shared with `models.download()` so the promise API and the event API cannot
+ * give a caller two different answers about the same failure.
+ */
+export const DOWNLOAD_TRANSFER_FAILURE_RETRYABLE = true;
+
 /** Map a failed download plan/start/terminal state to a storage or download error. */
-function throwDownloadFailure(feature: string, message: string, reason?: DownloadFailureReason): never {
+function throwDownloadFailure(
+  feature: string,
+  message: string,
+  reason?: DownloadFailureReason,
+  retryable = false,
+): never {
   const storageFailure = reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE
     || /not enough storage|insufficient (browser )?storage|free space/i.test(message);
-  throw SDKException.fromCode(
-    storageFailure
-      ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
-      : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-    message,
-    feature,
-  );
+  const code = storageFailure
+    ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
+    : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED;
+  const failure = SDKException.fromCode(code, message, feature);
+  // `retryable` is the honest answer to "would pressing Retry change anything?".
+  // A caller that offers a retry on every download error sends the user back
+  // into an identical failure; the planner already knows which refusals are
+  // permanent, so the error carries that verdict instead of the UI guessing.
+  throw new SDKException({ ...failure.proto, retryable });
+}
+
+/**
+ * Why a download plan refused to start, in words the caller can show, plus
+ * whether a retry could plausibly change the outcome.
+ *
+ * Commons populates `error.message` on most refusals, but not on all of them —
+ * the zero-file branch sets `can_start=false` with no message and no reason, and
+ * a planner that never answered at all leaves no plan to read. Both used to
+ * collapse into "Download plan for '<id>' could not start.", a sentence that
+ * names no cause and no next step, beside a Retry that reproduced it exactly.
+ * Every branch here says what is wrong and whether retrying is pointless.
+ */
+function describePlanRejection(
+  modelId: string,
+  plan: DownloadPlanResult | null,
+): { message: string; reason?: DownloadFailureReason; retryable: boolean } {
+  if (!plan) {
+    return {
+      message: `Could not plan the download for '${modelId}': the registered backend did not answer `
+        + 'the download planner. The engine that owns model storage is missing or failed to load — '
+        + 'reload the page to register it again; retrying the download alone cannot fix this.',
+      retryable: false,
+    };
+  }
+
+  // The structured reason decides the verdict, and only then does the wording
+  // get chosen. Reading `error.message` first — as this did — meant the
+  // partial-download branch below never ran: commons sets BOTH the message
+  // ("existing partial bytes exceed expected byte count") and the reason on
+  // that refusal, so the jargon won and the remedy was never shown.
+  const reason = plan.failureReason;
+  const detail = plan.error?.message?.trim();
+
+  switch (reason) {
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
+      return {
+        // Commons quotes the real figures ("needs about 2.1 GB but only 900 MB
+        // is free"), which beats any sentence written without them. Truthiness,
+        // not `??`: the `trim()` above turns a whitespace-only commons message
+        // into `''`, which `??` would happily pass through as the user-facing
+        // text — an insufficient-storage error with nothing written on it.
+        message: detail
+          || `Not enough browser storage to download '${modelId}'. Free some space — `
+            + 'the Storage screen can delete models you no longer need — then try again.',
+        reason,
+        retryable: true,
+      };
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME:
+      return {
+        // Deliberately not the commons text here: it names the mismatch in
+        // byte-counting terms and stops. This names the remedy.
+        message: `A partial download of '${modelId}' left behind bytes that no longer match the file `
+          + 'on the server, so it cannot be resumed. Delete the partial download from the Storage '
+          + 'screen and start it again.',
+        reason,
+        retryable: false,
+      };
+    default:
+      break;
+  }
+
+  if (detail) {
+    // A refusal this SDK has no branch for. Commons' words are still the best
+    // available description; the verdict is the conservative one, because a
+    // plan is computed from settled inputs — replaying it reproduces it.
+    return { message: detail, reason, retryable: false };
+  }
+
+  if (plan.files.length === 0) {
+    return {
+      // Deliberately not "the catalogue entry is incomplete": the file list is
+      // resolved by the planner from the entry, and either side can be at
+      // fault. Say what is observably true — no files came back — and that a
+      // retry replays the same empty plan.
+      message: `No files were resolved for '${modelId}', so there is nothing to fetch. The file list `
+        + 'is settled before any bytes are requested, so retrying produces the same empty plan. Pick '
+        + 'another model, and report this one if it is listed as downloadable.',
+      reason,
+      retryable: false,
+    };
+  }
+
+  return {
+    message: `The download planner refused '${modelId}' without giving a reason `
+      + `(failure reason ${downloadFailureReasonToJSON(reason)}). This is a bug in the planner rather `
+      + 'than something to retry — please report it with the console log.',
+    reason,
+    retryable: false,
+  };
 }
 
 async function pollDownloadWithRetry(
@@ -1571,10 +1689,12 @@ export const SDKCore = {
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
+      const rejection = describePlanRejection(request.modelId, plan ?? null);
       throwDownloadFailure(
         'downloadModel',
-        plan?.error?.message || `Download plan for '${request.modelId}' could not start.`,
-        plan?.failureReason,
+        rejection.message,
+        rejection.reason,
+        rejection.retryable,
       );
     }
     await assertBrowserStorageQuota(
@@ -1654,6 +1774,8 @@ export const SDKCore = {
       throwDownloadFailure(
         'downloadModel',
         lastProgress.error?.message || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
+        undefined,
+        DOWNLOAD_TRANSFER_FAILURE_RETRYABLE,
       );
     }
 

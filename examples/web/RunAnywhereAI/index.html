@@ -2,28 +2,126 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0C0E17" />
+  <!-- No maximum-scale / user-scalable=no: blocking pinch-zoom fails WCAG 1.4.4
+       and there is no layout here that needs it. interactive-widget keeps the
+       composer above the on-screen keyboard instead of letting the keyboard
+       shrink the visual viewport out from under a fixed-position input. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Matches --bg-primary in design-system.css; overwritten per theme by app.ts. -->
+  <meta name="theme-color" content="#191817" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>RunAnywhere</title>
   <link rel="icon" type="image/svg+xml" href="/runanywhere-logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" />
+  <!--
+    Loaded without blocking the first paint. As a plain stylesheet this cost 139ms
+    of render-blocking time on a *local* server (Chrome measured 291ms of FCP
+    savings from deferring it) — a third-party request on the critical path,
+    holding back a boot screen that exists specifically to appear immediately.
+
+    `media="print"` makes it non-blocking; onload promotes it to `all`. The
+    boot screen's inline CSS names the same system-font fallback the token layer
+    does, so the first frame renders in the platform UI font and re-renders in
+    Figtree when it arrives — `display=swap` already opted into exactly that
+    trade for the rest of the app. The <noscript> copy keeps the webfont for a
+    scripting-disabled reader.
+  -->
+  <link rel="stylesheet" media="print" onload="this.media='all'; this.onload=null;"
+    href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" />
+  </noscript>
   <script>
-    // Apply the persisted theme before first paint to avoid a flash.
+    // Resolve the theme to a concrete value before first paint, so no frame is
+    // ever painted in the wrong palette. This must always set the attribute —
+    // design-system.css declares light ONLY under [data-theme="light"] and has
+    // no prefers-color-scheme fallback, so an unset attribute means dark. The
+    // stored choice wins; absent one, the OS preference is read here rather than
+    // in CSS, which keeps a single source of truth for "which theme is on".
     (function () {
-      try {
-        var theme = localStorage.getItem('runanywhere-theme');
-        if (theme === 'light' || theme === 'dark') {
-          document.documentElement.dataset.theme = theme;
-        }
-      } catch (e) { /* storage unavailable */ }
+      var stored = null;
+      try { stored = localStorage.getItem('runanywhere-theme'); } catch (e) { /* storage unavailable */ }
+      var theme = stored === 'light' || stored === 'dark'
+        ? stored
+        : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
     })();
   </script>
+  <!--
+    Critical CSS for the boot screen only, inlined out of necessity rather than as
+    an optimisation: the app's stylesheets are imported by main.ts, so the served
+    document carries no stylesheet at all. The boot screen below is static markup
+    precisely so it can paint before that module runs — which means without these
+    rules it would paint *unstyled* for the same period, trading a blank page for
+    a raw left-aligned logo and unformatted text.
+
+    Deliberately a duplicate of the .loading-* rules in components.css, kept to
+    the handful of properties that decide the layout of this one screen. The
+    values are literals because the token layer is in that same unloaded
+    stylesheet; the two backgrounds are --bg-primary's light/dark values, and are
+    the only place in the app outside design-system.css that may hardcode them.
+    Everything after the first frame is governed by components.css as usual.
+  -->
+  <style>
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      background: #191817;
+      color: #F0EEEB;
+      font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      text-align: center;
+    }
+    :root[data-theme="light"] #loading-screen { background: #FCFBFA; color: #1D1B19; }
+    #loading-screen .loading-logo { width: 100px; height: 100px; }
+    #loading-screen h2 { font-size: 1.5rem; font-weight: 600; margin: 0 0 8px; }
+    #loading-screen p { margin: 0; font-size: 0.9375rem; opacity: 0.72; }
+    #loading-screen .loading-bar {
+      width: 200px; height: 3px; border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.16); overflow: hidden;
+    }
+    :root[data-theme="light"] #loading-screen .loading-bar { background: rgba(29, 27, 25, 0.14); }
+    #loading-screen .loading-bar-fill { height: 100%; border-radius: 9999px; background: #FF6900; }
+  </style>
 </head>
 <body>
+  <!--
+    The boot screen is static markup, not JS-injected, because it is the *only*
+    thing standing between the user and a blank page.
+
+    It used to be built in showLoadingScreen() after an awaited step in main(),
+    which means nothing at all painted until the module graph had been fetched,
+    parsed and executed — a blank window for ~900ms on a cold load. Markup that
+    ships in the document paints with the document, so the first frame carries
+    the brand no matter how slow the bundle is.
+
+    It also now uses the real logo, matching .consumer-brand__mark in the shell.
+    The JS version drew a hand-rolled "RA" placeholder, so the first thing a user
+    saw was not actually the product's mark.
+
+    JS only ever hides this (hideLoadingScreen()); it never builds it.
+  -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="loading-logo">
+      <img src="/runanywhere-logo.svg" alt="" width="100" height="100" />
+    </div>
+    <div class="loading-text">
+      <h2>Starting RunAnywhere</h2>
+      <p>Getting your on-device AI ready&hellip;</p>
+    </div>
+    <div class="loading-bar">
+      <div class="loading-bar-fill"></div>
+    </div>
+    <p class="text-sm text-tertiary" id="loading-status">Loading the SDK&hellip;</p>
+  </div>
   <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>

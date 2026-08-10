@@ -3,30 +3,85 @@
  * ============================================================================= */
 
 /* =============================================================================
- * Acceleration Badge
+ * Runtime row (drawer footer) — "where is this running?"
+ *
+ * Previously a `position: fixed` three-line block in the bottom-right corner at
+ * `z-index: 140` with `pointer-events: none`, i.e. an un-clickable overlay
+ * sitting on the chat composer at narrow widths. It is now the last row of the
+ * drawer: a privacy statement first, the execution path second, and the
+ * accelerator as a one-word chip.
+ *
+ * `margin-top: auto` pins it to the bottom of the drawer's flex column so it
+ * stays a footer whether the recents list has two entries or forty.
  * ============================================================================= */
-.accel-badge {
-  position: fixed;
-  bottom: 14px;
-  right: 16px;
-  z-index: 140;
+.consumer-drawer__footer {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-medium);
+}
+
+.consumer-runtime {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md-lg);
+  border-radius: var(--radius-xl);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  /* `default`, not `help`: the tooltip is a diagnostic bonus, and a help cursor
+     on a whole row implies the row itself is the explanation of something. */
+  cursor: default;
+}
+
+.consumer-runtime__icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--color-green);
+}
+.consumer-runtime--unavailable .consumer-runtime__icon { color: var(--color-yellow); }
+
+.consumer-runtime__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 5px 10px;
-  border-radius: var(--radius-md);
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.consumer-runtime__headline {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
+}
+.consumer-runtime__detail {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  line-height: var(--line-height-tight);
+  /* One line, ellipsised: the full matrix is in the row's `title`, and a
+     wrapping second line here would push the drawer's footer height around
+     every time the accelerator changed. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The accelerator chip. One token — never a sentence — because it is the only
+   glanceable part of the row and it is what the release browser suite reads. */
+.accel-badge {
+  flex-shrink: 0;
+  padding: 3px var(--space-sm-md);
+  border-radius: var(--radius-full);
+  font-family: var(--font-family);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
-  pointer-events: none;
-  font-family: var(--font-family);
-  border: 1px solid var(--border-light);
-  line-height: 1.25;
-  text-align: right;
+  line-height: 1.4;
+  white-space: nowrap;
 }
-.accel-badge__line { display: block; white-space: nowrap; }
 .accel-badge--gpu { background: var(--badge-green); color: var(--color-green); }
-.accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-tertiary); }
+.accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-secondary); }
+/* No engine registered — the chip must not read like a live execution path. */
+.accel-badge--unavailable { background: var(--badge-yellow); color: var(--color-yellow); }
 
 /* =============================================================================
  * App Layout
@@ -169,10 +224,20 @@
 }
 
 .shell-icon-btn:hover,
-.composer-icon-btn:hover,
+.composer-icon-btn:hover:not(:disabled),
 .composer-icon-btn.active {
   color: var(--color-primary);
   background: var(--color-primary-light);
+}
+
+/* A composer control the loaded model cannot honour — reasoning on a model with no
+   thinking phase. Dimmed and inert rather than removed, so the affordance stays
+   where the reader expects it and its title says why it is unavailable; the hover
+   tint is suppressed because a control that lights up but does nothing reads as
+   broken rather than unavailable. */
+.composer-icon-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
 }
 
 .shell-icon-btn:active,
@@ -186,12 +251,14 @@
   height: 20px;
 }
 
+/* Ink label for the same reason `.btn-primary` uses it: base-size semibold on a
+   solid orange fill is small text, not a large brand moment (§5). */
 .consumer-new-chat {
   height: 42px;
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  color: var(--text-white);
+  color: var(--text-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -360,7 +427,18 @@
   color: var(--text-primary);
 }
 
-/* Brand accent bar on the active nav item. */
+/* Brand accent bar on the active nav item.
+ *
+ * It grows from the centre rather than appearing, so the indicator reads as
+ * moving to the item you picked instead of blinking on. The pseudo-element only
+ * exists while .active is set, so — like the panel — the animation restarts on
+ * every switch with no JS and no state to reset. scaleY is used rather than
+ * height so the growth never touches layout. */
+@keyframes nav-indicator-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
 .tab-item.consumer-nav-item.active::before {
   content: '';
   position: absolute;
@@ -370,6 +448,7 @@
   width: 3px;
   border-radius: var(--radius-full);
   background: var(--color-primary);
+  animation: nav-indicator-grow var(--duration-fast) var(--ease-out);
 }
 
 .consumer-nav-item.active .consumer-nav-item__icon {
@@ -430,9 +509,45 @@
   overflow: hidden;
 }
 
+/* Switching views was the one moment the app had to feel deliberate, and it
+ * instead read like a page reload: display:none to display:flex is a hard cut
+ * with no continuity between where you were and where you landed.
+ *
+ * Enter-only, and CSS-only, on purpose:
+ *
+ * - The outgoing panel *cannot* animate. `display` is not interpolable, and this
+ *   app's build is pinned to Chrome 86 syntax, which predates @starting-style
+ *   and `transition-behavior: allow-discrete`. Keeping the old panel mounted for
+ *   a cross-fade would instead put two copies of every heading, control and
+ *   landmark in the accessibility tree and the tab order simultaneously — a real
+ *   regression bought for a flourish.
+ * - No JS. An element that is not rendered has no running animations, so
+ *   display:flex restarts this one on every switch for free — no direction
+ *   state, no class to clean up, no timer racing the next click.
+ * - Fail-safe. Keyframe values exist only while the animation runs (no fill
+ *   mode), so a panel whose animation never starts is simply fully visible.
+ *
+ * The rise is 8px: enough to read as arrival, too small to look like the layout
+ * settling. Uniform in both directions because the nav is a vertical sidebar and
+ * implies no spatial axis for content to travel along — direction-dependent
+ * motion here would be noise, not orientation. prefers-reduced-motion is already
+ * honoured by the global block in design-system.css.
+ */
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .tab-panel.active {
   display: flex;
   position: absolute;
+  animation: panel-enter var(--duration-fast) var(--ease-out);
 }
 
 /* =============================================================================
@@ -511,6 +626,23 @@
   display: flex;
   gap: var(--space-sm-md);
   align-items: center;
+  /* The toolbar is space-between, which balances two children but centres the
+   * title once a Back button makes three. Pushing the actions to the end keeps
+   * the title anchored beside the button it belongs to, and is a no-op in the
+   * two-child case. (`:has()` would be the direct way to scope this, but the
+   * build targets Chrome 86.) */
+  margin-left: auto;
+}
+
+/* Back out of a drilled-into surface. Leads the toolbar because that is where
+ * both platform conventions put it, and because it should be reachable before
+ * the title it qualifies — including as the first stop in the tab order. Spacing
+ * is negative-left so the icon's optical edge lines up with the content below
+ * rather than its 40px hit box, which would look inset by comparison. */
+.toolbar-back {
+  flex-shrink: 0;
+  margin-left: calc(var(--space-sm) * -1);
+  margin-right: var(--space-xs);
 }
 
 /* =============================================================================
@@ -534,16 +666,38 @@
   white-space: nowrap;
 }
 
-.btn:hover { background: var(--bg-gray5); border-color: var(--border-strong); }
-.btn:active { transform: scale(0.98); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover:not(:disabled) { background: var(--bg-gray5); border-color: var(--border-strong); }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { cursor: not-allowed; }
 
+/* Ink, not white. `.btn` sets base size / medium weight, so a primary label is
+   small text by WCAG's measure and white on #FF6900 is 2.89:1 — under AA and
+   under even the 3:1 large-text floor. DESIGN_GUIDELINE §5 keeps the
+   white-on-orange deviation for the *gradient* CTA and large/bold brand
+   moments only; a normal-weight button label is neither. Ink is 6.12:1 on
+   #FF6900 and 5.02:1 on the #E65E00 hover tone, so both states clear AA.
+   iOS `RAProminentButtonStyle` and Android's `onPrimary` token carry the same
+   ink, so the primary action reads identically on all four surfaces. */
 .btn-primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--text-white);
+  color: var(--text-on-primary);
 }
-.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+/* A disabled button drops the brand fill entirely rather than fading it.
+   Orange at 50% opacity over the dark canvas becomes a muddy brown that still
+   reads as "this is the bright primary action" while being inert, and its label
+   lands at ~3:1 — legible enough to invite a click, not enough to read
+   comfortably. Neutral surface + tertiary label says "not yet" unambiguously,
+   and the adjacent enabled button keeps the only orange on screen. */
+.btn:disabled,
+.btn-primary:disabled {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+  color: var(--text-tertiary);
+  box-shadow: none;
+}
 
 .btn-icon {
   width: 36px;
@@ -708,42 +862,6 @@
 }
 
 /* =============================================================================
- * Typing Indicator
- * ============================================================================= */
-.typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm-md) var(--space-md-lg);
-}
-
-.typing-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  opacity: 0.5;
-  animation: typing-bounce 1.4s infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-6px); opacity: 1; }
-}
-
-.typing-text {
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-}
-
-/* =============================================================================
  * Chat Input Area
  * ============================================================================= */
 .chat-input-area {
@@ -779,7 +897,11 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
   border: none;
-  color: white;
+  /* The arrow is a control glyph, so WCAG 1.4.11 asks 3:1 against the fill it
+     sits on: white on #FF6900 is 2.89:1 and misses even that floor. Ink is
+     6.12:1, and it is the same pairing Android's send button gets from its
+     `onPrimary` token, so the composer's send action matches across apps. */
+  color: var(--text-on-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -810,6 +932,21 @@
   padding: var(--space-sm-md) var(--space-lg) var(--space-lg);
   background: var(--bg-primary);
   flex-shrink: 0;
+}
+
+/*
+ * A file is being dragged over the composer.
+ *
+ * The cue goes on the input area rather than the shell so it outlines the target
+ * the user is aiming at. Brand-coloured because "you may drop here" is an
+ * affirmative invitation, and dashed to say the boundary is a drop zone rather
+ * than a focus ring — a solid brand outline is what focus-visible uses, and the
+ * two must not be confusable.
+ */
+.chat-composer-shell--dropping .chat-input-area {
+  border-color: var(--color-primary);
+  border-style: dashed;
+  background: var(--bg-tertiary);
 }
 
 .chat-panel-consumer .chat-input-area {
@@ -849,7 +986,7 @@
   background: transparent;
 }
 
-.chat-panel-consumer .composer-icon-btn:hover,
+.chat-panel-consumer .composer-icon-btn:hover:not(:disabled),
 .chat-panel-consumer .composer-icon-btn.active {
   background: var(--color-primary-light);
 }
@@ -1046,7 +1183,8 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
   vertical-align: baseline;
-  animation: chat-cursor-pulse 1s ease-in-out infinite;
+  /* Linear, not eased: an eased curve reads as a stutter on every loop. */
+  animation: chat-cursor-pulse var(--ambient-breathe) linear infinite;
 }
 
 @keyframes chat-cursor-pulse {
@@ -1149,26 +1287,153 @@
   overflow-y: auto;
 }
 
-/* Fenced code blocks inside replies. */
-.chat-code {
-  margin: var(--space-sm-md) 0;
-  padding: var(--space-md) var(--space-regular);
+/*
+ * ---------------------------------------------------------------------------
+ * Rendered markdown (services/markdown.ts)
+ * ---------------------------------------------------------------------------
+ *
+ * Model replies are markdown, and the block set here matches Android's
+ * MarkdownText.kt and iOS's AdaptiveMarkdownText so the same answer has the
+ * same shape on all four surfaces.
+ *
+ * Scoped by class rather than by element so these rules apply wherever model
+ * output is rendered — the chat bubble and the RAG answer panel — and nowhere
+ * else. A bare `h4`/`ul`/`blockquote` selector would reach the app's own chrome.
+ */
+
+/* The first and last block sit flush: the container already has padding. */
+.md-p, .md-heading, .md-list, .md-quote, .md-code, .md-rule { margin: 0; }
+.md-p + *, .md-heading + *, .md-list + *, .md-quote + *, .md-code + *, .md-rule + * {
+  margin-top: var(--space-sm-md);
+}
+
+.md-p { line-height: var(--line-height-relaxed); }
+
+/*
+ * Headings carry rank by weight and size, and the scale is compressed.
+ *
+ * A model writes `##` for what is a sub-point inside one reply, not a page
+ * title — so mapping it to a full document heading size would make a bubble
+ * shout louder than the view's own header. h1/h2 land at 18px, h3 at 16px, and
+ * h4-h6 at body size with weight alone doing the work.
+ */
+.md-heading {
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+/* Extra room above a heading that follows content — a new section needs a gap
+   wider than the one between two paragraphs to read as a break. */
+* + .md-heading { margin-top: var(--space-lg); }
+.md-heading--1, .md-heading--2 { font-size: var(--font-size-lg); }
+.md-heading--3 { font-size: var(--font-size-md); }
+.md-heading--4, .md-heading--5, .md-heading--6 { font-size: var(--font-size-base); }
+
+/*
+ * Lists.
+ *
+ * The indent is `--space-xl` so the marker column clears the bubble's own
+ * padding and wrapped item text aligns under the item, not under the marker.
+ */
+.md-list {
+  padding-left: var(--space-xl);
+  line-height: var(--line-height-relaxed);
+}
+.md-list li + li { margin-top: var(--space-xs); }
+/* Nested lists tighten rather than repeat the full block gap. */
+.md-list .md-list { margin-top: var(--space-xs); }
+.md-list::marker, .md-list li::marker { color: var(--text-tertiary); }
+
+.md-quote {
+  padding-left: var(--space-md-lg);
+  border-left: 3px solid var(--border-medium);
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+.md-rule {
+  border: 0;
+  border-top: 1px solid var(--border-light);
+}
+
+/*
+ * Fenced code.
+ *
+ * A header row carrying the language and a copy button, matching the iOS code
+ * renderer — a browser reader should not have to hand-select code out of a
+ * scrolling box when the phone offers one tap.
+ */
+.md-code {
+  overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
+}
+.md-code__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm-md);
+  /* min-height so a fence with no language still has a copy button on a row of
+     the same height — an unlabelled block must not jump smaller. */
+  min-height: 32px;
+  padding: 0 var(--space-sm-md) 0 var(--space-regular);
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+}
+.md-code__lang {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: lowercase;
+}
+.md-code__copy {
+  /* Pushed to the right edge when there is no language label to sit beside. */
+  margin-left: auto;
+  padding: var(--space-xs) var(--space-sm-md);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--duration-micro) var(--ease-standard),
+              background var(--duration-micro) var(--ease-standard);
+}
+.md-code__copy:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.md-code__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.md-code__body {
+  margin: 0;
+  padding: var(--space-md) var(--space-regular);
+  overflow-x: auto;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: 1.6;
-  overflow-x: auto;
+  /*
+   * `pre` preserves the model's own line breaks and does not add its own.
+   * Code is the one place where a soft wrap changes meaning, so it scrolls
+   * horizontally instead — which is what the head row's border is anchored
+   * against, so the header stays put while the body scrolls under it.
+   */
+  white-space: pre;
+}
+/* The body's own <code> must not pick up the inline-code chip styling below. */
+.md-code__body code {
+  padding: 0;
+  background: none;
+  font: inherit;
 }
 
-.chat-message--user .chat-code {
-  background: rgba(0, 0, 0, 0.22);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-white);
-}
-
-.chat-bubble code:not(.chat-code code) {
+/*
+ * Inline code, inside a bubble or a RAG answer.
+ *
+ * `0.9em` rather than a fixed size so a code span inside a heading scales with
+ * that heading instead of shrinking to body size mid-line.
+ */
+.chat-bubble code, .docs-answer-text code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   padding: 1px 5px;
@@ -1176,12 +1441,47 @@
   background: var(--bg-tertiary);
 }
 
-.chat-message--user .chat-bubble code:not(.chat-code code) {
+/*
+ * The user's own bubble is a filled brand surface, so every one of these needs
+ * a treatment that reads on it. Rare — a user rarely types markdown — but a
+ * pasted snippet is exactly the case that would otherwise render dark-on-dark.
+ */
+.chat-message--user .chat-bubble code { background: rgba(0, 0, 0, 0.22); }
+.chat-message--user .md-code {
   background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-white);
 }
+.chat-message--user .md-code__head {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.chat-message--user .md-code__lang,
+.chat-message--user .md-code__copy { color: rgba(255, 255, 255, 0.72); }
+.chat-message--user .md-code__copy:hover {
+  color: var(--text-white);
+  background: rgba(0, 0, 0, 0.24);
+}
+.chat-message--user .md-quote {
+  border-left-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.88);
+}
+.chat-message--user .md-rule { border-top-color: rgba(255, 255, 255, 0.24); }
+.chat-message--user .md-list::marker,
+.chat-message--user .md-list li::marker { color: rgba(255, 255, 255, 0.6); }
+.chat-message--user .chat-bubble a { color: var(--text-white); }
 
 .chat-bubble-typing {
   color: var(--text-tertiary);
+}
+
+/* A turn that failed. Colour is never the only carrier — the sentence itself starts
+   with "Error:" and the element is a live region — but the danger ink is what stops a
+   reader attributing the app's own failure report to the model. */
+.chat-error {
+  margin: 0;
+  color: var(--text-danger);
+  line-height: var(--line-height-relaxed);
 }
 
 .chat-attachment-card {
@@ -1263,9 +1563,13 @@
   font-size: var(--font-size-xs);
 }
 
+/*
+ * `.chat-code` is deliberately absent here: rendered code is `.md-code__body`
+ * now, and it wraps `pre` (not `pre-wrap`) because a soft wrap inside code
+ * changes what the code says. It scrolls horizontally instead.
+ */
 .chat-tool-call pre,
 .chat-thinking-content,
-.chat-code,
 .chat-source span {
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -1314,76 +1618,6 @@
   font-size: var(--font-size-xs);
 }
 
-/* =============================================================================
- * Model Overlay (Welcome / Get Started)
- * ============================================================================= */
-.model-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-primary);
-  z-index: 50;
-  gap: var(--space-xl);
-  text-align: center;
-  padding: var(--space-3xl);
-}
-
-.model-overlay-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.floating-circle {
-  position: absolute;
-  border-radius: var(--radius-full);
-  opacity: 0.08;
-  animation: float-circle 8s ease-in-out infinite;
-}
-@keyframes float-circle {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(20px, -30px) scale(1.1); }
-  50% { transform: translate(-10px, -60px) scale(0.95); }
-  75% { transform: translate(30px, -20px) scale(1.05); }
-}
-
-.model-overlay-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-lg);
-}
-
-.model-overlay .sparkle-icon {
-  font-size: 48px;
-  line-height: 1;
-}
-
-.model-overlay h2 {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-}
-
-.model-overlay p {
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-  max-width: 360px;
-}
-
-.privacy-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-  margin-top: var(--space-md);
-}
 
 /* =============================================================================
  * Model Selection Sheet
@@ -1521,6 +1755,14 @@
   color: var(--color-purple);
 }
 
+/*
+ * The modality avatar on a model row.
+ *
+ * Holds a stroked glyph from `components/icons.ts` (see `modalityIcon`), not an
+ * emoji, so it inherits the theme's text colour and sits at the same 1.5px
+ * weight as every other icon on the screen. `color` rather than `fill` because
+ * the glyph paints with `currentColor`.
+ */
 .model-logo {
   width: 40px;
   height: 40px;
@@ -1529,7 +1771,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -1580,11 +1822,23 @@
 }
 .model-action-btn:not(:disabled):hover { filter: brightness(1.08); }
 .model-action-btn:not(:disabled):active { transform: scale(0.97); }
-.model-action-btn.download { background: var(--color-primary); color: white; box-shadow: 0 2px 10px var(--shadow-accent); }
+/* Small semibold label on a solid brand fill — ink, per §5 and `.btn-primary`. */
+.model-action-btn.download { background: var(--color-primary); color: var(--text-on-primary); box-shadow: 0 2px 10px var(--shadow-accent); }
 .model-action-btn.load { background: var(--badge-green); color: var(--color-green); }
 .model-action-btn.loaded { background: var(--badge-green); color: var(--color-green); cursor: pointer; }
 .model-action-btn--progress { background: var(--bg-tertiary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .model-action-btn--retry { background: var(--badge-red); color: var(--color-red); }
+/* Quiet by default: stopping a download is available, not encouraged, and the
+   progress detail beside it is what should hold the eye. Warms to the red
+   destructive treatment on hover so the intent is unmistakable once aimed at. */
+.model-action-btn--cancel {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.model-action-btn--cancel:not(:disabled):hover {
+  background: var(--badge-red);
+  color: var(--color-red);
+}
 .model-action-btn--unavailable {
   max-width: 168px;
   background: var(--bg-tertiary);
@@ -1647,6 +1901,73 @@
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+}
+
+/* =============================================================================
+ * Engine banner — replaces the device banner when an inference engine failed
+ * to register, so the picker never claims a device recommendation for a list
+ * where nothing can load. Same geometry as .device-banner (no layout shift),
+ * warning tone instead of the brand gradient.
+ * ============================================================================= */
+.engine-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md-lg);
+  padding: var(--space-md-lg) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--badge-yellow);
+  border: 1px solid var(--color-yellow);
+}
+.engine-banner__glyph {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-regular);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-yellow);
+  background: var(--bg-secondary);
+  box-shadow: var(--elevation-sm);
+}
+/* Size comes from the icon() call (24, on the icon scale), not from here. */
+.engine-banner__text { flex: 1; min-width: 0; }
+.engine-banner__title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+}
+.engine-banner__meta {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+}
+.engine-banner__details {
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+}
+.engine-banner__details summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  /* Roomy enough to hit on a phone without inflating the collapsed banner. */
+  padding: var(--space-xs) 0;
+}
+.engine-banner__details summary:hover { color: var(--text-secondary); }
+.engine-banner__diagnostic {
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  /* Upstream fetch/WASM diagnostics contain long unbroken URLs; wrap them
+     rather than letting the banner scroll sideways. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow-y: auto;
 }
 
 /* =============================================================================
@@ -1971,8 +2292,6 @@
   white-space: nowrap;
 }
 .family-card__chevron {
-  width: 18px;
-  height: 18px;
   color: var(--text-tertiary);
   transition: transform var(--duration-fast) var(--ease-out);
 }
@@ -2066,23 +2385,37 @@
 }
 
 /* =============================================================================
- * Voice AI setup card — pre-selected STT + LLM + TTS (+ VAD) with one-tap
- * download/load and per-component progress.
+ * Setup card + model slots.
+ *
+ * Shared by every surface that needs a specific set of models resident before
+ * its primary action is honest: Voice AI (STT + LLM + TTS + VAD) and Solutions
+ * (the model ids each YAML names). The slot rows are rendered by
+ * `components/model-slot.ts` so the state vocabulary — "On device", "Loading…",
+ * "✓ Ready" — is written once and cannot drift between surfaces.
  * ============================================================================= */
-.voice-setup {
+.setup-card {
   margin: var(--space-lg);
+  /* Capped so the slot rows keep a sane row length on a wide desktop pane; the
+     card is a form, not a table. */
+  max-width: 720px;
   padding: var(--space-xl);
   border-radius: var(--radius-card);
   background: linear-gradient(135deg, var(--color-primary-light), var(--bg-secondary));
   border: 1px solid var(--border-light);
 }
-.voice-setup__head {
+/* The brand-tinted gradient marks a single hero setup task (Voice AI). Where a
+   surface stacks several cards of equal standing (Solutions), the tint stops
+   meaning "start here" and just adds noise — so those opt out. */
+.setup-card--plain {
+  background: var(--bg-secondary);
+}
+.setup-card__head {
   display: flex;
   align-items: center;
   gap: var(--space-md-lg);
   margin-bottom: var(--space-lg);
 }
-.voice-setup__glyph {
+.setup-card__glyph {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
@@ -2094,26 +2427,26 @@
   background: var(--bg-secondary);
   box-shadow: var(--elevation-sm);
 }
-.voice-setup__glyph svg { width: 24px; height: 24px; }
-.voice-setup__title {
+.setup-card__glyph svg { width: 24px; height: 24px; }
+.setup-card__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
 }
-.voice-setup__subtitle {
+.setup-card__subtitle {
   margin-top: 2px;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
 }
 
-.voice-setup__slots {
+.setup-card__slots {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 
-.voice-slot {
+.model-slot {
   display: flex;
   align-items: center;
   gap: var(--space-md-lg);
@@ -2123,11 +2456,21 @@
   border: 1px solid var(--border-light);
   transition: border-color var(--duration-fast);
 }
-.voice-slot--loaded { border-color: var(--color-green); }
-.voice-slot--error { border-color: var(--color-red); }
-.voice-slot--missing { opacity: 0.6; }
+.model-slot--loaded { border-color: var(--color-green); }
+.model-slot--error { border-color: var(--color-red); }
+.model-slot--missing { opacity: 0.6; }
+/*
+ * Blocked = the engine that runs this model never registered, so no action on
+ * this row can succeed. Yellow, not the red of `--error`: red is reserved for
+ * "this model's own download or load failed", which a retry of the same button
+ * can still fix. Same colour as the picker banner and the acceleration badge
+ * use for the identical condition, so one cause reads as one thing everywhere.
+ */
+.model-slot--blocked { border-color: var(--color-yellow); }
 
-.voice-slot__icon {
+/* Same stroked modality glyph as `.model-logo`, one step smaller for the
+   pipeline rows. */
+.model-slot__icon {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
@@ -2136,14 +2479,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  color: var(--text-secondary);
 }
-.voice-slot__body { flex: 1; min-width: 0; }
-.voice-slot__label {
+.model-slot__body { flex: 1; min-width: 0; }
+.model-slot__label {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
 }
-.voice-slot__opt {
+.model-slot__opt {
   margin-left: var(--space-xs);
   font-weight: var(--font-weight-normal);
   font-size: 10px;
@@ -2151,32 +2494,41 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.voice-slot__hint {
+.model-slot__hint {
   margin-top: 2px;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
-.voice-slot__progress {
+.model-slot__progress {
   margin-top: var(--space-sm);
   max-width: 220px;
 }
-.voice-slot__aside {
+.model-slot__blocked {
+  margin-top: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  /* Upstream diagnostics can carry long unbroken URLs. */
+  overflow-wrap: anywhere;
+}
+.model-slot__aside {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   flex-shrink: 0;
 }
-.voice-slot__state {
+.model-slot__state {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.voice-slot__state--ready { color: var(--color-green); }
-.voice-slot__state--error { color: var(--color-red); }
-.voice-slot__state--pending { color: var(--text-tertiary); }
-.voice-slot__change {
+.model-slot__state--ready { color: var(--color-green); }
+.model-slot__state--error { color: var(--color-red); }
+.model-slot__state--blocked { color: var(--color-yellow); }
+.model-slot__state--pending { color: var(--text-tertiary); }
+.model-slot__change {
   background: none;
   border: none;
   cursor: pointer;
@@ -2187,33 +2539,59 @@
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-full);
 }
-.voice-slot__change:hover { background: var(--color-primary-light); }
+.model-slot__change:hover { background: var(--color-primary-light); }
 
-.voice-setup__actions {
+.setup-card__actions {
   margin-top: var(--space-lg);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-sm);
 }
-.voice-setup__note,
-.voice-setup__ready {
+.setup-card__note,
+.setup-card__ready {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
-.voice-setup__ready {
+.setup-card__ready {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
 }
+/*
+ * The "no model yet" / "engine didn't load" card.
+ *
+ * Takes the scroll region's place in the panel's flex column rather than being
+ * painted absolutely over the whole panel. As an opaque `inset: 0` overlay it
+ * covered the composer and the panel's own empty state, which left nine
+ * controls — the four prompt chips, the attach/tools/talk buttons, the textarea
+ * and Send — invisible but still focusable and still read out by a screen
+ * reader. Occupying the same box as the region it replaces means there is
+ * nothing behind it to hide, so the composer stays visible and honest (Send is
+ * already disabled and labelled "Load a model first").
+ */
 .chat-model-overlay {
-  position: absolute;
-  inset: var(--toolbar-height, 56px) 0 0 0;
+  position: relative;
+  flex: 1;
+  /* Without this a tall card makes the flex item refuse to shrink and pushes
+     the composer off the bottom of the panel. */
+  min-height: 0;
   display: flex;
-  align-items: center;
+  /*
+   * Centred while the card fits, top-aligned once it doesn't.
+   *
+   * `align-items: center` on a scroll container clips the *unreachable* side:
+   * in landscape (390 px tall) the card's first 39 px sat above the region and
+   * scrolling only pushed it further away, so "AI engine didn't load" could not
+   * be read at all. `safe center` degrades to start-alignment exactly when
+   * overflow begins; the `margin: auto` on the card is the equivalent for
+   * browsers without `safe` (including this app's Chrome 86 floor), where a
+   * flex item's auto margin still yields to the container's edges instead of
+   * overflowing past them.
+   */
+  align-items: safe center;
   justify-content: center;
-  background: var(--bg-primary);
-  z-index: 1;
+  overflow-y: auto;
   padding: var(--space-xl);
 }
 .chat-model-overlay.hidden {
@@ -2222,9 +2600,24 @@
 .chat-model-overlay.chat-model-overlay--conversation-visible {
   display: none !important;
 }
+/*
+ * One empty state at a time.
+ *
+ * The panel's own empty state (greeting + prompt chips) and this card are both
+ * "nothing here yet" surfaces, and stacking them offered chips that would type
+ * a prompt into a composer that cannot send. The card outranks them while it is
+ * up: it names the one thing that has to happen first. Set as a class rather
+ * than `:has()` so it also holds on this app's documented Chrome 86 floor.
+ */
+.chat-panel--model-blocked > #chat-messages {
+  display: none;
+}
 .chat-model-overlay-card {
   max-width: 420px;
   width: 100%;
+  /* Centres the card in the taller-than-content case and yields to the top edge
+     in the shorter case — the `safe center` fallback described on the region. */
+  margin: auto;
   padding: var(--space-xl);
   text-align: center;
   display: flex;
@@ -2246,6 +2639,18 @@
 .chat-model-overlay-glyph svg {
   width: 40px;
   height: 40px;
+}
+/* The engine-failed variant of the same glyph well: warning tone, so the
+   overlay reads as a problem rather than an invitation. */
+.chat-model-overlay-glyph--warning {
+  background: var(--badge-yellow);
+  color: var(--color-yellow);
+}
+.chat-model-overlay-details {
+  width: 100%;
+  max-width: 340px;
+  margin-top: var(--space-lg);
+  text-align: left;
 }
 .chat-model-overlay-title {
   margin: 0 0 var(--space-md);
@@ -2272,10 +2677,86 @@
   width: 14px;
   height: 14px;
 }
-
-.chat-panel-consumer .chat-model-overlay {
-  inset: 0;
+/*
+ * Short viewports — phone landscape, and desktop windows dragged flat.
+ *
+ * The card is the whole screen's worth of content here, and at 390 px tall the
+ * full-size version pushed its only button ("Choose a Model" / "Try again")
+ * below the fold, so the state read as a dead end unless you thought to scroll.
+ * Shrinking the decorative parts first — the glyph well, the display-size title,
+ * the generous gaps — keeps the sentence and the action together. Keyed on
+ * height rather than width because it is vertical room that is missing.
+ */
+@media (max-height: 560px) {
+  .chat-model-overlay {
+    /* Tight block padding so the compacted card clears the region outright
+       rather than overflowing it by a handful of pixels and raising a scrollbar
+       over content that would otherwise fit. */
+    padding: var(--space-md) var(--space-xl);
+  }
+  .chat-model-overlay-card {
+    padding: 0;
+  }
+  .chat-model-overlay-glyph {
+    width: 52px;
+    height: 52px;
+    margin-bottom: var(--space-md);
+  }
+  .chat-model-overlay-glyph svg {
+    width: 26px;
+    height: 26px;
+  }
+  .chat-model-overlay-title {
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-xl);
+  }
+  .chat-model-overlay-description {
+    margin-bottom: var(--space-lg);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+  }
+  .chat-model-overlay-privacy,
+  .chat-model-overlay-details {
+    margin-top: var(--space-md);
+  }
+  /*
+   * Short *and* wide: spend the width instead of the height.
+   *
+   * A phone in landscape has 844 px across but only ~242 px of panel, so the
+   * centred column wasted its whole glyph band on vertical space it did not
+   * have — the button ended up below the fold even after the shrink above. Here
+   * the glyph moves beside the text instead of above it, and the paragraph gets
+   * the width it was already being denied (~60ch, still a comfortable measure),
+   * which is enough for the sentence and the action to be on screen together.
+   *
+   * Grid rather than a nested wrapper because both cards are flat child lists
+   * built in `model-selection.ts`: everything defaults to the text column, and
+   * only the glyph is pulled into the first one.
+   */
+  @media (min-width: 640px) {
+    .chat-model-overlay-card {
+      max-width: 620px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: var(--space-lg);
+      align-items: start;
+      text-align: left;
+    }
+    .chat-model-overlay-card > * {
+      grid-column: 2;
+      justify-self: start;
+    }
+    .chat-model-overlay-glyph {
+      grid-column: 1;
+      grid-row: 1;
+      margin-bottom: 0;
+    }
+    .chat-model-overlay-description {
+      max-width: none;
+    }
+  }
 }
+
 
 /* Small status badges shown in the storage tab model list. */
 .badge {
@@ -2289,6 +2770,12 @@
 .badge-green { background: var(--badge-green); color: var(--color-green); }
 .badge-blue  { background: var(--badge-blue);  color: var(--color-blue); }
 .badge-grey  { background: var(--badge-gray);  color: var(--text-secondary); }
+/* The failure variant. `--badge-red` was already tokenized but never had a
+   rule, so views that needed it fell back to the grey badge and rendered a
+   failure in the same colour as an idle state. */
+.badge-red   { background: var(--badge-red);   color: var(--color-red); }
+/* Blocked-by-environment, as distinct from failed: see `.model-slot--blocked`. */
+.badge-yellow { background: var(--badge-yellow); color: var(--color-yellow); }
 
 .storage-model-list {
   display: flex;
@@ -2322,7 +2809,52 @@
   height: 100%;
   background: var(--color-primary);
   border-radius: var(--radius-full);
-  transition: width 0.3s ease;
+  /* `--ease-in-out` because both ends of a filling bar matter, and never
+     `--ease-spring`: an overshoot here would read as the number going backwards. */
+  transition: width var(--duration-standard) var(--ease-in-out);
+}
+
+/*
+ * A phase whose progress cannot be measured — checksum verification, unpacking.
+ *
+ * The bar is full and a highlight sweeps across it, because the alternative is a
+ * static 100% bar that is indistinguishable from a finished-but-stuck download.
+ * The sweep says "still working" without claiming a position it does not know.
+ */
+.progress-bar--indeterminate .progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    var(--color-primary) 35%,
+    color-mix(in srgb, var(--color-primary) 45%, white) 50%,
+    var(--color-primary) 65%,
+    var(--color-primary) 100%
+  );
+  background-size: 220% 100%;
+  animation: progress-sweep var(--ambient-shimmer) linear infinite;
+}
+
+@keyframes progress-sweep {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/*
+ * Repeating motion is suppressed entirely rather than slowed: for a user who
+ * asked for less motion, an indefinite loop is the exact thing they opted out
+ * of. The gradient still reads as a distinct treatment from a solid bar.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar--indeterminate .progress-fill { animation: none; }
+}
+
+/* "1.2 GB of 4.1 GB · 8.4 MB/s · 6 min left", or the current phase's name. */
+.progress-detail {
+  margin-top: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  /* Tabular figures so the digits do not shift the line as they tick. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* =============================================================================
@@ -2349,6 +2881,21 @@
   pointer-events: none;
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
+
+/*
+ * The variant tints only the icon, via `currentColor`.
+ *
+ * The message itself stays --text-primary: a green sentence on a dark card is
+ * harder to read than a white one, and the colour is already carried by the
+ * glyph beside it. Set on the toast rather than baked into the SVG so the
+ * palette stays in one layer — the warning icon previously hardcoded
+ * `var(--color-orange, orange)`, an undefined token, and every warning toast
+ * rendered the CSS keyword `orange` (#FFA500) next to the brand's #FF6900.
+ */
+.toast--success > svg { color: var(--color-green); }
+.toast--warning > svg { color: var(--color-primary); }
+.toast--info > svg { color: var(--color-blue); }
+.toast > span { color: var(--text-primary); }
 
 /* =============================================================================
  * Voice Tab
@@ -2386,11 +2933,13 @@
 }
 .mic-btn:hover { transform: scale(1.05); box-shadow: 0 0 30px var(--shadow-accent); }
 .mic-btn:active { transform: scale(0.95); }
-.mic-btn.listening { animation: mic-pulse 2s ease-in-out infinite; }
+/* The listening ring shares the breathe period with every other "we are live"
+   indicator, so a mic and a streaming cursor on screen together stay in phase. */
+.mic-btn.listening { animation: mic-pulse var(--ambient-breathe) linear infinite; }
 
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 0, 0.4); }
-  50% { box-shadow: 0 0 0 20px rgba(255, 105, 0, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--ring-pulse-from); }
+  50% { box-shadow: 0 0 0 20px var(--ring-pulse-to); }
 }
 
 .mic-btn svg { width: 28px; height: 28px; }
@@ -2414,62 +2963,6 @@
   max-height: 150px;
   margin-top: var(--space-md);
   text-align: left;
-}
-
-/* =============================================================================
- * Pipeline Setup Cards (Voice Tab)
- * ============================================================================= */
-.pipeline-setup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md-lg);
-  padding: var(--space-xl);
-  max-width: 400px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.setup-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-card);
-  padding: var(--space-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--space-md-lg);
-  cursor: pointer;
-  transition: border-color var(--duration-fast);
-}
-.setup-card:hover { border-color: var(--border-strong); }
-.setup-card.loaded { border-color: var(--color-green); }
-
-.setup-step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--bg-gray5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-sm);
-  flex-shrink: 0;
-}
-.setup-card.loaded .setup-step-number { background: var(--badge-green); color: var(--color-green); }
-
-.setup-card-info {
-  flex: 1;
-}
-
-.setup-card-title {
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-base);
-}
-
-.setup-card-status {
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-  margin-top: 2px;
 }
 
 /* =============================================================================
@@ -2549,6 +3042,95 @@
 .setting-label { font-size: var(--font-size-base); }
 .setting-value { font-size: var(--font-size-base); color: var(--text-secondary); }
 
+/*
+ * A settings row that navigates away.
+ *
+ * The colour is set on the row rather than on its label and glyph separately, so
+ * the text and the external-link icon are one accented unit and the icon needs
+ * no colour of its own — it inherits `currentColor`. Previously the label
+ * carried `.text-accent` while the inline SVG repeated the same token as a
+ * hardcoded `stroke`, which is the same value stated twice in two languages.
+ *
+ * `text-decoration: none` because the whole card is the target: an underline
+ * under one word inside a full-width tappable row reads as a second, smaller
+ * link. Hover and focus therefore have to carry the affordance instead, and
+ * focus-visible gets a real ring — this was a <div> before, so keyboard users
+ * had no way to reach it at all.
+ */
+.setting-row--link {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: background var(--duration-micro) var(--ease-standard);
+}
+.setting-row--link:hover { background: var(--bg-tertiary); }
+.setting-row--link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * Explanatory text under a setting.
+ *
+ * Used eight times — including the API-key disclaimer about the browser sending
+ * the key directly — but it had no rule at all, so every hint rendered at full
+ * body size in primary text and competed with the setting it was explaining.
+ */
+.setting-hint {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+/*
+ * A hint that follows its card instead of sitting inside one.
+ *
+ * The section is an even 10 px stack, which left each of these floating exactly
+ * halfway between the row it explains and the row below — so it read as an
+ * introduction to the *next* setting. Pull it up against its own card and inset
+ * it to the card's text, so proximity and alignment both point at the right
+ * control. `+` rather than a class on the element: the relationship is "this
+ * hint follows that row", which is precisely what the selector says.
+ */
+.setting-row + .setting-hint {
+  margin-top: calc(-1 * var(--space-sm));
+  padding-left: var(--space-lg);
+  padding-right: var(--space-lg);
+}
+.setting-hint a { color: var(--color-primary); }
+.setting-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+/*
+ * "Saved" confirmation for the generation preferences.
+ *
+ * These persist on change and used to do it in complete silence. Reserving the
+ * line's height keeps the section from jumping when the notice appears and goes.
+ */
+.setting-saved {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  color: var(--color-green);
+  font-size: var(--font-size-sm);
+  /*
+   * `line-height` and `min-height` are deliberately the same number: the reserved
+   * empty height has to equal the height of one filled line, or the section still
+   * nudges when the notice appears — which is the jump this line exists to absorb.
+   * (The failure message wraps past one line, and growing for a real problem is
+   * fine; silently shifting for a routine "Saved" is not.)
+   */
+  line-height: var(--line-height-normal);
+  min-height: 1.5em;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+.setting-saved--visible { opacity: 1; }
+/* Storage was blocked, so the preference did not persist — never dressed as a
+   success. */
+.setting-saved--error { color: var(--color-yellow); }
+
 /** Stacked variant for form field rows (API key, URL, etc.) */
 .setting-row--stacked {
   flex-direction: column;
@@ -2556,16 +3138,42 @@
   gap: var(--space-sm-md);
 }
 
-/* Slider */
+/*
+ * Slider.
+ *
+ * The element was 4px tall — the track *was* the control, so grabbing the
+ * temperature meant hitting a 4px band. The element is now --hit-touch tall with
+ * a transparent background, and the visible 4px rail is drawn by the track
+ * pseudo-elements, which is what lets the hit area be 11x taller than the line
+ * you see. `height` on the input alone is not enough: without an explicit
+ * ::-*-slider-runnable-track the UA sizes the rail to the element.
+ */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 120px;
-  height: 4px;
-  background: var(--bg-gray5);
-  border-radius: var(--radius-full);
+  height: var(--hit-touch);
+  background: transparent;
   outline: none;
+  cursor: pointer;
+  /* The tall box would otherwise sit on the text baseline and push the row. */
+  display: block;
+  margin: 0;
 }
+
+/* Not --bg-gray5: an unfilled rail is a control boundary, and that grey measured
+   1.17:1 against the card — see --control-track-off. */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--control-track-off);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--control-track-off);
+}
+
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 18px;
@@ -2573,18 +3181,82 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: var(--radius-full);
   background: var(--color-primary);
   cursor: pointer;
+  /* Centres the 18px thumb on the 4px rail: (4 - 18) / 2. WebKit positions the
+     thumb against the track box, so without this it rides above the rail. */
+  margin-top: -7px;
+  /* Same 3:1 boundary rule as the switch knob — orange on a light card is
+     2.63:1, so the thumb carries its own edge. */
+  box-shadow: 0 0 0 1px var(--bg-primary);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--bg-primary);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
+
+/*
+ * Read-aloud speed row.
+ *
+ * Replaces three inline `style` attributes on the view's markup. The value is a
+ * fixed-width tabular column so dragging the slider doesn't shift the rail as
+ * the label goes 1.0× → 1.1× → 2.0×.
+ */
+.speak-rate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0;
+}
+.speak-rate__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+.speak-rate__slider { flex: 1; max-width: 240px; }
+.speak-rate__value {
+  min-width: 3.25rem;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
 
 /* Toggle */
+/*
+ * Switch. Now a real `<button role="switch">` rather than a styled `<div>`, so
+ * these rules also have to undo the UA button defaults (border, padding, and the
+ * platform background) that a div never had.
+ */
 .toggle {
   width: 48px;
   height: 28px;
+  /* `flex: none` because a `.setting-row` is a flex container and a button, unlike
+     the previous div, would otherwise be squeezed by a long label beside it. */
+  flex: none;
+  padding: 0;
+  border: none;
   border-radius: var(--radius-full);
-  background: var(--bg-gray5);
+  /* Not a surface grey: see --control-track-off. An off switch has to be visible
+     as a control before it is touched. */
+  background: var(--control-track-off);
   position: relative;
   cursor: pointer;
   transition: background var(--duration-fast);
 }
+/* Keyboard users need to see where they are: the switch is reachable now, so it
+   must also be visibly focused. */
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* `aria-checked` is the state of record; `.on` is kept as its visual echo so the
+   two can never disagree about what the user is being shown. */
 .toggle.on { background: var(--color-primary); }
 .toggle::after {
   content: '';
@@ -2595,6 +3267,10 @@ input[type="range"]::-webkit-slider-thumb {
   height: 24px;
   border-radius: var(--radius-full);
   background: white;
+  /* White on brand orange is only 2.89:1, so the knob needs its own edge to stay
+     a distinct shape in the on state — the same 3:1 boundary rule as the track
+     (4.1:1 against orange, and it also reads on both off-tracks). */
+  box-shadow: 0 0 0 1px #3A3733;
   transition: transform var(--duration-fast);
 }
 .toggle.on::after { transform: translateX(20px); }
@@ -2633,7 +3309,7 @@ input[type="range"]::-webkit-slider-thumb {
 .loading-logo {
   width: 100px;
   height: 100px;
-  animation: logo-pulse 2s ease-in-out infinite;
+  animation: logo-pulse var(--ambient-breathe) linear infinite;
 }
 
 @keyframes logo-pulse {
@@ -2664,17 +3340,28 @@ input[type="range"]::-webkit-slider-thumb {
   overflow: hidden;
 }
 
+/*
+ * The boot bar cannot know its progress — the SDK is still coming up — so it
+ * runs a fixed-width segment across the track rather than pretending to fill.
+ *
+ * Driven by `transform`, not `width`/`margin-left`: those two animated together
+ * relayout the element on every frame, on the one screen that is competing with
+ * WASM instantiation and model registration for the main thread. This version
+ * stays on the compositor, and the shimmer period is shared with the download
+ * progress bar so the app's two indeterminate states move at one speed.
+ */
 .loading-bar-fill {
   height: 100%;
+  width: 40%;
   background: var(--color-primary);
   border-radius: var(--radius-full);
-  animation: loading-sweep 2s ease-in-out infinite;
+  animation: loading-sweep var(--ambient-shimmer) linear infinite;
+  will-change: transform;
 }
 
 @keyframes loading-sweep {
-  0% { width: 0; margin-left: 0; }
-  50% { width: 60%; margin-left: 20%; }
-  100% { width: 0; margin-left: 100%; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
 }
 
 /* =============================================================================
@@ -2761,24 +3448,6 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* =============================================================================
- * Audio Waveform
- * ============================================================================= */
-.waveform-bars {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 40px;
-}
-
-.waveform-bar {
-  width: 3px;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: height 0.1s ease;
-}
-
-/* =============================================================================
  * Device Info Section (Model Sheet)
  * ============================================================================= */
 .device-info {
@@ -2831,43 +3500,6 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--color-blue);
 }
 .stt-mode-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-/* =============================================================================
- * STT Breathing Waveform Animation
- * ============================================================================= */
-.stt-waveform-anim {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 60px;
-}
-.stt-wave-bar {
-  width: 6px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(180deg, var(--color-blue), rgba(59, 130, 246, 0.3));
-  animation: stt-breathe 2s ease-in-out infinite;
-}
-.stt-wave-bar:nth-child(1) { height: 20px; animation-delay: 0s; }
-.stt-wave-bar:nth-child(2) { height: 35px; animation-delay: 0.2s; }
-.stt-wave-bar:nth-child(3) { height: 45px; animation-delay: 0.4s; }
-.stt-wave-bar:nth-child(4) { height: 35px; animation-delay: 0.6s; }
-.stt-wave-bar:nth-child(5) { height: 20px; animation-delay: 0.8s; }
-
-@keyframes stt-breathe {
-  0%, 100% { transform: scaleY(0.5); opacity: 0.4; }
-  50% { transform: scaleY(1); opacity: 1; }
-}
-
-@keyframes stt-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 /* =============================================================================
  * Vision Tab - Camera + VLM
@@ -2927,31 +3559,6 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-primary);
   white-space: pre-wrap;
 }
-.vision-live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.5px;
-  background: var(--badge-green);
-  color: var(--color-green);
-  animation: vision-live-pulse 1.5s ease-in-out infinite;
-}
-.vision-live-badge::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-green);
-}
-@keyframes vision-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
 /* Metrics row */
 .vision-metrics {
   display: flex;
@@ -3001,9 +3608,9 @@ input[type="range"]::-webkit-slider-thumb {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 3px solid var(--color-orange);
-  background: rgba(255, 105, 0, 0.15);
-  color: var(--color-orange);
+  border: 3px solid var(--color-primary);
+  background: var(--color-primary-medium);
+  color: var(--color-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3015,9 +3622,6 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(255, 105, 0, 0.25);
   transform: scale(1.05);
 }
-/** Scaled-down typing dots for the processing overlay */
-.vision-typing-dots-sm { transform: scale(0.8); }
-
 /** "Analyzing..." text overlay on camera */
 .vision-analyzing-label {
   font-size: var(--font-size-xs);
@@ -3348,72 +3952,19 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--bg-secondary);
 }
 
-/** Audio level bars container */
-.stt-level-container {
-  display: none;
-  width: 100%;
-  max-width: 300px;
-}
-
-.stt-level-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 24px;
-  justify-content: center;
-}
-
-.stt-level-bar {
-  width: 4px;
-  height: 3px;
-  background: var(--color-green);
-  border-radius: 1px;
-  transition: height 0.08s ease;
-}
-
 /** Mic button (large) for STT */
 .mic-btn-lg {
   width: 72px;
   height: 72px;
 }
 
-/** Drag-and-drop file zone for STT */
-.stt-drop-zone {
-  border: 2px dashed var(--border-color);
-  border-radius: 12px;
-  padding: 18px 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
-  margin-top: 16px;
-  color: var(--text-tertiary);
-  font-size: 13px;
-  line-height: 1.5;
-  user-select: none;
-}
-
-.stt-drop-zone:hover,
-.stt-drop-zone.drag-over {
-  border-color: var(--color-blue);
-  background: rgba(59, 130, 246, 0.06);
-  color: var(--color-blue);
-}
-
-.stt-drop-zone-icon {
-  font-size: 22px;
-  margin-bottom: 4px;
-}
-
-.stt-drop-zone-label {
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.stt-drop-zone-hint {
-  font-size: 11px;
-  opacity: 0.7;
-  margin-top: 2px;
-}
+/*
+ * `.stt-drop-zone` used to live here: a full set of rules with no markup
+ * anywhere referencing them, styled in --color-blue rather than the brand
+ * orange. With no CSS module scoping an orphan like that is silent, so the
+ * affordance now lives in one place — `components/file-drop.ts` renders
+ * `.docs-dropzone` for every view that takes a file.
+ */
 
 /* =============================================================================
  * TTS (Speak) Sub-view Specifics
@@ -3649,99 +4200,11 @@ input[type="range"]::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 
-/* =============================================================================
- * Quota Bar (Storage Tab)
- * ============================================================================= */
-.quota-bar-container {
-  padding: 0 var(--space-lg) var(--space-md);
-}
-
-.quota-bar {
-  height: 8px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.quota-bar-fill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width 0.4s ease;
-}
-
-.quota-bar-fill.quota-bar-fill--warning {
-  background: var(--color-orange, orange);
-}
-
-.quota-bar-fill.quota-bar-fill--critical {
-  background: var(--color-red);
-}
-
-.quota-bar-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  margin-top: var(--space-xs);
-}
-
 /* Storage model row: last-used timestamp */
 .model-last-used {
   font-size: var(--font-size-xs);
   color: var(--text-tertiary, var(--text-secondary));
   margin-top: 2px;
-}
-
-/* ---------------------------------------------------------------------------
-   Model-switch info banner
-   --------------------------------------------------------------------------- */
-
-.model-switch-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  margin: var(--space-sm) 0;
-  background: var(--bg-secondary, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-left: 3px solid var(--color-blue, #3b82f6);
-  border-radius: var(--radius-md, 8px);
-  font-size: var(--font-size-sm, 13px);
-  color: var(--text-secondary, #94a3b8);
-  animation: banner-slide-in 0.3s ease-out;
-}
-
-.model-switch-banner svg {
-  flex-shrink: 0;
-  color: var(--color-blue, #3b82f6);
-}
-
-.model-switch-banner strong {
-  color: var(--text-primary, #e2e8f0);
-}
-
-.model-switch-banner .banner-dismiss {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--text-secondary, #94a3b8);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-}
-
-.model-switch-banner .banner-dismiss:hover {
-  opacity: 1;
-  color: var(--text-primary, #e2e8f0);
-}
-
-@keyframes banner-slide-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================ */
@@ -3758,11 +4221,276 @@ input[type="range"]::-webkit-slider-thumb {
   margin-bottom: 8px;
 }
 
+/* Cap the measure. These sections stretch to the full detail pane, which on a
+   desktop window is ~1130px — roughly 180 characters per line, about 2.5x the
+   span the eye can track without losing its place returning to the next line.
+   Only prose is capped; rows, inputs, and previews keep the full width. */
+.docs-section > p {
+  max-width: 68ch;
+}
+
 .docs-actions {
   display: flex;
   gap: 8px;
   margin: 12px 0;
   flex-wrap: wrap;
+}
+
+/*
+ * A labelled control inside one of these panels.
+ *
+ * Vision shipped its prompt box as `<label class="form-label">` followed by a
+ * `<textarea>` — and `.form-label` was a class no stylesheet ever defined. Both
+ * elements therefore laid out inline, so the label sat *beside* its own field on
+ * one line and the field read as unlabelled. Declaring the pairing once means
+ * the next panel to add an input inherits the correct two-row block instead of
+ * inventing another undefined class.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-md-lg) 0;
+}
+
+.field__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* `.chat-input` carries `flex: 1` for its role in the composer row; inside a
+   column field that would stretch it vertically instead of sizing to `rows`. */
+.field .chat-input {
+  flex: none;
+  width: 100%;
+}
+
+/*
+ * Document drop zone.
+ *
+ * A <button>, so pointer and keyboard use the same control instead of the old
+ * arrangement — a hidden file input behind an "Upload" button, with no drop
+ * target at all. Full-width and dashed because the affordance has to read as
+ * "put something here" before it is hovered.
+ */
+.docs-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  margin: var(--space-md-lg) 0 0;
+  padding: var(--space-xl);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.docs-dropzone:hover { background: var(--bg-tertiary); border-color: var(--color-primary); }
+.docs-dropzone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/*
+ * Dragging over it. Set from JS with an enter/leave counter rather than `:hover`,
+ * because a pointer holding a dragged file does not reliably hover, and a plain
+ * `dragleave` fires when crossing onto a child and would flicker the state.
+ */
+.docs-dropzone--active {
+  background: var(--bg-tertiary);
+  border-color: var(--color-primary);
+  border-style: solid;
+}
+.docs-dropzone-glyph {
+  width: 28px;
+  height: 28px;
+  color: var(--text-tertiary);
+}
+.docs-dropzone--active .docs-dropzone-glyph,
+.docs-dropzone:hover .docs-dropzone-glyph { color: var(--color-primary); }
+.docs-dropzone-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+.docs-dropzone-hint {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+/*
+ * A disabled drop zone must not read as an invitation. `pointer-events: none`
+ * alone would leave a dashed, hoverable-looking target that silently ignores a
+ * drop, which is worse than an obviously inert one.
+ */
+.docs-dropzone:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.docs-dropzone:disabled:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-strong);
+}
+
+/*
+ * Two labelled model pickers side by side (Documents' index + answer pair).
+ *
+ * Replaces three inline `style` attributes — `display:flex; gap:12px`,
+ * `min-width:220px` — and, more importantly, two `<select>`s that had no
+ * `<label>` at all. Their only description was the paragraph above the row, so a
+ * screen reader announced "combo box, nemotron-3-embed-1b-q4_k_m" twice with
+ * nothing to say which was which.
+ *
+ * `min-width: 0` on the field is what lets the row shrink: a grid/flex child
+ * defaults to `min-width: auto`, and a `<select>` holding a long model id would
+ * otherwise refuse to compress and push the Download button off the edge.
+ */
+.model-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0 0;
+}
+.model-pair__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.model-pair__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+.model-pair__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md);
+  min-width: 0;
+}
+/* No `min-height` here: the coarse-pointer block at the end of this file grows
+   it to --hit-touch for fingers, which is where this file draws that line. */
+.model-pair__select {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-sm-md) var(--space-md-lg);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-regular);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  /* The native control truncates its own long option text; without this the
+     widest option would set the box width and break the row. */
+  text-overflow: ellipsis;
+}
+.model-pair__select:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.model-pair__select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Segmented control — a real radio group, for picking one of a few modes.
+ *
+ * Previously these were two `.btn`s where the selected one became
+ * `.btn-primary`. That reads as two independent actions ("Batch" and "Live" both
+ * look pressable, and the orange one looks like the thing to click *next*),
+ * and it told assistive tech nothing about the choice. As a `radiogroup` with
+ * `aria-checked`, arrow-key semantics and the pressed state come for free.
+ */
+.segmented {
+  display: inline-flex;
+  gap: var(--space-xxs);
+  padding: 3px;
+  margin: 0 0 var(--space-md-lg);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.segmented__option {
+  flex: 1;
+  min-height: var(--hit-touch);
+  padding: var(--space-sm-md) var(--space-lg);
+  border: none;
+  border-radius: calc(var(--radius-lg) - 3px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.segmented__option:hover:not([aria-checked="true"]):not(:disabled) {
+  color: var(--text-primary);
+}
+.segmented__option[aria-checked="true"] {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px var(--shadow-default);
+}
+.segmented__option:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.segmented__option:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/*
+ * Empty result state, for a panel whose content has not been produced yet.
+ *
+ * Distinct from an error and from a `<pre>` holding the literal string
+ * "(no transcript yet)" — which is what several of these panels used to show. A
+ * parenthetical placeholder inside a code block reads as *output*: the user
+ * cannot tell whether the model ran and returned nothing or never ran at all.
+ */
+.surface-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md-lg);
+  padding: var(--space-2xl) var(--space-lg);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.surface-empty svg { width: 26px; height: 26px; }
+.surface-empty p { margin: 0; font-size: var(--font-size-sm); }
+
+/*
+ * Live numeric readings — a `<dl>`, because each value has a name.
+ *
+ * These used to be `<li><strong>Confidence:</strong> <code>0.984</code></li>`
+ * inside `.feature-unavailable__list`, so live telemetry inherited the styling of
+ * a "this feature is missing" bullet list. Tabular numerals and a fixed cell
+ * width stop the row from reflowing as a value ticks between 0.9 and 0.95.
+ */
+.metric-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0 0;
+}
+.metric-grid__cell {
+  flex: 1 1 8rem;
+  padding: var(--space-md-lg) var(--space-regular);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+.metric-grid dt {
+  margin: 0 0 var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.metric-grid dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
 }
 
 .docs-list {
@@ -3806,6 +4534,71 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-secondary, #94a3b8);
   min-height: 18px;
   margin-top: 8px;
+}
+
+/* An error has to look like one. `.docs-status.error` is written by transcribe,
+   voice, and solutions; without this rule a failure rendered in the same grey
+   as an idle hint, which is the "silently label a failure as fine" failure the
+   app's rules forbid. */
+.docs-status.error {
+  color: var(--color-red);
+  background: var(--badge-red);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+/* Verbatim model/pipeline output — transcripts, responses, diagnostics. Wraps
+   rather than scrolling horizontally, since these hold sentences, not code. */
+.docs-pre {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  /* Sans, not the UA's monospace default: these hold spoken sentences, and mono
+     costs reading speed on prose. Sized at body scale because a transcript is
+     the content, not a caption. */
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/*
+ * A speech transcript that is still a hypothesis.
+ *
+ * Words in a partial result get revised as more audio arrives, so text visibly
+ * rewrites itself under the reader. Shown identically to the settled transcript
+ * that reads as a glitch; marked as provisional it reads as the system working.
+ *
+ * Italic plus secondary text carries the meaning, and a left bar in brand orange
+ * gives it a second, non-colour-dependent cue. Deliberately NOT a lower opacity
+ * or a lighter grey — this is live content a user is actively reading to check
+ * whether they were understood, so it has to stay at full legibility.
+ */
+.docs-pre--partial {
+  color: var(--text-secondary);
+  font-style: italic;
+  border-left: 2px solid var(--color-primary);
+  /* Only the property that changes, so the text itself never animates while it
+     is being rewritten. */
+  transition: color var(--duration-standard) var(--ease-out);
+}
+
+/* The DAG a solution's config expands into, above its model rows. */
+.solution-card__graph {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
 }
 
 .docs-query {
@@ -3866,9 +4659,8 @@ input[type="range"]::-webkit-slider-thumb {
   white-space: pre-wrap;
 }
 
-/* Feature unavailable placeholder — used by views whose canonical SDK
-   surface was deleted in the V2 cleanup and is pending the proto-byte
-   bridge re-land. */
+/* The designed "no browser engine ships for this modality" state — see
+   `components/modality-unavailable.ts` for what it says and why. */
 .feature-unavailable {
   padding: var(--space-3xl) var(--space-xl);
   display: flex;
@@ -3882,6 +4674,16 @@ input[type="range"]::-webkit-slider-thumb {
   animation: chat-message-in var(--duration-regular) var(--ease-out);
 }
 
+/*
+ * Neutral, not brand orange.
+ *
+ * Orange is this app's action colour, and a 72px orange disc is the loudest
+ * thing on a screen whose entire message is "there is nothing to press here" —
+ * it reads as a call to action that does not exist. It is also the wrong
+ * contrast bet: #FF6900 measures 2.8:1 on the light theme's paper, under the 3:1
+ * WCAG 1.4.11 floor for a graphical object, while `--text-secondary` clears 6.6:1
+ * in both themes. Not red either: nothing failed.
+ */
 .feature-unavailable__icon {
   width: 72px;
   height: 72px;
@@ -3889,8 +4691,9 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: radial-gradient(circle at 30% 30%, var(--color-primary-medium), var(--color-primary-light));
-  color: var(--color-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
   margin-bottom: var(--space-sm);
 }
 
@@ -3928,13 +4731,30 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: var(--line-height-relaxed);
 }
 
+/* Separate statements. Un-bulleted items at a relaxed line height run together
+   into one paragraph, and each of these is a distinct fact about the build. */
+.feature-unavailable__list li + li {
+  margin-top: var(--space-md);
+}
+
+/*
+ * Inline code inside this state.
+ *
+ * Neutral rather than brand orange: #FF6900 on the pale orange wash measures
+ * 2.7:1 in the light theme, and this is *text* — 4.5:1 is the bar, not 3:1. Ink
+ * on the tertiary surface clears 11:1 in both themes, and an API name is a
+ * quotation rather than something to accent.
+ */
 .feature-unavailable code {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  /* A verb like RunAnywhere.segmentation.segment(image) is longer than a 390px
+     column; break it rather than pushing the card wider than the viewport. */
+  overflow-wrap: anywhere;
 }
 
 /* =============================================================================
@@ -4119,14 +4939,14 @@ input[type="range"]::-webkit-slider-thumb {
     padding: var(--space-xs);
   }
 
-  .composer-icon-btn,
-  .chat-panel-consumer .send-btn {
-    width: 36px;
-    height: 36px;
-  }
-
+  /*
+   * Deliberately no width/height shrink for .composer-icon-btn / .send-btn here.
+   * This block used to drop them to 36px, which made the composer's controls
+   * smallest on exactly the screens most likely to be driven by a thumb. The
+   * narrow viewport is regained through the tighter gap and padding above; the
+   * targets stay at their 44px finger size (see the Hit targets section).
+   */
   .chat-panel-consumer .chat-input {
-    min-height: 36px;
     padding: var(--space-sm-md) var(--space-md);
     font-size: var(--font-size-base);
   }
@@ -4134,4 +4954,299 @@ input[type="range"]::-webkit-slider-thumb {
   .chat-message--user .chat-bubble {
     max-width: 92%;
   }
+}
+
+/* =============================================================================
+ * Hit targets
+ *
+ * Kept as one block rather than 16 edits scattered through the file, because it
+ * is one rule — a control must be reachable — and stating it once is what stops
+ * the next control from drifting under the line. An audit of every view found 18
+ * distinct control signatures below 44px and two below WCAG 2.5.8's absolute
+ * 24px floor: the temperature slider (4px) and the model-slot "Change" link
+ * (22px).
+ *
+ * The technique is padding and ::after extensions, never `min-height` on the
+ * visible box, because the visual scale of this UI is deliberate: a small text
+ * button should keep looking small. Growing the boxes would have meant
+ * redesigning every dense row to fix an input problem.
+ * ============================================================================= */
+
+/* --- The 24px floor: all pointers, mice included (WCAG 2.5.8 AA) --- */
+
+/*
+ * An invisible centred extension. `::after` is free on every one of these
+ * (checked: only .toggle uses it, for the knob — which is why .toggle is absent
+ * here and gets its own rule below). The extension is centred with the
+ * translate pair so it grows symmetrically regardless of the control's size.
+ */
+.model-slot__change::after,
+.btn-sm::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: var(--hit-min);
+  min-width: var(--hit-min);
+  transform: translate(-50%, -50%);
+}
+
+/* `position: relative` is required for the extension to anchor, and is added
+   here rather than in each base rule so the pairing stays visible. */
+.model-slot__change,
+.btn-sm {
+  position: relative;
+}
+
+/* --- The 44px finger target, only where the pointer is a fingertip ---
+ *
+ * `(pointer: coarse)` rather than a width breakpoint: a 1024px tablet needs
+ * finger targets and a 700px-wide desktop window does not. Width was the wrong
+ * axis — the previous `max-width: 700px` rules actually *shrank* the composer
+ * buttons to 36px, making them smallest exactly where fingers are.
+ */
+@media (pointer: coarse) {
+  .shell-icon-btn,
+  .composer-icon-btn,
+  .send-btn,
+  .chat-panel-consumer .send-btn,
+  .btn-ghost {
+    min-width: var(--hit-touch);
+    min-height: var(--hit-touch);
+  }
+
+  /* Undo the width-keyed shrink above; it fought this rule and won on
+     specificity grounds for the composer pair. */
+  .composer-icon-btn,
+  .chat-panel-consumer .send-btn {
+    width: var(--hit-touch);
+    height: var(--hit-touch);
+  }
+
+  .btn,
+  .toolbar-model-btn,
+  .model-action-btn,
+  .consumer-new-chat,
+  .text-input,
+  .model-search__input,
+  .model-pair__select,
+  .chat-input,
+  select.chat-input,
+  /* Qualified to match .chat-panel-consumer's own (0,2,1) rule, which sets a
+     40px min-height and would otherwise win on specificity. */
+  .chat-panel-consumer .chat-input {
+    min-height: var(--hit-touch);
+  }
+
+  /* A small button keeps its small type and its tight look; only the box it
+     occupies grows. */
+  .btn-sm {
+    min-height: var(--hit-touch);
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* The switch's ::after is the knob, so it cannot carry a hit extension, and
+     padding would move the knob. A transparent border grows the hit box while
+     `background-clip: content-box` keeps the painted track visually 48x28.
+     `content-box` sizing is essential: under this file's global `border-box` the
+     border would eat *into* the 48x28, painting a 32x12 stub instead. The knob
+     offsets shift by the border width to stay inside the painted track. */
+  .toggle {
+    box-sizing: content-box;
+    border: 8px solid transparent;
+    background-clip: content-box;
+  }
+  .toggle::after { top: 10px; left: 10px; }
+}
+
+/* =============================================================================
+ * Add from Hugging Face — the curated sub-1B shortlist.
+ *
+ * The sheet used to open on a bare sentence ("Type to search Hugging Face."),
+ * which only works for someone who already knows the name of a repo small
+ * enough to run in a tab — and the Hub's most-downloaded GGUF repos are 27B to
+ * 284B, so every obvious search ended in a model that cannot load. The
+ * shortlist answers that first.
+ *
+ * The tiles carry `.hf-repo-row` as well, so their frame, hover and focus come
+ * from the search-result rule above and cannot drift from it. Only what is
+ * genuinely different — a three-line body, its top alignment, and the reveal —
+ * is declared here.
+ * ============================================================================= */
+.hf-suggestions__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.hf-suggestions__subtext {
+  margin: 2px 0 var(--space-md);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.hf-suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.hf-suggestion { align-items: flex-start; }
+.hf-suggestion__info { flex: 1; min-width: 0; }
+.hf-suggestion__head {
+  display: flex;
+  align-items: center;
+  /* Wraps rather than squeezing the pill: the title is the longest thing on the
+     tile and a narrow sheet must break the line, not shrink the badge. */
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.hf-suggestion__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+/* The repo id is kept on the tile — authored copy has to stay verifiable
+   against the thing it will actually download. */
+.hf-suggestion__repo {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  word-break: break-word;
+}
+.hf-suggestion__blurb {
+  margin-top: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+/* Optically centres the chevron on the title line now that the row is
+   top-aligned rather than centred on a three-line body. */
+.hf-suggestion .hf-repo-row__chevron { margin-top: 3px; }
+
+/*
+ * The parameter count, on both the shortlist and the search rows.
+ *
+ * Neutral, not brand orange: at 10px, #FF6900 on the light theme's paper is
+ * 2.6:1 and fails AA. Not `--capability` blue either — in this app's pill
+ * vocabulary blue already means "what the model can do", and a size is a
+ * property, not a capability. Tabular figures so a column of badges lines up.
+ */
+.tag-pill--params {
+  background: var(--badge-gray);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The search row's meta line now mixes a pill with two text spans, so its
+   items have to sit on a shared centre line. */
+.hf-repo-row__meta { align-items: center; }
+
+/*
+ * The shortlist arrives rather than appearing: a 6px rise over the standard
+ * row-insert duration, staggered 22ms per tile so the eye reads down the list
+ * instead of taking all eight at once (154ms for the whole run). Eased out to a
+ * stop with no overshoot — these are rows settling into place, not an arrival
+ * worth a spring.
+ */
+.hf-suggestion {
+  animation: hf-suggestion-in var(--duration-standard) var(--ease-out) both;
+  animation-delay: calc(var(--hf-i, 0) * 22ms);
+}
+
+@keyframes hf-suggestion-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* `both` holds the from-state before the delay elapses, so the animation has to
+   be removed outright rather than zeroed — a 0s animation with fill would still
+   paint the first frame. */
+@media (prefers-reduced-motion: reduce) {
+  .hf-suggestion { animation: none; }
+}
+
+/* =============================================================================
+ * Benchmarks — throughput / latency charts
+ *
+ * The plot is inline SVG emitted at the container's real pixel width (see
+ * `drawCharts` in views/benchmarks.ts), so nothing here may resize it: a
+ * `width: 100%` would rescale the whole coordinate system and shrink the labels
+ * with it. This block only supplies colour and type, both from the theme
+ * tokens, which is what makes one chart correct in light and dark without a
+ * second palette.
+ * ============================================================================= */
+.bench-charts {
+  display: grid;
+  gap: var(--space-xl);
+  margin-top: var(--space-md-lg);
+}
+
+.bench-chart {
+  margin: 0;
+  /* The SVG is a fixed pixel width; on a pane narrower than the measurement was
+     taken at (a resize between draws) it scrolls rather than pushing the page. */
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.bench-chart__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.bench-chart__subtitle {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+/* Stated in place of the plot when a backend reported no value for this metric.
+   An axis with no bars would read as "the answer is zero". */
+.bench-chart__note {
+  margin-top: var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.bench-chart__plot {
+  display: block;
+  margin-top: var(--space-md);
+}
+
+.bench-chart__bar {
+  fill: var(--chart-accent);
+  /* Grow out of the baseline over the standard tier, eased to a stop. No spring:
+     an overshoot on a bar overstates the value at the moment the eye lands on
+     it, which on a measurement chart is the one thing motion must never do. */
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: bench-bar-in var(--duration-standard) var(--ease-out) both;
+}
+
+@keyframes bench-bar-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Recessive by design: a hairline in the separator grey, one step off the
+   surface, so the bars are the only thing with weight. */
+.bench-chart__axis {
+  stroke: var(--separator);
+  stroke-width: 1;
+}
+
+/* Text wears text tokens, never the series colour. */
+.bench-chart__label,
+.bench-chart__value {
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+}
+.bench-chart__label { fill: var(--text-secondary); }
+.bench-chart__value {
+  fill: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  /* A column of values has to line up; tabular figures are what does that. */
+  font-variant-numeric: tabular-nums;
 }

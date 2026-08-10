@@ -230,8 +230,20 @@ private extension ModelRecommendationEngine.TierPreferences {
             "mlx-soprano-1.1-80m-5bit",
             "vits-piper-en_US-lessac-medium"
         ],
+        // No MLX Qwen2-VL. Measured on this Mac (M4 Max, MLX 4-bit): every vision
+        // turn decoded its opening token and then repeated only that token —
+        // 23 × "The" for "what colour is the circle?", the same for a photograph
+        // and for a synthetic card, on a first turn and on later ones. The prompt
+        // was sized correctly (418 tokens, image tokens included) and the MLX
+        // *text* path answered normally with identical sampler settings, so this
+        // is the model on this runtime, not our image or generation plumbing.
+        // The web SDK already forces Qwen2-VL off WebGPU for an f16 M-RoPE
+        // overflow; this is the same family failing the same way on Metal.
+        // LFM2-VL through llama.cpp answers the same camera correctly (128 tokens
+        // at 32 tok/s), so it leads instead. Qwen2-VL stays in the catalog —
+        // pickable, just never the recommendation.
         vlmIDs: [
-            "mlx-qwen2-vl-2b-instruct-4bit",
+            "lfm2-vl-450m-q8_0",
             "smolvlm2-500m-video-instruct-q8_0",
             "smolvlm2-256m-video-instruct-q8_0"
         ],
@@ -258,10 +270,13 @@ private extension ModelRecommendationEngine.TierPreferences {
             "mlx-soprano-1.1-80m-5bit",
             "vits-piper-en_US-lessac-medium"
         ],
+        // Same reason as `midRange`: MLX Qwen2-VL answers with one repeated
+        // token. Qwen2.5-VL is a different generation on a different runtime
+        // (llama.cpp) and leads here; the MLX Qwen3-VL stays as the second
+        // choice rather than the default no one chose.
         vlmIDs: [
-            "mlx-qwen2-vl-2b-instruct-4bit",
-            "mlx-qwen3-vl-4b-instruct-4bit",
-            "qwen2.5-vl-3b-instruct-q4_k_m"
+            "qwen2.5-vl-3b-instruct-q4_k_m",
+            "mlx-qwen3-vl-4b-instruct-4bit"
         ],
         embeddingIDs: [
             "mlx-qwen3-embedding-0.6b-4bit-dwq",

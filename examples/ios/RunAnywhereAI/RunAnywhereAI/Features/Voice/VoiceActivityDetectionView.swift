@@ -8,7 +8,6 @@ import AppKit
 struct VoiceActivityDetectionView: View {
     @StateObject private var viewModel = VADViewModel()
     @State private var showModelPicker = false
-    @State private var pulseAnimation = false
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
@@ -16,7 +15,14 @@ struct VoiceActivityDetectionView: View {
 
     var body: some View {
         Group {
-            NavigationView {
+            // A `NavigationView` wrapping a single child renders that child as
+            // the *sidebar* column of a Mac split view, which is why this screen
+            // drew itself in a ~200pt strip against the left edge of a 1450pt
+            // detail pane. This screen is pushed from a NavigationLink, so the
+            // window already owns a navigation container; on the Mac it is plain
+            // content in a centred column and `.toolbar` attaches to the
+            // window's own bar.
+            navigationHost {
                 ZStack {
                     VStack(spacing: 0) {
                         if hasModelSelected {
@@ -53,9 +59,6 @@ struct VoiceActivityDetectionView: View {
                     }
                 }
             }
-            #if os(iOS)
-            .navigationViewStyle(.stack)
-            #endif
         }
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .vad) { model in
@@ -72,6 +75,19 @@ struct VoiceActivityDetectionView: View {
         .onDisappear {
             viewModel.cleanup()
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - Main Content
@@ -123,7 +139,7 @@ struct VoiceActivityDetectionView: View {
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
 
-                    Text("Tap the mic to start detecting speech activity")
+                    Text("\(VoiceAgentViewModel.pressVerb) the mic to start detecting speech activity")
                         .font(.system(size: 15, weight: .regular))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -136,76 +152,67 @@ struct VoiceActivityDetectionView: View {
 
     // MARK: - Speech Indicator
 
+    /// The speech / silence state, as one figure.
+    ///
+    /// Rebuilt from two independently-animating rings (1.0s and 1.5s
+    /// `repeatForever`, plus 0.3s and 0.2s off-tier eases on siblings) into a
+    /// single value change with a single signature. The old version had four
+    /// animations racing on one composite, which is what made the transition
+    /// between speech and silence look soft and uncertain — the exact opposite
+    /// of what a detector should convey.
+    ///
+    /// The expanding rings are kept only while speech is actually detected,
+    /// where they carry information (energy is arriving now), and they are phase
+    /// locked to one clock so the two rings cannot drift apart.
     private var speechIndicatorView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Space.lg) {
             ZStack {
-                // Outer pulse ring (only when speech detected)
                 if viewModel.isSpeechDetected {
-                    Circle()
-                        .stroke(AppColors.statusGreen.opacity(0.3), lineWidth: 2)
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(pulseAnimation ? 1.3 : 1.0)
-                        .opacity(pulseAnimation ? 0.0 : 0.6)
-                        .animation(
-                            .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                            value: pulseAnimation
-                        )
-
-                    Circle()
-                        .stroke(AppColors.statusGreen.opacity(0.2), lineWidth: 1.5)
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(pulseAnimation ? 1.6 : 1.0)
-                        .opacity(pulseAnimation ? 0.0 : 0.4)
-                        .animation(
-                            .easeOut(duration: 1.5).repeatForever(autoreverses: false),
-                            value: pulseAnimation
-                        )
+                    SpeechDetectedRings(diameter: Self.indicatorDiameter)
                 }
 
-                // Main indicator circle
                 Circle()
                     .fill(
                         viewModel.isSpeechDetected
-                            ? AppColors.statusGreen.opacity(0.2)
-                            : AppColors.statusGray.opacity(0.1)
+                            ? AppColors.statusGreen.opacity(0.20)
+                            : AppColors.statusGray.opacity(0.10)
                     )
-                    .frame(width: 100, height: 100)
+                    .frame(width: Self.indicatorDiameter, height: Self.indicatorDiameter)
 
-                // Inner filled circle
                 Circle()
                     .fill(
                         viewModel.isSpeechDetected
                             ? AppColors.statusGreen
-                            : AppColors.statusGray.opacity(0.3)
+                            : AppColors.statusGray.opacity(0.30)
                     )
-                    .frame(width: 60, height: 60)
+                    .frame(width: Self.coreDiameter, height: Self.coreDiameter)
 
-                // Icon
                 Image(systemName: viewModel.isSpeechDetected ? "mic.fill" : "mic.slash")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(.white)
+                    // The glyph swaps in place rather than cross-fading two
+                    // images, so the mic stays one object through the change.
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isSpeechDetected)
-            .onChange(of: viewModel.isSpeechDetected) { _, newValue in
-                if newValue {
-                    pulseAnimation = true
-                } else {
-                    pulseAnimation = false
-                }
-            }
+            // ONE animation for the whole figure, on the one value that changed.
+            .motionAware(Motion.standardFade, value: viewModel.isSpeechDetected)
 
-            // Status label
-            Text(viewModel.isSpeechDetected ? "Speech Detected" : "Silence")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundColor(viewModel.isSpeechDetected ? AppColors.statusGreen : .secondary)
-                .animation(.easeInOut(duration: 0.2), value: viewModel.isSpeechDetected)
+            Text(viewModel.isSpeechDetected ? "Speech detected" : "Silence")
+                .appType(.cardTitle)
+                .foregroundStyle(
+                    viewModel.isSpeechDetected ? AppColors.statusGreen : AppColors.textSecondary
+                )
+                .motionAware(Motion.standardFade, value: viewModel.isSpeechDetected)
 
-            // Audio level
             if viewModel.isListening {
                 AdaptiveAudioLevelIndicator(level: viewModel.audioLevel)
             }
         }
     }
+
+    private static let indicatorDiameter: CGFloat = 100
+    private static let coreDiameter: CGFloat = 60
 
     // MARK: - Activity Log
 
@@ -286,8 +293,14 @@ struct VoiceActivityDetectionView: View {
             .opacity(
                 viewModel.selectedModelName == nil || viewModel.isProcessing ? 0.6 : 1.0
             )
+            // The Mac's accessibility tree reported this as a bare `AXButton`
+            // with no title, description or value.
+            .accessibilityLabel(viewModel.isListening ? "Stop detection" : "Start detection")
+            .accessibilityValue(viewModel.isSpeechDetected ? "Speech detected" : "Silence")
 
-            Text(viewModel.isListening ? "Listening for speech..." : "Tap to start detection")
+            Text(viewModel.isListening
+                 ? "Listening for speech..."
+                 : "\(VoiceAgentViewModel.pressVerb) to start detection")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -302,44 +315,67 @@ struct VoiceActivityDetectionView: View {
     // MARK: - Model Button
 
     private var modelButton: some View {
-        Button {
+        VoiceModelChip(
+            modelName: viewModel.selectedModelName,
+            framework: viewModel.selectedFramework
+        ) {
             showModelPicker = true
-        } label: {
-            HStack(spacing: 6) {
-                if let modelName = viewModel.selectedModelName {
-                    Image(getModelLogo(for: modelName))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                } else {
-                    Image(systemName: "cube")
-                        .font(AppTypography.system14)
-                }
+        }
+    }
+}
 
-                if let modelName = viewModel.selectedModelName {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName.shortModelName())
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
+// MARK: - Speech Detected Rings
 
-                        if let framework = viewModel.selectedFramework {
-                            HStack(spacing: 3) {
-                                Image(systemName: "cube")
-                                    .font(.system(size: 7))
-                                Text(framework.displayName)
-                                    .font(.system(size: 8, weight: .medium))
-                            }
-                            .foregroundColor(AppColors.statusGray)
-                        }
+/// Two rings expanding outward from the detector core while speech is arriving.
+///
+/// One clock, two phase offsets. The previous build gave each ring its own
+/// `repeatForever` at a different duration (1.0s and 1.5s), so they drifted in
+/// and out of alignment on a cycle of their own — visible as an irregular
+/// stutter that had nothing to do with the audio. Deriving both from a single
+/// `TimelineView` date means the spacing between them is fixed by construction.
+///
+/// This motion earns its place: it only exists while `isSpeechDetected` is true,
+/// so it is a live readout of the detector, not decoration. Under Reduce Motion
+/// it collapses to a single static ring — the state is still marked, nothing
+/// travels.
+private struct SpeechDetectedRings: View {
+    let diameter: CGFloat
+
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
+    /// The canonical 1.6s ambient period, shared by both rings.
+    private static let period: Double = 1.6
+    /// Half a cycle apart: evenly spaced is the only spacing that reads as
+    /// deliberate rather than as two things that happened to overlap.
+    private static let offsets: [Double] = [0, 0.5]
+
+    var body: some View {
+        if reduceMotion {
+            ring(scale: 1.20, opacity: 0.45)
+        } else {
+            TimelineView(.animation) { context in
+                let base = Self.basePhase(at: context.date)
+                ZStack {
+                    ForEach(Self.offsets, id: \.self) { offset in
+                        let phase = (base + offset).truncatingRemainder(dividingBy: 1)
+                        ring(scale: 1.0 + 0.55 * phase, opacity: 0.55 * (1 - phase))
                     }
-                } else {
-                    Text("Select Model")
-                        .font(.caption)
                 }
             }
         }
+    }
+
+    private func ring(scale: CGFloat, opacity: Double) -> some View {
+        Circle()
+            .stroke(AppColors.statusGreen.opacity(opacity), lineWidth: Stroke.regular)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(scale)
+            .allowsHitTesting(false)
+    }
+
+    private static func basePhase(at date: Date) -> Double {
+        date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
     }
 }
 

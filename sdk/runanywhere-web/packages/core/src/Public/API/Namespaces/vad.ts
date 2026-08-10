@@ -164,26 +164,68 @@ export const vad = {
     options?: VadOptions,
   ): AsyncIterable<VadEvent> {
     return (async function* detection(): AsyncGenerator<VadEvent> {
-      let stream: VadStream | null = null;
-      let format: AudioFormatSpec | null = null;
-      for await (const chunk of audio) {
-        if (!format) {
-          format = chunk.format;
-          stream = await vad.openStream(format, options);
-        } else if (
-          chunk.format.encoding !== format.encoding
-          || chunk.format.sampleRate !== format.sampleRate
-          || (chunk.format.channels ?? 1) !== (format.channels ?? 1)
-        ) {
-          throw SDKException.invalidConfiguration(
-            'vad.detectStream requires every chunk to share one audio format.',
-          );
+      // The pump runs beside the yield loop, not before it. Draining `audio`
+      // to completion first and only then forwarding `stream.events` is fine
+      // for a finite buffer and fatal for the live microphone every caller
+      // actually passes: that iterable never completes, so the loop never
+      // exited and not one event was ever emitted — including the `failed`
+      // event that a rejected `openStream` had already queued, which is why
+      // a broken detector looked like silence instead of an error.
+      const source = audio[Symbol.asyncIterator]();
+      const first = await source.next();
+      if (first.done) return;
+      const format: AudioFormatSpec = first.value.format;
+      const stream = await vad.openStream(format, options);
+
+      let stopped = false;
+      let pumpError: unknown;
+      void (async () => {
+        try {
+          let step: IteratorResult<AudioInput> = first;
+          for (; !step.done; step = await source.next()) {
+            if (stopped) return;
+            const chunk: AudioInput = step.value;
+            if (
+              chunk.format.encoding !== format.encoding
+              || chunk.format.sampleRate !== format.sampleRate
+              || (chunk.format.channels ?? 1) !== (format.channels ?? 1)
+            ) {
+              throw SDKException.invalidConfiguration(
+                'vad.detectStream requires every chunk to share one audio format.',
+              );
+            }
+            stream.pushFrame({ samples: chunk.bytes, sampleCount: chunk.bytes.byteLength });
+          }
+        } catch (error) {
+          pumpError = error;
+        } finally {
+          // Always terminate the event stream, success or failure — otherwise a
+          // rejected pump leaves the consumer below waiting forever.
+          stream.finish();
         }
-        stream!.pushFrame({ samples: chunk.bytes, sampleCount: chunk.bytes.byteLength });
+      })();
+
+      try {
+        yield* stream.events;
+      } finally {
+        // Abandoning the generator (a `break`, an unmounted view) must stop the
+        // pump and release the native session, not leave audio being fed into
+        // a stream nobody reads. `source.return()` is how a caller's own
+        // generator learns to shut its microphone pump down.
+        //
+        // Deliberately not awaited, matching `stt.detectStream`: an async
+        // iterator defers its `return()` behind the pending `next()`, and for a
+        // live microphone that `next()` only settles when the next frame
+        // arrives. Awaiting here would make the consumer's `break` — and the
+        // `stream.close()` that releases the native session — block on a frame
+        // that may never come if capture has already stopped.
+        stopped = true;
+        void Promise.resolve(source.return?.(undefined)).catch(() => {
+          // Source cleanup is best-effort; the consumer has already left.
+        });
+        await stream.close();
       }
-      if (!stream) return;
-      stream.finish();
-      yield* stream.events;
+      if (pumpError) throw pumpError;
     })();
   },
 };

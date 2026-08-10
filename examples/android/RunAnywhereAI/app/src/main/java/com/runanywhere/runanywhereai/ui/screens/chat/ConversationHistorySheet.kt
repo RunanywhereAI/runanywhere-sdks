@@ -1,11 +1,14 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,9 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.data.conversation.ConversationSummary
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 
@@ -70,17 +76,42 @@ fun ConversationHistorySheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
+        // `fillMaxHeight` on the sheet body is what makes the list usable: a
+        // ModalBottomSheet wraps its content, and an unbounded LazyColumn inside a
+        // wrapping Column measures to a single row — the sheet then opened one item
+        // tall no matter how much history existed. Weighting the list also keeps the
+        // title and search field pinned while the rows scroll under them.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = dimens.spacingXl),
+                .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
-            Text(
-                text = "History",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingSm),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "History",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                // A count is the cheapest way to tell "nothing saved" apart from
+                // "the list failed to render" — the exact ambiguity of a one-row sheet.
+                if (conversations.isNotEmpty()) {
+                    Text(
+                        text = if (query.isBlank()) {
+                            "${conversations.size} saved"
+                        } else {
+                            "${filtered.size} of ${conversations.size}"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             if (conversations.isNotEmpty()) {
                 SearchField(
@@ -91,9 +122,23 @@ fun ConversationHistorySheet(
             }
 
             when {
-                conversations.isEmpty() -> EmptyNote("No conversations yet")
-                filtered.isEmpty() -> EmptyNote("No matches")
-                else -> LazyColumn {
+                conversations.isEmpty() -> HistoryEmptyState(
+                    title = "No conversations yet",
+                    body = "Chats are saved here automatically as soon as you send your first message.",
+                    icon = RACIcons.Outline.MessageCircle,
+                    modifier = Modifier.weight(1f),
+                )
+                filtered.isEmpty() -> HistoryEmptyState(
+                    title = "No matches for “$query”",
+                    body = "Search looks at conversation titles and every message inside them.",
+                    icon = RACIcons.Outline.Search,
+                    action = "Clear search" to { query = "" },
+                    modifier = Modifier.weight(1f),
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = dimens.spacingXl),
+                ) {
                     items(filtered, key = { it.id }) { conversation ->
                         ConversationRow(
                             conversation = conversation,
@@ -101,6 +146,11 @@ fun ConversationHistorySheet(
                             onRename = { renaming = conversation },
                             onTogglePin = { onTogglePin(conversation.id, !conversation.pinned) },
                             onDelete = { deleting = conversation },
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = AppMotion.standard(),
+                                placementSpec = AppMotion.springDefault(),
+                                fadeOutSpec = AppMotion.exit(),
+                            ),
                         )
                     }
                 }
@@ -178,11 +228,12 @@ private fun ConversationRow(
     onRename: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     var menuOpen by remember { mutableStateOf(false) }
 
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -290,20 +341,56 @@ private fun RenameDialog(initialTitle: String, onConfirm: (String) -> Unit, onDi
     )
 }
 
+/**
+ * An empty sheet has to explain itself. The old one-liner ("No conversations yet")
+ * left the reader guessing whether history was empty or broken, and offered nothing
+ * to do about it — so each state now carries a reason and, where one exists, the
+ * single action that resolves it.
+ */
 @Composable
-private fun EmptyNote(text: String) {
+private fun HistoryEmptyState(
+    title: String,
+    body: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    action: Pair<String, () -> Unit>? = null,
+) {
     val dimens = LocalDimens.current
-    Box(
-        modifier = Modifier
+    Column(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(dimens.spacingXl),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = dimens.spacingXl, vertical = dimens.spacingXl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd, Alignment.CenterVertically),
     ) {
+        Box(
+            modifier = Modifier
+                .size(dimens.artCircle)
+                .clip(RoundedCornerShape(dimens.radiusFull))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(dimens.iconLg),
+            )
+        }
         Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center,
         )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        action?.let { (label, onClick) ->
+            TextButton(onClick = onClick) { Text(label) }
+        }
     }
 }
 

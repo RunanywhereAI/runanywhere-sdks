@@ -291,8 +291,11 @@ export class CommonsModule {
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
       this._module = await createModule({
-        print: (text) => logger.info(text),
-        printErr: (text) => logger.info(text),
+        // Both Emscripten streams carry levelled commons lines (commons sends
+        // every diagnostic to stderr), so read the level out of the line
+        // rather than flattening the stream onto one console method.
+        print: (text) => logger.native(text, 'out'),
+        printErr: (text) => logger.native(text, 'err'),
         locateFile: (path) => baseUrl + path,
       });
       this._nativeShutdownComplete = false;

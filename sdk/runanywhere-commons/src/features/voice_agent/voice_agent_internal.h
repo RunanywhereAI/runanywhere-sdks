@@ -73,9 +73,82 @@ struct rac_voice_agent_feed_state {
     bool in_speech{false};
     int speech_ms{0};
     int silence_ms{0};
-    /// Adaptive ambient floor; seeded to the absolute speech threshold and
-    /// never reset across turns (only adapted while idle).
-    float noise_floor{0.015f};
+    /// Adaptive ambient floor, learned from this room and this microphone.
+    /// Seeded from the first warm-up frames rather than from a constant: a
+    /// constant is either above a quiet mic (deaf) or below a normal room
+    /// (opens on ambience), and both were shipped at different times. Never
+    /// reset across turns; only adapted while idle.
+    float noise_floor{0.0f};
+    /// Analysis frames observed since capture started, capped at the warm-up
+    /// length. While below it the gate stays shut and `noise_floor` is being
+    /// established — judging a room against an estimate of zero is what made
+    /// the first utterance of every session open on ambience.
+    int warmup_frames{0};
+    /// Consecutive analysis frames whose level cleared the (boosted) gate while
+    /// the agent's own reply was still audible. A barge-in has to survive a few
+    /// frames because the mic is hearing the loudspeaker at the same time.
+    int barge_in_frames{0};
+    /// Analysis frames elapsed since the current reply became audible. Doubles
+    /// as the index into `reply_envelope`, so it says both "how long has the
+    /// agent been talking" and "which part of the reply is being heard now".
+    int echo_frames{0};
+    /// Frames of the reply that have actually been heard and used to measure
+    /// `echo_gain`. The barge-in detector stays disarmed until this reaches its
+    /// settling count. Counted in frames carrying signal rather than in elapsed
+    /// frames because the platform player starts a device-dependent beat after
+    /// the core hands the bytes over; arming on elapsed time would meet the
+    /// reply's own onset already armed.
+    int echo_learn_frames{0};
+    /// Per-analysis-frame RMS of the reply currently coming out of the
+    /// loudspeaker, in the same normalized units as the microphone frames.
+    ///
+    /// The core synthesized this audio, so it knows exactly what its own echo
+    /// should look like over time. That prediction is what lets the barge-in
+    /// threshold rise with the agent's loud syllables and fall again in the
+    /// pauses between its sentences — which is where people actually interrupt.
+    /// Empty means "no prediction available" and leaves the detector unarmed.
+    std::vector<float> reply_envelope;
+    /// How much of the loudspeaker this room returns to this microphone:
+    /// measured microphone level divided by the reply's own level at the same
+    /// instant. The one quantity that genuinely has to be learned per device and
+    /// per room; everything else about the echo is already known.
+    float echo_gain{0.0f};
+    /// The predicted echo level for the frame just judged (`echo_gain` times the
+    /// reply's own level there). Kept as state only so the barge-in threshold and
+    /// any diagnostics read the same number.
+    float echo_floor{0.0f};
+    /// Consecutive milliseconds of frames whose level did not even reach the
+    /// absolute floor-of-the-floor, i.e. the input is delivering essentially no
+    /// signal (muted mic, wrong input device, dead capture graph). Ordinary
+    /// room silence sits well above that floor, so this counts only genuinely
+    /// dead input.
+    int64_t silent_input_ms{0};
+    /// Loudest frame seen during the current dead-input stretch, so the
+    /// diagnostic can report what it actually measured.
+    float silent_input_peak{0.0f};
+    /// True once the dead-input diagnostic has been reported for the current
+    /// stretch, so it is said once instead of every frame.
+    bool silent_input_reported{false};
+    /// Consecutive milliseconds the energy gate has stayed shut, and the
+    /// loudest frame seen during that stretch.
+    ///
+    /// Distinct from the dead-input counters above, and the gap between the two
+    /// is the whole point: an input can be delivering plenty of signal and still
+    /// never clear a gate set relative to it. That case reported nothing at all,
+    /// which made "the agent cannot hear me" over a live microphone
+    /// indistinguishable from a broken pipeline — twice. Reported once per shut
+    /// stretch, with the numbers, so the next time it is a measurement.
+    int64_t gate_shut_ms{0};
+    float gate_shut_peak{0.0f};
+    bool gate_shut_reported{false};
+    /// Wall-clock instant the reply we last handed the SDK stops being audible,
+    /// derived from that reply's own duration. 0 = no reply outstanding. A
+    /// speech onset before this instant is the user talking over the agent,
+    /// which is the one moment worth telling the SDK about immediately, because
+    /// only the SDK can stop the speaker. An onset after it is an ordinary new
+    /// turn — which is what a half-duplex driver, silent for the whole playout,
+    /// always produces.
+    int64_t reply_audible_until_ms{0};
     /// Serializes feed-call segmentation; the heavy turn pipeline runs
     /// outside this lock so concurrent feeds only contend on buffering.
     std::mutex mutex;
@@ -118,6 +191,23 @@ struct rac_voice_agent {
     /// (e.g. `detect_speech`) to drain before tearing the agent down.
     std::atomic<bool> is_shutting_down{false};
     std::atomic<int> in_flight{0};
+
+    /// Serializes in-flight admission against the shutdown transition.
+    ///
+    /// The flag and the counter cannot close the destroy race between them, no
+    /// matter how they are ordered. An entrant that reads `is_shutting_down` as
+    /// false can be preempted before it increments; destroy then flips the flag,
+    /// observes a counter still at zero, drains instantly, and frees the handle —
+    /// so the entrant's increment lands on released storage, and no re-check
+    /// afterwards can undo that. The two operations have to be one transition.
+    ///
+    /// Admission takes this lock around {test flag, bump counter}; destroy takes
+    /// it around {set flag}. That leaves exactly two outcomes for any entrant:
+    /// rejected, or counted before destroy can read the counter.
+    ///
+    /// Held only across those few instructions — never across a turn, and never
+    /// together with `mutex` — so it imposes no ordering against the lock below.
+    std::mutex admission_mutex;
 
     rac_handle_t llm_handle{nullptr};
     rac_handle_t stt_handle{nullptr};

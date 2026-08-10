@@ -422,13 +422,26 @@ extension RAModelInfo {
             framework == .qhexrt && downloadURL.localizedCaseInsensitiveContains("_HNPU")
     }
 
+    /// The size figure on a model row.
+    ///
+    /// Only `downloadSizeBytes` is a measured download size. `memoryRequiredBytes`
+    /// is what the model needs to *run* — weights plus KV cache and runtime
+    /// overhead — and every catalog row registers only that, so the fallback was
+    /// printing a run-time budget as if it were a transfer size. On LFM2.5 230M
+    /// that read "181.2 MB" beside a live progress line saying "of 146.3 MB":
+    /// two different numbers for one file, the unqualified one wrong by 18%.
+    /// An estimate is fine to show; asserting it as exact is not, so the
+    /// fallback is marked approximate and the exact form is reserved for the
+    /// figure that actually came off the wire.
     var consumerSizeLabel: String {
         if isBuiltIn {
             return "No download"
         }
-        let bytes = downloadSizeBytes > 0 ? downloadSizeBytes : memoryRequiredBytes
-        if bytes > 0 {
-            return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
+        if downloadSizeBytes > 0 {
+            return ByteCountFormatter.string(fromByteCount: downloadSizeBytes, countStyle: .memory)
+        }
+        if memoryRequiredBytes > 0 {
+            return "~" + ByteCountFormatter.string(fromByteCount: memoryRequiredBytes, countStyle: .memory)
         }
         return requiresHfAuth ? "Size varies" : "Size unknown"
     }
@@ -697,6 +710,12 @@ struct BackendPill: View {
             .font(AppTypography.caption2)
             .fontWeight(.medium)
             .foregroundColor(AppColors.textSecondary)
+            // A pill is one short token and must stay one line. Without this it
+            // is squeezed by whatever shares its row — a download row's progress
+            // control, for one — and SwiftUI hyphenates it into "Lla-/ma CPP",
+            // which reads as a rendering fault rather than a backend name.
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, AppSpacing.small)
             .padding(.vertical, AppSpacing.xxSmall)
             .background(AppColors.backgroundSecondary)

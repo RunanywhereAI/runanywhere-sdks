@@ -146,46 +146,14 @@ public extension RunAnywhere {
         onThinking: ((String) async -> Void)? = nil,
         onToken: ((String) async -> Void)? = nil
     ) async -> RALLMGenerationResult {
-        var answerResponse = ""
-        var thinkingResponse = ""
-        var tokenCount = 0
-        var firstTokenTime: Date?
         let startTime = Date()
-        var finishReason: RAFinishReason = .unspecified
-        var terminalError: RASDKError?
-        var finalEvent: RALLMStreamEvent?
-
-        for await event in events {
-            if !event.token.isEmpty {
-                if firstTokenTime == nil { firstTokenTime = Date() }
-                tokenCount += 1
-                // RALLMStreamEvent's discriminator is the event-level
-                // `eventKind: RALLMStreamEventKind`, not a per-token
-                // `RATokenKind` field (`.kind` doesn't exist on this type).
-                if event.eventKind == .thinking {
-                    thinkingResponse += event.token
-                    if let onThinking {
-                        await onThinking(thinkingResponse)
-                    }
-                } else if event.eventKind != .toolCall {
-                    answerResponse += event.token
-                    if let onToken {
-                        await onToken(answerResponse)
-                    }
-                }
-            }
-            // isFinal was deleted outright; .completed/.error are the
-            // terminal event_kind values now (idl/llm_service.proto).
-            if event.eventKind == .completed || event.eventKind == .error {
-                finalEvent = event
-                finishReason = event.finishReason
-                terminalError = event.hasError ? event.error : nil
-                break
-            }
-        }
+        let stream = await drainStream(events, onThinking: onThinking, onToken: onToken)
+        let answerResponse = stream.answer
+        let thinkingResponse = stream.thinking
+        let finalEvent = stream.finalEvent
 
         let totalLatency = Date().timeIntervalSince(startTime) * 1000
-        let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
+        let ttft = stream.firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
 
         let snapshot = loadedModelSnapshot(category: .language, includeModelMetadata: true)
         let modelID = snapshot.found ? snapshot.modelID : ""
@@ -214,30 +182,121 @@ public extension RunAnywhere {
             result.thinkingContent = thinkingResponse
         }
         result.usage.inputTokens = final.map { $0.usage.inputTokens } ?? Int32(max(1, prompt.count / 4))
-        result.usage.outputTokens = final.map { $0.usage.outputTokens } ?? Int32(tokenCount)
-        result.responseTokens = final.map { $0.usage.outputTokens } ?? Int32(tokenCount)
+        result.usage.outputTokens = final.map { $0.usage.outputTokens } ?? Int32(stream.tokenCount)
+        result.responseTokens = final.map { $0.usage.outputTokens } ?? Int32(stream.tokenCount)
         result.usage.totalTokens = final.map { $0.usage.totalTokens }
             ?? (result.usage.inputTokens + result.usage.outputTokens)
         result.modelUsed = modelID
         // totalTimeMs was deleted outright; generationTimeMs (already a
         // Double) is the sole wall-clock field left on this message.
-        result.generationTimeMs = final.map { $0.generationTimeMs } ?? totalLatency
+        let generationTimeMs: Double = {
+            if let fromFinal = final?.generationTimeMs, fromFinal > 0 { return fromFinal }
+            return totalLatency
+        }()
+        result.generationTimeMs = generationTimeMs
         result.framework = framework
-        result.promptEvalTimeMs = final.map { $0.promptEvalTimeMs } ?? 0
-        result.decodeTimeMs = final.map { $0.decodeTimeMs } ?? 0
-        // tokensPerSecond was renamed decodeTokensPerSecond and moved onto
-        // the shared RATokenUsage message (idl/token_usage.proto).
-        result.usage.decodeTokensPerSecond = final.map { $0.usage.decodeTokensPerSecond }
-            ?? (totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0)
-        // ttftMs (top-level Double) was deleted outright; ttft is now
-        // Int64 milliseconds on the shared RATokenUsage message.
-        if let ttftFromFinal = final?.usage.ttftMs, ttftFromFinal > 0 {
-            result.usage.ttftMs = ttftFromFinal
-        } else if let ttft {
-            result.usage.ttftMs = Int64(ttft.rounded())
-        }
-        if finishReason != .unspecified { result.finishReason = finishReason }
-        if let terminalError { result.error = terminalError }
+        applyTimingMetrics(
+            to: &result,
+            final: final,
+            wallClockTtftMs: ttft,
+            generationTimeMs: generationTimeMs
+        )
+        if stream.finishReason != .unspecified { result.finishReason = stream.finishReason }
+        if let terminalError = stream.terminalError { result.error = terminalError }
         return result
+    }
+}
+
+// MARK: - Stream aggregation internals
+
+private extension RunAnywhere {
+
+    /// What one pass over the event stream accumulated.
+    struct DrainedStream {
+        var answer = ""
+        var thinking = ""
+        var tokenCount = 0
+        var firstTokenTime: Date?
+        var finishReason: RAFinishReason = .unspecified
+        var terminalError: RASDKError?
+        var finalEvent: RALLMStreamEvent?
+    }
+
+    /// Consume `events` to the first terminal event, invoking the caller's
+    /// per-token hooks as text arrives.
+    static func drainStream(
+        _ events: AsyncStream<RALLMStreamEvent>,
+        onThinking: ((String) async -> Void)?,
+        onToken: ((String) async -> Void)?
+    ) async -> DrainedStream {
+        var drained = DrainedStream()
+        for await event in events {
+            if !event.token.isEmpty {
+                if drained.firstTokenTime == nil { drained.firstTokenTime = Date() }
+                drained.tokenCount += 1
+                // RALLMStreamEvent's discriminator is the event-level
+                // `eventKind: RALLMStreamEventKind`, not a per-token
+                // `RATokenKind` field (`.kind` doesn't exist on this type).
+                if event.eventKind == .thinking {
+                    drained.thinking += event.token
+                    if let onThinking {
+                        await onThinking(drained.thinking)
+                    }
+                } else if event.eventKind != .toolCall {
+                    drained.answer += event.token
+                    if let onToken {
+                        await onToken(drained.answer)
+                    }
+                }
+            }
+            // isFinal was deleted outright; .completed/.error are the
+            // terminal event_kind values now (idl/llm_service.proto).
+            if event.eventKind == .completed || event.eventKind == .error {
+                drained.finalEvent = event
+                drained.finishReason = event.finishReason
+                drained.terminalError = event.hasError ? event.error : nil
+                break
+            }
+        }
+        return drained
+    }
+
+    /// Fill in the throughput/latency fields, preferring the backend's own
+    /// numbers and falling back to wall clock.
+    ///
+    /// tokensPerSecond was renamed decodeTokensPerSecond and moved onto the
+    /// shared RATokenUsage message (idl/token_usage.proto). Batch-buffered
+    /// streams (Maple/Bonsai) dump tokens only after the full generate;
+    /// wall-to-first ≈ total and "decode = total − ttft" becomes a few ms →
+    /// absurd tok/s and a fake 15s TTFT. Match commons.
+    static func applyTimingMetrics(
+        to result: inout RALLMGenerationResult,
+        final: RALLMGenerationResult?,
+        wallClockTtftMs: Double?,
+        generationTimeMs: Double
+    ) {
+        let reportedTps = final?.usage.decodeTokensPerSecond ?? 0
+        let reportedTtft: Int64? = {
+            if let ttftFromFinal = final?.usage.ttftMs, ttftFromFinal > 0 { return ttftFromFinal }
+            if let wallClockTtftMs { return Int64(wallClockTtftMs.rounded()) }
+            return nil
+        }()
+        let outputTokens = Int(result.usage.outputTokens)
+        let wallTps = generationTimeMs > 0 && outputTokens > 0
+            ? Double(outputTokens) / (generationTimeMs / 1000.0) : 0
+        let decodeWindow = reportedTtft.map { generationTimeMs - Double($0) } ?? generationTimeMs
+        let batchBuffered =
+            reportedTtft != nil && decodeWindow < max(50.0, generationTimeMs * 0.05)
+        if batchBuffered {
+            result.usage.decodeTokensPerSecond = wallTps
+            result.usage.ttftMs = 0
+            result.promptEvalTimeMs = 0
+            result.decodeTimeMs = Int64(generationTimeMs.rounded())
+        } else {
+            result.usage.decodeTokensPerSecond = reportedTps > 0 ? reportedTps : wallTps
+            if let reportedTtft { result.usage.ttftMs = reportedTtft }
+            result.promptEvalTimeMs = final?.promptEvalTimeMs ?? (reportedTtft ?? 0)
+            result.decodeTimeMs = final?.decodeTimeMs ?? 0
+        }
     }
 }

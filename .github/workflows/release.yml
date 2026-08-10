@@ -36,6 +36,13 @@ on:
         description: 'Also build the external Swift/RN starter repos (advisory; they version-lag the SDK)'
         type: boolean
         default: false
+      publish_from_run_id:
+        description: >-
+          Publish the artifacts of an earlier run that already passed every gate but failed
+          in publish itself. Skips all build and validation jobs and republishes that run's
+          artifacts verbatim. Use only when nothing but the publish step needs to change.
+        required: false
+        default: ''
       reuse_native_web_run_id:
         description: >-
           Run id whose native-web artifact to reuse instead of rebuilding (skips native_web).
@@ -134,6 +141,7 @@ jobs:
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
     # Use the macOS 26 runner line for Xcode 26 while keeping the desktop rcli
     # lane on its existing macos-14 llama.cpp Metal pin.
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     # The Apple build compiles all XCFramework slices + the heavy mlx-swift/MLX
     # Metal runtime; wall-clock is ~45min typical but has spiked to the 90min cap
@@ -187,6 +195,7 @@ jobs:
 
   native_android:
     needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -227,6 +236,7 @@ jobs:
 
   native_linux:
     needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -259,6 +269,7 @@ jobs:
     # before entering the shared C++ CLI. It consumes the exact Apple release
     # candidates produced above and requires Swift 6.2+ for mlx-audio-swift.
     # Pull-request smoke keeps the faster CMake-only macos-14 lane.
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     timeout-minutes: 120
     steps:
@@ -486,6 +497,7 @@ jobs:
 
   native_rcli_linux:
     needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -517,6 +529,7 @@ jobs:
 
   native_rcli_windows:
     needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -612,6 +625,7 @@ jobs:
     # Pin windows-2022: build-windows.bat hardcodes the "Visual Studio 17 2022"
     # generator, and the floating windows-latest label has moved to an image
     # (windows-2025) where VS 2022 is no longer installed, breaking configure.
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -663,7 +677,7 @@ jobs:
     needs: validate
     # Skipped when reusing a prior run's WASM. sdk_web and publish both tolerate
     # the resulting 'skipped' only while reuse_native_web_run_id is set.
-    if: ${{ !inputs.reuse_native_web_run_id }}
+    if: ${{ !inputs.publish_from_run_id && (!inputs.reuse_native_web_run_id) }}
     runs-on: ubuntu-latest
     # The WASM build compiles Abseil + Protobuf from source (RAG/Solutions ON)
     # and is forced to --parallel 1 to dodge a zlib static-lib race, then builds
@@ -742,6 +756,7 @@ jobs:
 
   sdk_kotlin:
     needs: [validate, native_android]
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -773,6 +788,7 @@ jobs:
   sdk_web:
     needs: [validate, native_web]
     if: >-
+      !inputs.publish_from_run_id &&
       !cancelled() &&
       needs.validate.result == 'success' &&
       (needs.native_web.result == 'success' ||
@@ -820,6 +836,7 @@ jobs:
 
   sdk_react_native:
     needs: [validate, native_ios, native_android]
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -908,7 +925,7 @@ jobs:
     # is not evidence about this release. It never gated publish (see the
     # ADVISORY note there); running it only produced a red job nobody could
     # act on from this repo. Opt in with validate_external_starters.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
+    if: ${{ !inputs.publish_from_run_id && (github.event_name == 'workflow_dispatch' && inputs.validate_external_starters) }}
     # native_ios produces the iOS artifact this job downloads. Do NOT add
     # sdk_kotlin here — the Swift consumer doesn't touch Kotlin artifacts
     # and serializing Swift validation behind ubuntu Kotlin
@@ -1025,6 +1042,7 @@ jobs:
 
   validate_consumer_kotlin:
     needs: [validate, sdk_kotlin]
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -1331,6 +1349,7 @@ jobs:
     # Explicit, because a skipped native_web propagates through sdk_web to here:
     # GitHub only stops that cascade at a job that states its own condition.
     if: >-
+      !inputs.publish_from_run_id &&
       !cancelled() &&
       needs.validate.result == 'success' &&
       needs.sdk_web.result == 'success'
@@ -1450,6 +1469,7 @@ jobs:
 
   validate_consumer_flutter:
     needs: [validate, native_ios, native_android]
+    if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -1519,7 +1539,7 @@ jobs:
   validate_consumer_react_native:
     # Off by default, same reasoning as validate_consumer_swift: this builds
     # RunanywhereAI/react-native-starter-app, an external repo.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_external_starters }}
+    if: ${{ !inputs.publish_from_run_id && (github.event_name == 'workflow_dispatch' && inputs.validate_external_starters) }}
     needs: [validate, sdk_react_native]
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -1772,19 +1792,21 @@ jobs:
     if: >-
       !cancelled() &&
       needs.validate.result == 'success' &&
-      needs.native_ios.result == 'success' &&
-      needs.native_android.result == 'success' &&
-      needs.native_linux.result == 'success' &&
-      needs.native_rcli_macos.result == 'success' &&
-      needs.native_rcli_linux.result == 'success' &&
-      needs.native_rcli_windows.result == 'success' &&
-      (needs.native_web.result == 'success' ||
-       (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
-      needs.sdk_kotlin.result == 'success' &&
-      needs.sdk_web.result == 'success' &&
-      needs.sdk_react_native.result == 'success' &&
-      needs.validate_consumer_web.result == 'success' &&
-      needs.validate_consumer_flutter.result == 'success'
+      (inputs.publish_from_run_id != '' || (
+        needs.native_ios.result == 'success' &&
+        needs.native_android.result == 'success' &&
+        needs.native_linux.result == 'success' &&
+        needs.native_rcli_macos.result == 'success' &&
+        needs.native_rcli_linux.result == 'success' &&
+        needs.native_rcli_windows.result == 'success' &&
+        (needs.native_web.result == 'success' ||
+         (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
+        needs.sdk_kotlin.result == 'success' &&
+        needs.sdk_web.result == 'success' &&
+        needs.sdk_react_native.result == 'success' &&
+        needs.validate_consumer_web.result == 'success' &&
+        needs.validate_consumer_flutter.result == 'success'
+      ))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1792,12 +1814,20 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v7
+      # In publish-only mode every build job was skipped, so this run holds no
+      # artifacts of its own; take the whole set from the run being republished.
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
+          run-id: ${{ inputs.publish_from_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       # native_web was skipped, so RACommons-web-v*.tar.gz is absent from this
       # run. Pull it from the reused run or the asset assertion below fails.
+      # This applies in publish-only mode too: a run that itself reused the WASM
+      # never held a native-web artifact, so republishing it needs the same
+      # source. Only pass reuse_native_web_run_id when the artifacts being
+      # published genuinely lack native-web, or flatten will report a collision.
       - name: Download reused Web natives
         if: ${{ inputs.reuse_native_web_run_id != '' }}
         uses: actions/download-artifact@v8
@@ -1888,7 +1918,15 @@ jobs:
           fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
           assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
-          assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
+          # The DMG exists only when the Developer ID + notary secrets are set;
+          # without them the packaging step soft-skips it by design and ships the
+          # ad-hoc tarball alone. Asserting it unconditionally made publish
+          # unsatisfiable, which is what blocked every release after v0.20.10.
+          if [ -s "release-flat/rcli-macos-arm64-v${VERSION}.dmg" ]; then
+            assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
+          else
+            echo "::warning::no notarized rcli DMG in this release — Developer ID/notary secrets are not configured"
+          fi
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
           assert_pair "rcli Windows x86_64"            "rcli-windows-x86_64-v${VERSION}.zip"
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"

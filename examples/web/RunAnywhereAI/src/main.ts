@@ -9,7 +9,7 @@
 import './styles/design-system.css';
 import './styles/commons.css';
 import './styles/components.css';
-import { buildAppShell } from './app';
+import { buildAppShell, getActiveTabId, isChatRouteActive } from './app';
 import { RunAnywhere, type Environment } from '@runanywhere/web';
 import { registerAll as registerModelCatalogAll } from './services/model-catalog';
 import {
@@ -24,6 +24,15 @@ import {
 } from './views/settings';
 import { formatError } from './services/format-error';
 import { appLogger } from './services/app-logger';
+import {
+  engineFailures,
+  failureDiagnostics,
+  reportEngineRegistration,
+  resetEngineAvailability,
+  setEngineRetryHandler,
+} from './services/engine-availability';
+import { escapeHtml } from './services/escape-html';
+import { icon, type IconName } from './components/icons';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -86,13 +95,15 @@ let readinessStep: AppReadinessStep = 'booting';
 interface RuntimeConfiguration {
   environment: Environment;
   apiKey?: string;
-  baseUrl?: string;
+  /** Spelled to match `SDKInitOptions.baseURL`; this object is passed to `initialize()` as-is. */
+  baseURL?: string;
 }
 
 let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
 let runtimeReconfigurationPromise: Promise<APIConfigurationApplyResult> | null = null;
 
 setAPIConfigurationApplyHandler(applyAPIConfiguration);
+setEngineRetryHandler(retryEngineRegistration);
 
 function publishReadiness(state: AppReadinessState, error?: string): AppReadinessSnapshot {
   appReadinessState = state;
@@ -103,10 +114,14 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
   // demo (Voice/Documents/Settings tabs plus explicit unavailable states)
   // is still navigable. Treating that as "not interactive" would convert
   // the documented degraded mode into a fatal initialization error view.
+  //
+  // A surface other than the assistant is the third case: the model selector is
+  // not part of that screen at all, so its absence there says nothing about
+  // readiness. `probeAppShell` already reports `interactive` for those routes.
   const backendDegraded = backendReadinessState === 'unavailable';
   const ready = state === 'interactive'
     && probe.shellReady
-    && (probe.modelUiReady || backendDegraded);
+    && (probe.modelUiReady || backendDegraded || probe.reason === 'interactive');
   const snapshot: AppReadinessSnapshot = {
     ...probe,
     ready,
@@ -167,9 +182,28 @@ function publishReadinessStep(step: AppReadinessStep): void {
   publishReadiness(appReadinessState);
 }
 
+/**
+ * Consumer-facing wording for each boot step.
+ *
+ * The status line used to print the internal slug — "Step: registering
+ * llamacpp..." — which is the engine package's name, not language a user of a
+ * consumer app has any way to interpret. The step values themselves stay
+ * internal identifiers; this is the one place they become English.
+ */
+const LOADING_STATUS_TEXT: Record<AppReadinessStep, string> = {
+  booting: 'Loading the SDK…',
+  'initializing-sdk': 'Starting the on-device runtime…',
+  'registering-llamacpp': 'Preparing text generation…',
+  'registering-onnx': 'Preparing speech…',
+  catalog: 'Checking available models…',
+  'building-shell': 'Almost ready…',
+  interactive: 'Ready.',
+  error: 'Something went wrong.',
+};
+
 function updateLoadingStatus(step: AppReadinessStep): void {
   const status = document.getElementById('loading-status');
-  if (status) status.textContent = `Step: ${step.replaceAll('-', ' ')}...`;
+  if (status) status.textContent = LOADING_STATUS_TEXT[step];
 }
 
 async function withTimeout<T>(step: string, timeoutMs: number, operation: Promise<T>): Promise<T> {
@@ -192,6 +226,13 @@ function probeAppShell(): AppShellProbe {
   const tabBar = app?.querySelector('.tab-bar') ?? null;
   const activePanel = app?.querySelector<HTMLElement>('.tab-panel.active') ?? null;
   const chatPanel = document.getElementById('tab-chat');
+  // The shell now restores the tab named by the URL, so the assistant is the
+  // panel that *should* be showing only when the URL says so. Deep-linking to
+  // `#/benchmarks` must not read as "the chat tab failed to activate" and tip
+  // `waitForInteractiveShell` into the fatal initialization error view. Loading
+  // the app with no fragment still routes to chat, so the default path — and
+  // every probe the browser suite makes — is unchanged.
+  const onChatRoute = app !== null && isChatRouteActive();
   const modelTrigger = document.getElementById('chat-toolbar-model') as HTMLElement | null;
   const modelTriggerText = document.getElementById('chat-toolbar-model-text')?.textContent?.trim() ?? '';
   const modelOverlay = document.getElementById('chat-model-overlay') as HTMLElement | null;
@@ -220,18 +261,22 @@ function probeAppShell(): AppShellProbe {
       && tabBar
       && activePanel
       && chatPanel
-      && activePanel === chatPanel
+      // On the chat route the active panel has to *be* the chat panel; on any
+      // other route it has to be the panel that route names, which is exactly
+      // what `.tab-panel.active` already is.
+      && (!onChatRoute || activePanel === chatPanel)
       && loadingHidden,
   );
   const modelUiReady = Boolean(
     shellReady
       && modelUiTarget,
   );
+  const routedTab = getActiveTabId();
 
   if (!app) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-app-root' };
   if (!tabContent || !tabBar) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-tab-shell' };
   if (!activePanel) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-active-tab' };
-  if (activePanel !== chatPanel) {
+  if (onChatRoute && activePanel !== chatPanel) {
     return {
       shellReady,
       modelUiReady,
@@ -240,7 +285,12 @@ function probeAppShell(): AppShellProbe {
       reason: 'chat-tab-not-active',
     };
   }
-  if (!loadingHidden) return { shellReady, modelUiReady, modelUiTarget, activeTab: 'chat', reason: 'loading-screen-visible' };
+  if (!loadingHidden) return { shellReady, modelUiReady, modelUiTarget, activeTab: routedTab, reason: 'loading-screen-visible' };
+  // The model selector lives on the assistant. A deep link to another surface is
+  // interactive without it, and claiming otherwise would be the probe lying.
+  if (!onChatRoute) {
+    return { shellReady, modelUiReady, modelUiTarget, activeTab: routedTab, reason: 'interactive' };
+  }
   if (!modelTrigger && !getStartedTrigger) {
     return { shellReady, modelUiReady, modelUiTarget, activeTab: 'chat', reason: 'missing-model-selector' };
   }
@@ -336,11 +386,15 @@ async function main(): Promise<void> {
   readinessStep = 'booting';
   publishReadiness('booting');
 
+  // The boot screen is already on screen — index.html ships it as static markup
+  // so it paints with the document. This only matters on the retry path, where
+  // the previous attempt removed it. It must come *before* the awaited step
+  // below, or a retry shows a blank page for the duration of that step.
+  showLoadingScreen();
+
   // Step 0: Ensure cross-origin isolation for SharedArrayBuffer (Safari/iOS)
   await withTimeout('setting up cross-origin isolation', 60_000, ensureCrossOriginIsolation());
 
-  // Show loading screen while SDK initializes
-  showLoadingScreen();
   publishReadinessStep('initializing-sdk');
   publishReadiness('initializing-sdk');
 
@@ -386,10 +440,12 @@ async function initializeSDK(): Promise<void> {
     const configuration: RuntimeConfiguration = hostedConfiguration
       ? {
           apiKey: hostedConfiguration.apiKey,
-          // APIConfiguration exposes `baseURL`; the SDK's initialize() reads
-          // `baseUrl`. Map explicitly so the URL isn't silently dropped (which
-          // made production init fail with "URL required").
-          baseUrl: hostedConfiguration.baseURL,
+          // Mapped field-by-field rather than spread, because the spread's
+          // excess properties are invisible to the type checker: the name has
+          // to match `SDKInitOptions.baseURL` exactly or the URL is dropped at
+          // runtime while both sides still compile, and production init fails
+          // with "URL required".
+          baseURL: hostedConfiguration.baseURL,
           environment: 'production',
         }
       : { environment: 'development' };
@@ -450,13 +506,22 @@ async function startRuntime(
         ? RunAnywhere.runtime.active
         : LlamaCPP.accelerationMode;
     appLogger.info('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
+    reportEngineRegistration('llamacpp', { ok: true });
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`llamacpp: ${message}`);
+    // Pass the formatted string, not the Error: `appLogger` deliberately
+    // reduces an Error to `{ errorType }` so a message carrying a signed URL
+    // can never reach the console. A string routes through
+    // `sanitizeDiagnosticText` instead, which redacts credentials and keeps the
+    // actionable part ("which artifact failed to load").
     appLogger.warning(
       '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
-      err,
+      message,
     );
+    // Tell the UI which engine died, so the picker can disable exactly the rows
+    // that need it instead of offering downloads that cannot load.
+    reportEngineRegistration('llamacpp', { ok: false, error: message });
   }
 
   try {
@@ -491,13 +556,16 @@ async function startRuntime(
       diagnostics: ONNX.lastWorkerDiagnostics,
       speech,
     };
+    reportEngineRegistration('onnx', { ok: true });
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`onnx/sherpa: ${message}`);
+    // Formatted string, not the Error — see the llamacpp branch above.
     appLogger.warning(
       '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
-      err,
+      message,
     );
+    reportEngineRegistration('onnx', { ok: false, error: message });
   }
 
   backendReadinessState = backendErrors.length === 0 ? 'registered' : 'unavailable';
@@ -549,7 +617,7 @@ function applyAPIConfiguration(
   runtimeReconfigurationPromise = (async () => {
     const next: RuntimeConfiguration = {
       apiKey: configuration.apiKey,
-      baseUrl: configuration.baseURL,
+      baseURL: configuration.baseURL,
       environment: 'production',
     };
     const previous = activeRuntimeConfiguration;
@@ -557,6 +625,7 @@ function applyAPIConfiguration(
     sdkReadinessState = 'initializing';
     backendReadinessState = 'pending';
     backendRegistrationError = undefined;
+    resetEngineAvailability();
     identityReadinessState = 'not-required';
     identityInitializationError = undefined;
 
@@ -597,6 +666,55 @@ function applyAPIConfiguration(
   });
 
   return runtimeReconfigurationPromise;
+}
+
+/**
+ * Re-run the boot path with the configuration already in effect.
+ *
+ * A WASM registration failure is often transient — one chunk request failed,
+ * the tab was offline, a proxy stalled — and a full page reload throws away
+ * conversations, the loaded catalog state, and whatever tab the user was on.
+ * This is the same teardown-then-`startRuntime` sequence Settings uses, minus
+ * the credential change, so recovery costs a few seconds instead of a reload.
+ *
+ * `requireAllBackends: false` matches boot: one engine failing must not abort
+ * the other's registration or tip the app into the fatal error view.
+ * `startRuntime` reports each outcome through `reportEngineRegistration`, so
+ * the UI ends up truthful whether this succeeds, partly succeeds, or throws.
+ */
+async function retryEngineRegistration(): Promise<void> {
+  // Serialize against a Settings apply: both drive teardown + startRuntime, and
+  // interleaving them would register backends onto a runtime being destroyed.
+  if (runtimeReconfigurationPromise) {
+    await runtimeReconfigurationPromise.catch(() => undefined);
+    return;
+  }
+
+  const configuration = activeRuntimeConfiguration ?? { environment: 'development' };
+  backendReadinessState = 'pending';
+  backendRegistrationError = undefined;
+  publishReadiness(appReadinessState);
+
+  runtimeReconfigurationPromise = (async () => {
+    await teardownRuntime();
+    await startRuntime(configuration, false);
+    return {
+      environment: configuration.environment,
+      telemetryEnabled: configuration.environment === 'production',
+    };
+  })().finally(() => {
+    runtimeReconfigurationPromise = null;
+  });
+
+  try {
+    await runtimeReconfigurationPromise;
+    sdkReadinessState = 'ready';
+    sdkInitializationError = undefined;
+  } finally {
+    // Republish either way: on failure the snapshot must show the engines still
+    // unavailable rather than stay stuck on 'pending'.
+    publishReadiness(appReadinessState);
+  }
 }
 
 /** Backends own native registrations, so release them before core shutdown. */
@@ -641,83 +759,173 @@ async function refreshSDKCatalogs(): Promise<void> {
     const { applied } = await RunAnywhere.lora.list();
     appLogger.info(`[RunAnywhere] LoRA adapters applied: ${applied.length}`);
   } catch (err) {
-    appLogger.warning('[RunAnywhere] LoRA state unavailable:', err);
+    // Formatted string so the reason survives the logger's Error redaction.
+    appLogger.warning('[RunAnywhere] LoRA state unavailable:', formatError(err));
   }
 }
 
 /**
- * Multi-modality badge: LLM + Speech (+ note that full matrix is on
- * RunAnywhere.runtime.modalities). WebGPU on the LLM line does not imply
- * speech GPU.
+ * The runtime row in the drawer footer: where inference is actually running.
+ *
+ * WHERE IT LIVES, AND WHY IT MOVED. This was a `position: fixed` block pinned to
+ * the bottom-right corner at `z-index: 140`, three lines tall and
+ * `pointer-events: none` — so at a 390px viewport it sat *on top of* the chat
+ * composer, un-clickable and un-dismissable, over the one control the screen
+ * exists for. It now sits in the drawer footer, where it is a labelled fact
+ * about the session instead of an overlay on the conversation.
+ *
+ * WHAT IT SAYS. One consumer sentence ("Runs entirely on this device"), one
+ * detail line naming the execution path in words, and one chip carrying the
+ * accelerator token. `title` keeps the full per-modality matrix for diagnostics,
+ * which is where a build-log-shaped string belongs.
+ *
+ * `runtime.modalities` reports *where* a modality would execute (worker vs main
+ * thread), not *whether* an engine registered — with no engine at all it still
+ * answers `status: 'main'`. So the per-engine outcome this app tracked itself is
+ * checked first; without it the row would report a running LLM path while the
+ * screen behind it says the engine never loaded.
  */
 function showAccelerationBadge(llmMode: string): void {
-  document.getElementById('accel-badge')?.remove();
-  const badge = document.createElement('div');
-  badge.id = 'accel-badge';
+  const slot = document.getElementById('consumer-runtime-slot');
+  if (!slot) return;
+
+  const failures = engineFailures();
+  if (failures.length > 0) {
+    slot.innerHTML = runtimeRowMarkup({
+      variant: 'unavailable',
+      icon: 'warning',
+      headline: 'On-device engine unavailable',
+      detail: failures.map((failure) => failure.label).join(' · ') + ' did not load',
+      chip: 'None',
+      title: failureDiagnostics(failures),
+    });
+    return;
+  }
+
   const mods = RunAnywhere.runtime.modalities;
-  const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speech = RunAnywhere.runtime.speech;
+  const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speechGPU = speech.acceleration === 'webgpu';
-  const fmt = (id: keyof typeof mods) => {
-    const m = mods[id];
-    const accel = m.acceleration === 'webgpu' ? 'WebGPU' : m.acceleration === 'cpu' ? 'CPU' : '—';
-    return `${m.label}: ${m.status === 'unavailable' ? 'n/a' : `${accel} · ${m.status}`}`;
-  };
-  badge.innerHTML =
-    `<span class="accel-badge__line">${fmt('llm')}</span>`
-    + `<span class="accel-badge__line">${fmt('stt').replace('STT', 'Speech')}`
-    + `${speech.threads > 1 ? ` ×${speech.threads}` : ''}</span>`
-    + `<span class="accel-badge__line">${fmt('embeddings')}</span>`;
-  badge.title = Object.entries(mods)
-    .map(([id, m]) => `${id}=${m.status}/${m.acceleration ?? 'none'}${m.note ? ` (${m.note})` : ''}`)
-    .join('\n');
-  badge.className =
-    `accel-badge ${llmGPU || speechGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
-  document.body.appendChild(badge);
+  const accelWord = (accel: string | null | undefined) =>
+    (accel === 'webgpu' ? 'WebGPU' : accel === 'cpu' ? 'CPU' : '—');
+
+  // Two paths, named in the words a user would use for them, and only split
+  // apart when they actually differ — "Chat and speech on CPU" is the common
+  // case and reads as one fact rather than a table with one row per engine.
+  const chatWord = accelWord(llmGPU ? 'webgpu' : mods.llm.acceleration ?? 'cpu');
+  const speechWord = mods.stt.status === 'unavailable'
+    ? null
+    : accelWord(speechGPU ? 'webgpu' : speech.acceleration ?? 'cpu');
+  const detail = speechWord === null
+    ? `Chat on ${chatWord}`
+    : chatWord === speechWord
+      ? `Chat and speech on ${chatWord}`
+      : `Chat on ${chatWord} · speech on ${speechWord}`;
+
+  slot.innerHTML = runtimeRowMarkup({
+    variant: llmGPU || speechGPU ? 'gpu' : 'cpu',
+    icon: 'lock',
+    headline: 'Runs entirely on this device',
+    detail,
+    chip: llmGPU || speechGPU ? 'WebGPU' : 'CPU',
+    title: Object.entries(mods)
+      .map(([id, m]) => `${id}=${m.status}/${m.acceleration ?? 'none'}${m.note ? ` (${m.note})` : ''}`)
+      .concat(speech.threads > 1 ? [`speech threads=${speech.threads}`] : [])
+      .join('\n'),
+  });
+}
+
+interface RuntimeRow {
+  variant: 'gpu' | 'cpu' | 'unavailable';
+  icon: IconName;
+  headline: string;
+  detail: string;
+  /**
+   * A single token, never a sentence. The chip is the one glanceable part of the
+   * row, and it is also what the release browser suite reads out of
+   * `#accel-badge` — so it stays one word per state.
+   */
+  chip: string;
+  title: string;
+}
+
+function runtimeRowMarkup(row: RuntimeRow): string {
+  return `
+    <div class="consumer-runtime consumer-runtime--${row.variant}" title="${escapeHtml(row.title)}">
+      <span class="consumer-runtime__icon">${icon(row.icon, { size: 16 })}</span>
+      <span class="consumer-runtime__text">
+        <span class="consumer-runtime__headline">${escapeHtml(row.headline)}</span>
+        <span class="consumer-runtime__detail">${escapeHtml(row.detail)}</span>
+      </span>
+      <span id="accel-badge" class="accel-badge accel-badge--${row.variant}">${escapeHtml(row.chip)}</span>
+    </div>
+  `;
 }
 
 // ---------------------------------------------------------------------------
 // Loading Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * Make the boot screen visible.
+ *
+ * The markup lives in index.html so it paints with the document rather than
+ * after the module graph runs — see the comment there. This must therefore never
+ * build or replace it: re-creating the node would throw away an already-painted
+ * screen and flash. It only un-hides, which matters on the retry path, where
+ * hideLoadingScreen() has already run and removed the element.
+ */
 function showLoadingScreen(): void {
-  document.getElementById('loading-screen')?.remove();
+  // Cancel a pending teardown before adopting the node it is about to delete.
+  // hideLoadingScreen() removes the element 500ms after fading it out, so a
+  // Retry click inside that window would un-hide the screen and then have it
+  // yanked out from under the boot it just started — leaving the user on a blank
+  // page with no sign that anything is happening.
+  if (loadingScreenRemovalTimer !== null) {
+    clearTimeout(loadingScreenRemovalTimer);
+    loadingScreenRemovalTimer = null;
+  }
 
+  const existing = document.getElementById('loading-screen');
+  if (existing) {
+    existing.classList.remove('hidden');
+    return;
+  }
+
+  // Retry after a failed boot: the original was removed, so rebuild the same
+  // structure index.html ships.
   const screen = document.createElement('div');
   screen.className = 'loading-screen';
   screen.id = 'loading-screen';
   screen.innerHTML = `
     <div class="loading-logo">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-        <defs>
-          <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#FF6900"/>
-            <stop offset="100%" style="stop-color:#FB2C36"/>
-          </linearGradient>
-        </defs>
-        <circle cx="50" cy="50" r="45" fill="url(#logo-grad)" opacity="0.15"/>
-        <circle cx="50" cy="50" r="30" fill="url(#logo-grad)" opacity="0.3"/>
-        <text x="50" y="58" text-anchor="middle" fill="url(#logo-grad)" font-size="28" font-weight="bold" font-family="-apple-system, system-ui, sans-serif">RA</text>
-      </svg>
+      <img src="/runanywhere-logo.svg" alt="" width="100" height="100" />
     </div>
     <div class="loading-text">
-      <h2>Setting Up Your AI</h2>
-      <p>Preparing your private AI assistant...</p>
+      <h2>Starting RunAnywhere</h2>
+      <p>Getting your on-device AI ready&hellip;</p>
     </div>
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
-    <p class="text-sm text-tertiary" id="loading-status">Step: initializing SDK...</p>
+    <p class="text-sm text-tertiary" id="loading-status">Loading the SDK&hellip;</p>
   `;
   document.body.appendChild(screen);
 }
 
+/** Pending removal timer, so showLoadingScreen() can cancel a fade in flight. */
+let loadingScreenRemovalTimer: number | null = null;
+
 function hideLoadingScreen(): void {
   const screen = document.getElementById('loading-screen');
-  if (screen) {
-    screen.classList.add('hidden');
-    setTimeout(() => screen.remove(), 500);
-  }
+  if (!screen) return;
+
+  screen.classList.add('hidden');
+  if (loadingScreenRemovalTimer !== null) clearTimeout(loadingScreenRemovalTimer);
+  loadingScreenRemovalTimer = window.setTimeout(() => {
+    loadingScreenRemovalTimer = null;
+    screen.remove();
+  }, 500);
 }
 
 // ---------------------------------------------------------------------------

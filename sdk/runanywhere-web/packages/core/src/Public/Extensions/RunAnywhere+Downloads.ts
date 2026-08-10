@@ -22,7 +22,7 @@ function requireAdapter(): DownloadAdapter {
 }
 
 export const Downloads = {
-  plan(request: DownloadPlanRequest): DownloadPlanResult | null {
+  plan(request: DownloadPlanRequest): Promise<DownloadPlanResult | null> {
     return requireAdapter().plan(request);
   },
 

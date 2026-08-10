@@ -64,10 +64,16 @@ data object Benchmarks
 @Serializable
 data class BenchmarkDetail(val runId: String)
 
+/**
+ * Drawer sections.
+ *
+ * Two, not three. "Library" held Settings alone and "Advanced" held one row also called Advanced,
+ * so both headings said less than the row beneath them — one of them said the same word twice. The
+ * real split is between the things the assistant can do and the things that configure or inspect it.
+ */
 enum class ConsumerNavGroup(val title: String) {
     ASSISTANT("Assistant"),
-    LIBRARY("Library"),
-    ADVANCED("Advanced"),
+    APP("App"),
 }
 
 enum class ConsumerDestination(
@@ -114,14 +120,14 @@ enum class ConsumerDestination(
         "Personalization and downloads",
         RACIcons.Outline.Settings,
         RACIcons.Filled.Settings,
-        ConsumerNavGroup.LIBRARY,
+        ConsumerNavGroup.APP,
     ),
     ADVANCED(
         More,
         "Advanced",
         "SDK tools and diagnostics",
-        RACIcons.Outline.Stack,
-        group = ConsumerNavGroup.ADVANCED,
+        RACIcons.Outline.Sliders,
+        group = ConsumerNavGroup.APP,
     ),
 }
 

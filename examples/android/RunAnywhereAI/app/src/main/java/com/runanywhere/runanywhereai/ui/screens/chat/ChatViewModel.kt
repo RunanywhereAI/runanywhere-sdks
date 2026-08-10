@@ -143,7 +143,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     val thinkingSupported: Boolean
-        get() = GlobalState.model.loaded?.supports_thinking == true
+        get() {
+            val loaded = GlobalState.model.loaded ?: return false
+            // NPU batch backends cannot stream thinking live; hide the capability.
+            val framework = loaded.framework
+            if (framework == ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT) {
+                return false
+            }
+            return loaded.supports_thinking
+        }
 
     val thinkingEnabled: Boolean
         get() = thinkingSupported && !SettingsRepository.settings.disableThinking
@@ -153,8 +161,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val canSend: Boolean
-        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() &&
-            (GlobalState.model.isLoaded || isUsingConnect)
+        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && hasUsableModel
+
+    /** A local model is resident, or a hosted one is reachable. */
+    val hasUsableModel: Boolean
+        get() = GlobalState.model.isLoaded || isUsingConnect
+
+    /**
+     * Why a written message cannot be sent, or null when nothing is in the way.
+     *
+     * Only about the *model*, never about a transient busy state: "sending" and
+     * "stopping" already have their own visible affordances (the spinner, the
+     * stop button, the stopping pill), and repeating them here would make the
+     * composer shout during every normal turn. A missing model is different —
+     * it is the one blocker the user has to act on, and without this the send
+     * button is simply grey for no stated reason.
+     */
+    val sendBlockedReason: String?
+        get() = if (hasUsableModel) null else "No model is loaded yet."
 
     val isUsingConnect: Boolean
         get() = connectState.status == ConnectStatus.CONNECTED && connectState.activeModel != null
@@ -254,10 +278,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         input = value
     }
 
-    fun sendPrompt(prompt: String) {
-        if (isGenerating) return
+    /**
+     * Put a suggested prompt in the composer and send it if that is possible.
+     *
+     * Returns false when the prompt was staged but not sent, so the caller can
+     * take the user to whatever is missing. It used to return silently in that
+     * case, which made the launch screen's most prominent affordance a dead tap:
+     * no message, no keyboard, no explanation.
+     */
+    fun sendPrompt(prompt: String): Boolean {
+        if (isBusy) return false
         input = prompt
+        if (!canSend) return false
         send()
+        return true
     }
 
     fun toggleTools() {
@@ -301,13 +335,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (!canSend) return
         val request = beginGeneration() ?: return
         val turn = ChatRequestPolicy.snapshot(input.trim(), messages)
-        val prompt = turn.prompt
         input = ""
-        messages += ChatMessage(text = prompt, isUser = true)
+        messages += ChatMessage(text = turn.prompt, isUser = true)
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
         activeReplyIndex = replyIndex
+        launchTextGeneration(request, turn, replyIndex)
+    }
 
+    /**
+     * Run one text turn against the loaded (or hosted) model and stream it into
+     * `messages[replyIndex]`.
+     *
+     * Extracted from [send] so [regenerateReply] reaches inference through the
+     * exact same path. A second launch site would be a second place for the
+     * `generationOwnership` bookkeeping to drift, and that bookkeeping is the
+     * only thing stopping a superseded stream from writing into a conversation
+     * the user has since replaced.
+     */
+    private fun launchTextGeneration(
+        request: ChatGenerationRequest,
+        turn: ChatTurnSnapshot,
+        replyIndex: Int,
+    ) {
+        val prompt = turn.prompt
         val titleToStop = cancelSmartTitle()
         val launched = viewModelScope.launch {
             try {
@@ -407,7 +458,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("generation failed", e)
-                updateReply(request, replyIndex) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                updateReply(request, replyIndex) {
+                    it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                }
             } finally {
                 finishGeneration(request, replyIndex)
             }
@@ -494,9 +547,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 RACLog.e("image question failed", e)
                 val index = replyIndex
                 if (index != null) {
-                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                    updateReply(request, index) {
+                        it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                    }
                 } else if (generationOwnership.owns(request)) {
-                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                    messages += ChatMessage(errorReplyText(e.message), isUser = false, isError = true)
                 }
             } finally {
                 finishGeneration(request, replyIndex)
@@ -597,9 +652,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 RACLog.e("document question failed", e)
                 val index = replyIndex
                 if (index != null) {
-                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                    updateReply(request, index) {
+                        it.copy(text = errorReplyText(e.message), thinking = null, isError = true)
+                    }
                 } else if (generationOwnership.owns(request)) {
-                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                    messages += ChatMessage(errorReplyText(e.message), isUser = false, isError = true)
                 }
             } finally {
                 finishGeneration(request, replyIndex)
@@ -623,6 +680,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
                 val outputTokens = generation.output_tokens
                 val durationMs = generation.total_duration_ms
+                val rawTtft = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs
+                val decodeWindow = if (rawTtft != null && rawTtft > 0) durationMs - rawTtft else durationMs
+                // Batch backends (Maple) emit first stream token only after the
+                // full generate — raw TTFT ≈ wall clock and must not be shown.
+                val batchBuffered =
+                    rawTtft != null && rawTtft > 0 &&
+                        decodeWindow < maxOf(50.0, durationMs * 0.05)
+                val ttftMs = if (batchBuffered) null else rawTtft
                 val tps = if (durationMs > 0 && outputTokens > 0) {
                     outputTokens * 1000.0 / durationMs
                 } else {
@@ -633,7 +698,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     outputTokens = outputTokens,
                     durationMs = durationMs,
                     tokensPerSecond = tps,
-                    timeToFirstTokenMs = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs,
+                    timeToFirstTokenMs = ttftMs,
                 )
                 if (firstTokenLatencies.size > MAX_TRACKED_GENERATIONS) firstTokenLatencies.clear()
             }
@@ -655,7 +720,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             forceGreedy = forceGreedy,
         )
         val s = SettingsRepository.settings
+        // QHexRT Maple/Bonsai finishes the whole decode before streaming. With
+        // thinking on, "TTFT" becomes the full generate (reasoning + answer) and
+        // the chat burns tokens on chain-of-thought the UI can't stream live.
+        // Keep reasoning off for NPU until token-level streaming exists.
         val reasoning = when {
+            activeModel.framework ==
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT ->
+                ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF)
             !activeModel.model.supports_thinking -> null
             s.disableThinking -> ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF)
             else -> ReasoningOptions(
@@ -695,6 +767,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun generationStats(
+        tokens: Int,
+        reportedTps: Double?,
+        reportedTtftMs: Long?,
+        totalMs: Long,
+        inputTokens: Int,
+        modelName: String,
+        framework: String?,
+        mode: GenerationMode,
+    ): GenerationStats {
+        val wallTps = if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
+        val tps = reportedTps?.takeIf { it > 0.0 } ?: wallTps
+        // Maple/Bonsai dump the full completion after DSP generate — stream
+        // intervals invent five-digit tok/s and a TTFT equal to wall clock.
+        val batchBuffered =
+            (reportedTtftMs != null && reportedTtftMs > 0 &&
+                totalMs - reportedTtftMs < maxOf(50L, (totalMs * 0.05).toLong())) ||
+                (tps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
+                (reportedTtftMs != null && totalMs > 0 && reportedTtftMs >= (totalMs * 0.95).toLong())
+        return GenerationStats(
+            tokens = tokens,
+            tokensPerSecond = if (batchBuffered) wallTps else tps,
+            timeToFirstTokenMs = if (batchBuffered) null else reportedTtftMs?.takeIf { it > 0 },
+            totalTimeMs = totalMs,
+            inputTokens = inputTokens,
+            modelName = modelName,
+            framework = framework,
+            mode = mode,
+        )
+    }
+
     private suspend fun generateHostedReply(
         request: ChatGenerationRequest,
         llmRequest: RALLMGenerateRequest,
@@ -715,26 +818,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = result.text,
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = tokens,
-                    tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens ?: 0,
                     modelName = model.displayName,
                     framework = model.framework,
@@ -762,31 +860,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val outputTokens = result.usage?.output_tokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && outputTokens > 0) outputTokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
-                // fall back to the value recorded from the SDK's first-token event;
-                // framework falls back to the loaded model's analytics key.
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = outputTokens,
-                    tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs,
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
                     framework = result.framework?.takeIf { it.isNotBlank() }
@@ -826,7 +915,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ensureOwns(request)
         if (!result.error?.message.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = "Error: ${result.error?.message}", thinking = null)
+                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
             }
             return
         }
@@ -834,23 +923,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens?.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = tokens,
-                    tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs
-                        ?: sdkMetrics?.timeToFirstTokenMs,
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
                     framework = result.framework?.takeIf { it.isNotBlank() }
@@ -925,6 +1006,112 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             finalizeVisibleReply = true,
             persistTerminalReply = true,
         )
+    }
+
+    /**
+     * Replace an assistant reply by re-asking the question above it.
+     *
+     * The reply and everything after it are dropped first, so the model sees a
+     * history ending at the question exactly as a fresh turn does — leaving the
+     * old answer in place would condition the retry on the answer it is meant to
+     * replace. Mirrors iOS `LLMViewModel.regenerateReply`.
+     */
+    fun regenerateReply(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices || messages[index].isUser) return
+        val questionIndex = (index - 1 downTo 0).firstOrNull { messages[it].isUser } ?: return
+        val prompt = messages[questionIndex].text.trim()
+        if (prompt.isEmpty()) return
+
+        val request = beginGeneration() ?: return
+        // Persist the trimmed transcript before regenerating so a force-quit
+        // mid-retry reopens the chat at the question rather than at an answer the
+        // user already rejected.
+        messages.removeRange(questionIndex + 1, messages.size)
+        persist()
+
+        // History stops *before* the question, because the question is the prompt. Snapshotting the
+        // whole trimmed transcript would hand the model the question twice — once as the last
+        // history turn and again as the prompt — which is not the conversation the original turn
+        // saw, and the duplicate spends context budget in windowHistory. send() gets this for free
+        // by snapshotting before it appends the user message; here the question is already in place.
+        val turn = ChatRequestPolicy.snapshot(prompt, messages.take(questionIndex))
+        val replyIndex = messages.size
+        messages += ChatMessage("", isUser = false)
+        activeReplyIndex = replyIndex
+        launchTextGeneration(request, turn, replyIndex)
+    }
+
+    /**
+     * Put a question back in the composer and rewind the transcript to just
+     * before it, so sending again continues from that point.
+     *
+     * Deliberately does not auto-send: the reason to edit is to change the
+     * wording, and an edit that fires immediately leaves nowhere to do that.
+     */
+    fun editQuestion(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices || !messages[index].isUser) return
+        input = messages[index].text
+        messages.removeRange(index, messages.size)
+        persistTrimmedTranscript()
+    }
+
+    /**
+     * Delete a message. Deleting a question also deletes the reply it produced.
+     *
+     * A question and its answer are one exchange: keeping the answer would leave
+     * a reply with nothing to reply to, and [ChatRequestPolicy.snapshot] would
+     * then hand the model an unanchored assistant turn. Deleting an answer alone
+     * is fine — the question stands and Retry is right there.
+     */
+    fun deleteMessage(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices) return
+        val last = if (messages[index].isUser && messages.getOrNull(index + 1)?.isUser == false) {
+            index + 1
+        } else {
+            index
+        }
+        messages.removeRange(index, last + 1)
+        persistTrimmedTranscript()
+    }
+
+    /**
+     * Write a transcript that just got shorter.
+     *
+     * [persist] rewrites the whole message list, so it expresses a deletion fine —
+     * except that it declines outright when no question remains. Removing the last
+     * exchange would therefore leave the old messages on disk and the chat would
+     * reappear in History with exactly what the user just deleted, so an emptied
+     * transcript drops the conversation instead of saving it.
+     */
+    private fun persistTrimmedTranscript() {
+        if (messages.any { it.isUser }) persist() else discardEmptyConversation()
+    }
+
+    /**
+     * Forget a conversation the user just emptied, without touching the composer.
+     *
+     * Deliberately not [clearChat]: that clears `input`, and editing the *first*
+     * question empties the transcript at the exact moment the question is sitting
+     * in the composer waiting to be reworded — so routing this through
+     * `clearChat` silently ate the text the edit had just placed there.
+     *
+     * There is no generation to cancel: both callers refuse to run while
+     * [isBusy]. The RAG corpus goes with the messages, since no remaining
+     * question is anchored to it.
+     */
+    private fun discardEmptyConversation() {
+        val discarded = conversationId
+        conversationId = null
+        createdAt = 0L
+        conversationModelName = null
+        activeReplyIndex = null
+        viewModelScope.launch {
+            discarded?.let { ConversationRepository.delete(it) }
+            RagPipelineCoordinator.release(ragPipelineOwner)
+        }
     }
 
     fun clearChat() {

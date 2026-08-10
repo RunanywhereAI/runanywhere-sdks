@@ -39,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,9 +47,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.components.AudioWaveform
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -62,7 +62,6 @@ import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 @Composable
@@ -123,12 +122,36 @@ fun SttScreen() {
 
         ModeSelector(mode = sttVm.mode, enabled = !busy, onSelect = sttVm::selectMode)
 
+        // Swapping the recognizer mid-capture would pull native state out from under the
+        // stream, so both rows lock while the mic is hot.
+        val canSwapModel = !sttVm.isRecording && !sttVm.isTranscribing
         if (sttVm.mode == SttMode.HYBRID) {
-            ModelCard("On-device model", model, null, RACIcons.Outline.Brain) { showSheet = true }
-            ModelCard("Cloud model", null, onlineLabel, RACIcons.Outline.Cloud) { showProviderPicker = true }
+            ModelPickerCard(
+                label = "On-device model",
+                model = model,
+                icon = RACIcons.Outline.Waveform,
+                enabled = canSwapModel,
+                onClick = { showSheet = true },
+            )
+            ModelPickerCard(
+                label = "Cloud model",
+                model = null,
+                icon = RACIcons.Outline.Cloud,
+                enabled = canSwapModel,
+                // A hosted recognizer has no local RAModelInfo; the provider label is the
+                // whole answer, so it stands in as the row's resting text.
+                placeholder = onlineLabel,
+                onClick = { showProviderPicker = true },
+            )
             PolicyCard(sttVm)
         } else {
-            ModelCard("Model", model, null, RACIcons.Outline.Brain) { showSheet = true }
+            ModelPickerCard(
+                label = "Model",
+                model = model,
+                icon = RACIcons.Outline.Waveform,
+                enabled = canSwapModel,
+                onClick = { showSheet = true },
+            )
         }
 
         RecordButton(
@@ -143,9 +166,23 @@ fun SttScreen() {
             sttVm.transcript.isNotBlank() -> LabeledCard("Transcript") {
                 Text(text = sttVm.transcript, style = MaterialTheme.typography.bodyLarge)
             }
-            sttVm.metrics != null && !sttVm.isRecording && !sttVm.isTranscribing -> LabeledCard("Transcript") {
+            // Keyed off the view model's explicit no-speech state rather than
+            // "metrics exist", which live mode never sets — so a silent Live
+            // recording used to show nothing at all where Batch showed this.
+            // Same sentence as iOS `SpeechToTextView`.
+            sttVm.noSpeechDetected && !sttVm.isRecording && !sttVm.isTranscribing -> LabeledCard("Transcript") {
                 Text(
-                    text = "No speech recognized.",
+                    // A capture that carried no signal at all is a different
+                    // problem from a room that stayed quiet, and only one of
+                    // the two is the speaker's to fix. See
+                    // `SttViewModel.micInputUnusable`.
+                    text = if (sttVm.micInputUnusable) {
+                        "The microphone returned a flat signal, so there was nothing to " +
+                            "transcribe. Check that the right input is selected and that " +
+                            "nothing else is using it, then try again."
+                    } else {
+                        "No speech detected. Nothing was recognised in that recording."
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -268,7 +305,7 @@ private fun Header(mode: SttMode) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = RACIcons.Outline.Microphone,
+                imageVector = RACIcons.Outline.Waveform,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(dimens.iconLg),
@@ -366,55 +403,6 @@ private fun RoutingStat(label: String, value: String) {
 }
 
 @Composable
-private fun ModelCard(
-    label: String,
-    model: RAModelInfo?,
-    fallbackName: String?,
-    icon: ImageVector,
-    onClick: (() -> Unit)?,
-) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(model?.name ?: fallbackName ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
-                model?.let {
-                    BackendBadge(framework = it.framework, compact = true)
-                }
-            }
-            if (onClick != null) {
-                Icon(
-                    imageVector = RACIcons.Outline.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(dimens.iconSm),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun PolicyCard(vm: SttViewModel) {
     val dimens = LocalDimens.current
     LabeledCard("Routing policy") {
@@ -503,6 +491,15 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         recording -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    // Paired with the container rather than always `onPrimary`, the rule
+    // `VoiceScreen.MicButton` already follows: the glyph has to clear 3:1 against whichever
+    // of the three fills is showing, and no single foreground does that for a grey, a red
+    // and an orange. `onPrimary` is ink now, so on the red fill it would all but vanish.
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        recording -> MaterialTheme.colorScheme.onError
+        else -> MaterialTheme.colorScheme.onPrimary
+    }
     Box(
         modifier = Modifier
             .padding(top = 8.dp)
@@ -515,7 +512,7 @@ private fun RecordButton(recording: Boolean, enabled: Boolean, onClick: () -> Un
         Icon(
             imageVector = if (recording) RACIcons.Outline.PlayerStop else RACIcons.Outline.Microphone,
             contentDescription = if (recording) "Stop" else "Record",
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = tint,
             modifier = Modifier.size(40.dp),
         )
     }
@@ -529,7 +526,7 @@ private fun StatusLine(sttVm: SttViewModel, hasModel: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
-            LevelBars(level = sttVm.audioLevel)
+            AudioWaveform(level = sttVm.audioLevel)
             Text(
                 text = if (sttVm.mode == SttMode.LIVE) "Listening — pause to transcribe" else "Recording…",
                 style = MaterialTheme.typography.bodyMedium,
@@ -548,22 +545,6 @@ private fun StatusLine(sttVm: SttViewModel, hasModel: Boolean) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun LevelBars(level: Float) {
-    val dimens = LocalDimens.current
-    val active = (level * BAR_COUNT).toInt()
-    Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs), verticalAlignment = Alignment.CenterVertically) {
-        repeat(BAR_COUNT) { index ->
-            Box(
-                modifier = Modifier
-                    .size(width = 5.dp, height = (8 + index * 2).dp)
-                    .clip(RoundedCornerShape(dimens.radiusFull))
-                    .background(if (index < active) primaryGreen else MaterialTheme.colorScheme.surfaceContainerHighest),
-            )
-        }
     }
 }
 
@@ -604,4 +585,3 @@ private fun StatRows(metrics: SttMetrics) {
     }
 }
 
-private const val BAR_COUNT = 12

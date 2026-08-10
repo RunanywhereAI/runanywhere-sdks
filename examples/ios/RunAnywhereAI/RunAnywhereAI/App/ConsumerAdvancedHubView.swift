@@ -7,6 +7,14 @@
 
 import SwiftUI
 
+/// Secondary utilities and agents.
+///
+/// Every subtitle says what the reader gets, never which model does it. They used to read like
+/// release notes — "(NVIDIA Sortformer)", "(SegFormer)", "Fara1.5 reads a screenshot" — and a
+/// parenthesised codename is the one thing a reader deciding whether to tap cannot use. The
+/// model names live on the screens themselves, where a curious reader has already opted in.
+/// Android's `MoreScreen` and the web hub carry the same rewritten copy, so a row means the same
+/// thing whichever app it is read in.
 struct ConsumerAdvancedHubView: View {
     var body: some View {
         List {
@@ -29,7 +37,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "waveform",
                         color: AppColors.primaryBlue,
                         title: "Transcribe",
-                        subtitle: "Speech-to-text utility"
+                        subtitle: "Turn a recording into text"
                     )
                 }
 
@@ -38,7 +46,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "speaker.wave.2",
                         color: AppColors.statusGreen,
                         title: "Read Aloud",
-                        subtitle: "Text-to-speech utility"
+                        subtitle: "Hear any text spoken on this device"
                     )
                 }
 
@@ -47,7 +55,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "waveform.badge.mic",
                         color: .cyan,
                         title: "Voice Activity",
-                        subtitle: "Speech/silence diagnostics"
+                        subtitle: "See when speech starts and stops"
                     )
                 }
 
@@ -57,7 +65,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "person.2.wave.2",
                         color: AppColors.primaryAccent,
                         title: "Diarization",
-                        subtitle: "Who spoke when (NVIDIA Sortformer)"
+                        subtitle: "See who spoke when in a recording"
                     )
                 }
                 #endif
@@ -70,7 +78,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "square.stack.3d.up",
                         color: AppColors.primaryAccent,
                         title: "Segmentation",
-                        subtitle: "Semantic image segmentation (SegFormer)"
+                        subtitle: "Split a photo into labelled regions"
                     )
                 }
             }
@@ -81,8 +89,12 @@ struct ConsumerAdvancedHubView: View {
                     AdvancedFeatureRow(
                         icon: "mic.circle",
                         color: AppColors.primaryAccent,
-                        title: "Voice Assistant",
-                        subtitle: "Talk to the model (speech → answer → speech)"
+                        // "Talk", the one name this feature has. Android's drawer row and
+                        // the web app's nav row both call it that; this row said "Voice
+                        // Assistant" and the web app said "Talk Mode", so one screen had
+                        // three names and no reader could tell they were the same thing.
+                        title: "Talk",
+                        subtitle: "Hands-free voice conversation, all on this device"
                     )
                 }
 
@@ -91,7 +103,7 @@ struct ConsumerAdvancedHubView: View {
                         icon: "cursorarrow.rays",
                         color: AppColors.primaryAccent,
                         title: "Computer Use",
-                        subtitle: "Fara1.5 reads a screenshot and picks the next action"
+                        subtitle: "Let the model read your screen and act on it"
                     )
                 }
             }

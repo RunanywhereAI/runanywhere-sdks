@@ -91,6 +91,9 @@ internal object ModelCatalog {
         // v81 now ships the fully-on-NPU TRUE-TERNARY {-1,0,+1} decoder (no int8 fallback), not the
         // older QNN W8A16 build — smaller download (~1.12 GB vs ~2.37 GB). v75/v79 are unchanged (W8A16).
         SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 1_117_937_842L, contextLength = 1_024),
+        // Maple is a v81-only true-ternary MoE bundle. The native catalog keeps
+        // this private row hidden until an HF token is configured.
+        SingleFileModel("maple_preview", "Maple Preview 20B-A1B Ternary MoE (HNPU)", "https://huggingface.co/runanywhere/maple_preview_HNPU/maple-preview-1024.json", QHEXRT, LANGUAGE, 6_279_675_508L, contextLength = 1_024, supportsThinking = false),
         SingleFileModel("bonsai_1_7b_1bit", "Bonsai-1.7B 1-bit (HNPU, fully-on-NPU)", "https://huggingface.co/runanywhere/bonsai_1_7b_1bit_HNPU/bonsai-1.7b-1bit-1024.json", QHEXRT, LANGUAGE, 902_000_000L, contextLength = 1_024),
         SingleFileModel("bonsai_4b_1bit", "Bonsai-4B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json", QHEXRT, LANGUAGE, 1_358_352_318L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("bonsai_8b_1bit", "Bonsai-8B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json", QHEXRT, LANGUAGE, 2_323_975_102L, contextLength = 1_024, supportsThinking = true),
@@ -211,7 +214,13 @@ internal object ModelCatalog {
             "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
             LLAMA,
             LANGUAGE,
-            600_000_000,
+            // downloadBytes defaults to memoryBytes, so a RAM-shaped round number here is also
+            // published as the transfer total the progress bar divides by. 600_000_000 is 50 MB short
+            // of the real asset (measured twice: 650_379_104 bytes on disk, and the HTTP layer logs
+            // `bytes_written=650379104`), which drove the bar to 100% at 92% of the file and left the
+            // line reading "596.2 MB of 572.2 MB" with the ETA gone while 50 MB was still arriving.
+            memoryBytes = 600_000_000,
+            downloadBytes = 650_379_104,
             supportsLora = true
         ),
         SingleFileModel(

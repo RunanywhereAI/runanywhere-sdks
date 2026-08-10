@@ -11,7 +11,10 @@ import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
-import { VoiceAgentMicDriver } from '../../../Infrastructure/VoiceAgentMicDriver.js';
+import {
+  VoiceAgentMicDriver,
+  type VoiceAgentMicPhase,
+} from '../../../Infrastructure/VoiceAgentMicDriver.js';
 import {
   cleanupVoiceAgent,
   ensureDefaultVAD,
@@ -52,11 +55,22 @@ export interface VoiceSession {
   /**
    * Stop the agent mid-utterance. Awaitable: resolves once the interrupted
    * `say()`/turn-loop response, its tools, and its playout have all settled.
+   *
+   * This is the deterministic path, not the only one: the session also cuts an
+   * audible reply on its own when the user speaks over it, publishing
+   * `speechStarted` as it does. Call this when the interrupt must not depend on
+   * clearing an acoustic threshold — a UI button, a hotword, a timeout.
    */
   interrupt(): Promise<void>;
   /** Close the session and release the microphone. */
   close(): Promise<void>;
 }
+
+const DRIVER_PHASE_STATES: Record<VoiceAgentMicPhase, AgentState> = {
+  listening: 'listening',
+  processing: 'thinking',
+  speaking: 'speaking',
+};
 
 const AGENT_STATES: Partial<Record<PipelineState, AgentState>> = {
   [PipelineState.PIPELINE_STATE_LISTENING]: 'listening',
@@ -144,9 +158,12 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
         silenceDurationMs: options.turnHandling?.endpointing?.minDelayMs,
         maxRecordingDurationMs: options.turnHandling?.endpointing?.maxDelayMs,
         speechThreshold: options.vad?.activationThreshold,
+        // The driver owns playout, so it is the only layer that can say
+        // "speaking" while sound is actually leaving the speaker. Mirrors
+        // Swift/Kotlin, where the same phase is merged into `session.events`.
         onPhase: (phase) => publish({
           type: 'agentStateChanged',
-          state: phase === 'listening' ? 'listening' : 'thinking',
+          state: DRIVER_PHASE_STATES[phase],
         }),
         onTurn: (turn) => {
           if (turn.userText) {
@@ -154,6 +171,10 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
           }
           if (turn.assistantText) publish({ type: 'agentResponse', text: turn.assistantText });
         },
+        // The user took the turn back while the reply was audible. The driver
+        // has already cut playout and will report the phase change; this is the
+        // event that says *why* the answer stopped short.
+        onBargeIn: () => publish({ type: 'speechStarted' }),
         onError: (error) => publish({ type: 'error', message: error.message, recoverable: true }),
       });
     },

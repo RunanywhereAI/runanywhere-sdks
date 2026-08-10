@@ -54,7 +54,7 @@ public extension RunAnywhere {
                         loadedModel: snapshot
                     )
                     var sawFinal = false
-                    for await partial in partials {
+                    for try await partial in partials {
                         if Task.isCancelled { break }
                         if partial.isFinal { sawFinal = true }
                         continuation.yield(partial)
@@ -65,10 +65,18 @@ public extension RunAnywhere {
                         continuation.yield(finalPartial)
                     }
                 } catch {
-                    var failure = RASTTPartialResult()
-                    failure.isFinal = true
-                    failure.text = "STT stream failed: \(error)"
-                    continuation.yield(failure)
+                    // Deliberately not yielded as a partial. This used to emit
+                    // `isFinal = true` with the error message as `text`, which a
+                    // consumer reads as recognized speech — the failure arrived
+                    // looking like the user had said "STT stream failed: …".
+                    //
+                    // `AsyncStream<RASTTPartialResult>` has no error channel and
+                    // widening this deprecated signature would be source-breaking,
+                    // so the honest option left is to log and end the stream
+                    // without a transcript. Callers that need the failure itself
+                    // should use `RunAnywhere.stt.openStream`, whose event grammar
+                    // carries `.failed`.
+                    SDKLogger.stt.error("transcribeStream failed: \(error.localizedDescription)")
                 }
                 continuation.finish()
             }

@@ -69,52 +69,11 @@ public extension RunAnywhere {
             let requestId = UUID().uuidString
             let events = AsyncThrowingStream<TranscriptionEvent, Error> { continuation in
                 let task = Task {
-                    continuation.yield(.started(requestId: requestId))
-                    var sawTerminal = false
-                    var sequence: Int64 = 0
-                    func nextSequence() -> Int64 {
-                        sequence += 1
-                        return sequence
-                    }
-
-                    for await partial in partials {
-                        if Task.isCancelled { break }
-                        if partial.isFinal {
-                            continuation.yield(.transcriptFinal(
-                                requestId: requestId,
-                                sequence: nextSequence(),
-                                transcription: RunAnywhere.transcription(from: partial)
-                            ))
-                            continuation.yield(.completed(requestId: requestId))
-                            sawTerminal = true
-                            break
-                        }
-                        continuation.yield(.partial(
-                            requestId: requestId,
-                            sequence: nextSequence(),
-                            segmentId: requestId,
-                            revision: Int(sequence),
-                            alternatives: [partial.text]
-                        ))
-                    }
-
-                    // The grammar ends in `completed`/`failed`/`cancelled` —
-                    // never a fabricated `transcriptFinal`/`completed` when the
-                    // producer never reported one.
-                    if !sawTerminal {
-                        if Task.isCancelled {
-                            continuation.yield(.cancelled(requestId: requestId))
-                        } else {
-                            continuation.yield(.failed(
-                                requestId: requestId,
-                                error: SDKException(
-                                    code: .streamCancelled,
-                                    message: "Transcription stream ended before a final result",
-                                    category: .component
-                                )
-                            ))
-                        }
-                    }
+                    await RunAnywhere.pumpTranscriptionEvents(
+                        partials: partials,
+                        requestId: requestId,
+                        into: continuation
+                    )
                     continuation.finish()
                 }
                 continuation.onTermination = { @Sendable _ in task.cancel() }
@@ -136,59 +95,71 @@ public extension RunAnywhere {
         /// with a thrown error.
         ///
         /// - Throws: `SDKException` from this call when no STT model is loaded,
-        ///   and into the returned stream when chunks disagree on format or the
-        ///   session fails mid-flight.
+        ///   and into the returned stream when the input produced no chunks,
+        ///   chunks disagree on format, or the session fails mid-flight.
         @available(*, deprecated, message: "Use openStream(format:options:) and push AudioFrame values")
         public func transcribeStream(
             _ audio: AsyncStream<AudioInput>,
             options: SttOptions? = nil
         ) async throws -> AsyncThrowingStream<TranscriptionEvent, Error> {
+            // Preflight only what can be answered without touching the caller's
+            // stream, so "no model loaded" still fails from this call.
+            _ = try RunAnywhere.requireSTTModel()
             let iterator = AudioInputIteratorBox(audio)
-            guard let first = await iterator.next() else {
-                throw SDKException(
-                    code: .invalidInput,
-                    message: "Audio stream produced no chunks",
-                    category: .validation
-                )
-            }
-            let format = try first.liveFormatSpec()
-            let stream = try await openStream(format: format, options: options)
 
             return AsyncThrowingStream { continuation in
-                let pumpTask = Task { () -> SDKException? in
-                    stream.pushFrame(first.toLiveFrame())
-                    while let chunk = await iterator.next() {
-                        if Task.isCancelled { break }
-                        guard chunk.matchesLiveFormat(format) else {
-                            stream.finish()
-                            return SDKException.validationFailed(
-                                "stt.transcribeStream chunks must share one AudioFormatSpec"
+                // The first chunk is read *inside* the returned stream, never
+                // before it is handed back. Every microphone-fed caller starts
+                // capture only once this factory returns, so peeking here would
+                // park the consumer on a producer that cannot start yet — that
+                // circular wait is what froze STT Live on iOS and macOS.
+                let driver = Task {
+                    var live: SttStream?
+                    do {
+                        guard let first = await iterator.next() else {
+                            throw SDKException(
+                                code: .invalidInput,
+                                message: "Audio stream produced no chunks",
+                                category: .validation
                             )
                         }
-                        stream.pushFrame(chunk.toLiveFrame())
+                        let format = try first.liveFormatSpec()
+                        let stream = try await openStream(format: format, options: options)
+                        live = stream
+
+                        // Drain concurrently with the pump so partials reach the
+                        // caller while the microphone is still open.
+                        let drainTask = Task {
+                            for try await event in stream.events {
+                                continuation.yield(event)
+                            }
+                        }
+
+                        var mismatch: SDKException?
+                        stream.pushFrame(first.toLiveFrame())
+                        while let chunk = await iterator.next() {
+                            if Task.isCancelled { break }
+                            guard chunk.matchesLiveFormat(format) else {
+                                mismatch = SDKException.validationFailed(
+                                    "stt.transcribeStream chunks must share one AudioFormatSpec"
+                                )
+                                break
+                            }
+                            stream.pushFrame(chunk.toLiveFrame())
+                        }
+                        stream.finish()
+                        _ = try? await drainTask.value
+                        if let mismatch {
+                            continuation.finish(throwing: mismatch)
+                        } else {
+                            continuation.finish()
+                        }
+                    } catch {
+                        continuation.finish(throwing: SDKException.from(error))
                     }
-                    stream.finish()
-                    return nil
+                    await live?.close()
                 }
-                let drainTask = Task {
-                    for try await event in stream.events {
-                        continuation.yield(event)
-                    }
-                }
-                Task {
-                    let mismatch = await pumpTask.value
-                    _ = try? await drainTask.value
-                    if let mismatch {
-                        continuation.finish(throwing: mismatch)
-                    } else {
-                        continuation.finish()
-                    }
-                }
-                continuation.onTermination = { @Sendable _ in
-                    pumpTask.cancel()
-                    drainTask.cancel()
-                    Task { await stream.close() }
-                }
+                continuation.onTermination = { @Sendable _ in driver.cancel() }
             }
         }
 
@@ -204,6 +175,99 @@ public extension RunAnywhere {
 // MARK: - Internal proto-level helpers
 
 extension RunAnywhere {
+
+    /// Translate one native partial stream into the public `TranscriptionEvent`
+    /// grammar, closing with exactly one terminal event.
+    ///
+    /// Extracted from `openStream` so that body stays inside the lint limit; the
+    /// behaviour is the loop that used to live there verbatim.
+    internal static func pumpTranscriptionEvents(
+        partials: AsyncThrowingStream<RASTTPartialResult, Error>,
+        requestId: String,
+        into continuation: AsyncThrowingStream<TranscriptionEvent, Error>.Continuation
+    ) async {
+        continuation.yield(.started(requestId: requestId))
+        var sawTerminal = false
+        var sequence: Int64 = 0
+        func nextSequence() -> Int64 {
+            sequence += 1
+            return sequence
+        }
+
+        // A FINAL ends an UTTERANCE, not the session. commons closes a window on
+        // ~800 ms of trailing silence and publishes one FINAL for it
+        // (rac_stt_stream.cpp), then keeps the session open for the next phrase.
+        // This loop used to `break` on the first one and report `.completed`, so a
+        // live session went deaf the moment the speaker drew breath: measured on
+        // the simulator, a 16 s recording of four spaced sentences transcribed the
+        // first and silently discarded the other three while the panel still said
+        // RECORDING. Every final is forwarded now; the session ends when the audio
+        // source does.
+        //
+        // A native error arrives by throwing out of this loop rather than as a
+        // final partial whose `text` was the error message, so it ends the session
+        // as `.failed` instead of being read back as the user's own words.
+        var streamFailure: Error?
+        do {
+            for try await partial in partials {
+                if Task.isCancelled { break }
+                if partial.isFinal {
+                    continuation.yield(.transcriptFinal(
+                        requestId: requestId,
+                        sequence: nextSequence(),
+                        transcription: transcription(from: partial)
+                    ))
+                    sawTerminal = true
+                    continue
+                }
+                continuation.yield(.partial(
+                    requestId: requestId,
+                    sequence: nextSequence(),
+                    segmentId: requestId,
+                    revision: Int(sequence),
+                    alternatives: [partial.text]
+                ))
+            }
+        } catch {
+            streamFailure = error
+        }
+
+        // The grammar ends in `completed`/`failed`/`cancelled` — never a
+        // fabricated `transcriptFinal`/`completed` when the producer never
+        // reported one.
+        if Task.isCancelled {
+            continuation.yield(.cancelled(requestId: requestId))
+        } else if let streamFailure {
+            // Reported even when some finals already landed: the transcripts stay
+            // delivered, but the session is not allowed to end in `completed`
+            // after the producer failed.
+            continuation.yield(.failed(
+                requestId: requestId,
+                error: streamFailure as? SDKException ?? SDKException(
+                    code: .processingFailed,
+                    message: "Transcription stream failed: \(streamFailure)",
+                    category: .component
+                )
+            ))
+        } else if sawTerminal {
+            continuation.yield(.completed(requestId: requestId))
+        } else {
+            // `.processingFailed`, not `.streamCancelled`: this branch is reached
+            // precisely when the task was *not* cancelled, so a cancellation code
+            // would tell a consumer that branches on the code the opposite of what
+            // happened — and `.streamCancelled` is classified as expected, which
+            // would also suppress the log for a producer that died without ever
+            // reporting a transcript.
+            continuation.yield(.failed(
+                requestId: requestId,
+                error: SDKException(
+                    code: .processingFailed,
+                    message: "Transcription stream ended before a final result",
+                    category: .component
+                )
+            ))
+        }
+    }
 
     internal static func requireSTTModel() throws -> RACurrentModelResult {
         guard isReady else {

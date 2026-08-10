@@ -190,7 +190,10 @@ private fun DrawerActionItem(
                     text = description,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    // Two lines: the drawer is 260 dp wide and every subtitle here is a short
+                    // phrase, so clipping one mid-word ("Personalization and downlo…") loses real
+                    // meaning to save vertical space the drawer has in abundance.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

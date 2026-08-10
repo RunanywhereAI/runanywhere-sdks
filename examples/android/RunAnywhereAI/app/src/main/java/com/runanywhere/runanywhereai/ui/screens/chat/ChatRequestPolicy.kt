@@ -126,6 +126,13 @@ internal object ChatRequestPolicy {
     }
 
     private fun toProtoMessage(message: ChatMessage): ProtoChatMessage? {
+        // A failed turn is the APP's report, not something the model said, so it must never
+        // come back as a prior assistant message — otherwise the next request tells the model
+        // it previously answered "Error: Backend not available for: llm" and it starts
+        // apologising for a failure it had no part in. iOS skips the same turns when it builds
+        // history (LLMViewModel+Generation), and the web `conversationHistoryForGeneration`
+        // now filters on the same flag.
+        if (message.isError) return null
         val content = message.text.takeIf(String::isNotBlank) ?: return null
         return ProtoChatMessage(
             role = if (message.isUser) {

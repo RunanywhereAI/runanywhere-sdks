@@ -27,7 +27,9 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class DiffusionViewModel(application: Application) : AndroidViewModel(application) {
 
-    var prompt by mutableStateOf("a red apple")
+    // Starts empty. A pre-filled prompt reads as a result the app already has, and it makes
+    // the first tap of Generate produce someone else's picture rather than the user's.
+    var prompt by mutableStateOf("")
         private set
     var isGenerating by mutableStateOf(false)
         private set
@@ -42,6 +44,16 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun onPromptChange(value: String) {
         prompt = value
+    }
+
+    /**
+     * Abandons the in-flight generation. The engine call itself is not interruptible, so this
+     * releases the UI rather than the NPU — which is why the screen says "Stopping…" and not
+     * "Cancelled" until the job actually unwinds.
+     */
+    fun cancel() {
+        job?.cancel()
+        job = null
     }
 
     fun generate() {

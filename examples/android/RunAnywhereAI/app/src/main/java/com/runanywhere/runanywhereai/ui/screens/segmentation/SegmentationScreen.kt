@@ -2,8 +2,11 @@ package com.runanywhere.runanywhereai.ui.screens.segmentation
 
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -19,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -36,16 +37,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.components.EmptyState
+import com.runanywhere.runanywhereai.ui.components.EmptyStateAction
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
+import com.runanywhere.runanywhereai.ui.components.SectionCard
+import com.runanywhere.runanywhereai.ui.components.SectionHeader
+import com.runanywhere.runanywhereai.ui.components.StatusNote
+import com.runanywhere.runanywhereai.ui.components.StatusTone
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
  * Semantic image segmentation UI. Model selection uses the shared catalog
@@ -64,8 +71,10 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
     val modelLoaded = model != null
     val busy = modelVm.state.busyModelId != null
 
+    // The Android photo picker rather than ACTION_GET_CONTENT: it needs no storage permission and
+    // offers only images, so the user can never pick something this screen cannot decode.
     val imagePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) {
             runCatching {
@@ -86,112 +95,45 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Text(
-            text = "Segmentation",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Download SegFormer B0 from the catalog, then pick an image to segment classes on-device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        ScreenLede(
+            "Pick a segmentation model, then choose an image to label its regions on-device.",
         )
 
         // Lock the sheet during inference too: swapping the model under an
         // in-flight segmentation would pull native state out from under it.
-        ModelCard(
+        ModelPickerCard(
+            label = "Segmentation model",
             model = model,
+            icon = RACIcons.Outline.Layers,
             busy = busy,
-            sheetLocked = busy || viewModel.isSegmenting,
+            enabled = !(busy || viewModel.isSegmenting),
             onClick = { showSheet = true },
         )
         ImageCard(
             viewModel = viewModel,
             modelLoaded = modelLoaded,
             busy = busy,
-            onPickImage = { imagePicker.launch("image/*") },
+            onPickImage = {
+                imagePicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
         )
 
-        if (viewModel.classSummaries.isNotEmpty()) {
+        AnimatedVisibility(
+            visible = viewModel.classSummaries.isNotEmpty(),
+            enter = fadeIn(AppMotion.standard()),
+            exit = fadeOut(AppMotion.exit()),
+        ) {
             ResultCard(viewModel)
         }
 
-        viewModel.error?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        if (viewModel.status.isNotEmpty()) {
-            Text(
-                text = viewModel.status,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        viewModel.error?.let { StatusNote(it, StatusTone.ERROR) }
+        if (viewModel.status.isNotEmpty()) StatusNote(viewModel.status, StatusTone.NEUTRAL)
     }
 
     if (showSheet) {
         ModelSelectionSheet(viewModel = modelVm, onDismiss = { showSheet = false })
-    }
-}
-
-@Composable
-private fun ModelCard(
-    model: RAModelInfo?,
-    busy: Boolean,
-    sheetLocked: Boolean,
-    onClick: () -> Unit,
-) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .clickable(enabled = !sheetLocked, onClick = onClick)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = RACIcons.Outline.Cpu,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text(
-                    "Model",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    when {
-                        busy -> "Preparing model…"
-                        model != null -> model.name
-                        else -> "Select a model"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                model?.let { BackendBadge(framework = it.framework, compact = true) }
-            }
-            if (busy) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-            } else {
-                Icon(
-                    imageVector = RACIcons.Outline.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }
 
@@ -203,8 +145,8 @@ private fun ImageCard(
     onPickImage: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    Card {
-        Text("Image", style = MaterialTheme.typography.titleMedium)
+    SectionCard {
+        SectionHeader(title = "Image")
 
         val source = viewModel.sourceBitmap
         if (source != null) {
@@ -232,26 +174,37 @@ private fun ImageCard(
                 }
             }
         } else {
+            // Where a first-time user actually is. It names what segmentation produces,
+            // because "no image selected" describes the app's state and not the user's goal.
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 shape = RoundedCornerShape(dimens.radiusMd),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "No image selected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                EmptyState(
+                    icon = RACIcons.Outline.Layers,
+                    title = "No image yet",
+                    body = if (modelLoaded) {
+                        "Choose a photo and the model paints every region it recognises — " +
+                            "sky, road, person — as a coloured mask over your image."
+                    } else {
+                        "Choose a segmentation model above first, then pick a photo to label " +
+                            "its regions."
+                    },
+                    primaryAction = EmptyStateAction(
+                        label = "Choose an image",
+                        enabled = !viewModel.isSegmenting,
+                        onClick = onPickImage,
+                    ),
+                )
             }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-            OutlinedButton(onClick = onPickImage) {
-                Text(if (viewModel.sourceBitmap == null) "Pick image…" else "Change image…")
+            if (viewModel.sourceBitmap != null) {
+                OutlinedButton(onClick = onPickImage, enabled = !viewModel.isSegmenting) {
+                    Text("Change image…")
+                }
             }
             Button(
                 onClick = { viewModel.runSegmentation() },
@@ -261,28 +214,37 @@ private fun ImageCard(
                     !viewModel.isSegmenting,
             ) {
                 if (viewModel.isSegmenting) {
-                    CircularProgressIndicator(modifier = Modifier.height(18.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(dimens.iconSm),
+                            strokeWidth = 2.dp,
+                        )
+                        Text("Labelling…")
+                    }
                 } else {
                     Text("Run segmentation")
                 }
             }
+        }
+        if (!modelLoaded && viewModel.sourceBitmap != null) {
+            StatusNote(
+                "Choose a segmentation model above to label this image.",
+                StatusTone.NEUTRAL,
+            )
         }
     }
 }
 
 @Composable
 private fun ResultCard(viewModel: SegmentationViewModel) {
-    Card {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Classes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (viewModel.processingTimeMs > 0) {
-                Text(
-                    "${viewModel.processingTimeMs} ms",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+    SectionCard {
+        SectionHeader(
+            title = "Classes",
+            status = viewModel.processingTimeMs.takeIf { it > 0 }?.let { "$it ms" },
+        )
         viewModel.classSummaries.forEach { summary ->
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -297,23 +259,5 @@ private fun ResultCard(viewModel: SegmentationViewModel) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(dimens.spacingLg),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-            content = content,
-        )
     }
 }

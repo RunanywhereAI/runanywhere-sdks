@@ -122,10 +122,15 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 500_000_000,
             supportsThinking: true
         )
+        // unsloth, not bartowski: the bartowski repo prefixes every artifact with
+        // the org (`Qwen_Qwen3.5-0.8B-Q4_K_M.gguf`), so the un-prefixed filename
+        // this row used to point at 404'd — the row was offered in the picker and
+        // every download of it failed. unsloth publishes the plain filename and
+        // is already the source for the three Qwen3 rows around it.
         await registerLLM(
             id: "qwen3.5-0.8b-q4_k_m",
             name: "Qwen3.5 0.8B Q4_K_M",
-            url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
             framework: .llamaCpp,
             memoryRequirement: 620_000_000,
             supportsThinking: true

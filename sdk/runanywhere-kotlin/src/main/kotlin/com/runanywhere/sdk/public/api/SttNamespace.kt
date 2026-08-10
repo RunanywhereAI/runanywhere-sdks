@@ -9,16 +9,19 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.STTOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -49,10 +52,28 @@ private class KotlinSttStream(
 
     init {
         sttStreamScope.launch {
+            var sawTerminal = false
             try {
+                // Preflight before any audio is accepted. `transcribeStream` answers
+                // an uninitialized SDK or an unloaded model by closing its flow
+                // without emitting, which the generic "ended before a final result"
+                // path below would report as a mystery. This names the actual
+                // precondition, matching Swift's `requireSTTModel()`.
+                legacyRequireSttModel()
                 legacyTranscribeStream(frames.consumeAsFlow(), options.orDefault().toProto()).collect { partial ->
                     announceStarted()
                     if (partial.is_final) {
+                        // A FINAL ends an UTTERANCE, not the session. commons closes a
+                        // window on ~800 ms of trailing silence and publishes one FINAL
+                        // for it (rac_stt_stream.cpp), then keeps the session open for
+                        // the next phrase. Emitting `Completed` right here — as this
+                        // used to — told the consumer the whole session was over at the
+                        // speaker's first pause, so a recording of several spaced
+                        // sentences delivered the first and silently dropped the rest.
+                        // Forward every final; the session ends when the audio does.
+                        // This is the port of the same fix already made in Swift's
+                        // `STTNamespace.openStream`.
+                        //
                         // `STTPartialResult` collapsed to `text`/`is_final`/`language`
                         // (idl/stt_options.proto): `final_output`/`confidence`/
                         // `audio_start_ms`/`audio_end_ms` no longer exist on it, so
@@ -66,7 +87,7 @@ private class KotlinSttStream(
                         outbox.trySend(
                             TranscriptionEvent.TranscriptFinal(requestId, sequence++, synthesized.toTranscription()),
                         )
-                        outbox.trySend(TranscriptionEvent.Completed(requestId))
+                        sawTerminal = true
                     } else if (partial.text.isNotEmpty()) {
                         outbox.trySend(
                             TranscriptionEvent.Partial(
@@ -79,8 +100,27 @@ private class KotlinSttStream(
                         )
                     }
                 }
-                // The native pass ended without a final/error envelope. Stop
-                // silently rather than fabricating a successful `completed`.
+                // Exactly one terminal event, decided once the native pass has ended
+                // — not one per utterance. The grammar closes with
+                // `Completed`/`Failed`/`Cancelled`, and a pass that ended without ever
+                // reporting a final is a failure, not a silent success: a consumer
+                // awaiting a terminal event would otherwise wait forever on a stream
+                // whose producer had already died.
+                if (sawTerminal) {
+                    outbox.trySend(TranscriptionEvent.Completed(requestId))
+                } else {
+                    announceStarted()
+                    outbox.trySend(
+                        TranscriptionEvent.Failed(
+                            requestId,
+                            SDKException.stt("Transcription stream ended before a final result"),
+                        ),
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                announceStarted()
+                outbox.trySend(TranscriptionEvent.Cancelled(requestId))
+                throw cancellation
             } catch (error: SDKException) {
                 announceStarted()
                 outbox.trySend(TranscriptionEvent.Failed(requestId, error))
@@ -98,12 +138,13 @@ private class KotlinSttStream(
 
     override fun pushFrame(frame: AudioFrame) {
         if (closed.get() || finished.get()) return
-        val normalized =
-            when (format.encoding) {
-                AudioEncoding.PCM16 -> AudioInput.pcm16(frame.samples, format.sampleRate, format.channels).normalizedBytes()
-                AudioEncoding.FLOAT32, AudioEncoding.CONTAINER -> frame.samples
-            }
-        frames.trySend(normalized)
+        // PCM16, exactly as `transcribe` sends it. This used to hand the native pass
+        // float32 (`normalizedBytes`), which sherpa reinterprets as int16 — see the
+        // contract on `AudioInput.pcm16Bytes`, "sending float32 here would be misread as
+        // int16 and transcribed as noise". It was: clear speech came back as "[Music]"
+        // and "(wind)" through every streaming path while batch transcribed the same
+        // microphone perfectly.
+        frames.trySend(AudioInput(frame.samples, format).pcm16Bytes())
     }
 
     override fun flush() {
@@ -166,28 +207,41 @@ public class SttNamespace internal constructor() {
         audio: Flow<AudioInput>,
         options: SttOptions? = null,
     ): Flow<TranscriptionEvent> =
-        flow {
+        channelFlow {
+            // Events are forwarded from the moment the stream exists, concurrently with the
+            // audio still arriving. The previous shape ran `audio.collect { … }` to
+            // completion and only then `emitAll(live.events)`, so nothing reached the
+            // caller until the microphone had already closed — a "live" transcription that
+            // could not emit a partial while the user was still talking.
             var stream: SttStream? = null
             var format: AudioFormatSpec? = null
-            audio.collect { chunk ->
-                if (format == null) {
-                    format = chunk.format
-                    if (format?.encoding == AudioEncoding.CONTAINER) {
+            var forwarder: Job? = null
+            try {
+                audio.collect { chunk ->
+                    if (stream == null) {
+                        if (chunk.format.encoding == AudioEncoding.CONTAINER) {
+                            throw SDKException.invalidConfiguration(
+                                "stt.transcribeStream needs raw PCM chunks; decode container audio before streaming it.",
+                            )
+                        }
+                        val opened = openStream(chunk.format, options)
+                        format = chunk.format
+                        stream = opened
+                        forwarder = launch { opened.events.collect { send(it) } }
+                    } else if (chunk.format != format) {
                         throw SDKException.invalidConfiguration(
-                            "stt.transcribeStream needs raw PCM chunks; decode container audio before streaming it.",
+                            "stt.transcribeStream requires every chunk to share one audio format.",
                         )
                     }
-                    stream = openStream(chunk.format, options)
-                } else if (chunk.format != format) {
-                    throw SDKException.invalidConfiguration(
-                        "stt.transcribeStream requires every chunk to share one audio format.",
-                    )
+                    stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
                 }
-                stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
+                // Upstream ended: let the native pass finalize and drain its last events
+                // (the terminal transcript) before this flow completes.
+                stream?.finish()
+                forwarder?.join()
+            } finally {
+                withContext(NonCancellable) { stream?.close() }
             }
-            val live = stream ?: return@flow
-            live.finish()
-            emitAll(live.events)
         }
 
     /** Readiness, model, and language coverage of the speech-recognition component. */

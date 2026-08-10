@@ -17,19 +17,27 @@ import { showToast } from '../components/dialogs';
 import { RunAnywhere } from '@runanywhere/web';
 import type { ModelsState } from '@runanywhere/web';
 import {
-  findLoadedModelForCategory,
+  cancelModelDownload,
+  getModelStatus,
+  isDownloadCancellable,
   onModelStateChange,
   openSheet as openModelSheet,
+  patchDownloadProgress,
   refreshModelSelectionState,
+  renderDownloadProgress,
+  resetModelRowState,
+  type ModelStatusSnapshot,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
+import { icon } from '../components/icons';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  formatModelSize,
   modelDisplaySizeBytes,
-  modalityEmoji,
+  modalityIcon,
 } from '../services/model-display';
 
 let container: HTMLElement;
@@ -37,11 +45,22 @@ let unsubscribeState: (() => void) | null = null;
 let lastStorageInfo: ModelsState | null = null;
 let storageInfoError: string | null = null;
 
+/**
+ * The structure each rendered row was built for, keyed by model id.
+ *
+ * Only the parts that decide what the row *is* — its badge, its buttons, its
+ * note — never the numbers inside a transfer. That split is what lets a progress
+ * tick be patched instead of re-rendered.
+ */
+const renderedRowShapes = new Map<string, string>();
+
 export function initStorageTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Storage</div>
+      <!-- "Downloads": the one name the nav row, the Advanced-hub row and the tab
+           registry all use for this panel. It used to be the fourth name for it. -->
+      <div class="toolbar-title">Downloads</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="storage-clear-cache-btn" style="font-size: 0.8rem;">Clear Caches</button>
       </div>
@@ -56,7 +75,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       >
         <div style="flex: 1; min-width: 200px;">
           <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px;">Storage Location</div>
-          <div id="storage-location-label" style="font-size: 0.9rem; font-weight: 500;">Browser Storage (OPFS)</div>
+          <div id="storage-location-label" style="font-size: 0.9rem; font-weight: 500;">Checking&hellip;</div>
         </div>
         <button class="btn btn-secondary" id="storage-choose-dir-btn" style="font-size: 0.8rem; padding: 6px 14px;">
           Choose Storage Folder
@@ -121,7 +140,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 
   unsubscribeState = onModelStateChange(() => {
     void refreshStorageInfo();
-    renderModelList();
+    syncModelList();
   });
 
   return {
@@ -176,12 +195,14 @@ function renderStorageInfoHeader(): void {
   const quota = storageUsedBytes + storageFreeBytes;
   const usedPct = quota > 0 ? (storageUsedBytes / quota) * 100 : 0;
 
+  // "Origin used" / "Origin free" is the storage API's vocabulary, not a word a
+  // user of this app has any reason to know. The quota is per-site, so say that.
   host.innerHTML = `
     <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 6px;">Storage</div>
     <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.85rem;">
-      <div><strong>Origin used:</strong> ${formatBytes(storageUsedBytes)}</div>
+      <div><strong>Used by this site:</strong> ${formatBytes(storageUsedBytes)}</div>
       <div><strong>Models:</strong> ${formatBytes(modelsSize)}</div>
-      <div><strong>Origin free:</strong> ${formatBytes(storageFreeBytes)}</div>
+      <div><strong>Still available:</strong> ${formatBytes(storageFreeBytes)}</div>
     </div>
     ${quota > 0
       ? `<div class="progress-bar" style="margin-top: 8px;">
@@ -195,6 +216,16 @@ function renderStorageInfoHeader(): void {
 // Storage location switcher (web platform code)
 // ---------------------------------------------------------------------------
 
+/**
+ * Describe where downloaded models are being kept.
+ *
+ * The four states used to be written in the storage layer's own vocabulary —
+ * "OPFS", "the split-WASM SDK", "not visible in Finder" — which names an API, a
+ * build topology, and one operating system's file manager. None of the three
+ * tells a user what is true of their models, and the middle one is not even a
+ * thing that exists outside this repository. Each branch now says where the
+ * files are and what that means for them.
+ */
 function updateStorageLocationUI(): void {
   const label = container.querySelector('#storage-location-label') as HTMLElement;
   const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLElement;
@@ -202,27 +233,27 @@ function updateStorageLocationUI(): void {
 
   if (RunAnywhere.storage.isReady) {
     const safeName = escapeHtml(RunAnywhere.storage.directoryName ?? 'Unknown');
-    label.innerHTML = `<strong>Local Folder:</strong> ~/${safeName}/`
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
+    label.innerHTML = `<strong>Your folder:</strong> ~/${safeName}/`
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Models are saved as ordinary files you can open, move, and delete yourself.</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   } else if (RunAnywhere.storage.directoryName !== null) {
-    label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
+    label.innerHTML = '<strong>Your folder needs permission again</strong>'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Browsers drop folder access between visits. Re-authorize to reconnect it.</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = '';
   } else if (RunAnywhere.storage.backend === 'memory') {
-    label.innerHTML = '<strong>Persistent model storage unavailable</strong>'
-      + '<br><span style="font-size:0.75rem;opacity:0.5">Model downloads require OPFS or an approved local folder in the split-WASM SDK.</span>';
+    label.innerHTML = '<strong>Nothing can be saved here</strong>'
+      + '<br><span style="font-size:0.75rem;opacity:0.5">This browser is offering neither its own storage nor a folder to write to, so downloads cannot be kept.</span>';
     label.style.color = 'var(--color-warning, #ff9800)';
     chooseDirBtn.style.display = RunAnywhere.storage.isSupported ? '' : 'none';
     reauthBtn.style.display = 'none';
   } else {
-    label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Sandboxed browser storage &mdash; not visible in Finder. Use "Choose Storage Folder" for a real path.</span>`;
+    label.innerHTML = '<strong>Private browser storage</strong>'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">The browser keeps these files for this site; they don&rsquo;t appear in your file manager. Choose a folder to keep them somewhere you can see.</span>`;
     label.style.color = '';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
@@ -230,48 +261,141 @@ function updateStorageLocationUI(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Model list (read-only registry view + per-model Delete)
+// Model list (registry view + live transfers + per-model Delete)
 // ---------------------------------------------------------------------------
+
+/**
+ * The badge naming a model's state, in the words the picker and the pipeline
+ * slots already use.
+ *
+ * This list read from the registry alone, so it knew only three states —
+ * "Loaded", "Downloaded", "Not downloaded" — and a transfer running right now
+ * appeared under a tab called *Downloads* as "Not downloaded". The state comes
+ * from the same snapshot the picker renders from, so the two cannot disagree
+ * about what a model is doing.
+ */
+function storageStatusBadge(status: ModelStatusSnapshot): string {
+  switch (status.status) {
+    case 'loaded':
+      // "Active" everywhere in this app, and "On device" for merely downloaded —
+      // the split iOS draws between `activeIndicator` and a model that is only
+      // on disk. This badge used to be the app's fourth word for the same state.
+      return '<span class="badge badge-green">Active</span>';
+    case 'downloaded':
+      return '<span class="badge badge-blue">On device</span>';
+    case 'downloading':
+      return `<span class="badge badge-blue">${escapeHtml(downloadingBadgeLabel(status))}</span>`;
+    case 'loading':
+      return '<span class="badge badge-blue">Loading…</span>';
+    case 'paused':
+      return '<span class="badge badge-yellow">Paused</span>';
+    case 'error':
+      return '<span class="badge badge-red">Failed</span>';
+    default:
+      return '<span class="badge badge-grey">Not downloaded</span>';
+  }
+}
+
+/** The phase's own name, so a checksum is not reported as a stalled transfer. */
+function downloadingBadgeLabel(status: ModelStatusSnapshot): string {
+  switch (status.phase) {
+    case 'queued':
+      return 'Starting…';
+    case 'cancelling':
+      return 'Cancelling…';
+    case 'verifying':
+      return 'Checking…';
+    case 'extracting':
+      return 'Unpacking…';
+    default:
+      return 'Downloading';
+  }
+}
+
+/** What a row is, as opposed to what its numbers currently read. */
+function rowShape(status: ModelStatusSnapshot): string {
+  return `${status.status}|${status.phase ?? ''}|${status.error ?? ''}`;
+}
+
+/**
+ * Apply a model-state change to the list, rebuilding only when it changed shape.
+ *
+ * A running transfer emits about four progress events a second. Rebuilding the
+ * whole list on each of them would take the focus ring with it every time, so a
+ * keyboard user could never reach the Cancel button on the row they are watching
+ * — and the bar would restart its width transition on each rebuild, stuttering
+ * rather than gliding. A tick that only moves numbers is written into the
+ * existing markup instead.
+ */
+function syncModelList(): void {
+  if (!patchLiveTransfers()) renderModelList();
+}
+
+/** True when every row is still the shape it was rendered as and at least one
+ * live transfer was updated in place. */
+function patchLiveTransfers(): boolean {
+  const host = container.querySelector('#storage-model-list');
+  if (!host || renderedRowShapes.size === 0) return false;
+
+  const live: Array<[Element, ModelStatusSnapshot]> = [];
+  for (const entry of getCatalog()) {
+    const status = getModelStatus(entry.id);
+    if (renderedRowShapes.get(entry.id) !== rowShape(status)) return false;
+    if (status.status !== 'downloading') continue;
+    const row = host.querySelector(`[data-model-id="${CSS.escape(entry.id)}"]`);
+    if (!row) return false;
+    live.push([row, status]);
+  }
+  if (live.length === 0) return false;
+  return live.every(([row, status]) => patchDownloadProgress(row, status));
+}
 
 function renderModelList(): void {
   const host = container.querySelector('#storage-model-list') as HTMLElement | null;
   if (!host) return;
 
   const catalog = getCatalog();
+  renderedRowShapes.clear();
   if (!catalog.length) {
-    host.innerHTML = '<p class="text-secondary" style="padding: 12px 0;">Catalog not registered yet.</p>';
+    host.innerHTML = '<p class="text-secondary" style="padding: 12px 0;">No models yet — still loading the list.</p>';
     return;
   }
 
-  const downloadedIds = new Set(
-    RunAnywhere.models.list({ downloadedOnly: true }).map((model) => model.id),
-  );
-  const loadedIds = new Set(
-    [...new Set(catalog.map((entry) => entry.category))]
-      .map((category) => findLoadedModelForCategory(category)?.id)
-      .filter((id): id is string => Boolean(id)),
-  );
-
   host.innerHTML = catalog.map((entry) => {
-    const isDownloaded = downloadedIds.has(entry.id);
-    const isLoaded = loadedIds.has(entry.id);
-    const statusLabel = isLoaded
-      ? '<span class="badge badge-green">Loaded</span>'
-      : isDownloaded
-        ? '<span class="badge badge-blue">Downloaded</span>'
-        : '<span class="badge badge-grey">Not downloaded</span>';
+    const status = getModelStatus(entry.id);
+    // Not "is downloading": the wind-down phases are still `downloading`, and a
+    // Cancel there is a live-looking button with nothing left to stop — the row
+    // rendered one throughout the cancel it had just started. The picker decides
+    // this from the same predicate, so one transfer cannot be offered a Cancel
+    // on one screen and refused it on the other.
+    const canCancel = isDownloadCancellable(entry.id);
+    const hasArtifacts = status.status === 'downloaded' || status.status === 'loaded';
+    // A paused or failed transfer left partial bytes on disk. Delete is the only
+    // way to reclaim them, so the row that says they exist also offers it.
+    const hasPartials = status.status === 'paused' || status.status === 'error';
+    renderedRowShapes.set(entry.id, rowShape(status));
     return `
-      <div class="model-row" style="cursor: default;">
-        <div class="model-logo">${modalityEmoji(entry.category)}</div>
+      <div class="model-row" style="cursor: default;" data-model-id="${escapeHtml(entry.id)}">
+        <div class="model-logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
         <div class="model-info">
           <div class="model-name">${escapeHtml(entry.name)}</div>
           <div class="model-meta">
             <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
-            <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
-            ${statusLabel}
+            <span class="model-size">${formatModelSize(modelDisplaySizeBytes(entry))}</span>
+            ${storageStatusBadge(status)}
           </div>
+          ${renderDownloadProgress(status)}
+          ${status.status === 'paused'
+            ? '<div class="model-row-error">Paused — resume from Manage Models picks up where it stopped</div>'
+            : ''}
+          ${status.status === 'error'
+            ? `<div class="model-row-error error">${escapeHtml(status.error ?? 'Download failed')}</div>`
+            : ''}
         </div>
-        ${isDownloaded
+        ${canCancel
+          ? `<button class="btn btn-secondary btn-sm storage-cancel-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Cancel</button>`
+          : ''}
+        ${hasArtifacts || hasPartials
           ? `<button class="btn btn-secondary btn-sm storage-delete-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Delete</button>`
           : ''}
       </div>
@@ -284,12 +408,20 @@ function renderModelList(): void {
       if (modelId) void deleteModel(modelId);
     });
   });
+  host.querySelectorAll<HTMLButtonElement>('.storage-cancel-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const modelId = btn.dataset.modelId;
+      if (modelId) void cancelModelDownload(modelId);
+    });
+  });
 }
 
 async function deleteModel(modelId: string): Promise<void> {
   try {
     await RunAnywhere.models.delete(modelId);
-    refreshModelSelectionState();
+    // Clears the row's memory of a paused or failed attempt too: the partial
+    // bytes are gone, so an offer to resume them would be a lie.
+    resetModelRowState(modelId);
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');

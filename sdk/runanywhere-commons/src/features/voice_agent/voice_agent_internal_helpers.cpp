@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -129,16 +130,20 @@ rac_result_t validate_voice_response(const VoiceResponseParts& response) {
 // rac_voice_agent_destroy's existing `while (handle->in_flight > 0)` drain
 // loop now covers every long-running entry point that wraps its body here.
 InFlightGuard::InFlightGuard(rac_voice_agent_handle_t handle) : handle_(handle) {
-    if (!handle_ || handle_->is_shutting_down.load(std::memory_order_acquire)) {
+    if (!handle_) {
+        return;
+    }
+    // Test-then-increment under admission_mutex, which rac_voice_agent_destroy
+    // also takes to publish is_shutting_down. Doing it with the atomics alone
+    // could not work: an entrant preempted between reading the flag and
+    // incrementing left destroy looking at a zero counter, free to drain and
+    // delete the handle before that increment ever landed. Re-checking after the
+    // increment did not help, because the increment was itself the use-after-free.
+    std::lock_guard<std::mutex> admission(handle_->admission_mutex);
+    if (handle_->is_shutting_down.load(std::memory_order_acquire)) {
         return;
     }
     handle_->in_flight.fetch_add(1, std::memory_order_acq_rel);
-    // Re-check after incrementing to avoid TOCTOU with rac_voice_agent_destroy,
-    // which sets is_shutting_down=true and then drains the counter.
-    if (handle_->is_shutting_down.load(std::memory_order_acquire)) {
-        handle_->in_flight.fetch_sub(1, std::memory_order_acq_rel);
-        return;
-    }
     admitted_ = true;
 }
 
@@ -357,7 +362,7 @@ void emit_component_states(rac_voice_agent_handle_t handle) {
 
 void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind, const char* transcript,
-                         const char* response, const char* error) {
+                         const char* response, const char* error, bool error_recoverable) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(error ? runanywhere::v1::EVENT_CATEGORY_ERROR
@@ -378,6 +383,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
         auto* turn_error = turn->mutable_error();
         turn_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
         turn_error->set_message(error);
+        turn_error->set_recoverable(error_recoverable);
     }
     emit_generated_voice_event(handle, event,
                                error ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -385,7 +391,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
 }
 
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
-                            rac_result_t code, const char* message) {
+                            rac_result_t code, const char* message, bool recoverable) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
@@ -395,12 +401,13 @@ void emit_component_failure(rac_voice_agent_handle_t handle, const char* compone
     // VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
     session_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
     session_error->set_message(message ? message : rac_error_message(code));
+    session_error->set_recoverable(recoverable);
     if (component) {
         session_error->set_failed_component(component);
     }
     emit_generated_voice_event(handle, event, runanywhere::v1::ERROR_SEVERITY_ERROR);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_FAILED, nullptr, nullptr,
-                        message ? message : rac_error_message(code));
+                        message ? message : rac_error_message(code), recoverable);
     (void)rac_sdk_event_publish_failure(code, message, component ? component : "voice_agent",
                                         "processVoiceTurn", RAC_TRUE);
 }

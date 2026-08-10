@@ -43,10 +43,30 @@ class STTViewModel: VoiceComponentViewModelBase {
     @Published var hybridMinBattery: Double = 20
     @Published var hybridConfidenceThreshold = Double(RAHybridSTTConfidenceThreshold)
     @Published var hybridRouting: HybridRoutedMetadata?
+    /// Why the transcript pane is empty once a run has finished.
+    ///
+    /// Three facts, not one flag. "Nothing recorded yet" and "recorded, and the
+    /// engine recognised nothing" were already distinct — commons publishes an
+    /// engine's own no-speech marker as empty text, so an honestly silent
+    /// recording is an empty transcript. The third is the one that was being
+    /// misreported: a Live session whose stream opened and closed without a
+    /// single transcription event never asked anything of the microphone's
+    /// output, so blaming the input device sends the reader to hardware that
+    /// works.
+    @Published private(set) var emptyOutcome: STTEmptyOutcome = .nothingRecorded
     @Published var selectedMode: STTMode = .batch {
         didSet {
             // Stop any active recording/transcription when mode changes
             if oldValue != selectedMode {
+                // Drop the previous mode's result immediately. Leaving it under
+                // the new mode's description attributes one mode's output to
+                // another — a Batch "[ Silence ]" read as a Live result. Same
+                // reset `startRecording` already performs. Synchronous, so the
+                // stale text cannot survive even one frame.
+                transcription = ""
+                committedTranscription = ""
+                hybridRouting = nil
+                errorMessage = nil
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
                     if self.isRecording {
@@ -74,6 +94,10 @@ class STTViewModel: VoiceComponentViewModelBase {
     private var liveAudioContinuation: AsyncStream<AudioInput>.Continuation?
     private var liveStreamTask: Task<Void, Never>?
     private var committedTranscription = ""
+    /// Partial + final transcription events this live session produced. Zero at
+    /// the end means the engine never answered, which is a different failure
+    /// from a recogniser that answered with no words.
+    private var liveEventCount = 0
     private var hybridRouter: HybridSTTRouter?
     private var hybridPairKey: String?
 
@@ -179,6 +203,8 @@ class STTViewModel: VoiceComponentViewModelBase {
         audioBuffer = Data()
         transcription = ""
         committedTranscription = ""
+        emptyOutcome = .nothingRecorded
+        liveEventCount = 0
 
         guard selectedModelId != nil else {
             errorMessage = "No STT model loaded"
@@ -236,6 +262,16 @@ class STTViewModel: VoiceComponentViewModelBase {
 
         isRecording = false
         audioLevel = 0.0
+        // "Recorded, and nothing was recognised" is a different fact from
+        // "nothing recorded yet", and the screen used to show the second for
+        // both — telling the user they never recorded when in fact seconds of
+        // audio were captured and came back empty. Live mode settles
+        // asynchronously, so it classifies its own outcome on completion.
+        if selectedMode != .live {
+            if !audioBuffer.isEmpty && transcription.isEmpty && errorMessage == nil {
+                emptyOutcome = .recognisedNothing
+            }
+        }
     }
 
     // MARK: - Private Methods - Transcription
@@ -405,7 +441,24 @@ class STTViewModel: VoiceComponentViewModelBase {
                     guard let self, !Task.isCancelled else { break }
                     self.handleTranscriptionEvent(event)
                 }
-                self?.logger.info("Live transcription stream ended")
+                // The live session settles after `stopRecording` has returned, so
+                // it classifies its own empty outcome rather than leaving the
+                // screen on "nothing recorded yet" after a real recording.
+                //
+                // Which empty it was matters. A stream that emitted partials or a
+                // final and still has no text means the recogniser heard nothing;
+                // a stream that emitted neither never transcribed the recording
+                // at all, and calling that a microphone problem sends the reader
+                // to hardware that is working.
+                guard let self, !Task.isCancelled else { return }
+                self.logger.info(
+                    "Live transcription stream ended after \(self.liveEventCount) transcription event(s)"
+                )
+                if self.errorMessage == nil, self.transcription.isEmpty {
+                    self.emptyOutcome = self.liveEventCount == 0
+                        ? .streamProducedNoEvents
+                        : .recognisedNothing
+                }
             } catch {
                 guard let self, !Task.isCancelled else { return }
                 self.logger.error("Live transcription failed: \(error.localizedDescription)")
@@ -423,6 +476,9 @@ class STTViewModel: VoiceComponentViewModelBase {
             break
 
         case .partial(_, _, _, _, let alternatives):
+            // Counted even when the preview is blank: the engine did answer, and
+            // that is what separates "heard nothing" from "never ran".
+            liveEventCount += 1
             let preview = (alternatives.first ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard !preview.isEmpty else { return }
             transcription = committedTranscription.isEmpty
@@ -430,6 +486,7 @@ class STTViewModel: VoiceComponentViewModelBase {
                 : committedTranscription + "\n" + preview
 
         case .transcriptFinal(_, _, let result):
+            liveEventCount += 1
             let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 committedTranscription = committedTranscription.isEmpty
@@ -473,6 +530,43 @@ class STTViewModel: VoiceComponentViewModelBase {
 }
 
 // MARK: - Supporting Types
+
+/// Why the transcript pane is empty after a run, and therefore what the screen
+/// is allowed to claim. Each case blames something different, so they cannot
+/// share one message.
+enum STTEmptyOutcome: Equatable {
+    /// Nothing has been recorded yet in this session — the neutral idle state.
+    case nothingRecorded
+    /// Audio was captured, the recogniser ran, and it reported no words. The
+    /// recording is the suspect, so pointing at the input device is fair here.
+    case recognisedNothing
+    /// A live session opened and closed without a single transcription event.
+    /// Nothing judged the audio at all, so this is a transcription failure and
+    /// must not be reported as a microphone problem.
+    case streamProducedNoEvents
+
+    var title: String {
+        switch self {
+        case .nothingRecorded: return "Ready to transcribe"
+        case .recognisedNothing: return "No speech detected"
+        case .streamProducedNoEvents: return "Live transcription produced nothing"
+        }
+    }
+
+    /// Nil for the idle case, where the mode's own description is the subtitle.
+    var detail: String? {
+        switch self {
+        case .nothingRecorded:
+            return nil
+        case .recognisedNothing:
+            return "Nothing was recognised in that recording. Check your input device, then try again."
+        case .streamProducedNoEvents:
+            return "The stream opened and closed without returning a single result, "
+                + "so the recording was never transcribed. "
+                + "Try \"Record, then transcribe\" — it runs the same model over the whole recording."
+        }
+    }
+}
 
 /// STT Mode for UI selection
 enum STTMode: String {

@@ -130,6 +130,11 @@ sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/VadNamespa
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/ModelsNamespace.kt|kotlin:deprecated-declaration
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/SttNamespace.kt|kotlin:deprecated-declaration
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/LoraNamespace.kt|kotlin:deprecated-declaration
+# Local on-disk resume-state persistence for background downloads — private
+# bookkeeping (a plan record, a resume-byte-count checkpoint) that never crosses
+# a language or process boundary, so there is no proto/wire type to bridge to.
+# Sibling of BackgroundDownloadCoordinator.swift below, same subsystem.
+sdk/runanywhere-swift/Sources/RunAnywhere/Features/Downloads/DownloadPersistenceStore.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Features/Downloads/BackgroundDownloadCoordinator.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Options.swift|swift:deprecated-declaration
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Rag/RagSession.swift|swift:deprecated-declaration

@@ -174,6 +174,21 @@ export class ProtoWasmBridge {
       const dataPtr = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_data!());
       const dataSize = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_size!());
       if (!dataPtr || dataSize === 0) {
+        // Success with an untouched out-buffer is ambiguous: for a query like
+        // `current_model` it really is "nothing to report", but it is also the
+        // exact signature of an Asyncify unwind escaping a synchronous export
+        // (the export returns before writing anything, and the rewind later
+        // writes into a buffer this frame has already freed). Every bare
+        // `.gguf` download failed that way — an empty plan decodes to zero
+        // files and reads as "no files were resolved". Left silent it is
+        // undiagnosable, so record it; debug level because the benign case is
+        // common and must not cry wolf.
+        this.logger.debug(
+          `${functionName} returned success with an empty result buffer (no bytes written); `
+          + 'the decoded result is all-default. Benign for queries with nothing to report — '
+          + 'but if this export can suspend (HTTP/Asyncify) it must be invoked with '
+          + 'ccall({ async: true }) or the result is a phantom.',
+        );
         return new Uint8Array();
       }
       return mod.HEAPU8!.slice(dataPtr, dataPtr + dataSize);
@@ -225,6 +240,21 @@ export class ProtoWasmBridge {
       const dataPtr = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_data!());
       const dataSize = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_size!());
       if (!dataPtr || dataSize === 0) {
+        // Success with an untouched out-buffer is ambiguous: for a query like
+        // `current_model` it really is "nothing to report", but it is also the
+        // exact signature of an Asyncify unwind escaping a synchronous export
+        // (the export returns before writing anything, and the rewind later
+        // writes into a buffer this frame has already freed). Every bare
+        // `.gguf` download failed that way — an empty plan decodes to zero
+        // files and reads as "no files were resolved". Left silent it is
+        // undiagnosable, so record it; debug level because the benign case is
+        // common and must not cry wolf.
+        this.logger.debug(
+          `${functionName} returned success with an empty result buffer (no bytes written); `
+          + 'the decoded result is all-default. Benign for queries with nothing to report — '
+          + 'but if this export can suspend (HTTP/Asyncify) it must be invoked with '
+          + 'ccall({ async: true }) or the result is a phantom.',
+        );
         return new Uint8Array();
       }
       return mod.HEAPU8!.slice(dataPtr, dataPtr + dataSize);

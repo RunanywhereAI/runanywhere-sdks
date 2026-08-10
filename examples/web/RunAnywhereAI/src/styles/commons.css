@@ -250,53 +250,6 @@
   font-size: 0.85em;
 }
 
-/** Small status dot (recording / live indicators) */
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot.green  { background: var(--color-green); }
-.status-dot.red    { background: var(--color-red); }
-.status-dot.orange { background: var(--color-primary); }
-.status-dot.blue   { background: var(--color-blue); }
-.status-dot.pulse  { animation: stt-pulse 1s infinite; }
-
-/** Status badge (compact pill with dot + label) */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: var(--font-weight-semibold);
-}
-.status-badge.recording {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--color-red);
-}
-.status-badge.processing {
-  background: rgba(249, 115, 22, 0.1);
-  color: var(--color-primary);
-}
-.status-badge.ready {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--color-green);
-}
-
-/** Spinner (small inline loading indicator) */
-.spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-primary);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  display: inline-block;
-}
-
 /** Ghost button (no background, no border — toolbar icons etc.) */
 .btn-ghost {
   display: inline-flex;

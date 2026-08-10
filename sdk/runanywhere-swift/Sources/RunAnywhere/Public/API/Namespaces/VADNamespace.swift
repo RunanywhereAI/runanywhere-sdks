@@ -111,60 +111,68 @@ public extension RunAnywhere {
         /// `AudioFormatSpec`; a chunk with a different format ends the stream
         /// with a thrown error.
         ///
-        /// - Throws: `SDKException` from this call when the stream produced no
-        ///   chunks, and into the returned stream when chunks disagree on
-        ///   format or detection fails.
+        /// - Throws: `SDKException` into the returned stream when the input
+        ///   produced no chunks, chunks disagree on format, or detection fails.
         @available(*, deprecated, message: "Use openStream(format:options:) and push AudioFrame values")
         public func detectStream(
             _ audio: AsyncStream<AudioInput>,
             options: VadOptions? = nil
         ) async throws -> AsyncThrowingStream<VadEvent, Error> {
             let iterator = AudioInputIteratorBox(audio)
-            guard let first = await iterator.next() else {
-                throw SDKException(
-                    code: .invalidInput,
-                    message: "Audio stream produced no chunks",
-                    category: .validation
-                )
-            }
-            let format = try first.liveFormatSpec()
-            let stream = openStream(format: format, options: options)
 
             return AsyncThrowingStream { continuation in
-                let pumpTask = Task { () -> SDKException? in
-                    stream.pushFrame(first.toLiveFrame())
-                    while let chunk = await iterator.next() {
-                        if Task.isCancelled { break }
-                        guard chunk.matchesLiveFormat(format) else {
-                            stream.finish()
-                            return SDKException.validationFailed(
-                                "vad.detectStream chunks must share one AudioFormatSpec"
+                // The first chunk is read *inside* the returned stream, never
+                // before it is handed back. Every microphone-fed caller starts
+                // capture only once this factory returns, so peeking here would
+                // park the consumer on a producer that cannot start yet — that
+                // circular wait is what froze the VAD screen on iOS and macOS.
+                let driver = Task {
+                    var live: VadStream?
+                    do {
+                        guard let first = await iterator.next() else {
+                            throw SDKException(
+                                code: .invalidInput,
+                                message: "Audio stream produced no chunks",
+                                category: .validation
                             )
                         }
-                        stream.pushFrame(chunk.toLiveFrame())
+                        let format = try first.liveFormatSpec()
+                        let stream = openStream(format: format, options: options)
+                        live = stream
+
+                        // Drain concurrently with the pump so speech-started /
+                        // speech-ended reach the caller while the mic is open.
+                        let drainTask = Task {
+                            for try await event in stream.events {
+                                continuation.yield(event)
+                            }
+                        }
+
+                        var mismatch: SDKException?
+                        stream.pushFrame(first.toLiveFrame())
+                        while let chunk = await iterator.next() {
+                            if Task.isCancelled { break }
+                            guard chunk.matchesLiveFormat(format) else {
+                                mismatch = SDKException.validationFailed(
+                                    "vad.detectStream chunks must share one AudioFormatSpec"
+                                )
+                                break
+                            }
+                            stream.pushFrame(chunk.toLiveFrame())
+                        }
+                        stream.finish()
+                        _ = try? await drainTask.value
+                        if let mismatch {
+                            continuation.finish(throwing: mismatch)
+                        } else {
+                            continuation.finish()
+                        }
+                    } catch {
+                        continuation.finish(throwing: SDKException.from(error))
                     }
-                    stream.finish()
-                    return nil
+                    await live?.close()
                 }
-                let drainTask = Task {
-                    for try await event in stream.events {
-                        continuation.yield(event)
-                    }
-                }
-                Task {
-                    let mismatch = await pumpTask.value
-                    _ = try? await drainTask.value
-                    if let mismatch {
-                        continuation.finish(throwing: mismatch)
-                    } else {
-                        continuation.finish()
-                    }
-                }
-                continuation.onTermination = { @Sendable _ in
-                    pumpTask.cancel()
-                    drainTask.cancel()
-                    Task { await stream.close() }
-                }
+                continuation.onTermination = { @Sendable _ in driver.cancel() }
             }
         }
 

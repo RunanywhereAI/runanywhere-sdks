@@ -31,6 +31,8 @@ import {
 import type { ToolValue } from '@runanywhere/proto-ts/tool_calling';
 import {
   buildGetStartedOverlay,
+  syncMountedOverlayState,
+  setOverlaySuppressed,
   findLoadedModelForCategory,
   onModelStateChange,
   openSheet,
@@ -38,16 +40,22 @@ import {
   type OpenSheetOptions,
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
-import { getGenerationSettings } from './settings';
+import { icon, type IconName } from '../components/icons';
+import { getGenerationSettings, setThinkingModeEnabled } from './settings';
 import {
   answerDocumentAttachment,
   answerImageAttachment,
+  canAnswerDocumentAttachment,
   canAnswerImageAttachment,
   cancelActiveDocumentAttachmentAnswer,
   cancelActiveImageAttachmentAnswer,
+  imageAttachmentThumbnail,
+  kindForFile,
   validateChatAttachmentFile,
+  type ChatAttachmentAnswer,
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
+import { renderMarkdown } from '../services/markdown';
 import { formatError } from '../services/format-error';
 import {
   ConversationsStore,
@@ -66,6 +74,16 @@ interface ChatAttachmentInfo {
   kind: 'image' | 'document';
   name: string;
   detail?: string;
+  /**
+   * A thumbnail-sized JPEG data URL of an image attachment.
+   *
+   * An image turn that shows only a filename and a picture glyph asks the reader
+   * to remember which photo they sent — iOS keeps the image itself on the turn
+   * (LLMViewModel+Vision.swift:75-92 persists the attachment bytes). Stored at
+   * 96 px so a conversation full of photos stays a few kilobytes per turn in
+   * IndexedDB rather than a few megabytes.
+   */
+  thumbnailDataUrl?: string;
 }
 
 interface ChatSourceInfo {
@@ -83,6 +101,17 @@ interface ChatMessage {
   toolCalls?: ChatToolCallInfo[];
   /** RAG citations for document attachments. */
   sources?: ChatSourceInfo[];
+  /**
+   * This turn is a failure report, not something the model said.
+   *
+   * Mirrors iOS `Message.isError`. Without it a failed turn was an ordinary assistant
+   * bubble — same ink, run through the markdown renderer — and
+   * `conversationHistoryForGeneration` filtered only on blank content, so the next
+   * request told the model it had previously said "Error: …". Persisted with the turn
+   * because the conversation is reloaded from IndexedDB, and a reload must not
+   * resurrect the error into history.
+   */
+  isError?: boolean;
 }
 
 interface ConversationGenerationContext {
@@ -95,6 +124,8 @@ interface PendingAttachment {
   file: File;
   name: string;
   description: string;
+  /** Filled in asynchronously for images; see `ChatAttachmentInfo`. */
+  thumbnailDataUrl?: string;
 }
 
 type JsonObject = Readonly<Record<string, unknown>>;
@@ -119,7 +150,13 @@ function isChatAttachmentInfo(value: unknown): value is ChatAttachmentInfo {
   return isJsonObject(value)
     && (value.kind === 'image' || value.kind === 'document')
     && typeof value.name === 'string'
-    && hasOptionalString(value, 'detail');
+    && hasOptionalString(value, 'detail')
+    // Restored straight into an `<img src>`, so a stored value that is not a
+    // data URL never reaches the DOM — the database is app-owned but it is still
+    // persisted, origin-scoped input.
+    && (value.thumbnailDataUrl === undefined
+      || (typeof value.thumbnailDataUrl === 'string'
+        && value.thumbnailDataUrl.startsWith('data:image/')));
 }
 
 function isChatSourceInfo(value: unknown): value is ChatSourceInfo {
@@ -137,7 +174,8 @@ function isChatMessage(value: unknown): value is ChatMessage {
     && (value.toolCalls === undefined
       || (Array.isArray(value.toolCalls) && value.toolCalls.every(isChatToolCallInfo)))
     && (value.sources === undefined
-      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)));
+      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)))
+    && (value.isError === undefined || typeof value.isError === 'boolean');
 }
 
 // Chat's picker is scoped to LLMs — iOS parity:
@@ -152,6 +190,19 @@ const VLM_SHEET_OPTIONS: OpenSheetOptions = {
   filterCategories: [
     ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     ModelCategory.MODEL_CATEGORY_VISION,
+  ],
+};
+
+/**
+ * A grounded file answer needs both halves of the pipeline, so the picker it
+ * opens shows both — the same move the image branch already made, rather than
+ * failing the send with the SDK's "model is not downloaded" sentence.
+ */
+const DOCUMENT_SHEET_OPTIONS: OpenSheetOptions = {
+  title: 'Choose Document Models',
+  filterCategories: [
+    ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    ModelCategory.MODEL_CATEGORY_LANGUAGE,
   ],
 };
 
@@ -177,6 +228,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 
   messages = [];
   toolsEnabled = loadToolsEnabled();
+  // Module state outlives a panel rebuild. Without this, remounting the tab
+  // re-showed the pill for a File the previous composer had staged.
+  pendingAttachment = null;
 
   // Register the demo tools once at chat setup — iOS parity:
   // ToolSettingsViewModel.registerDemoTools (ToolSettingsView.swift:153-159).
@@ -188,35 +242,46 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     <div class="chat-composer-shell">
       <div class="composer-status-pill hidden" id="chat-attachment-pill"></div>
       <div class="composer-status-pill composer-status-pill--tools hidden" id="chat-tools-status">
-        ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+        ${icon('globe')}
         <span><strong>Web & tools on</strong><small>Trace appears in replies</small></span>
       </div>
       <div class="chat-input-area">
         <div class="composer-menu-wrap">
-          <button class="composer-icon-btn" id="chat-attach-btn" type="button" aria-label="Attach or open mode" title="Attach or open mode">
-            ${svgIcon('<path d="M12 5v14"/><path d="M5 12h14"/>')}
+          <button class="composer-icon-btn" id="chat-attach-btn" type="button"
+            aria-label="Attach a file or open live camera" title="Attach a file or open live camera"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="chat-attach-menu">
+            ${icon('plus')}
           </button>
-          <div class="composer-menu hidden" id="chat-attach-menu">
-            <button type="button" data-action="document">
-              ${svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+          <div class="composer-menu hidden" id="chat-attach-menu" role="menu">
+            <button type="button" role="menuitem" data-action="document">
+              ${icon('file')}
               <span><strong>Document</strong><small>Ask questions with sources</small></span>
             </button>
-            <button type="button" data-action="image">
-              ${svgIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>')}
+            <button type="button" role="menuitem" data-action="image">
+              ${icon('image')}
               <span><strong>Image</strong><small>Ask about a photo</small></span>
             </button>
-            <button type="button" data-action="live">
-              ${svgIcon('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M8 6h8v9H8z"/>')}
+            <button type="button" role="menuitem" data-action="live">
+              ${icon('eye')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
           </div>
         </div>
         <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
-          ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+          ${icon('globe')}
+        </button>
+        <!-- Reasoning lives in the composer, next to web-and-tools, because it
+             changes what the NEXT turn does — the same place and the same brain
+             glyph Android's composer uses. It used to exist only as a switch in
+             the Settings tab, so a browser reader had to leave the conversation
+             to change how the reply would be produced, and had no way to see
+             from here whether reasoning was on. -->
+        <button class="composer-icon-btn" id="chat-thinking-btn" type="button" aria-label="Enable reasoning" title="Enable reasoning">
+          ${icon('brain')}
         </button>
         <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk mode" title="Talk mode">
-          ${svgIcon('<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>')}
+        <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk" title="Talk">
+          ${icon('mic')}
         </button>
         <button class="send-btn" id="chat-send-btn" disabled aria-label="Send message"></button>
       </div>
@@ -233,13 +298,22 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     CHAT_SHEET_OPTIONS,
     CHAT_CAPABLE_MODEL_CATEGORIES,
   );
-  container.appendChild(getStartedOverlay);
-
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
+  // Inserted where the scroll region sits in the flex column, not appended after
+  // the composer: the card takes that region's place instead of covering the
+  // panel, so the composer below it stays visible rather than being hidden
+  // behind an opaque layer while remaining focusable.
+  container.insertBefore(getStartedOverlay, messagesEl.nextSibling);
+  // Only now can the overlay set state on its parent — see
+  // syncMountedOverlayState. Without this the panel's empty state is hidden a
+  // frame late and the overlay doubles in height after paint.
+  syncMountedOverlayState();
+
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;
   const toolsBtn = container.querySelector('#chat-tools-btn') as HTMLButtonElement;
   const toolsStatus = container.querySelector('#chat-tools-status') as HTMLElement;
+  const thinkingBtn = container.querySelector('#chat-thinking-btn') as HTMLButtonElement;
   const attachBtn = container.querySelector('#chat-attach-btn') as HTMLButtonElement;
   const attachMenu = container.querySelector('#chat-attach-menu') as HTMLElement;
   const attachmentPill = container.querySelector('#chat-attachment-pill') as HTMLElement;
@@ -271,12 +345,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
     attachmentPill.classList.remove('hidden');
     attachmentPill.innerHTML = `
-      ${svgIcon(pendingAttachment.kind === 'image'
-        ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
-        : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+      ${attachmentGlyph(pendingAttachment.kind, pendingAttachment.thumbnailDataUrl)}
       <span><strong>${escapeHtml(pendingAttachment.name)}</strong><small>${escapeHtml(pendingAttachment.description)}</small></span>
-      <button type="button" id="chat-clear-attachment" aria-label="Remove attachment">
-        ${svgIcon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>')}
+      <button type="button" id="chat-clear-attachment" aria-label="Remove ${escapeHtml(pendingAttachment.name)}">
+        ${icon('close')}
       </button>
     `;
     attachmentPill
@@ -287,18 +359,41 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         refreshSendButton();
       }, listenerOptions);
   };
+  /**
+   * The reasoning toggle's three honest states.
+   *
+   * A model with no thinking phase cannot be made to reason, so the control is
+   * disabled and says why rather than offering a switch that would change nothing —
+   * the same rule Android's composer applies via `thinkingSupported`.
+   */
+  const refreshThinkingButton = () => {
+    const supported = loadedModelSupportsThinking();
+    const on = supported && getGenerationSettings().thinkingModeEnabled;
+    thinkingBtn.disabled = !supported;
+    thinkingBtn.classList.toggle('active', on);
+    const label = !supported
+      ? 'Reasoning not supported by this model'
+      : on ? 'Disable reasoning' : 'Enable reasoning';
+    thinkingBtn.setAttribute('aria-label', label);
+    thinkingBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    thinkingBtn.title = label;
+  };
   refreshToolsButton();
+  refreshThinkingButton();
   refreshAttachmentPill();
 
   const refreshSendButton = () => {
+    // Reasoning availability depends on the loaded model, and this runs on every
+    // model-state change (see `onModelStateChange` below), so the toggle follows.
+    refreshThinkingButton();
     const hasInput = inputEl.value.trim().length > 0;
     const modelLoaded = isModelLoaded();
     const hasAttachment = pendingAttachment !== null;
     sendBtn.disabled = !conversationHydrated
       || (!isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment)));
     sendBtn.innerHTML = isGenerating
-      ? svgIcon('<rect x="6" y="6" width="12" height="12" rx="2"/>')
-      : svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>');
+      ? icon('stop')
+      : icon('send');
     // Tooltip clarifies why the button is disabled. The textbox stays
     // enabled so users may compose while a model is loading.
     if (!conversationHydrated) {
@@ -337,6 +432,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
     }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
   }, listenerOptions);
+  // Copy a fenced code block. Delegated for the same reason as the reply copy
+  // above — every streamed token re-renders the bubble, so a listener bound to
+  // the button itself would be discarded on the next token. The code rides in
+  // the attribute rather than being read from the DOM so what lands on the
+  // clipboard is exactly what the model wrote.
+  messagesEl.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-md-code]');
+    if (!button) return;
+    const code = button.dataset.mdCode;
+    if (!code) return;
+    void navigator.clipboard.writeText(code).then(() => {
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+    }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
+  }, listenerOptions);
   inputEl.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -355,13 +465,27 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     saveToolsEnabled(toolsEnabled);
     refreshToolsButton();
   }, listenerOptions);
+  thinkingBtn.addEventListener('click', () => {
+    // Writes through to the one persisted setting the Settings tab also edits, so
+    // the two controls can never disagree about whether reasoning is on.
+    setThinkingModeEnabled(!getGenerationSettings().thinkingModeEnabled);
+    refreshThinkingButton();
+  }, listenerOptions);
+  // `aria-expanded` is the only thing that tells a screen-reader user the menu
+  // opened at all — the visual state is a class that flips `display`, which is
+  // silent. Kept in one place so the flag cannot drift from the class.
+  const setAttachMenuOpen = (open: boolean) => {
+    attachMenu.classList.toggle('hidden', !open);
+    attachBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  const closeAttachMenu = () => setAttachMenuOpen(false);
   attachBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    attachMenu.classList.toggle('hidden');
+    setAttachMenuOpen(attachMenu.classList.contains('hidden'));
   }, listenerOptions);
   attachMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
     button.addEventListener('click', () => {
-      attachMenu.classList.add('hidden');
+      closeAttachMenu();
       const action = button.dataset.action;
       if (action === 'document') documentInput.click();
       if (action === 'image') imageInput.click();
@@ -369,54 +493,146 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (action === 'advanced') navigateTo('advanced');
     }, listenerOptions);
   });
-  const closeAttachMenu = () => attachMenu.classList.add('hidden');
   document.addEventListener('click', closeAttachMenu, listenerOptions);
+  // Escape is how every other dismissible surface in this app closes; a menu
+  // that only closes on an outside click strands a keyboard user inside it.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || attachMenu.classList.contains('hidden')) return;
+    closeAttachMenu();
+    attachBtn.focus();
+  }, listenerOptions);
+  /**
+   * Validate one file and stage it as the pending attachment.
+   *
+   * The single funnel for all four ways a file can arrive — the image picker,
+   * the document picker, a drop on the composer, and a paste. Sharing it is what
+   * guarantees a dropped file is checked exactly as strictly as a picked one; the
+   * `accept` attribute only constrains the pickers, and drop and paste never
+   * consult it.
+   */
+  const stageAttachment = (kind: 'image' | 'document', file: File): boolean => {
+    const error = validateChatAttachmentFile(kind, file);
+    if (error) {
+      showToast(error, 'warning', 4200);
+      return false;
+    }
+    const staged: PendingAttachment = kind === 'image'
+      ? {
+        kind: 'image',
+        file,
+        name: file.name || 'Selected image',
+        description: 'Ask about this image',
+      }
+      : {
+        kind: 'document',
+        file,
+        name: file.name || 'Selected document',
+        description: 'Ask with sources from this document',
+      };
+    pendingAttachment = staged;
+    refreshAttachmentPill();
+    refreshSendButton();
+    if (kind === 'image') {
+      // Decoding is async, so the pill appears immediately with its glyph and
+      // gains the picture a moment later rather than making the reader wait for
+      // a canvas round-trip before the composer responds at all.
+      void imageAttachmentThumbnail(file).then((thumbnailDataUrl) => {
+        if (!thumbnailDataUrl || pendingAttachment !== staged) return;
+        staged.thumbnailDataUrl = thumbnailDataUrl;
+        refreshAttachmentPill();
+      });
+    }
+    return true;
+  };
+
   imageInput.addEventListener('change', () => {
     const file = imageInput.files?.[0] ?? null;
     imageInput.value = '';
-    if (!file) return;
-    const error = validateChatAttachmentFile('image', file);
-    if (error) {
-      showToast(error, 'warning', 4200);
-      return;
-    }
-    pendingAttachment = {
-      kind: 'image',
-      file,
-      name: file.name || 'Selected image',
-      description: 'Ask about this image',
-    };
-    refreshAttachmentPill();
-    refreshSendButton();
+    if (file) stageAttachment('image', file);
   }, listenerOptions);
   documentInput.addEventListener('change', () => {
     const file = documentInput.files?.[0] ?? null;
     documentInput.value = '';
-    if (!file) return;
-    const error = validateChatAttachmentFile('document', file);
-    if (error) {
-      showToast(error, 'warning', 4200);
+    if (file) stageAttachment('document', file);
+  }, listenerOptions);
+
+  /**
+   * Accept a file the user dropped or pasted, choosing the mode from the file.
+   *
+   * Dropping an image on a chat box and pasting a screenshot are both things a
+   * user simply expects to work — Documents already accepted drops and pastes,
+   * so the composer not accepting them was an inconsistency inside one app as
+   * well as across the four. `kindForFile` decides the mode, and an unsupported
+   * file says so rather than being silently ignored, which is indistinguishable
+   * from the feature being broken.
+   */
+  const acceptDroppedFile = (file: File): void => {
+    const kind = kindForFile(file);
+    if (!kind) {
+      showToast(
+        `${file.name || 'That file'} is not supported. Attach an image or a .txt, .md, or .json file.`,
+        'warning',
+        4200,
+      );
       return;
     }
-    pendingAttachment = {
-      kind: 'document',
-      file,
-      name: file.name || 'Selected document',
-      description: 'Ask with sources from this document',
-    };
-    refreshAttachmentPill();
-    refreshSendButton();
+    if (stageAttachment(kind, file)) inputEl.focus();
+  };
+
+  const composerShell = container.querySelector('.chat-composer-shell') as HTMLElement;
+  // `dragover` must be cancelled or the browser navigates away to the dropped
+  // file, discarding the conversation.
+  composerShell.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    composerShell.classList.add('chat-composer-shell--dropping');
+  }, listenerOptions);
+  // `dragleave` fires when crossing between child elements too, so the target
+  // check keeps the highlight from flickering as the pointer moves inside.
+  composerShell.addEventListener('dragleave', (event) => {
+    if (event.target === composerShell) {
+      composerShell.classList.remove('chat-composer-shell--dropping');
+    }
+  }, listenerOptions);
+  composerShell.addEventListener('drop', (event) => {
+    if (!event.dataTransfer?.files.length) return;
+    event.preventDefault();
+    composerShell.classList.remove('chat-composer-shell--dropping');
+    acceptDroppedFile(event.dataTransfer.files[0]);
+  }, listenerOptions);
+  inputEl.addEventListener('paste', (event) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind !== 'file') continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      // Only claim the paste once a file is actually found, so pasting ordinary
+      // text still lands in the textarea as normal.
+      event.preventDefault();
+      acceptDroppedFile(file);
+      return;
+    }
   }, listenerOptions);
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
-  const showConversation = (nextMessages: ChatMessage[]) => {
+  /**
+   * Show a different conversation.
+   *
+   * `clearComposer` is false for exactly one caller: the initial restore from
+   * IndexedDB. Restoring is not switching — the reader did not ask for it and
+   * may already be typing or have staged a file while it was in flight, and this
+   * function used to wipe both, so a message composed in the first second after
+   * opening chat silently vanished.
+   */
+  const showConversation = (nextMessages: ChatMessage[], clearComposer = true) => {
     messages = nextMessages;
-    getStartedOverlay.classList.toggle(
-      'chat-model-overlay--conversation-visible',
-      conversationSuppressesModelOverlay(nextMessages),
-    );
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    pendingAttachment = null;
+    setOverlaySuppressed(conversationSuppressesModelOverlay(nextMessages));
+    if (clearComposer) {
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      pendingAttachment = null;
+    }
     renderMessages(messagesEl);
     refreshAttachmentPill();
     refreshSendButton();
@@ -480,7 +696,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const initialConversationVersion = conversationActionVersion;
   conversationHydration = loadConversation().then((savedMessages) => {
     if (conversationActionVersion === initialConversationVersion) {
-      showConversation(savedMessages);
+      showConversation(savedMessages, false);
     }
   }).catch(reportConversationStorageError).finally(() => {
     conversationHydrated = true;
@@ -552,6 +768,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } catch (error) {
       if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
       assistantMsg.content = formatChatError(error);
+      assistantMsg.isError = true;
       renderLastMessage(messagesEl, assistantMsg, false);
     } finally {
       cancelGeneration = null;
@@ -569,9 +786,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     prompt: string,
     host: HTMLElement,
   ): Promise<void> {
+    // Both branches leave the file staged on purpose: the reader's next action
+    // after picking a model is to press Send again, and re-attaching the file
+    // first would be busywork the app created.
     if (attachment.kind === 'image' && !canAnswerImageAttachment()) {
       openSheet(VLM_SHEET_OPTIONS);
       showToast('Load an image model first, then send the attached image.', 'info', 4200);
+      return;
+    }
+    if (attachment.kind === 'document' && !canAnswerDocumentAttachment()) {
+      openSheet(DOCUMENT_SHEET_OPTIONS);
+      showToast(
+        'Answering questions about a file needs an indexing model and a chat model. Download them here, then send the file again.',
+        'info',
+        5200,
+      );
       return;
     }
 
@@ -592,6 +821,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         kind: attachment.kind,
         name: attachment.name,
         detail: attachment.description,
+        ...(attachment.thumbnailDataUrl
+          ? { thumbnailDataUrl: attachment.thumbnailDataUrl }
+          : {}),
       },
     };
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
@@ -615,23 +847,32 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.content = content;
         renderLastMessage(host, assistantMsg);
       };
+      let answer: ChatAttachmentAnswer;
       if (attachment.kind === 'image') {
         cancelGeneration = cancelActiveImageAttachmentAnswer;
-        const answer = await answerImageAttachment(attachment.file, question, settings, onProgress);
-        assistantMsg.content = answer.content;
-        assistantMsg.thinking = answer.thinking;
-        assistantMsg.sources = answer.sources;
+        answer = await answerImageAttachment(attachment.file, question, settings, onProgress);
       } else {
         cancelGeneration = cancelActiveDocumentAttachmentAnswer;
-        const answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
-        assistantMsg.content = answer.content;
-        assistantMsg.thinking = answer.thinking;
-        assistantMsg.sources = answer.sources;
+        answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
       }
+      assistantMsg.thinking = answer.thinking;
+      assistantMsg.sources = answer.sources;
+      // A stopped turn keeps whatever had already been written — it is on screen
+      // and the reader chose to stop it — and only says "Stopped." when nothing
+      // arrived at all. Replacing partial text with a one-word status would
+      // delete an answer the reader was in the middle of reading.
+      assistantMsg.content = answer.cancelled
+        ? (answer.content || 'Stopped.')
+        : (answer.content || attachmentEmptyAnswer(attachment.kind));
       renderLastMessage(host, assistantMsg, false);
     } catch (error) {
       if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
-      assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
+      const cancelled = isAbortError(error);
+      assistantMsg.content = cancelled ? 'Stopped.' : formatChatError(error);
+      // Only a real failure is flagged. A cancellation is the reader's own decision,
+      // so painting it in the danger colour would report their own action back to
+      // them as an error (DESIGN_GUIDELINE §9 keeps cancelled and error distinct).
+      assistantMsg.isError = !cancelled;
       renderLastMessage(host, assistantMsg, false);
     } finally {
       cancelGeneration = null;
@@ -665,6 +906,20 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (cancelGeneration) cancelGeneration();
     },
   };
+}
+
+/**
+ * What an attachment turn says when the model answered nothing.
+ *
+ * A plain sentence rather than the "(empty response)" stand-in this used to
+ * render — a parenthetical is developer shorthand, and a reader cannot tell it
+ * apart from an answer the model actually gave. iOS says the same thing in the
+ * same place (LLMViewModel+Vision.swift:128).
+ */
+function attachmentEmptyAnswer(kind: 'image' | 'document'): string {
+  return kind === 'image'
+    ? 'The model did not describe that image. Try another photo, or ask a more specific question.'
+    : 'The model did not find an answer in that file. Try rephrasing the question.';
 }
 
 /** Saved content stays readable even when no inference model is loaded. */
@@ -1211,6 +1466,12 @@ export function conversationHistoryForGeneration(
 ): SDKChatMessage[] {
   return conversationMessages
     .filter(isChatMessage)
+    // A failed turn is the app's own report. Sending it back as a prior assistant
+    // message tells the model it said "Error: Backend not available for: llm", and it
+    // starts apologising for a failure it had no part in. iOS skips the same turns
+    // (LLMViewModel+Generation), and Android's `ChatRequestPolicy.toProtoMessage` now
+    // does too.
+    .filter(({ isError }) => isError !== true)
     .filter(({ content }) => content.trim().length > 0)
     .map((message) => ({
       role: message.role === 'user' ? ('user' as const) : ('assistant' as const),
@@ -1262,10 +1523,6 @@ function navigateTo(tab: string): void {
   window.dispatchEvent(new CustomEvent('runanywhere:navigate', { detail: { tab } }));
 }
 
-function svgIcon(paths: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-}
-
 /**
  * True when the C++ lifecycle reports an LLM loaded. Used to gate the chat
  * Send button so users can't click into a silent no-op before loading a
@@ -1312,26 +1569,38 @@ function greeting(): string {
   return 'Good evening';
 }
 
-const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: string }> = [
+/**
+ * The four things a consumer opens an on-device assistant to do.
+ *
+ * Labels and prompt bodies are byte-identical to Android `generalSuggestions`
+ * (PromptSuggestions.kt) and iOS `StarterPrompt.all` (ChatMessageListView.swift) —
+ * the greeting above these chips is already shared across the three apps, so a
+ * different set of chips underneath it read as an accident.
+ *
+ * The bodies end in a colon on purpose: each is a *prefix* the reader completes with
+ * their own notes or options. The chip prefills the composer and focuses it rather
+ * than sending, which is what makes the trailing colon work.
+ */
+const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: IconName }> = [
   {
-    label: 'Draft a message',
-    prompt: 'Help me draft a short, friendly message to my team about shipping our next release this Friday.',
-    icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    label: 'Plan my day',
+    prompt: 'Turn this messy list into a realistic plan with the top three priorities:',
+    icon: 'checklist',
   },
   {
-    label: 'Explain a topic',
-    prompt: 'Explain how on-device AI keeps my data private, in simple terms.',
-    icon: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    label: 'Rewrite clearly',
+    prompt: 'Rewrite this so it is clear, warm, and concise:',
+    icon: 'pencil',
   },
   {
     label: 'Compare options',
-    prompt: 'Help me compare two small local models for private chat.',
-    icon: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/>',
+    prompt: 'Compare these options, explain the tradeoffs, and recommend one:',
+    icon: 'compare',
   },
   {
-    label: 'Make a checklist',
-    prompt: 'Draft a concise checklist for testing an on-device AI app.',
-    icon: '<path d="M3 17l2 2 4-4"/><path d="M3 7l2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+    label: 'Summarize notes',
+    prompt: 'Summarize these notes into decisions, action items, and open questions:',
+    icon: 'condense',
   },
 ];
 
@@ -1339,7 +1608,7 @@ function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
       <div class="chat-empty-state">
-        <div class="empty-logo">${svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>')}</div>
+        <div class="empty-logo">${icon('sparkles')}</div>
         <h3>${greeting()}</h3>
         <p>
           AI inference runs on this device. Setup, model downloads, and
@@ -1348,7 +1617,7 @@ function renderMessages(host: HTMLElement): void {
         <div class="suggestion-chips">
           ${STARTER_PROMPTS.map((starter) => `
             <button type="button" class="suggestion-chip" data-prompt="${escapeHtml(starter.prompt)}">
-              ${svgIcon(starter.icon)}
+              ${icon(starter.icon, { size: 20 })}
               <span>${starter.label}</span>
             </button>
           `).join('')}
@@ -1377,12 +1646,28 @@ function renderMessages(host: HTMLElement): void {
   host.scrollTop = host.scrollHeight;
 }
 
+/**
+ * The picture itself when there is one, the modality glyph otherwise.
+ *
+ * Sized inline because the attachment card's stylesheet rule only ever expected
+ * an SVG; the thumbnail borrows that same 20px box so the pill and the bubble
+ * keep their existing rhythm. The `src` is a data URL this app produced and
+ * `isChatAttachmentInfo` re-checks on restore, never remote content.
+ */
+function attachmentGlyph(kind: 'image' | 'document', thumbnailDataUrl?: string): string {
+  if (kind === 'image' && thumbnailDataUrl) {
+    return `<img src="${escapeHtml(thumbnailDataUrl)}" alt=""
+      style="width:28px;height:28px;object-fit:cover;border-radius:var(--radius-sm);flex:none;" />`;
+  }
+  return icon(kind === 'image' ? 'image' : 'file');
+}
+
 function renderMessageActions(msg: ChatMessage, idx: number): string {
   if (msg.role !== 'assistant' || !msg.content) return '';
   return `
     <div class="chat-msg-actions">
       <button type="button" class="chat-action-btn" data-copy-idx="${idx}" aria-label="Copy reply">
-        ${svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>')}
+        ${icon('copy')}
         <span>Copy</span>
       </button>
     </div>
@@ -1420,9 +1705,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
         ${msg.toolCalls.map((call) => `
           <details class="chat-tool-call">
             <summary>
-              ${svgIcon(call.error
-                ? '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
-                : '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>')}
+              ${icon(call.error ? 'warning' : 'tool')}
               <span>${escapeHtml(call.name)}</span>
               <small>${call.error ? 'failed' : 'completed'}</small>
             </summary>
@@ -1436,9 +1719,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const attachmentSection = msg.attachment
     ? `
       <div class="chat-attachment-card chat-attachment-card--${msg.attachment.kind}">
-        ${svgIcon(msg.attachment.kind === 'image'
-          ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
-          : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+        ${attachmentGlyph(msg.attachment.kind, msg.attachment.thumbnailDataUrl)}
         <span><strong>${escapeHtml(msg.attachment.name)}</strong><small>${escapeHtml(msg.attachment.detail ?? '')}</small></span>
       </div>
     `
@@ -1461,8 +1742,19 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const cursor = streaming && msg.role === 'assistant'
     ? '<span class="chat-cursor" aria-hidden="true"></span>'
     : '';
+  // A failure report is the app speaking, not the model, so it is NOT run through the
+  // markdown renderer: an error string's own punctuation would become bold or italic,
+  // and it would read in the same ink as a real reply. Danger colour plus an escaped
+  // paragraph, matching iOS `assistantBody` (`AppColors.dangerText`) and Android's
+  // error branch. The `role="alert"` is what makes the failure reach a screen reader at
+  // all — the turn used to arrive as ordinary prose.
+  if (msg.isError === true && msg.content) {
+    const alert = `<p class="chat-error" role="alert">${escapeHtml(msg.content)}</p>`;
+    return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${alert}</div>`;
+  }
+
   const body = msg.content
-    ? renderMarkdownLite(msg.content) + cursor
+    ? renderMarkdown(msg.content) + cursor
     : (streaming
       ? (thinking
         ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
@@ -1470,26 +1762,6 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
       : '<span class="chat-bubble-typing">No final answer was generated.</span>');
 
   return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
-}
-
-/**
- * Minimal markdown rendering on top of escapeHtml (kept dependency-free):
- * fenced code blocks, inline code, and bold. Everything passes through
- * escapeHtml first, so model output can never inject markup.
- */
-function renderMarkdownLite(text: string): string {
-  const codeBlocks: string[] = [];
-  const escaped = escapeHtml(text);
-  // Fenced code blocks (tolerates an unterminated fence while streaming).
-  let html = escaped.replace(/```[^\n`]*\n?([\s\S]*?)(?:```|$)/g, (_match, code: string) => {
-    codeBlocks.push(`<pre class="chat-code"><code>${code.replace(/\n$/, '')}</code></pre>`);
-    return `\uE000${codeBlocks.length - 1}\uE000`;
-  });
-  html = html
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
-  return html.replace(/\uE000(\d+)\uE000/g, (_match, i: string) => codeBlocks[Number(i)]);
 }
 
 export function formatChatError(error: unknown): string {
