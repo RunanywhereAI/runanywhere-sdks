@@ -1,10 +1,11 @@
 /**
- * @file desktop_device.cpp
- * @brief Desktop rac_device_callbacks_t — hardware probing + registration POST.
+ * @file rac_device_manager_desktop.cpp
+ * @brief Desktop provider for the ordinary rac_device_manager callback surface.
  *
- * The device manager's inversion-of-control surface, written once for every
- * desktop consumer (rcli and the Electron addon today) rather than once per
- * binary. Commons still owns the registration flow itself: it decides
+ * The device manager's fallback desktop provider, installed by the desktop
+ * HTTP bootstrap. Hosts can replace it through the ordinary
+ * rac_device_manager_set_callbacks() surface when they have richer telemetry.
+ * Commons still owns the registration flow itself: it decides
  * whether registration is needed, builds the JSON, picks the endpoint, and
  * parses the response. This file only answers the four questions commons
  * cannot answer portably — what machine is this, what is its id, has it
@@ -21,7 +22,7 @@
 #include <thread>
 #include <vector>
 
-#include "../infrastructure/device/rac_device_live_state_internal.h"
+#include "rac_device_live_state_internal.h"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -40,6 +41,7 @@
 
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_sdk_state.h"
+#include "desktop/desktop_internal.h"
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
@@ -169,7 +171,7 @@ void device_get_info(rac_device_registration_info_t* out_info, void* /*user_data
         out_info->available_memory = static_cast<int64_t>(memory.available_bytes);
     }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && (defined(__arm64__) || defined(__aarch64__))
     out_info->gpu_family = "apple";
 #endif
     // Desktop exposes no portable battery or NPU inventory: report unavailable
@@ -351,7 +353,11 @@ const char* rac_desktop_os_version(void) {
     return version.c_str();
 }
 
-rac_result_t rac_desktop_device_callbacks_register(void) {
+}  // extern "C"
+
+namespace rac::desktop {
+
+rac_result_t install_device_manager_provider() {
     // These callbacks are plain C and callable from any thread, which is the
     // precondition for stamping telemetry events with live battery/RAM.
     rac_telemetry_enable_live_platform_sampling();
@@ -366,4 +372,4 @@ rac_result_t rac_desktop_device_callbacks_register(void) {
     return rac_device_manager_set_callbacks(&callbacks);
 }
 
-}  // extern "C"
+}  // namespace rac::desktop

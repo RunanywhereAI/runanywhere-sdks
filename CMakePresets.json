@@ -285,7 +285,7 @@
         {
             "name": "windows-arm64-release-vs2026",
             "displayName": "Windows ARM64 \u2014 Release on the VS 2026 toolset",
-            "description": "Identical to windows-arm64-release but pinned to Visual Studio 18 2026, for workstations that only have the newer toolset installed.",
+            "description": "Identical to windows-arm64-release but pinned to Visual Studio 18 2026, for workstations that only have the newer toolset installed. Requires a CMake build that provides this generator (upstream CMake 4.2+).",
             "inherits": "windows-arm64-release",
             "generator": "Visual Studio 18 2026"
         }

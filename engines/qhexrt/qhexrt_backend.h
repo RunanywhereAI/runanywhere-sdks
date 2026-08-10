@@ -56,7 +56,8 @@
  * Everything else — macOS, Linux, iOS, WASM, Windows x64 — stays unsupported and
  * compiles the not-routable shell exactly as before.
  */
-#if defined(__ANDROID__) || (defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__)))
+#if (defined(__ANDROID__) && defined(__aarch64__)) || \
+    (defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__)))
 #define RAC_QHEXRT_PLATFORM_SUPPORTED 1
 #else
 #define RAC_QHEXRT_PLATFORM_SUPPORTED 0

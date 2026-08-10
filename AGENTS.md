@@ -493,7 +493,7 @@ All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to t
 | Flutter | 3.44.6 | Melos / AGP 9.0.1 / Gradle 9.1.0 | Dart 3.12.2+, compile/target SDK 36, NDK 28.2.13676358 |
 | React Native | 0.85.3 (min 0.83.1) | Yarn Berry 3.6.1 | NitroModules, Hermes |
 | Web | Chrome 86+ | Vite | Emscripten 6.0.2, Node 24 LTS |
-| C++ Core | N/A | CMake 3.22+ | C++20, Ninja |
+| C++ Core | N/A | CMake 3.24+ (upstream 4.2+ for the VS 2026 preset) | C++20, Ninja |
 
 ---
 

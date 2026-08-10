@@ -288,11 +288,13 @@ set(_qhexrt_platform_supported FALSE)
 set(_qhexrt_core_name "libqhexrt_core.a")
 set(_qhexrt_host_name "libqhexrt_host.a")
 if(RAC_PLATFORM_ANDROID)
-    set(_qhexrt_platform_supported TRUE)
     # ABI subdir under QHEXRT_ROOT/lib (arm64-v8a is the shipped Snapdragon target).
     set(_qhexrt_abi "${ANDROID_ABI}")
     if(NOT _qhexrt_abi)
-        set(_qhexrt_abi "arm64-v8a")
+        set(_qhexrt_abi "${CMAKE_ANDROID_ARCH_ABI}")
+    endif()
+    if(_qhexrt_abi STREQUAL "arm64-v8a")
+        set(_qhexrt_platform_supported TRUE)
     endif()
 elseif(RAC_PLATFORM_WINDOWS AND
        (CMAKE_SYSTEM_PROCESSOR MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$" OR

@@ -118,10 +118,14 @@ PROTOC_VERSION_MAJOR=35
 # the floor that each CMakeLists.txt advertises.
 CMAKE_VERSION=4.3.2
 
-# Minimum CMake version advertised by every `cmake_minimum_required()` in this
-# repo. Must be >= 3.24 because cmake/FetchONNXRuntime.cmake uses the
-# DOWNLOAD_EXTRACT_TIMESTAMP keyword which was added in CMake 3.24. Bumping
-# this drops support for older CMake hosts; CI/devs need this version+.
+# Minimum CMake version for the main native build graph and SDK bridge CMake
+# entry points. Standalone Playground projects and the Flutter Android shim
+# keep independent lower floors. Must be >= 3.24 because
+# cmake/FetchONNXRuntime.cmake uses the DOWNLOAD_EXTRACT_TIMESTAMP keyword added
+# in CMake 3.24. The opt-in windows-arm64-release-vs2026 preset separately
+# requires a CMake build that provides that generator (upstream CMake 4.2+); it
+# does not change this portable project floor. Bumping this drops support for
+# older CMake hosts; CI/devs need this version+.
 # NOTE: `cmake_minimum_required(VERSION ...)` must be the first command and
 # cannot be parameterised by a CMake variable — keep the literal value in
 # each CMakeLists.txt in sync with this when bumping.

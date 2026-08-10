@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "desktop/desktop_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 
@@ -359,5 +360,9 @@ const rac_http_transport_ops_t kCurlTransportOps = {
 }  // namespace
 
 extern "C" rac_result_t rac_desktop_http_transport_register(void) {
-    return rac_http_transport_register(&kCurlTransportOps, nullptr);
+    const rac_result_t transport_rc = rac_http_transport_register(&kCurlTransportOps, nullptr);
+    if (transport_rc != RAC_SUCCESS) {
+        return transport_rc;
+    }
+    return rac::desktop::install_device_manager_provider();
 }

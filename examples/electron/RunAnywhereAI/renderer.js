@@ -608,13 +608,17 @@ function looksRemote(source) {
 // Reflect the actual compute device (passed by main.js from the addon path).
 function applyDeviceUi() {
   const device = new URLSearchParams(location.search).get('device') || 'cpu';
-  if (device !== 'gpu') return;
+  const isGpu = device === 'gpu';
   const label = $('devicelabel');
-  if (label) label.textContent = 'GPU · CUDA';
+  if (label) label.textContent = isGpu ? 'GPU · CUDA' : 'CPU';
   const pill = $('devicepill');
-  if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
+  if (pill) pill.title = isGpu
+    ? 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.'
+    : 'Which compute device this build runs on.';
   const note = $('devicenote');
-  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.';
+  if (note) note.innerHTML = isGpu
+    ? 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.'
+    : 'Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>RunAnywhere AI (GPU).cmd</code>.';
 }
 // The header pill above is a BUILD-time claim — which prebuild main.js resolved.
 // Which engine actually ran a model is a LOAD-time fact and can differ: on a
@@ -622,7 +626,10 @@ function applyDeviceUi() {
 // serves GGUF on the CPU. Correct the pill from what commons reports it routed
 // to, so the header can never say CPU while decode is happening on the NPU.
 function applyEngineUi(engine) {
-  if (engine !== 'QHEXRT') return;
+  if (engine !== 'QHEXRT') {
+    applyDeviceUi();
+    return;
+  }
   const label = $('devicelabel');
   if (label) label.textContent = 'NPU · Hexagon';
   const pill = $('devicepill');

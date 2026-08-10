@@ -1010,7 +1010,7 @@ if(RAC_DESKTOP_ADAPTER)
     endif()
     set(RAC_DESKTOP_SOURCES
         src/desktop/desktop_adapter.cpp
-        src/desktop/desktop_device.cpp
+        src/infrastructure/device/rac_device_manager_desktop.cpp
         src/desktop/desktop_secure_store.cpp
         src/desktop/http_transport_curl.cpp
     )

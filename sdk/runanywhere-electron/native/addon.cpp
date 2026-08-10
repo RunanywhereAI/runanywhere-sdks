@@ -310,7 +310,11 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
         // transport, and downloading a model has nothing to do with having
         // control-plane credentials — so the libcurl transport goes up here
         // rather than only inside configureControlPlane().
-        rac_desktop_http_transport_register();
+        rc = rac_desktop_http_transport_register();
+        if (rc != RAC_SUCCESS) {
+            rac_shutdown();
+            return rc;
+        }
 #endif
 
         // Backend/plugin registration is process-global and persists across
@@ -626,7 +630,12 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
 
     void Execute() override {
         const auto env = static_cast<rac_environment_t>(env_);
-        rac_desktop_http_transport_register();
+        const rac_result_t transport_rc = rac_desktop_http_transport_register();
+        if (transport_rc != RAC_SUCCESS) {
+            code_ = transport_rc;
+            err_ = "desktop HTTP/device bootstrap failed: " + std::to_string(transport_rc);
+            return;
+        }
 
         // Runtime state first (auth/device/telemetry read env + creds from it),
         // then the copied SDK configuration + client info.
@@ -658,12 +667,6 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         if (load_rc != RAC_SUCCESS && load_rc != RAC_ERROR_FILE_NOT_FOUND) {
             RAC_LOG_WARNING("Electron", "stored auth tokens unreadable (%d); re-authenticating",
                             load_rc);
-        }
-
-        // Device registration is a phase-2 step, and commons only runs it when
-        // these callbacks are installed.
-        if (rac_desktop_device_callbacks_register() != RAC_SUCCESS) {
-            RAC_LOG_WARNING("Electron", "device manager callbacks failed to install");
         }
 
         {

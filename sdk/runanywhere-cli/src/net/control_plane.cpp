@@ -4,11 +4,9 @@
  *
  * The CLI drives the canonical commons entry points and adds only what is
  * genuinely CLI-shaped: a buffered POST helper the telemetry commands reuse and
- * the login flow's user-facing error text. Device probing and the
- * rac_device_callbacks_t vtable live in commons
- * (rac_desktop_device_callbacks_register), shared with every other desktop
- * consumer; request building and response parsing stay in commons too, per the
- * repo layering rule.
+ * the login flow's user-facing error text. Device callbacks are installed by
+ * bootstrap.cpp through the ordinary rac_device_manager surface; request
+ * building and response parsing stay in commons, per the repo layering rule.
  */
 
 #include "net/control_plane.h"
@@ -64,12 +62,6 @@ const std::string& device_model() {
 const std::string& os_version_string() {
     static const std::string version = rac_desktop_os_version();
     return version;
-}
-
-void register_device_callbacks() {
-    if (rac_desktop_device_callbacks_register() != RAC_SUCCESS) {
-        out::status_line("warning: device manager callbacks failed to install");
-    }
 }
 
 std::string HttpResult::describe() const {
