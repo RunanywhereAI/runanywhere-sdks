@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.settings.AppSettings
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
@@ -89,7 +88,6 @@ class SettingsViewModel : ViewModel() {
             try {
                 // Empty clears the token (public no-auth behavior); never logged.
                 RunAnywhere.setHfToken(candidate)
-                ModelBootstrap.refreshNpuCatalog()
                 storage = storage.copy(
                     hfTokenBusy = false,
                     hfTokenMessage = if (clearing) {

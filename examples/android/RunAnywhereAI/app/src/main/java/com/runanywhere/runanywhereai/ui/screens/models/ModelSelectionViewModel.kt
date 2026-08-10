@@ -7,8 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.BackendAvailability
-import com.runanywhere.runanywhereai.data.ModelBootstrap
-import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.download.DownloadInterruptionState
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
@@ -82,17 +80,12 @@ class ModelSelectionViewModel(
             }
         }
         viewModelScope.launch {
-            // SDK Phase 1 completes before ModelBootstrap finishes seeding the
-            // registry. Suspend on the explicit bootstrap-complete signal, then
-            // observe every catalog revision. The VM is activity-scoped, so a
-            // one-shot load would stay stale after Settings applies an HF token.
+            // Wait until SDK initialization and the regular app catalog seed are complete.
             GlobalState.awaitBootstrapComplete()
             // Probe device-dependent backends (QHexRT) before the first list so
             // unavailable-backend rows are filtered from the very first render.
             BackendAvailability.refresh()
-            ModelBootstrap.npuCatalogSnapshots.collect { snapshot ->
-                reload(snapshot.registeredModelIds)
-            }
+            reload()
         }
         viewModelScope.launch {
             // Re-filter live when backend availability changes (e.g. the async
@@ -134,19 +127,10 @@ class ModelSelectionViewModel(
         viewModelScope.launch { reload() }
     }
 
-    private suspend fun reload(
-        registeredNpuIds: Set<String> = ModelBootstrap.registeredNpuModelIds,
-    ) {
+    private suspend fun reload() {
         try {
-            // Union live QHexRT registration with what is already downloaded so an
-            // on-disk NPU bundle stays selectable even when re-registration is
-            // skipped offline (see isVisibleForNativeNpuCatalog).
             val models = RunAnywhere.models.list()
                 .filter { context.accepts(it) }
-                // Native QHexRT registration is the source of truth. This also
-                // hides stale rows left by older app versions that registered
-                // HNPU definitions through the generic URL path.
-                .filter { it.isVisibleForNativeNpuCatalog(registeredNpuIds) }
                 // Hide rows whose backend is not packaged/available on this build
                 // + device (e.g. Sherpa voice on an NPU-only slice); otherwise
                 // they look tappable and then hard-fail at load.

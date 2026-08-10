@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.data
 
-import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.public.RunAnywhere
@@ -13,16 +12,6 @@ import kotlin.coroutines.cancellation.CancellationException
 // fs callbacks. Core backends (LlamaCPP/ONNX) are registered earlier, in RunAnywhereApplication,
 // before RunAnywhere.initialize().
 object ModelBootstrap {
-
-    private val npuCatalogState = NpuCatalogState()
-
-    /** App-owned QHexRT rows successfully registered through the core SDK. */
-    internal val registeredNpuModelIds: Set<String>
-        get() = npuCatalogState.snapshots.value.registeredModelIds
-
-    /** Emits after every completed app catalog registration/refresh. */
-    internal val npuCatalogSnapshots
-        get() = npuCatalogState.snapshots
 
     suspend fun setupModels() {
         registerRemoteBackends()
@@ -44,52 +33,7 @@ object ModelBootstrap {
     // checksums), so catalog metadata fixes reach existing installs without losing downloads.
     private suspend fun seedCatalog() {
         val regular = registerCatalogRows(ModelCatalog.models, "catalog")
-        val npu = registerNpuCatalogRows()
-        npuCatalogState.publish(npu.registeredIds)
-        RACLog.i(
-            "catalog seeded: ok=${regular.registered + npu.registered} " +
-                "failed=${regular.failed + npu.failed} " +
-                "skippedNative=${regular.skippedNative + npu.skippedNative}",
-        )
-    }
-
-    suspend fun refreshNpuCatalog() {
-        val npu = registerNpuCatalogRows()
-        val registryRefreshed = try {
-            RunAnywhere.refreshModelRegistry()
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            RACLog.e("npu catalog registry refresh failed", e)
-            false
-        }
-        // Publish after the registry operation so retained pickers always read
-        // the completed refresh, never an intermediate catalog snapshot.
-        npuCatalogState.publish(npu.registeredIds)
-        RACLog.i(
-            "npu catalog refreshed: ok=${npu.registered} failed=${npu.failed} " +
-                "skippedNative=${npu.skippedNative} " +
-                "registryRefreshed=$registryRefreshed",
-        )
-    }
-
-    /**
-     * Probe once for the whole app-owned QHexRT list. This is only a device
-     * preflight: every supported row still registers its exact dedicated URL
-     * through the backend-neutral core API.
-     */
-    private suspend fun registerNpuCatalogRows(): CatalogSeedResult {
-        BackendAvailability.refresh()
-        if (!BackendAvailability.isAvailable(InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT)) {
-            return CatalogSeedResult(
-                registered = 0,
-                failed = 0,
-                skippedNative = ModelCatalog.npuCatalog.size,
-                registeredIds = emptySet(),
-            )
-        }
-        return registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
+        RACLog.i("catalog seeded: ok=${regular.registered} failed=${regular.failed}")
     }
 
     private suspend fun registerCatalogRows(
@@ -98,16 +42,11 @@ object ModelBootstrap {
     ): CatalogSeedResult {
         var registered = 0
         var failed = 0
-        var skippedNative = 0
-        val registeredIds = mutableSetOf<String>()
         for (model in models) {
             try {
                 val saved = model.register()
-                if (saved == null) {
-                    skippedNative++
-                } else {
+                if (saved != null) {
                     registered++
-                    registeredIds += saved.id
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -119,8 +58,6 @@ object ModelBootstrap {
         return CatalogSeedResult(
             registered = registered,
             failed = failed,
-            skippedNative = skippedNative,
-            registeredIds = registeredIds,
         )
     }
 
@@ -140,6 +77,4 @@ object ModelBootstrap {
 private data class CatalogSeedResult(
     val registered: Int,
     val failed: Int,
-    val skippedNative: Int,
-    val registeredIds: Set<String>,
 )

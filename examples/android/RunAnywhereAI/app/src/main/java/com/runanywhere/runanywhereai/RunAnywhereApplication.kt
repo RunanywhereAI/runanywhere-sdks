@@ -77,8 +77,8 @@ class RunAnywhereApplication : Application() {
      * Register the curated catalog after the app is on screen.
      *
      * Measured on a Snapdragon 8 Elite: `RunAnywhere.initialize()` returns in
-     * ~0.6 s, then 105 sequential `models.register()` calls take a further
-     * ~13.4 s of JNI round-trips. In front of the splash that was the single
+     * ~0.6 s, then sequential app-owned `models.register()` calls add further
+     * JNI round-trips. In front of the splash that was the single
      * largest source of cold-start abandonment; behind it, it is invisible —
      * chat with an already-downloaded model, voice, and vision are all live
      * while it runs, and the only surface that reads the catalog (the model

@@ -122,6 +122,7 @@ class ModelRegistration {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     String? cuaProfile,
   }) => ModelRegistration._(
     kind: ModelArtifactKind.multiFile,
@@ -135,6 +136,7 @@ class ModelRegistration {
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,
+    description: description,
     cuaProfile: cuaProfile,
   );
 

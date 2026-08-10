@@ -1,14 +1,12 @@
 package com.runanywhere.runanywhereai.data.settings
 
-import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Storing a Hugging Face sign-in is three things that have to happen together — an encrypted
- * write, the SDK's live credential, and a catalog refresh so the gated rows appear — and each of
- * them can fail differently.
+ * Storing a Hugging Face sign-in requires an encrypted write and updating the SDK's live
+ * credential, and each operation can fail differently.
  *
  * It lives here rather than in whichever screen happens to own a text field because two surfaces
  * now ask for the token: Settings, and the model picker at the moment a private model is tapped.
@@ -47,7 +45,6 @@ object HuggingFaceToken {
         return try {
             // Empty clears the token (public no-auth behavior); never logged.
             RunAnywhere.setHfToken(candidate)
-            ModelBootstrap.refreshNpuCatalog()
             if (clearing) Outcome.Cleared else Outcome.Saved
         } catch (e: CancellationException) {
             throw e

@@ -125,6 +125,7 @@ class ModelsApi {
           contextLength: model.contextLength,
           supportsThinking: model.supportsThinking,
           source: model.source,
+          description: model.description,
           cuaProfile: model.cuaProfile,
         );
     }

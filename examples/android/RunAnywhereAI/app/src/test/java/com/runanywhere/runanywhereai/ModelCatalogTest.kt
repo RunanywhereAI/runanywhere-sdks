@@ -2,11 +2,9 @@ package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.runanywhereai.data.ModelCatalog
 import com.runanywhere.runanywhereai.data.MultiFileModel
 import com.runanywhere.runanywhereai.data.SingleFileModel
-import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -199,22 +197,6 @@ class ModelCatalogTest {
         listOf("lfm2-350m-q8_0", "lfm2-1.2b-tool-q8_0", "lfm2.5-2.6b-q8_0").forEach { id ->
             assertFalse("removed Q8_0 sibling $id came back", byId.containsKey(id))
         }
-    }
-
-    @Test
-    fun pickerShowsOnlyQhexrtRowsReturnedByNativeRegistration() {
-        val cpu = ModelInfo(
-            id = "cpu-model",
-            framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        )
-        val npu = ModelInfo(
-            id = "npu-model",
-            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        )
-
-        assertTrue(cpu.isVisibleForNativeNpuCatalog(emptySet()))
-        assertFalse(npu.isVisibleForNativeNpuCatalog(emptySet()))
-        assertTrue(npu.isVisibleForNativeNpuCatalog(setOf(npu.id)))
     }
 
 }

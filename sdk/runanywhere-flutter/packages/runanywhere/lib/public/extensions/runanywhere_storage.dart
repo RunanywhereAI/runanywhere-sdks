@@ -207,6 +207,7 @@ class RunAnywhereStorage {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     String? cuaProfile,
   }) async {
     if (!DartBridge.isInitialized) {
@@ -239,6 +240,9 @@ class RunAnywhereStorage {
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
     if (resolvedContextLength != null) {
       request.contextLength = resolvedContextLength;
+    }
+    if (description != null && description.isNotEmpty) {
+      request.description = description;
     }
 
     final model = await DartBridgeModelRegistry.instance.registerMultiFileModel(
