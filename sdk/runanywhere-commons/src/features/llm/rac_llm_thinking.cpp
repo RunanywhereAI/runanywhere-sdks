@@ -6,6 +6,14 @@
  * ThinkingContentParser.{extract,splitTokens,strip} (RunAnywhere+TextGeneration.swift).
  * Same character-ratio heuristic for token splits, same trim semantics,
  * same handling of trailing unclosed <think> on streaming output.
+ *
+ * This is also the authority for the STREAMING terminal result: rather than
+ * accumulate the streaming splitter's per-delta segments and hope the two agree,
+ * `dispatch_terminal_once` (llm_module.cpp) re-splits the accumulated raw text
+ * through `rac_llm_extract_thinking_with_tags` here. One function, one answer —
+ * the only structural way to keep a whole-text splitter and its incremental twin
+ * from drifting, and they had drifted (trailing whitespace, a second bare
+ * closing tag, a second reasoning block).
  */
 
 #include "rac/features/llm/rac_llm_thinking.h"
@@ -20,8 +28,6 @@
 
 namespace {
 
-constexpr std::string_view kDefaultOpenTag{"<think>"};
-constexpr std::string_view kDefaultCloseTag{"</think>"};
 constexpr std::array<std::pair<std::string_view, std::string_view>, 2> kDefaultTagPairs = {{
     {std::string_view{"<think>"}, std::string_view{"</think>"}},
     {std::string_view{"<thinking>"}, std::string_view{"</thinking>"}},
@@ -47,23 +53,134 @@ std::string trim(std::string_view sv) {
     return std::string(sv.substr(b, e - b));
 }
 
-rac_result_t extract_thinking_with_pair(const char* text, std::string_view open_tag,
-                                        std::string_view close_tag, const char** out_response,
-                                        size_t* out_response_len, const char** out_thinking,
-                                        size_t* out_thinking_len) {
+struct ThinkingSplit {
+    std::string response;
+    std::string thinking;
+};
+
+using TagPair = std::pair<std::string_view, std::string_view>;
+
+/** Appends a trimmed segment, newline-joining it to whatever is already there. */
+void append_segment(std::string* dst, std::string_view segment) {
+    const std::string trimmed = trim(segment);
+    if (trimmed.empty())
+        return;
+    if (!dst->empty())
+        *dst += '\n';
+    *dst += trimmed;
+}
+
+/** Earliest occurrence of any pair's opening (or closing) delimiter. All pairs
+ *  are searched together rather than one being chosen up front: picking a pair
+ *  by its opening tag sent `</thinking>` output to the `<think>` recognizer,
+ *  which cannot see it, and picking one at all is wrong for a response that
+ *  legitimately uses two families. */
+const TagPair* find_earliest(std::string_view sv, const TagPair* pairs, size_t pair_count,
+                             bool want_close, size_t* out_pos) {
+    size_t best = std::string_view::npos;
+    const TagPair* best_pair = nullptr;
+    for (size_t i = 0; i < pair_count; ++i) {
+        const size_t pos = sv.find(want_close ? pairs[i].second : pairs[i].first);
+        if (pos < best) {
+            best = pos;
+            best_pair = &pairs[i];
+        }
+    }
+    *out_pos = best;
+    return best_pair;
+}
+
+/** Whole-text split.
+ *
+ *  This is the same state machine `ThinkingStreamSplitter::push` runs, applied
+ *  to the complete response instead of delta by delta, and that is deliberate:
+ *  the previous version handled ONE leading close-before-open plus ONE matched
+ *  pair and then appended the rest verbatim, so `R1</think>A1</think>A2` came
+ *  back with a raw `</think>` inside the answer and `<think>a</think>X<think>b
+ *  </think>Y` echoed the second block whole. The streaming twin looped and got
+ *  both right, which is precisely the divergence that must not exist.
+ *
+ *  The three rules, in the order the loop applies them:
+ *   - Inside reasoning, a further opening tag is swallowed (never a channel
+ *     change) and the first closing tag ends the region.
+ *   - In answer mode, a closing tag reached before any opening tag closes a
+ *     reasoning region that began before the first generated token. That is not
+ *     malformed output: a reasoning chat template may put the opening tag in the
+ *     PROMPT rather than ask the model to emit it (maple-preview's manifest sets
+ *     `gen_prefill: "<think>\n"`). Only the FIRST such tag reclassifies what
+ *     precedes it; a later bare closing tag is swallowed so the delimiter never
+ *     reaches the answer, but the answer around it survives.
+ *   - An opening tag begins a reasoning region and the text before it stays
+ *     answer text.
+ *
+ *  Every segment is trimmed, so no whitespace that hugged a delimiter can reach
+ *  either channel. */
+ThinkingSplit split_all(std::string_view sv, const TagPair* pairs, size_t pair_count) {
+    ThinkingSplit out;
+    bool inside_reasoning = false;
+    bool saw_delimiter = false;
+
+    for (;;) {
+        size_t open_pos = std::string_view::npos;
+        size_t close_pos = std::string_view::npos;
+        const TagPair* open_pair = find_earliest(sv, pairs, pair_count, false, &open_pos);
+        const TagPair* close_pair = find_earliest(sv, pairs, pair_count, true, &close_pos);
+
+        if (inside_reasoning) {
+            if (open_pair != nullptr && (close_pair == nullptr || open_pos < close_pos)) {
+                append_segment(&out.thinking, sv.substr(0, open_pos));
+                sv.remove_prefix(open_pos + open_pair->first.size());
+                continue;
+            }
+            if (close_pair != nullptr) {
+                append_segment(&out.thinking, sv.substr(0, close_pos));
+                sv.remove_prefix(close_pos + close_pair->second.size());
+                inside_reasoning = false;
+                continue;
+            }
+            // A generation that exhausted its token budget inside a thinking
+            // phase leaves the opening tag unterminated. The remainder is
+            // thinking — never surfaced as an answer, never dropped either.
+            append_segment(&out.thinking, sv);
+            return out;
+        }
+
+        if (close_pair != nullptr && (open_pair == nullptr || close_pos < open_pos)) {
+            append_segment(saw_delimiter ? &out.response : &out.thinking, sv.substr(0, close_pos));
+            sv.remove_prefix(close_pos + close_pair->second.size());
+            saw_delimiter = true;
+            continue;
+        }
+        if (open_pair != nullptr) {
+            append_segment(&out.response, sv.substr(0, open_pos));
+            sv.remove_prefix(open_pos + open_pair->first.size());
+            inside_reasoning = true;
+            saw_delimiter = true;
+            continue;
+        }
+        append_segment(&out.response, sv);
+        return out;
+    }
+}
+
+rac_result_t extract_thinking_with_pairs(const char* text, const TagPair* pairs, size_t pair_count,
+                                         const char** out_response, size_t* out_response_len,
+                                         const char** out_thinking, size_t* out_thinking_len) {
     if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
         out_thinking == nullptr || out_thinking_len == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::string_view sv(text);
-    const size_t open = sv.find(open_tag);
-    const size_t close = (open != std::string_view::npos)
-                             ? sv.find(close_tag, open + open_tag.size())
-                             : std::string_view::npos;
-
-    if (open == std::string_view::npos) {
-        // No thinking block.
+    const std::string_view sv(text);
+    // Text carrying no delimiter of any recognized pair is returned verbatim —
+    // no trim, no reflow. A response with no thinking at all must be
+    // bit-identical to its input.
+    bool has_delimiter = false;
+    for (size_t i = 0; i < pair_count && !has_delimiter; ++i) {
+        has_delimiter = sv.find(pairs[i].first) != std::string_view::npos ||
+                        sv.find(pairs[i].second) != std::string_view::npos;
+    }
+    if (!has_delimiter) {
         tl_response.assign(text);
         tl_thinking.clear();
         *out_response = tl_response.c_str();
@@ -73,90 +190,14 @@ rac_result_t extract_thinking_with_pair(const char* text, std::string_view open_
         return RAC_SUCCESS;
     }
 
-    if (close == std::string_view::npos) {
-        // A generation that exhausts its token budget inside a thinking phase
-        // commonly leaves the opening tag unterminated. Keep any visible text
-        // before it, classify the remainder as thinking, and never surface the
-        // raw tag/body as an answer. Preserve deliberately malformed close-
-        // before-open text for compatibility with the parser's prior contract.
-        if (sv.find(close_tag) != std::string_view::npos) {
-            tl_response.assign(text);
-            tl_thinking.clear();
-            *out_response = tl_response.c_str();
-            *out_response_len = tl_response.size();
-            *out_thinking = nullptr;
-            *out_thinking_len = 0;
-            return RAC_SUCCESS;
-        }
-
-        tl_response = trim(sv.substr(0, open));
-        tl_thinking = trim(sv.substr(open + open_tag.size()));
-        *out_response = tl_response.c_str();
-        *out_response_len = tl_response.size();
-        *out_thinking = tl_thinking.empty() ? nullptr : tl_thinking.c_str();
-        *out_thinking_len = tl_thinking.size();
-        return RAC_SUCCESS;
-    }
-
-    std::string thinking =
-        trim(sv.substr(open + open_tag.size(), close - (open + open_tag.size())));
-    std::string before = trim(sv.substr(0, open));
-    std::string after = trim(sv.substr(close + close_tag.size()));
-
-    std::string response;
-    if (!before.empty())
-        response = before;
-    if (!after.empty()) {
-        if (!response.empty())
-            response += '\n';
-        response += after;
-    }
-
-    tl_response = std::move(response);
+    ThinkingSplit split = split_all(sv, pairs, pair_count);
+    tl_response = std::move(split.response);
+    tl_thinking = std::move(split.thinking);
     *out_response = tl_response.c_str();
     *out_response_len = tl_response.size();
-
-    if (thinking.empty()) {
-        tl_thinking.clear();
-        *out_thinking = nullptr;
-        *out_thinking_len = 0;
-    } else {
-        tl_thinking = std::move(thinking);
-        *out_thinking = tl_thinking.c_str();
-        *out_thinking_len = tl_thinking.size();
-    }
+    *out_thinking = tl_thinking.empty() ? nullptr : tl_thinking.c_str();
+    *out_thinking_len = tl_thinking.size();
     return RAC_SUCCESS;
-}
-
-rac_result_t extract_thinking_with_pairs(const char* text,
-                                         const std::pair<std::string_view, std::string_view>* pairs,
-                                         size_t pair_count, const char** out_response,
-                                         size_t* out_response_len, const char** out_thinking,
-                                         size_t* out_thinking_len) {
-    if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
-        out_thinking == nullptr || out_thinking_len == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    std::string_view sv(text);
-    size_t best_open = std::string_view::npos;
-    std::string_view best_open_tag;
-    std::string_view best_close_tag;
-    for (size_t i = 0; i < pair_count; ++i) {
-        const auto& pair = pairs[i];
-        const size_t open = sv.find(pair.first);
-        if (open != std::string_view::npos && open < best_open) {
-            best_open = open;
-            best_open_tag = pair.first;
-            best_close_tag = pair.second;
-        }
-    }
-    if (best_open == std::string_view::npos) {
-        return extract_thinking_with_pair(text, kDefaultOpenTag, kDefaultCloseTag, out_response,
-                                          out_response_len, out_thinking, out_thinking_len);
-    }
-    return extract_thinking_with_pair(text, best_open_tag, best_close_tag, out_response,
-                                      out_response_len, out_thinking, out_thinking_len);
 }
 
 rac_result_t extract_thinking_with_default_pairs(const char* text, const char** out_response,
@@ -194,36 +235,12 @@ rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* op
         kDefaultTagPairs[1],
     }};
 
-    // Thinking-capable chat templates may prefill the opening tag as part of
-    // the prompt. The generated text then contains only the reasoning body,
-    // the closing tag, and the answer. The caller-provided tag pair is the
-    // model-level signal that makes this otherwise malformed-looking form
-    // unambiguous; keep the default parser's close-before-open compatibility
-    // unchanged when no explicit model pattern is supplied.
-    if (text != nullptr && out_response != nullptr && out_response_len != nullptr &&
-        out_thinking != nullptr && out_thinking_len != nullptr) {
-        const std::string_view value{text};
-        size_t earliest_open = std::string_view::npos;
-        size_t earliest_close = std::string_view::npos;
-        std::string_view matched_close_tag;
-        for (const auto& pair : tag_pairs) {
-            earliest_open = std::min(earliest_open, value.find(pair.first));
-            const size_t close = value.find(pair.second);
-            if (close < earliest_close) {
-                earliest_close = close;
-                matched_close_tag = pair.second;
-            }
-        }
-        if (earliest_open == std::string_view::npos && earliest_close != std::string_view::npos) {
-            tl_thinking = trim(value.substr(0, earliest_close));
-            tl_response = trim(value.substr(earliest_close + matched_close_tag.size()));
-            *out_response = tl_response.c_str();
-            *out_response_len = tl_response.size();
-            *out_thinking = tl_thinking.empty() ? nullptr : tl_thinking.c_str();
-            *out_thinking_len = tl_thinking.size();
-            return RAC_SUCCESS;
-        }
-    }
+    // A prefilled opening tag needs no special case here any more: the shared
+    // recognizer treats a close-before-open as a thinking region that started
+    // before the first token, so a model WITH a configured pattern and a model
+    // WITHOUT one split identically. That equivalence is the fix — the app
+    // registers local bundles that carry no ThinkingTagPattern, so a
+    // pattern-gated rule never fired for them.
     return extract_thinking_with_pairs(text, tag_pairs.data(), tag_pairs.size(), out_response,
                                        out_response_len, out_thinking, out_thinking_len);
 }
@@ -235,6 +252,30 @@ rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
     }
 
     std::string buf(text);
+
+    /* A closing tag with no opening tag before it closes a thinking region that
+     * began before the first generated token — the prefilled `gen_prefill:
+     * "<think>\n"` shape. This function is what the voice agent runs before
+     * handing text to TTS (voice_agent_internal_helpers.cpp), so skipping this
+     * rule did not merely render the whole chain of thought, it SPOKE it, bare
+     * delimiter included. Only the first such tag reclassifies what precedes it,
+     * matching rac_llm_extract_thinking; later ones are handled below. */
+    {
+        size_t lead_close = std::string::npos;
+        std::string_view lead_close_tag;
+        size_t lead_open = std::string::npos;
+        for (const auto& pair : kDefaultTagPairs) {
+            const size_t close = buf.find(pair.second);
+            if (close < lead_close) {
+                lead_close = close;
+                lead_close_tag = pair.second;
+            }
+            lead_open = std::min(lead_open, buf.find(pair.first));
+        }
+        if (lead_close != std::string::npos && lead_close < lead_open) {
+            buf.erase(0, lead_close + lead_close_tag.size());
+        }
+    }
 
     /* Remove every complete thinking block. */
     while (true) {
@@ -274,6 +315,18 @@ rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
         if (buf.find(trailing_close_tag, trailing_open + trailing_open_tag.size()) ==
             std::string::npos) {
             buf.erase(trailing_open);
+        }
+    }
+
+    /* Whatever closing tags survive both passes are bare: no block opened them
+     * and the leading-region rule has already fired once. Drop the delimiter and
+     * keep the text around it, exactly as the splitter does — a delimiter that
+     * reaches a screen or a speech synthesiser is the failure this whole family
+     * of functions exists to prevent. */
+    for (const auto& pair : kDefaultTagPairs) {
+        for (size_t at = buf.find(pair.second); at != std::string::npos;
+             at = buf.find(pair.second, at)) {
+            buf.erase(at, pair.second.size());
         }
     }
 
