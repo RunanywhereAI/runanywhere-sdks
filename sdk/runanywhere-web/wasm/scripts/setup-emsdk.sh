@@ -33,6 +33,33 @@ source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
 EMSDK_VERSION="${EMSCRIPTEN_VERSION}"
 INSTALL_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/emsdk}"
 
+# `emsdk install` unpacks Emscripten but never installs its own npm
+# dependencies, and the emsdk tree is gitignored, so a fresh clone has an
+# `upstream/emscripten/node_modules` that does not exist at all.
+#
+# Nothing notices until link time: the C++ compiles to 98%, then emcc runs its
+# JS post-processing and `tools/acorn-optimizer.mjs` imports `acorn-import-phases`
+# — a declared dependency — and every WASM target dies with ERR_MODULE_NOT_FOUND.
+# The failure reads like a compiler bug hours into a build rather than a missing
+# `npm install`, so install the dependencies as part of setup.
+ensure_emscripten_node_modules() {
+    local emscripten_dir="$1/upstream/emscripten"
+    if [ ! -f "${emscripten_dir}/package.json" ]; then
+        return 0
+    fi
+    if [ -d "${emscripten_dir}/node_modules/acorn-import-phases" ]; then
+        echo "Emscripten npm dependencies already installed."
+        return 0
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "ERROR: npm is required to install Emscripten's own JS tool dependencies." >&2
+        echo "       Without them every WASM link fails in acorn-optimizer.mjs." >&2
+        return 1
+    fi
+    echo "Installing Emscripten's npm dependencies (required by its JS optimizer)..."
+    ( cd "${emscripten_dir}" && npm install --no-audit --no-fund )
+}
+
 echo "======================================"
 echo " Emscripten SDK Setup"
 echo "======================================"
@@ -48,6 +75,7 @@ if [ -d "${INSTALL_DIR}" ] && [ -f "${INSTALL_DIR}/emsdk" ]; then
     git pull 2>/dev/null || true
     ./emsdk install "${EMSDK_VERSION}"
     ./emsdk activate "${EMSDK_VERSION}"
+    ensure_emscripten_node_modules "${INSTALL_DIR}"
     echo ""
     echo "Activate in your shell:"
     echo "  source ${INSTALL_DIR}/emsdk_env.sh"
@@ -63,6 +91,7 @@ cd "${INSTALL_DIR}"
 echo "Installing Emscripten ${EMSDK_VERSION}..."
 ./emsdk install "${EMSDK_VERSION}"
 ./emsdk activate "${EMSDK_VERSION}"
+ensure_emscripten_node_modules "${INSTALL_DIR}"
 
 echo ""
 echo "======================================"

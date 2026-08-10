@@ -31,6 +31,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -65,6 +66,13 @@ class AudioCaptureManager {
 
     @Volatile
     private var currentAudioLevel: Float = 0f
+
+    /**
+     * The platform echo canceller attached to the live capture session, when one was asked for
+     * and the device has one. Held only so it can be released with the record it belongs to.
+     */
+    @Volatile
+    private var echoCanceler: AcousticEchoCanceler? = null
 
     @Volatile
     private var focusRequest: AudioFocusRequest? = null
@@ -103,7 +111,22 @@ class AudioCaptureManager {
         return granted
     }
 
-    suspend fun startRecording(onAudioData: (ByteArray) -> Unit) {
+    /**
+     * Open the microphone and deliver 100 ms PCM16 chunks to [onAudioData].
+     *
+     * @param echoCancelling ask the platform to keep the device's own loudspeaker out of the
+     *   captured signal — `VOICE_COMMUNICATION` plus [AcousticEchoCanceler]. Only the voice
+     *   agent needs it (it feeds the mic through its own playout, so without cancellation the
+     *   agent hears itself); plain recognition keeps the untouched `MIC` source, whose signal
+     *   is what the STT models were tuned on. Best effort by construction, and the two halves
+     *   travel together: a device with no canceller records from `MIC` as well, because the
+     *   communication source's own processing costs signal fidelity and, with no canceller
+     *   attached, would buy nothing back.
+     */
+    suspend fun startRecording(
+        echoCancelling: Boolean = false,
+        onAudioData: (ByteArray) -> Unit,
+    ) {
         if (recordingFlag.get()) {
             logger.warning("Already recording")
             return
@@ -153,31 +176,67 @@ class AudioCaptureManager {
             (sampleRate * AudioCaptureConstants.BYTES_PER_SAMPLE * AudioCaptureConstants.CHUNK_DURATION_MS) / 1000
         val recordBufferBytes = maxOf(minBufferBytes, chunkBytes * 2)
 
-        val record =
-            try {
-                AudioRecord(
+        // VOICE_COMMUNICATION is the source the platform runs its echo canceller on — so it is
+        // only worth asking for on a device that HAS one. Leaving MIC is not free: the
+        // communication source is a processed capture (noise suppression, AGC, and on some
+        // HALs a noise gate), and the energy segmenters downstream decide speech by the RATIO
+        // of a frame to the room, which is exactly the quantity that processing flattens.
+        // Measured on the Android emulator, whose HAL reports no canceller: the voice agent
+        // opened VOICE_COMMUNICATION successfully and then never opened its energy gate on
+        // real speech, while the plain MIC source in the same room, same volume, drove Silero
+        // VAD and batch Whisper perfectly. Asking a device with no canceller for the
+        // communication source therefore trades the signal every model was tuned on for
+        // nothing at all.
+        val echoCancellerAvailable = echoCancelling && AcousticEchoCanceler.isAvailable()
+        if (echoCancelling && !echoCancellerAvailable) {
+            logger.info(
+                "No AcousticEchoCanceler on this device — recording from the plain MIC source " +
+                    "instead of VOICE_COMMUNICATION, which would only add capture processing",
+            )
+        }
+        // A device that cannot open the preferred source (or initialises it in a broken state)
+        // still has to record, so the plain MIC source is the fallback rather than a failure.
+        val preferredSource =
+            if (echoCancellerAvailable) {
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            } else {
+                MediaRecorder.AudioSource.MIC
+            }
+        val preferred =
+            openRecord(
+                preferredSource,
+                sampleRate,
+                channelConfig,
+                audioEncoding,
+                recordBufferBytes,
+            )
+        val fallback =
+            if (echoCancellerAvailable && preferred?.state != AudioRecord.STATE_INITIALIZED) {
+                preferred.releaseQuietly()
+                logger.warning("VOICE_COMMUNICATION capture unavailable — falling back to the plain MIC source")
+                openRecord(
                     MediaRecorder.AudioSource.MIC,
                     sampleRate,
                     channelConfig,
                     audioEncoding,
                     recordBufferBytes,
                 )
-            } catch (t: Throwable) {
+            } else {
+                preferred
+            }
+        val record =
+            fallback ?: run {
                 abandonAudioFocus(ctx)
                 throw SDKException.make(
                     code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                    message = AudioCaptureError.EngineStartFailed(t.message).description,
+                    message =
+                        AudioCaptureError.EngineStartFailed("AudioRecord could not be constructed").description,
                     category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                    cause = t,
                 )
             }
 
         if (record.state != AudioRecord.STATE_INITIALIZED) {
-            try {
-                record.release()
-            } catch (_: Throwable) {
-                // ignored
-            }
+            record.releaseQuietly()
             abandonAudioFocus(ctx)
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
@@ -225,6 +284,7 @@ class AudioCaptureManager {
         }
 
         audioRecord = record
+        if (echoCancellerAvailable) attachEchoCanceler(record)
         recordingFlag.set(true)
 
         val scope = CoroutineScope(Dispatchers.IO)
@@ -253,7 +313,13 @@ class AudioCaptureManager {
                 }
             }
 
-        logger.info("Recording started (sampleRate=$sampleRate, chunkBytes=$chunkBytes)")
+        // The source is named because it decides what the segmenters downstream see, and it is
+        // otherwise invisible from outside — "recording started" on a source delivering a
+        // processed or dead stream reads exactly like a healthy capture.
+        logger.info(
+            "Recording started (source=${sourceName(record.audioSource)}, " +
+                "sampleRate=$sampleRate, chunkBytes=$chunkBytes)",
+        )
     }
 
     fun stopRecording() {
@@ -268,8 +334,18 @@ class AudioCaptureManager {
         captureScope = null
         val record = audioRecord
         audioRecord = null
+        val canceler = echoCanceler
+        echoCanceler = null
 
         job?.cancel()
+
+        // Released before the record it is attached to: an effect outliving its audio session is
+        // what leaks the underlying native effect slot on some devices.
+        try {
+            canceler?.release()
+        } catch (e: Exception) {
+            logger.warning("AcousticEchoCanceler.release threw: ${e.message}")
+        }
 
         try {
             record?.stop()
@@ -307,6 +383,92 @@ class AudioCaptureManager {
     }
 
     // Private helpers
+
+    /**
+     * Construct an [AudioRecord] on [source], or null when the constructor itself throws.
+     *
+     * A source the device does not support surfaces two different ways — a throw, or an object
+     * in `STATE_UNINITIALIZED` — so the caller checks the state as well as the null.
+     */
+    private fun openRecord(
+        source: Int,
+        sampleRate: Int,
+        channelConfig: Int,
+        audioEncoding: Int,
+        bufferBytes: Int,
+    ): AudioRecord? =
+        try {
+            AudioRecord(source, sampleRate, channelConfig, audioEncoding, bufferBytes)
+        } catch (e: Exception) {
+            // `Exception`, not `Throwable`: an unsupported source throws
+            // IllegalArgumentException/UnsupportedOperationException, while a JVM `Error`
+            // (OutOfMemoryError and friends) says nothing about this source and must not be
+            // turned into a silent fallback.
+            logger.warning("AudioRecord(source=$source) failed: ${e.message}")
+            null
+        }
+
+    /** Human-readable name for the [MediaRecorder.AudioSource] a live record is reading. */
+    private fun sourceName(source: Int): String =
+        when (source) {
+            MediaRecorder.AudioSource.MIC -> "MIC"
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION -> "VOICE_COMMUNICATION"
+            else -> "source-$source"
+        }
+
+    /** Release without caring about the outcome — used on paths that are already failing. */
+    private fun AudioRecord?.releaseQuietly() {
+        try {
+            this?.release()
+        } catch (_: Exception) {
+            // ignored
+        }
+    }
+
+    /**
+     * Attach the platform's echo canceller to [record]'s session, if it has one.
+     *
+     * Logged either way: whether the device's own playout is being cancelled out of the capture
+     * is exactly the thing that decides how well talking over the agent works, and it is
+     * otherwise invisible from outside.
+     */
+    private fun attachEchoCanceler(record: AudioRecord) {
+        if (!AcousticEchoCanceler.isAvailable()) {
+            logger.info("No AcousticEchoCanceler on this device — capture keeps the speaker's echo")
+            return
+        }
+        val canceler =
+            try {
+                AcousticEchoCanceler.create(record.audioSessionId)
+            } catch (e: Exception) {
+                logger.warning("AcousticEchoCanceler.create failed: ${e.message}")
+                null
+            }
+        if (canceler == null) {
+            logger.info("AcousticEchoCanceler unavailable for this session — capture keeps the speaker's echo")
+            return
+        }
+        // Best effort by contract, so the enable is guarded: `setEnabled` throws
+        // IllegalStateException when the effect is not in a controllable state, and this runs
+        // after `audioRecord = record` but before `recordingFlag.set(true)` — a throw escaping
+        // here would leave startRecording failed with the microphone open and stopRecording
+        // returning early on the flag, i.e. a leaked AudioRecord. An effect that cannot be
+        // enabled is also released rather than stored, so nothing holds a native effect slot
+        // that stopRecording would otherwise be responsible for.
+        try {
+            canceler.enabled = true
+        } catch (e: Exception) {
+            logger.warning("AcousticEchoCanceler.setEnabled failed: ${e.message} — capture keeps the speaker's echo")
+            try {
+                canceler.release()
+            } catch (_: Exception) {
+                // ignored
+            }
+            return
+        }
+        echoCanceler = canceler
+        logger.info("AcousticEchoCanceler enabled (enabled=${canceler.enabled})")
+    }
 
     /**
      * Compute a normalized audio level (0.0–1.0) for the given PCM 16-bit

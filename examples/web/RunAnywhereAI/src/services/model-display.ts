@@ -9,43 +9,171 @@
 
 import { ModelCategory } from '@runanywhere/web';
 import type { CatalogEntry } from './model-catalog';
+// Type-only: the mapping below names glyphs, it does not draw them, so this
+// service still has no runtime dependency on the component layer.
+import type { IconName } from '../components/icons';
 export { formatFramework } from '@runanywhere/web';
 
 /**
- * Returns the HTML entity for the emoji shown next to a model row. The
- * return value is an HTML-safe entity ("&#129302;") so it can be inlined
- * inside an innerHTML template without further escaping.
+ * The glyph that stands for a model's modality, everywhere a model is listed.
+ *
+ * WAS AN EMOJI. Every model row, family card, recommendation card and pipeline
+ * slot carried one of 🤖 👁 🎤 🔊 🗣 🎨 🔗 ⚙️ — eight emoji rendered by the OS,
+ * so the avatar column was a different typeface, weight, and colour on every
+ * platform, ignored the theme entirely, and sat beside a UI drawn in 1.5px
+ * outline strokes. Emoji also cannot inherit `currentColor`, so a row could not
+ * dim its own avatar when the row was disabled.
+ *
+ * The mapping mirrors iOS `ModelCategory.consumerCapabilityIcon`
+ * (Features/Models/ModelPresentation.swift) one-for-one, so the same model shows
+ * the same idea on both platforms: message for chat, a picture for vision, a
+ * waveform for speech-in, a speaker for speech-out, two people for diarization.
+ *
+ * Returns the name only — the caller renders it with `icon()` at the size its
+ * slot wants, which is why this can live beside the other display helpers
+ * instead of inside the glyph registry.
  */
-export function modalityEmoji(category: ModelCategory): string {
+export function modalityIcon(category: ModelCategory): IconName {
   switch (category) {
     case ModelCategory.MODEL_CATEGORY_LANGUAGE:
-      return '&#129302;';
+      return 'message';
     case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-      return '&#128065;';
+    case ModelCategory.MODEL_CATEGORY_VISION:
+      return 'image';
     case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-      return '&#127908;';
+      return 'waveform';
     case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-      return '&#128266;';
+      return 'speaker';
     case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-      return '&#128483;';
+      return 'pulse';
+    case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      return 'speakers';
+    case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+      return 'segments';
     case ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:
-      return '&#127912;';
+      return 'imageSparkle';
+    // An embedding model exists to make a corpus searchable, which is the same
+    // meaning `file` already carries ("files indexed for retrieval") — not a
+    // second meaning borrowing the glyph.
     case ModelCategory.MODEL_CATEGORY_EMBEDDING:
-      return '&#128279;';
+      return 'file';
     default:
-      return '&#9881;&#65039;';
+      return 'model';
   }
 }
 
+const KIB = 1024;
+const MIB = KIB * 1024;
+const GIB = MIB * 1024;
+
 /**
- * Decimal byte formatter ("GB" / "MB" / "KB"). Aligns with how model
- * catalogs advertise file sizes (1 GB = 10^9 bytes) and with the eviction
- * dialog's storage gauge, both of which run against model catalog byte inputs.
+ * A byte quantity the user is meant to compare against their disk — a model's
+ * advertised size, the origin's quota, a free-space figure.
+ *
+ * WAS DECIMAL (1 GB = 10^9) on the argument that model catalogs advertise their
+ * files that way. Both other apps read the very same catalog bytes with binary
+ * prefixes — iOS `ByteCountFormatter(countStyle: .memory)`, Android
+ * `formatModelSize` — so one model claimed "4.4 GB" here and "4.10 GB" there:
+ * a third of a gigabyte of apparent disagreement about a single file. Which
+ * convention wins matters far less than the four apps sharing one, and the two
+ * that already agreed set it.
+ *
+ * Precision mirrors Android's explicit rule (two decimals once past a gigabyte,
+ * none below) rather than being re-invented here.
  */
 export function formatBytes(bytes: number): string {
-  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
-  if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
-  return `${Math.round(bytes / 1_000)} KB`;
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes >= GIB) return `${(bytes / GIB).toFixed(2)} GB`;
+  if (bytes >= MIB) return `${Math.round(bytes / MIB)} MB`;
+  return `${Math.round(bytes / KIB)} KB`;
+}
+
+/**
+ * The size shown on a model row, including the case where there isn't one.
+ *
+ * A catalog entry can arrive with no advertised bytes (a gated Hugging Face
+ * repo, a built-in). `formatBytes` would render that as "0 KB", which reads as
+ * a free download rather than as an unknown one. Mirrors iOS
+ * `RAModelInfo.consumerSizeLabel`.
+ */
+export function formatModelSize(bytes: number): string {
+  return Number.isFinite(bytes) && bytes > 0 ? formatBytes(bytes) : 'Size unknown';
+}
+
+/**
+ * A byte quantity inside a live transfer readout — the counter and the rate.
+ *
+ * Deliberately a second formatter rather than a reuse of `formatBytes`: this one
+ * ticks several times a second, so it trades the advertised size's precision for
+ * a number that does not jitter between renders. One decimal from a megabyte up,
+ * none below, byte-for-byte the same rule as iOS `ModelDownloadProgress.formatBytes`
+ * and Android `DownloadProgressInfo.formatBytes`.
+ */
+export function formatTransferBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes >= GIB) return `${(bytes / GIB).toFixed(1)} GB`;
+  if (bytes >= MIB) return `${(bytes / MIB).toFixed(1)} MB`;
+  if (bytes >= KIB) return `${Math.round(bytes / KIB)} KB`;
+  return `${Math.round(bytes)} B`;
+}
+
+/**
+ * Coarse remaining time — "45s", "2m 15s", "1h 20m". Seconds are dropped past
+ * an hour, where they are noise. Same rule as iOS/Android `formatDuration`.
+ */
+export function formatDuration(seconds: number): string {
+  // A derived ETA can arrive as NaN or Infinity, and both survive the arithmetic
+  // below to render as a label ("NaNs", "Infinityh NaNm"). Callers that cannot
+  // measure a remaining time should omit the part entirely — this floor only
+  // guarantees the helper never emits one of those.
+  if (!Number.isFinite(seconds)) return '0s';
+  const total = Math.max(0, Math.round(seconds));
+  if (total >= 3600) return `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m`;
+  if (total >= 60) return `${Math.floor(total / 60)}m ${total % 60}s`;
+  return `${total}s`;
+}
+
+/** What is known about a transfer right now. Every field is absent, not zero,
+ * when it has not been measured — so the line omits a part instead of claiming
+ * "0 B/s" while the connection is still opening. */
+export interface TransferSnapshot {
+  bytesDone?: number;
+  bytesTotal?: number;
+  bytesPerSecond?: number;
+  etaSeconds?: number;
+}
+
+/**
+ * The one line of detail under a progress bar: "1.2 GB of 4.1 GB · 3.4 MB/s ·
+ * 2m 15s left", or as much of it as is actually known.
+ *
+ * Ordered by what a waiting user looks for first — how much is left, then how
+ * fast, then when it will be done — identically to iOS `detailLine` and Android
+ * `DownloadProgressInfo.detailLine`, so the same transfer reads the same
+ * sentence on all three. Empty before the first byte lands, which is the
+ * caller's cue to say "Starting…" rather than "0 B".
+ */
+export function transferDetailLine(transfer: TransferSnapshot): string {
+  const parts: string[] = [];
+
+  const { bytesDone, bytesTotal, bytesPerSecond, etaSeconds } = transfer;
+  if (bytesTotal !== undefined && bytesTotal > 0 && bytesDone !== undefined) {
+    parts.push(`${formatTransferBytes(bytesDone)} of ${formatTransferBytes(bytesTotal)}`);
+  } else if (bytesDone !== undefined && bytesDone > 0) {
+    // No total: report what has arrived rather than inventing a denominator.
+    parts.push(formatTransferBytes(bytesDone));
+  }
+
+  if (bytesPerSecond !== undefined && bytesPerSecond > 0) {
+    parts.push(`${formatTransferBytes(bytesPerSecond)}/s`);
+  }
+  // `>= 1` alone lets `Infinity` through — an unmeasurable ETA belongs in the
+  // same bucket as an absent one, which this line drops rather than renders.
+  if (etaSeconds !== undefined && Number.isFinite(etaSeconds) && etaSeconds >= 1) {
+    parts.push(`${formatDuration(etaSeconds)} left`);
+  }
+
+  return parts.join(' · ');
 }
 
 export function modelDisplaySizeBytes(model: {

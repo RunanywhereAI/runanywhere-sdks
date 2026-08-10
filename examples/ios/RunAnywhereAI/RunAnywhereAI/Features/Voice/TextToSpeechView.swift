@@ -32,15 +32,12 @@ private let funnyTTSSampleTexts: [String] = [
 
 // MARK: - Text-to-Speech View
 
-// swiftlint:disable type_body_length
 /// Dedicated Text-to-Speech view with text input and instant playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
     @State private var showModelPicker = false
     @State private var inputText: String = funnyTTSSampleTexts.randomElement()
         ?? "Hello! This is a text to speech test."
-    @State private var borderAnimation = false
-    @State private var waveAnimation = false
 
     // MARK: - Computed Properties
 
@@ -51,7 +48,13 @@ struct TextToSpeechView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationView {
+        // A `NavigationView` wrapping a single child renders that child as the
+        // *sidebar* column of a Mac split view, which is why this screen drew
+        // itself in a ~200pt strip against the left edge of a 1450pt detail
+        // pane. This screen is pushed from a NavigationLink, so the window
+        // already owns a navigation container; on the Mac it is plain content in
+        // a centred column and `.toolbar` attaches to the window's own bar.
+        navigationHost {
             ZStack {
                 VStack(spacing: 0) {
                     // Main content - only enabled when model is selected
@@ -89,9 +92,6 @@ struct TextToSpeechView: View {
                 }
             }
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .tts) { model in
                 Task {
@@ -103,7 +103,6 @@ struct TextToSpeechView: View {
             Task {
                 await viewModel.initialize()
             }
-            borderAnimation = true
         }
         .onDisappear {
             viewModel.cleanup()
@@ -114,6 +113,19 @@ struct TextToSpeechView: View {
                 inputText = funnyTTSSampleTexts.randomElement() ?? inputText
             }
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - View Components
@@ -198,7 +210,11 @@ struct TextToSpeechView: View {
 
                 // Premium surprise me button
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    // Text swapping under the cursor is a content change, not a
+                    // spatial one: it gets a crossfade, not a spring. Animating
+                    // a text field the user may be reading is called out in
+                    // DESIGN_GUIDELINE §6.6.
+                    withMotion(Motion.microFade) {
                         inputText = funnyTTSSampleTexts.randomElement() ?? inputText
                     }
                 } label: {
@@ -260,7 +276,10 @@ struct TextToSpeechView: View {
             // Waveform visualization when speaking
             if viewModel.isSpeaking {
                 speakingWaveform
-                    .transition(.scale.combined(with: .opacity))
+                    // Grows from the button it belongs to rather than scaling
+                    // from its own center, so it reads as the speak action
+                    // expanding into a readout.
+                    .transition(.scale(scale: 0.92, anchor: .bottom).combined(with: .opacity))
             }
 
             // Speak button
@@ -275,48 +294,21 @@ struct TextToSpeechView: View {
         }
         .padding()
         .background(AppColors.backgroundPrimary)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.isSpeaking)
+        // One signature for the whole speaking/idle change: the waveform's
+        // insertion, the button, and the status line all move together.
+        .motionAware(Motion.standardSpring, value: viewModel.isSpeaking)
     }
 
-    /// Minimal waveform visualization for speaking state
+    /// Audio activity while speaking.
+    ///
+    /// `.indeterminate`, not a fake meter. This screen has no amplitude to draw:
+    /// `TTSViewModel` publishes `isSpeaking`, and `RunAnywhere.tts.speak` returns
+    /// nothing and exposes no playback level or progress. The previous version
+    /// papered over that by toggling between two hardcoded height arrays on a
+    /// 0.6s stagger, which looked exactly like a real waveform of the user's
+    /// audio and was in fact a constant.
     private var speakingWaveform: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<7) { index in
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                AppColors.primaryPurple.opacity(0.8),
-                                AppColors.primaryPurple.opacity(0.4)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 5, height: waveHeight(for: index))
-                    .animation(
-                        .easeInOut(duration: 0.6)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.08),
-                        value: waveAnimation
-                    )
-            }
-        }
-        .frame(height: 40)
-        .onAppear {
-            waveAnimation = true
-        }
-        .onDisappear {
-            waveAnimation = false
-        }
-    }
-
-    /// Calculate waveform bar heights with variation
-    private func waveHeight(for index: Int) -> CGFloat {
-        let heights: [CGFloat] = [20, 32, 28, 36, 28, 32, 20]
-        let animatedHeights: [CGFloat] = [28, 40, 36, 44, 36, 40, 28]
-
-        return waveAnimation ? animatedHeights[index] : heights[index]
+        AudioActivityBars(mode: .indeterminate, tint: AppColors.primaryPurple)
     }
 
     /// Speak button - synthesizes and plays audio instantly
@@ -335,11 +327,15 @@ struct TextToSpeechView: View {
                     },
                     label: {
                         HStack {
+                            // A button names the action it performs, not the
+                            // state it is in: while speaking, tapping this stops
+                            // playback, so it says Stop. "Speaking…" is a state
+                            // and lives in the status line below. Android's Read
+                            // aloud button already reads Stop here.
                             if viewModel.isSpeaking {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Speaking...")
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 20))
+                                Text("Stop")
                                     .fontWeight(.semibold)
                             } else {
                                 Image(systemName: "speaker.wave.2.fill")
@@ -370,11 +366,15 @@ struct TextToSpeechView: View {
                     },
                     label: {
                         HStack {
+                            // A button names the action it performs, not the
+                            // state it is in: while speaking, tapping this stops
+                            // playback, so it says Stop. "Speaking…" is a state
+                            // and lives in the status line below. Android's Read
+                            // aloud button already reads Stop here.
                             if viewModel.isSpeaking {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Speaking...")
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 20))
+                                Text("Stop")
                                     .fontWeight(.semibold)
                             } else {
                                 Image(systemName: "speaker.wave.2.fill")
@@ -393,49 +393,22 @@ struct TextToSpeechView: View {
                 .disabled(inputText.isEmpty || viewModel.selectedModelName == nil)
             }
         }
+        // The glyph + word are two children, so the announcement was a fragment
+        // pair; and the state ("Speaking") was carried only by the fill turning
+        // orange. One name for the action, one value for the state.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(viewModel.isSpeaking ? "Stop" : "Speak")
+        .accessibilityValue(viewModel.isSpeaking ? "Speaking" : "Idle")
+        .accessibilityAddTraits(.isButton)
     }
 
-    /// Model button for navigation bar with logo
+    /// Model button for the navigation bar.
     private var modelButton: some View {
-        Button {
+        VoiceModelChip(
+            modelName: viewModel.selectedModelName,
+            framework: viewModel.selectedFramework
+        ) {
             showModelPicker = true
-        } label: {
-            HStack(spacing: 6) {
-                // Model logo instead of cube icon
-                if let modelName = viewModel.selectedModelName {
-                    Image(getModelLogo(for: modelName))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                } else {
-                    Image(systemName: "cube")
-                        .font(AppTypography.system14)
-                }
-
-                if let modelName = viewModel.selectedModelName {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName.shortModelName())
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-
-                        // Framework indicator
-                        if let framework = viewModel.selectedFramework {
-                            HStack(spacing: 3) {
-                                Image(systemName: frameworkIcon(for: framework))
-                                    .font(.system(size: 7))
-                                Text(framework.displayName)
-                                    .font(.system(size: 8, weight: .medium))
-                            }
-                            .foregroundColor(frameworkColor(for: framework))
-                        }
-                    }
-                } else {
-                    Text("Select Model")
-                        .font(.caption)
-                }
-            }
         }
     }
 
@@ -447,7 +420,7 @@ struct TextToSpeechView: View {
         if viewModel.isSpeaking {
             return "Speaking..."
         } else if viewModel.didSpeak {
-            return "Tap Speak to hear it again"
+            return "\(VoiceAgentViewModel.pressVerb) Speak to hear it again"
         } else {
             return "Ready"
         }
@@ -463,22 +436,7 @@ struct TextToSpeechView: View {
             return AppColors.primaryPurple
         }
     }
-
-    private func frameworkIcon(for framework: InferenceFramework) -> String {
-        switch framework {
-        case .foundationModels: return "apple.logo"
-        default: return "cube"
-        }
-    }
-
-    private func frameworkColor(for framework: InferenceFramework) -> Color {
-        switch framework {
-        case .foundationModels: return .primary
-        default: return AppColors.statusGray
-        }
-    }
 }
-// swiftlint:enable type_body_length
 
 // MARK: - Preview
 

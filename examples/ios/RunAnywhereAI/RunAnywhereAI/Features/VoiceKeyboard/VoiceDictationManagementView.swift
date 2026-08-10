@@ -224,9 +224,11 @@ private struct SetupStep: View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.headline)
-                .foregroundColor(.white)
+                // The accent asset is #FF6900, so white here was the 2.89:1 pairing
+                // DESIGN_GUIDELINE §5 forbids for anything short of large/bold.
+                .foregroundColor(AppColors.onBrand)
                 .frame(width: 26, height: 26)
-                .background(Color.accentColor)
+                .background(AppColors.brand)
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

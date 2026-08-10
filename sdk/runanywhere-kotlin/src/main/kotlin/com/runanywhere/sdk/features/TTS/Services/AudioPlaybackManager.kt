@@ -56,6 +56,14 @@ class AudioPlaybackManager {
                 playPcmData(playbackId, pcmData, wavInfo.sampleRate, wavInfo.channels, wavInfo.bitsPerSample)
 
                 logger.info("[playbackId=$playbackId] play() completed")
+            } catch (e: AudioPlaybackException.PlaybackInterrupted) {
+                // Taking the turn back is the single most-used control in a voice
+                // conversation, not a fault. Logging it at ERROR made ordinary use
+                // look broken and polluted crash triage. Still rethrown, so callers
+                // observe the interrupt exactly as before. Mirrors the Swift driver,
+                // which reports the same outcome at info.
+                logger.info("[playbackId=$playbackId] play() interrupted by the user")
+                throw e
             } catch (e: Exception) {
                 logger.error("[playbackId=$playbackId] play() failed: ${e.message}")
                 throw if (e is AudioPlaybackException) e else AudioPlaybackException.PlaybackFailed(e.message)

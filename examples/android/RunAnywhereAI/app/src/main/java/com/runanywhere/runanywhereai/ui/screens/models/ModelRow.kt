@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadInterruptionState
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -39,13 +38,21 @@ fun ModelRow(
     isCurrent: Boolean,
     isReady: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
+    // Non-null only while this row is transferring bytes. A row that is merely loading or deleting
+    // is busy too, and drawing it a download bar and a Cancel button would promise two things that
+    // are not happening.
+    progress: DownloadProgressInfo?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)? = null,
     // When non-null, the busy spinner becomes a tap-to-cancel control so an
     // in-flight download can be stopped. Null keeps the plain progress spinner.
     onCancel: (() -> Unit)? = null,
+    // Non-null when this model has bytes on disk from a transfer that stopped — failed, or
+    // cancelled by the user. The trailing verb becomes Retry or Resume accordingly, both of which
+    // continue from those bytes instead of starting the transfer over. Already the reader's view of
+    // it, so this row never has to interpret a download-service record.
+    interruption: DownloadInterruptionState? = null,
     highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -125,20 +132,26 @@ fun ModelRow(
                         )
                     }
                 }
-                if (isBusy && progressPercent != null) {
-                    Text(
-                        "Downloading… $progressPercent%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (progress != null) {
+                    DownloadProgressBlock(progress)
+                } else if (!isBusy && interruption != null) {
+                    DownloadInterruptionNote(interruption)
                 }
             }
 
             Spacer(Modifier.width(dimens.spacingSm))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                TrailingAction(isCurrent, isReady, isBusy, model, onDownload, onCancel)
+                DownloadRowAction(
+                    model = model,
+                    isCurrent = isCurrent,
+                    isReady = isReady,
+                    isBusy = isBusy,
+                    interruption = interruption?.kind,
+                    onDownload = onDownload,
+                    onCancel = onCancel,
+                )
                 if (onDelete != null && isReady) {
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(ROW_TAP_TARGET)) {
                         Icon(
                             imageVector = RACIcons.Outline.Trash,
                             contentDescription = "Delete ${model.name}",
@@ -152,72 +165,3 @@ fun ModelRow(
     }
 }
 
-@Composable
-private fun TrailingAction(
-    isCurrent: Boolean,
-    isReady: Boolean,
-    isBusy: Boolean,
-    model: RAModelInfo,
-    onDownload: () -> Unit,
-    onCancel: (() -> Unit)? = null,
-) {
-    when {
-        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
-        isBusy -> DownloadProgressAction(onCancel)
-        isReady -> ModelPill("Use", ModelPillColors.Availability)
-        else -> DownloadChip(model = model, onDownload = onDownload)
-    }
-}
-
-// Busy-state control. With [onCancel] the spinner sits inside a tap target that
-// stops the download; without it, it stays a plain progress indicator.
-@Composable
-private fun DownloadProgressAction(onCancel: (() -> Unit)?) {
-    if (onCancel == null) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        return
-    }
-    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                imageVector = RACIcons.Outline.Close,
-                contentDescription = "Cancel download",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(12.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
-    val dimens = LocalDimens.current
-    val needsHfToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
-    AssistChip(
-        onClick = onDownload,
-        label = {
-            // The row already shows the size; the chip stays a simple verb.
-            Text(
-                text = if (needsHfToken) "Set token" else "Get",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = RACIcons.Outline.Download,
-                contentDescription = null,
-                modifier = Modifier.size(dimens.iconSm),
-            )
-        },
-    )
-}

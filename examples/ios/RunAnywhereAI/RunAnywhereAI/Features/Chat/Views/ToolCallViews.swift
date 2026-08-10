@@ -155,35 +155,11 @@ struct ToolCallDetailSheet: View {
     }
 }
 
-// MARK: - Tool Calling Active Indicator
-
-struct ToolCallingActiveIndicator: View {
-    @State private var rotation: Double = 0
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "gearshape.2")
-                .font(.system(size: 12))
-                .foregroundColor(AppColors.primaryAccent)
-                .rotationEffect(.degrees(rotation))
-                .onAppear {
-                    withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                        rotation = 360
-                    }
-                }
-
-            Text("Calling tool...")
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.primaryAccent.opacity(0.1))
-        )
-    }
-}
+// `ToolCallingActiveIndicator` lived here with no call site outside its own
+// preview: a 2s `repeatForever` gear rotation (off every canonical period, and
+// with no Reduce Motion path) plus raw 12/10/6/8 metrics. The live in-progress
+// tool state is the streaming caret in `StreamingTextView` and the tool row
+// above, so it was one more spinner competing with them. Deleted.
 
 #Preview {
     VStack(spacing: 20) {
@@ -204,8 +180,6 @@ struct ToolCallingActiveIndicator: View {
                 error: "Network timeout"
             )
         ) {}
-
-        ToolCallingActiveIndicator()
     }
     .padding()
 }

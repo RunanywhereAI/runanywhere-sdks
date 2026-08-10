@@ -13,6 +13,7 @@ import {
   EmbeddingsProtoAdapter,
   RAGProtoAdapter,
 } from '../../Adapters/ModalityProtoAdapter.js';
+import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
 import type {
   RAGConfiguration,
   RAGDocument,
@@ -42,7 +43,10 @@ import {
   Embeddings,
   embeddingCosineSimilarity,
 } from './RunAnywhere+Embeddings.js';
-import { TextGeneration } from './RunAnywhere+TextGeneration.js';
+import {
+  TextGeneration,
+  type TextGenerationOptions,
+} from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('RAG');
 export interface RAGDocumentSummary {
@@ -501,6 +505,36 @@ interface CrossWasmRAGDocument {
   chunkCount: number;
 }
 
+const CROSS_WASM_RAG_SYSTEM_PROMPT =
+  'Answer the question using only the supplied context. '
+  + 'If the context does not contain the answer, say so.';
+
+/**
+ * Outcome of retrieval + prompt assembly. `grounded: false` carries the
+ * finished empty-corpus result verbatim so neither query path has to
+ * reconstruct it.
+ */
+type CrossWasmPreparedQuery =
+  | { grounded: false; result: RAGResult }
+  | {
+    grounded: true;
+    version: number;
+    retrievedChunks: RAGSearchResult[];
+    context: string;
+    retrievalTimeMs: number;
+    request: TextGenerationOptions;
+  };
+
+function ragStreamCompleted(result: RAGResult, requestId: string): RAGStreamEvent {
+  return {
+    timestampUs: nowUs(),
+    requestId,
+    kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED,
+    token: '',
+    result,
+  };
+}
+
 interface PersistentRAGSnapshot {
   config: RAGConfiguration;
   chunks: CrossWasmRAGChunk[];
@@ -775,18 +809,24 @@ class CrossWasmRAGProvider implements RAGProvider {
     return this.retrieve(query, queryOptions, this.lifecycleVersion);
   }
 
-  async ragQuery(
+  /**
+   * Retrieve, assemble the grounded prompt, and make sure the answer model is
+   * resident. Shared by `ragQuery` and `ragQueryStream` so the two paths can
+   * only differ in how they consume the generation.
+   */
+  private async prepareQuery(
     question: string,
-    options: RAGQueryOverrides = {},
-  ): Promise<RAGResult> {
-    this.requireInitialized('RAG.query');
+    options: RAGQueryOverrides,
+    feature: 'RAG.query' | 'RAG.queryStream',
+  ): Promise<CrossWasmPreparedQuery> {
+    this.requireInitialized(feature);
     const version = this.lifecycleVersion;
     const query = question.trim();
     if (!query) {
       throw SDKException.fromCode(
         -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
         'RAG query question is empty.',
-        'RAG.query',
+        feature,
       );
     }
 
@@ -800,13 +840,16 @@ class CrossWasmRAGProvider implements RAGProvider {
       // equivalent (Swift parity: RARAGResult.totalTime).
       this.lastQueryMs = Date.now();
       return {
-        answer: '',
-        retrievedChunks: [],
-        contextUsed: '',
-        retrievalTimeMs,
-        generationTimeMs: 0,
-        usage: emptyTokenUsage(),
-        requestId: createId('rag-query'),
+        grounded: false,
+        result: {
+          answer: '',
+          retrievedChunks: [],
+          contextUsed: '',
+          retrievalTimeMs,
+          generationTimeMs: 0,
+          usage: emptyTokenUsage(),
+          requestId: createId('rag-query'),
+        },
       };
     }
 
@@ -835,30 +878,132 @@ class CrossWasmRAGProvider implements RAGProvider {
         ModelCategory.MODEL_CATEGORY_LANGUAGE,
         'LLM',
       );
-      this.assertCurrent(version, 'RAG.query');
+      this.assertCurrent(version, feature);
     }
 
+    return {
+      grounded: true,
+      version,
+      retrievedChunks,
+      context,
+      retrievalTimeMs,
+      request: {
+        ...(queryOptions.generation ?? {}),
+        prompt,
+        systemPrompt: queryOptions.generation?.systemPrompt ?? CROSS_WASM_RAG_SYSTEM_PROMPT,
+        conversationId: 'web-cross-wasm-rag',
+      },
+    };
+  }
+
+  async ragQuery(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): Promise<RAGResult> {
+    const prepared = await this.prepareQuery(question, options, 'RAG.query');
+    if (!prepared.grounded) return prepared.result;
+
     const generationStarted = nowMs();
-    const generated = await TextGeneration.generate({
-      ...(queryOptions.generation ?? {}),
-      prompt,
-      systemPrompt: queryOptions.generation?.systemPrompt
-        ?? 'Answer the question using only the supplied context. If the context does not contain the answer, say so.',
-      conversationId: 'web-cross-wasm-rag',
-    });
-    this.assertCurrent(version, 'RAG.query');
+    const generated = await TextGeneration.generate(prepared.request);
+    this.assertCurrent(prepared.version, 'RAG.query');
     const generationTimeMs = nowMs() - generationStarted;
     this.lastQueryMs = Date.now();
     return {
       answer: generated.text,
-      retrievedChunks,
-      contextUsed: context,
-      retrievalTimeMs,
+      retrievedChunks: prepared.retrievedChunks,
+      contextUsed: prepared.context,
+      retrievalTimeMs: prepared.retrievalTimeMs,
       generationTimeMs,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
     };
+  }
+
+  /**
+   * Token-by-token grounded answer. The native RAG session ABI is absent in
+   * the current WASM builds, so without this the whole document-Q&A feature
+   * dead-ended on "Streaming RAG is not available on this provider" even
+   * though retrieval and generation both worked. Retrieval is announced first
+   * (the caller renders sources before any text), then the LLM's own token
+   * stream is forwarded — the same stream `generate` folds internally, so this
+   * is real streaming, not a one-shot answer replayed as a single chunk.
+   */
+  async *ragQueryStream(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): AsyncIterable<RAGStreamEvent> {
+    const requestId = createId('rag-query');
+    const prepared = await this.prepareQuery(question, options, 'RAG.queryStream');
+    if (!prepared.grounded) {
+      yield ragStreamCompleted({ ...prepared.result, requestId }, requestId);
+      return;
+    }
+    // Retrieval, announced before a single token exists, so the caller can put
+    // the sources on screen while generation is still running. Carried on a
+    // TOKEN event with an empty token because the stream has no separate
+    // retrieval kind; the answer tokens and the completed event still follow.
+    yield {
+      timestampUs: nowUs(),
+      requestId,
+      kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN,
+      token: '',
+      result: {
+        answer: '',
+        retrievedChunks: prepared.retrievedChunks,
+        contextUsed: prepared.context,
+        retrievalTimeMs: prepared.retrievalTimeMs,
+        generationTimeMs: 0,
+        usage: emptyTokenUsage(),
+        requestId,
+      },
+    };
+
+    const generationStarted = nowMs();
+    const streaming = await TextGeneration.generateStream(prepared.request);
+    let answer = '';
+    let nativeStreamDone = false;
+    try {
+      for await (const token of streaming.stream) {
+        if (!token) continue;
+        answer += token;
+        yield {
+          timestampUs: nowUs(),
+          requestId,
+          kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN,
+          token,
+        };
+      }
+      nativeStreamDone = true;
+    } catch (error) {
+      // Producer self-terminated — the native stream is already over, so
+      // cancelling it would be a lie. Swallow the duplicate rejection the
+      // result promise carries before rethrowing the original error.
+      nativeStreamDone = true;
+      void streaming.result.catch(() => undefined);
+      throw error;
+    } finally {
+      // Only reachable with the stream still live when the consumer abandoned
+      // the generator — a `break`, an early `return`, a view that unmounted.
+      // JavaScript resumes the suspended `yield` with a return completion,
+      // which runs no `catch`, so without this the backend would keep
+      // generating tokens into a stream nobody is reading. Mirrors
+      // `generateStructuredStream`'s cancellation contract.
+      if (!nativeStreamDone) streaming.cancel();
+    }
+    const generated = await streaming.result;
+    this.assertCurrent(prepared.version, 'RAG.queryStream');
+    this.lastQueryMs = Date.now();
+    yield ragStreamCompleted({
+      answer: generated.text || answer,
+      retrievedChunks: prepared.retrievedChunks,
+      contextUsed: prepared.context,
+      retrievalTimeMs: prepared.retrievalTimeMs,
+      generationTimeMs: nowMs() - generationStarted,
+      usage: generated.usage ?? emptyTokenUsage(),
+      requestId,
+      thinkingContent: generated.thinkingContent,
+    }, requestId);
   }
 
   async ragClearDocuments(): Promise<void> {
@@ -1189,6 +1334,11 @@ function renderRAGPrompt(template: string | undefined, context: string, query: s
 
 function nowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
+}
+
+/** Wall-clock microseconds — the `timestamp_us` unit every stream event uses. */
+function nowUs(): number {
+  return Date.now() * 1000;
 }
 
 /** `TokenUsage` zero value — used where a RAG result has no real usage to report. */
@@ -1588,17 +1738,40 @@ export function ragQueryStream(
   options?: RAGQueryOverrides,
 ): AsyncIterable<RAGStreamEvent> {
   const provider = requireProvider('RAG.queryStream');
-  if (!provider.ragQueryStream) {
-    throw SDKException.backendNotAvailable(
-      'RAG.queryStream',
-      'Streaming RAG is not available on this provider.',
-    );
-  }
+  let question: string;
+  let overrides: RAGQueryOverrides | undefined;
   if (typeof questionOrOptions === 'string') {
-    return provider.ragQueryStream(questionOrOptions, options);
+    question = questionOrOptions;
+    overrides = options;
+  } else {
+    // RAGQueryOptions.question was renamed `query` (idl/rag.proto).
+    const { query, ...rest } = questionOrOptions;
+    question = query;
+    overrides = rest;
   }
-  const { query, ...overrides } = questionOrOptions;
-  return provider.ragQueryStream(query, overrides);
+  if (provider.ragQueryStream) {
+    return provider.ragQueryStream(question, overrides);
+  }
+  // A provider without a token stream still has a grounded answer to give.
+  // Refusing outright dead-ended chat-with-document on "Streaming RAG is not
+  // available on this provider" — a sentence about our own plumbing, offered
+  // to a reader with no way forward. `ragQuery` is the same retrieval and the
+  // same model; only the delivery differs, so replay it as the one COMPLETED
+  // event the stream contract already defines.
+  return nonStreamingRAGFallback(provider, question, overrides);
+}
+
+async function* nonStreamingRAGFallback(
+  provider: RAGProvider,
+  question: string,
+  overrides?: RAGQueryOverrides,
+): AsyncIterable<RAGStreamEvent> {
+  const requestId = createId('rag-query');
+  const result = await provider.ragQuery(question, overrides);
+  // A failed grounded answer must reach the caller as a failure, not as a
+  // COMPLETED event carrying an empty answer and an error nobody reads.
+  if (result.error) throw new SDKException(result.error);
+  yield ragStreamCompleted({ ...result, requestId }, requestId);
 }
 
 // ---------------------------------------------------------------------------

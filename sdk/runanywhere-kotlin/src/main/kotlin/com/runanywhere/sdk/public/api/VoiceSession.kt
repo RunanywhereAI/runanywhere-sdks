@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.InterruptReason
 import ai.runanywhere.proto.v1.PipelineState
 import ai.runanywhere.proto.v1.TurnLifecycleEventKind
 import ai.runanywhere.proto.v1.VADStreamEventKind
@@ -26,7 +27,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import ai.runanywhere.proto.v1.TokenKind as ProtoTokenKind
 import ai.runanywhere.proto.v1.VoiceEvent as ProtoVoiceEvent
@@ -46,9 +49,41 @@ public class VoiceSession internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var micJob: Job? = null
 
-    /** Turn-by-turn progress of the conversation. */
+    /**
+     * Watches the core's own event stream for a barge-in. Owned by the session rather than by a
+     * caller's [events] subscription: stopping the speaker when the user takes the turn is the
+     * session's job and has to happen whether or not anybody is rendering events.
+     */
+    private var bargeInJob: Job? = null
+
+    /**
+     * The live capture/playout driver, retained so [interrupt] and the barge-in watcher can
+     * reach the playback it owns. Without the reference, taking the turn back had nothing to
+     * stop — see [interrupt].
+     */
+    @Volatile
+    private var micDriver: VoiceAgentMicDriver? = null
+
+    /**
+     * Playout phase reported by the mic driver. Kept off the core's stream on
+     * purpose: the core emits `PLAYING_TTS` before synthesis and hands the audio
+     * back for the platform to play, so it cannot say when sound starts or stops.
+     */
+    private val playbackPhase =
+        MutableSharedFlow<VoiceEvent>(replay = 0, extraBufferCapacity = 8)
+
+    /**
+     * Turn-by-turn progress of the conversation.
+     *
+     * Merges the core's own voice events with the driver's real playout phase, so
+     * a subscriber is told "speaking" exactly while the reply is audible — and is
+     * told when it stops. Mirrors Swift `VoiceSession.events`.
+     */
     public val events: Flow<VoiceEvent> =
-        VoiceAgentStreamAdapter(handle).stream().mapNotNull { it.toVoiceEvent() }
+        merge(
+            VoiceAgentStreamAdapter(handle).stream().mapNotNull { it.toVoiceEvent() },
+            playbackPhase,
+        )
 
     /**
      * Open the microphone and begin taking turns.
@@ -57,7 +92,31 @@ public class VoiceSession internal constructor(
      */
     public fun start() {
         if (micJob?.isActive == true) return
-        micJob = scope.launch(Dispatchers.IO) { VoiceAgentMicDriver(handle).run() }
+        val driver =
+            VoiceAgentMicDriver(handle) { phase ->
+                playbackPhase.tryEmit(VoiceEvent.AgentStateChanged(phase))
+            }
+        micDriver = driver
+        micJob = scope.launch(Dispatchers.IO) { driver.run() }
+
+        // Speaking over the agent: the core decides whether an onset inside the audible window
+        // is a real interruption or the microphone hearing the loudspeaker, and says so with
+        // INTERRUPT_REASON_USER_BARGE_IN. Only this layer can stop the speaker, so this
+        // subscription is the other half of that handshake — without it the core's decision has
+        // no effect and the agent talks over the user to the end of its sentence. Mirrors Swift
+        // `VoiceSession.start`.
+        bargeInJob =
+            scope.launch {
+                VoiceAgentStreamAdapter(handle).stream().collect { proto ->
+                    if (proto.interrupted?.reason != InterruptReason.INTERRUPT_REASON_USER_BARGE_IN) {
+                        return@collect
+                    }
+                    voiceLogger.info("User barge-in: stopping playout, turn handed back")
+                    // The frames queued behind the onset are the rest of the user's sentence,
+                    // so they are kept — dropping them would clip the turn that caused this.
+                    micDriver?.stopPlayback(discardPendingInput = false)
+                }
+            }
     }
 
     /**
@@ -80,13 +139,30 @@ public class VoiceSession internal constructor(
     /**
      * Stop the agent mid-utterance. Awaitable: suspends until the interrupted
      * response, its tools, and its playout have all settled.
+     *
+     * A turn's reply is played out by the mic driver's own playback manager, not by the
+     * TTS namespace's singleton, so stopping only the latter left the agent talking to the
+     * end of its buffer while the UI claimed the turn had been handed back. The driver is
+     * silenced first — that is the part the user hears — and `legacyStopSpeaking` still
+     * runs afterwards to cancel any synthesis the TTS path itself has in flight.
      */
     public suspend fun interrupt() {
+        // The control was pressed, so whatever is queued behind it is the tail of the agent's
+        // own playout rather than the user's next sentence.
+        micDriver?.stopPlayback(discardPendingInput = true)
         legacyStopSpeaking()
     }
 
     /** Stop capture, release the pipeline's components, and end the session. */
     public suspend fun close() {
+        micDriver?.stopPlayback(discardPendingInput = true)
+        micDriver = null
+        // Both jobs are joined, not just the mic: the barge-in collector holds a subscription on
+        // the adapter's event stream, and leaving that collector is what deregisters the native
+        // proto callback. Returning before it has happened lets the deregistration land after
+        // `rac_voice_agent_cleanup` has already torn the pipeline down.
+        bargeInJob?.cancelAndJoin()
+        bargeInJob = null
         micJob?.cancelAndJoin()
         micJob = null
         scope.cancel()

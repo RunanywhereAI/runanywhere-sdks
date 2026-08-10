@@ -44,4 +44,15 @@ describe('conversation generation context', () => {
       { role: 'assistant', content: 'Nice to meet you, Ada.' },
     ]);
   });
+
+  it('never replays a failed turn as something the model said', () => {
+    expect(conversationHistoryForGeneration([
+      { role: 'user', content: 'My name is Ada.' },
+      { role: 'assistant', content: 'Error: Backend not available for: llm', isError: true },
+      { role: 'user', content: 'What is my name?' },
+    ])).toEqual([
+      { role: 'user', content: 'My name is Ada.' },
+      { role: 'user', content: 'What is my name?' },
+    ]);
+  });
 });

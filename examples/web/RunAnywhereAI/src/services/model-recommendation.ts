@@ -16,9 +16,22 @@
  * or over budget, so a trimmed catalog can never crash the picker.
  */
 
-import type { CatalogEntry } from './model-catalog';
+import { webModelCompatibility, type CatalogEntry } from './model-catalog';
 import type { HardwareTier } from './device-capabilities';
 import { ModelCategory } from '@runanywhere/web';
+
+/**
+ * A recommendation is a promise that the model works here, so it must clear the
+ * same gate the picker uses to allow download and load at all
+ * (`webModelCompatibility`) — not just the tier's memory budget. The two rules
+ * were independent, which let the engine advertise "best for this device" for a
+ * model the picker itself marks unavailable.
+ */
+function isRecommendable(entry: CatalogEntry | undefined, memoryBudgetBytes: number): entry is CatalogEntry {
+  if (entry == null) return false;
+  if (entry.memoryRequiredBytes > memoryBudgetBytes) return false;
+  return webModelCompatibility(entry).supported;
+}
 
 export interface RecommendedSelection {
   /** Best-fit LLM to preselect. `null` when no LLM fits the budget. */
@@ -85,13 +98,11 @@ export function recommendModels(
   catalog: readonly CatalogEntry[],
 ): RecommendedSelection {
   const byId = new Map(catalog.map((entry) => [entry.id, entry]));
-  const fits = (entry: CatalogEntry | undefined): entry is CatalogEntry =>
-    entry != null && entry.memoryRequiredBytes <= memoryBudgetBytes;
 
   const pick = (ids: readonly string[]): CatalogEntry | null => {
     for (const id of ids) {
       const entry = byId.get(id);
-      if (fits(entry)) return entry;
+      if (isRecommendable(entry, memoryBudgetBytes)) return entry;
     }
     return null;
   };
@@ -133,7 +144,7 @@ function selectLLMs(
       entry &&
       !seen.has(entry.id) &&
       entry.category === ModelCategory.MODEL_CATEGORY_LANGUAGE &&
-      entry.memoryRequiredBytes <= memoryBudgetBytes &&
+      isRecommendable(entry, memoryBudgetBytes) &&
       selected.length < MAX_RECOMMENDED_LLMS
     ) {
       seen.add(entry.id);
@@ -182,7 +193,7 @@ export function recommendVoicePipeline(
   const pick = (ids: readonly string[]): CatalogEntry | null => {
     for (const id of ids) {
       const entry = byId.get(id);
-      if (entry && entry.memoryRequiredBytes <= memoryBudgetBytes) return entry;
+      if (isRecommendable(entry, memoryBudgetBytes)) return entry;
     }
     return null;
   };

@@ -39,6 +39,22 @@ actor DownloadNotifier {
         await post(identifier: identifier(modelID), content: content)
     }
 
+    /// The bytes have all arrived and are being checksummed.
+    ///
+    /// A separate notification rather than leaving the progress one at 100%,
+    /// because on a multi-gigabyte model the hash runs for long enough that
+    /// "100% complete" sitting on the lock screen while nothing finishes reads
+    /// as a stuck download. Clearing `lastPercent` also means the next real
+    /// progress update — from a retry, say — is not throttled away as a
+    /// near-duplicate of the last percentage seen.
+    func notifyVerifying(modelID: String) async {
+        lastPercent[modelID] = nil
+        let content = UNMutableNotificationContent()
+        content.title = "Downloading model"
+        content.body = "Checking the downloaded files…"
+        await post(identifier: identifier(modelID), content: content)
+    }
+
     func notifyCompleted(modelID: String) async {
         lastPercent[modelID] = nil
         let content = UNMutableNotificationContent()

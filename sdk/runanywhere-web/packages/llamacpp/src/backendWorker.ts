@@ -456,6 +456,22 @@ type WorkerStreamExport = {
   ) => number | Promise<number>;
   cancelName?: string;
   cancelFn?: (outEvent: number) => number;
+  /**
+   * Emscripten signature of the event trampoline, which is NOT the same for
+   * every modality and must not be hardcoded here.
+   *
+   * LLM's callback is `void (*)(const uint8_t*, size_t, void*)` → `'viii'`.
+   * VLM's returns a value — `rac_bool_t (*)(const uint8_t*, size_t, void*)`,
+   * `rac_vlm_service.h:136`, the bool being how a consumer asks the stream to
+   * stop — so it is `'iiii'`. Registering VLM's as `'viii'` puts the wrong type
+   * in the WASM function table, and the indirect call traps with
+   * "function signature mismatch": one `failed` event, zero tokens, every
+   * session, because `main.ts` sets `preferBackendWorker: true`.
+   *
+   * The main-thread adapter already had this right via
+   * `callbackSignature(returnsBool)`; the worker path is what drifted.
+   */
+  callbackSignature: 'viii' | 'iiii';
 };
 
 async function* streamProtoEvents(
@@ -485,11 +501,16 @@ async function* streamProtoEvents(
   module.HEAPU8.set(requestBytes, requestPtr);
   const requestSize = requestBytes.byteLength;
 
-  const callbackPtr = module.addFunction((bytesPtr: number, size: number): void => {
-    if (!bytesPtr || size <= 0) return;
+  // Returns 1 = "keep going". Harmless for the `'viii'` (void) LLM case, where
+  // the return value is simply ignored, and required for the `'iiii'` VLM case,
+  // where returning nothing would read as 0 and cancel the stream after the
+  // first event.
+  const callbackPtr = module.addFunction((bytesPtr: number, size: number): number => {
+    if (!bytesPtr || size <= 0) return 1;
     queue.push(module.HEAPU8.slice(bytesPtr, bytesPtr + size));
     wake();
-  }, 'viii');
+    return 1;
+  }, exports.callbackSignature);
 
   let cancelPosted = false;
   activeStreamCancel = () => {
@@ -571,6 +592,8 @@ async function* streamLLM(
     cancelFn: module._rac_llm_cancel_proto
       ? (outEvent) => module._rac_llm_cancel_proto!(outEvent)
       : undefined,
+    // void (*)(const uint8_t*, size_t, void*) — rac_llm_stream.h:54
+    callbackSignature: 'viii',
   }, 'LLM');
 }
 
@@ -590,6 +613,9 @@ async function* streamVLM(
     streamFn,
     cancelName: 'rac_vlm_cancel_lifecycle_proto',
     cancelFn,
+    // rac_bool_t (*)(const uint8_t*, size_t, void*) — rac_vlm_service.h:136.
+    // Returns a value, so it is 'iiii', not 'viii'.
+    callbackSignature: 'iiii',
   }, 'VLM');
 }
 

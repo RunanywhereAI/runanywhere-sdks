@@ -247,9 +247,22 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
         attr.onsuccess = fetch_mark_done;
         attr.onerror = fetch_mark_done;
     }
-    // HEAD requests should not download a body.
+    // A HEAD carries no body of its own, so nothing here needs to suppress one.
+    // What it DOES need is to bypass Emscripten's IndexedDB cache: with
+    // FETCH_SUPPORT_INDEXEDDB (on by default) and none of the APPEND / REPLACE /
+    // NO_DOWNLOAD flags set, startFetch() routes through fetchLoadCachedData()
+    // first, so a HEAD probe answers out of a stale cache entry instead of the
+    // server's current Content-Length. EMSCRIPTEN_FETCH_REPLACE without
+    // EMSCRIPTEN_FETCH_PERSIST_FILE is the documented way to run a plain XHR
+    // that neither reads nor writes IndexedDB (see emscripten/fetch.h).
+    //
+    // This must NOT be EMSCRIPTEN_FETCH_NO_DOWNLOAD, whose name reads like "no
+    // body" but means "look this URL up in IndexedDB only and raise an error
+    // rather than going to the network". That flag made every HEAD resolve
+    // without issuing a single request, and — because the miss path never
+    // allocates an XHR — left fetch->id == 0 for the header read below.
     if (method_is_head(req->method)) {
-        attr.attributes |= EMSCRIPTEN_FETCH_NO_DOWNLOAD;
+        attr.attributes |= EMSCRIPTEN_FETCH_REPLACE;
     }
 
     // Timeout (emscripten expects ms; 0 = no timeout).
@@ -298,12 +311,20 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     // redirected_url stays NULL (already zeroed by the caller) per the C ABI:
     // it must be non-NULL only when a real 3xx hop occurred.
 
-    // Headers.
-    size_t hdrs_len = emscripten_fetch_get_response_headers_length(fetch);
-    if (hdrs_len > 0) {
-        std::string raw(hdrs_len + 1, '\0');
-        emscripten_fetch_get_response_headers(fetch, raw.data(), raw.size());
-        parse_response_headers(raw.c_str(), out);
+    // Headers. fetch->id is the handle of the JS-side XHR that served this
+    // request; it stays 0 whenever the fetch settled without one (an
+    // IndexedDB-only resolution, or a request that never started). Emscripten's
+    // header accessors index Fetch.xhrs with that id unguarded, so asking for
+    // headers in that state evaluates `undefined.getAllResponseHeaders()` and
+    // throws a JS TypeError straight through this frame into our caller. A
+    // response with no XHR simply has no headers to report.
+    if (fetch->id != 0) {
+        size_t hdrs_len = emscripten_fetch_get_response_headers_length(fetch);
+        if (hdrs_len > 0) {
+            std::string raw(hdrs_len + 1, '\0');
+            emscripten_fetch_get_response_headers(fetch, raw.data(), raw.size());
+            parse_response_headers(raw.c_str(), out);
+        }
     }
 
     // Body.

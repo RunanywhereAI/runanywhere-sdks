@@ -86,7 +86,26 @@ export class VADProtoAdapter {
     ]).length === 0;
   }
 
-  configureLifecycle(config: ProtoVADConfiguration): ProtoVADServiceState | null {
+  /**
+   * Apply the detector threshold / frame geometry to the loaded VAD service.
+   *
+   * The lifecycle VAD component lives in the heap that loaded the model. When
+   * the ONNX BackendWorker owns Silero, a main-thread configure reaches a
+   * module whose lifecycle map has no VAD component and returns
+   * NOT_INITIALIZED — which left the loaded detector permanently unusable and
+   * silently demoted the voice agent to energy VAD. Route it to the owning
+   * heap, exactly as `processLifecycle` already does.
+   */
+  async configureLifecycle(
+    config: ProtoVADConfiguration,
+  ): Promise<ProtoVADServiceState | null> {
+    const host = requireLiveOnnxWorkerOrMain('vad.configureLifecycle');
+    if (host) {
+      const response = await host.infer('vad.configure', {
+        requestBytes: VADConfiguration.encode(config).finish(),
+      });
+      return decodeWorkerInferResult(response, VADServiceState);
+    }
     if (!ensureExports(this.module, 'vad.configureLifecycle', [
       '_rac_vad_configure_lifecycle_proto',
     ])) {
@@ -149,27 +168,30 @@ export class VADProtoAdapter {
     );
   }
 
-  startLifecycle(): ProtoVADServiceState | null {
+  startLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.startLifecycle',
       '_rac_vad_start_lifecycle_proto',
       'rac_vad_start_lifecycle_proto',
+      'vad.start',
     );
   }
 
-  stopLifecycle(): ProtoVADServiceState | null {
+  stopLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.stopLifecycle',
       '_rac_vad_stop_lifecycle_proto',
       'rac_vad_stop_lifecycle_proto',
+      'vad.stop',
     );
   }
 
-  resetLifecycle(): ProtoVADServiceState | null {
+  resetLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.resetLifecycle',
       '_rac_vad_reset_lifecycle_proto',
       'rac_vad_reset_lifecycle_proto',
+      'vad.reset',
     );
   }
 
@@ -452,14 +474,20 @@ export class VADProtoAdapter {
     return new ProtoWasmBridge(this.module, logger);
   }
 
-  private callLifecycleState(
+  private async callLifecycleState(
     feature: string,
     exportName:
       | '_rac_vad_start_lifecycle_proto'
       | '_rac_vad_stop_lifecycle_proto'
       | '_rac_vad_reset_lifecycle_proto',
     functionName: string,
-  ): ProtoVADServiceState | null {
+    workerKind: 'vad.start' | 'vad.stop' | 'vad.reset',
+  ): Promise<ProtoVADServiceState | null> {
+    const host = requireLiveOnnxWorkerOrMain(feature);
+    if (host) {
+      const response = await host.infer(workerKind, {});
+      return decodeWorkerInferResult(response, VADServiceState);
+    }
     if (!ensureExports(this.module, feature, [exportName])) return null;
     const call = this.module[exportName];
     if (typeof call !== 'function') return null;

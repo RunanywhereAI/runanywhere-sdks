@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/common/special_token_filter.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
@@ -120,6 +121,52 @@ struct rac_llm_component {
  * Simple token estimation (~4 chars per token).
  * Mirrors Swift's token estimation in LLMCapability.
  */
+// Batch-style backends (Maple/Bonsai FastRPC, some remote hosts) finish the
+// whole generate before dumping stream chunks. Wall-to-first-token then ≈ total
+// time, so "decode = total − ttft" collapses to a few ms → absurd five-digit
+// tok/s. Keep TTFT: for these backends it is time to the first streamed token
+// (first thinking token when reasoning is on), not a fake prefill figure.
+struct StreamTimingMetrics {
+    int64_t ttft_ms = 0;
+    int64_t prompt_eval_ms = 0;
+    double tokens_per_second = 0.0;
+    /// The backend buffered the whole generate and then dumped the chunks, so the
+    /// post-TTFT window is an artifact and every rate must be taken over the full
+    /// wall time instead.
+    ///
+    /// Reported explicitly because it is not recoverable from the other fields:
+    /// `ttft_ms` carries the real first-token time in both modes, so a caller
+    /// trying to detect this from `ttft_ms == 0` is testing a state that cannot
+    /// occur, and silently gets the non-buffered arithmetic.
+    bool batch_buffered = false;
+};
+
+static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64_t raw_ttft_ms,
+                                                         int32_t completion_tokens) {
+    StreamTimingMetrics m;
+    if (total_ms <= 0 || completion_tokens <= 0) {
+        return m;
+    }
+    const int64_t decode_window =
+        (raw_ttft_ms > 0 && raw_ttft_ms < total_ms) ? (total_ms - raw_ttft_ms) : total_ms;
+    m.batch_buffered = raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
+    m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
+    m.prompt_eval_ms = m.ttft_ms;
+    if (m.batch_buffered) {
+        m.tokens_per_second = static_cast<double>(completion_tokens) /
+                              (static_cast<double>(total_ms) / 1000.0);
+        return m;
+    }
+    // TTFT ends when token 1 is delivered. Steady decode therefore measures
+    // tokens 2..N over the first-to-last interval, not all N tokens.
+    const int32_t steady_tokens = std::max<int32_t>(0, completion_tokens - 1);
+    m.tokens_per_second = decode_window > 0
+                              ? static_cast<double>(steady_tokens) /
+                                    (static_cast<double>(decode_window) / 1000.0)
+                              : 0.0;
+    return m;
+}
+
 static int32_t estimate_tokens(const char* text) {
     if (!text)
         return 1;
@@ -259,100 +306,6 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
 }
 
 #endif  // RAC_HAVE_PROTOBUF
-
-// =============================================================================
-// EOS / SPECIAL TOKEN STRIPPING
-// =============================================================================
-
-/**
- * Strip tokenizer-internal special tokens from a streamed LLM token before
- * the value reaches user callbacks or downstream proto subscribers.
- *
- * Backends occasionally leak end-of-utterance / end-of-text sentinels into
- * the streaming callback when the runtime swallow path missed them (notably
- * SmolVLM, Qwen-VL, Llama-3 — see B-RN-14-001). Without this
- * filter the angle-bracket artifacts (`<|im_end|>`, `<|eot_id|>`,
- * `<|endoftext|>`, `<eot>`, `<end_of_utterance>`) appear in chat UIs.
- *
- * Two pattern families are recognised:
- *   1. `<|TOKEN|>` — Qwen / Llama-3 / GPT-style pipe-wrapped sentinels.
- *      The scanner consumes everything between `<|` and the next `|>` so
- *      this naturally covers `im_end`, `eot_id`, `endoftext`, `im_start`,
- *      `vision_start`, `vision_end`, etc.
- *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`,
- *      `<endoftext>`, `<eos>`. Only the explicit allowlist is stripped so
- *      legitimate user content containing `<` is preserved.
- *
- * The cleaned output is written to @p buf and is guaranteed NUL-terminated
- * provided @p buf_size >= 1. The function returns @p buf for convenience —
- * if the entire token was a sentinel, @p buf points at the empty string.
- */
-static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf_size) {
-    if (!buf || buf_size == 0) {
-        return buf;
-    }
-    if (!token) {
-        buf[0] = '\0';
-        return buf;
-    }
-
-    // Bare-form sentinels matched as exact substrings. Keep the list short:
-    // every additional entry costs an O(n*m) scan per token. Patterns must
-    // not overlap (`<eos>` is a prefix of `<eos_id>` — not in this list).
-    static const char* kBareSentinels[] = {
-        "<end_of_utterance>",
-        "<endoftext>",
-        "<eot>",
-        "<eos>",
-    };
-    constexpr size_t kBareCount = sizeof(kBareSentinels) / sizeof(kBareSentinels[0]);
-
-    size_t out = 0;
-    size_t i = 0;
-    while (token[i] != '\0' && out + 1 < buf_size) {
-        if (token[i] == '<' && token[i + 1] == '|') {
-            // Pipe-wrapped form: skip everything through the next |> .
-            size_t end = i + 2;
-            while (token[end] != '\0') {
-                if (token[end] == '|' && token[end + 1] == '>') {
-                    i = end + 2;
-                    break;
-                }
-                ++end;
-            }
-            if (token[end] == '\0') {
-                // No closing |> in this chunk — copy `<` literally and
-                // continue so a multi-chunk sentinel surfacing across two
-                // callback invocations still appears (downstream gets one
-                // partial chunk; this never produced the angle-bracket
-                // artifact observed in the reports because the runtime
-                // emits the full sentinel as a single token).
-                buf[out++] = token[i++];
-            }
-            continue;
-        }
-
-        if (token[i] == '<') {
-            bool stripped = false;
-            for (size_t k = 0; k < kBareCount; ++k) {
-                const char* needle = kBareSentinels[k];
-                const size_t needle_len = strlen(needle);
-                if (strncmp(token + i, needle, needle_len) == 0) {
-                    i += needle_len;
-                    stripped = true;
-                    break;
-                }
-            }
-            if (stripped) {
-                continue;
-            }
-        }
-
-        buf[out++] = token[i++];
-    }
-    buf[out] = '\0';
-    return buf;
-}
 
 // =============================================================================
 // LIFECYCLE CALLBACKS
@@ -747,6 +700,11 @@ struct llm_stream_context {
     std::string full_text;
     int32_t prompt_tokens;
 
+    // Per-stream sentinel filter. Stateful on purpose: a backend may split
+    // `<|im_end|>` across two callbacks, and neither half is recognisable on
+    // its own.
+    rac::tokens::StreamFilter filter;
+
     // Analytics event data
     std::string generation_id;
     const char* model_id;
@@ -772,8 +730,8 @@ struct llm_stream_context {
 /**
  * Internal token callback that wraps user callback and tracks metrics.
  *
- * Every emitted token is run through
- * `llm_strip_eos_tokens()` before it reaches the user callback or the
+ * Every emitted token is run through the per-stream
+ * `rac::tokens::StreamFilter` before it reaches the user callback or the
  * proto stream dispatcher. Backends occasionally leak EOS sentinels
  * (`<|im_end|>`, `<|eot_id|>`, `<end_of_utterance>`, …) which the example
  * apps used to strip locally; the regex-based example workaround in
@@ -793,20 +751,22 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
         if (finish_reason != nullptr && finish_reason[0] != '\0') {
             ctx->producer_finish_reason = finish_reason;
         }
-        // Terminal event may carry empty text; the component synthesizes its
-        // own proto terminal after generate_stream returns. Do not forward
-        // empty finals to the user token callback.
-        if (token == nullptr || token[0] == '\0') {
-            return RAC_TRUE;
-        }
     }
 
     // Strip tokenizer-internal sentinels before any caller observes the
-    // chunk. The stack-allocated buffer comfortably fits a single decoded
-    // token; backends emit at most a few dozen bytes per callback.
-    char cleaned_buf[512];
-    const char* cleaned = llm_strip_eos_tokens(token, cleaned_buf, sizeof(cleaned_buf));
-    const bool cleaned_empty = (cleaned[0] == '\0');
+    // chunk. The filter carries per-stream state because a sentinel a backend
+    // splits over two callbacks (`"<|im_"` then `"end|>"`) is only
+    // recognisable once the halves are joined; the unresolved prefix is held
+    // here rather than delivered as the angle-bracket artifact. The terminal
+    // releases whatever is still held — with nothing more coming, an
+    // unfinished prefix is ordinary text. That released tail is why an empty
+    // terminal is no longer short-circuited above: every delivery below is
+    // already guarded on `cleaned`, so an empty final still forwards nothing.
+    std::string cleaned = ctx->filter.feed(token);
+    if (is_final) {
+        cleaned += ctx->filter.flush();
+    }
+    const bool cleaned_empty = cleaned.empty();
 
     // Track first token time and emit first token event only for the first
     // non-empty cleaned chunk so TTFT does not get charged to a leading
@@ -851,7 +811,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     // to filter empty events themselves.
     if (!cleaned_empty) {
         rac::llm::LLMStreamEventParams event;
-        event.token = cleaned;
+        event.token = cleaned.c_str();
         event.kind = 1;  // ANSWER
         rac::llm::dispatch_llm_stream_event(ctx->component_handle, event);
     }
@@ -859,7 +819,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     // Forward only non-empty cleaned tokens to the user callback so the
     // example/SDK rendering layer never has to strip these sentinels.
     if (!cleaned_empty && ctx->token_callback) {
-        return ctx->token_callback(cleaned, ctx->user_data);
+        return ctx->token_callback(cleaned.c_str(), ctx->user_data);
     }
 
     return RAC_TRUE;  // Continue by default
@@ -1025,27 +985,19 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
-    double ttft_ms = 0.0;
-    // Calculate TTFT
+    int64_t raw_ttft_ms = 0;
     if (ctx.first_token_recorded) {
-        auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            ctx.first_token_time - ctx.start_time);
-        final_result.time_to_first_token_ms = ttft_duration.count();
-        final_result.prompt_eval_time_ms = ttft_duration.count();
-        ttft_ms = static_cast<double>(ttft_duration.count());
+        raw_ttft_ms = std::chrono::duration_cast<std::chrono::milliseconds>(ctx.first_token_time -
+                                                                            ctx.start_time)
+                          .count();
     }
-
-    // Tokens/sec over decode time only — including prefill (TTFT) in the
-    // denominator systematically understates generation speed.
-    double tokens_per_second = 0.0;
-    const double decode_ms = (ttft_ms > 0.0 && ttft_ms < static_cast<double>(total_time_ms))
-                                 ? static_cast<double>(total_time_ms) - ttft_ms
-                                 : static_cast<double>(total_time_ms);
-    if (decode_ms > 0.0) {
-        tokens_per_second =
-            static_cast<double>(final_result.completion_tokens) / (decode_ms / 1000.0);
-        final_result.tokens_per_second = static_cast<float>(tokens_per_second);
-    }
+    const StreamTimingMetrics timing = compute_stream_timing_metrics(
+        total_time_ms, raw_ttft_ms, final_result.completion_tokens);
+    final_result.time_to_first_token_ms = timing.ttft_ms;
+    final_result.prompt_eval_time_ms = timing.prompt_eval_ms;
+    final_result.tokens_per_second = static_cast<float>(timing.tokens_per_second);
+    const double tokens_per_second = timing.tokens_per_second;
+    const double ttft_ms = static_cast<double>(timing.ttft_ms);
 
     if (complete_callback) {
         complete_callback(&final_result, user_data);
@@ -1830,6 +1782,12 @@ struct ProtoStreamContext {
     rac_llm_stream_proto_callback_fn callback = nullptr;
     void* user_data = nullptr;
     rac::llm::LifecycleLlmRef* ref = nullptr;
+    // Same per-stream sentinel filter the handle-based path (llm_stream_context)
+    // has carried for a while. This context backs the handle-LESS lifecycle ABI
+    // — the one every SDK that is not iOS actually calls (Web/WASM, Kotlin JNI,
+    // Flutter FFI, React Native) — so without it `<|im_end|>` reached chat
+    // bubbles and TTS on four platforms while iOS was clean.
+    rac::tokens::StreamFilter filter;
     uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
@@ -2178,17 +2136,34 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_generation_time_ms(static_cast<double>(total_time_ms));
-    int64_t ttft_ms = 0;
-    if (ctx->first_token_ms > 0) {
-        ttft_ms = ctx->first_token_ms - ctx->started_ms;
-        final_result.mutable_usage()->set_ttft_ms(ttft_ms);
+    const int64_t raw_ttft_ms =
+        ctx->first_token_ms > 0 ? ctx->first_token_ms - ctx->started_ms : 0;
+    const StreamTimingMetrics timing =
+        compute_stream_timing_metrics(total_time_ms, raw_ttft_ms, ctx->token_count);
+    if (timing.ttft_ms > 0) {
+        final_result.mutable_usage()->set_ttft_ms(timing.ttft_ms);
     }
-    // Tokens/sec over decode time only, not prefill-inclusive wall time.
-    const int64_t decode_ms =
-        (ttft_ms > 0 && ttft_ms < total_time_ms) ? total_time_ms - ttft_ms : total_time_ms;
-    if (decode_ms > 0 && ctx->token_count > 0) {
-        final_result.mutable_usage()->set_decode_tokens_per_second(static_cast<double>(
-            static_cast<double>(ctx->token_count) / (static_cast<double>(decode_ms) / 1000.0)));
+    if (timing.prompt_eval_ms > 0) {
+        final_result.set_prompt_eval_time_ms(timing.prompt_eval_ms);
+    }
+    if (timing.tokens_per_second > 0.0) {
+        final_result.mutable_usage()->set_decode_tokens_per_second(timing.tokens_per_second);
+    }
+    // When the stream was batch-buffered, decode_time_ms is the full wall
+    // generate (there is no separate post-TTFT decode window to report).
+    //
+    // Keyed off the flag, not off `timing.ttft_ms == 0`: that test could never
+    // pass alongside `raw_ttft_ms > 0` in the same condition, so buffered streams
+    // fell through to `total − ttft` below and reported a decode window of a few
+    // milliseconds — while `decode_tokens_per_second`, computed inside the helper,
+    // had already used the full wall time. The two numbers disagreed by the same
+    // factor that made the rate look absurd in the first place.
+    if (timing.batch_buffered && total_time_ms > 0) {
+        final_result.set_decode_time_ms(total_time_ms);
+    } else if (timing.ttft_ms > 0 && timing.ttft_ms < total_time_ms) {
+        final_result.set_decode_time_ms(total_time_ms - timing.ttft_ms);
+    } else if (total_time_ms > 0) {
+        final_result.set_decode_time_ms(total_time_ms);
     }
     // finish_reason widened from a bare string to the FinishReason enum
     // (idl/llm_options.proto). Map the producer's plain-English reason
@@ -2223,13 +2198,25 @@ rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const c
         if (finish_reason != nullptr && finish_reason[0] != '\0') {
             ctx->producer_finish_reason = finish_reason;
         }
-        if (token == nullptr || token[0] == '\0') {
-            return RAC_TRUE;
-        }
     }
 
-    const char* safe_token = token ? token : "";
-    consume_thinking_aware_text(ctx, safe_token);
+    // Strip tokenizer-internal sentinels before the thinking splitter, the
+    // accumulated answer, or the caller ever sees the chunk. The filter is
+    // stateful because a backend is free to split `<|im_end|>` across two
+    // callbacks and neither half is recognisable alone; `flush()` on the
+    // terminal releases a held prefix that turned out to be ordinary text.
+    // An empty final still has to reach the flush, so this runs before the
+    // old "empty final, nothing to do" short-circuit — every delivery below
+    // is already guarded on the cleaned text being non-empty.
+    std::string cleaned = ctx->filter.feed(token ? token : "");
+    if (is_final) {
+        cleaned += ctx->filter.flush();
+    }
+    if (cleaned.empty()) {
+        return RAC_TRUE;
+    }
+
+    consume_thinking_aware_text(ctx, cleaned.c_str());
     return RAC_TRUE;
 }
 
@@ -2332,7 +2319,13 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    const char* raw_text = raw.text ? raw.text : "";
+    // Sentinel-free before the thinking splitter runs, matching the streaming
+    // sibling. A leaked `<|im_end|>` here is not cosmetic: this text is what
+    // the non-streaming SDK verbs return and what the voice agent hands to
+    // TTS, so the artifact was rendered *and* spoken on every SDK that calls
+    // the handle-less ABI.
+    const std::string clean_text = rac::tokens::strip_special_tokens(raw.text ? raw.text : "");
+    const char* raw_text = clean_text.c_str();
     std::string thinking_open_tag;
     std::string thinking_close_tag;
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
@@ -2504,12 +2497,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         }
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
-        // Tokens/sec over decode time only, not prefill-inclusive wall time.
-        const int64_t stream_ttft =
+        const int64_t raw_stream_ttft =
             ctx.first_token_ms > ctx.started_ms ? ctx.first_token_ms - ctx.started_ms : 0;
-        const int64_t stream_decode = (stream_ttft > 0 && stream_ttft < stream_elapsed)
-                                          ? stream_elapsed - stream_ttft
-                                          : stream_elapsed;
+        const StreamTimingMetrics stream_timing =
+            compute_stream_timing_metrics(stream_elapsed, raw_stream_ttft, ctx.token_count);
         // GENERATION_EVENT_KIND_STREAM_COMPLETED was deleted (idl/sdk_events.proto):
         // streaming completion now folds into COMPLETED, discriminated by
         // is_streaming below (matches the non-streaming completion event).
@@ -2517,13 +2508,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  prompt.c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count, stream_elapsed,
                                  ctx.prompt_tokens, ref.framework_name,
-                                 (ctx.token_count > 0 && stream_decode > 0)
-                                     ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
-                                     : 0.0,
-                                 static_cast<double>(stream_ttft), options.temperature,
+                                 stream_timing.tokens_per_second,
+                                 static_cast<double>(stream_timing.ttft_ms), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),
                                  /*is_streaming=*/true,
-                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_ttft));
+                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_timing.prompt_eval_ms));
     }
 
     rac::llm::release_lifecycle_llm(&ref);
@@ -2659,7 +2648,13 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    const char* raw_text = raw.text ? raw.text : "";
+    // Sentinel-free before the thinking splitter runs, matching the streaming
+    // sibling. A leaked `<|im_end|>` here is not cosmetic: this text is what
+    // the non-streaming SDK verbs return and what the voice agent hands to
+    // TTS, so the artifact was rendered *and* spoken on every SDK that calls
+    // the handle-less ABI.
+    const std::string clean_text = rac::tokens::strip_special_tokens(raw.text ? raw.text : "");
+    const char* raw_text = clean_text.c_str();
     std::string thinking_open_tag;
     std::string thinking_close_tag;
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);

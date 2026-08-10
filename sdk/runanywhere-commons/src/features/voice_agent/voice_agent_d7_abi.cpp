@@ -36,6 +36,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "features/stt/stt_transcript_text.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -215,10 +216,17 @@ void d7_emit_audio(rac_voice_agent_handle_t handle, const void* data, size_t siz
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
+// `recoverable` says whether the SESSION survived this — see the contract on
+// `emit_component_failure`. It defaults to false because the pre-flight
+// rejections (agent shutting down, agent not configured, a modality not loaded)
+// really are terminal: nothing the user does at the panel will make the next
+// utterance work. A failure of one pipeline STAGE is the opposite and must say
+// so, or a single unlucky turn strands the user behind a red pill with the
+// microphone released.
 void d7_emit_error(rac_voice_agent_handle_t handle, rac_result_t code, const char* component_name,
                    const char* message, const std::string& session_id, const std::string& turn_id,
                    const std::string& request_id, rac_voice_agent_turn_event_callback_fn cb,
-                   void* user_data) {
+                   void* user_data, bool recoverable = false) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
@@ -232,7 +240,7 @@ void d7_emit_error(rac_voice_agent_handle_t handle, rac_result_t code, const cha
     e->set_message(message ? message : rac_error_message(code));
     e->set_failed_component(component_name ? component_name : "voice_agent");
     e->set_c_abi_code(signed_code);
-    e->set_recoverable(false);
+    e->set_recoverable(recoverable);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
@@ -518,18 +526,31 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
 
-    // Surface a real VAD verdict for the turn instead of
-    // emitting a hard-coded SPEECH_STARTED/SPEECH_ENDED pair around STT.
-    // The per-turn d7 path receives a pre-framed audio buffer, so we run
-    // the VAD component once over the whole buffer and emit a single
-    // SPEECH_ACTIVITY event reflecting the real verdict. Frontends that
-    // need per-frame VAD edges should use the streaming pipeline (which
-    // runs VADGateNode per frame); the d7 turn ABI only owes them an
-    // honest "did this turn contain speech?" signal.
-    auto run_turn_vad = [&]() -> bool {
+    // Ask the VAD whether this buffer contains a voice, and mean it.
+    //
+    // The detector was already being run here, and its answer was already
+    // wrong twice over. First the question: `process()` streams windows into
+    // Silero and then reports `Detected()`, which is the detector's state AFTER
+    // the last window — and the last window of a closed utterance is always part
+    // of the 800 ms of silence that closed it, so a single whole-buffer call
+    // answers "is the user speaking right now", to which the answer at the end of
+    // every utterance is no. Sweeping the buffer and taking the union of the
+    // answers asks the question the turn actually cares about: was anybody
+    // talking at any point in here. Second the use: the verdict only decided
+    // whether to emit a VAD event. The turn ran regardless, so the pipeline's one
+    // real speech classifier had no say in whether there was a turn, and the
+    // decision was left to "did the recognizer return any string" — which for a
+    // silent room is the string Whisper hallucinates from noise.
+    enum class TurnVadVerdict {
+        // No detector could answer (none loaded, or a buffer we cannot frame).
+        unavailable,
+        speech,
+        no_speech,
+    };
+    auto run_turn_vad = [&]() -> TurnVadVerdict {
         const size_t bytes = audio.size();
         if (bytes < sizeof(int16_t) || (bytes % sizeof(int16_t)) != 0)
-            return false;
+            return TurnVadVerdict::unavailable;
         const int16_t* pcm = reinterpret_cast<const int16_t*>(audio.data());
         const size_t count = bytes / sizeof(int16_t);
         std::vector<float> floats(count);
@@ -537,17 +558,49 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         for (size_t i = 0; i < count; ++i) {
             floats[i] = static_cast<float>(pcm[i]) * kInv;
         }
+        // One Silero window at 16 kHz. The backend buffers whatever it is given
+        // and consumes whole windows itself, so this only controls how often the
+        // verdict is sampled, never whether the audio is analysed.
+        constexpr size_t kVadSweepSamples = 512;
+
         rac::lifecycle::LifecycleVadRef vad_ref{};
         const bool have_lifecycle_vad =
             rac::lifecycle::acquire_lifecycle_vad(&vad_ref) == RAC_SUCCESS;
-        rac_bool_t is_speech = RAC_FALSE;
         if (have_lifecycle_vad && vad_ref.ops && vad_ref.ops->process) {
-            (void)vad_ref.ops->process(vad_ref.impl, floats.data(), count, &is_speech);
+            // Start from a clean detector: the previous turn's trailing state is
+            // not evidence about this one.
+            if (vad_ref.ops->reset) {
+                (void)vad_ref.ops->reset(vad_ref.impl);
+            }
+            bool heard_speech = false;
+            for (size_t offset = 0; offset < count && !heard_speech; offset += kVadSweepSamples) {
+                const size_t window = std::min(kVadSweepSamples, count - offset);
+                rac_bool_t window_speech = RAC_FALSE;
+                if (vad_ref.ops->process(vad_ref.impl, floats.data() + offset, window,
+                                         &window_speech) == RAC_SUCCESS &&
+                    window_speech == RAC_TRUE) {
+                    heard_speech = true;
+                }
+            }
             rac::lifecycle::release_lifecycle_vad(&vad_ref);
-        } else if (handle->vad_handle) {
-            (void)rac_vad_component_process(handle->vad_handle, floats.data(), count, &is_speech);
+            return heard_speech ? TurnVadVerdict::speech : TurnVadVerdict::no_speech;
         }
-        return is_speech == RAC_TRUE;
+        if (have_lifecycle_vad) {
+            rac::lifecycle::release_lifecycle_vad(&vad_ref);
+        }
+        if (handle->vad_handle) {
+            rac_bool_t is_speech = RAC_FALSE;
+            (void)rac_vad_component_process(handle->vad_handle, floats.data(), count, &is_speech);
+            // A positive from the component is worth reporting, but a negative
+            // is NOT a veto: with no model loaded the component falls back to its
+            // own energy threshold, which is the same measurement the segmenter
+            // already made on the same samples. Letting it overrule the turn
+            // would double-count one opinion and would silence a quiet talker
+            // that the segmenter — which judges relative to this room — correctly
+            // let through.
+            return is_speech == RAC_TRUE ? TurnVadVerdict::speech : TurnVadVerdict::unavailable;
+        }
+        return TurnVadVerdict::unavailable;
     };
     if (!cancellation.begin_stage(rac_voice_agent_turn_stage::vad)) {
         turn_metrics.error_code = RAC_ERROR_CANCELLED;
@@ -556,7 +609,13 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
                           request_id, event_callback, user_data);
         return RAC_ERROR_CANCELLED;
     }
-    const bool turn_has_speech = run_turn_vad();
+    const TurnVadVerdict vad_verdict = run_turn_vad();
+    const bool turn_has_speech = vad_verdict == TurnVadVerdict::speech;
+    RAC_LOG_INFO("VoiceAgent", "turn VAD verdict: %s (%zu bytes)",
+                 vad_verdict == TurnVadVerdict::speech
+                     ? "speech"
+                     : (vad_verdict == TurnVadVerdict::no_speech ? "no speech" : "unavailable"),
+                 audio.size());
     cancellation.end_stage();
     if (cancellation.cancelled()) {
         turn_metrics.error_code = RAC_ERROR_CANCELLED;
@@ -564,6 +623,20 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         d7_emit_cancelled(handle, runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id,
                           request_id, event_callback, user_data);
         return RAC_ERROR_CANCELLED;
+    }
+    // A speech detector that has looked at the buffer and found no voice in it
+    // ends the turn here — before STT, before the LLM, before anything is said
+    // out loud. This is the gate that stops a noisy room becoming a sentence: the
+    // energy segmenter can and does open on a fan or a chair, but Silero does not
+    // mistake either for a person. Nothing is reported to the frontend beyond the
+    // turn closing, because nothing went wrong.
+    if (vad_verdict == TurnVadVerdict::no_speech) {
+        turn_metrics.error_code = RAC_ERROR_INSUFFICIENT_AUDIO_DATA;
+        turn_metrics.error_message = "no speech in the captured utterance";
+        RAC_LOG_INFO("VoiceAgent",
+                     "VAD found no speech in the captured utterance; no turn, still listening");
+        emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED);
+        return RAC_ERROR_INSUFFICIENT_AUDIO_DATA;
     }
     if (turn_has_speech) {
         d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
@@ -621,22 +694,44 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         turn_metrics.error_code = rc;
         turn_metrics.error_message = "STT transcription failed";
         d7_emit_error(handle, rc, "stt", "STT transcription failed", session_id, turn_id,
-                      request_id, event_callback, user_data);
-        emit_component_failure(handle, "stt", rc, "STT transcription failed");
+                      request_id, event_callback, user_data, /*recoverable=*/true);
+        emit_component_failure(handle, "stt", rc, "STT transcription failed",
+                               /*recoverable=*/true);
         return rc;
     }
-    if (!stt.text || stt.text[0] == '\0') {
+    // A no-speech engine marker is not something the user said. Whisper answers
+    // silence with `[BLANK_AUDIO]` / `[ Silence ]` / `(wind)` — non-empty, so it
+    // passed the old `stt.text[0] == '\0'` check and became the turn: shown as
+    // the user's own words, then handed to the LLM as the prompt, so the agent
+    // answered a question nobody asked, out loud. The predicate treats it as
+    // what it is: no speech.
+    //
+    // And "no speech" is not a failure. This used to raise a session error
+    // (RAC_ERROR_INVALID_STATE / -231, "STT transcription was empty") through
+    // BOTH error channels, which is how a quiet room ended a live macOS session:
+    // the panel latched a terminal red "Error" pill reading "STT transcription
+    // was empty / Click to try again", released the microphone, and left the user
+    // with no way back except restarting the conversation. The segmenter is
+    // allowed to be wrong occasionally about what was worth transcribing — that
+    // is why the recognizer gets a look at all — and the correct answer when it
+    // was is to drop the turn and carry on listening, silently.
+    if (rac::stt::transcript_is_non_speech(stt.text)) {
         rac_stt_result_free(&stt);
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
-        turn_metrics.error_code = RAC_ERROR_INVALID_STATE;
-        turn_metrics.error_message = "STT transcription was empty";
-        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt", "STT transcription was empty",
-                      session_id, turn_id, request_id, event_callback, user_data);
-        emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
-                               "STT transcription was empty");
-        return RAC_ERROR_INVALID_STATE;
+        turn_metrics.error_code = RAC_ERROR_INSUFFICIENT_AUDIO_DATA;
+        turn_metrics.error_message = "no speech in the captured utterance";
+        RAC_LOG_INFO("VoiceAgent",
+                     "Captured utterance carried no speech; dropping the turn and listening on");
+        // The turn already announced PROCESSING_SPEECH, so it owes the frontend
+        // the way back. Without this the panel sits on "Working out a reply…"
+        // over a pipeline that has stopped working on anything.
+        d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH,
+                      runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
+                      event_callback, user_data);
+        emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED);
+        return RAC_ERROR_INSUFFICIENT_AUDIO_DATA;
     }
     // Only emit the matching "speech ended" event if we
     // previously emitted "speech started" for this turn. Emitting
@@ -741,8 +836,8 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         turn_metrics.error_code = rc;
         turn_metrics.error_message = "LLM generation failed";
         d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id, request_id,
-                      event_callback, user_data);
-        emit_component_failure(handle, "llm", rc, "LLM generation failed");
+                      event_callback, user_data, /*recoverable=*/true);
+        emit_component_failure(handle, "llm", rc, "LLM generation failed", /*recoverable=*/true);
         return rc;
     }
     const VoiceResponseParts response = split_voice_response(llm.text);
@@ -760,8 +855,9 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         turn_metrics.error_code = response_status;
         turn_metrics.error_message = kVoiceAgentEmptyResponseMessage;
         d7_emit_error(handle, response_status, "llm", kVoiceAgentEmptyResponseMessage, session_id,
-                      turn_id, request_id, event_callback, user_data);
-        emit_component_failure(handle, "llm", response_status, kVoiceAgentEmptyResponseMessage);
+                      turn_id, request_id, event_callback, user_data, /*recoverable=*/true);
+        emit_component_failure(handle, "llm", response_status, kVoiceAgentEmptyResponseMessage,
+                               /*recoverable=*/true);
         return response_status;
     }
 
@@ -861,8 +957,8 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         turn_metrics.error_code = rc;
         turn_metrics.error_message = "TTS synthesis failed";
         d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id, request_id,
-                      event_callback, user_data);
-        emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
+                      event_callback, user_data, /*recoverable=*/true);
+        emit_component_failure(handle, "tts", rc, "TTS synthesis failed", /*recoverable=*/true);
         return rc;
     }
 
@@ -1101,8 +1197,11 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     runanywhere::v1::STTOutput output;
+    // Same normalisation as `fill_stt_output` on the proto path: an engine's
+    // no-speech marker is published as empty so every SDK renders its own honest
+    // empty state instead of showing `[BLANK_AUDIO]` as words the speaker said.
     if (stt.text)
-        output.set_text(stt.text);
+        output.set_text(rac::stt::transcript_for_display(stt.text));
     output.set_confidence(stt.confidence);
     if (stt.detected_language)
         output.set_language(stt.detected_language);

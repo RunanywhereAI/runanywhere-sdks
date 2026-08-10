@@ -18,6 +18,7 @@ import ai.runanywhere.proto.v1.DiarizationRequest
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionResult
 import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelGetRequest
 import ai.runanywhere.proto.v1.ModelGetResult
 import ai.runanywhere.proto.v1.ModelListRequest
@@ -45,6 +46,7 @@ import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VLMStreamEvent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.availableTTSVoicesInternal
 import com.runanywhere.sdk.public.extensions.currentModel
@@ -159,6 +161,28 @@ internal fun legacyTranscribeStream(
     audio: Flow<ByteArray>,
     options: STTOptions,
 ): Flow<STTPartialResult> = RunAnywhere.transcribeStream(audio, options)
+
+/**
+ * Fail with the actual reason a live STT stream cannot open.
+ *
+ * `transcribeStream` answers an uninitialized SDK or an unloaded model by
+ * closing its `callbackFlow` without emitting, so the caller saw a stream that
+ * ended immediately and had nothing to distinguish "no model" from "no speech".
+ * This is the port of Swift's `RunAnywhere.requireSTTModel()` preflight
+ * (`STTNamespace.openStream`), so both SDKs name the precondition they failed.
+ */
+internal suspend fun legacyRequireSttModel() {
+    if (!RunAnywhere.isInitialized) {
+        throw SDKException.notInitialized("RunAnywhere")
+    }
+    val current =
+        RunAnywhere.currentModel(
+            CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+        )
+    if (!current.found) {
+        throw SDKException.modelNotLoaded()
+    }
+}
 
 internal suspend fun legacySttState(): STTServiceState = RunAnywhere.sttState()
 

@@ -346,6 +346,14 @@ class SDKException(
         // codes ≤ 899; the chosen ProtoErrorCode drives cAbiCode via of()'s
         // round-trip computation — no hand-written cAbiCode literals.
 
+        fun stt(message: String, cause: Throwable? = null) =
+            of(
+                code = ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                message = message,
+                cause = cause,
+            )
+
         fun tts(message: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,

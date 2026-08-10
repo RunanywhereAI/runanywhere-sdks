@@ -137,7 +137,8 @@ public actor SystemFoundationModelsService {
             let response = try await performGeneration(
                 with: sessionObj,
                 prompt: prompt,
-                temperature: Double(options.temperature)
+                temperature: Double(options.temperature),
+                maxOutputTokens: maximumResponseTokens(from: options)
             )
             logger.debug("Generated response successfully")
             return response
@@ -181,6 +182,7 @@ public actor SystemFoundationModelsService {
                 with: sessionObj,
                 prompt: prompt,
                 temperature: Double(options.temperature),
+                maxOutputTokens: maximumResponseTokens(from: options),
                 onToken: onToken
             )
             logger.debug("Streaming generation completed successfully")
@@ -199,13 +201,27 @@ public actor SystemFoundationModelsService {
     }
 
     #if canImport(FoundationModels)
+    /// The caller's output-token cap as FoundationModels wants it.
+    ///
+    /// `nil` means "no cap", which is what an unset field asks for — and, because
+    /// the generated accessor reports an unset `maxOutputTokens` as `0`, what a
+    /// literal `0` has to mean here too. Passing that `0` straight through would
+    /// read as "generate nothing", so the caller who never expressed an opinion
+    /// would get an empty response from Apple Intelligence and a full one from
+    /// every other engine.
+    private func maximumResponseTokens(from options: RALLMGenerationOptions) -> Int? {
+        guard options.hasMaxOutputTokens, options.maxOutputTokens > 0 else { return nil }
+        return Int(options.maxOutputTokens)
+    }
+
     /// Performs text generation with the given session
     private func performGeneration(
         with session: LanguageModelSession,
         prompt: String,
-        temperature: Double
+        temperature: Double,
+        maxOutputTokens: Int?
     ) async throws -> String {
-        let foundationOptions = GenerationOptions(temperature: temperature)
+        let foundationOptions = GenerationOptions(temperature: temperature, maximumResponseTokens: maxOutputTokens)
         let response = try await session.respond(to: prompt, options: foundationOptions)
         return response.content
     }
@@ -215,9 +231,10 @@ public actor SystemFoundationModelsService {
         with session: LanguageModelSession,
         prompt: String,
         temperature: Double,
+        maxOutputTokens: Int?,
         onToken: @escaping @Sendable (String) -> Void
     ) async throws {
-        let foundationOptions = GenerationOptions(temperature: temperature)
+        let foundationOptions = GenerationOptions(temperature: temperature, maximumResponseTokens: maxOutputTokens)
         let responseStream = session.streamResponse(to: prompt, options: foundationOptions)
 
         var previousContent = ""

@@ -13,6 +13,7 @@
  */
 
 import { RunAnywhere } from '@runanywhere/web';
+import { icon } from '../components/icons';
 import { escapeHtml } from '../services/escape-html';
 import {
   isUsableCredential,
@@ -22,6 +23,17 @@ import {
 let container: HTMLElement;
 
 const STORAGE_KEY = 'runanywhere-settings';
+
+/**
+ * Max-token bounds, named because they are enforced in three places that must
+ * agree: the stepper's clamp, the persisted-value validator, and the hint that
+ * tells the user what the range is. They were previously literals in the first
+ * two and absent from the third, so the ceiling was invisible until generation
+ * time.
+ */
+const TOKENS_MIN = 500;
+const TOKENS_MAX = 20_000;
+const TOKENS_STEP = 500;
 
 // Generation defaults mirror iOS. A persisted explicit preference still wins
 // in loadSettings().
@@ -65,9 +77,9 @@ function decodePersistedSettings(value: unknown): PersistedAppSettings | null {
   if (
     typeof value.maxTokens === 'number'
     && Number.isInteger(value.maxTokens)
-    && value.maxTokens >= 500
-    && value.maxTokens <= 20000
-    && value.maxTokens % 500 === 0
+    && value.maxTokens >= TOKENS_MIN
+    && value.maxTokens <= TOKENS_MAX
+    && value.maxTokens % TOKENS_STEP === 0
   ) {
     decoded.maxTokens = value.maxTokens;
   }
@@ -170,6 +182,21 @@ export function getGenerationSettings(): GenerationSettings {
   };
 }
 
+/**
+ * Set reasoning on or off from outside the Settings tab.
+ *
+ * The chat composer carries the same toggle (reasoning changes what the next turn
+ * does, so it belongs where the turn is composed — iOS and Android both put it
+ * there). Both controls write this one persisted value rather than keeping their own
+ * copy, so they cannot disagree, and the Settings switch shows the composer's last
+ * choice because that view rebuilds its markup from `settings` on mount.
+ */
+export function setThinkingModeEnabled(enabled: boolean): void {
+  loadSettings();
+  settings.thinkingModeEnabled = enabled;
+  saveSettings();
+}
+
 export function initSettingsTab(el: HTMLElement): void {
   container = el;
   loadSettings();
@@ -184,33 +211,54 @@ export function initSettingsTab(el: HTMLElement): void {
       <div class="settings-section">
         <div class="settings-section-title">Generation</div>
         <div class="setting-row">
-          <span class="setting-label">Temperature</span>
+          <label class="setting-label" for="settings-temp">Temperature</label>
           <div class="flex items-center gap-sm">
-            <span class="setting-value" id="settings-temp-val">${settings.temperature.toFixed(1)}</span>
-            <input type="range" id="settings-temp" min="0" max="2" step="0.1" value="${settings.temperature}">
+            <span class="setting-value" id="settings-temp-val" aria-hidden="true">${settings.temperature.toFixed(1)}</span>
+            <input type="range" id="settings-temp" min="0" max="2" step="0.1" value="${settings.temperature}"
+              aria-describedby="settings-temp-hint">
           </div>
         </div>
+        <p class="setting-hint" id="settings-temp-hint">
+          0 is repeatable and literal, 2 is loose and inventive. The slider
+          reports its own value, so the number beside it is decorative.
+        </p>
         <div class="setting-row">
-          <span class="setting-label">Max Tokens</span>
+          <span class="setting-label" id="settings-tokens-label">Max Tokens</span>
           <div class="flex items-center gap-sm">
-            <button class="btn btn-sm" id="settings-tokens-minus">-</button>
-            <span class="setting-value" id="settings-tokens-val">${settings.maxTokens}</span>
-            <button class="btn btn-sm" id="settings-tokens-plus">+</button>
+            <button type="button" class="btn btn-sm" id="settings-tokens-minus"
+              aria-label="Decrease max tokens by ${TOKENS_STEP}">&minus;</button>
+            <span class="setting-value" id="settings-tokens-val" role="status" aria-live="polite"
+              aria-labelledby="settings-tokens-label">${settings.maxTokens}</span>
+            <button type="button" class="btn btn-sm" id="settings-tokens-plus"
+              aria-label="Increase max tokens by ${TOKENS_STEP}">+</button>
           </div>
         </div>
+        <p class="setting-hint" id="settings-tokens-hint">
+          ${TOKENS_MIN.toLocaleString()}–${TOKENS_MAX.toLocaleString()}, in steps of
+          ${TOKENS_STEP}. A model still stops early at its own context limit.
+        </p>
         <div class="setting-row setting-row--stacked">
-          <label class="label">System Prompt</label>
+          <label class="label" for="settings-system-prompt">System Prompt</label>
           <textarea class="text-input w-full" id="settings-system-prompt" rows="3"
             placeholder="${escapeHtml(DEFAULT_SYSTEM_PROMPT)}">${escapeHtml(settings.systemPrompt)}</textarea>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Thinking Mode</span>
-          <div class="toggle ${settings.thinkingModeEnabled ? 'on' : ''}" id="settings-thinking-toggle"></div>
+          <span class="setting-label" id="settings-thinking-label">Thinking Mode</span>
+          <!-- A real <button role="switch">, not a styled <div>: this was a
+               click-only element with tabIndex -1, no role and no state, so it
+               was unreachable by keyboard and silent to a screen reader — a fake
+               toggle by this app's own truthfulness rule, even though the value
+               it wrote was honoured at send time. -->
+          <button type="button" class="toggle" id="settings-thinking-toggle"
+            role="switch" aria-checked="${settings.thinkingModeEnabled ? 'true' : 'false'}"
+            aria-labelledby="settings-thinking-label"
+            aria-describedby="settings-thinking-hint"></button>
         </div>
-        <p class="setting-hint">
+        <p class="setting-hint" id="settings-thinking-hint">
           Off by default. Turn on for thinking-capable models (e.g. Qwen3)
           when you want a visible reasoning phase before the answer.
         </p>
+        <p class="setting-saved" id="settings-generation-saved" role="status" aria-live="polite"></p>
       </div>
 
       <!-- Optional direct-browser API configuration, applied explicitly by
@@ -238,23 +286,29 @@ export function initSettingsTab(el: HTMLElement): void {
         </div>
       </div>
 
-      <!-- Hugging Face access token for gated/private model downloads. The SDK
-           owns the token (RunAnywhere.setHuggingFaceToken); it is held in memory for the
-           current session only and is never persisted to browser storage. -->
+      <!-- Hugging Face access token for restricted model downloads. The SDK owns
+           the token (RunAnywhere.setHuggingFaceToken); it is held in memory for the
+           current session only and is never persisted to browser storage.
+
+           The hint below is consumer copy and deliberately names none of that:
+           it used to say "gated or private models" and quote the SDK method,
+           which tells the reader what the code does rather than whether they
+           need to do anything. -->
       <div class="settings-section">
         <div class="settings-section-title">Hugging Face Access</div>
         <div class="setting-row">
-          <span class="setting-label">Token</span>
+          <span class="setting-label">Access token</span>
           <span class="setting-value" id="settings-hf-state">${hfTokenConfigured ? 'Configured' : 'Not set'}</span>
         </div>
         <div class="setting-row setting-row--stacked">
+          <label class="sr-only" for="settings-hf-token">Hugging Face access token</label>
           <input type="password" class="text-input w-full" id="settings-hf-token" placeholder="hf_..." autocomplete="off" spellcheck="false">
           <p class="setting-hint">
-            Optional. Add a Hugging Face token to download gated or private
-            models; public models need none. The token is passed to the SDK via
-            <code>RunAnywhere.setHuggingFaceToken</code>, kept in memory for this session
-            only, and never persisted to browser storage; re-enter it after a
-            reload.
+            Optional. Every model in this app downloads without one. You only
+            need a token for models Hugging Face asks you to sign in for &mdash;
+            a licence you have to accept, or something private of your own.
+            It is kept in memory for this tab only, never saved, and never sent
+            anywhere but Hugging Face; re-enter it after a reload.
             <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
           </p>
           <div class="flex items-center gap-sm">
@@ -283,12 +337,15 @@ export function initSettingsTab(el: HTMLElement): void {
         </div>
         <div class="setting-row">
           <span class="setting-label">Platform</span>
-          <span class="setting-value">Web (Emscripten WASM)</span>
+          <!-- Emscripten is the toolchain that produced the binary, not a thing
+               the reader is running on. WebAssembly is. -->
+          <span class="setting-value">Web browser (WebAssembly)</span>
         </div>
-        <div class="setting-row cursor-pointer" id="settings-docs-link">
-          <span class="setting-label text-accent">Documentation</span>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.5" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+        <a class="setting-row setting-row--link" id="settings-docs-link"
+          href="https://docs.runanywhere.ai" target="_blank" rel="noopener noreferrer">
+          <span class="setting-label">Documentation</span>
+          ${icon('externalLink', { size: 16 })}
+        </a>
       </div>
 
     </div>
@@ -300,21 +357,31 @@ export function initSettingsTab(el: HTMLElement): void {
   tempSlider.addEventListener('input', () => {
     settings.temperature = parseFloat(tempSlider.value);
     tempVal.textContent = settings.temperature.toFixed(1);
-    saveSettings();
+    // `input` fires per pixel of drag, so announce once the drag settles rather
+    // than shouting "Saved" a hundred times into the live region.
+    saveSettings({ announce: false });
   });
+  tempSlider.addEventListener('change', () => saveSettings());
 
   // Max tokens stepper
   const tokensVal = container.querySelector('#settings-tokens-val')!;
-  container.querySelector('#settings-tokens-minus')!.addEventListener('click', () => {
-    settings.maxTokens = Math.max(500, settings.maxTokens - 500);
+  const minusButton = container.querySelector('#settings-tokens-minus') as HTMLButtonElement;
+  const plusButton = container.querySelector('#settings-tokens-plus') as HTMLButtonElement;
+  const stepTokens = (delta: number): void => {
+    const next = Math.min(TOKENS_MAX, Math.max(TOKENS_MIN, settings.maxTokens + delta));
+    if (next === settings.maxTokens) return;
+    settings.maxTokens = next;
     tokensVal.textContent = String(settings.maxTokens);
+    // Disable at the ends instead of letting a live button do nothing — the
+    // ceiling was previously invisible until a model refused the request.
+    minusButton.disabled = settings.maxTokens <= TOKENS_MIN;
+    plusButton.disabled = settings.maxTokens >= TOKENS_MAX;
     saveSettings();
-  });
-  container.querySelector('#settings-tokens-plus')!.addEventListener('click', () => {
-    settings.maxTokens = Math.min(20000, settings.maxTokens + 500);
-    tokensVal.textContent = String(settings.maxTokens);
-    saveSettings();
-  });
+  };
+  minusButton.disabled = settings.maxTokens <= TOKENS_MIN;
+  plusButton.disabled = settings.maxTokens >= TOKENS_MAX;
+  minusButton.addEventListener('click', () => stepTokens(-TOKENS_STEP));
+  plusButton.addEventListener('click', () => stepTokens(TOKENS_STEP));
 
   // System prompt (iOS parity: SettingsViewModel.swift:251-254 saveSystemPrompt)
   const systemPromptInput = container.querySelector('#settings-system-prompt') as HTMLTextAreaElement;
@@ -380,10 +447,10 @@ export function initSettingsTab(el: HTMLElement): void {
     }
   });
 
-  // Docs link
-  container.querySelector('#settings-docs-link')!.addEventListener('click', () => {
-    window.open('https://docs.runanywhere.ai', '_blank');
-  });
+  // The docs link is a real <a href target="_blank">, so the browser owns
+  // opening it — which is what makes it keyboard-reachable, announced as a
+  // link, and usable via "open in new window". It was a <div> with a click
+  // handler calling window.open(), which none of those are true of.
 }
 
 async function applyAPIConfiguration(
@@ -474,15 +541,57 @@ function updateTelemetryState(environment: string, enabled: boolean): void {
   }
 }
 
+/**
+ * Wire a `role="switch"` button.
+ *
+ * `aria-checked` is the state of record and `.on` is only its visual echo, so
+ * the two cannot disagree — a screen reader reads the same value the eye sees.
+ * Space and Enter come free from using a real `<button>`.
+ */
 function setupToggle(id: string, onChange: (on: boolean) => void): void {
   const toggle = container.querySelector(`#${id}`)!;
+  const render = (on: boolean): void => {
+    toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+    toggle.classList.toggle('on', on);
+  };
+  // Sync once up front rather than writing the class in the template too: a
+  // switch restored from storage as on would otherwise render visually off,
+  // which is the exact disagreement this arrangement exists to rule out.
+  render(toggle.getAttribute('aria-checked') === 'true');
   toggle.addEventListener('click', () => {
-    toggle.classList.toggle('on');
-    onChange(toggle.classList.contains('on'));
+    const next = toggle.getAttribute('aria-checked') !== 'true';
+    render(next);
+    onChange(next);
   });
 }
 
-function saveSettings(): void {
+/**
+ * Confirm a preference was stored.
+ *
+ * Every generation setting writes to localStorage on change and previously did
+ * so in complete silence, leaving no way to tell a saved value from a dropped
+ * one. Announced through a polite live region so it is spoken as well as seen,
+ * and cleared afterwards so a stale "Saved" cannot outlive its edit.
+ */
+let savedNoticeTimer: number | null = null;
+
+function announceSaved(): void {
+  const notice = container?.querySelector('#settings-generation-saved');
+  if (!notice) return;
+  notice.textContent = 'Saved';
+  notice.classList.add('setting-saved--visible');
+  // Clears a previous storage failure: if writing works now, the warning it left
+  // behind is stale and must not stay on screen in its error colour.
+  notice.classList.remove('setting-saved--error');
+  if (savedNoticeTimer !== null) window.clearTimeout(savedNoticeTimer);
+  savedNoticeTimer = window.setTimeout(() => {
+    notice.textContent = '';
+    notice.classList.remove('setting-saved--visible');
+    savedNoticeTimer = null;
+  }, 2000);
+}
+
+function saveSettings(options: { announce?: boolean } = {}): void {
   try {
     // iOS parity stops at the Keychain: SettingsViewModel persists the API
     // key via KeychainService (SettingsViewModel.swift:65-72), and browsers
@@ -491,7 +600,30 @@ function saveSettings(): void {
     // so the key is session-only — every other setting round-trips.
     const { apiKey: _apiKey, ...persistable } = settings;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
-  } catch { /* storage may not be available */ }
+    if (options.announce !== false) announceSaved();
+  } catch {
+    // Storage can be unavailable (private mode, quota, blocked cookies). Say so
+    // rather than reporting a save that did not happen.
+    reportSaveFailed();
+  }
+}
+
+/**
+ * Report that the preference did *not* persist.
+ *
+ * The catch here used to swallow the failure entirely, which — now that the
+ * success path says "Saved" — would be the worse kind of dishonesty: a setting
+ * that silently reverts on reload while the UI claimed otherwise.
+ */
+function reportSaveFailed(): void {
+  const notice = container?.querySelector('#settings-generation-saved');
+  if (!notice) return;
+  if (savedNoticeTimer !== null) {
+    window.clearTimeout(savedNoticeTimer);
+    savedNoticeTimer = null;
+  }
+  notice.textContent = 'Not saved — this browser blocked local storage, so this applies to the current tab only.';
+  notice.classList.add('setting-saved--visible', 'setting-saved--error');
 }
 
 function loadSettings(): void {

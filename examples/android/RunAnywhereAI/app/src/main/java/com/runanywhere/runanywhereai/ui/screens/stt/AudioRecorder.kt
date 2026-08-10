@@ -108,6 +108,14 @@ class AudioRecorder {
     companion object {
         const val SAMPLE_RATE = 16000
         private const val CHUNK_BYTES = 3200
+
+        /**
+         * Milliseconds of audio in one `onChunk` callback, derived from
+         * [CHUNK_BYTES] so callers sizing a buffer in seconds cannot drift from
+         * the size this recorder actually emits.
+         */
+        const val CHUNK_MS = CHUNK_BYTES * 1000 / (SAMPLE_RATE * 2)
+
         private const val JOIN_TIMEOUT_MS = 5000L
         private val CHANNEL = AudioFormat.CHANNEL_IN_MONO
         private val ENCODING = AudioFormat.ENCODING_PCM_16BIT

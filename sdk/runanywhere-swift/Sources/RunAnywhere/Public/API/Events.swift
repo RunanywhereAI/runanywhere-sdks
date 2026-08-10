@@ -79,6 +79,22 @@ public enum VoiceEvent: Sendable {
     case agentResponse(text: String)
     case speechStarted
     case speechEnded
+
+    /// The session is running and reading the microphone, but the microphone is
+    /// not delivering a usable signal — muted, the wrong input device selected,
+    /// or a host with no audio device at all. `detail` is the core's own
+    /// measurement, e.g. "the microphone is delivering digital silence (every
+    /// sample zero for 8s)".
+    ///
+    /// Separate from `.error` because nothing has failed: the pipeline is
+    /// healthy and will hear the moment real signal arrives. Rendering it as an
+    /// error would be wrong, and rendering it as nothing at all is what left the
+    /// panel asserting "Go ahead — I'm listening" at a user it could not hear.
+    /// The distinction is on the wire already (`ERROR_CODE_INSUFFICIENT_AUDIO_DATA`
+    /// on a recoverable `VoiceSessionError`); this case stops the SDK throwing it
+    /// away.
+    case inputSilent(detail: String)
+
     case error(message: String, recoverable: Bool)
 
     /// Fold one native voice event onto the spec grammar, or drop it when it
@@ -102,15 +118,33 @@ public enum VoiceEvent: Sendable {
             }
             return nil
         case .sessionError(let error):
+            if error.code == .insufficientAudioData {
+                return .inputSilent(detail: error.message)
+            }
             return .error(message: error.message, recoverable: error.recoverable)
         case .turnLifecycle(let turn):
-            if turn.kind == .agentResponseStarted {
+            switch turn.kind {
+            case .agentResponseStarted:
                 return .agentStateChanged(.speaking)
-            }
-            if turn.kind == .failed, turn.hasError {
+            // The core's in-feed segmenter reports the moment the energy gate
+            // opens (voice_agent_feed_abi.cpp → USER_SPEECH_STARTED), which is
+            // the only signal that arrives *while* the user is still talking.
+            // Swift used to drop both of these and derive `.speechStarted`
+            // solely from the `vad` arm, which the turn pipeline emits once,
+            // after the utterance has already closed — and only when a VAD
+            // model answered. With no VAD resident it never arrived at all, so
+            // "I can't hear you" stayed on screen through a transcript and a
+            // spoken reply. Kotlin has always mapped these two (VoiceSession.kt);
+            // this is Swift catching up.
+            case .userSpeechStarted:
+                return .speechStarted
+            case .userSpeechEnded:
+                return .speechEnded
+            case .failed where turn.hasError:
                 return .error(message: turn.error.message, recoverable: turn.error.recoverable)
+            default:
+                return nil
             }
-            return nil
         default:
             return nil
         }
@@ -149,12 +183,114 @@ public enum ImageEvent: Sendable {
 /// Progress of one model download.
 public enum DownloadEvent: Sendable {
     case started(operationId: String, sequence: Int64)
-    case progress(operationId: String, sequence: Int64, bytesDone: Int64, bytesTotal: Int64, percent: Float, file: String?)
+    case progress(DownloadProgressSnapshot)
     case verifying(operationId: String, sequence: Int64)
     case extracting(operationId: String, sequence: Int64, percent: Float?)
     case completed(operationId: String, sequence: Int64, model: ModelInfo)
     case failed(operationId: String, sequence: Int64, error: SDKException)
     case cancelled(operationId: String, sequence: Int64)
+}
+
+/// What a download looks like to a caller at one instant.
+///
+/// ## Why this is a struct and not six more associated values
+///
+/// `.progress` used to be a six-tuple, which meant every consumer wrote
+/// `case .progress(_, _, _, _, let percent, _)` — five wildcards to reach one
+/// value, and a pattern that silently changes meaning if a field is ever
+/// inserted. Adding speed and ETA that way would have made it eleven positions.
+///
+/// ## Why these fields exist at all
+///
+/// A model is hundreds of megabytes to several gigabytes, so a bare percentage
+/// cannot distinguish a slow transfer from a stalled one. C++ already measures
+/// throughput and projects a finish time (`download_orchestrator.cpp` sets
+/// `bytes_per_second` and `eta_seconds`), and the `DownloadProgress` proto has
+/// carried both — along with the retry count and the position in a multi-file
+/// plan — the whole time. Those fields were computed, sent across the ABI, and
+/// then dropped at this boundary, so no consumer could show a rate or a
+/// remaining time no matter what it did.
+///
+/// They are surfaced rather than re-derived per platform on purpose: five SDKs
+/// each computing a rate from two successive UI-thread samples would disagree
+/// with each other and with the transfer that knows its own history.
+///
+/// Optional fields are `nil` when genuinely unknown rather than `0`, so a
+/// caller can omit a row instead of rendering "0 B/s" while the connection is
+/// still opening. This mirrors `DownloadEvent.Progress` in the Kotlin SDK
+/// field-for-field.
+public struct DownloadProgressSnapshot: Sendable, Equatable {
+    public let operationId: String
+    public let sequence: Int64
+    public let bytesDone: Int64
+    /// 0 when the server never sent a length.
+    public let bytesTotal: Int64
+    /// Name of the file currently transferring, when the plan names one.
+    public let file: String?
+    /// Measured throughput. `nil` when not yet known — never a zero standing in
+    /// for unknown.
+    public let bytesPerSecond: Float?
+    /// Projected seconds remaining. `nil` when the total size or the rate is
+    /// unknown.
+    public let etaSeconds: Int64?
+    /// 0 on the first attempt. Above 0 means the transfer recovered from a
+    /// failure, which a UI should show rather than hide.
+    public let retryAttempt: Int
+    /// 0-based position in the planned file list.
+    public let currentFileIndex: Int
+    /// Files in the plan. 1 for a single-file model.
+    public let totalFiles: Int
+
+    /// Progress across the whole plan as reported by the transfer, 0...1.
+    let overallProgress: Float?
+
+    public init(
+        operationId: String,
+        sequence: Int64,
+        bytesDone: Int64,
+        bytesTotal: Int64,
+        file: String? = nil,
+        bytesPerSecond: Float? = nil,
+        etaSeconds: Int64? = nil,
+        retryAttempt: Int = 0,
+        currentFileIndex: Int = 0,
+        totalFiles: Int = 1,
+        overallProgress: Float? = nil
+    ) {
+        self.operationId = operationId
+        self.sequence = sequence
+        self.bytesDone = bytesDone
+        self.bytesTotal = bytesTotal
+        self.file = file
+        self.bytesPerSecond = bytesPerSecond
+        self.etaSeconds = etaSeconds
+        self.retryAttempt = retryAttempt
+        self.currentFileIndex = currentFileIndex
+        self.totalFiles = totalFiles
+        self.overallProgress = overallProgress
+    }
+
+    /// Fraction of the whole download that is done, 0...1, or `nil` when the
+    /// size is unknown.
+    ///
+    /// Prefers `overallProgress` because a multi-file model's byte counts are
+    /// per-file: reaching the end of file one of three is 100% of those bytes
+    /// but a third of the download, and a bar that fills and resets twice reads
+    /// as a stall or a restart. Falls back to the byte ratio for a single file,
+    /// and reports `nil` rather than a fake `0` so a caller can show an
+    /// indeterminate bar instead of one that looks stuck at the left edge.
+    public var fraction: Float? {
+        if let overallProgress { return overallProgress }
+        guard bytesTotal > 0 else { return nil }
+        return min(max(Float(bytesDone) / Float(bytesTotal), 0), 1)
+    }
+
+    /// `fraction` as 0–100, or `nil` when the size is unknown.
+    public var percent: Float? { fraction.map { $0 * 100 } }
+
+    /// True when the size is unknown, so the caller should show an
+    /// indeterminate bar.
+    public var isIndeterminate: Bool { fraction == nil }
 }
 
 // MARK: - SdkEvent

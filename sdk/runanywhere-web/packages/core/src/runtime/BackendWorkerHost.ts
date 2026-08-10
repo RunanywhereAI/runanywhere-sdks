@@ -294,9 +294,15 @@ export class BackendWorkerHost {
     this.worker = null;
     this.ready = null;
     this.executionContext = 'main';
-    if (this.backendId === 'llamacpp') {
-      clearModelOwnedByBackendWorker();
-    }
+    // Terminating the worker destroys its WASM heap, so every model this host
+    // owned is gone — for ONNX exactly as much as for llamacpp. Clearing only
+    // llamacpp left `currentModel()` answering "Silero is loaded" from stale
+    // JS bookkeeping after ONNX.unregister()/re-register (Settings
+    // reinitialization, a failed handshake retry). `ensureModelForCategory`
+    // believed it and skipped the load, so the next VAD verb reached a fresh,
+    // empty heap and came back NOT_INITIALIZED (rc=-100) with the model
+    // sitting on disk.
+    clearModelOwnedByBackendWorker(undefined, this.backendId);
     if (getBackendWorkerHost(this.backendId) === this) {
       setBackendWorkerHost(this.backendId, null);
     }

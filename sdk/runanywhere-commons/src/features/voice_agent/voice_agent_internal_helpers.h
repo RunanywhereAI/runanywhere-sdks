@@ -56,18 +56,32 @@ rac_result_t validate_voice_response(const VoiceResponseParts& response);
 
 // RAII admission guard for every long-running voice-agent entry
 // point (process_voice_turn{,_proto}, process_stream, process_turn_proto,
-// transcribe_proto, synthesize_speech_proto, detect_speech). Implements the
-// canonical TOCTOU-safe sequence the lock-free design relies on:
-//   1. check handle->is_shutting_down before incrementing,
-//   2. increment handle->in_flight,
-//   3. re-check handle->is_shutting_down (publish-before-check race with
-//      rac_voice_agent_destroy, which sets the flag then drains the counter),
+// transcribe_proto, synthesize_speech_proto, detect_speech). Admission is:
+//   1. take handle->admission_mutex,
+//   2. reject if handle->is_shutting_down,
+//   3. otherwise increment handle->in_flight and release the lock,
 //   4. RAII-decrement on scope exit.
+//
+// Step 1 is what makes the rest sound. This used to be a lock-free
+// check → increment → re-check, on the theory that the trailing re-check closed
+// the publish-before-check race with rac_voice_agent_destroy. It did not: an
+// entrant preempted between the first check and the increment was invisible to
+// destroy's drain, so destroy saw a zero counter, deleted the handle, and the
+// increment then wrote to freed memory. The re-check could never fire, because
+// the step before it was already the use-after-free. Sharing a lock with the
+// flag's publisher collapses the window: an entrant is either rejected or
+// counted before destroy can read the counter.
+//
 // `rac_voice_agent_destroy` spin-waits on handle->in_flight > 0, so wrapping
 // each entry point in this guard makes the shutdown barrier cover them all
 // instead of only detect_speech. Mirrors VlmInFlightGuard (rac_vlm_proto_abi)
 // and SDKEventInFlightGuard (event_publisher), but scoped per-handle because
 // the voice-agent counter/flag live on the rac_voice_agent struct.
+//
+// Still the caller's contract, and not fixable here: calling any entry point
+// after rac_voice_agent_destroy has *returned* is use-after-free on the handle
+// itself, before this guard runs at all. This closes the concurrent race, not
+// the sequential misuse.
 struct InFlightGuard {
     explicit InFlightGuard(rac_voice_agent_handle_t handle);
     ~InFlightGuard();
@@ -121,15 +135,24 @@ void emit_generated_voice_event(
 // Build + emit a component-state-changed VoiceEvent for `handle`.
 void emit_component_states(rac_voice_agent_handle_t handle);
 
-// Build + emit a turn lifecycle VoiceEvent.
+// Build + emit a turn lifecycle VoiceEvent. `error_recoverable` is only read
+// when `error` is set; it is the same claim `emit_component_failure` makes and
+// has to agree with it, because a frontend sees both events for one failure.
 void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind,
                          const char* transcript = nullptr, const char* response = nullptr,
-                         const char* error = nullptr);
+                         const char* error = nullptr, bool error_recoverable = false);
 
 // Build + emit a session-error VoiceEvent + publish an SDKEvent failure.
+//
+// `recoverable` is a claim about the SESSION, not the turn: true means the
+// pipeline is still running and the next utterance will be tried, so a frontend
+// should show the message and keep listening. Every SDK folds a non-recoverable
+// session error onto its terminal path — the iOS panel, for one, latches a red
+// "Error" pill AND releases the microphone — so a per-turn stage failure that
+// leaves the session perfectly healthy must not be reported with the default.
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
-                            rac_result_t code, const char* message);
+                            rac_result_t code, const char* message, bool recoverable = false);
 
 // Publish a per-turn MetricsEvent (kMetrics) so the turn is recorded to
 // telemetry under the "voice" modality. telemetry_records() only records

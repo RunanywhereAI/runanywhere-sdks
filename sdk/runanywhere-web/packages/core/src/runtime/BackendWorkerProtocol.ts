@@ -40,6 +40,14 @@ export type BackendWorkerInferenceKind =
   | 'tts.synthesize'
   | 'vlm.generate'
   | 'vad.process'
+  // The lifecycle VAD service (threshold, session start/stop/reset) lives in
+  // the heap that owns the loaded detector. When a BackendWorker owns the
+  // model, these must be RPCs too — a main-thread call reaches a module whose
+  // lifecycle map has no VAD component and fails with NOT_INITIALIZED.
+  | 'vad.configure'
+  | 'vad.start'
+  | 'vad.stop'
+  | 'vad.reset'
   | 'embeddings.embed';
 
 export interface BackendWorkerInitRequest {

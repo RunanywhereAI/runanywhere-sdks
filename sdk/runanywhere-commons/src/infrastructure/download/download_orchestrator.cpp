@@ -56,6 +56,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "infrastructure/download/partial_download_internal.h"
 #include "infrastructure/model_management/model_manifest_internal.h"
 #include "infrastructure/rac_path_safety_internal.h"
 
@@ -157,6 +158,13 @@ int64_t filesystem_available_bytes(const std::string& path) {
 // or a missing Hugging Face token) from a genuine "server sent no
 // Content-Length". A -1 return with a 401/403 status is an access failure, not
 // an unknown size.
+//
+// The probe is an optimisation, never a gate. Every failure mode — no
+// transport, a refused request, a fault inside a platform transport — has to
+// land on "size unknown" so the caller keeps the catalogue's
+// download_size_bytes and the plan still starts. A probe that propagates a
+// failure outward instead kills the plan before a single byte is requested,
+// which is how a working artifact ends up looking like a dead one.
 int64_t http_head_content_length(const std::string& url, int32_t* out_http_status = nullptr) {
     if (out_http_status)
         *out_http_status = 0;
@@ -180,43 +188,58 @@ int64_t http_head_content_length(const std::string& url, int32_t* out_http_statu
     req.header_count = 1;
     rac_http_response_t resp{};
     int64_t len = -1;
-    rac_result_t rc = rac_http_request_send(client, &req, &resp);
-    if (out_http_status && rc == RAC_SUCCESS)
-        *out_http_status = resp.status;
-    if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
-        RAC_LOG_WARNING(LOG_TAG,
-                        "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
-                        "the size is unknown because access was denied, not because the server "
-                        "omitted Content-Length",
-                        static_cast<int>(resp.status));
-    }
-    if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 && resp.headers != nullptr) {
-        for (size_t i = 0; i < resp.header_count; ++i) {
-            const char* name = resp.headers[i].name;
-            const char* value = resp.headers[i].value;
-            if (name == nullptr || value == nullptr)
-                continue;
-            static const char* kWant = "content-length";
-            const size_t n = std::strlen(kWant);
-            if (std::strlen(name) != n)
-                continue;
-            bool match = true;
-            for (size_t k = 0; k < n; ++k) {
-                char c = name[k];
-                if (c >= 'A' && c <= 'Z')
-                    c = static_cast<char>(c - 'A' + 'a');
-                if (c != kWant[k]) {
-                    match = false;
+    // Platform transports are free to fault rather than return an error code —
+    // the WASM adapter in particular can have a JS exception thrown back across
+    // this frame by emscripten's glue. Contain it here so the worst a broken
+    // probe can do is leave the size unknown.
+    try {
+        rac_result_t rc = rac_http_request_send(client, &req, &resp);
+        if (out_http_status && rc == RAC_SUCCESS)
+            *out_http_status = resp.status;
+        if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
+            RAC_LOG_WARNING(
+                LOG_TAG,
+                "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
+                "the size is unknown because access was denied, not because the server "
+                "omitted Content-Length",
+                static_cast<int>(resp.status));
+        }
+        if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 &&
+            resp.headers != nullptr) {
+            for (size_t i = 0; i < resp.header_count; ++i) {
+                const char* name = resp.headers[i].name;
+                const char* value = resp.headers[i].value;
+                if (name == nullptr || value == nullptr)
+                    continue;
+                static const char* kWant = "content-length";
+                const size_t n = std::strlen(kWant);
+                if (std::strlen(name) != n)
+                    continue;
+                bool match = true;
+                for (size_t k = 0; k < n; ++k) {
+                    char c = name[k];
+                    if (c >= 'A' && c <= 'Z')
+                        c = static_cast<char>(c - 'A' + 'a');
+                    if (c != kWant[k]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    long long v = std::strtoll(value, nullptr, 10);
+                    if (v > 0)
+                        len = static_cast<int64_t>(v);
                     break;
                 }
             }
-            if (match) {
-                long long v = std::strtoll(value, nullptr, 10);
-                if (v > 0)
-                    len = static_cast<int64_t>(v);
-                break;
-            }
         }
+    } catch (...) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "HEAD probe faulted — treating the download size as unknown and "
+                        "falling back to the catalog size");
+        len = -1;
+        if (out_http_status)
+            *out_http_status = 0;
     }
     rac_http_response_free(&resp);
     rac_http_client_destroy(client);
@@ -448,6 +471,14 @@ struct proto_download_task {
     bool delete_partial_on_cancel = false;
     int64_t last_partial_bytes = 0;
     int64_t last_deleted_bytes = 0;
+    // The full transfer size the HTTP layer actually reported (Content-Length
+    // plus any resume prefix) for a single-file download. The plan's
+    // expected_bytes is a hand-maintained catalog estimate that drifts from the
+    // asset; once the response header has arrived the server is the authority,
+    // so the bar and the "of X" label stop contradicting the bytes on the wire.
+    // Written by the progress callback, read by the worker for its terminal
+    // frames. 0 = the transport has not reported a length yet.
+    int64_t observed_total_bytes = 0;
     int64_t started_at_unix_ms = 0;
     bool download_telemetry_started = false;   // model.download.started emitted once
     bool download_telemetry_finished = false;  // terminal model.download.* emitted once
@@ -942,12 +973,12 @@ int64_t file_size_or_zero(const std::string& path) {
 
 // In-flight partials are written by rac_http_download to "<final>.part" and
 // atomically renamed to "<final>" only after checksum/size validation. The
-// suffix convention is shared verbatim with the folder deleter (which removes
-// any "<name>.part" alongside the model files), so keep it identical here.
-constexpr const char* kPartSuffix = ".part";
-
+// suffix is shared with the folder deleter (which reclaims the sidecar) and the
+// registry rescan (which must not mistake it for a finished artifact), so it has
+// exactly one definition in partial_download_internal.h.
 std::string part_path_for(const std::string& final_path) {
-    return final_path.empty() ? final_path : final_path + kPartSuffix;
+    return final_path.empty() ? final_path
+                              : final_path + std::string(rac::download::kPartialSuffix);
 }
 
 // Size of the in-flight partial for a planned file — the ".part" sidecar the
@@ -1220,6 +1251,20 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
         return RAC_TRUE;
     }
 
+    // A single-file transfer has exactly one authority on its size: the response
+    // the server is streaming right now. The catalog's expected_bytes is only a
+    // pre-flight estimate, and when it drifts the UI contradicts itself — a
+    // 620.2 MB asset drew "11.3 MB of 572.2 MB" long after the header landed.
+    // Adopt the transport's length as soon as it reports one. (The multi-file
+    // aggregate keeps total_expected: per-file Content-Lengths arrive piecemeal,
+    // so a plan-wide total cannot be rebuilt from the file in flight.)
+    if (total_bytes > 0 && ctx->task->files.size() == 1 &&
+        static_cast<int64_t>(total_bytes) != ctx->total_expected) {
+        ctx->total_expected = static_cast<int64_t>(total_bytes);
+        std::lock_guard<std::mutex> lock(ctx->task->mutex);
+        ctx->task->observed_total_bytes = ctx->total_expected;
+    }
+
     int64_t total = ctx->total_expected > 0
                         ? ctx->total_expected
                         : (total_bytes > 0 ? static_cast<int64_t>(total_bytes) : 0);
@@ -1394,10 +1439,19 @@ enum class plan_file_step { CONTINUE, STOP };
 // / extraction failure it emits the terminal progress event, stops the task and
 // returns STOP. On success it sets `final_path` for this file and advances
 // `completed_before_file`, returning CONTINUE.
+//
+// `total_expected` is in/out: for a single-file plan the transport's own
+// Content-Length supersedes the catalog estimate mid-transfer (see
+// proto_http_progress), and the terminal frames this function emits have to
+// quote the same total the progress frames just did.
 plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& task,
-                                 const proto_plan_file& file, size_t i, int64_t total_expected,
+                                 const proto_plan_file& file, size_t i, int64_t& total_expected,
                                  uint64_t file_resume_from, int64_t& completed_before_file,
                                  std::string& final_path) {
+    // Mirrors total_expected for this file: for a single-file plan the two are
+    // the same number, so an adopted transport length has to move both or the
+    // extraction frame would quote the stale catalog size.
+    int64_t file_expected = file.expected_bytes;
     // Ensure the file's parent directory exists. Most bundles write straight
     // into the per-model folder (already created), but a descriptor may carry a
     // multi-segment subpath (e.g. VLM host-weight fixtures under "vlm/…") whose
@@ -1479,6 +1533,17 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         rac_http_download_status_t status = execute_stream_with_retry(
             req, cb_ctx, file.destination_path, file_resume_from, i, &http_status);
 
+        // Pick up a length the transport reported mid-transfer, before any
+        // terminal frame below quotes a total (cancel / failure / extraction /
+        // completion all read total_expected).
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            if (task->observed_total_bytes > 0) {
+                total_expected = task->observed_total_bytes;
+                file_expected = task->observed_total_bytes;
+            }
+        }
+
         if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
             int64_t file_partial = partial_size_or_zero(file.destination_path);
             int64_t deleted = 0;
@@ -1522,7 +1587,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
 
     if (file.requires_extraction) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING,
-                          total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                          total_expected > 0 ? completed_before_file + file_expected : 0,
                           total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
         emit_progress(task);
 
@@ -1541,7 +1606,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             // instead of re-opening a corrupt OPFS/MEMFS stub.
             delete_file(file.destination_path.c_str());
             set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
-                              total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                              total_expected > 0 ? completed_before_file + file_expected : 0,
                               total_expected, static_cast<int32_t>(i), file.storage_key, "",
                               "archive extraction failed");
             mark_task_stopped(task);
@@ -1572,7 +1637,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     }
 
     if (total_expected > 0) {
-        completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+        completed_before_file += std::max<int64_t>(file_expected, 0);
     } else {
         completed_before_file += file_size_or_zero(final_path);
     }
@@ -1918,7 +1983,9 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                                                  nullptr);
     }
 
-    const int64_t total_expected = plan_total_expected(task->files);
+    // Non-const: process_plan_file replaces this with the transport's own length
+    // for a single-file plan (the catalog estimate is only a pre-flight guess).
+    int64_t total_expected = plan_total_expected(task->files);
     if (run_parallel_direct_download_worker(task, total_expected, resume_from)) {
         return;
     }
@@ -2070,6 +2137,11 @@ void web_download_on_progress(int64_t bytes_downloaded, int64_t total_bytes, voi
 
     const int64_t downloaded = drv->completed_before_file + bytes_downloaded;
     const proto_plan_file& file = task->files[drv->file_index];
+    // See proto_http_progress: for a single file the response being streamed is
+    // the authority on its size, not the catalog's expected_bytes estimate.
+    if (total_bytes > 0 && task->files.size() == 1 && total_bytes != drv->total_expected) {
+        drv->total_expected = total_bytes;
+    }
     // See proto_http_progress: multi-file bundles without per-file sizes need a
     // monotonic file-count overall fraction (a byte ratio against an unknown
     // plan total would otherwise stay at 0 the whole download, then snap to 1).
@@ -2107,6 +2179,13 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
 
     const size_t i = drv->file_index;
     const proto_plan_file& file = task->files[i];
+    // For a single-file plan the transport's own length superseded the catalog
+    // estimate mid-transfer (see web_download_on_progress), so the frames below
+    // have to quote the same number the progress frames just did — otherwise the
+    // extraction frame reports more bytes done than the total it is shown against.
+    const int64_t file_expected = (task->files.size() == 1 && drv->total_expected > 0)
+                                      ? drv->total_expected
+                                      : file.expected_bytes;
 
     const bool cancelled = task->cancel_requested.load() || result == RAC_ERROR_CANCELLED;
     if (cancelled) {
@@ -2154,7 +2233,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
     // the post-download tail of process_plan_file.
     if (file.requires_extraction) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING, 
-                          drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes
+                          drv->total_expected > 0 ? drv->completed_before_file + file_expected
                                                   : 0,
                           drv->total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
         emit_progress(task);
@@ -2171,7 +2250,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             delete_file(file.destination_path.c_str());
             set_task_progress(
                 task, rav1::DOWNLOAD_STATE_FAILED, 
-                drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,
+                drv->total_expected > 0 ? drv->completed_before_file + file_expected : 0,
                 drv->total_expected, static_cast<int32_t>(i), file.storage_key, "",
                 "archive extraction failed");
             mark_task_stopped(task);
@@ -2194,7 +2273,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
     }
 
     if (drv->total_expected > 0) {
-        drv->completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+        drv->completed_before_file += std::max<int64_t>(file_expected, 0);
     } else {
         drv->completed_before_file += file_size_or_zero(drv->final_path);
     }
@@ -3148,13 +3227,21 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
     //     unsized PLAIN file (unsized_nonarchive_file) trips the unknown-total
     //     refusal, because there we truly cannot bound the disk consumed.
     //   - WASM/MEMFS reports available_bytes == -1 (no POSIX statvfs) and the
-    //     browser enforces its own quota, so the free-space fail-closed is
-    //     scoped to native platforms.
+    //     browser enforces its own quota, so BOTH storage fail-closed arms are
+    //     scoped to native platforms. There is no device filesystem here to fill
+    //     and no figure to compare against, so refusing an unsized plain file
+    //     protects nothing — it only converts a download that would have
+    //     succeeded into a hard failure with no request issued, which is exactly
+    //     how every bare .gguf in the web catalogue came to look like a dead
+    //     artifact. The browser is the authority on its own quota and reports a
+    //     real quota error if the write does not fit.
     const bool free_space_known = available_bytes > 0;
 #if defined(__EMSCRIPTEN__)
     const bool require_free_space = false;
+    const bool require_plain_file_size = false;
 #else
     const bool require_free_space = true;
+    const bool require_plain_file_size = true;
 #endif
     if (invalid_existing_bytes) {
         result.set_can_start(false);
@@ -3163,27 +3250,41 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
     } else if (result.files_size() == 0) {
         result.set_can_start(false);
-    } else if (unsized_nonarchive_file) {
-        // A plain (non-archive) file has an unknown size — we cannot size the
-        // storage gate for it, so refuse rather than risk filling the disk.
+    } else if (unsized_nonarchive_file && head_auth_denied) {
+        // Access was denied, not merely unsized. Worth refusing on every
+        // platform: the download itself is going to fail the same way, and the
+        // caller has something actionable to do about it.
+        //
+        // failure_reason stays UNSPECIFIED: DownloadFailureReason has no
+        // authentication value, and every one it does have is a storage or
+        // partial-bytes condition. Borrowing INSUFFICIENT_STORAGE here would be
+        // read literally downstream — the Web SDK maps that reason to a
+        // retryable storage error, so a denied token would render as "free up
+        // space" beside a Retry that reproduces the denial exactly. With the
+        // field unset the SDKs fall back to the RAC_ERROR_AUTHENTICATION_FAILED
+        // code and this message, which name the real cause and the real fix.
         result.set_can_start(false);
-        if (head_auth_denied) {
-            // The size is unknown because the HEAD probe was denied (401/403),
-            // not because the server omitted it — surface the actionable cause.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_AUTHENTICATION_FAILED);
-            result.mutable_error()->set_message(
-                "authentication failed while checking the download — check your Hugging Face "
-                "token / repo access, then try again.");
-        } else {
-            // The caller can retry once the server exposes a Content-Length.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_INSUFFICIENT_STORAGE);
-            result.mutable_error()->set_message(
-                "Cannot verify there is enough storage: the total download size is unknown (the "
-                "server did not report a file size). Try again later or check the model source.");
-        }
+        rac::foundation::populate_sdk_error(result.mutable_error(),
+                                            RAC_ERROR_AUTHENTICATION_FAILED);
+        result.mutable_error()->set_message(
+            "authentication failed while checking the download — check your Hugging Face "
+            "token / repo access, then try again.");
+    } else if (unsized_nonarchive_file && require_plain_file_size) {
+        // A plain (non-archive) file has an unknown size — on a device we cannot
+        // size the storage gate for it, so refuse rather than risk filling the
+        // disk. The caller can retry once the server exposes a Content-Length.
+        result.set_can_start(false);
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        result.mutable_error()->set_message(
+            "Cannot verify there is enough storage: the total download size is unknown (the "
+            "server did not report a file size). Try again later or check the model source.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
+    } else if (unsized_nonarchive_file) {
+        // Browser target: start with the size unknown. Progress is indeterminate
+        // until the response declares a length, which is the honest state and is
+        // what every SDK's unknown-total path already renders.
+        result.add_warnings("download size is unknown; progress will be indeterminate");
+        result.set_can_start(true);
     } else if (total_bytes > 0 && require_free_space && !free_space_known) {
         // We know the payload is non-trivial but could not read free space —
         // fail closed instead of proceeding blind.

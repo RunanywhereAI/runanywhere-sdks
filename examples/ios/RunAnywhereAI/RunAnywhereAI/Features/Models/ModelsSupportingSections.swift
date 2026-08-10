@@ -100,7 +100,10 @@ struct ModelSearchBar: View {
             Text(filter.title)
                 .font(AppTypography.caption)
                 .fontWeight(.medium)
-                .foregroundColor(isSelected ? AppColors.textWhite : AppColors.textPrimary)
+                // `onBrand`, not white: caption/medium on the solid brand fill is small text
+                // by every measure, and white on #FF6900 is 2.89:1. Same pairing as
+                // `RAProminentButtonStyle`, the web `.btn-primary` and Android `onPrimary`.
+                .foregroundColor(isSelected ? AppColors.onBrand : AppColors.textPrimary)
                 .padding(.horizontal, AppSpacing.smallMedium)
                 .padding(.vertical, AppSpacing.xSmall)
                 .background(isSelected ? AppColors.primaryAccent : AppColors.backgroundSecondary)
@@ -230,12 +233,26 @@ struct ModelStorageSection: View {
         }
     }
 
+    /// Two maintenance actions, two distinct glyphs.
+    ///
+    /// Both were `trash` — the same symbol on two adjacent controls, which is
+    /// the one iconography failure that actively misleads: side by side they
+    /// read as the same action offered twice, and the only thing separating
+    /// "clear the cache" from "delete a model" was the caption. `trash` is
+    /// reserved app-wide for destroying user content (a conversation, a
+    /// message, a downloaded model, a LoRA adapter). Neither of these does
+    /// that — they reclaim space the app can regenerate — so neither should
+    /// wear it.
+    ///
+    /// `arrow.3.trianglepath` reads as recycling/reclaiming, and
+    /// `clock.badge.xmark` says "discard what's expired", which is precisely
+    /// what a temp sweep is.
     private var maintenanceButtons: some View {
         HStack {
             Button {
                 Task { await storageViewModel.clearCache() }
             } label: {
-                Label("Clear Cache", systemImage: "trash")
+                Label("Clear Cache", systemImage: "arrow.3.trianglepath")
             }
             .font(AppTypography.caption)
             .foregroundColor(AppColors.primaryRed)
@@ -245,11 +262,12 @@ struct ModelStorageSection: View {
             Button {
                 Task { await storageViewModel.cleanTempFiles() }
             } label: {
-                Label("Clean Temp", systemImage: "trash")
+                Label("Clean Temp", systemImage: "clock.badge.xmark")
             }
             .font(AppTypography.caption)
             .foregroundColor(AppColors.primaryOrange)
         }
+        .symbolRenderingMode(.hierarchical)
     }
 
     private func infoRow(label: String, systemImage: String, value: String) -> some View {

@@ -1,9 +1,7 @@
 import Combine
 import Foundation
+import os.log
 import RunAnywhere
-#if canImport(FoundationModels)
-import FoundationModels
-#endif
 
 // Note: Message, MessageAnalytics and ConversationAnalytics are now in separate model files
 
@@ -17,6 +15,7 @@ class ConversationStore: ObservableObject {
     @Published var currentConversation: Conversation?
 
     private let documentsDirectory: URL
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ConversationStore")
 
     private static func getDocumentsDirectory() -> URL {
         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -127,13 +126,11 @@ class ConversationStore: ObservableObject {
 
         updateConversation(updated)
 
-        // Try to generate smart title with Foundation Models after first AI response
-        if message.role == .assistant && updated.messages.count >= 2 {
-            let conversationId = updated.id
-            Task { @MainActor in
-                await self.generateSmartTitleIfNeeded(for: conversationId)
-            }
-        }
+        // Titling is NOT triggered here. `LLMViewModel.finalizeGeneration` asks
+        // for it once, when the turn it owns has finished — and it is the only
+        // caller that knows the turn is over. Firing a second request from here
+        // meant every reply queued two generations for the same chat, which on
+        // the single-generation LLM component is a race by construction.
     }
 
     func saveAttachment(
@@ -160,76 +157,220 @@ class ConversationStore: ObservableObject {
         )
     }
 
-    // MARK: - Foundation Models Title Generation
+    // MARK: - Smart Titles
 
-    /// Public method to generate smart title for a conversation
-    func generateSmartTitleForConversation(_ conversationId: String) async {
-        await generateSmartTitleIfNeeded(for: conversationId)
+    // A chat title is written by the same model that answers, through the same
+    // `RunAnywhere.llm` entry point every other generation in this app uses.
+    //
+    // It used to open its own `FoundationModels.LanguageModelSession` here in
+    // the app. That is a second inference client for the one on-device model the
+    // SDK already holds a session on, and Apple's Foundation Models will not
+    // serve two: the title request never returned, and — because it never
+    // returned — every *subsequent* chat turn wedged behind it with no error and
+    // no timeout. Reproduced on macOS 26.5: turn one answered in 0.8s, the title
+    // request that followed it hung, and turn two hung forever. Selecting a chat
+    // whose title was already set (so no title request fired) made turn two
+    // answer normally.
+    //
+    // Routing through the SDK also means a title is no longer an
+    // Apple-Intelligence-only feature: whatever model is loaded writes it.
+
+    /// The title request in flight, so a new chat turn can take the model back.
+    /// Only one exists at a time — a title is a nicety and the turn the user
+    /// just started is not, and the two cannot share one LLM component.
+    private var titleTask: Task<Void, Never>?
+
+    /// Give the model back to the chat. Called by the chat view model the moment
+    /// it claims a new turn.
+    func cancelPendingTitleGeneration() {
+        titleTask?.cancel()
+        titleTask = nil
     }
 
-    private func generateSmartTitleIfNeeded(for conversationId: String) async {
-        #if canImport(FoundationModels)
-        guard #available(iOS 26.0, macOS 26.0, *) else { return }
-
-        // Find the conversation
-        guard let conversation = conversations.first(where: { $0.id == conversationId }) else {
-            return
+    /// Ask the loaded model to name a conversation, if it still has a
+    /// placeholder name. Returns once the title has been written or abandoned.
+    func generateSmartTitleForConversation(_ conversationId: String) async {
+        cancelPendingTitleGeneration()
+        let task: Task<Void, Never> = Task { @MainActor [weak self] in
+            await self?.writeSmartTitle(for: conversationId)
         }
+        titleTask = task
+        await task.value
+        if titleTask == task { titleTask = nil }
+    }
 
-        // Get the fallback title to compare
+    private func writeSmartTitle(for conversationId: String) async {
+        guard let conversation = conversations.first(where: { $0.id == conversationId }) else { return }
+
+        // Only ever replace a placeholder: "New Chat", or the deterministic
+        // first-line title `addMessage` writes. A name the user typed, or one a
+        // model already produced, is left alone.
         let firstUserMessage = conversation.messages.first { $0.role == .user }
         let fallbackTitle = firstUserMessage.map { generateTitle(from: $0.content) } ?? "New Chat"
+        guard conversation.title == "New Chat" || conversation.title == fallbackTitle else { return }
 
-        // Only generate if title is still the default or fallback
-        let currentTitle = conversation.title
-        guard currentTitle == "New Chat" || currentTitle == fallbackTitle else {
-            return
-        }
-
-        // Use the SDK's platform capability gate so simulator and unsupported
-        // devices keep the deterministic fallback title.
-        guard SystemFoundationModels.isAvailable else { return }
-
-        // Create conversation text from first few messages
-        let conversationText = conversation.messages
+        let transcript = conversation.messages
             .prefix(4)
-            .map { msg in
-                "\(msg.role == .user ? "User" : "Assistant"): \(msg.content.prefix(200))"
-            }
+            .map { "\($0.role == .user ? "User" : "Assistant"): \($0.content.prefix(200))" }
             .joined(separator: "\n")
+        guard !transcript.isEmpty else { return }
 
-        do {
-            let titleSession = LanguageModelSession(
-                instructions: Instructions("""
-                    You are an expert at creating descriptive, readable chat titles.
-                    Generate a clear title (2-5 words) that captures the main topic.
-                    Respond in the same language as the conversation.
-                    Only output the title, nothing else.
-                    """)
-            )
-
-            let titlePrompt = """
-            Create a descriptive, readable title for this conversation:
-
-            \(conversationText)
-
-            Title:
+        var options = LlmOptions()
+        // A title is five words. Anything past this is the model ignoring the
+        // instruction, and capping it keeps the request off the user's next turn.
+        options.maxOutputTokens = 24
+        // Low but not zero: at 0 a small model repeats the prompt's first line.
+        options.temperature = 0.2
+        options.systemPrompt = """
+            You name chat conversations. Reply with a title of 2 to 5 words that \
+            names the main topic, in the language of the conversation. Output the \
+            title and nothing else — no quotes, no punctuation, no explanation.
             """
+        // Tools are registered app-wide, and a title request must not trigger a
+        // web search. Reasoning off for the same reason: thought tokens here are
+        // pure latency on a request nobody is waiting to read.
+        options.toolChoice = .none
+        options.reasoning = ReasoningOptions(mode: .off)
 
-            let response = try await titleSession.respond(to: Prompt(titlePrompt))
-            let title = response.content
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: "\"", with: "")
-
-            // Update the conversation with the AI-generated title
-            if !title.isEmpty, var conv = self.conversations.first(where: { $0.id == conversationId }) {
-                conv.title = String(title.prefix(50))
-                self.updateConversation(conv)
+        logger.debug("Requesting a smart title")
+        do {
+            let result = try await RunAnywhere.llm.generate(
+                prompt: "Name this conversation:\n\n\(transcript)",
+                options: options
+            )
+            guard !Task.isCancelled else { return }
+            let title = Self.sanitizedTitle(result.text)
+            if title.isEmpty {
+                // The raw text is model output about the user's own conversation,
+                // so it stays private in the log: enough to debug the sanitizer,
+                // never enough to leak a chat into a sysdiagnose.
+                logger.info("Smart title rejected, keeping the fallback: \(result.text)")
             }
+            guard !title.isEmpty,
+                  var conversation = conversations.first(where: { $0.id == conversationId }),
+                  // A model that just echoes the first line has produced the
+                  // fallback again; writing it stamps `updatedAt` and reorders
+                  // the sidebar for no change the reader can see.
+                  conversation.title != title else { return }
+            conversation.title = title
+            updateConversation(conversation)
+            logger.debug("Smart title written")
         } catch {
-            // Keep the fallback title
+            // Busy, cancelled, or no model loaded — the deterministic title
+            // already on the row stays. Logged and not surfaced: nothing about a
+            // chat's name is worth interrupting the reader for, but a feature
+            // that silently never fires is one nobody can debug either.
+            logger.info("Smart title skipped: \(error.localizedDescription, privacy: .public)")
         }
-        #endif
+    }
+
+    /// Reduce model output to something that fits a sidebar row, or `""` when it
+    /// cannot be reduced to one.
+    ///
+    /// Small on-device models do not answer "name this conversation" with a
+    /// title. Measured against Apple's built-in model, they answer with a
+    /// sentence around one — `Sure! A good title would be "Capital of France".`
+    /// — or with a `Title:` preamble, or with a Markdown heading. Every one of
+    /// those contains the answer; a strict length check threw all three away and
+    /// the feature never fired once. So the wrappers are peeled in the order
+    /// they actually occur, and only genuinely title-less output is rejected.
+    private static func sanitizedTitle(_ raw: String) -> String {
+        var candidate = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // A quoted span is the model handing over the title inside a sentence,
+        // and it is unambiguous wherever it appears — so it wins outright.
+        if let quoted = firstQuotedSpan(in: candidate) {
+            candidate = quoted
+        } else {
+            // Otherwise the title is on one line: the first non-empty one, minus
+            // any Markdown heading marker or bullet the model decorated it with.
+            candidate = candidate
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .first { !$0.isEmpty } ?? ""
+            candidate = candidate.trimmingCharacters(in: CharacterSet(charactersIn: "#*->• \t"))
+
+            candidate = Self.strippingLeadingLabel(from: candidate)
+        }
+
+        candidate = candidate
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”‘’*`.,;:"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Still a sentence, not a name. Truncating it would put an ellipsis in
+        // the sidebar where a title belongs, and the deterministic first-line
+        // title already there is the better of the two. Both a word count and a
+        // character count, because the failures look different: an ignored
+        // instruction comes back as a clause ("This conversation is about how to
+        // clean a bathroom"), and a run-on comes back as one very long line.
+        let words = candidate.split(whereSeparator: \.isWhitespace)
+        guard !candidate.isEmpty, words.count <= 8, candidate.count <= 48 else { return "" }
+
+        // Only the first character, and only when it is lowercase. A small model
+        // often answers in lower case and a sidebar of lowercase rows reads as
+        // unfinished; `localizedCapitalized` is the wrong tool because it would
+        // also rewrite "iPhone" and "macOS".
+        guard let first = candidate.first, first.isLowercase else { return candidate }
+        return candidate.replacingCharacters(
+            in: candidate.startIndex...candidate.startIndex,
+            with: String(first).localizedUppercase
+        )
+    }
+
+    /// Drop a leading `Title:` / `Name —` style label, keeping the rest.
+    ///
+    /// Matched on the *last* word before the separator rather than against a
+    /// list of whole phrases, because the model rewords the label every few
+    /// turns and a phrase list only ever grows: "Title:", "Name:", "Suggested
+    /// title:", and — observed verbatim — "Conversation Name**:". Requiring that
+    /// last word to be one of a handful of nouns is what keeps a real title
+    /// containing a colon ("Swift: generics explained") intact.
+    private static func strippingLeadingLabel(from text: String) -> String {
+        let labelNouns: Set<String> = ["title", "name", "subject", "topic", "heading"]
+        let separators: Set<Character> = [":", "-", "—", "–"]
+
+        guard let separatorIndex = text.prefix(30).firstIndex(where: { separators.contains($0) }) else {
+            return text
+        }
+        let remainder = text[text.index(after: separatorIndex)...]
+            .trimmingCharacters(in: .whitespaces)
+        guard !remainder.isEmpty else { return text }
+
+        let label = text[..<separatorIndex]
+        let words = label.split(whereSeparator: \.isWhitespace)
+        guard words.count <= 3,
+              let last = words.last?
+                  .trimmingCharacters(in: CharacterSet(charactersIn: "*_`"))
+                  .lowercased(),
+              labelNouns.contains(last) else {
+            return text
+        }
+        return remainder
+    }
+
+    /// What the model put in quotes, if it quoted anything.
+    ///
+    /// The closing quote is optional. A small model asked for a title inside a
+    /// 24-token budget routinely runs out mid-answer and returns
+    /// `This conversation is named "Cleaning the Bathroom.` — an opening quote,
+    /// the title, and no close. Requiring the pair threw that away and let the
+    /// whole sentence through as the title instead, which is how the sidebar
+    /// ended up with a row reading `This conversation is named "Capital of
+    /// France.`
+    private static func firstQuotedSpan(in text: String) -> String? {
+        let openers: [Character: Character] = ["\"": "\"", "“": "”", "'": "'", "‘": "’"]
+        guard let openIndex = text.firstIndex(where: { openers.keys.contains($0) }),
+              let closer = openers[text[openIndex]] else { return nil }
+        let afterOpen = text.index(after: openIndex)
+        guard afterOpen < text.endIndex else { return nil }
+
+        let remainder = text[afterOpen...]
+        let span = remainder.firstIndex(of: closer).map { String(remainder[..<$0]) }
+            ?? String(remainder)
+        // A one-word quote in the middle of a sentence is usually emphasis, not
+        // the title; require something title-shaped.
+        return span.count >= 3 ? span : nil
     }
 
     func loadConversation(_ id: String) -> Conversation? {
