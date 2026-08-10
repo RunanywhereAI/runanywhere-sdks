@@ -85,13 +85,8 @@ class ModelSelectionViewModel(
             // Probe device-dependent backends (QHexRT) before the first list so
             // unavailable-backend rows are filtered from the very first render.
             BackendAvailability.refresh()
-            reload()
-        }
-        viewModelScope.launch {
             // Re-filter live when backend availability changes (e.g. the async
             // NPU probe resolves, or bootstrap reports a registration outcome).
-            // Gate on bootstrap so we never call listModels before SDK init.
-            GlobalState.awaitBootstrapComplete()
             BackendAvailability.snapshots.collect { reload() }
         }
         viewModelScope.launch {
