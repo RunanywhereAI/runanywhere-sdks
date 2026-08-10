@@ -44,7 +44,9 @@
 // events so any collectors registered via rac_llm_set_stream_proto_callback()
 // see the full decoded sequence. The proto section calls
 // `rac::llm::serialize_llm_stream_event()` directly.
+#include "features/llm/llm_stream_metrics_internal.h"
 #include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/llm_thinking_stream_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "features/llm/structured_output_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -121,51 +123,18 @@ struct rac_llm_component {
  * Simple token estimation (~4 chars per token).
  * Mirrors Swift's token estimation in LLMCapability.
  */
-// Batch-style backends (Maple/Bonsai FastRPC, some remote hosts) finish the
-// whole generate before dumping stream chunks. Wall-to-first-token then ≈ total
-// time, so "decode = total − ttft" collapses to a few ms → absurd five-digit
-// tok/s. Keep TTFT: for these backends it is time to the first streamed token
-// (first thinking token when reasoning is on), not a fake prefill figure.
-struct StreamTimingMetrics {
-    int64_t ttft_ms = 0;
-    int64_t prompt_eval_ms = 0;
-    double tokens_per_second = 0.0;
-    /// The backend buffered the whole generate and then dumped the chunks, so the
-    /// post-TTFT window is an artifact and every rate must be taken over the full
-    /// wall time instead.
-    ///
-    /// Reported explicitly because it is not recoverable from the other fields:
-    /// `ttft_ms` carries the real first-token time in both modes, so a caller
-    /// trying to detect this from `ttft_ms == 0` is testing a state that cannot
-    /// occur, and silently gets the non-buffered arithmetic.
-    bool batch_buffered = false;
-};
+// The stream timing arithmetic now lives in
+// features/llm/llm_stream_metrics_internal.h so it can be unit-tested against
+// synthetic timings. It replaces a `completion_tokens / (total − ttft)` figure
+// that read 612-1594 tok/s against an engine doing 57 — see that header for why.
+using rac::llm::compute_stream_timing;
+using rac::llm::StreamTimingMetrics;
+using rac::llm::StreamTokenTiming;
 
-static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64_t raw_ttft_ms,
-                                                         int32_t completion_tokens) {
-    StreamTimingMetrics m;
-    if (total_ms <= 0 || completion_tokens <= 0) {
-        return m;
-    }
-    const int64_t decode_window =
-        (raw_ttft_ms > 0 && raw_ttft_ms < total_ms) ? (total_ms - raw_ttft_ms) : total_ms;
-    m.batch_buffered = raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
-    m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
-    m.prompt_eval_ms = m.ttft_ms;
-    if (m.batch_buffered) {
-        m.tokens_per_second = static_cast<double>(completion_tokens) /
-                              (static_cast<double>(total_ms) / 1000.0);
-        return m;
-    }
-    // TTFT ends when token 1 is delivered. Steady decode therefore measures
-    // tokens 2..N over the first-to-last interval, not all N tokens.
-    const int32_t steady_tokens = std::max<int32_t>(0, completion_tokens - 1);
-    m.tokens_per_second = decode_window > 0
-                              ? static_cast<double>(steady_tokens) /
-                                    (static_cast<double>(decode_window) / 1000.0)
-                              : 0.0;
-    return m;
-}
+// A local trim helper lived here to nudge the streaming terminal result into
+// agreement with the unary splitter. Do not bring it back: that result is now
+// produced BY the unary splitter (dispatch_terminal_once), and a second,
+// parallel definition of "agrees with unary" is precisely what drifted.
 
 static int32_t estimate_tokens(const char* text) {
     if (!text)
@@ -991,12 +960,12 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                                                                             ctx.start_time)
                           .count();
     }
-    const StreamTimingMetrics timing = compute_stream_timing_metrics(
+    const StreamTimingMetrics timing = rac::llm::compute_stream_timing_from_totals(
         total_time_ms, raw_ttft_ms, final_result.completion_tokens);
     final_result.time_to_first_token_ms = timing.ttft_ms;
-    final_result.prompt_eval_time_ms = timing.prompt_eval_ms;
-    final_result.tokens_per_second = static_cast<float>(timing.tokens_per_second);
-    const double tokens_per_second = timing.tokens_per_second;
+    final_result.prompt_eval_time_ms = timing.prefill_ms;
+    final_result.tokens_per_second = static_cast<float>(timing.decode_tokens_per_second);
+    const double tokens_per_second = timing.decode_tokens_per_second;
     const double ttft_ms = static_cast<double>(timing.ttft_ms);
 
     if (complete_callback) {
@@ -1791,98 +1760,38 @@ struct ProtoStreamContext {
     uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
-    bool inside_thinking = false;
     bool emit_thoughts = false;
-    int64_t started_ms = 0;
-    int64_t first_token_ms = 0;
     int32_t prompt_tokens = 0;
     int32_t token_count = 0;
     std::string request_id;
     std::string conversation_id;
     std::string raw_text;
-    std::string pending_text;
     std::string response_text;
     std::string thinking_text;
     std::string thinking_open_tag;
     std::string thinking_close_tag;
     std::string producer_finish_reason;
     bool producer_final_seen = false;
+
+    // The incremental reasoning/content splitter. Owns the partial-delimiter
+    // tail, so a `</think>` straddling two engine deltas is still recognised.
+    rac::llm::ThinkingStreamSplitter splitter;
+    // Reused across deltas so the hot path does not allocate a vector per token.
+    std::vector<rac::llm::ThinkingStreamSegment> segments;
+
+    // Timing observations, taken where deltas are PRODUCED rather than where
+    // they are dispatched — a visibility flag must not move a latency metric.
+    StreamTokenTiming timing;
+    // Production time of the first delta the splitter withheld while deciding
+    // whether the stream opened inside a prefilled reasoning block. If that text
+    // turns out to be the answer, time-to-first-content is THIS instant, not the
+    // instant the hold released it; otherwise it is discarded.
+    int64_t provisional_content_ms = 0;
+    // `started_ms` is duplicated on the context because many call sites below
+    // read it directly for events; `timing.started_ms` is the same value.
+    int64_t started_ms = 0;
+    int64_t first_token_ms = 0;
 };
-
-struct StreamThinkingTagPair {
-    const char* open;
-    const char* close;
-};
-
-constexpr StreamThinkingTagPair kDefaultStreamThinkingTags[] = {
-    {"<think>", "</think>"},
-    {"<thinking>", "</thinking>"},
-};
-
-size_t matching_tag_suffix_len(const std::string& text, const char* tag) {
-    const size_t tag_len = std::strlen(tag);
-    const size_t max_len = std::min(tag_len - 1, text.size());
-    for (size_t len = max_len; len > 0; --len) {
-        if (std::memcmp(text.data() + text.size() - len, tag, len) == 0) {
-            return len;
-        }
-    }
-    return 0;
-}
-
-size_t matching_open_suffix_len(const std::string& text, const StreamThinkingTagPair* pairs,
-                                size_t pair_count) {
-    size_t best = 0;
-    for (size_t i = 0; i < pair_count; ++i) {
-        best = std::max(best, matching_tag_suffix_len(text, pairs[i].open));
-    }
-    return best;
-}
-
-size_t matching_close_suffix_len(const std::string& text, const StreamThinkingTagPair* pairs,
-                                 size_t pair_count) {
-    size_t best = 0;
-    for (size_t i = 0; i < pair_count; ++i) {
-        best = std::max(best, matching_tag_suffix_len(text, pairs[i].close));
-    }
-    return best;
-}
-
-const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
-                                                     const StreamThinkingTagPair* pairs,
-                                                     size_t pair_count, size_t* out_open_pos) {
-    size_t best = std::string::npos;
-    const StreamThinkingTagPair* best_pair = nullptr;
-    for (size_t i = 0; i < pair_count; ++i) {
-        const size_t pos = text.find(pairs[i].open);
-        if (pos != std::string::npos && pos < best) {
-            best = pos;
-            best_pair = &pairs[i];
-        }
-    }
-    if (out_open_pos) {
-        *out_open_pos = best;
-    }
-    return best_pair;
-}
-
-const StreamThinkingTagPair* find_earliest_close_pair(const std::string& text,
-                                                      const StreamThinkingTagPair* pairs,
-                                                      size_t pair_count, size_t* out_close_pos) {
-    size_t best = std::string::npos;
-    const StreamThinkingTagPair* best_pair = nullptr;
-    for (size_t i = 0; i < pair_count; ++i) {
-        const size_t pos = text.find(pairs[i].close);
-        if (pos != std::string::npos && pos < best) {
-            best = pos;
-            best_pair = &pairs[i];
-        }
-    }
-    if (out_close_pos) {
-        *out_close_pos = best;
-    }
-    return best_pair;
-}
 
 // BUG-STREAMING-001 unification: `dispatch_stream_event` now delegates
 // to `rac::llm::serialize_llm_stream_event` — the single canonical
@@ -1981,20 +1890,22 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
         ctx->response_text += token;
     }
 
-    // Completion accounting includes generated reasoning even when thought
-    // events are intentionally hidden from the consumer. Otherwise a stream
-    // that exhausts max_tokens inside <think> is misreported as a natural
-    // "stop" and its terminal result undercounts completion tokens.
-    ctx->token_count += 1;
+    // Completion accounting is per ENGINE delta (see stream_token_callback), not
+    // per post-split segment: the splitter can turn one delta into two segments
+    // or hold it back entirely, and counting segments here is what let the token
+    // total drift from what the engine actually produced.
     if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT && !ctx->emit_thoughts) {
         return;
     }
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
+        // Kept as the first DISPATCHED token for the event stream's sake, while
+        // `timing.first_token_ms` records the first PRODUCED token. Reporting
+        // the dispatched time as TTFT is the defect this separation fixes.
         ctx->first_token_ms = now_ms();
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
                                  nullptr, token.c_str(), nullptr, nullptr, ctx->ref->model_id, 1,
-                                 ctx->first_token_ms - ctx->started_ms);
+                                 ctx->timing.first_token_ms - ctx->started_ms);
     }
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED, nullptr,
                              token.c_str(), nullptr, nullptr, ctx->ref->model_id, ctx->token_count,
@@ -2002,98 +1913,78 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
     dispatch_stream_event(ctx, token.c_str(), false, kind, nullptr, nullptr);
 }
 
-void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
+/** Applies one classified segment from the splitter to the stream context. */
+void apply_thinking_segment(ProtoStreamContext* ctx,
+                            const rac::llm::ThinkingStreamSegment& segment) {
+    if (segment.reclassify_prior_content_as_reasoning) {
+        // The splitter just proved that the reasoning region opened before the
+        // first token (its opening tag was prefilled into the prompt), so
+        // everything accumulated as answer so far is reasoning.
+        //
+        // This branch only runs for a model that declared NOTHING about
+        // reasoning — one that did gets `set_hold_ambiguous_prefix`, which
+        // settles the same question before any delta is dispatched. Here the
+        // deltas already handed to the callback keep the kind they were sent
+        // with; a callback cannot be un-called, and the terminal result is
+        // recomputed from the raw text regardless.
+        ctx->thinking_text.insert(0, ctx->response_text);
+        ctx->response_text.clear();
+        // The content clock never actually started: every delta it was stamped
+        // from was reasoning. Leaving it set is what collapsed
+        // time-to-first-content into TTFT on exactly the models that prefill.
+        ctx->timing.first_content_token_ms = 0;
+        ctx->provisional_content_ms = 0;
+    }
+    if (segment.text.empty()) {
+        return;
+    }
+    const bool reasoning = segment.channel == rac::llm::ThinkingChannel::kReasoning;
+    if (reasoning) {
+        // Whatever was withheld was reasoning after all; it must not be allowed
+        // to back-date the first answer token.
+        ctx->provisional_content_ms = 0;
+    } else if (ctx->timing.first_content_token_ms == 0) {
+        // Time to first CONTENT — the wait the user actually experiences, since
+        // everything before it is reasoning they may never see. Stamped at the
+        // channel boundary and never conflated with `ttft_ms`. Text released
+        // from the ambiguity hold is dated from when the ENGINE produced it, not
+        // from when the hold let go, or the hold itself would show up as
+        // latency the model never spent.
+        ctx->timing.first_content_token_ms =
+            ctx->provisional_content_ms > 0 ? ctx->provisional_content_ms : now_ms();
+        ctx->provisional_content_ms = 0;
+    }
+    emit_stream_segment(ctx, segment.text,
+                        reasoning ? runanywhere::v1::TOKEN_KIND_THOUGHT
+                                  : runanywhere::v1::TOKEN_KIND_ANSWER);
+}
+
+void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token, int64_t produced_ms) {
     if (!ctx || !token || token[0] == '\0') {
         return;
     }
-
-    const bool has_custom_tags =
-        !ctx->thinking_open_tag.empty() && !ctx->thinking_close_tag.empty();
-    const std::array<StreamThinkingTagPair, 3> custom_tag_pairs = {{
-        {has_custom_tags ? ctx->thinking_open_tag.c_str() : "",
-         has_custom_tags ? ctx->thinking_close_tag.c_str() : ""},
-        kDefaultStreamThinkingTags[0],
-        kDefaultStreamThinkingTags[1],
-    }};
-    const StreamThinkingTagPair* tag_pairs =
-        has_custom_tags ? custom_tag_pairs.data() : kDefaultStreamThinkingTags;
-    const size_t tag_pair_count = has_custom_tags ? custom_tag_pairs.size()
-                                                  : sizeof(kDefaultStreamThinkingTags) /
-                                                        sizeof(kDefaultStreamThinkingTags[0]);
-
     ctx->raw_text += token;
-    ctx->pending_text += token;
-    while (!ctx->pending_text.empty()) {
-        if (ctx->inside_thinking) {
-            size_t open_pos = std::string::npos;
-            const StreamThinkingTagPair* open_pair =
-                find_earliest_open_pair(ctx->pending_text, tag_pairs, tag_pair_count, &open_pos);
-            size_t close_pos = std::string::npos;
-            const StreamThinkingTagPair* close_pair =
-                find_earliest_close_pair(ctx->pending_text, tag_pairs, tag_pair_count, &close_pos);
-            if (open_pos != std::string::npos &&
-                (close_pos == std::string::npos || open_pos < close_pos)) {
-                // Some chat templates prefill the opening thinking tag in the
-                // prompt, while other runtimes include it in the generated
-                // stream. Starting in thinking mode supports the prefilled
-                // form; swallowing a generated opening tag here supports both
-                // without ever surfacing the delimiter to SDK consumers.
-                emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
-                                    runanywhere::v1::TOKEN_KIND_THOUGHT);
-                ctx->pending_text.erase(0, open_pos + std::strlen(open_pair->open));
-                continue;
-            }
-            if (close_pos != std::string::npos) {
-                emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
-                                    runanywhere::v1::TOKEN_KIND_THOUGHT);
-                ctx->pending_text.erase(0, close_pos + std::strlen(close_pair->close));
-                ctx->inside_thinking = false;
-                continue;
-            }
-
-            const size_t keep =
-                std::max(matching_open_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count),
-                         matching_close_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count));
-            const size_t emit_len = ctx->pending_text.size() - keep;
-            if (emit_len == 0) {
-                break;
-            }
-            emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
-                                runanywhere::v1::TOKEN_KIND_THOUGHT);
-            ctx->pending_text.erase(0, emit_len);
-            continue;
-        }
-
-        size_t open_pos = std::string::npos;
-        const StreamThinkingTagPair* open_pair =
-            find_earliest_open_pair(ctx->pending_text, tag_pairs, tag_pair_count, &open_pos);
-        if (open_pos != std::string::npos) {
-            emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
-                                runanywhere::v1::TOKEN_KIND_ANSWER);
-            ctx->pending_text.erase(0, open_pos + std::strlen(open_pair->open));
-            ctx->inside_thinking = true;
-            continue;
-        }
-
-        const size_t keep = matching_open_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count);
-        const size_t emit_len = ctx->pending_text.size() - keep;
-        if (emit_len == 0) {
-            break;
-        }
-        emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
-                            runanywhere::v1::TOKEN_KIND_ANSWER);
-        ctx->pending_text.erase(0, emit_len);
+    ctx->segments.clear();
+    ctx->splitter.push(token, &ctx->segments);
+    for (const auto& segment : ctx->segments) {
+        apply_thinking_segment(ctx, segment);
+    }
+    // Remember when the withheld run began. Recorded after the push so a delta
+    // that both starts and ends the hold is dated by the hold's own release.
+    if (ctx->provisional_content_ms == 0 && ctx->splitter.holding_ambiguous_prefix()) {
+        ctx->provisional_content_ms = produced_ms;
     }
 }
 
 void flush_pending_stream_text(ProtoStreamContext* ctx) {
-    if (!ctx || ctx->pending_text.empty()) {
+    if (!ctx) {
         return;
     }
-    emit_stream_segment(ctx, ctx->pending_text,
-                        ctx->inside_thinking ? runanywhere::v1::TOKEN_KIND_THOUGHT
-                                             : runanywhere::v1::TOKEN_KIND_ANSWER);
-    ctx->pending_text.clear();
+    ctx->segments.clear();
+    ctx->splitter.flush(&ctx->segments);
+    for (const auto& segment : ctx->segments) {
+        apply_thinking_segment(ctx, segment);
+    }
 }
 
 void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
@@ -2103,6 +1994,31 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     }
     flush_pending_stream_text(ctx);
     ctx->terminal_sent = true;
+
+    // ONE authority for the split. The incremental splitter exists to decide
+    // which channel each delta goes out on while the text is still arriving; it
+    // is not a second opinion on the final answer. Re-splitting the accumulated
+    // raw text through the same whole-text function the unary verb calls makes
+    // the streaming terminal result byte-identical to the unary result for the
+    // same generated text BY CONSTRUCTION. Accumulating the live segments
+    // instead is what let the two drift — the stream kept trailing whitespace
+    // the unary path trimmed, and the two disagreed about a second bare
+    // `</think>` and about a second reasoning block.
+    const char* split_answer = nullptr;
+    size_t split_answer_len = 0;
+    const char* split_reasoning = nullptr;
+    size_t split_reasoning_len = 0;
+    (void)rac_llm_extract_thinking_with_tags(
+        ctx->raw_text.c_str(),
+        ctx->thinking_open_tag.empty() ? nullptr : ctx->thinking_open_tag.c_str(),
+        ctx->thinking_close_tag.empty() ? nullptr : ctx->thinking_close_tag.c_str(), &split_answer,
+        &split_answer_len, &split_reasoning, &split_reasoning_len);
+    // Written back so the completion/cancellation telemetry published after this
+    // call reports the authoritative split rather than whatever the delta
+    // boundaries happened to produce.
+    ctx->response_text.assign(split_answer != nullptr ? split_answer : "", split_answer_len);
+    ctx->thinking_text.assign(split_reasoning != nullptr ? split_reasoning : "",
+                              split_reasoning_len);
 
     // Surface a structured tool call on LLMStreamEvent.tool_call
     // (proto field 18) when the streaming output contains one. The terminal
@@ -2127,43 +2043,50 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     // terminal result is now the same LLMGenerationResult the unary call
     // returns, carried on LLMStreamEvent.result (fresh tag 22).
     LLMGenerationResult final_result;
-    final_result.set_text(ctx->response_text);
-    if (!ctx->thinking_text.empty()) {
-        final_result.set_thinking_content(ctx->thinking_text);
+    const std::string& answer_text = ctx->response_text;
+    const std::string& reasoning_text = ctx->thinking_text;
+    final_result.set_text(answer_text);
+    if (!reasoning_text.empty()) {
+        final_result.set_thinking_content(reasoning_text);
     }
+
+    ctx->timing.started_ms = ctx->started_ms;
+    ctx->timing.completed_ms = now_ms();
+    StreamTimingMetrics timing = compute_stream_timing(ctx->timing);
+
+    // Per-channel token counts. Apportioned by character ratio through the same
+    // helper the unary path uses, so the two paths cannot disagree; the engine
+    // does not tell us which side of `</think>` each delta fell on.
+    int32_t reasoning_tokens = 0;
+    int32_t content_tokens = ctx->timing.total_tokens;
+    (void)rac_llm_split_thinking_tokens(ctx->timing.total_tokens, answer_text.c_str(),
+                                        reasoning_text.empty() ? nullptr : reasoning_text.c_str(),
+                                        &reasoning_tokens, &content_tokens);
+    final_result.set_thinking_tokens(reasoning_tokens);
+    final_result.set_response_tokens(content_tokens);
+    rac::llm::set_content_rate(&timing, ctx->timing, content_tokens);
+
     final_result.mutable_usage()->set_input_tokens(ctx->prompt_tokens);
-    final_result.mutable_usage()->set_output_tokens(ctx->token_count);
-    final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->token_count);
-    const int64_t total_time_ms = now_ms() - ctx->started_ms;
-    final_result.set_generation_time_ms(static_cast<double>(total_time_ms));
-    const int64_t raw_ttft_ms =
-        ctx->first_token_ms > 0 ? ctx->first_token_ms - ctx->started_ms : 0;
-    const StreamTimingMetrics timing =
-        compute_stream_timing_metrics(total_time_ms, raw_ttft_ms, ctx->token_count);
+    final_result.mutable_usage()->set_output_tokens(ctx->timing.total_tokens);
+    final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->timing.total_tokens);
+    final_result.set_generation_time_ms(static_cast<double>(timing.wall_ms));
     if (timing.ttft_ms > 0) {
         final_result.mutable_usage()->set_ttft_ms(timing.ttft_ms);
     }
-    if (timing.prompt_eval_ms > 0) {
-        final_result.set_prompt_eval_time_ms(timing.prompt_eval_ms);
+    if (timing.prefill_ms > 0) {
+        final_result.set_prompt_eval_time_ms(timing.prefill_ms);
     }
-    if (timing.tokens_per_second > 0.0) {
-        final_result.mutable_usage()->set_decode_tokens_per_second(timing.tokens_per_second);
+    if (timing.decode_tokens_per_second > 0.0) {
+        final_result.mutable_usage()->set_decode_tokens_per_second(
+            timing.decode_tokens_per_second);
     }
-    // When the stream was batch-buffered, decode_time_ms is the full wall
-    // generate (there is no separate post-TTFT decode window to report).
-    //
-    // Keyed off the flag, not off `timing.ttft_ms == 0`: that test could never
-    // pass alongside `raw_ttft_ms > 0` in the same condition, so buffered streams
-    // fell through to `total − ttft` below and reported a decode window of a few
-    // milliseconds — while `decode_tokens_per_second`, computed inside the helper,
-    // had already used the full wall time. The two numbers disagreed by the same
-    // factor that made the rate look absurd in the first place.
-    if (timing.batch_buffered && total_time_ms > 0) {
-        final_result.set_decode_time_ms(total_time_ms);
-    } else if (timing.ttft_ms > 0 && timing.ttft_ms < total_time_ms) {
-        final_result.set_decode_time_ms(total_time_ms - timing.ttft_ms);
-    } else if (total_time_ms > 0) {
-        final_result.set_decode_time_ms(total_time_ms);
+    // The decode window is now measured (first produced delta to last), not
+    // reconstructed as `total − ttft`. A batch-buffered backend has no real
+    // window, so the honest figure there is the full wall clock.
+    if (timing.batch_buffered || timing.decode_ms <= 0) {
+        final_result.set_decode_time_ms(timing.wall_ms);
+    } else {
+        final_result.set_decode_time_ms(timing.decode_ms);
     }
     // finish_reason widened from a bare string to the FinishReason enum
     // (idl/llm_options.proto). Map the producer's plain-English reason
@@ -2216,7 +2139,19 @@ rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const c
         return RAC_TRUE;
     }
 
-    consume_thinking_aware_text(ctx, cleaned.c_str());
+    // One engine delta = one token, timed HERE, at production. Doing it further
+    // down (at dispatch) makes the measurement depend on whether reasoning is
+    // visible to the caller, which is how TTFT came to mean "time to the first
+    // token after `</think>`" and inflated every rate derived from it.
+    const int64_t produced_ms = now_ms();
+    if (ctx->timing.first_token_ms == 0) {
+        ctx->timing.first_token_ms = produced_ms;
+    }
+    ctx->timing.last_token_ms = produced_ms;
+    ctx->timing.total_tokens += 1;
+    ctx->token_count = ctx->timing.total_tokens;
+
+    consume_thinking_aware_text(ctx, cleaned.c_str(), produced_ms);
     return RAC_TRUE;
 }
 
@@ -2435,12 +2370,45 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.conversation_id = request.conversation_id();
     thinking_tags_from_request_or_model(request, ref, &ctx.thinking_open_tag,
                                         &ctx.thinking_close_tag);
-    // Reasoning chat templates such as Qwen/Bonsai commonly append the
-    // opening tag to the prompt and generate only the reasoning body followed
-    // by the closing tag. A configured tag pair is the typed signal that this
-    // stream begins in thinking mode; emit_thoughts controls visibility only.
-    ctx.inside_thinking = options.disable_thinking == RAC_FALSE && !ctx.thinking_open_tag.empty() &&
-                          !ctx.thinking_close_tag.empty();
+    // A model-declared pair is tried first, with the built-ins kept behind it so
+    // a model that ignores its own pattern still splits.
+    if (!ctx.thinking_open_tag.empty() && !ctx.thinking_close_tag.empty()) {
+        std::vector<rac::llm::ThinkingTagPair> pairs;
+        pairs.push_back({ctx.thinking_open_tag, ctx.thinking_close_tag});
+        for (auto& builtin : rac::llm::default_thinking_tag_pairs()) {
+            pairs.push_back(std::move(builtin));
+        }
+        ctx.splitter.set_pairs(std::move(pairs));
+        // Reasoning chat templates such as Qwen/Bonsai/maple append the opening
+        // tag to the PROMPT and generate only the reasoning body plus the
+        // closing tag, so the stream can begin inside reasoning with nothing in
+        // the text to say so.
+        //
+        // A declared pair does NOT prove that happened, and treating it as proof
+        // is a data-loss bug: `normalize_thinking_capability()` (model_registry)
+        // fills a default `<think>`/`</think>` pattern into EVERY model with
+        // `supports_thinking`, so the pair is a capability, not a statement about
+        // the template — the prefill itself lives in the model bundle's manifest
+        // (`gen_prefill`), which commons never sees and which has no field in
+        // idl/thinking_tag_pattern.proto. A reasoning-capable model that answers
+        // without reasoning on this turn produces no closing tag at all, and
+        // asserting "we started inside reasoning" routes its entire answer to
+        // the reasoning channel, which `emit_thoughts == false` then discards:
+        // zero deltas, empty text.
+        //
+        // So the pair arms a HOLD instead of an assertion. The splitter withholds
+        // answer-channel text until a delimiter settles the question, which is
+        // right either way it lands and is wrong in neither: when the model does
+        // reason, the hold ends at `</think>` and costs nothing (the text it
+        // covered was reasoning the caller was not going to be shown); when the
+        // model does not reason, the answer is delivered at end of stream —
+        // later than ideal, but complete, on the right channel, and never
+        // silently dropped. `disable_thinking` means no reasoning is coming, so
+        // there is nothing to hold for.
+        if (options.disable_thinking == RAC_FALSE) {
+            ctx.splitter.set_hold_ambiguous_prefix(true);
+        }
+    }
 
     // Defensive: catch any C++ exception that escapes the engine vtable.
     // Each backend (llamacpp, onnx, etc.) already wraps its inference call in
@@ -2498,10 +2466,9 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         }
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
-        const int64_t raw_stream_ttft =
-            ctx.first_token_ms > ctx.started_ms ? ctx.first_token_ms - ctx.started_ms : 0;
-        const StreamTimingMetrics stream_timing =
-            compute_stream_timing_metrics(stream_elapsed, raw_stream_ttft, ctx.token_count);
+        // The same observations dispatch_terminal_once already used, so the
+        // telemetry event and the terminal result cannot report different rates.
+        const StreamTimingMetrics stream_timing = compute_stream_timing(ctx.timing);
         // GENERATION_EVENT_KIND_STREAM_COMPLETED was deleted (idl/sdk_events.proto):
         // streaming completion now folds into COMPLETED, discriminated by
         // is_streaming below (matches the non-streaming completion event).
@@ -2509,11 +2476,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  prompt.c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count, stream_elapsed,
                                  ctx.prompt_tokens, ref.framework_name,
-                                 stream_timing.tokens_per_second,
+                                 stream_timing.decode_tokens_per_second,
                                  static_cast<double>(stream_timing.ttft_ms), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),
                                  /*is_streaming=*/true,
-                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_timing.prompt_eval_ms));
+                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_timing.prefill_ms));
     }
 
     rac::llm::release_lifecycle_llm(&ref);
