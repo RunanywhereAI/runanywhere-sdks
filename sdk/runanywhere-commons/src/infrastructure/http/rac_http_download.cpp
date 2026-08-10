@@ -44,6 +44,7 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/download/partial_download_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_sha256.h"
@@ -249,8 +250,11 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // the final path where a loader would treat it as complete. Resume operates
     // on the ".part" sidecar; the final path is written exactly once, by the
     // rename below. The suffix ".part" is a shared convention: the model-folder
-    // deleter removes any "<name>.part" alongside the final files.
-    const fs::path part_path(std::string(req->destination_path) + ".part");
+    // deleter removes any "<name>.part" alongside the final files. This writer is
+    // the producer of that convention, so it takes the suffix from the same
+    // constant its three readers do rather than restating the literal.
+    const fs::path part_path(std::string(req->destination_path) +
+                             std::string(rac::download::kPartialSuffix));
 
     if (req->resume_from_byte > 0) {
         if (!fs::exists(part_path, ec) || ec) {

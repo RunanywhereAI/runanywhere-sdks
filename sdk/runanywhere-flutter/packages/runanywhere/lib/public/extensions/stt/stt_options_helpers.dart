@@ -5,13 +5,9 @@
 // Int64-millisecond timestamps, validity checks) without modifying
 // the generated files.
 //
-// The `STTLanguageBcp47.bcp47` getter / `fromBcp47` static factory
-// were retired in T6.4 — call sites now use the generated
-// `STTLanguageWireString.wireString` extension and the top-level
-// `sttLanguageFromWireString` factory in
-// `package:runanywhere/generated/convenience/ra_convenience.dart`
-// (the BCP-47 codes ARE the wire strings; see idl/stt_options.proto
-// `rac_wire_string` annotations on `STTLanguage`).
+// The `STTLanguage` enum was retired with the v2 proto contract —
+// `STTOptions.language` is now an optional BCP-47 string (unset =
+// auto-detect).
 
 import 'package:fixnum/fixnum.dart';
 
@@ -39,20 +35,15 @@ extension WordTimestampHelpers on WordTimestamp {
 
 /// Helpers on the proto [TranscriptionMetadata] message — convert the
 /// Int64-millisecond fields into idiomatic seconds doubles.
+///
+/// `audio_length_ms` was deleted outright (idl/stt_options.proto):
+/// `TranscriptionMetadata` shrunk to `model_id`/`processing_time_ms`, so the
+/// audio-length-derived helpers that used to live here
+/// (`audioLengthSeconds`, `computedRealTimeFactor`) have no wire input left
+/// and were removed rather than silently returning a meaningless 0.0.
 extension TranscriptionMetadataHelpers on TranscriptionMetadata {
   /// Wall-clock processing time in seconds.
   double get processingTimeSeconds => processingTimeMs.toInt() / 1000.0;
-
-  /// Total audio length in seconds.
-  double get audioLengthSeconds => audioLengthMs.toInt() / 1000.0;
-
-  /// Real-time factor (`processingTime / audioLength`). Falls back to
-  /// the proto-recorded `realTimeFactor` when audio length is zero.
-  double get computedRealTimeFactor {
-    final audio = audioLengthMs.toInt();
-    if (audio <= 0) return realTimeFactor;
-    return processingTimeMs.toInt() / audio;
-  }
 }
 
 /// Convenience constructor wrappers — Int64 ergonomics.

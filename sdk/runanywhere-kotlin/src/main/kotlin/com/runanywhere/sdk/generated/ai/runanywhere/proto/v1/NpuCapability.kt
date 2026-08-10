@@ -29,6 +29,11 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * The single NPU-capability description in this IDL. Static device
+ * description lives in exactly one other place: device_info.proto's
+ * DeviceInfo.
+ */
 public class NpuCapability(
   /**
    * Vendor SoC model (e.g. "SM8750"); empty when unknown.
@@ -42,16 +47,16 @@ public class NpuCapability(
   )
   public val soc_model: String = "",
   /**
-   * /sys/devices/soc0/soc_id value; -1 when unavailable.
+   * /sys/devices/soc0/soc_id value. ABSENT when unavailable — never a -1 or 0
+   * sentinel; a default-constructed message is already "unavailable".
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "socId",
     schemaIndex = 1,
   )
-  public val soc_id: Int = 0,
+  public val soc_id: Int? = null,
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.HexagonArch#ADAPTER",
@@ -61,29 +66,28 @@ public class NpuCapability(
   )
   public val hexagon_arch: HexagonArch = HexagonArch.HEXAGON_ARCH_UNKNOWN,
   /**
-   * True iff hexagon_arch is in the device-validated QHexRT-supported set
-   * (v75, v79, or v81 today).
+   * True iff this accelerator generation is in the device-validated supported
+   * set (Hexagon v75/v79/v81 today). Engine-agnostic on purpose: a second NPU
+   * engine must not require a second boolean.
    */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "qhexrtSupported",
     schemaIndex = 3,
   )
-  public val qhexrt_supported: Boolean = false,
+  public val supported: Boolean = false,
   /**
-   * rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
-   * SDKs never re-derive the display name from the enum.
+   * NPU vendor family. Re-homed here so a non-Qualcomm device gets a
+   * meaningful answer instead of an empty message.
    */
   @field:WireField(
     tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.NPUChip#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "archName",
     schemaIndex = 4,
   )
-  public val arch_name: String = "",
+  public val npu: NPUChip = NPUChip.NPU_CHIP_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<NpuCapability, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -99,8 +103,8 @@ public class NpuCapability(
     if (soc_model != other.soc_model) return false
     if (soc_id != other.soc_id) return false
     if (hexagon_arch != other.hexagon_arch) return false
-    if (qhexrt_supported != other.qhexrt_supported) return false
-    if (arch_name != other.arch_name) return false
+    if (supported != other.supported) return false
+    if (npu != other.npu) return false
     return true
   }
 
@@ -109,10 +113,10 @@ public class NpuCapability(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + soc_model.hashCode()
-      result = result * 37 + soc_id.hashCode()
+      result = result * 37 + (soc_id?.hashCode() ?: 0)
       result = result * 37 + hexagon_arch.hashCode()
-      result = result * 37 + qhexrt_supported.hashCode()
-      result = result * 37 + arch_name.hashCode()
+      result = result * 37 + supported.hashCode()
+      result = result * 37 + npu.hashCode()
       super.hashCode = result
     }
     return result
@@ -121,21 +125,21 @@ public class NpuCapability(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """soc_model=${sanitize(soc_model)}"""
-    result += """soc_id=$soc_id"""
+    if (soc_id != null) result += """soc_id=$soc_id"""
     result += """hexagon_arch=$hexagon_arch"""
-    result += """qhexrt_supported=$qhexrt_supported"""
-    result += """arch_name=${sanitize(arch_name)}"""
+    result += """supported=$supported"""
+    result += """npu=$npu"""
     return result.joinToString(prefix = "NpuCapability{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     soc_model: String = this.soc_model,
-    soc_id: Int = this.soc_id,
+    soc_id: Int? = this.soc_id,
     hexagon_arch: HexagonArch = this.hexagon_arch,
-    qhexrt_supported: Boolean = this.qhexrt_supported,
-    arch_name: String = this.arch_name,
+    supported: Boolean = this.supported,
+    npu: NPUChip = this.npu,
     unknownFields: ByteString = this.unknownFields,
-  ): NpuCapability = NpuCapability(soc_model, soc_id, hexagon_arch, qhexrt_supported, arch_name, unknownFields)
+  ): NpuCapability = NpuCapability(soc_model, soc_id, hexagon_arch, supported, npu, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,17 +156,15 @@ public class NpuCapability(
         if (value.soc_model != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.soc_model)
         }
-        if (value.soc_id != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.soc_id)
-        }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.soc_id)
         if (value.hexagon_arch != ai.runanywhere.proto.v1.HexagonArch.HEXAGON_ARCH_UNKNOWN) {
           size += HexagonArch.ADAPTER.encodedSizeWithTag(3, value.hexagon_arch)
         }
-        if (value.qhexrt_supported != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.qhexrt_supported)
+        if (value.supported != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.supported)
         }
-        if (value.arch_name != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.arch_name)
+        if (value.npu != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          size += NPUChip.ADAPTER.encodedSizeWithTag(5, value.npu)
         }
         return size
       }
@@ -171,35 +173,31 @@ public class NpuCapability(
         if (value.soc_model != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.soc_model)
         }
-        if (value.soc_id != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.soc_id)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.soc_id)
         if (value.hexagon_arch != ai.runanywhere.proto.v1.HexagonArch.HEXAGON_ARCH_UNKNOWN) {
           HexagonArch.ADAPTER.encodeWithTag(writer, 3, value.hexagon_arch)
         }
-        if (value.qhexrt_supported != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.qhexrt_supported)
+        if (value.supported != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.supported)
         }
-        if (value.arch_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.arch_name)
+        if (value.npu != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          NPUChip.ADAPTER.encodeWithTag(writer, 5, value.npu)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: NpuCapability) {
         writer.writeBytes(value.unknownFields)
-        if (value.arch_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.arch_name)
+        if (value.npu != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          NPUChip.ADAPTER.encodeWithTag(writer, 5, value.npu)
         }
-        if (value.qhexrt_supported != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.qhexrt_supported)
+        if (value.supported != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.supported)
         }
         if (value.hexagon_arch != ai.runanywhere.proto.v1.HexagonArch.HEXAGON_ARCH_UNKNOWN) {
           HexagonArch.ADAPTER.encodeWithTag(writer, 3, value.hexagon_arch)
         }
-        if (value.soc_id != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.soc_id)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.soc_id)
         if (value.soc_model != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.soc_model)
         }
@@ -207,10 +205,10 @@ public class NpuCapability(
 
       override fun decode(reader: ProtoReader): NpuCapability {
         var soc_model: String = ""
-        var soc_id: Int = 0
+        var soc_id: Int? = null
         var hexagon_arch: HexagonArch = HexagonArch.HEXAGON_ARCH_UNKNOWN
-        var qhexrt_supported: Boolean = false
-        var arch_name: String = ""
+        var supported: Boolean = false
+        var npu: NPUChip = NPUChip.NPU_CHIP_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> soc_model = ProtoAdapter.STRING.decode(reader)
@@ -220,8 +218,12 @@ public class NpuCapability(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            4 -> qhexrt_supported = ProtoAdapter.BOOL.decode(reader)
-            5 -> arch_name = ProtoAdapter.STRING.decode(reader)
+            4 -> supported = ProtoAdapter.BOOL.decode(reader)
+            5 -> try {
+              npu = NPUChip.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -229,8 +231,8 @@ public class NpuCapability(
           soc_model = soc_model,
           soc_id = soc_id,
           hexagon_arch = hexagon_arch,
-          qhexrt_supported = qhexrt_supported,
-          arch_name = arch_name,
+          supported = supported,
+          npu = npu,
           unknownFields = unknownFields
         )
       }

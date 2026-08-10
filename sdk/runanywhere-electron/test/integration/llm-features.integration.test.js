@@ -22,7 +22,7 @@ before(async () => {
   ({ RunAnywhere, SDKException } = require('../../dist'));
   try {
     RunAnywhere.initialize();
-    llm = await RunAnywhere.loadLLM('qwen2.5-0.5b');
+    llm = await RunAnywhere.loadLLM('qwen3.5-0.8b');
   } catch (e) {
     loadError = e;
   }
@@ -41,7 +41,7 @@ function requireLlm() {
 test('generateStream yields token events then a final event with metrics', withTimeout(SKIP), async () => {
   const model = requireLlm();
   const events = [];
-  for await (const e of model.generateStream('Say hello in one short sentence.', { maxTokens: 24 })) {
+  for await (const e of model.generateStream('Say hello in one short sentence.', { maxOutputTokens: 24 })) {
     events.push(e);
   }
   assert.ok(events.length >= 2, 'at least one token event + a final event');
@@ -61,7 +61,7 @@ test('generateStream yields token events then a final event with metrics', withT
 test('generateStructured (house-uniform name) returns typed JSON', withTimeout(SKIP), async () => {
   const model = requireLlm();
   const result = await model.generateStructured('Extract the person as JSON. Text: "Bob is 40 years old."', {
-    maxTokens: 64,
+    maxOutputTokens: 64,
     schema: {
       type: 'object',
       properties: { name: { type: 'string' }, age: { type: 'integer' } },

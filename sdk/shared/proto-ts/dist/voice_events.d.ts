@@ -1,6 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ComponentLifecycleState, EventCategory } from "./component_types";
-import { ErrorCode, ErrorSeverity } from "./errors";
+import { ErrorCode, ErrorSeverity, SDKError } from "./errors";
+import { AudioEncoding } from "./model_types";
 import { VADStreamEventKind } from "./vad_options";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum VoicePipelineComponent {
@@ -30,14 +31,6 @@ export declare enum TokenKind {
 }
 export declare function tokenKindFromJSON(object: any): TokenKind;
 export declare function tokenKindToJSON(object: TokenKind): string;
-export declare enum AudioEncoding {
-    AUDIO_ENCODING_UNSPECIFIED = 0,
-    AUDIO_ENCODING_PCM_F32_LE = 1,
-    AUDIO_ENCODING_PCM_S16_LE = 2,
-    UNRECOGNIZED = -1
-}
-export declare function audioEncodingFromJSON(object: any): AudioEncoding;
-export declare function audioEncodingToJSON(object: AudioEncoding): string;
 export declare enum InterruptReason {
     INTERRUPT_REASON_UNSPECIFIED = 0,
     INTERRUPT_REASON_USER_BARGE_IN = 1,
@@ -65,16 +58,6 @@ export declare enum PipelineState {
 }
 export declare function pipelineStateFromJSON(object: any): PipelineState;
 export declare function pipelineStateToJSON(object: PipelineState): string;
-export declare enum SpeechTurnDetectionEventKind {
-    SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED = 2,
-    SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED = 3,
-    SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS = 4,
-    UNRECOGNIZED = -1
-}
-export declare function speechTurnDetectionEventKindFromJSON(object: any): SpeechTurnDetectionEventKind;
-export declare function speechTurnDetectionEventKindToJSON(object: SpeechTurnDetectionEventKind): string;
 export declare enum TurnLifecycleEventKind {
     TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
     TURN_LIFECYCLE_EVENT_KIND_STARTED = 1,
@@ -102,10 +85,10 @@ export interface VoiceEvent {
      */
     seq: number;
     /**
-     * Wall-clock timestamp captured at the C++ edge, in microseconds since
+     * Wall-clock timestamp captured at the C++ edge, in milliseconds since
      * Unix epoch. Frontends may re-timestamp for UI display.
      */
-    timestampUs: number;
+    timestampMs: number;
     category: EventCategory;
     severity: ErrorSeverity;
     component: VoicePipelineComponent;
@@ -115,27 +98,16 @@ export interface VoiceEvent {
     vad?: VADEvent | undefined;
     interrupted?: InterruptedEvent | undefined;
     state?: StateChangeEvent | undefined;
-    error?: ErrorEvent | undefined;
     metrics?: MetricsEvent | undefined;
-    /**
-     * Voice agent lifecycle events. Mirror Swift VoiceSessionError /
-     * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
-     * signals consumed by the cross-platform VoiceAgent extensions
-     * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
-     * VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
-     * voice_agent_types.dart).
-     */
     componentStateChanged?: VoiceAgentComponentStates | undefined;
+    /** The one error payload in this domain. */
     sessionError?: VoiceSessionError | undefined;
-    sessionStarted?: SessionStartedEvent | undefined;
-    sessionStopped?: SessionStoppedEvent | undefined;
-    agentResponseStarted?: AgentResponseStartedEvent | undefined;
-    agentResponseCompleted?: AgentResponseCompletedEvent | undefined;
-    speechTurnDetection?: SpeechTurnDetectionEvent | undefined;
+    /**
+     * Agent-response start/complete and user-speech start/end are
+     * TurnLifecycleEventKind values, not separate arms. Session start and
+     * stop are PipelineState transitions on StateChangeEvent.
+     */
     turnLifecycle?: TurnLifecycleEvent | undefined;
-    wakewordDetected?: WakeWordDetectedEvent | undefined;
-    audioLevel?: AudioLevelEvent | undefined;
-    componentProgress?: ComponentProgressEvent | undefined;
     /** Correlation fields shared by streaming and one-shot voice turns. */
     sessionId: string;
     turnId: string;
@@ -154,9 +126,17 @@ export interface UserSaidEvent {
     isFinal: boolean;
     /** 0.0..1.0, engine-dependent */
     confidence: number;
-    audioStartUs: number;
-    audioEndUs: number;
-    languageCode: string;
+    /**
+     * Milliseconds from the start of ALL audio fed this session, matching
+     * OpenAI input_audio_buffer.speech_started.audio_start_ms.
+     */
+    audioStartMs: number;
+    audioEndMs: number;
+    /**
+     * Detected language, BCP-47. One spelling across this domain and
+     * stt_options.proto.
+     */
+    language: string;
     segmentIndex: number;
 }
 /**
@@ -196,8 +176,10 @@ export interface AudioFrameEvent {
  */
 export interface VADEvent {
     type: VADStreamEventKind;
-    frameOffsetUs: number;
-    confidence: number;
+    /** Position of the analyzed frame on the session timeline, in ms. */
+    frameOffsetMs: number;
+    /** Same scale and caveats as VADResult.probability. */
+    probability: number;
     isSpeech: boolean;
     speechDurationMs: number;
     silenceDurationMs: number;
@@ -216,20 +198,6 @@ export interface StateChangeEvent {
     previous: PipelineState;
     current: PipelineState;
 }
-/**
- * Terminal or recoverable error in the pipeline. Frontends map these to
- * their native error types.
- */
-export interface ErrorEvent {
-    /** See ra_status_t in core/abi/ra_primitives.h */
-    code: number;
-    message: string;
-    /** "llm", "stt", "tts", "vad", "pipeline", ... */
-    component: string;
-    isRecoverable: boolean;
-    operation: string;
-    detailsJson: string;
-}
 /** Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop. */
 export interface MetricsEvent {
     sttFinalMs: number;
@@ -244,31 +212,10 @@ export interface MetricsEvent {
      * dashboards without re-computing the threshold themselves.
      */
     isOverBudget: boolean;
-    /**
-     * Monotonic producer-side timestamp in nanoseconds. Set by the
-     * producer (C++ dispatcher) at event-emit time; read by consumers
-     * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
-     * latency without relying on wall-clock sync. Encoded as int64 so
-     * std::chrono::steady_clock::now().time_since_epoch() values fit
-     * directly (2^63 ns ≈ 292 years of runtime headroom).
-     */
-    createdAtNs: number;
     vadFirstSpeechMs: number;
     sttFirstPartialMs: number;
     llmTotalMs: number;
     ttsTotalMs: number;
-}
-export interface AudioLevelEvent {
-    rms: number;
-    peak: number;
-    noiseFloorDb: number;
-    isSpeech: boolean;
-}
-export interface ComponentProgressEvent {
-    component: VoicePipelineComponent;
-    operation: string;
-    progress: number;
-    message: string;
 }
 /**
  * Aggregate load state across all four voice-agent components. Mirrors Swift
@@ -299,37 +246,20 @@ export interface VoiceAgentComponentStates {
      */
     anyLoading: boolean;
     wakewordState: ComponentLifecycleState;
-    errorMessage?: string | undefined;
+    error?: SDKError | undefined;
 }
 export interface VoiceSessionError {
     code: ErrorCode;
     message: string;
     failedComponent?: string | undefined;
+    /**
+     * The raw ra_status_t (core/abi/ra_primitives.h), preserved for
+     * diagnostics alongside the canonical `code`.
+     */
     cAbiCode: number;
     recoverable: boolean;
-}
-export interface SessionStartedEvent {
-    sessionId: string;
-}
-export interface SessionStoppedEvent {
-    sessionId: string;
-    reason: string;
-}
-export interface AgentResponseStartedEvent {
-    turnId: string;
-}
-export interface AgentResponseCompletedEvent {
-    turnId: string;
-    responseDurationMs: number;
-}
-export interface SpeechTurnDetectionEvent {
-    kind: SpeechTurnDetectionEventKind;
-    speakerId: string;
-    turnStartUs: number;
-    turnEndUs: number;
-    confidence: number;
-    speechDurationMs: number;
-    silenceDurationMs: number;
+    /** The operation that failed, e.g. "transcribe", "generate", "synthesize". */
+    operation?: string | undefined;
 }
 export interface TurnLifecycleEvent {
     kind: TurnLifecycleEventKind;
@@ -337,17 +267,10 @@ export interface TurnLifecycleEvent {
     sessionId: string;
     transcript: string;
     response: string;
-    error: string;
+    /** Set on KIND_FAILED. Same payload as VoiceEvent.session_error. */
+    error?: VoiceSessionError | undefined;
     startedAtMs: number;
     completedAtMs: number;
-}
-export interface WakeWordDetectedEvent {
-    wakeWord: string;
-    confidence: number;
-    timestampMs: number;
-    modelId: string;
-    modelIndex: number;
-    durationMs: number;
 }
 export declare const VoiceEvent: MessageFns<VoiceEvent>;
 export declare const VoiceEvent_MetadataEntry: MessageFns<VoiceEvent_MetadataEntry>;
@@ -357,19 +280,10 @@ export declare const AudioFrameEvent: MessageFns<AudioFrameEvent>;
 export declare const VADEvent: MessageFns<VADEvent>;
 export declare const InterruptedEvent: MessageFns<InterruptedEvent>;
 export declare const StateChangeEvent: MessageFns<StateChangeEvent>;
-export declare const ErrorEvent: MessageFns<ErrorEvent>;
 export declare const MetricsEvent: MessageFns<MetricsEvent>;
-export declare const AudioLevelEvent: MessageFns<AudioLevelEvent>;
-export declare const ComponentProgressEvent: MessageFns<ComponentProgressEvent>;
 export declare const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates>;
 export declare const VoiceSessionError: MessageFns<VoiceSessionError>;
-export declare const SessionStartedEvent: MessageFns<SessionStartedEvent>;
-export declare const SessionStoppedEvent: MessageFns<SessionStoppedEvent>;
-export declare const AgentResponseStartedEvent: MessageFns<AgentResponseStartedEvent>;
-export declare const AgentResponseCompletedEvent: MessageFns<AgentResponseCompletedEvent>;
-export declare const SpeechTurnDetectionEvent: MessageFns<SpeechTurnDetectionEvent>;
 export declare const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent>;
-export declare const WakeWordDetectedEvent: MessageFns<WakeWordDetectedEvent>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

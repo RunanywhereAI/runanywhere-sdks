@@ -1,10 +1,10 @@
 # RunAnywhere React Native SDK Documentation
 
-Updated: 2026-05-13
-Source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`
-Status: target public documentation for Swift-parity React Native alignment.
+Updated: 2026-07-30
+Public API contract: `thoughts/shared/plans/public_api_spec.md` (v3)
+Architecture source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`
 
-The React Native SDK exposes a Swift-shaped API over native `runanywhere-commons` services. TypeScript is a facade over generated protobuf request/result types and native bridge calls. SDK-owned lifecycle, auth, device registration, model registry, downloads, imports, storage, and inference orchestration are native-owned.
+The React Native SDK implements the v3 public API spec over native `runanywhere-commons`. TypeScript marshals options and results; lifecycle, auth, device registration, model registry, downloads, imports, storage, and inference orchestration all live in native code.
 
 ## Install Shape
 
@@ -12,83 +12,111 @@ The React Native SDK exposes a Swift-shaped API over native `runanywhere-commons
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
 ```
 
-Backend packages such as `@runanywhere/llamacpp` and `@runanywhere/onnx` are thin backend-registration packages. They do not own downloads, model registry state, storage, or lifecycle orchestration.
+Backend packages such as `@runanywhere/llamacpp` and `@runanywhere/onnx` only register backends. They do not own downloads, model registry state, storage, or lifecycle orchestration.
 
 ## Initialization
 
-React Native follows Swift's two-phase initialization contract.
+Initialization is a single call; there is no second phase to remember.
 
 ```typescript
 await RunAnywhere.initialize({
   apiKey: 'your-api-key',
-  baseURL: 'https://api.runanywhere.ai',
+  baseUrl: 'https://api.runanywhere.ai',
   environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 });
-
-await RunAnywhere.completeServicesInitialization();
 ```
 
-Phase 1 registers native platform adapters, configures native state, resolves model storage paths, and calls commons Phase 1. Phase 2 configures HTTP/auth, registers the device when needed, fetches assignments, discovers downloaded models, and marks services ready. Phase 2 may fall back to offline mode, matching Swift.
+`initialize` registers platform adapters, loads native code, and brings commons up, then returns as soon as local inference is usable. Auth, device registration, the model catalog, and telemetry continue in the background and retry on their own; the first call that needs the network joins that work.
 
-Public state should mirror Swift:
-
-| Property | Meaning |
+| Member | Meaning |
 |---|---|
-| `RunAnywhere.isInitialized` | Phase 1 completed and native ABI is callable |
-| `RunAnywhere.areServicesReady` | Phase 2 completed |
-| `RunAnywhere.isActive` | SDK has initialized params and Phase 1 is active |
+| `RunAnywhere.isReady` | Local inference is usable |
 | `RunAnywhere.version` | SDK version |
-| `RunAnywhere.environment` | Current SDK environment |
-| `RunAnywhere.deviceId` | Native persistent device identifier |
-| `RunAnywhere.isAuthenticated` | Native auth state |
-| `RunAnywhere.events` | SDK event bus facade |
+| `RunAnywhere.deviceId` | Native persistent device identifier (a promise on RN) |
+| `RunAnywhere.events` | `AsyncIterable<SdkEvent>` of lifecycle, model, and error breadcrumbs |
+| `RunAnywhere.reset()` | Unload models, close sessions, clear state |
 
-## Proto-Byte API Pattern
+## Namespaces
 
-Canonical lifecycle and modality APIs are request/result based. TypeScript constructs generated proto messages and native bridges receive encoded bytes.
+Every capability hangs off a namespace, with spec-named options and results:
+
+| Namespace | Verbs |
+|---|---|
+| `llm` | `generate`, `generateStream`, `generateStructured`, `tools.register/unregister/list` |
+| `vlm` | `generate`, `generateStream` |
+| `stt` | `transcribe`, `transcribeStream`, `state` |
+| `tts` | `synthesize`, `synthesizeStream`, `speak`, `stop`, `voices` |
+| `vad` | `detect`, `detectStream` |
+| `embeddings` / `rerank` | `embed` / `rerank` |
+| `images` / `diarization` / `segmentation` | `generate`, `generateStream` / `diarize` / `segment` |
+| `voice` | `createSession` → `VoiceSession` (`events`, `start`, `say`, `interrupt`, `close`) |
+| `rag` | `open` → `RagSession` (`ingest`, `search`, `query`, `queryStream`, `stats`, `clear`, `close`) |
+| `models` | `list`, `get`, `register`, `download`, `delete`, `load`, `unload`, `state` |
+| `lora` | `apply`, `remove`, `list` |
+
+Generation verbs auto-load, and download when the named model is absent, so `models.load` is for callers who want to control when that cost is paid.
+
+Platform services outside the modality spec stay reachable as their own namespaces: `storage`, `logging`, `auth`, `pluginLoader`, `solutions`, plus `lora.catalog` for adapter registration.
 
 ```typescript
-const result = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
-  modelId: 'smollm2-360m-q8_0',
-  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-}));
+const result = await RunAnywhere.llm.generate('Summarize on-device AI.', {
+  model: 'smollm2-360m-q8_0',
+  temperature: 0.7,
+});
+console.log(result.text, result.tokensPerSecond);
 ```
 
-Bridge internals should follow this pattern:
+Option defaults are never written in TypeScript. Each option bag merges over the generated `*Defaults()` helper derived from the `rac_default` annotations in `idl/`, so a default has one declaration for all SDKs.
+
+## Streaming
+
+Every `*Stream` verb returns an `AsyncIterable` directly, so there is nothing to await before iterating. Events follow one grammar: `started`, then deltas, then `completed`, with failures thrown into the consumer.
+
+Hermes cannot iterate the Nitro-backed streams with `for await...of`. Drive them manually and call `return()` to cancel:
+
+```typescript
+const iterator = RunAnywhere.llm.generateStream(prompt)[Symbol.asyncIterator]();
+try {
+  let step = await iterator.next();
+  while (!step.done) {
+    if (step.value.type === 'token') append(step.value.text);
+    step = await iterator.next();
+  }
+} finally {
+  await iterator.return?.();
+}
+```
+
+Cancelling one stream cancels that one request. There are no global cancel verbs.
+
+## Proto-Byte Bridge Pattern
+
+Below the public surface, every bridge call is request/result proto bytes:
 
 ```typescript
 const requestBytes = ModelLoadRequest.encode(request).finish();
-const resultBytes = await NativeRunAnywhere.loadModel(requestBytes);
+const resultBytes = await NativeRunAnywhere.modelLifecycleLoadProto(requestBytes);
 return ModelLoadResult.decode(resultBytes);
 ```
 
-Avoid new JSON bridge methods for SDK-owned flows. Delete old RN-specific compatibility aliases when the Swift-shaped method exists.
+Avoid new JSON bridge methods for SDK-owned flows.
 
 ## Models, Downloads, Imports, And Storage
 
-Native commons owns model paths, registry state, downloads, imports, and storage deletion. React Native should expose Swift-equivalent methods such as:
+Native commons owns model paths, registry state, downloads, imports, and storage deletion. `models.register` takes one builder covering a single url, an archive, or a multi-file set; `models.download(id)` reports progress, extraction, and completion through one stream.
 
-| Area | Canonical surface |
-|---|---|
-| Registry | `listModels`, `queryModels`, `getModel`, `downloadedModels`, `registerModel` |
-| Lifecycle | `loadModel(ModelLoadRequest)`, `unloadModel`, lifecycle status/current model queries |
-| Downloads | plan/start/progress/poll/cancel/complete methods matching Swift request/result semantics |
-| Imports | `importModel` and completed-download import flows with managed-storage flags |
-| Storage | storage analysis and delete APIs backed by native storage requests |
-
-Do not document or reintroduce JS-owned `DownloadService`, JS-owned `ModelRegistry`, or `react-native-blob-util` as SDK model-management paths. Apps may use their own download UI, but SDK model artifacts enter the registry through native import/download completion APIs.
+Do not reintroduce a JS-owned `DownloadService`, a JS-owned `ModelRegistry`, or `react-native-blob-util` as a model-management path. Apps may build their own download UI, but artifacts enter the registry through the native download and import completion paths.
 
 ## Modalities
 
-All modalities should be thin wrappers over native commons-backed proto APIs:
+Each namespace is a thin projection over the commons proto ABI:
 
-- LLM generation and streaming read generated text, token counts, thinking fields, metrics, and events from native result/event payloads.
-- Structured output delegates schema validation/orchestration to native commons.
-- Tool calling keeps JS tool executors, while native owns parsing, validation, formatting, follow-up orchestration, and result envelopes.
-- RAG exposes Swift-equivalent resolved configuration helpers and model-info/model-id overloads.
-- STT, TTS, VAD, VLM, and VoiceAgent use Swift-equivalent request/result types, readiness checks, cancellation semantics, and typed unavailable errors.
-- LoRA and Solutions use flattened Swift-named APIs.
-- Plugin loading should expose the Swift surface; if dynamic plugin loading is not supported in RN mobile, return the typed unavailable error.
+- LLM text, thinking content, token counts, and metrics come from the native result and stream payloads.
+- Structured output delegates schema validation and orchestration to commons.
+- Tool calling keeps JS executors; commons owns parsing, validation, prompt formatting, and the follow-up loop.
+- A voice session owns its models, microphone, endpointing, and reply playback. Subscribing to `events` does not open the microphone; `start()` does.
+- A RAG session owns its pipeline, and `close()` releases it.
+- Plugin loading exposes the commons registry surface, returning a typed unavailable error where dynamic loading is not supported.
 
 ## Auth, Device, Events, Logging, Errors
 

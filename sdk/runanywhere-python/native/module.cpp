@@ -12,7 +12,9 @@
 // blocking rac calls release the GIL only around the C call, then build the
 // numpy / str / tuple results with the GIL held.
 //
-// Modalities: LLM, VLM, embeddings (ONNX), STT + TTS (sherpa), VAD (built-in).
+// Modalities: LLM, VLM, embeddings (ONNX), STT + TTS (sherpa), VAD (built-in),
+// diarization + segmentation (ONNX), voice-agent file-PCM turns, and (when
+// RAC_HAVE_BACKEND_NEURT) CoreML diffusion.
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -43,6 +45,9 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 #include "rac/plugin/rac_plugin_entry_onnx.h"
+#ifdef RAC_HAVE_BACKEND_NEURT
+#include "rac/plugin/rac_plugin_entry_neurt.h"
+#endif
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -50,7 +55,35 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/diarization/rac_diarization_types.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
+#include "rac/features/segmentation/rac_segmentation_types.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
+#if defined(RAC_HAVE_BACKEND_NEURT)
+#include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diffusion/rac_diffusion_types.h"
+#endif
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+// Control plane (telemetry + auth). Compiled when the protobuf runtime is present
+// (RAC_PY_CONTROL_PLANE, set by native/CMakeLists.txt) since the two-phase init is
+// proto-driven. HTTP goes through a Python urllib-backed transport we register —
+// no libcurl / no third-party client, per this SDK's stdlib-HTTP rule; this mirrors
+// how Swift (URLSession) and Kotlin (OkHttp) supply their own transport to commons.
+#ifdef RAC_PY_CONTROL_PLANE
+#include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/device/rac_device_identity.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/network/rac_client_info.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
+#endif
 // Model registry (RAG resolves embedding/LLM model ids -> local_path via the
 // global registry) + the proto-byte RAG session ABI + its proto-buffer helpers.
 #include "rac/core/rac_error.h"
@@ -92,19 +125,33 @@ rac_result_t rac_backend_qhexrt_register(void);  // Qualcomm Hexagon NPU (Snapdr
 #ifdef RAC_HAVE_BACKEND_MLX
 rac_result_t rac_backend_mlx_register(void);  // Apple MLX
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-rac_result_t rac_backend_coreml_register(void);  // Apple Core ML
-#endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
 rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
 #endif
 }
+
+#if defined(RAC_HAVE_BACKEND_NEURT)
+// The neurt engine has no bespoke rac_backend_*_register() fn — it registers
+// via the unified plugin entry (see engines/neurt/rac_static_register_neurt.cpp).
+#include "rac/plugin/rac_plugin_entry.h"
+#endif
 
 namespace {
 
 // The adapter struct is caller-owned and must outlive rac_shutdown().
 rac_platform_adapter_t g_adapter;
 std::atomic<bool> g_initialized{false};
+
+#ifdef RAC_PY_CONTROL_PLANE
+// Owns the telemetry manager for the process lifetime so the terminal flush in
+// rac_shutdown() can deliver through our HTTP callback before teardown. Guarded
+// by g_handles_mutex on create/destroy.
+rac_telemetry_manager_t* g_telemetry_manager = nullptr;
+
+// The Python urllib poster backing the registered HTTP transport. Held by value;
+// its refcount is touched only under the GIL. Set once at control-plane bring-up.
+py::object g_http_poster;
+#endif
 
 // Handles are exposed to Python as small integer ids. Each component family
 // uses a distinct rac_*_destroy call, so they live in separate maps.
@@ -115,6 +162,12 @@ std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
 std::unordered_map<int32_t, rac_handle_t> g_stt_handles;
 std::unordered_map<int32_t, rac_handle_t> g_tts_handles;
 std::unordered_map<int32_t, rac_handle_t> g_vad_handles;
+std::unordered_map<int32_t, rac_handle_t> g_diar_handles;
+std::unordered_map<int32_t, rac_handle_t> g_seg_handles;
+std::unordered_map<int32_t, rac_voice_agent_handle_t> g_voice_handles;
+#if defined(RAC_HAVE_BACKEND_NEURT)
+std::unordered_map<int32_t, rac_handle_t> g_diff_handles;
+#endif
 #ifdef RAC_HAVE_BACKEND_RAG
 std::unordered_map<int32_t, rac_handle_t> g_rag_handles;  // RAG session handles
 #endif
@@ -202,6 +255,35 @@ rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& ma
     if (it == map.end()) return nullptr;
     rac_handle_t h = it->second;
     map.erase(it);
+    return h;
+}
+
+// Voice-agent handles are a distinct opaque pointer type (not rac_handle_t).
+int32_t register_voice_handle(rac_voice_agent_handle_t h) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    int32_t hid = g_next_handle_id++;
+    g_voice_handles[hid] = h;
+    return hid;
+}
+
+rac_voice_agent_handle_t begin_voice_op(int32_t id) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    auto it = g_voice_handles.find(id);
+    if (it == g_voice_handles.end()) return nullptr;
+    ++g_inflight[id];
+    return it->second;
+}
+
+rac_voice_agent_handle_t take_voice_handle_when_idle(int32_t id) {
+    std::unique_lock<std::mutex> lock(g_handles_mutex);
+    g_inflight_cv.wait(lock, [&] {
+        auto it = g_inflight.find(id);
+        return it == g_inflight.end() || it->second == 0;
+    });
+    auto it = g_voice_handles.find(id);
+    if (it == g_voice_handles.end()) return nullptr;
+    rac_voice_agent_handle_t h = it->second;
+    g_voice_handles.erase(it);
     return h;
 }
 
@@ -319,8 +401,10 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
 #ifdef RAC_HAVE_BACKEND_MLX
         rac_backend_mlx_register();  // Apple MLX (Apple Silicon)
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-        rac_backend_coreml_register();  // Apple Core ML
+#ifdef RAC_HAVE_BACKEND_NEURT
+        // No bespoke rac_backend_*_register() fn for this engine — register the
+        // plugin entry directly, like rcli's bootstrap does.
+        rac_plugin_register(rac_plugin_entry_neurt());  // Apple Neural Engine + CoreML diffusion
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
         rac_backend_cloud_register();  // cloud STT provider fallback
@@ -334,6 +418,276 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
     }
     g_initialized.store(true);
 }
+
+#ifdef RAC_PY_CONTROL_PLANE
+// =============================================================================
+// Control plane: telemetry + auth. Ports rcli's bootstrap (sdk/runanywhere-cli/
+// src/bootstrap.cpp: initialize_sdk_metadata + initialize_telemetry_auth), but
+// registers a Python urllib-backed HTTP transport instead of commons' libcurl one
+// (no third-party client, per this SDK's stdlib-HTTP rule). Auth, model
+// assignments, and telemetry all POST through rac_http_client over that transport.
+// Phase-1/2 proto requests are built in Python (runanywhere/_proto/sdk_init_pb2)
+// and handed in as serialized bytes.
+// =============================================================================
+
+// Malloc a NUL-terminated copy for rac_http_response_t fields (freed by
+// rac_http_response_free with free(); the module shares commons' CRT heap).
+char* http_dup(const std::string& s) {
+    char* p = static_cast<char*>(std::malloc(s.size() + 1));
+    if (!p) return nullptr;
+    std::memcpy(p, s.c_str(), s.size() + 1);
+    return p;
+}
+
+// rac_http_transport_ops_t::request_send — the one HTTP primitive commons routes
+// every request through. Marshals to the Python urllib poster:
+//   poster(method, url, [(k,v)...], body: bytes, timeout_ms) ->
+//       (status: int, [(k,v)...], body: bytes)  |  None on a network/connect error
+// Per the transport contract, ANY HTTP response (incl. 4xx/5xx) is RAC_SUCCESS with
+// out->status set; only connect/DNS/TLS/timeout failures return an error code.
+rac_result_t py_http_request_send(void* /*ud*/, const rac_http_request_t* req,
+                                  rac_http_response_t* out) {
+    std::memset(out, 0, sizeof(*out));
+    py::gil_scoped_acquire gil;
+    if (!g_http_poster || g_http_poster.is_none()) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    try {
+        py::list headers;
+        for (size_t i = 0; i < req->header_count; ++i) {
+            headers.append(py::make_tuple(req->headers[i].name ? req->headers[i].name : "",
+                                          req->headers[i].value ? req->headers[i].value : ""));
+        }
+        py::bytes body(reinterpret_cast<const char*>(req->body_bytes ? req->body_bytes
+                                                                     : (const uint8_t*)""),
+                       req->body_len);
+        py::object r = g_http_poster(std::string(req->method ? req->method : "GET"),
+                                     std::string(req->url ? req->url : ""), headers, body,
+                                     req->timeout_ms);
+        if (r.is_none()) return RAC_ERROR_NETWORK_ERROR;  // connect/DNS/TLS/timeout
+        py::tuple t = r.cast<py::tuple>();
+        out->status = t[0].cast<int32_t>();
+        std::string rb = t[2].cast<py::bytes>();
+        if (!rb.empty()) {
+            out->body_bytes = reinterpret_cast<uint8_t*>(http_dup(rb));
+            out->body_len = rb.size();
+        }
+        py::list rh = t[1].cast<py::list>();
+        size_t hc = rh.size();
+        if (hc) {
+            out->headers = static_cast<rac_http_header_kv_t*>(
+                std::malloc(hc * sizeof(rac_http_header_kv_t)));
+            out->header_count = hc;
+            for (size_t i = 0; i < hc; ++i) {
+                py::tuple kv = rh[i].cast<py::tuple>();
+                out->headers[i].name = http_dup(kv[0].cast<std::string>());
+                out->headers[i].value = http_dup(kv[1].cast<std::string>());
+            }
+        }
+        return RAC_SUCCESS;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+// Static ops table — must outlive the registration (commons borrows the pointer).
+rac_http_transport_ops_t g_py_transport_ops = {py_http_request_send, nullptr, nullptr, nullptr,
+                                               nullptr};
+
+// Delivers a queued telemetry batch over the registered HTTP transport. Wired via
+// rac_telemetry_manager_set_http_callback (user_data = the manager); reports the
+// outcome back through rac_telemetry_manager_http_complete. Runs on commons'
+// telemetry thread — pure C++, never touches Python state or the GIL.
+void py_telemetry_http_callback(void* user_data, const char* endpoint, const char* json_body,
+                                size_t json_length, rac_bool_t requires_auth) {
+    auto* manager = static_cast<rac_telemetry_manager_t*>(user_data);
+    const char* base_url = rac_state_get_base_url();
+    if (base_url == nullptr || base_url[0] == '\0' ||
+        rac_http_transport_is_registered() != RAC_TRUE) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry transport unavailable");
+        return;
+    }
+
+    char url[2048] = {};
+    if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry URL build failed");
+        return;
+    }
+
+    std::vector<rac_http_header_kv_t> headers;
+    const rac_http_header_kv_t* defaults = nullptr;
+    size_t default_count = 0;
+    if (rac_http_default_headers(&defaults, &default_count) == RAC_SUCCESS && defaults) {
+        headers.assign(defaults, defaults + default_count);
+    }
+    std::string auth_value;
+    if (requires_auth == RAC_TRUE) {
+        const char* token = rac_auth_get_access_token();
+        if (token && token[0] != '\0') {
+            auth_value = std::string("Bearer ") + token;
+            headers.push_back({"Authorization", auth_value.c_str()});
+        }
+    }
+
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry client create failed");
+        return;
+    }
+
+    rac_http_request_t request = {};
+    request.method = "POST";
+    request.url = url;
+    request.headers = headers.empty() ? nullptr : headers.data();
+    request.header_count = headers.size();
+    request.body_bytes = reinterpret_cast<const uint8_t*>(json_body);
+    request.body_len = json_length;
+    request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
+    request.follow_redirects = RAC_FALSE;
+
+    rac_http_response_t response = {};
+    const rac_result_t rc = rac_http_request_send(client, &request, &response);
+    rac_http_client_destroy(client);
+
+    const bool ok = rc == RAC_SUCCESS && response.status >= 200 && response.status < 300;
+    std::string body;
+    if (response.body_bytes && response.body_len > 0) {
+        body.assign(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
+    }
+    if (manager) {
+        rac_telemetry_manager_http_complete(manager, ok ? RAC_TRUE : RAC_FALSE,
+                                            body.empty() ? nullptr : body.c_str(),
+                                            ok ? nullptr : "telemetry POST failed");
+    }
+    rac_http_response_free(&response);
+}
+
+// The persistent per-device id commons mints (36-char UUID). Callers pass this
+// as SdkInitPhase1Request.device_id and the telemetry manager device id.
+std::string device_persistent_id() {
+    char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
+    if (rac_device_get_or_create_persistent_id(device_id, sizeof(device_id)) != RAC_SUCCESS) {
+        return {};
+    }
+    return device_id;
+}
+
+// The baked staging backend URL used by keyless DEVELOPMENT builds; empty when
+// none is configured. Mirrors rcli's dev base-URL fallback.
+std::string dev_staging_base_url() {
+    const char* baked = rac_dev_config_get_staging_base_url();
+    if (baked && rac_dev_config_is_usable_http_url(baked)) return baked;
+    return {};
+}
+
+// Run the full desktop control-plane bring-up: register the libcurl transport,
+// seed runtime state + client info, create the telemetry sink, then drive the
+// canonical two-phase init. `environment` is a rac_environment_t (0=dev, 2=prod).
+// `phase1_bytes` / `phase2_bytes` are serialized SdkInit{Phase1,Phase2}Request.
+// Returns the serialized SdkInitResult from phase 2 (empty on a phase failure).
+// Best-effort: HTTP/auth failures are non-fatal (the SDK stays usable offline),
+// matching commons' Phase-2 contract.
+py::bytes configure_control_plane(py::function http_poster, int32_t environment,
+                                  const std::string& api_key, const std::string& base_url,
+                                  const std::string& device_id, const std::string& platform,
+                                  const std::string& sdk_version, const std::string& sdk_binding,
+                                  const std::string& app_identifier, const std::string& app_name,
+                                  const std::string& app_version, const std::string& phase1_bytes,
+                                  const std::string& phase2_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    const auto env = static_cast<rac_environment_t>(environment);
+
+    // Install the urllib poster + register our transport before any HTTP runs.
+    g_http_poster = http_poster;
+    rac_http_transport_register(&g_py_transport_ops, nullptr);
+
+    // Runtime state first (the auth/device/telemetry paths read env + creds from
+    // rac_state), then the copied SDK configuration + client info.
+    rac_state_initialize(env, api_key.c_str(), base_url.c_str(), device_id.c_str());
+
+    rac_sdk_config_t sdk_config = {};
+    sdk_config.environment = env;
+    sdk_config.api_key = api_key.c_str();
+    sdk_config.base_url = base_url.c_str();
+    sdk_config.device_id = device_id.c_str();
+    sdk_config.platform = platform.c_str();
+    sdk_config.sdk_version = sdk_version.c_str();
+    sdk_config.client_info.sdk_binding = sdk_binding.c_str();
+    sdk_config.client_info.app_identifier = app_identifier.c_str();
+    sdk_config.client_info.app_name = app_name.c_str();
+    sdk_config.client_info.app_version = app_version.c_str();
+    rac_sdk_init(&sdk_config);
+
+    // Per-run auth (NULL secure storage: tokens aren't persisted across runs,
+    // like rcli). Authentication still runs when Phase 2 expects a key.
+    rac_auth_init(nullptr);
+
+    // Create + register the telemetry sink BEFORE Phase 2 so its flush has a
+    // sink; delivery runs through py_telemetry_http_callback over libcurl. The
+    // terminal batch flushes in rac_shutdown() during teardown.
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        if (!g_telemetry_manager) {
+            g_telemetry_manager = rac_telemetry_manager_create(env, device_id.c_str(),
+                                                               platform.c_str(),
+                                                               sdk_version.c_str());
+            if (g_telemetry_manager) {
+                rac_telemetry_manager_set_http_callback(g_telemetry_manager,
+                                                        py_telemetry_http_callback,
+                                                        g_telemetry_manager);
+                rac_events_set_telemetry_sink(g_telemetry_manager);
+            }
+        }
+    }
+
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rac_proto_buffer_t phase1_out;
+        rac_proto_buffer_init(&phase1_out);
+        rc = rac_sdk_init_phase1_proto(reinterpret_cast<const uint8_t*>(phase1_bytes.data()),
+                                       phase1_bytes.size(), &phase1_out);
+        rac_proto_buffer_free(&phase1_out);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "sdk_init_phase1");
+
+    rac_proto_buffer_t phase2_out;
+    rac_proto_buffer_init(&phase2_out);
+    {
+        py::gil_scoped_release release;
+        rc = rac_sdk_init_phase2_proto(reinterpret_cast<const uint8_t*>(phase2_bytes.data()),
+                                       phase2_bytes.size(), &phase2_out);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&phase2_out);
+        raise_rac_error(rc, "sdk_init_phase2");
+    }
+    py::bytes result(reinterpret_cast<const char*>(phase2_out.data ? phase2_out.data
+                                                                    : (const uint8_t*)""),
+                     phase2_out.data ? phase2_out.size : 0);
+    rac_proto_buffer_free(&phase2_out);
+    return result;
+}
+
+// Detach + destroy the telemetry manager. Called from shutdown() after
+// rac_shutdown() has flushed the terminal batch through the sink.
+void telemetry_teardown() {
+    rac_telemetry_manager_t* mgr = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        mgr = g_telemetry_manager;
+        g_telemetry_manager = nullptr;
+    }
+    if (mgr) {
+        rac_events_set_telemetry_sink(nullptr);
+        rac_telemetry_manager_destroy(mgr);
+    }
+    // Unregister our transport and drop the Python poster (GIL held here).
+    rac_http_transport_register(nullptr, nullptr);
+    g_http_poster = py::none();
+}
+#endif  // RAC_PY_CONTROL_PLANE
 
 // =============================================================================
 // Streaming core — shared by LLM generate + VLM generate_vlm.
@@ -480,6 +834,50 @@ void cancel_generate(int32_t handle) {
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "cancel_generate");
 }
 
+// =============================================================================
+// LoRA adapters on a loaded LLM (rac_llm_component_{load,remove,clear}_lora).
+// Backend-agnostic dispatch inside commons (llm_module.cpp); LlamaCPP is the only
+// engine that currently wires load_lora/remove_lora/clear_lora ops, so a non-LlamaCPP
+// resident model surfaces RAC_ERROR_NOT_SUPPORTED here rather than failing to bind.
+// The C ABI is write-only (no read-back) — same shape as the Electron addon
+// (addon.cpp's g_lora_applied) — so the Python side mirrors the applied set itself
+// (see runanywhere/_handles.py's LLMModel).
+// =============================================================================
+void lora_apply(int32_t handle, const std::string& adapter_path, std::optional<float> scale) {
+    rac_handle_t h = begin_op(g_llm_handles, handle);
+    if (!h) throw std::runtime_error("invalid handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_llm_component_load_lora(h, adapter_path.c_str(), scale.value_or(1.0f));
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_apply");
+}
+
+void lora_remove(int32_t handle, const std::string& adapter_path) {
+    rac_handle_t h = begin_op(g_llm_handles, handle);
+    if (!h) throw std::runtime_error("invalid handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_llm_component_remove_lora(h, adapter_path.c_str());
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_remove");
+}
+
+void lora_remove_all(int32_t handle) {
+    rac_handle_t h = begin_op(g_llm_handles, handle);
+    if (!h) throw std::runtime_error("invalid handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_llm_component_clear_lora(h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_remove_all");
+}
 
 // =============================================================================
 // VLM: load_vlm_model / generate_vlm / unload_vlm_model
@@ -822,6 +1220,21 @@ py::bytes rag_query(int32_t handle, const std::string& query_bytes) {
     return finish_proto_out(rc, &out, "rag_query");
 }
 
+py::bytes rag_search(int32_t handle, const std::string& request_bytes) {
+    rac_handle_t h = begin_op(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_search_proto(h, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                  request_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "rag_search");
+}
+
 // Streaming query: each serialized RAGStreamEvent is delivered to on_event(bytes),
 // which returns False to stop early. Same GIL discipline as the LLM stream.
 struct RagStreamCtx {
@@ -1103,6 +1516,484 @@ void unload_vad(int32_t handle) {
 }
 
 // =============================================================================
+// Speaker diarization: load_diarization_model / diarize / unload_diarization_model.
+//
+// The rac_diarization_* service ABI is thin (create/initialize/diarize/cleanup/destroy —
+// the same shape the Electron addon binds), and offline batch diarize is routed to the
+// ONNX Sortformer provider registered by rac_backend_onnx_register() (already called in
+// initialize() when RAC_HAVE_BACKEND_ONNX). Bound unconditionally, like embed()/embed_batch()
+// above: a build without the ONNX backend registered simply surfaces RAC_ERROR_NOT_SUPPORTED
+// at call time rather than failing to bind.
+// =============================================================================
+int32_t load_diarization_model(const std::string& model_path, std::optional<std::string> id) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    std::string model_id = id.has_value() ? *id : model_path;
+
+    rac_handle_t h = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_diarization_create(model_id.c_str(), &h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "diarization_create");
+    {
+        py::gil_scoped_release release;
+        rc = rac_diarization_initialize(h, model_path.c_str());
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_diarization_destroy(h);
+        raise_rac_error(rc, "diarization_initialize");
+    }
+    return register_handle(g_diar_handles, h);
+}
+
+// diarize(handle, float32 samples, sample_rate_hz=16000, threshold=None,
+//         minimum_duration_ms=None, merge_gap_ms=None) ->
+//   {segments: [{start_ms, end_ms, speaker_index, speaker_id}], speaker_count, duration_ms}.
+py::dict diarize(int32_t handle,
+                 py::array_t<float, py::array::c_style | py::array::forcecast> samples,
+                 std::optional<int32_t> sample_rate_hz, std::optional<float> threshold,
+                 std::optional<int64_t> minimum_duration_ms, std::optional<int64_t> merge_gap_ms) {
+    rac_handle_t h = begin_op(g_diar_handles, handle);
+    if (!h) throw std::runtime_error("invalid diarization handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+
+    auto buf = samples.request();
+    const float* data = static_cast<const float*>(buf.ptr);
+    size_t count = static_cast<size_t>(buf.size);
+
+    rac_diarization_options_t opts = RAC_DIARIZATION_OPTIONS_DEFAULT;
+    if (sample_rate_hz.has_value()) opts.sample_rate_hz = *sample_rate_hz;
+    if (threshold.has_value()) opts.threshold = *threshold;
+    if (minimum_duration_ms.has_value()) opts.minimum_duration_ms = *minimum_duration_ms;
+    if (merge_gap_ms.has_value()) opts.merge_gap_ms = *merge_gap_ms;
+
+    rac_diarization_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_diarization_diarize(h, data, count, &opts, &result);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "diarize");
+
+    py::list segments;
+    for (size_t i = 0; i < result.segment_count; ++i) {
+        py::dict seg;
+        seg["start_ms"] = result.segments[i].start_ms;
+        seg["end_ms"] = result.segments[i].end_ms;
+        seg["speaker_index"] = result.segments[i].speaker_index;
+        seg["speaker_id"] = result.segments[i].speaker_id ? result.segments[i].speaker_id : "";
+        segments.append(seg);
+    }
+    py::dict out;
+    out["segments"] = segments;
+    out["speaker_count"] = result.speaker_count;
+    out["duration_ms"] = result.audio_duration_ms;
+    rac_diarization_result_free(&result);
+    return out;
+}
+
+void unload_diarization_model(int32_t handle) {
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_diar_handles, handle);
+    }
+    if (h) {
+        rac_diarization_cleanup(h);
+        rac_diarization_destroy(h);
+    }
+}
+
+// =============================================================================
+// Semantic segmentation: load_segmentation_model / segment / unload_segmentation_model.
+//
+// Same create/initialize/segment/cleanup/destroy shape the Electron addon binds as
+// loadSegmentationModel / segment / unloadSegmentationModel. Offline batch routes
+// through the ONNX segmentation provider registered by rac_backend_onnx_register().
+// Bound unconditionally (like diarization): a build without ONNX surfaces
+// RAC_ERROR_NOT_SUPPORTED at call time.
+// =============================================================================
+int32_t load_segmentation_model(const std::string& model_path, std::optional<std::string> id) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    std::string model_id = id.has_value() ? *id : model_path;
+
+    rac_handle_t h = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_segmentation_create(model_id.c_str(), &h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "segmentation_create");
+    {
+        py::gil_scoped_release release;
+        rc = rac_segmentation_initialize(h, model_path.c_str());
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_segmentation_destroy(h);
+        raise_rac_error(rc, "segmentation_initialize");
+    }
+    return register_handle(g_seg_handles, h);
+}
+
+// segment(handle, data, width, height, pixel_format=1, stride_bytes=0,
+//         include_diagnostic_rgba=False) ->
+//   {width, height, class_mask: uint16 ndarray, classes: [...], diagnostic_rgba?: bytes}.
+py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t height,
+                 std::optional<int32_t> pixel_format, std::optional<int64_t> stride_bytes,
+                 std::optional<bool> include_diagnostic_rgba) {
+    rac_handle_t h = begin_op(g_seg_handles, handle);
+    if (!h) throw std::runtime_error("invalid segmentation handle");
+    OpScope op(handle);
+
+    py::buffer_info info = data.request();
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(info.ptr);
+    size_t nbytes = static_cast<size_t>(info.size) * static_cast<size_t>(info.itemsize);
+
+    rac_segmentation_image_t image;
+    std::memset(&image, 0, sizeof(image));
+    image.data = bytes;
+    image.data_size = nbytes;
+    image.width = static_cast<uint32_t>(width);
+    image.height = static_cast<uint32_t>(height);
+    image.pixel_format = pixel_format.has_value()
+                             ? static_cast<rac_segmentation_pixel_format_t>(*pixel_format)
+                             : RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
+    image.stride_bytes = stride_bytes.has_value() ? static_cast<size_t>(*stride_bytes) : 0;
+
+    rac_segmentation_options_t opts = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+    if (include_diagnostic_rgba.has_value() && *include_diagnostic_rgba) {
+        opts.include_diagnostic_rgba = RAC_TRUE;
+    }
+
+    rac_segmentation_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_segmentation_segment(h, &image, &opts, &result);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "segment");
+
+    py::array_t<uint16_t> mask(static_cast<py::ssize_t>(result.class_mask_count));
+    if (result.class_mask && result.class_mask_count) {
+        std::memcpy(mask.mutable_data(), result.class_mask,
+                    result.class_mask_count * sizeof(uint16_t));
+    }
+    py::list classes;
+    for (size_t i = 0; i < result.class_summary_count; ++i) {
+        py::dict c;
+        c["class_id"] = result.class_summaries[i].class_id;
+        c["pixel_count"] = static_cast<uint64_t>(result.class_summaries[i].pixel_count);
+        c["fraction"] = result.class_summaries[i].fraction;
+        c["label"] = result.class_summaries[i].label ? result.class_summaries[i].label : "";
+        classes.append(c);
+    }
+    py::dict out;
+    out["width"] = result.width;
+    out["height"] = result.height;
+    out["class_mask"] = mask;
+    out["classes"] = classes;
+    if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
+        out["diagnostic_rgba"] =
+            py::bytes(reinterpret_cast<const char*>(result.diagnostic_rgba),
+                      result.diagnostic_rgba_size);
+    }
+    rac_segmentation_result_free(&result);
+    return out;
+}
+
+void unload_segmentation_model(int32_t handle) {
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_seg_handles, handle);
+    }
+    if (h) {
+        rac_segmentation_cleanup(h);
+        rac_segmentation_destroy(h);
+    }
+}
+
+// =============================================================================
+// Voice agent (file-PCM turn): create / initialize / process_voice_turn / destroy.
+//
+// Composes STT → LLM → TTS via rac_voice_agent_* (no mic / WebRTC / wake-word).
+// process_voice_turn feeds one complete PCM16 utterance and decodes the returned
+// VoiceAgentResult proto into a Python dict (key fields only — avoids linking the
+// generated C++ protobuf into this module).
+// =============================================================================
+
+// Minimal protobuf wire reader for VoiceAgentResult key fields.
+static bool pb_read_varint(const uint8_t*& p, const uint8_t* end, uint64_t* out) {
+    uint64_t value = 0;
+    int shift = 0;
+    while (p < end && shift < 64) {
+        uint8_t byte = *p++;
+        value |= static_cast<uint64_t>(byte & 0x7f) << shift;
+        if ((byte & 0x80) == 0) {
+            *out = value;
+            return true;
+        }
+        shift += 7;
+    }
+    return false;
+}
+
+static bool pb_skip_field(const uint8_t*& p, const uint8_t* end, uint32_t wire_type) {
+    switch (wire_type) {
+        case 0: {  // varint
+            uint64_t tmp;
+            return pb_read_varint(p, end, &tmp);
+        }
+        case 1:  // 64-bit
+            if (static_cast<size_t>(end - p) < 8) return false;
+            p += 8;
+            return true;
+        case 2: {  // length-delimited
+            uint64_t len = 0;
+            if (!pb_read_varint(p, end, &len)) return false;
+            if (static_cast<uint64_t>(end - p) < len) return false;
+            p += static_cast<size_t>(len);
+            return true;
+        }
+        case 5:  // 32-bit
+            if (static_cast<size_t>(end - p) < 4) return false;
+            p += 4;
+            return true;
+        default:
+            return false;
+    }
+}
+
+static py::dict decode_voice_agent_result(const uint8_t* data, size_t size) {
+    py::dict out;
+    out["speech_detected"] = false;
+    out["transcription"] = py::str("");
+    out["assistant_response"] = py::str("");
+    out["synthesized_audio"] = py::bytes();
+    out["sample_rate_hz"] = 0;
+    out["channels"] = 0;
+    out["stt_time_ms"] = static_cast<int64_t>(0);
+    out["llm_time_ms"] = static_cast<int64_t>(0);
+    out["tts_time_ms"] = static_cast<int64_t>(0);
+    out["total_time_ms"] = static_cast<int64_t>(0);
+
+    const uint8_t* p = data;
+    const uint8_t* end = data + size;
+    while (p < end) {
+        uint64_t tag = 0;
+        if (!pb_read_varint(p, end, &tag)) break;
+        uint32_t field = static_cast<uint32_t>(tag >> 3);
+        uint32_t wire = static_cast<uint32_t>(tag & 0x7);
+        if (wire == 0) {
+            uint64_t v = 0;
+            if (!pb_read_varint(p, end, &v)) break;
+            if (field == 1) out["speech_detected"] = (v != 0);
+            else if (field == 7) out["sample_rate_hz"] = static_cast<int32_t>(v);
+            else if (field == 8) out["channels"] = static_cast<int32_t>(v);
+            else if (field == 12) out["stt_time_ms"] = static_cast<int64_t>(v);
+            else if (field == 13) out["llm_time_ms"] = static_cast<int64_t>(v);
+            else if (field == 14) out["tts_time_ms"] = static_cast<int64_t>(v);
+            else if (field == 15) out["total_time_ms"] = static_cast<int64_t>(v);
+        } else if (wire == 2) {
+            uint64_t len = 0;
+            if (!pb_read_varint(p, end, &len)) break;
+            if (static_cast<uint64_t>(end - p) < len) break;
+            const char* s = reinterpret_cast<const char*>(p);
+            if (field == 2) out["transcription"] = py::str(s, static_cast<size_t>(len));
+            else if (field == 3) out["assistant_response"] = py::str(s, static_cast<size_t>(len));
+            else if (field == 5) out["synthesized_audio"] = py::bytes(s, static_cast<size_t>(len));
+            p += static_cast<size_t>(len);
+        } else {
+            if (!pb_skip_field(p, end, wire)) break;
+        }
+    }
+    return out;
+}
+
+int32_t create_voice_agent() {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_voice_agent_handle_t h = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_voice_agent_create_standalone(&h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "voice_agent_create");
+    if (!h) throw std::runtime_error("voice_agent_create returned null");
+    return register_voice_handle(h);
+}
+
+void initialize_voice_agent(int32_t handle, const std::string& stt_path, const std::string& llm_path,
+                            const std::string& tts_path, std::optional<std::string> stt_id,
+                            std::optional<std::string> llm_id, std::optional<std::string> tts_id,
+                            std::optional<std::string> stt_name, std::optional<std::string> llm_name,
+                            std::optional<std::string> tts_name) {
+    rac_voice_agent_handle_t h = begin_voice_op(handle);
+    if (!h) throw std::runtime_error("invalid voice agent handle");
+    OpScope op(handle);
+
+    std::string stt_model_id = stt_id.has_value() ? *stt_id : stt_path;
+    std::string llm_model_id = llm_id.has_value() ? *llm_id : llm_path;
+    std::string tts_voice_id = tts_id.has_value() ? *tts_id : tts_path;
+    std::string stt_model_name = stt_name.has_value() ? *stt_name : stt_model_id;
+    std::string llm_model_name = llm_name.has_value() ? *llm_name : llm_model_id;
+    std::string tts_voice_name = tts_name.has_value() ? *tts_name : tts_voice_id;
+
+    rac_voice_agent_config_t config = RAC_VOICE_AGENT_CONFIG_DEFAULT;
+    config.stt_config.model_path = stt_path.c_str();
+    config.stt_config.model_id = stt_model_id.c_str();
+    config.stt_config.model_name = stt_model_name.c_str();
+    config.llm_config.model_path = llm_path.c_str();
+    config.llm_config.model_id = llm_model_id.c_str();
+    config.llm_config.model_name = llm_model_name.c_str();
+    config.tts_config.voice_path = tts_path.c_str();
+    config.tts_config.voice_id = tts_voice_id.c_str();
+    config.tts_config.voice_name = tts_voice_name.c_str();
+
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_voice_agent_initialize(h, &config);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "voice_agent_initialize");
+}
+
+// process_voice_turn(handle, pcm16) -> dict with transcription / response / audio.
+py::dict process_voice_turn(int32_t handle, const py::buffer& pcm16) {
+    rac_voice_agent_handle_t h = begin_voice_op(handle);
+    if (!h) throw std::runtime_error("invalid voice agent handle");
+    OpScope op(handle);
+
+    py::buffer_info info = pcm16.request();
+    const void* audio_data = info.ptr;
+    size_t audio_size = static_cast<size_t>(info.size) * static_cast<size_t>(info.itemsize);
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_voice_agent_process_voice_turn_proto(h, audio_data, audio_size, &out);
+    }
+    rac_result_t code = (out.status != RAC_SUCCESS) ? out.status : rc;
+    if (code != RAC_SUCCESS) {
+        std::string msg = out.error_message ? std::string(out.error_message) : "process_voice_turn";
+        rac_proto_buffer_free(&out);
+        raise_rac_error(code, msg);
+    }
+    py::dict result = decode_voice_agent_result(out.data, out.size);
+    rac_proto_buffer_free(&out);
+    return result;
+}
+
+void destroy_voice_agent(int32_t handle) {
+    rac_voice_agent_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_voice_handle_when_idle(handle);
+    }
+    if (h) {
+        rac_voice_agent_cleanup(h);
+        rac_voice_agent_destroy(h);
+    }
+}
+
+#if defined(RAC_HAVE_BACKEND_NEURT)
+// =============================================================================
+// Diffusion (CoreML): load_diffusion_model / generate_image / unload_diffusion_model.
+//
+// Compile-gated: the desktop wheels typically link no diffusion backend. When
+// rac_backend_neurt is present, these export; otherwise capabilities() reports
+// images unavailable via hasattr(core, "load_diffusion_model").
+// =============================================================================
+int32_t load_diffusion_model(const std::string& model_path, std::optional<std::string> id) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    std::string model_id = id.has_value() ? *id : model_path;
+
+    rac_handle_t h = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_diffusion_create(model_id.c_str(), &h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "diffusion_create");
+    {
+        py::gil_scoped_release release;
+        rc = rac_diffusion_initialize(h, model_path.c_str(), nullptr);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_diffusion_destroy(h);
+        raise_rac_error(rc, "diffusion_initialize");
+    }
+    return register_handle(g_diff_handles, h);
+}
+
+py::dict generate_image(int32_t handle, const std::string& prompt,
+                        std::optional<std::string> negative_prompt, std::optional<int32_t> width,
+                        std::optional<int32_t> height, std::optional<int32_t> steps,
+                        std::optional<float> guidance_scale, std::optional<int64_t> seed) {
+    rac_handle_t h = begin_op(g_diff_handles, handle);
+    if (!h) throw std::runtime_error("invalid diffusion handle");
+    OpScope op(handle);
+
+    rac_diffusion_options_t opts = RAC_DIFFUSION_OPTIONS_DEFAULT;
+    opts.prompt = prompt.c_str();
+    std::string neg;
+    if (negative_prompt.has_value()) {
+        neg = *negative_prompt;
+        opts.negative_prompt = neg.c_str();
+    }
+    if (width.has_value()) opts.width = *width;
+    if (height.has_value()) opts.height = *height;
+    if (steps.has_value()) opts.steps = *steps;
+    if (guidance_scale.has_value()) opts.guidance_scale = *guidance_scale;
+    if (seed.has_value()) opts.seed = *seed;
+
+    rac_diffusion_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_diffusion_generate(h, &opts, &result);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_diffusion_result_free(&result);
+        raise_rac_error(rc, "diffusion_generate");
+    }
+
+    py::dict out;
+    out["width"] = result.width;
+    out["height"] = result.height;
+    out["seed"] = result.seed_used;
+    out["generation_time_ms"] = result.generation_time_ms;
+    out["safety_flagged"] = result.safety_flagged == RAC_TRUE;
+    if (result.image_data && result.image_size) {
+        out["image_data"] =
+            py::bytes(reinterpret_cast<const char*>(result.image_data), result.image_size);
+    } else {
+        out["image_data"] = py::bytes();
+    }
+    rac_diffusion_result_free(&result);
+    return out;
+}
+
+void unload_diffusion_model(int32_t handle) {
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_diff_handles, handle);
+    }
+    if (h) {
+        rac_diffusion_cleanup(h);
+        rac_diffusion_destroy(h);
+    }
+}
+#endif  // RAC_HAVE_BACKEND_NEURT
+
+// =============================================================================
 // shutdown()
 // =============================================================================
 void shutdown() {
@@ -1137,15 +2028,52 @@ void shutdown() {
             for (auto& kv : g_stt_handles) rac_stt_component_destroy(kv.second);
             for (auto& kv : g_tts_handles) rac_tts_component_destroy(kv.second);
             for (auto& kv : g_vad_handles) rac_vad_component_destroy(kv.second);
+            for (auto& kv : g_diar_handles) {
+                rac_diarization_cleanup(kv.second);
+                rac_diarization_destroy(kv.second);
+            }
+            for (auto& kv : g_seg_handles) {
+                rac_segmentation_cleanup(kv.second);
+                rac_segmentation_destroy(kv.second);
+            }
+            for (auto& kv : g_voice_handles) {
+                rac_voice_agent_cleanup(kv.second);
+                rac_voice_agent_destroy(kv.second);
+            }
+#if defined(RAC_HAVE_BACKEND_NEURT)
+            for (auto& kv : g_diff_handles) {
+                rac_diffusion_cleanup(kv.second);
+                rac_diffusion_destroy(kv.second);
+            }
+#endif
             g_llm_handles.clear();
             g_vlm_handles.clear();
             g_embed_handles.clear();
             g_stt_handles.clear();
             g_tts_handles.clear();
             g_vad_handles.clear();
+            g_diar_handles.clear();
+            g_seg_handles.clear();
+            g_voice_handles.clear();
+#if defined(RAC_HAVE_BACKEND_NEURT)
+            g_diff_handles.clear();
+#endif
             g_inflight.clear();
         }
+#ifdef RAC_PY_CONTROL_PLANE
+        // Flush queued telemetry while the HTTP transport is still registered:
+        // rac_shutdown() tears the transport down before its own terminal flush,
+        // which would otherwise drop the last batch ("transport unavailable").
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            if (g_telemetry_manager) rac_events_flush_telemetry_sink();
+        }
+#endif
         rac_shutdown();
+#ifdef RAC_PY_CONTROL_PLANE
+        // Detach + destroy the telemetry manager after the runtime is down.
+        telemetry_teardown();
+#endif
     }
 }
 
@@ -1188,8 +2116,10 @@ std::string version() {
 }
 
 // The engine backends compiled into this build (from the RAC_HAVE_BACKEND_<X> defines the
-// CMake backend loop emits). The plugin registry auto-selects the highest-priority registered
-// backend per modality, so this is what a loaded model can route to on this host.
+// CMake backend loop emits). This is COMPILE-TIME availability only, not proof of registration:
+// an engine's capability_check can still refuse registration at runtime (e.g. neurt returns
+// RAC_ERROR_CAPABILITY_UNSUPPORTED off Apple, RAC_ERROR_BACKEND_UNAVAILABLE in a stub build), in
+// which case it is listed here but nothing routes to it.
 std::vector<std::string> backends() {
     std::vector<std::string> out;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -1207,8 +2137,8 @@ std::vector<std::string> backends() {
 #ifdef RAC_HAVE_BACKEND_MLX
     out.push_back("mlx");
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-    out.push_back("coreml");
+#ifdef RAC_HAVE_BACKEND_NEURT
+    out.push_back("neurt");
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
     out.push_back("cloud");
@@ -1225,12 +2155,33 @@ PYBIND11_MODULE(_core, m) {
     m.doc() = "RunAnywhere native core (rac_* C ABI bound via pybind11).";
 
     m.def("version", &version, "Return the RunAnywhere SDK version string.");
-    m.def("backends", &backends, "List the engine backends compiled into this build.");
+    m.def("backends", &backends,
+          "List the engine backends compiled into this build (compile-time availability; a "
+          "listed engine may still refuse registration at runtime).");
 
     m.def("initialize", &initialize, py::arg("secure_dir"), py::arg("base_dir") = py::none(),
           "Initialize the runtime: fill the platform adapter, set the base dir, "
           "call rac_init, and register backends once.");
     m.def("shutdown", &shutdown, "Destroy all live handles and shut the runtime down.");
+
+#ifdef RAC_PY_CONTROL_PLANE
+    // Desktop control plane (telemetry + auth). Present only when the desktop
+    // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
+    m.attr("has_control_plane") = true;
+    m.def("device_persistent_id", &device_persistent_id,
+          "The persistent per-device UUID commons mints.");
+    m.def("dev_staging_base_url", &dev_staging_base_url,
+          "Baked staging backend URL for keyless development (empty when none).");
+    m.def("configure_control_plane", &configure_control_plane, py::arg("http_poster"),
+          py::arg("environment"), py::arg("api_key"), py::arg("base_url"), py::arg("device_id"),
+          py::arg("platform"), py::arg("sdk_version"), py::arg("sdk_binding"),
+          py::arg("app_identifier"), py::arg("app_name"), py::arg("app_version"),
+          py::arg("phase1_bytes"), py::arg("phase2_bytes"),
+          "Register the urllib HTTP transport (http_poster), seed state, and run the "
+          "two-phase init (telemetry + auth). Returns serialized SdkInitResult bytes.");
+#else
+    m.attr("has_control_plane") = false;
+#endif
 
     // LLM
     m.def("load_model", &load_model, py::arg("path"), py::arg("id") = py::none(),
@@ -1245,6 +2196,15 @@ PYBIND11_MODULE(_core, m) {
     m.def("cancel_generate", &cancel_generate, py::arg("handle"),
           "Request cancellation of an in-flight LLM generation.");
     m.def("unload_model", &unload_model, py::arg("handle"), "Unload an LLM handle.");
+
+    // LoRA (LlamaCPP backend only; write-only — no read-back)
+    m.def("lora_apply", &lora_apply, py::arg("handle"), py::arg("adapter_path"),
+          py::arg("scale") = py::none(),
+          "Load and apply a LoRA adapter onto an LLM handle (recreates context, clears KV cache).");
+    m.def("lora_remove", &lora_remove, py::arg("handle"), py::arg("adapter_path"),
+          "Remove one LoRA adapter previously applied to an LLM handle.");
+    m.def("lora_remove_all", &lora_remove_all, py::arg("handle"),
+          "Remove every LoRA adapter applied to an LLM handle.");
 
     // VLM
     m.def("load_vlm_model", &load_vlm_model, py::arg("model_path"), py::arg("mmproj_path"),
@@ -1288,6 +2248,8 @@ PYBIND11_MODULE(_core, m) {
           "Ingest one RAGDocument (bytes); returns RAGStatistics bytes.");
     m.def("rag_query", &rag_query, py::arg("handle"), py::arg("query_bytes"),
           "Query with RAGQueryOptions bytes; returns RAGResult bytes.");
+    m.def("rag_search", &rag_search, py::arg("handle"), py::arg("request_bytes"),
+          "Retrieval-only search with RAGSearchRequest bytes; returns RAGSearchResponse bytes.");
     m.def("rag_query_stream", &rag_query_stream, py::arg("handle"), py::arg("query_bytes"),
           py::arg("on_event"),
           "Stream a RAG query; on_event(RAGStreamEvent bytes) per event, may return False to stop.");
@@ -1329,6 +2291,56 @@ PYBIND11_MODULE(_core, m) {
           py::arg("id") = py::none(), py::arg("name") = py::none(),
           "Load a Silero/sherpa VAD model onto an existing energy VAD handle.");
     m.def("unload_vad", &unload_vad, py::arg("handle"), "Unload a VAD handle.");
+
+    // Diarization (offline batch; ONNX Sortformer)
+    m.def("load_diarization_model", &load_diarization_model, py::arg("model_path"),
+          py::arg("id") = py::none(),
+          "Create + initialize a diarization model (file or directory); returns an integer handle.");
+    m.def("diarize", &diarize, py::arg("handle"), py::arg("samples"),
+          py::arg("sample_rate_hz") = py::none(), py::arg("threshold") = py::none(),
+          py::arg("minimum_duration_ms") = py::none(), py::arg("merge_gap_ms") = py::none(),
+          "Diarize float32 mono samples; returns {segments, speaker_count, duration_ms}.");
+    m.def("unload_diarization_model", &unload_diarization_model, py::arg("handle"),
+          "Unload a diarization handle.");
+
+    // Segmentation (offline batch; ONNX)
+    m.def("load_segmentation_model", &load_segmentation_model, py::arg("model_path"),
+          py::arg("id") = py::none(),
+          "Create + initialize a segmentation model (file or directory); returns an integer handle.");
+    m.def("segment", &segment, py::arg("handle"), py::arg("data"), py::arg("width"),
+          py::arg("height"), py::arg("pixel_format") = py::none(),
+          py::arg("stride_bytes") = py::none(), py::arg("include_diagnostic_rgba") = py::none(),
+          "Segment raw image pixels; returns {width, height, class_mask, classes}.");
+    m.def("unload_segmentation_model", &unload_segmentation_model, py::arg("handle"),
+          "Unload a segmentation handle.");
+
+    // Voice agent (file-PCM turn; STT→LLM→TTS — no mic/WebRTC/wake-word)
+    m.def("create_voice_agent", &create_voice_agent,
+          "Create a standalone voice agent; returns an integer handle.");
+    m.def("initialize_voice_agent", &initialize_voice_agent, py::arg("handle"),
+          py::arg("stt_path"), py::arg("llm_path"), py::arg("tts_path"),
+          py::arg("stt_id") = py::none(), py::arg("llm_id") = py::none(),
+          py::arg("tts_id") = py::none(), py::arg("stt_name") = py::none(),
+          py::arg("llm_name") = py::none(), py::arg("tts_name") = py::none(),
+          "Initialize a voice agent with STT/LLM/TTS model paths (loads components).");
+    m.def("process_voice_turn", &process_voice_turn, py::arg("handle"), py::arg("pcm16"),
+          "Run one STT→LLM→TTS turn over 16 kHz mono PCM16; returns a decoded result dict.");
+    m.def("destroy_voice_agent", &destroy_voice_agent, py::arg("handle"),
+          "Cleanup + destroy a voice agent handle.");
+
+#if defined(RAC_HAVE_BACKEND_NEURT)
+    // Diffusion (CoreML) — only exported when the CoreML backend is linked.
+    m.def("load_diffusion_model", &load_diffusion_model, py::arg("model_path"),
+          py::arg("id") = py::none(),
+          "Create + initialize a diffusion model; returns an integer handle.");
+    m.def("generate_image", &generate_image, py::arg("handle"), py::arg("prompt"),
+          py::arg("negative_prompt") = py::none(), py::arg("width") = py::none(),
+          py::arg("height") = py::none(), py::arg("steps") = py::none(),
+          py::arg("guidance_scale") = py::none(), py::arg("seed") = py::none(),
+          "Generate an image; returns {image_data, width, height, seed, ...}.");
+    m.def("unload_diffusion_model", &unload_diffusion_model, py::arg("handle"),
+          "Unload a diffusion handle.");
+#endif
 
     // Secure store
     m.def("secure_set", &secure_set, py::arg("key"), py::arg("value"),

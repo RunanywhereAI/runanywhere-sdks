@@ -19,9 +19,8 @@ import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.cleanTempFiles
 import com.runanywhere.sdk.public.extensions.clearCache
-import com.runanywhere.sdk.public.extensions.deleteModel
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.getStorageInfo
-import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.matchesLifecycleCategory
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
@@ -127,7 +126,7 @@ class SettingsViewModel : ViewModel() {
                 ).info
             }.getOrNull()
             val models = runCatching {
-                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+                RunAnywhere.models.list()
                     .filter { it.isDownloadedOnDisk && !it.isBuiltIn }
             }.getOrDefault(emptyList())
             storage = storage.copy(
@@ -152,7 +151,7 @@ class SettingsViewModel : ViewModel() {
                 if (model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)) {
                     LlmModelChangeInterlock.awaitReadyForModelChange()
                 }
-                RunAnywhere.deleteModel(model.id)
+                RunAnywhere.models.delete(model.id)
                 RuntimeModelSelection.clearModelEverywhere(model.id)
             } catch (e: CancellationException) {
                 throw e

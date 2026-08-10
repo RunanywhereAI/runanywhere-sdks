@@ -36,17 +36,8 @@ import FoundationModels
 /// import RunAnywhere
 ///
 /// // Platform backend is registered automatically during SDK init.
-/// // Load the built-in model via the canonical proto request.
-/// var load = RAModelLoadRequest()
-/// load.modelID = "foundation-models-default"
-/// load.category = .language
-/// load.framework = .foundationModels
-/// _ = await RunAnywhere.loadModel(load)
-///
-/// // Generate text via canonical proto API
-/// var req = RALLMGenerateRequest()
-/// req.prompt = "Hello!"
-/// let result = try await RunAnywhere.generate(req)
+/// try await RunAnywhere.models.load(id: "foundation-models-default")
+/// let result = try await RunAnywhere.llm.generate(prompt: "Hello!")
 /// print(result.text)
 /// ```
 public enum SystemFoundationModels {

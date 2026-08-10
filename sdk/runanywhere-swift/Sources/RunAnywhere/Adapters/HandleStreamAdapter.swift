@@ -205,6 +205,15 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             let result = register(handle, trampoline, userPtr.rawValue)
 
             if result != RAC_SUCCESS {
+                // Loudly. A refused registration means the consumer's
+                // `for await` finishes with no events and no error, which on the
+                // voice path is indistinguishable from a session that simply
+                // never spoke — the failure mode that made a dead voice panel
+                // take an audio recording to diagnose.
+                SDKLogger(category: "HandleStreamAdapter").error(
+                    "Native \(storeKey.streamKey) stream callback registration was refused (rc=\(result)); "
+                        + "subscribers will receive no events"
+                )
                 // Roll back: drop every continuation that joined the
                 // in-flight install (so their AsyncStreams finish),
                 // reset the installation flag so a fresh first

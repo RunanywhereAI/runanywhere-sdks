@@ -11,7 +11,7 @@ import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
 import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.getRegisteredTools
+import com.runanywhere.sdk.public.api.llm
 import com.runanywhere.sdk.public.types.RAToolDefinition
 import kotlinx.coroutines.launch
 
@@ -37,7 +37,7 @@ class ToolsViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            tools = runCatching { RunAnywhere.getRegisteredTools() }
+            tools = runCatching { RunAnywhere.llm.tools.list() }
                 .onFailure { RACLog.w("failed to load registered tools: ${it.message}") }
                 .getOrDefault(emptyList())
         }

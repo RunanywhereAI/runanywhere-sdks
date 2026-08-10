@@ -13,14 +13,29 @@ typealias SDKEvent = ai.runanywhere.proto.v1.SDKEvent
 typealias EventCategory = ai.runanywhere.proto.v1.EventCategory
 typealias EventDestination = ai.runanywhere.proto.v1.EventDestination
 
-typealias ComponentInitializationEvent = ai.runanywhere.proto.v1.ComponentInitializationEvent
+// `ComponentInitializationEvent`/`FailureEvent`/`ModelRegistryEvent`/
+// `DownloadEvent`/`StorageLifecycleEvent`/`PerformanceEvent` are deleted
+// outright (idl/sdk_events.proto): `FailureEvent`'s fields moved onto the
+// SDKEvent envelope itself (`error`, `component`, `operation_id`);
+// `DownloadEvent`/`ModelRegistryEvent` were absorbed into `ModelEvent`
+// outright ("+ model_registry, + download"); `ComponentInitializationEvent`
+// is superseded by `InitializationEvent`; `StorageLifecycleEvent` by
+// `StorageEvent`; `PerformanceEvent` has no replacement (nothing in commons
+// emits it). Mirrors Swift's typed `RA*Event` usage in EventBus.swift/Events.swift.
+typealias InitializationEvent = ai.runanywhere.proto.v1.InitializationEvent
+typealias ConfigurationEvent = ai.runanywhere.proto.v1.ConfigurationEvent
 typealias ComponentLifecycleEvent = ai.runanywhere.proto.v1.ComponentLifecycleEvent
-typealias FailureEvent = ai.runanywhere.proto.v1.FailureEvent
 typealias GenerationEvent = ai.runanywhere.proto.v1.GenerationEvent
 typealias ModelEvent = ai.runanywhere.proto.v1.ModelEvent
-typealias ModelRegistryEvent = ai.runanywhere.proto.v1.ModelRegistryEvent
-typealias DownloadEvent = ai.runanywhere.proto.v1.DownloadEvent
-typealias StorageLifecycleEvent = ai.runanywhere.proto.v1.StorageLifecycleEvent
 typealias NetworkEvent = ai.runanywhere.proto.v1.NetworkEvent
-typealias PerformanceEvent = ai.runanywhere.proto.v1.PerformanceEvent
+typealias StorageEvent = ai.runanywhere.proto.v1.StorageEvent
+typealias FrameworkEvent = ai.runanywhere.proto.v1.FrameworkEvent
+typealias DeviceEvent = ai.runanywhere.proto.v1.DeviceEvent
+typealias VoiceLifecycleEvent = ai.runanywhere.proto.v1.VoiceLifecycleEvent
 typealias VoiceEvent = ai.runanywhere.proto.v1.VoiceEvent
+typealias SessionEvent = ai.runanywhere.proto.v1.SessionEvent
+typealias AuthEvent = ai.runanywhere.proto.v1.AuthEvent
+typealias HardwareRoutingEvent = ai.runanywhere.proto.v1.HardwareRoutingEvent
+typealias CapabilityOperationEvent = ai.runanywhere.proto.v1.CapabilityOperationEvent
+typealias TelemetryEvent = ai.runanywhere.proto.v1.TelemetryEvent
+typealias CancellationEvent = ai.runanywhere.proto.v1.CancellationEvent

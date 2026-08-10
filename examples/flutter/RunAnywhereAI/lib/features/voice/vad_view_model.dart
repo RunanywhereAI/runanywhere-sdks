@@ -15,16 +15,12 @@ class VADViewModel extends VoiceComponentViewModelBase {
   VADViewModel();
 
   final sdk.AudioCaptureManager _capture = sdk.AudioCaptureManager();
-  StreamSubscription<sdk.VADResult>? _vadSubscription;
+  StreamSubscription<sdk.VadEvent>? _vadSubscription;
+  StreamSubscription<Uint8List>? _vadChunkSubscription;
+  sdk.VadStream? _vadStream;
   StreamSubscription<double>? _levelSubscription;
 
   // --- Component identity -----------------------------------------------------
-
-  @override
-  sdk.SDKComponent get component => sdk.SDKComponent.SDK_COMPONENT_VAD;
-
-  @override
-  sdk.EventCategory get eventCategory => sdk.EventCategory.EVENT_CATEGORY_VAD;
 
   @override
   ModelCategory get modelCategory =>
@@ -35,8 +31,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
   bool isProcessing = false;
   bool isListening = false;
   bool isSpeech = false;
-  double confidence = 0;
-  double energy = 0;
+  double probability = 0;
   int frameCount = 0;
   double audioLevel = 0;
 
@@ -63,7 +58,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
 
   @override
   Future<void> performLoad(ModelInfo model) =>
-      sdk.RunAnywhere.vad.loadModel(model.id);
+      sdk.RunAnywhere.models.load(model.id);
 
   /// VAD resolves the display name from the model catalog when available
   /// (mirrors iOS).
@@ -85,7 +80,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
 
   Future<void> startListening() async {
     debugPrint('Starting VAD listening');
-    if (!sdk.RunAnywhere.vad.isModelLoaded) {
+    if (!hasModelSelected) {
       errorMessage = 'Select a VAD model first';
       notify();
       return;
@@ -107,21 +102,39 @@ class VADViewModel extends VoiceComponentViewModelBase {
       notify();
     });
 
-    // Consume the SDK's streaming VAD session: one VADResult per mic chunk;
-    // the SDK owns model framing — no app-side buffer math.
-    _vadSubscription = sdk.RunAnywhere.vad.streamVAD(chunks).listen(
-      (result) {
-        if (result.errorMessage.isNotEmpty) {
-          errorMessage = result.errorMessage;
-          isListening = false;
-          notify();
-          unawaited(_capture.cancel());
-          return;
+    // Open the VAD session once with the capture format, then push each mic
+    // chunk as a frame. The SDK owns model framing, so there is still no
+    // app-side buffer math; the format is just established up front now
+    // instead of being re-derived from every chunk.
+    final stream = sdk.RunAnywhere.vad.openStream(
+      const sdk.AudioFormatSpec(
+        encoding: sdk.AudioEncoding.pcm16,
+        sampleRate: 16000,
+      ),
+    );
+    _vadStream = stream;
+    _vadChunkSubscription = chunks.listen(
+      (bytes) => stream.pushFrame(
+        sdk.AudioFrame(samples: bytes, sampleCount: bytes.length),
+      ),
+      onDone: stream.finish,
+    );
+
+    _vadSubscription = stream.events.listen(
+      (event) {
+        switch (event) {
+          case sdk.VadActivity(:final isSpeech, :final probability):
+            this.isSpeech = isSpeech;
+            this.probability = probability;
+            frameCount += 1;
+          case sdk.VadFailed(:final error):
+            errorMessage = 'VAD failed: $error';
+            isListening = false;
+          case sdk.VadSpeechStarted():
+          case sdk.VadSpeechEnded():
+          case sdk.VadCompleted():
+            break;
         }
-        isSpeech = result.isSpeech;
-        confidence = result.confidence;
-        energy = result.energy;
-        frameCount += 1;
         notify();
       },
       onError: (Object e) {
@@ -144,8 +157,13 @@ class VADViewModel extends VoiceComponentViewModelBase {
   Future<void> stopListening() async {
     debugPrint('Stopping VAD listening');
 
+    await _vadChunkSubscription?.cancel();
+    _vadChunkSubscription = null;
     await _vadSubscription?.cancel();
     _vadSubscription = null;
+    final stream = _vadStream;
+    _vadStream = null;
+    await stream?.close();
     await _levelSubscription?.cancel();
     _levelSubscription = null;
     await _capture.stopRecording();
@@ -160,6 +178,8 @@ class VADViewModel extends VoiceComponentViewModelBase {
 
   @override
   void dispose() {
+    unawaited(_vadChunkSubscription?.cancel());
+    unawaited(_vadStream?.close());
     unawaited(_vadSubscription?.cancel());
     unawaited(_levelSubscription?.cancel());
     unawaited(_capture.dispose());

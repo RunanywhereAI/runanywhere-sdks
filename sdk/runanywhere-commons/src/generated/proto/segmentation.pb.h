@@ -31,6 +31,7 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -309,6 +310,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationOptions final : public 
   // accessors -------------------------------------------------------
   enum : int {
     kIncludeDiagnosticRgbaFieldNumber = 1,
+    kIncludeConfidenceFieldNumber = 2,
   };
   // bool include_diagnostic_rgba = 1;
   void clear_include_diagnostic_rgba() ;
@@ -320,11 +322,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationOptions final : public 
   void _internal_set_include_diagnostic_rgba(bool value);
 
   public:
+  // bool include_confidence = 2;
+  void clear_include_confidence() ;
+  [[nodiscard]] bool include_confidence() const;
+  void set_include_confidence(bool value);
+
+  private:
+  bool _internal_include_confidence() const;
+  void _internal_set_include_confidence(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SegmentationOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 1,
+      ::google::protobuf::internal::TcParseTable<1, 2,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -354,6 +366,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationOptions final : public 
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     bool include_diagnostic_rgba_;
+    bool include_confidence_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -514,7 +527,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
     kHeightFieldNumber = 3,
     kPixelFormatFieldNumber = 4,
   };
-  // bytes data = 1;
+  // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_data() ;
   [[nodiscard]] const ::std::string& data() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -529,7 +542,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_data();
 
   public:
-  // uint32 width = 2;
+  // uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
   void clear_width() ;
   [[nodiscard]] ::uint32_t width() const;
   void set_width(::uint32_t value);
@@ -539,7 +552,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   void _internal_set_width(::uint32_t value);
 
   public:
-  // uint32 height = 3;
+  // uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
   void clear_height() ;
   [[nodiscard]] ::uint32_t height() const;
   void set_height(::uint32_t value);
@@ -549,7 +562,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   void _internal_set_height(::uint32_t value);
 
   public:
-  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
   void clear_pixel_format() ;
   [[nodiscard]] ::runanywhere::v1::SegmentationPixelFormat pixel_format() const;
   void set_pixel_format(::runanywhere::v1::SegmentationPixelFormat value);
@@ -751,12 +764,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
 
   // accessors -------------------------------------------------------
   enum : int {
-    kLabelFieldNumber = 4,
+    kLabelFieldNumber = 3,
     kPixelCountFieldNumber = 2,
     kClassIdFieldNumber = 1,
-    kFractionFieldNumber = 3,
   };
-  // string label = 4;
+  // string label = 3;
   void clear_label() ;
   [[nodiscard]] const ::std::string& label() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -791,21 +803,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
   void _internal_set_class_id(::uint32_t value);
 
   public:
-  // float fraction = 3;
-  void clear_fraction() ;
-  [[nodiscard]] float fraction() const;
-  void set_fraction(float value);
-
-  private:
-  float _internal_fraction() const;
-  void _internal_set_fraction(float value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SegmentationClassSummary)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
+      ::google::protobuf::internal::TcParseTable<2, 3,
                           0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -837,7 +839,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
     ::google::protobuf::internal::ArenaStringPtr label_;
     ::uint64_t pixel_count_;
     ::uint32_t class_id_;
-    float fraction_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -997,6 +998,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationResult final : public :
     kClassMaskU16LeFieldNumber = 3,
     kDiagnosticRgbaFieldNumber = 4,
     kModelIdFieldNumber = 7,
+    kConfidenceMaskU8FieldNumber = 8,
     kWidthFieldNumber = 1,
     kHeightFieldNumber = 2,
     kProcessingTimeMsFieldNumber = 6,
@@ -1069,6 +1071,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationResult final : public :
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
+  // optional bytes confidence_mask_u8 = 8;
+  [[nodiscard]] bool has_confidence_mask_u8()
+      const;
+  void clear_confidence_mask_u8() ;
+  [[nodiscard]] const ::std::string& confidence_mask_u8() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_confidence_mask_u8(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_confidence_mask_u8();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_confidence_mask_u8();
+  void set_allocated_confidence_mask_u8(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_confidence_mask_u8() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_confidence_mask_u8(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_confidence_mask_u8();
+
+  public:
   // uint32 width = 1;
   void clear_width() ;
   [[nodiscard]] ::uint32_t width() const;
@@ -1103,8 +1122,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationResult final : public :
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
-                          1, 50,
+      ::google::protobuf::internal::TcParseTable<3, 8,
+                          1, 58,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1136,6 +1155,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationResult final : public :
     ::google::protobuf::internal::ArenaStringPtr class_mask_u16_le_;
     ::google::protobuf::internal::ArenaStringPtr diagnostic_rgba_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr confidence_mask_u8_;
     ::uint32_t width_;
     ::uint32_t height_;
     ::int64_t processing_time_ms_;
@@ -1294,9 +1314,27 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationRequest final : public 
 
   // accessors -------------------------------------------------------
   enum : int {
+    kModelIdFieldNumber = 3,
     kImageFieldNumber = 1,
     kOptionsFieldNumber = 2,
   };
+  // optional string model_id = 3;
+  [[nodiscard]] bool has_model_id()
+      const;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
   // .runanywhere.v1.SegmentationImage image = 1;
   [[nodiscard]] bool has_image()
       const;
@@ -1333,8 +1371,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationRequest final : public 
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          2, 0,
+      ::google::protobuf::internal::TcParseTable<2, 3,
+                          2, 51,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1362,6 +1400,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationRequest final : public 
         const SegmentationRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::runanywhere::v1::SegmentationImage* PROTOBUF_NULLABLE image_;
     ::runanywhere::v1::SegmentationOptions* PROTOBUF_NULLABLE options_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -1386,7 +1425,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationRequest final : public 
 
 // SegmentationImage
 
-// bytes data = 1;
+// bytes data = 1 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.data_.ClearToEmpty();
@@ -1450,7 +1489,7 @@ inline void SegmentationImage::set_allocated_data(::std::string* PROTOBUF_NULLAB
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationImage.data)
 }
 
-// uint32 width = 2;
+// uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
 inline void SegmentationImage::clear_width() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.width_ = 0u;
@@ -1474,7 +1513,7 @@ inline void SegmentationImage::_internal_set_width(::uint32_t value) {
   _impl_.width_ = value;
 }
 
-// uint32 height = 3;
+// uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
 inline void SegmentationImage::clear_height() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.height_ = 0u;
@@ -1498,7 +1537,7 @@ inline void SegmentationImage::_internal_set_height(::uint32_t value) {
   _impl_.height_ = value;
 }
 
-// .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+// .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_pixel_format() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pixel_format_ = 0;
@@ -1550,20 +1589,44 @@ inline void SegmentationOptions::_internal_set_include_diagnostic_rgba(bool valu
   _impl_.include_diagnostic_rgba_ = value;
 }
 
+// bool include_confidence = 2;
+inline void SegmentationOptions::clear_include_confidence() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_confidence_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline bool SegmentationOptions::include_confidence() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationOptions.include_confidence)
+  return _internal_include_confidence();
+}
+inline void SegmentationOptions::set_include_confidence(bool value) {
+  _internal_set_include_confidence(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationOptions.include_confidence)
+}
+inline bool SegmentationOptions::_internal_include_confidence() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.include_confidence_;
+}
+inline void SegmentationOptions::_internal_set_include_confidence(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_confidence_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // SegmentationRequest
 
 // .runanywhere.v1.SegmentationImage image = 1;
 inline bool SegmentationRequest::has_image() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.image_ != nullptr);
   return value;
 }
 inline void SegmentationRequest::clear_image() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.image_ != nullptr) _impl_.image_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::SegmentationImage& SegmentationRequest::_internal_image() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1582,16 +1645,16 @@ inline void SegmentationRequest::unsafe_arena_set_allocated_image(
   }
   _impl_.image_ = reinterpret_cast<::runanywhere::v1::SegmentationImage*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SegmentationRequest.image)
 }
 inline ::runanywhere::v1::SegmentationImage* PROTOBUF_NULLABLE SegmentationRequest::release_image() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::SegmentationImage* released = _impl_.image_;
   _impl_.image_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -1611,7 +1674,7 @@ inline ::runanywhere::v1::SegmentationImage* PROTOBUF_NULLABLE SegmentationReque
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.SegmentationRequest.image)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::SegmentationImage* temp = _impl_.image_;
   _impl_.image_ = nullptr;
   return temp;
@@ -1626,7 +1689,7 @@ inline ::runanywhere::v1::SegmentationImage* PROTOBUF_NONNULL SegmentationReques
 }
 inline ::runanywhere::v1::SegmentationImage* PROTOBUF_NONNULL SegmentationRequest::mutable_image()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::SegmentationImage* _msg = _internal_mutable_image();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.SegmentationRequest.image)
   return _msg;
@@ -1643,9 +1706,9 @@ inline void SegmentationRequest::set_allocated_image(::runanywhere::v1::Segmenta
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.image_ = reinterpret_cast<::runanywhere::v1::SegmentationImage*>(value);
@@ -1654,14 +1717,14 @@ inline void SegmentationRequest::set_allocated_image(::runanywhere::v1::Segmenta
 
 // optional .runanywhere.v1.SegmentationOptions options = 2;
 inline bool SegmentationRequest::has_options() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.options_ != nullptr);
   return value;
 }
 inline void SegmentationRequest::clear_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.options_ != nullptr) _impl_.options_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::SegmentationOptions& SegmentationRequest::_internal_options() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1680,16 +1743,16 @@ inline void SegmentationRequest::unsafe_arena_set_allocated_options(
   }
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::SegmentationOptions*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SegmentationRequest.options)
 }
 inline ::runanywhere::v1::SegmentationOptions* PROTOBUF_NULLABLE SegmentationRequest::release_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::SegmentationOptions* released = _impl_.options_;
   _impl_.options_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -1709,7 +1772,7 @@ inline ::runanywhere::v1::SegmentationOptions* PROTOBUF_NULLABLE SegmentationReq
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.SegmentationRequest.options)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::SegmentationOptions* temp = _impl_.options_;
   _impl_.options_ = nullptr;
   return temp;
@@ -1724,7 +1787,7 @@ inline ::runanywhere::v1::SegmentationOptions* PROTOBUF_NONNULL SegmentationRequ
 }
 inline ::runanywhere::v1::SegmentationOptions* PROTOBUF_NONNULL SegmentationRequest::mutable_options()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::SegmentationOptions* _msg = _internal_mutable_options();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.SegmentationRequest.options)
   return _msg;
@@ -1741,13 +1804,81 @@ inline void SegmentationRequest::set_allocated_options(::runanywhere::v1::Segmen
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
 
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::SegmentationOptions*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationRequest.options)
+}
+
+// optional string model_id = 3;
+inline bool SegmentationRequest::has_model_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  return value;
+}
+inline void SegmentationRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& SegmentationRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SegmentationRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL SegmentationRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SegmentationRequest.model_id)
+  return _s;
+}
+inline const ::std::string& SegmentationRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void SegmentationRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SegmentationRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SegmentationRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SegmentationRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SegmentationRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationRequest.model_id)
 }
 
 // -------------------------------------------------------------------
@@ -1802,31 +1933,7 @@ inline void SegmentationClassSummary::_internal_set_pixel_count(::uint64_t value
   _impl_.pixel_count_ = value;
 }
 
-// float fraction = 3;
-inline void SegmentationClassSummary::clear_fraction() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.fraction_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline float SegmentationClassSummary::fraction() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationClassSummary.fraction)
-  return _internal_fraction();
-}
-inline void SegmentationClassSummary::set_fraction(float value) {
-  _internal_set_fraction(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationClassSummary.fraction)
-}
-inline float SegmentationClassSummary::_internal_fraction() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.fraction_;
-}
-inline void SegmentationClassSummary::_internal_set_fraction(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.fraction_ = value;
-}
-
-// string label = 4;
+// string label = 3;
 inline void SegmentationClassSummary::clear_label() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.label_.ClearToEmpty();
@@ -1898,7 +2005,7 @@ inline void SegmentationClassSummary::set_allocated_label(::std::string* PROTOBU
 inline void SegmentationResult::clear_width() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.width_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::uint32_t SegmentationResult::width() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationResult.width)
@@ -1906,7 +2013,7 @@ inline ::uint32_t SegmentationResult::width() const {
 }
 inline void SegmentationResult::set_width(::uint32_t value) {
   _internal_set_width(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationResult.width)
 }
 inline ::uint32_t SegmentationResult::_internal_width() const {
@@ -1922,7 +2029,7 @@ inline void SegmentationResult::_internal_set_width(::uint32_t value) {
 inline void SegmentationResult::clear_height() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.height_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::uint32_t SegmentationResult::height() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationResult.height)
@@ -1930,7 +2037,7 @@ inline ::uint32_t SegmentationResult::height() const {
 }
 inline void SegmentationResult::set_height(::uint32_t value) {
   _internal_set_height(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationResult.height)
 }
 inline ::uint32_t SegmentationResult::_internal_height() const {
@@ -2133,7 +2240,7 @@ SegmentationResult::_internal_mutable_class_summaries() {
 inline void SegmentationResult::clear_processing_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.processing_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int64_t SegmentationResult::processing_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationResult.processing_time_ms)
@@ -2141,7 +2248,7 @@ inline ::int64_t SegmentationResult::processing_time_ms() const {
 }
 inline void SegmentationResult::set_processing_time_ms(::int64_t value) {
   _internal_set_processing_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationResult.processing_time_ms)
 }
 inline ::int64_t SegmentationResult::_internal_processing_time_ms() const {
@@ -2215,6 +2322,74 @@ inline void SegmentationResult::set_allocated_model_id(::std::string* PROTOBUF_N
     _impl_.model_id_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationResult.model_id)
+}
+
+// optional bytes confidence_mask_u8 = 8;
+inline bool SegmentationResult::has_confidence_mask_u8() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
+inline void SegmentationResult::clear_confidence_mask_u8() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.confidence_mask_u8_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline const ::std::string& SegmentationResult::confidence_mask_u8() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationResult.confidence_mask_u8)
+  return _internal_confidence_mask_u8();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SegmentationResult::set_confidence_mask_u8(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.confidence_mask_u8_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationResult.confidence_mask_u8)
+}
+inline ::std::string* PROTOBUF_NONNULL SegmentationResult::mutable_confidence_mask_u8()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_confidence_mask_u8();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SegmentationResult.confidence_mask_u8)
+  return _s;
+}
+inline const ::std::string& SegmentationResult::_internal_confidence_mask_u8() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.confidence_mask_u8_.Get();
+}
+inline void SegmentationResult::_internal_set_confidence_mask_u8(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.confidence_mask_u8_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SegmentationResult::_internal_mutable_confidence_mask_u8() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.confidence_mask_u8_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SegmentationResult::release_confidence_mask_u8() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SegmentationResult.confidence_mask_u8)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.confidence_mask_u8_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.confidence_mask_u8_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SegmentationResult::set_allocated_confidence_mask_u8(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.confidence_mask_u8_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.confidence_mask_u8_.IsDefault()) {
+    _impl_.confidence_mask_u8_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationResult.confidence_mask_u8)
 }
 
 #ifdef __GNUC__

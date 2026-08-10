@@ -90,7 +90,16 @@ class RAGBackend {
 
     bool is_initialized() const { return initialized_; }
 
-    bool add_document(const std::string& text, const nlohmann::json& metadata = {});
+    /**
+     * @brief Chunk, embed and index one document.
+     *
+     * @param out_error Optional. On failure receives a specific, user-facing
+     *        reason ("the embedding model produced no vector …") instead of
+     *        leaving the caller to publish the generic "Processing failed".
+     *        Every ingest failure the user can act on is distinguishable here.
+     */
+    bool add_document(const std::string& text, const nlohmann::json& metadata = {},
+                      std::string* out_error = nullptr);
 
     std::vector<SearchResult> search(const std::string& query_text, size_t top_k) const;
 
@@ -126,6 +135,17 @@ class RAGBackend {
                        std::function<bool(const std::string&)> on_token = nullptr,
                        const QueryOverrides* overrides = nullptr);
 
+    /**
+     * @brief Retrieval-only search (no answer generation).
+     *
+     * Embed-only sessions are supported. Multi-query expansion and session
+     * LLM rerank require an LLM and return RAC_ERROR_INVALID_STATE without one.
+     * On success, `out_sources` holds the retrieved chunks (may be empty).
+     */
+    rac_result_t retrieve(const std::string& question, std::vector<SearchResult>& out_sources,
+                          double* out_retrieval_ms = nullptr,
+                          const QueryOverrides* overrides = nullptr);
+
     /** Request cancellation without taking the corpus mutex. */
     rac_result_t cancel_query();
 
@@ -137,7 +157,7 @@ class RAGBackend {
     // Must be called with mutex_ held. Initializes the vector store on the
     // first real embedding when the provider could not report its dimension at
     // session creation, or validates an explicit/previously resolved value.
-    bool ensure_embedding_dimension_locked(size_t actual_dimension);
+    bool ensure_embedding_dimension_locked(size_t actual_dimension, std::string* out_error);
 
     std::vector<float> embed_text(const std::string& text) const;
     std::vector<std::vector<float>> embed_texts_batch(const std::vector<std::string>& texts) const;

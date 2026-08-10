@@ -213,11 +213,11 @@ std::string run_rag_case(const std::string& embed_id, const std::string& llm_id,
     rac_proto_buffer_free(&stats_buf);
 
     runanywhere::v1::RAGQueryOptions q;
-    q.set_question(question);
-    q.set_max_tokens(160);
-    q.set_temperature(0.0f);
+    q.set_query(question);
+    q.mutable_generation()->set_max_output_tokens(160);
+    q.mutable_generation()->set_temperature(0.0f);
     if (multi_query)
-        q.set_enable_multi_query(true);
+        q.mutable_retrieval()->set_enable_multi_query(true);
     const std::string q_bytes = q.SerializeAsString();
 
     rac_proto_buffer_t res_buf;
@@ -297,7 +297,7 @@ void run_threshold_override_case(const std::string& embed_id, const std::string&
     cfg.set_llm_model_id(llm_id);
     cfg.set_embedding_config_json(std::string("{\"vocab_path\":\"") + embed_vocab + "\"}");
     cfg.set_top_k(4);
-    cfg.set_similarity_threshold(0.95f);  // effectively filters everything
+    cfg.set_score_threshold(0.95f);  // effectively filters everything
     const std::string cb = cfg.SerializeAsString();
 
     rac_handle_t s = nullptr;
@@ -321,11 +321,11 @@ void run_threshold_override_case(const std::string& embed_id, const std::string&
     const std::string probe = "xylophone";
     auto query_chunks = [&](bool set_override) -> int {
         runanywhere::v1::RAGQueryOptions q;
-        q.set_question(probe);
-        q.set_max_tokens(64);
-        q.set_temperature(0.0f);
+        q.set_query(probe);
+        q.mutable_generation()->set_max_output_tokens(64);
+        q.mutable_generation()->set_temperature(0.0f);
         if (set_override)
-            q.set_similarity_threshold(0.0f);  // explicit accept-all
+            q.mutable_retrieval()->set_score_threshold(0.0f);  // explicit accept-all
         const std::string qb = q.SerializeAsString();
         rac_proto_buffer_t rb;
         rac_proto_buffer_init(&rb);
@@ -386,10 +386,10 @@ void run_scoping_case(const std::string& embed_id, const std::string& llm_id,
     ingest("kelp:doc", other_text);
 
     runanywhere::v1::RAGQueryOptions q;
-    q.set_question("Summarize the document.");
-    q.set_max_tokens(96);
-    q.set_temperature(0.0f);
-    q.set_scope_prefix("kelp:");
+    q.set_query("Summarize the document.");
+    q.mutable_generation()->set_max_output_tokens(96);
+    q.mutable_generation()->set_temperature(0.0f);
+    q.mutable_retrieval()->set_scope_prefix("kelp:");
     const std::string qb = q.SerializeAsString();
 
     rac_proto_buffer_t rb;

@@ -237,8 +237,13 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
 /**
  * @brief Override the optional Hugging Face bearer token used by commons.
  *
- * Pass NULL to return to RAC_HF_TOKEN / HF_TOKEN environment lookup. Pass an
- * empty string to clear the in-memory override and disable env fallback.
+ * Pass NULL to return to the environment lookup: HF_TOKEN, then $HF_TOKEN_PATH,
+ * then $HF_HOME/token, then ~/.cache/huggingface/token (the huggingface_hub
+ * order, so `hf auth login` is honoured). Pass an empty string to clear the
+ * in-memory override and disable that fallback.
+ *
+ * There is no RAC_HF_TOKEN — this doc named one for a while, but the
+ * implementation has only ever read HF_TOKEN.
  */
 RAC_API void rac_http_hf_token_set(const char* token);
 

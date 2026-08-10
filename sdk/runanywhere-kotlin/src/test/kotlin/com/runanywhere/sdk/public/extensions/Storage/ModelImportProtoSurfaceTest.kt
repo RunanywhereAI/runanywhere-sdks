@@ -10,6 +10,7 @@ import com.runanywhere.sdk.public.extensions.importModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -21,6 +22,8 @@ import kotlin.test.assertTrue
 class ModelImportProtoSurfaceTest {
     @Test
     fun testModelImportRequestCarriesCanonicalFields() {
+        // `is_downloaded` is deleted outright (idl/model_types.proto);
+        // `registry_status`/non-empty `local_path` carry that signal now.
         val model =
             ModelInfo(
                 id = "demo-model",
@@ -28,7 +31,6 @@ class ModelImportProtoSurfaceTest {
                 local_path = "/models/demo.gguf",
                 format = ModelFormat.MODEL_FORMAT_GGUF,
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-                is_downloaded = true,
             )
 
         val request =
@@ -78,7 +80,6 @@ class ModelImportProtoSurfaceTest {
     fun testModelImportResultCarriesPersistenceMetadata() {
         val result =
             ModelImportResult(
-                success = true,
                 model =
                     ModelInfo(
                         id = "demo-model",
@@ -96,7 +97,7 @@ class ModelImportProtoSurfaceTest {
                 ModelImportResult.ADAPTER.encode(result),
             )
 
-        assertTrue(decoded.success)
+        assertNull(decoded.error)
         assertTrue(decoded.registered)
         assertEquals("demo-model", decoded.model?.id)
         assertEquals("/models/demo.gguf", decoded.local_path)

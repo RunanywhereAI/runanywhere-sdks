@@ -6,11 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.api.lora
+import com.runanywhere.sdk.public.api.models
+import com.runanywhere.sdk.public.extensions.loraCatalog
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -18,7 +21,7 @@ data class LoraUiState(
     val adapters: List<LoraAdapterCatalogEntry> = emptyList(),
     val activeId: String? = null,
     val busyId: String? = null,
-    val progressPercent: Int? = null,
+    val progress: DownloadProgressInfo? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
 )
@@ -39,34 +42,39 @@ class LoraViewModel : ViewModel() {
     fun download(entry: LoraAdapterCatalogEntry) {
         if (isDownloaded(entry)) return
         viewModelScope.launch {
-            state = state.copy(busyId = entry.id, progressPercent = 0, error = null)
+            state = state.copy(busyId = entry.id, progress = DownloadProgressInfo(), error = null)
             try {
                 val path =
-                    adapterLocalPath(entry) ?: RunAnywhere.lora.download(entry) { progress ->
-                        val pct =
-                            if (progress.total_bytes > 0) {
-                                (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
-                            } else {
-                                (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
-                            }
-                        state = state.copy(progressPercent = pct)
+                    adapterLocalPath(entry) ?: run {
+                        // LoraAdapterCatalogEntry no longer carries url/filename/size
+                        // (idl/lora_options.proto: "everything generic about the
+                        // artifact ... lives on the ModelInfo record for this
+                        // adapter"), so lora.download() now takes the companion
+                        // ModelInfo artifact directly -- looked up under the
+                        // `lora-adapter:{id}` convention ModelBootstrap/seedLora
+                        // registers it under.
+                        val artifact = RunAnywhere.models.get(loraArtifactModelId(entry.id))
+                            ?: throw SDKException.modelNotFound(entry.id)
+                        RunAnywhere.loraCatalog.download(entry, artifact) { progress ->
+                            state = state.copy(progress = DownloadProgressInfo.from(progress))
+                        }
                     }
 
                 if (path.isNotBlank()) {
                     downloadedPaths[entry.id] = path
                 }
-                state = state.copy(busyId = null, progressPercent = null)
+                state = state.copy(busyId = null, progress = null)
                 reload()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("lora download failed: ${entry.id}", e)
-                state = state.copy(busyId = null, progressPercent = null, error = e.message ?: "Download failed")
+                state = state.copy(busyId = null, progress = null, error = e.message ?: "Download failed")
             }
         }
     }
 
-    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale.takeIf { it > 0f } ?: 1f) {
+    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale?.takeIf { it > 0f } ?: 1f) {
         val path = adapterLocalPath(entry)
         if (path.isNullOrBlank()) {
             state = state.copy(error = "Adapter not downloaded yet")
@@ -75,18 +83,9 @@ class LoraViewModel : ViewModel() {
         viewModelScope.launch {
             state = state.copy(busyId = entry.id, error = null)
             try {
-                val result = RunAnywhere.lora.apply(
-                    entry = entry,
-                    localPath = path,
-                    scale = scale,
-                    replaceExisting = true,
-                )
-                if (result.success) {
-                    GlobalState.lora.set(entry.id)
-                    state = state.copy(busyId = null, activeId = entry.id)
-                } else {
-                    state = state.copy(busyId = null, error = result.error_message?.ifBlank { null } ?: "Apply failed")
-                }
+                RunAnywhere.lora.apply(entry.id, scale)
+                GlobalState.lora.set(entry.id)
+                state = state.copy(busyId = null, activeId = entry.id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -99,7 +98,7 @@ class LoraViewModel : ViewModel() {
     fun clear() {
         viewModelScope.launch {
             try {
-                RunAnywhere.lora.remove(RALoRARemoveRequest(clear_all = true))
+                RunAnywhere.lora.remove()
                 GlobalState.lora.set(null)
                 state = state.copy(activeId = null)
             } catch (e: CancellationException) {
@@ -115,12 +114,24 @@ class LoraViewModel : ViewModel() {
         state = state.copy(error = null)
     }
 
+    // LoraAdapterCatalogEntry.is_downloaded was deleted outright; a non-empty
+    // local_path is the proto's sole documented "is this downloaded" signal.
     fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean =
-        adapterLocalPath(entry) != null || entry.is_downloaded == true
+        adapterLocalPath(entry) != null
 
     private fun adapterLocalPath(entry: LoraAdapterCatalogEntry): String? =
         downloadedPaths[entry.id]
             ?: entry.local_path?.takeIf { it.isNotBlank() }
+
+    /**
+     * Stable model-registry id for a LoRA adapter's downloadable artifact.
+     * `LoraAdapterCatalogEntry` no longer carries url/filename/size
+     * (idl/lora_options.proto), so its bytes are described by a companion
+     * [com.runanywhere.sdk.public.types.RAModelInfo] artifact keyed by this
+     * id -- the same `lora-adapter:{id}` convention commons and the other
+     * SDKs' reference LoRA extensions use.
+     */
+    private fun loraArtifactModelId(adapterId: String): String = "lora-adapter:$adapterId"
 
     private suspend fun reload() {
         val modelId = GlobalState.model.loaded?.id
@@ -129,14 +140,13 @@ class LoraViewModel : ViewModel() {
             return
         }
         try {
-            val adapters = RunAnywhere.lora.adaptersForModel(modelId)
+            val adapters = RunAnywhere.loraCatalog.adaptersForModel(modelId)
             adapters.forEach { entry ->
                 entry.local_path?.takeIf { it.isNotBlank() }?.let { path ->
                     downloadedPaths[entry.id] = path
                 }
             }
-            val active = RunAnywhere.lora.state().loaded_adapters
-                .firstOrNull { it.applied }?.adapter_id?.takeIf { it.isNotEmpty() }
+            val active = RunAnywhere.lora.list().applied.firstOrNull()?.id?.takeIf { it.isNotEmpty() }
             GlobalState.lora.set(active)
             state = state.copy(adapters = adapters, activeId = active, isLoading = false, error = null)
         } catch (e: CancellationException) {

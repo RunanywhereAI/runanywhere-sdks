@@ -337,6 +337,7 @@ std::string manifest_dsp_arch(const fs::path& file) {
 std::string resolve_manifest(const char* path, const char* arch) {
     std::error_code ec;
     fs::path p(path);
+    bool recover_from_bundle_file = false;
     if (fs::is_regular_file(p, ec)) {
         // A real manifest .json was passed directly — use it.
         std::string name = p.filename().generic_string();
@@ -351,33 +352,54 @@ std::string resolve_manifest(const char* path, const char* arch) {
         // override. Recover by resolving the manifest from the file's own bundle
         // directory (the layout below handles the arch-subdir and flat cases).
         p = p.parent_path();
+        recover_from_bundle_file = true;
     }
     if (!fs::is_directory(p, ec)) {
         return {};
     }
-    if (arch != nullptr && arch[0] != '\0') {
-        std::string m = find_manifest_in_dir(p / arch);
-        if (!m.empty()) {
-            return m;
+
+    bool arch_mismatch = false;
+    auto resolve_in_dir = [&](const fs::path& dir) -> std::string {
+        if (arch != nullptr && arch[0] != '\0') {
+            std::string m = find_manifest_in_dir(dir / arch);
+            if (!m.empty()) {
+                return m;
+            }
         }
-    }
-    // Flat-layout fallback: no per-arch subdirectory. Unlike the arch-subdir
-    // path (correct by construction), a flat bundle may target a different DSP
-    // (e.g. a v81 bundle on a v79 device). Reject an arch mismatch here with a
-    // clear message instead of trusting qhx_model_load to fail deep in QNN with
-    // an opaque error (A21).
-    std::string flat = find_manifest_in_dir(p);
-    if (flat.empty() || arch == nullptr || arch[0] == '\0') {
+
+        // Flat-layout fallback: no per-arch subdirectory. Unlike the arch-subdir
+        // path (correct by construction), a flat bundle may target a different DSP
+        // (e.g. a v81 bundle on a v79 device). Reject an arch mismatch here with a
+        // clear message instead of trusting qhx_model_load to fail deep in QNN with
+        // an opaque error (A21).
+        std::string flat = find_manifest_in_dir(dir);
+        if (flat.empty() || arch == nullptr || arch[0] == '\0') {
+            return flat;
+        }
+        std::string manifest_arch = manifest_dsp_arch(flat);
+        if (!manifest_arch.empty() && manifest_arch != arch) {
+            RAC_LOG_ERROR(LOG_CAT,
+                          "QHexRT manifest dsp_arch '%s' does not match device arch '%s': %s",
+                          manifest_arch.c_str(), arch, flat.c_str());
+            arch_mismatch = true;
+            return {};
+        }
         return flat;
+    };
+
+    // Commons may choose a nested bundle artifact (for example
+    // v81/experts/L00.bin) as the primary model path. Walk only from such a file,
+    // and only a bounded number of ancestors, so explicit directory references
+    // keep their existing fail-closed behavior.
+    const int search_depth = recover_from_bundle_file ? 4 : 1;
+    for (int depth = 0; depth < search_depth && !p.empty(); ++depth) {
+        std::string manifest = resolve_in_dir(p);
+        if (!manifest.empty() || arch_mismatch) {
+            return manifest;
+        }
+        p = p.parent_path();
     }
-    std::string manifest_arch = manifest_dsp_arch(flat);
-    if (!manifest_arch.empty() && manifest_arch != arch) {
-        RAC_LOG_ERROR(LOG_CAT,
-                      "QHexRT manifest dsp_arch '%s' does not match device arch '%s': %s",
-                      manifest_arch.c_str(), arch, flat.c_str());
-        return {};
-    }
-    return flat;
+    return {};
 }
 
 }  // namespace

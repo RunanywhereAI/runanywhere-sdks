@@ -18,24 +18,26 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  STTLanguage,
-  STTAudioEncoding,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
+  type STTServiceState,
 } from '@runanywhere/proto-ts/stt_options';
 import {
   STTAudioSource,
   STTOptions as STTOptionsCtor,
   STTOutput as STTOutputMessage,
   STTPartialResult as STTPartialResultMessage,
+  STTServiceState as STTServiceStateMessage,
   STTStreamEvent,
   STTStreamEventKind,
   STTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
+import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import {
-  AudioFormat,
   CurrentModelRequest,
   ModelCategory,
 } from '@runanywhere/proto-ts/model_types';
@@ -48,38 +50,27 @@ const logger = new SDKLogger('RunAnywhere.STT');
 let requestCounter = 0;
 
 /**
- * Build a default proto `STTOptions` for callers that pass no options.
- * Defaults mirror Swift `RASTTOptions.defaults()` (Generated/RAConvenience.swift):
- * language EN, punctuation + word timestamps enabled.
+ * `STTPartialResult.finalOutput` is deleted from the wire type outright — the
+ * finished result now arrives solely on `STTStreamEvent.finalOutput`
+ * ("correlation ... and failures live on the STTStreamEvent envelope"). This
+ * internal iterable is JS-only (its values are never `.encode()`d back to
+ * proto bytes), so it carries the finished `STTOutput` alongside the plain
+ * partial for `Stt.ts` to consume, without adding a field the wire type does
+ * not have.
  */
-function defaultSTTOptions(): STTOptions {
-  return STTOptionsCtor.create({
-    language: STTLanguage.STT_LANGUAGE_EN,
-    enablePunctuation: true,
-    enableDiarization: false,
-    maxSpeakers: 0,
-    vocabularyList: [],
-    enableWordTimestamps: true,
-    beamSize: 0,
-    detectLanguage: true,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: audioCaptureDefaults.micSampleRateHz,
-    maxAlternatives: 0,
-  });
-}
+export type STTPartialResultWithOutput = STTPartialResult & {
+  finalOutput?: STTOutput;
+};
 
+/**
+ * Merge caller options over the generated `sTTOptionsDefaults()` pool.
+ * `language` stays unset (BCP-47 tag) unless the caller provides one —
+ * unset means auto-detect.
+ */
 function buildSTTOptions(options?: Partial<STTOptions>): STTOptions {
   return STTOptionsCtor.create({
-    ...defaultSTTOptions(),
+    ...sTTOptionsDefaults(),
     ...options,
-    language: options?.language ?? STTLanguage.STT_LANGUAGE_EN,
-    detectLanguage:
-      options?.detectLanguage ??
-      (options?.language === undefined ||
-        options.language === STTLanguage.STT_LANGUAGE_AUTO),
-    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: options?.sampleRate ?? 16000,
-    maxAlternatives: options?.maxAlternatives ?? 0,
   });
 }
 
@@ -104,16 +95,32 @@ function buildSTTRequestBytes(
     requestId: nextSTTRequestId(),
     audio: STTAudioSource.fromPartial({
       audioData: audio,
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
-      audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-      sampleRate: options?.sampleRate ?? 16000,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+      sampleRate: audioCaptureDefaults.micSampleRateHz,
       channels: 1,
-      bitsPerSample: 16,
     }),
     options: buildSTTOptions(options),
     metadata: {},
   });
   return encodeProtoMessage(request, STTTranscriptionRequest);
+}
+
+/**
+ * Report the lifecycle-loaded STT service's state (readiness, current model,
+ * streaming support, supported languages). Succeeds with `isReady = false`
+ * when no STT model is loaded.
+ */
+export async function sttState(): Promise<STTServiceState> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  await ensureServicesReady();
+  const native = requireNativeModule();
+  const bytes = arrayBufferToBytes(await native.sttStateProto());
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('sttStateProto');
+  }
+  return STTServiceStateMessage.decode(bytes);
 }
 
 /**
@@ -156,7 +163,7 @@ export async function transcribe(
 export function transcribeStream(
   audio: AsyncIterable<Uint8Array>,
   options: Partial<STTOptions> = {}
-): AsyncIterable<STTPartialResult> {
+): AsyncIterable<STTPartialResultWithOutput> {
   return transcribeStreamFromAsyncIterable(audio, options);
 }
 
@@ -170,11 +177,11 @@ export function transcribeStream(
 function transcribeStreamFromAsyncIterable(
   chunks: AsyncIterable<Uint8Array>,
   options: Partial<STTOptions>
-): AsyncIterable<STTPartialResult> {
+): AsyncIterable<STTPartialResultWithOutput> {
   return {
-    [Symbol.asyncIterator](): AsyncIterator<STTPartialResult> {
-      const queue: STTPartialResult[] = [];
-      let resolver: ((value: IteratorResult<STTPartialResult>) => void) | null = null;
+    [Symbol.asyncIterator](): AsyncIterator<STTPartialResultWithOutput> {
+      const queue: STTPartialResultWithOutput[] = [];
+      let resolver: ((value: IteratorResult<STTPartialResultWithOutput>) => void) | null = null;
       let done = false;
       let started = false;
       let cancelled = false;
@@ -185,12 +192,12 @@ function transcribeStreamFromAsyncIterable(
       const finish = (): void => {
         done = true;
         if (resolver) {
-          resolver({ value: undefined as unknown as STTPartialResult, done: true });
+          resolver({ value: undefined as unknown as STTPartialResultWithOutput, done: true });
           resolver = null;
         }
       };
 
-      const deliver = (partial: STTPartialResult): void => {
+      const deliver = (partial: STTPartialResultWithOutput): void => {
         if (done || cancelled) return;
         if (partial.isFinal) sawFinal = true;
         if (resolver) {
@@ -203,23 +210,28 @@ function transcribeStreamFromAsyncIterable(
 
       // Terminal failure partial — bridge errors never throw out of the
       // iterator (RunAnywhere+STT.swift:91-98).
-      const failTerminally = (message: string, errorCode = 0): void => {
-        deliver(
-          STTPartialResultMessage.fromPartial({
+      const failTerminally = (error: SDKError): void => {
+        deliver({
+          ...STTPartialResultMessage.fromPartial({
             isFinal: true,
-            text: message,
-            finalOutput: STTOutputMessage.fromPartial({
-              errorMessage: message,
-              errorCode,
-            }),
-          })
-        );
+            text: error.message,
+          }),
+          finalOutput: STTOutputMessage.fromPartial({
+            error,
+          }),
+        });
         finish();
       };
 
       // Event mapping per Swift STTStreamSessionContext.yield:
       // PARTIAL/ENDPOINT → partial if present; FINAL → merged final partial;
       // ERROR → terminal failure partial; STARTED/UNSPECIFIED ignored.
+      //
+      // `STTPartialResult.finalOutput` is deleted from the wire type
+      // outright; the finished result arrives solely on
+      // `STTStreamEvent.finalOutput`. Carried here as a JS-only extension
+      // field (see `STTPartialResultWithOutput`) rather than written back
+      // onto the proto message.
       const onEvent = (eventBytes: ArrayBuffer): void => {
         if (done || cancelled) return;
         let event;
@@ -235,7 +247,9 @@ function transcribeStreamFromAsyncIterable(
             if (event.partial) deliver(event.partial);
             break;
           case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL: {
-            const partial = STTPartialResultMessage.fromPartial(event.partial ?? {});
+            const partial: STTPartialResultWithOutput = STTPartialResultMessage.fromPartial(
+              event.partial ?? {}
+            );
             partial.isFinal = true;
             if (event.finalOutput) {
               partial.finalOutput = event.finalOutput;
@@ -245,7 +259,10 @@ function transcribeStreamFromAsyncIterable(
             break;
           }
           case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
-            failTerminally(event.errorMessage || 'STT stream failed', event.errorCode);
+            failTerminally(
+              event.error ??
+                SDKException.processingFailed('STT stream failed').proto
+            );
             break;
           default:
             // STARTED / UNSPECIFIED — ignored.
@@ -305,7 +322,11 @@ function transcribeStreamFromAsyncIterable(
         const modelPath = snapshot.resolvedPath || snapshot.model?.localPath || '';
         const modelName = snapshot.model?.name || modelId;
         if (!modelId || !modelPath) {
-          failTerminally('STT stream failed: loaded STT model is missing a resolved path');
+          failTerminally(
+            SDKException.processingFailed(
+              'STT stream failed: loaded STT model is missing a resolved path'
+            ).proto
+          );
           return;
         }
 
@@ -323,7 +344,9 @@ function transcribeStreamFromAsyncIterable(
           );
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           return;
         }
@@ -348,7 +371,9 @@ function transcribeStreamFromAsyncIterable(
           }
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           await cancelNativeSession();
           return;
@@ -367,7 +392,9 @@ function transcribeStreamFromAsyncIterable(
           await native.sttStreamStop(activeSessionId);
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           return;
         }
@@ -387,19 +414,19 @@ function transcribeStreamFromAsyncIterable(
       };
 
       return {
-        async next(): Promise<IteratorResult<STTPartialResult>> {
+        async next(): Promise<IteratorResult<STTPartialResultWithOutput>> {
           start();
           if (queue.length > 0) {
             return { value: queue.shift()!, done: false };
           }
           if (done) {
-            return { value: undefined as unknown as STTPartialResult, done: true };
+            return { value: undefined as unknown as STTPartialResultWithOutput, done: true };
           }
-          return new Promise<IteratorResult<STTPartialResult>>((resolve) => {
+          return new Promise<IteratorResult<STTPartialResultWithOutput>>((resolve) => {
             resolver = resolve;
           });
         },
-        async return(): Promise<IteratorResult<STTPartialResult>> {
+        async return(): Promise<IteratorResult<STTPartialResultWithOutput>> {
           // Consumer cancel: stop the input source, cancel the native
           // session, suppress further event delivery.
           cancelled = true;
@@ -410,7 +437,7 @@ function transcribeStreamFromAsyncIterable(
           }
           await cancelNativeSession();
           finish();
-          return { value: undefined as unknown as STTPartialResult, done: true };
+          return { value: undefined as unknown as STTPartialResultWithOutput, done: true };
         },
       };
     },

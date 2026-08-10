@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.data.benchmark
 
-import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.api.GenerationResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -8,14 +8,14 @@ import org.junit.Test
 
 class BenchmarkMetricPolicyTest {
     @Test
-    fun `qhex terminal metrics retain native token count and throughput`() {
+    fun `terminal metrics retain native token count and throughput`() {
         val metrics = llmBenchmarkMetrics(
-            result = RALLMGenerationResult(
-                input_tokens = 41,
-                tokens_generated = 256,
-                generation_time_ms = 20_500.0,
-                ttft_ms = 500.0,
-                tokens_per_second = 12.8,
+            result = GenerationResult(
+                text = "hello",
+                inputTokens = 41,
+                outputTokens = 256,
+                timeToFirstTokenMs = 500,
+                tokensPerSecond = 12.8f,
             ),
             loadTimeMs = 900.0,
             warmupTimeMs = 400.0,
@@ -24,24 +24,19 @@ class BenchmarkMetricPolicyTest {
         )
 
         assertEquals(256, metrics.outputTokens)
-        assertEquals(12.8, metrics.tokensPerSecond!!, 0.0001)
-        assertEquals(20_000.0, metrics.decodeMs!!, 0.0001)
+        assertEquals(12.8, metrics.tokensPerSecond!!, 0.001)
+        assertEquals(20_000.0, metrics.decodeMs!!, 1.0)
         assertEquals(500.0, metrics.promptEvalMs!!, 0.0001)
-        assertEquals(20_500.0, metrics.endToEndLatencyMs, 0.0001)
+        assertEquals(21_000.0, metrics.endToEndLatencyMs, 0.0001)
     }
 
     @Test
-    fun `throughput is derived from native decode time when backend omits it`() {
+    fun `throughput falls back to the measured wall clock when the backend omits it`() {
         val metrics = llmBenchmarkMetrics(
-            result = RALLMGenerationResult(
-                tokens_generated = 256,
-                generation_time_ms = 20_500.0,
-                tokens_per_second = 0.0,
-                decode_time_ms = 20_000,
-            ),
+            result = GenerationResult(text = "hello", outputTokens = 256, tokensPerSecond = 0f),
             loadTimeMs = 0.0,
             warmupTimeMs = 0.0,
-            measuredEndToEndMs = 21_000.0,
+            measuredEndToEndMs = 20_000.0,
             memoryDeltaBytes = 0L,
         )
 
@@ -52,7 +47,7 @@ class BenchmarkMetricPolicyTest {
     fun `zero output cannot be reported as a successful llm benchmark`() {
         assertThrows(IllegalArgumentException::class.java) {
             llmBenchmarkMetrics(
-                result = RALLMGenerationResult(tokens_generated = 0, generation_time_ms = 1_000.0),
+                result = GenerationResult(text = "", outputTokens = 0),
                 loadTimeMs = 0.0,
                 warmupTimeMs = 0.0,
                 measuredEndToEndMs = 1_000.0,

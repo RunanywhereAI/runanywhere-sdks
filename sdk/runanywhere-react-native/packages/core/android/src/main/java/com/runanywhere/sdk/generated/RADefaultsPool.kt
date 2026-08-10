@@ -23,11 +23,15 @@ public object RADefaults {
         public const val RETRY_BACKOFF_BASE_MS: Int = 100
     }
 
+    public object Connect {
+        public const val CONNECT_TIMEOUT_MS: Int = 5000
+        public const val GENERATION_READ_TIMEOUT_MS: Int = 120000
+    }
+
     public object AudioCapture {
         public const val MIC_SAMPLE_RATE_HZ: Int = 16000
         public const val MIC_CHANNELS: Int = 1
         public const val MIC_CHANNEL_CAPACITY: Int = 128
-        public const val MIC_TAP_BUFFER_FRAMES: Int = 4096
         public const val TTS_SAMPLE_RATE_HZ: Int = 22050
     }
 

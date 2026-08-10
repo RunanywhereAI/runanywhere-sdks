@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -46,6 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 
@@ -53,6 +56,14 @@ data class ComposerAttachment(
     val name: String,
     val description: String,
     val icon: ImageVector,
+    /**
+     * What the editor invites while this attachment is staged.
+     *
+     * Sending with an empty box is allowed — the send path supplies its own default question —
+     * so the placeholder has to say so. "Ask anything..." implies a question is required and
+     * gives no hint that the file is what will be answered about.
+     */
+    val placeholder: String = "Add a question, or send to describe this file",
 )
 
 private data class AttachmentAction(
@@ -68,6 +79,14 @@ fun ChatInputBar(
     onInputChange: (String) -> Unit = {},
     onSend: () -> Unit = {},
     canSend: Boolean = false,
+    /**
+     * Why the composer cannot send, or null when it can. Shown as an actionable
+     * strip above the editor rather than left to the reader to infer from a grey
+     * button. Null while a turn is in flight — the spinner already says that.
+     */
+    blockedReason: String? = null,
+    /** Takes the user to whatever [blockedReason] is asking for. */
+    onResolveBlocked: () -> Unit = {},
     isGenerating: Boolean = false,
     isStopping: Boolean = false,
     onStop: () -> Unit = {},
@@ -85,7 +104,20 @@ fun ChatInputBar(
     modifier: Modifier = Modifier,
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
+    /**
+     * Why the last file the user chose was not attached, or null. Shown here rather than as a
+     * dialog: the user is mid-compose and the remedy is to pick a different file, not to dismiss
+     * something. Silently ignoring a rejected file is indistinguishable from the picker being broken.
+     */
+    attachmentRejection: String? = null,
+    onDismissAttachmentRejection: () -> Unit = {},
     compact: Boolean = false,
+    /**
+     * Lets the caller put the cursor in the editor. Editing a sent question is
+     * the case that needs it: the text arrives here from the transcript, and
+     * without focus and a keyboard it reads as though the tap did nothing.
+     */
+    focusRequester: FocusRequester? = null,
 ) {
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -96,17 +128,19 @@ fun ChatInputBar(
             RACIcons.Outline.FileText,
             onAttachDocument
         ),
-        AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Eye, onAttachImage),
+        // A still photo the app will hold, versus a live camera feed it will look through.
+        // Both used to be an eye, which made the two rows of this menu near-identical.
+        AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Image, onAttachImage),
         AttachmentAction(
             "Live camera",
             "Look around with vision",
-            RACIcons.Outline.DeviceMobile,
+            RACIcons.Outline.Eye,
             onOpenLive
         ),
         AttachmentAction(
             "Advanced tools",
             "SDK demos and diagnostics",
-            RACIcons.Outline.Stack,
+            RACIcons.Outline.Sliders,
             onOpenAdvanced
         ),
     )
@@ -120,22 +154,58 @@ fun ChatInputBar(
         )
         if (!compact) {
             AnimatedVisibility(
-                visible = pendingAttachment != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                visible = blockedReason != null,
+                enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+                exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
             ) {
-                pendingAttachment?.let {
-                    AttachmentStatusPill(
-                        attachment = it,
-                        onClear = onClearAttachment,
-                        modifier = Modifier.padding(
-                            start = dimens.spacingMd,
-                            top = dimens.spacingSm,
-                            end = dimens.spacingMd,
-                        ),
-                    )
-                }
+                BlockedReasonStrip(
+                    reason = blockedReason.orEmpty(),
+                    onResolve = onResolveBlocked,
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
             }
+        }
+        // Deliberately *not* inside the `!compact` gate, unlike the rest of the status strips.
+        // These two are the only ones that change what the Send button does, and hiding them in a
+        // short landscape viewport meant a staged file was sent with no way to see or remove it,
+        // while a refused file vanished as if the picker had never returned.
+        AnimatedVisibility(
+            visible = attachmentRejection != null,
+            enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+            exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+        ) {
+            AttachmentRejectionStrip(
+                reason = attachmentRejection.orEmpty(),
+                onDismiss = onDismissAttachmentRejection,
+                modifier = Modifier.padding(
+                    start = dimens.spacingMd,
+                    top = dimens.spacingSm,
+                    end = dimens.spacingMd,
+                ),
+            )
+        }
+        AnimatedVisibility(
+            visible = pendingAttachment != null,
+            enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+            exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+        ) {
+            pendingAttachment?.let {
+                AttachmentStatusPill(
+                    attachment = it,
+                    onClear = onClearAttachment,
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
+        }
+        if (!compact) {
             AnimatedVisibility(
                 visible = toolsEnabled || toolsUnavailableMessage != null,
                 enter = fadeIn() + expandVertically(),
@@ -220,7 +290,9 @@ fun ChatInputBar(
                 ),
             ) {
                 Icon(
-                    imageVector = RACIcons.Outline.Cloud,
+                    // Globe, not Cloud: Cloud means "a hosted provider" in the Advanced hub
+                    // and on the Transcribe screen, and one glyph cannot mean two things (§7).
+                    imageVector = RACIcons.Outline.Globe,
                     contentDescription = when {
                         toolsEnabled -> "Disable web and tools"
                         toolsUnavailableMessage != null -> "Web and tools unavailable for current model"
@@ -294,7 +366,10 @@ fun ChatInputBar(
             ) {
                 if (input.isEmpty()) {
                     Text(
-                        text = if (toolsEnabled) "Ask with web and tools..." else "Ask anything...",
+                        // The attachment wins over the tools hint: it is the more specific fact
+                        // about what pressing Send will do right now.
+                        text = pendingAttachment?.placeholder
+                            ?: if (toolsEnabled) "Ask with web and tools..." else "Ask anything...",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )
@@ -304,7 +379,8 @@ fun ChatInputBar(
                     onValueChange = onInputChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "Message input" },
+                        .semantics { contentDescription = "Message input" }
+                        .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -351,6 +427,114 @@ fun ChatInputBar(
                         top = dimens.spacingSm,
                         end = dimens.spacingMd,
                     ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The one blocker standing between a written message and an answer, plus the tap
+ * that clears it.
+ *
+ * Deliberately not an error colour: nothing has gone wrong on a first launch, the
+ * user simply has not chosen a model yet. Error red here would read as a fault
+ * the user caused.
+ */
+@Composable
+private fun BlockedReasonStrip(
+    reason: String,
+    onResolve: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        onClick = onResolve,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                // The blocker is always "no model chosen", so the strip wears the model mark
+                // rather than a chip — the user is being sent to pick a file, not to inspect
+                // their silicon.
+                imageVector = RACIcons.Outline.Model,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Tap to choose one — it downloads and runs on this device.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = RACIcons.Outline.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+        }
+    }
+}
+
+/**
+ * The file the composer would not take, and why.
+ *
+ * Error-coloured, unlike [BlockedReasonStrip]: something the user did was refused, and softening
+ * that into a neutral hint would leave them wondering whether the attachment went through.
+ */
+@Composable
+private fun AttachmentRejectionStrip(
+    reason: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = dimens.spacingMd,
+                end = dimens.spacingXs,
+                top = dimens.spacingXs,
+                bottom = dimens.spacingXs,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = RACIcons.Outline.AlertTriangle,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(REJECTION_DISMISS_SIZE)) {
+                Icon(
+                    RACIcons.Outline.Close,
+                    contentDescription = "Dismiss",
+                    modifier = Modifier.size(dimens.iconSm),
                 )
             }
         }
@@ -418,7 +602,7 @@ private fun AttachmentStatusPill(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onClear, modifier = Modifier.size(REJECTION_DISMISS_SIZE)) {
                 Icon(
                     RACIcons.Outline.Close,
                     contentDescription = "Remove attachment",
@@ -456,7 +640,7 @@ private fun ToolStatusPill(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Cloud,
+                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Globe,
                 contentDescription = null,
                 modifier = Modifier.size(dimens.iconSm),
             )
@@ -481,3 +665,9 @@ private fun ToolStatusPill(
         }
     }
 }
+
+/**
+ * Dismiss/clear affordances inside a pill. Larger than the 32 dp they used to be, which was under
+ * the floor for a touch pointer sitting next to a text field people are already aiming at.
+ */
+private val REJECTION_DISMISS_SIZE = 44.dp

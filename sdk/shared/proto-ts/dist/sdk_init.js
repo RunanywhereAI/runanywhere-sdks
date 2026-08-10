@@ -5,110 +5,23 @@
 //   protoc               v7.35.1
 // source: sdk_init.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SdkInitResult = exports.SdkInitPhase2Request = exports.SdkInitPhase1Request = exports.SdkInitEnvironment = exports.SdkInitPhase = exports.protobufPackage = void 0;
-exports.sdkInitPhaseFromJSON = sdkInitPhaseFromJSON;
-exports.sdkInitPhaseToJSON = sdkInitPhaseToJSON;
-exports.sdkInitEnvironmentFromJSON = sdkInitEnvironmentFromJSON;
-exports.sdkInitEnvironmentToJSON = sdkInitEnvironmentToJSON;
+exports.SdkInitResult = exports.SdkInitPhase2Request = exports.SdkInitPhase1Request = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
+const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Phase identifiers — used by SdkInitResult.phase to indicate which phase the
- * result describes. Mirrors the SDK_INIT_* analytics events (started /
- * completed / failed) that exist in sdk_events.proto.
- * ---------------------------------------------------------------------------
- */
-var SdkInitPhase;
-(function (SdkInitPhase) {
-    SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_UNSPECIFIED"] = 0] = "SDK_INIT_PHASE_UNSPECIFIED";
-    /** SDK_INIT_PHASE_ONE - Synchronous core init (~1-5ms, no network) */
-    SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_ONE"] = 1] = "SDK_INIT_PHASE_ONE";
-    /** SDK_INIT_PHASE_TWO - Async services init (~100-500ms, network) */
-    SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_TWO"] = 2] = "SDK_INIT_PHASE_TWO";
-    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after offline init */
-    SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_RETRY_HTTP"] = 3] = "SDK_INIT_PHASE_RETRY_HTTP";
-    SdkInitPhase[SdkInitPhase["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(SdkInitPhase || (exports.SdkInitPhase = SdkInitPhase = {}));
-function sdkInitPhaseFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "SDK_INIT_PHASE_UNSPECIFIED":
-            return SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED;
-        case 1:
-        case "SDK_INIT_PHASE_ONE":
-            return SdkInitPhase.SDK_INIT_PHASE_ONE;
-        case 2:
-        case "SDK_INIT_PHASE_TWO":
-            return SdkInitPhase.SDK_INIT_PHASE_TWO;
-        case 3:
-        case "SDK_INIT_PHASE_RETRY_HTTP":
-            return SdkInitPhase.SDK_INIT_PHASE_RETRY_HTTP;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return SdkInitPhase.UNRECOGNIZED;
-    }
-}
-function sdkInitPhaseToJSON(object) {
-    switch (object) {
-        case SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED:
-            return "SDK_INIT_PHASE_UNSPECIFIED";
-        case SdkInitPhase.SDK_INIT_PHASE_ONE:
-            return "SDK_INIT_PHASE_ONE";
-        case SdkInitPhase.SDK_INIT_PHASE_TWO:
-            return "SDK_INIT_PHASE_TWO";
-        case SdkInitPhase.SDK_INIT_PHASE_RETRY_HTTP:
-            return "SDK_INIT_PHASE_RETRY_HTTP";
-        case SdkInitPhase.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Environment values — must match RAC_ENV_* in
- * sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
- * (development=0, production=2). Numeric values are part of the wire format;
- * do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
- * reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
- * ---------------------------------------------------------------------------
- */
-var SdkInitEnvironment;
-(function (SdkInitEnvironment) {
-    SdkInitEnvironment[SdkInitEnvironment["SDK_INIT_ENVIRONMENT_DEVELOPMENT"] = 0] = "SDK_INIT_ENVIRONMENT_DEVELOPMENT";
-    SdkInitEnvironment[SdkInitEnvironment["SDK_INIT_ENVIRONMENT_PRODUCTION"] = 2] = "SDK_INIT_ENVIRONMENT_PRODUCTION";
-    SdkInitEnvironment[SdkInitEnvironment["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(SdkInitEnvironment || (exports.SdkInitEnvironment = SdkInitEnvironment = {}));
-function sdkInitEnvironmentFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "SDK_INIT_ENVIRONMENT_DEVELOPMENT":
-            return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
-        case 2:
-        case "SDK_INIT_ENVIRONMENT_PRODUCTION":
-            return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return SdkInitEnvironment.UNRECOGNIZED;
-    }
-}
-function sdkInitEnvironmentToJSON(object) {
-    switch (object) {
-        case SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT:
-            return "SDK_INIT_ENVIRONMENT_DEVELOPMENT";
-        case SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION:
-            return "SDK_INIT_ENVIRONMENT_PRODUCTION";
-        case SdkInitEnvironment.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 function createBaseSdkInitPhase1Request() {
-    return { environment: 0, apiKey: "", baseUrl: "", deviceId: "", platform: "", sdkVersion: "" };
+    return {
+        environment: 0,
+        apiKey: "",
+        baseUrl: "",
+        deviceId: "",
+        platform: "",
+        sdkVersion: "",
+        requestTimeoutMs: undefined,
+        maxRetries: undefined,
+    };
 }
 exports.SdkInitPhase1Request = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -129,6 +42,12 @@ exports.SdkInitPhase1Request = {
         }
         if (message.sdkVersion !== "") {
             writer.uint32(50).string(message.sdkVersion);
+        }
+        if (message.requestTimeoutMs !== undefined) {
+            writer.uint32(56).int32(message.requestTimeoutMs);
+        }
+        if (message.maxRetries !== undefined) {
+            writer.uint32(64).int32(message.maxRetries);
         }
         return writer;
     },
@@ -181,6 +100,20 @@ exports.SdkInitPhase1Request = {
                     message.sdkVersion = reader.string();
                     continue;
                 }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.requestTimeoutMs = reader.int32();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.maxRetries = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -191,7 +124,7 @@ exports.SdkInitPhase1Request = {
     },
     fromJSON(object) {
         return {
-            environment: isSet(object.environment) ? sdkInitEnvironmentFromJSON(object.environment) : 0,
+            environment: isSet(object.environment) ? (0, model_types_1.sDKEnvironmentFromJSON)(object.environment) : 0,
             apiKey: isSet(object.apiKey)
                 ? globalThis.String(object.apiKey)
                 : isSet(object.api_key)
@@ -213,12 +146,22 @@ exports.SdkInitPhase1Request = {
                 : isSet(object.sdk_version)
                     ? globalThis.String(object.sdk_version)
                     : "",
+            requestTimeoutMs: isSet(object.requestTimeoutMs)
+                ? globalThis.Number(object.requestTimeoutMs)
+                : isSet(object.request_timeout_ms)
+                    ? globalThis.Number(object.request_timeout_ms)
+                    : undefined,
+            maxRetries: isSet(object.maxRetries)
+                ? globalThis.Number(object.maxRetries)
+                : isSet(object.max_retries)
+                    ? globalThis.Number(object.max_retries)
+                    : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.environment !== 0) {
-            obj.environment = sdkInitEnvironmentToJSON(message.environment);
+            obj.environment = (0, model_types_1.sDKEnvironmentToJSON)(message.environment);
         }
         if (message.apiKey !== "") {
             obj.apiKey = message.apiKey;
@@ -235,6 +178,12 @@ exports.SdkInitPhase1Request = {
         if (message.sdkVersion !== "") {
             obj.sdkVersion = message.sdkVersion;
         }
+        if (message.requestTimeoutMs !== undefined) {
+            obj.requestTimeoutMs = Math.round(message.requestTimeoutMs);
+        }
+        if (message.maxRetries !== undefined) {
+            obj.maxRetries = Math.round(message.maxRetries);
+        }
         return obj;
     },
     create(base) {
@@ -248,34 +197,18 @@ exports.SdkInitPhase1Request = {
         message.deviceId = object.deviceId ?? "";
         message.platform = object.platform ?? "";
         message.sdkVersion = object.sdkVersion ?? "";
+        message.requestTimeoutMs = object.requestTimeoutMs ?? undefined;
+        message.maxRetries = object.maxRetries ?? undefined;
         return message;
     },
 };
 function createBaseSdkInitPhase2Request() {
-    return {
-        buildToken: "",
-        forceRefreshAssignments: false,
-        flushTelemetry: false,
-        discoverDownloadedModels: false,
-        rescanLocalModels: false,
-    };
+    return { buildToken: "" };
 }
 exports.SdkInitPhase2Request = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.buildToken !== "") {
             writer.uint32(10).string(message.buildToken);
-        }
-        if (message.forceRefreshAssignments !== false) {
-            writer.uint32(16).bool(message.forceRefreshAssignments);
-        }
-        if (message.flushTelemetry !== false) {
-            writer.uint32(24).bool(message.flushTelemetry);
-        }
-        if (message.discoverDownloadedModels !== false) {
-            writer.uint32(32).bool(message.discoverDownloadedModels);
-        }
-        if (message.rescanLocalModels !== false) {
-            writer.uint32(40).bool(message.rescanLocalModels);
         }
         return writer;
     },
@@ -293,34 +226,6 @@ exports.SdkInitPhase2Request = {
                     message.buildToken = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.forceRefreshAssignments = reader.bool();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.flushTelemetry = reader.bool();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.discoverDownloadedModels = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.rescanLocalModels = reader.bool();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -336,44 +241,12 @@ exports.SdkInitPhase2Request = {
                 : isSet(object.build_token)
                     ? globalThis.String(object.build_token)
                     : "",
-            forceRefreshAssignments: isSet(object.forceRefreshAssignments)
-                ? globalThis.Boolean(object.forceRefreshAssignments)
-                : isSet(object.force_refresh_assignments)
-                    ? globalThis.Boolean(object.force_refresh_assignments)
-                    : false,
-            flushTelemetry: isSet(object.flushTelemetry)
-                ? globalThis.Boolean(object.flushTelemetry)
-                : isSet(object.flush_telemetry)
-                    ? globalThis.Boolean(object.flush_telemetry)
-                    : false,
-            discoverDownloadedModels: isSet(object.discoverDownloadedModels)
-                ? globalThis.Boolean(object.discoverDownloadedModels)
-                : isSet(object.discover_downloaded_models)
-                    ? globalThis.Boolean(object.discover_downloaded_models)
-                    : false,
-            rescanLocalModels: isSet(object.rescanLocalModels)
-                ? globalThis.Boolean(object.rescanLocalModels)
-                : isSet(object.rescan_local_models)
-                    ? globalThis.Boolean(object.rescan_local_models)
-                    : false,
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.buildToken !== "") {
             obj.buildToken = message.buildToken;
-        }
-        if (message.forceRefreshAssignments !== false) {
-            obj.forceRefreshAssignments = message.forceRefreshAssignments;
-        }
-        if (message.flushTelemetry !== false) {
-            obj.flushTelemetry = message.flushTelemetry;
-        }
-        if (message.discoverDownloadedModels !== false) {
-            obj.discoverDownloadedModels = message.discoverDownloadedModels;
-        }
-        if (message.rescanLocalModels !== false) {
-            obj.rescanLocalModels = message.rescanLocalModels;
         }
         return obj;
     },
@@ -383,62 +256,28 @@ exports.SdkInitPhase2Request = {
     fromPartial(object) {
         const message = createBaseSdkInitPhase2Request();
         message.buildToken = object.buildToken ?? "";
-        message.forceRefreshAssignments = object.forceRefreshAssignments ?? false;
-        message.flushTelemetry = object.flushTelemetry ?? false;
-        message.discoverDownloadedModels = object.discoverDownloadedModels ?? false;
-        message.rescanLocalModels = object.rescanLocalModels ?? false;
         return message;
     },
 };
 function createBaseSdkInitResult() {
-    return {
-        phase: 0,
-        success: false,
-        error: undefined,
-        httpConfigured: false,
-        deviceRegistered: false,
-        linkedModelsCount: 0,
-        discoveredOrphans: 0,
-        warning: "",
-        durationMs: 0,
-        hasCompletedHttpSetup: false,
-        httpApplicable: false,
-    };
+    return { error: undefined, linkedModelsCount: 0, warning: "", hasCompletedHttpSetup: false, httpApplicable: false };
 }
 exports.SdkInitResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.phase !== 0) {
-            writer.uint32(8).int32(message.phase);
-        }
-        if (message.success !== false) {
-            writer.uint32(16).bool(message.success);
-        }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
-        }
-        if (message.httpConfigured !== false) {
-            writer.uint32(32).bool(message.httpConfigured);
-        }
-        if (message.deviceRegistered !== false) {
-            writer.uint32(40).bool(message.deviceRegistered);
+            errors_1.SDKError.encode(message.error, writer.uint32(10).fork()).join();
         }
         if (message.linkedModelsCount !== 0) {
-            writer.uint32(48).uint32(message.linkedModelsCount);
-        }
-        if (message.discoveredOrphans !== 0) {
-            writer.uint32(56).uint32(message.discoveredOrphans);
+            writer.uint32(16).uint32(message.linkedModelsCount);
         }
         if (message.warning !== "") {
-            writer.uint32(66).string(message.warning);
-        }
-        if (message.durationMs !== 0) {
-            writer.uint32(72).int64(message.durationMs);
+            writer.uint32(26).string(message.warning);
         }
         if (message.hasCompletedHttpSetup !== false) {
-            writer.uint32(80).bool(message.hasCompletedHttpSetup);
+            writer.uint32(32).bool(message.hasCompletedHttpSetup);
         }
         if (message.httpApplicable !== false) {
-            writer.uint32(88).bool(message.httpApplicable);
+            writer.uint32(40).bool(message.httpApplicable);
         }
         return writer;
     },
@@ -450,77 +289,35 @@ exports.SdkInitResult = {
             const tag = reader.uint32();
             switch (tag >>> 3) {
                 case 1: {
-                    if (tag !== 8) {
+                    if (tag !== 10) {
                         break;
                     }
-                    message.phase = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
                 case 2: {
                     if (tag !== 16) {
                         break;
                     }
-                    message.success = reader.bool();
+                    message.linkedModelsCount = reader.uint32();
                     continue;
                 }
                 case 3: {
                     if (tag !== 26) {
                         break;
                     }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    message.warning = reader.string();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.httpConfigured = reader.bool();
+                    message.hasCompletedHttpSetup = reader.bool();
                     continue;
                 }
                 case 5: {
                     if (tag !== 40) {
-                        break;
-                    }
-                    message.deviceRegistered = reader.bool();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.linkedModelsCount = reader.uint32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.discoveredOrphans = reader.uint32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.warning = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.durationMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.hasCompletedHttpSetup = reader.bool();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
                         break;
                     }
                     message.httpApplicable = reader.bool();
@@ -536,35 +333,13 @@ exports.SdkInitResult = {
     },
     fromJSON(object) {
         return {
-            phase: isSet(object.phase) ? sdkInitPhaseFromJSON(object.phase) : 0,
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
-            httpConfigured: isSet(object.httpConfigured)
-                ? globalThis.Boolean(object.httpConfigured)
-                : isSet(object.http_configured)
-                    ? globalThis.Boolean(object.http_configured)
-                    : false,
-            deviceRegistered: isSet(object.deviceRegistered)
-                ? globalThis.Boolean(object.deviceRegistered)
-                : isSet(object.device_registered)
-                    ? globalThis.Boolean(object.device_registered)
-                    : false,
             linkedModelsCount: isSet(object.linkedModelsCount)
                 ? globalThis.Number(object.linkedModelsCount)
                 : isSet(object.linked_models_count)
                     ? globalThis.Number(object.linked_models_count)
                     : 0,
-            discoveredOrphans: isSet(object.discoveredOrphans)
-                ? globalThis.Number(object.discoveredOrphans)
-                : isSet(object.discovered_orphans)
-                    ? globalThis.Number(object.discovered_orphans)
-                    : 0,
             warning: isSet(object.warning) ? globalThis.String(object.warning) : "",
-            durationMs: isSet(object.durationMs)
-                ? globalThis.Number(object.durationMs)
-                : isSet(object.duration_ms)
-                    ? globalThis.Number(object.duration_ms)
-                    : 0,
             hasCompletedHttpSetup: isSet(object.hasCompletedHttpSetup)
                 ? globalThis.Boolean(object.hasCompletedHttpSetup)
                 : isSet(object.has_completed_http_setup)
@@ -579,32 +354,14 @@ exports.SdkInitResult = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.phase !== 0) {
-            obj.phase = sdkInitPhaseToJSON(message.phase);
-        }
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
-        }
-        if (message.httpConfigured !== false) {
-            obj.httpConfigured = message.httpConfigured;
-        }
-        if (message.deviceRegistered !== false) {
-            obj.deviceRegistered = message.deviceRegistered;
         }
         if (message.linkedModelsCount !== 0) {
             obj.linkedModelsCount = Math.round(message.linkedModelsCount);
         }
-        if (message.discoveredOrphans !== 0) {
-            obj.discoveredOrphans = Math.round(message.discoveredOrphans);
-        }
         if (message.warning !== "") {
             obj.warning = message.warning;
-        }
-        if (message.durationMs !== 0) {
-            obj.durationMs = Math.round(message.durationMs);
         }
         if (message.hasCompletedHttpSetup !== false) {
             obj.hasCompletedHttpSetup = message.hasCompletedHttpSetup;
@@ -619,32 +376,16 @@ exports.SdkInitResult = {
     },
     fromPartial(object) {
         const message = createBaseSdkInitResult();
-        message.phase = object.phase ?? 0;
-        message.success = object.success ?? false;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
-        message.httpConfigured = object.httpConfigured ?? false;
-        message.deviceRegistered = object.deviceRegistered ?? false;
         message.linkedModelsCount = object.linkedModelsCount ?? 0;
-        message.discoveredOrphans = object.discoveredOrphans ?? 0;
         message.warning = object.warning ?? "";
-        message.durationMs = object.durationMs ?? 0;
         message.hasCompletedHttpSetup = object.hasCompletedHttpSetup ?? false;
         message.httpApplicable = object.httpApplicable ?? false;
         return message;
     },
 };
-function longToNumber(int64) {
-    const num = globalThis.Number(int64.toString());
-    if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-    }
-    if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-    }
-    return num;
-}
 function isSet(value) {
     return value !== null && value !== undefined;
 }

@@ -19,7 +19,7 @@
  *   of the first-through-last subscriber.
  */
 
-import type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+import type { VoiceAgentTurnRequest } from '@runanywhere/proto-ts/voice_agent_service';
 import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
@@ -63,13 +63,11 @@ export class VoiceAgentStreamAdapter {
         : handleOrTransport;
   }
 
-  stream(req: VoiceAgentRequest = {
-    eventFilter: '',
+  stream(req: VoiceAgentTurnRequest = {
+    requestId: '',
     sessionId: '',
-    categories: [],
-    minSeverity: 0,
-    replayFromSeq: 0,
-    includeAudio: false,
+    audioData: new Uint8Array(0),
+    metadata: {},
   }): AsyncIterable<VoiceEvent> {
     return streamVoiceAgent(this.transportImpl, req);
   }

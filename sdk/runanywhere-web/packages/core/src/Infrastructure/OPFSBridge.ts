@@ -239,12 +239,25 @@ async function writeBytesToOPFSFile(
   // require a sync-access handle (i.e. no main-thread restrictions on
   // Chrome / Firefox).
   if (typeof (handle as { createWritable?: unknown }).createWritable === 'function') {
+    let writable: Awaited<ReturnType<FileSystemFileHandle['createWritable']>> | undefined;
     try {
-      const writable = await handle.createWritable({ keepExistingData: false });
+      writable = await handle.createWritable({ keepExistingData: false });
       await writable.write(toOwnedArrayBuffer(bytes));
       await writable.close();
       return;
     } catch (err) {
+      // An open writable stream holds an exclusive lock on the file, so it has
+      // to be released before the fallback below asks the same handle for a
+      // sync-access handle — otherwise the fallback fails too and the write is
+      // lost. abort() itself throws when close() already ran, hence the
+      // nested catch.
+      if (writable !== undefined) {
+        try {
+          await writable.abort();
+        } catch {
+          // Stream was already closed or errored; the lock is gone either way.
+        }
+      }
       logger.debug(
         `OPFS createWritable failed, falling back to sync-access handle: ${
           err instanceof Error ? err.message : String(err)
@@ -294,6 +307,31 @@ function supportsChunkedMemfsIO(fs: EmscriptenFS): boolean {
     && typeof fs.close === 'function'
     && typeof fs.read === 'function'
     && typeof fs.write === 'function';
+}
+
+/**
+ * True for the empty MEMFS placeholder an OPFS-direct download leaves behind
+ * (`PlatformAdapter.installMemfsSizeStub`): a zero-length backing store whose
+ * `usedBytes` is set to the artifact's real size so commons'
+ * `validate_downloaded_sizes` can see the right length.
+ *
+ * The distinction is load-bearing in BOTH directions. `fs.stat().size` reports
+ * the full length, so a stub is indistinguishable from a real file by size
+ * alone — and reading it yields zeros, not bytes. Flushing one to OPFS
+ * therefore overwrites the genuine downloaded artifact with a correctly-sized
+ * run of 0x00, which no loader can open (`gguf_init_from_reader: invalid magic
+ * characters`) while every size check still passes.
+ */
+function isEmptyMemfsSizeStub(fs: EmscriptenFS, path: string): boolean {
+  try {
+    const node = (fs as {
+      lookupPath?(p: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
+    }).lookupPath?.(path)?.node;
+    if (!node) return false;
+    return (node.contents?.length ?? 0) === 0 && (node.usedBytes ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function flushMemfsFileChunked(
@@ -537,9 +575,19 @@ export class OPFSBridge {
     return modules.filter((module) => getFS(module) !== null);
   }
 
-  /** FS-bearing modules whose private MEMFS does not contain the artifact. */
+  /**
+   * FS-bearing modules whose private MEMFS does not contain the artifact.
+   *
+   * A size stub counts as missing even though it stats non-zero: it holds no
+   * bytes (see `isEmptyMemfsSizeStub`), so a module carrying one cannot open
+   * the model any more than an empty module can.
+   */
   private static modulesMissingPath(modules: ModuleLike[], path: string): ModuleLike[] {
-    return modules.filter((module) => OPFSBridge.memfsFileSize(module, path) === 0);
+    return modules.filter((module) => {
+      if (OPFSBridge.memfsFileSize(module, path) === 0) return true;
+      const fs = getFS(module);
+      return fs !== null && isEmptyMemfsSizeStub(fs, path);
+    });
   }
 
   /**
@@ -773,7 +821,17 @@ export class OPFSBridge {
         } catch {
           // Missing from this module's MEMFS — restore below.
         }
-        if (currentSize !== file.size) {
+        // The same trap the single-file restores guard against, one level down:
+        // a child left behind by an OPFS-direct download stats at the artifact's
+        // full length while holding no bytes, so `currentSize === file.size` is
+        // true for a file that reads back as a run of zeros. Treat a stub as
+        // missing, and unlink it first so the write rebuilds the backing store
+        // rather than filling the empty placeholder in place.
+        const emptyStub = isEmptyMemfsSizeStub(fs, childPath);
+        if (emptyStub || currentSize !== file.size) {
+          if (emptyStub) {
+            try { fs.unlink?.(childPath); } catch { /* the write below rebuilds it */ }
+          }
           const bytes = new Uint8Array(await file.arrayBuffer());
           const parent = childPath.slice(0, childPath.lastIndexOf('/')) || '/';
           ensureMemfsDirectory(fs, parent);
@@ -848,6 +906,17 @@ export class OPFSBridge {
       );
       return 0;
     }
+    // Same situation as the ENOENT case above, one step further along: the
+    // bytes went straight to OPFS and MEMFS holds only the size placeholder.
+    // Flushing it would replace the real artifact with `size` zero bytes, so
+    // report "nothing to flush" and let the caller verify the OPFS copy.
+    if (isEmptyMemfsSizeStub(fs, path)) {
+      logger.debug(
+        `flushFromMemfs: '${path}' is an OPFS-direct size stub in MEMFS `
+        + `(${size} bytes, no contents); OPFS already holds the bytes`,
+      );
+      return 0;
+    }
     const dir = await resolveOPFSDirectory(dirSegments, true);
     if (!dir) {
       return 0;
@@ -910,12 +979,7 @@ export class OPFSBridge {
     if (fs.analyzePath?.(path)?.exists) {
       try {
         const size = fs.stat(path).size;
-        const node = (fs as {
-          lookupPath?(p: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
-        }).lookupPath?.(path)?.node;
-        const emptyStub = !!node
-          && (node.contents?.length ?? 0) === 0
-          && (node.usedBytes ?? 0) > 0;
+        const emptyStub = isEmptyMemfsSizeStub(fs, path);
         if (size > 0 && !emptyStub) {
           logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
           return 0;
@@ -1027,12 +1091,20 @@ export class OPFSBridge {
       if (fs.analyzePath?.(path)?.exists) {
         try {
           const size = fs.stat(path).size;
-          if (size > 0) {
+          // Same trap as the single-module restore above: an OPFS-direct
+          // download leaves a stub that stats at the artifact's full length
+          // while holding no bytes, so size alone cannot prove the module is
+          // hydrated. Skipping on it would hand the loader a run of zeros.
+          const emptyStub = isEmptyMemfsSizeStub(fs, path);
+          if (size > 0 && !emptyStub) {
             logger.debug(
               `restoreToMemfsAll: '${path}' already in MEMFS (${size} bytes); skipping module`,
             );
             if (size > maxWritten) maxWritten = size;
             continue;
+          }
+          if (emptyStub) {
+            try { fs.unlink?.(path); } catch { /* the write below rebuilds it */ }
           }
         } catch {
           // stat failed — fall through and rewrite from OPFS bytes.

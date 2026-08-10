@@ -24,7 +24,6 @@ export {
 } from './HybridDeviceState';
 export {
   HybridBackendKind,
-  HybridModelType,
   DEFAULT_CLOUD_PROVIDER,
   offlineSherpa,
   onlineCloud,
@@ -35,7 +34,6 @@ export {
   type HybridRoutedMetadata,
 } from './HybridModel';
 export {
-  HybridRank,
   HYBRID_STT_CONFIDENCE_THRESHOLD,
   Filters,
   Cascades,

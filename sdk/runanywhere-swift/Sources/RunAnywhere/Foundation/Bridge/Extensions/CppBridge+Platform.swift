@@ -131,7 +131,23 @@ extension CppBridge {
         /// Upper bound for a single platform create/generate/synthesize call.
         /// Speech and on-device generation finish well inside this; exceeding
         /// it indicates a stall, surfaced as a failure rather than a hang.
-        private static let callbackTimeout: DispatchTime = .now() + .seconds(120)
+        ///
+        /// This is a *duration*, converted to a deadline per call. It used to be
+        /// `static let callbackTimeout: DispatchTime = .now() + .seconds(120)` —
+        /// an absolute instant on the monotonic clock, frozen by Swift's
+        /// once-only static initialization at whichever moment the first
+        /// platform callback happened to run. Every later call then waited
+        /// against that same expired instant, so once the app had been up for
+        /// two minutes `semaphore.wait` returned `.timedOut` before the work
+        /// had a chance to start: Apple Foundation Models generation returned
+        /// `RAC_ERROR_TIMEOUT` with nothing to show for it, which the voice
+        /// agent surfaced as `rc=-155` and the chat surfaced as an empty
+        /// assistant turn.
+        private static let callbackTimeoutSeconds = 120
+
+        private static var callbackDeadline: DispatchTime {
+            .now() + .seconds(callbackTimeoutSeconds)
+        }
 
         /// Run `work` to completion off the caller's actor and return its
         /// handle, or `nil` on timeout / error.
@@ -156,7 +172,7 @@ extension CppBridge {
                 }
                 semaphore.signal()
             }
-            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+            guard semaphore.wait(timeout: callbackDeadline) == .success else {
                 onTimeout()
                 if let handle = box.markTimedOut() {
                     releaseAfterTimeout(handle)
@@ -179,7 +195,7 @@ extension CppBridge {
                 do { box.value = try await work() } catch { onError(error) }
                 semaphore.signal()
             }
-            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+            guard semaphore.wait(timeout: callbackDeadline) == .success else {
                 return RAC_ERROR_TIMEOUT
             }
             return box.value
@@ -206,7 +222,7 @@ extension CppBridge {
                 }
                 semaphore.signal()
             }
-            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+            guard semaphore.wait(timeout: callbackDeadline) == .success else {
                 return (RAC_ERROR_TIMEOUT, nil)
             }
             return (resultBox.value, valueBox.value)
@@ -244,10 +260,11 @@ extension CppBridge {
                 Platform.createFoundationModelsHandle()
             }
 
-            callbacks.generate = { handle, promptPtr, _, outResponsePtr, _ -> rac_result_t in
+            callbacks.generate = { handle, promptPtr, optionsPtr, outResponsePtr, _ -> rac_result_t in
                 Platform.foundationModelsGenerate(
                     handle: handle,
                     promptPtr: promptPtr,
+                    optionsPtr: optionsPtr,
                     outResponsePtr: outResponsePtr
                 )
             }
@@ -310,6 +327,7 @@ extension CppBridge {
         private static func foundationModelsGenerate(
             handle: rac_handle_t?,
             promptPtr: UnsafePointer<CChar>?,
+            optionsPtr: UnsafePointer<rac_llm_platform_options_t>?,
             outResponsePtr: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
         ) -> rac_result_t {
             guard let handle = handle,
@@ -326,12 +344,10 @@ extension CppBridge {
                 .fromOpaque(handle).takeUnretainedValue()
 
             let prompt = String(cString: promptPtr)
+            let options = makeLLMOptions(optionsPtr)
 
             let waitResult = Platform.syncWaitValue {
-                try await service.generate(
-                    prompt: prompt,
-                    options: RALLMGenerationOptions.defaults()
-                )
+                try await service.generate(prompt: prompt, options: options)
             } onError: { error in
                 Platform.logger.error("Foundation Models generate failed: \(error)")
             }
@@ -346,6 +362,27 @@ extension CppBridge {
             }
             outResponsePtr.pointee = responsePtr
             return RAC_SUCCESS
+        }
+
+        /// Fold the router's generation options onto the proto options the
+        /// Swift service takes.
+        ///
+        /// This used to pass `RALLMGenerationOptions.defaults()` and drop the
+        /// pointer on the floor, so the caller's temperature was ignored and —
+        /// worse — Apple Foundation Models ran with no output ceiling at all.
+        /// An unbounded reply is what turned "slow" into "never returns" for a
+        /// long prompt.
+        private static func makeLLMOptions(
+            _ optionsPtr: UnsafePointer<rac_llm_platform_options_t>?
+        ) -> RALLMGenerationOptions {
+            var options = RALLMGenerationOptions.defaults()
+            guard let optionsPtr else { return options }
+
+            let temperature = optionsPtr.pointee.temperature
+            if temperature >= 0 { options.temperature = temperature }
+            let maxTokens = optionsPtr.pointee.max_tokens
+            if maxTokens > 0 { options.maxOutputTokens = maxTokens }
+            return options
         }
 
         // MARK: - TTS Callbacks (System TTS)
@@ -447,7 +484,7 @@ extension CppBridge {
             var options = RATTSOptions.defaults()
             guard let optionsPtr else { return options }
 
-            options.speakingRate = optionsPtr.pointee.rate
+            options.speed = optionsPtr.pointee.rate
             options.pitch = optionsPtr.pointee.pitch
             options.volume = optionsPtr.pointee.volume
             if let voicePtr = optionsPtr.pointee.voice_id {

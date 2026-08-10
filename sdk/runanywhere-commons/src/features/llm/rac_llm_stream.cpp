@@ -34,6 +34,7 @@
 #include "features/common/rac_stream_registry_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 
 namespace {
 
@@ -66,12 +67,6 @@ std::mutex& g_mu() {
 std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_handle_t, CallbackSlot> m;
     return m;
-}
-
-int64_t now_us() {
-    return std::chrono::duration_cast<std::chrono::microseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
 }
 
 }  // namespace
@@ -165,75 +160,40 @@ int derive_event_kind(int kind, bool is_final, const char* error_message) {
 
 namespace rac::llm {
 
-/**
- * @brief Map a RAC_LLM_* token kind (internal / engine-specific) to the
- *        canonical proto `TokenKind` (voice_events.proto). Today
- *        llm_component.cpp emits only ANSWER tokens; THOUGHT / TOOL_CALL
- *        arms are reserved for the pending thinking-parser +
- *        tool-calling integration.
- */
-static runanywhere::v1::TokenKind to_proto_kind(int internal_kind) {
-    switch (internal_kind) {
-        case 1:
-            return runanywhere::v1::TOKEN_KIND_ANSWER;
-        case 2:
-            return runanywhere::v1::TOKEN_KIND_THOUGHT;
-        case 3:
-            return runanywhere::v1::TOKEN_KIND_TOOL_CALL;
-        default:
-            return runanywhere::v1::TOKEN_KIND_UNSPECIFIED;
-    }
-}
-
 bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
                                 std::vector<uint8_t>& out) {
     thread_local runanywhere::v1::LLMStreamEvent proto_event;
     proto_event.Clear();
 
     proto_event.set_seq(seq);
-    proto_event.set_timestamp_us(now_us());
+    // timestamp_us / is_final / kind / token_id / logprob / conversation_id /
+    // prompt_tokens_processed / completion_tokens_generated / elapsed_ms were
+    // all deleted from LLMStreamEvent (idl/llm_service.proto): event_kind is
+    // now the SOLE discriminator for what an event means, and the per-call
+    // envelope (LLMGenerateRequest.request_id) already carries correlation.
     if (p.token) {
         proto_event.set_token(p.token);
     }
-    proto_event.set_is_final(p.is_final);
-    proto_event.set_kind(to_proto_kind(p.kind));
-    if (p.token_id != 0) {
-        proto_event.set_token_id(p.token_id);
-    }
-    if (p.logprob != 0.0f) {
-        proto_event.set_logprob(p.logprob);
-    }
     if (p.finish_reason && p.finish_reason[0] != '\0') {
-        proto_event.set_finish_reason(p.finish_reason);
+        proto_event.set_finish_reason(
+            static_cast<runanywhere::v1::FinishReason>(finish_reason_from_string(p.finish_reason)));
     }
-    if (p.error_message && p.error_message[0] != '\0') {
-        proto_event.set_error_message(p.error_message);
+    if (p.error_code != 0 || (p.error_message && p.error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            proto_event.mutable_error(),
+            p.error_code != 0 ? static_cast<rac_result_t>(p.error_code) : RAC_ERROR_UNKNOWN);
+        if (p.error_message && p.error_message[0] != '\0') {
+            proto_event.mutable_error()->set_message(p.error_message);
+        }
     }
 
-    // Extended fields (BUG-STREAMING-001 unification). proto3 scalar
-    // defaults mean callers that don't set these still emit identical
-    // wire bytes to the pre-unification 9-field shape.
+    // event_kind (proto field 12) is now the sole discriminator for what this
+    // event means (COMPLETED/ERROR terminal vs. TOKEN/THINKING/TOOL_CALL
+    // delta), since is_final + kind were both deleted from the wire message.
     const int event_kind = derive_event_kind(p.kind, p.is_final, p.error_message);
-    if (event_kind != 0) {
-        proto_event.set_event_kind(static_cast<runanywhere::v1::LLMStreamEventKind>(event_kind));
-    }
+    proto_event.set_event_kind(static_cast<runanywhere::v1::LLMStreamEventKind>(event_kind));
     if (p.request_id && p.request_id[0] != '\0') {
         proto_event.set_request_id(p.request_id);
-    }
-    if (p.conversation_id && p.conversation_id[0] != '\0') {
-        proto_event.set_conversation_id(p.conversation_id);
-    }
-    if (p.prompt_tokens_processed > 0) {
-        proto_event.set_prompt_tokens_processed(p.prompt_tokens_processed);
-    }
-    if (p.completion_tokens_generated > 0) {
-        proto_event.set_completion_tokens_generated(p.completion_tokens_generated);
-    }
-    if (p.elapsed_ms > 0) {
-        proto_event.set_elapsed_ms(p.elapsed_ms);
-    }
-    if (p.error_code != 0) {
-        proto_event.set_error_code(p.error_code);
     }
     if (p.final_result != nullptr) {
         *proto_event.mutable_result() = *p.final_result;
@@ -273,33 +233,28 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
 // serializing this single message manually. Wire format reference:
 //   https://protobuf.dev/programming-guides/encoding/
 //
-// Field numbers and types must match `idl/llm_service.proto`:
-//   1: uint64 seq                         (varint)
-//   2: int64  timestamp_us                (varint)
-//   3: string token                       (length-delimited)
-//   4: bool   is_final                    (varint)
-//   5: enum   kind                        (varint)
-//   6: uint32 token_id                    (varint)
-//   7: float  logprob                     (fixed32)
-//   8: string finish_reason               (length-delimited)
-//   9: string error_message               (length-delimited)
-//  11: int32  error_code                  (varint)
-//  12: enum   event_kind                  (varint)
-//  13: string request_id                  (length-delimited)
-//  14: string conversation_id             (length-delimited)
-//  15: int32  prompt_tokens_processed     (varint)
-//  16: int32  completion_tokens_generated (varint)
-//  17: int64  elapsed_ms                  (varint)
-//  18: bytes  tool_call                   (length-delimited, pre-serialized
-//                                          runanywhere.v1.ToolCall bytes via
-//                                          LLMStreamEventParams::tool_call_bytes;
-//                                          omitted when tool_call_bytes == NULL
-//                                          or tool_call_bytes_size == 0)
+// Field numbers and types must match the CURRENT `idl/llm_service.proto`.
+// The API-realignment pass reserved timestamp_us(2)/is_final(4)/kind(5)/
+// token_id(6)/logprob(7)/conversation_id(14)/prompt_tokens_processed(15)/
+// completion_tokens_generated(16)/elapsed_ms(17) outright (event_kind is now
+// the sole discriminator), and widened finish_reason from a bare string (was
+// field 8) to the FinishReason enum on a fresh tag. Surviving fields this
+// encoder writes:
+//   1:  uint64 seq                         (varint)
+//   3:  string token                       (length-delimited)
+//  12:  enum   event_kind                  (varint)
+//  13:  string request_id                  (length-delimited)
+//  18:  bytes  tool_call                   (length-delimited, pre-serialized
+//                                           runanywhere.v1.ToolCall bytes via
+//                                           LLMStreamEventParams::tool_call_bytes;
+//                                           omitted when tool_call_bytes == NULL
+//                                           or tool_call_bytes_size == 0)
+//  21:  enum   finish_reason                (varint, FinishReason)
 //
-// Field 10 (nested LLMStreamFinalResult) is NOT emitted on the
-// hand-encoded path because no caller sets LLMStreamEventParams::final_result
-// without libprotobuf (proto_service, the only populator of `result`,
-// runs only with RAC_HAVE_PROTOBUF defined).
+// Field 22 (nested LLMGenerationResult, was LLMStreamFinalResult on the old
+// field 10) is NOT emitted on the hand-encoded path because no caller sets
+// LLMStreamEventParams::final_result without libprotobuf (proto_service, the
+// only populator of `result`, runs only with RAC_HAVE_PROTOBUF defined).
 //
 // Field 18 (nested runanywhere.v1.ToolCall) is emitted as opaque
 // length-delimited bytes on this path: the libprotobuf build sets
@@ -407,19 +362,6 @@ inline void wire_bytes_field(std::vector<uint8_t>& out, uint32_t field, const ui
     out.insert(out.end(), bytes, bytes + size);
 }
 
-int32_t to_proto_kind_int(int internal_kind) {
-    switch (internal_kind) {
-        case 1:
-            return 1;  // ANSWER
-        case 2:
-            return 2;  // THOUGHT
-        case 3:
-            return 3;  // TOOL_CALL
-        default:
-            return 0;  // UNSPECIFIED
-    }
-}
-
 }  // namespace
 
 namespace rac::llm {
@@ -430,31 +372,32 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     out.reserve(96);
 
     wire_uint64_field(out, /*field=*/1, seq);
-    wire_int64_field(out, /*field=*/2, now_us());
     wire_string_field(out, /*field=*/3, p.token);
-    wire_bool_field(out, /*field=*/4, p.is_final);
-    wire_enum_field(out, /*field=*/5, to_proto_kind_int(p.kind));
-    wire_uint32_field(out, /*field=*/6, p.token_id);
-    wire_float_field(out, /*field=*/7, p.logprob);
-    wire_string_field(out, /*field=*/8, p.finish_reason);
-    wire_string_field(out, /*field=*/9, p.error_message);
 
-    // Extended fields (BUG-STREAMING-001 fix). Nested `result` (field
-    // 10) is intentionally not encoded on the hand-rolled path — no
-    // caller sets `p.final_result` without libprotobuf.
-    wire_int32_field(out, /*field=*/11, p.error_code);
+    // event_kind (field 12) is now the sole discriminator for what this event
+    // means; is_final/kind/timestamp_us/token_id/logprob/conversation_id/
+    // prompt_tokens_processed/completion_tokens_generated/elapsed_ms were all
+    // reserved outright on the wire message.
     wire_enum_field(out, /*field=*/12, derive_event_kind(p.kind, p.is_final, p.error_message));
     wire_string_field(out, /*field=*/13, p.request_id);
-    wire_string_field(out, /*field=*/14, p.conversation_id);
-    wire_int32_field(out, /*field=*/15, p.prompt_tokens_processed);
-    wire_int32_field(out, /*field=*/16, p.completion_tokens_generated);
-    wire_int64_field(out, /*field=*/17, p.elapsed_ms);
+
+    // finish_reason (field 21) widened from string to the FinishReason enum.
+    wire_enum_field(out, /*field=*/21, finish_reason_from_string(p.finish_reason));
+
     // tool_call (field 18) — length-delimited nested message.
     // The libprotobuf path uses `p.tool_call`; the hand-encoded path here
     // accepts pre-serialized bytes via `p.tool_call_bytes` so a caller that
     // already has encoded ToolCall bytes can still emit the field. NULL or
     // zero size omits per proto3 defaults.
     wire_bytes_field(out, /*field=*/18, p.tool_call_bytes, p.tool_call_bytes_size);
+
+    // Nested `result` (field 22, was LLMStreamFinalResult on the old field
+    // 10) is intentionally not encoded on the hand-rolled path — no caller
+    // sets `p.final_result` without libprotobuf. `error` (field 19,
+    // SDKError) is likewise a nested message this hand-encoder does not
+    // build; error_code/error_message are dropped from the wire on this
+    // path as before (same limitation the previous 9-field encoder had for
+    // the nested SDKError shape).
 
     return true;
 }

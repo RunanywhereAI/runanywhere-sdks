@@ -33,6 +33,10 @@ import okio.ByteString
  * ---------------------------------------------------------------------------
  * Voice session error taxonomy.
  *
+ * The one error payload in this domain: everything that fails in the voice
+ * pipeline is reported as a VoiceSessionError, on the
+ * `VoiceEvent.session_error` arm or on `TurnLifecycleEvent.error`.
+ *
  * Mirrors Swift `VoiceSessionError`, Kotlin `VoiceSessionError`. The
  * `failed_component` field is populated only for component-failure mappings —
  * naming the sub-component that produced the underlying error ("stt", "llm",
@@ -68,6 +72,10 @@ public class VoiceSessionError(
     schemaIndex = 2,
   )
   public val failed_component: String? = null,
+  /**
+   * The raw ra_status_t (core/abi/ra_primitives.h), preserved for
+   * diagnostics alongside the canonical `code`.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -83,6 +91,15 @@ public class VoiceSessionError(
     schemaIndex = 4,
   )
   public val recoverable: Boolean = false,
+  /**
+   * The operation that failed, e.g. "transcribe", "generate", "synthesize".
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 5,
+  )
+  public val operation: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceSessionError, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -100,6 +117,7 @@ public class VoiceSessionError(
     if (failed_component != other.failed_component) return false
     if (c_abi_code != other.c_abi_code) return false
     if (recoverable != other.recoverable) return false
+    if (operation != other.operation) return false
     return true
   }
 
@@ -112,6 +130,7 @@ public class VoiceSessionError(
       result = result * 37 + (failed_component?.hashCode() ?: 0)
       result = result * 37 + c_abi_code.hashCode()
       result = result * 37 + recoverable.hashCode()
+      result = result * 37 + (operation?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -124,6 +143,7 @@ public class VoiceSessionError(
     if (failed_component != null) result += """failed_component=${sanitize(failed_component)}"""
     result += """c_abi_code=$c_abi_code"""
     result += """recoverable=$recoverable"""
+    if (operation != null) result += """operation=${sanitize(operation)}"""
     return result.joinToString(prefix = "VoiceSessionError{", separator = ", ", postfix = "}")
   }
 
@@ -133,8 +153,9 @@ public class VoiceSessionError(
     failed_component: String? = this.failed_component,
     c_abi_code: Int = this.c_abi_code,
     recoverable: Boolean = this.recoverable,
+    operation: String? = this.operation,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceSessionError = VoiceSessionError(code, message, failed_component, c_abi_code, recoverable, unknownFields)
+  ): VoiceSessionError = VoiceSessionError(code, message, failed_component, c_abi_code, recoverable, operation, unknownFields)
 
   public companion object {
     @JvmField
@@ -161,6 +182,7 @@ public class VoiceSessionError(
         if (value.recoverable != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.recoverable)
         }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.operation)
         return size
       }
 
@@ -178,11 +200,13 @@ public class VoiceSessionError(
         if (value.recoverable != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.recoverable)
         }
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.operation)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceSessionError) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.operation)
         if (value.recoverable != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.recoverable)
         }
@@ -204,6 +228,7 @@ public class VoiceSessionError(
         var failed_component: String? = null
         var c_abi_code: Int = 0
         var recoverable: Boolean = false
+        var operation: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -215,6 +240,7 @@ public class VoiceSessionError(
             3 -> failed_component = ProtoAdapter.STRING.decode(reader)
             4 -> c_abi_code = ProtoAdapter.INT32.decode(reader)
             5 -> recoverable = ProtoAdapter.BOOL.decode(reader)
+            6 -> operation = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -224,6 +250,7 @@ public class VoiceSessionError(
           failed_component = failed_component,
           c_abi_code = c_abi_code,
           recoverable = recoverable,
+          operation = operation,
           unknownFields = unknownFields
         )
       }

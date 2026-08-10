@@ -43,26 +43,32 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
                    "keyless development)")
         ->envname("RUNANYWHERE_API_KEY");
 
-    commands::register_version(app, options);
-    commands::register_info(app, options);
-    commands::register_backends(app, options);
-    commands::register_list(app, options);
-    commands::register_lora(app, options);
-    commands::register_pull(app, options);
-    commands::register_rm(app, options);
-    commands::register_show(app, options);
-    commands::register_run(app, options);
-    commands::register_image(app, options);
-    commands::register_segment(app, options);
-    commands::register_embed(app, options);
-    commands::register_diarize(app, options);
+    // Namespaces first (the spec grammar), then the terminal aliases, then the
+    // infrastructure commands — that is the order `--help` lists them in.
+    commands::register_llm(app, options);
+    commands::register_vlm(app, options);
+    commands::register_tool(app, options);  // must follow register_llm (extends the `llm` group)
     commands::register_stt(app, options);
     commands::register_tts(app, options);
     commands::register_vad(app, options);
+    commands::register_embed(app, options);
+    commands::register_rerank(app, options);
+    commands::register_image(app, options);
+    commands::register_diarize(app, options);
+    commands::register_segment(app, options);
     commands::register_voice(app, options);
     commands::register_rag(app, options);
-    commands::register_bench(app, options);
+    commands::register_models(app, options);
+    commands::register_lora(app, options);
+
+    commands::register_llm_aliases(app, options);
+    commands::register_models_aliases(app, options);
+
     commands::register_serve(app, options);
+    commands::register_bench(app, options);
+    commands::register_backends(app, options);
+    commands::register_info(app, options);
+    commands::register_version(app, options);
     commands::register_auth(app, options);
     commands::register_telemetry(app, options);
 }
@@ -70,7 +76,8 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
 int run(int argc, char** argv) {
     GlobalOptions options;
 
-    CLI::App app{"RunAnywhere on-device AI CLI — run, manage and serve local models"};
+    CLI::App app{"RunAnywhere on-device AI CLI — llm, vlm, stt, tts, vad, embed, rerank, "
+                 "image, rag, voice and the models that back them"};
     configure_app(app, options);
 
     int exit_code = 0;

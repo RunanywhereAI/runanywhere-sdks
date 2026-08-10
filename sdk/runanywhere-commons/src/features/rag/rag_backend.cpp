@@ -33,6 +33,14 @@ static const std::string kSystemPrompt =
 namespace runanywhere::rag {
 namespace {
 
+// Record a specific, user-facing ingest failure. Only the first reason is kept:
+// the earliest failure is the cause, and everything after it is a consequence.
+void set_error(std::string* out_error, std::string message) {
+    if (out_error && out_error->empty()) {
+        *out_error = std::move(message);
+    }
+}
+
 std::string first_string_metadata(const nlohmann::json& metadata,
                                   std::initializer_list<const char*> keys) {
     for (const char* key : keys) {
@@ -126,15 +134,23 @@ RAGBackend::~RAGBackend() {
 // Embedding helper — calls through embeddings service vtable
 // =============================================================================
 
-bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
+bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension,
+                                                   std::string* out_error) {
     if (actual_dimension == 0) {
         LOGE("Embedding provider returned an empty vector; cannot resolve RAG dimension");
+        set_error(out_error,
+                  "The embedding model produced no vector, so this document could not be indexed. "
+                  "Reload the embedding model and try again.");
         return false;
     }
 
     if (config_.embedding_dimension > 0 && config_.embedding_dimension != actual_dimension) {
         LOGE("Embedding dimension mismatch: model produced %zu, pipeline expects %zu",
              actual_dimension, config_.embedding_dimension);
+        set_error(out_error, "This embedding model produces " + std::to_string(actual_dimension) +
+                                 "-dimension vectors but the index expects " +
+                                 std::to_string(config_.embedding_dimension) +
+                                 ". Start a new document session with one embedding model.");
         return false;
     }
 
@@ -149,6 +165,8 @@ bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
         } catch (const std::exception& e) {
             LOGE("Failed to initialize vector store for embedding dimension %zu: %s",
                  actual_dimension, e.what());
+            set_error(out_error,
+                      std::string("The document index could not be created: ") + e.what());
             return false;
         }
     }
@@ -156,6 +174,7 @@ bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
     if (!vector_store_) {
         LOGE("RAG vector store is unavailable after resolving embedding dimension %zu",
              actual_dimension);
+        set_error(out_error, "The document index is unavailable, so nothing could be stored.");
         return false;
     }
     return true;
@@ -215,7 +234,8 @@ RAGBackend::embed_texts_batch(const std::vector<std::string>& texts) const {
 // Document management
 // =============================================================================
 
-bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
+bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata,
+                              std::string* out_error) {
     // Content-addressed dedup: skip re-chunk + re-embed when this exact input
     // (normalized) was already ingested into this index.
     const std::string content_hash = sha256_hex(normalize_for_hash(text));
@@ -224,6 +244,8 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         std::lock_guard<std::mutex> lock(mutex_);
         if (!initialized_) {
             LOGE("Pipeline not initialized");
+            set_error(out_error,
+                      "The document pipeline has no embedding model, so nothing could be indexed.");
             return false;
         }
         if (ingested_content_hashes_.count(content_hash)) {
@@ -260,6 +282,9 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     if (embeddings.size() != chunks.size()) {
         LOGE("Embedding count mismatch: got %zu, expected %zu", embeddings.size(), chunks.size());
+        set_error(out_error, "The embedding model returned " + std::to_string(embeddings.size()) +
+                                 " vectors for " + std::to_string(chunks.size()) +
+                                 " passages, so this document could not be indexed.");
         std::lock_guard<std::mutex> lock(mutex_);
         ingested_content_hashes_.erase(content_hash);
         return false;
@@ -272,7 +297,7 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
     // explicit dimensions and subsequent outputs are validated here before
     // any chunk reaches the index.
     const size_t actual_dimension = embeddings.empty() ? 0 : embeddings.front().size();
-    if (!ensure_embedding_dimension_locked(actual_dimension)) {
+    if (!ensure_embedding_dimension_locked(actual_dimension, out_error)) {
         ingested_content_hashes_.erase(content_hash);
         return false;
     }
@@ -305,6 +330,13 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
                 "Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
                 "document ingest",
                 i, embeddings[i].size(), embedding_dimension);
+            set_error(out_error, embeddings[i].empty()
+                                     ? "The embedding model produced no vector for passage " +
+                                           std::to_string(i + 1) + " of " +
+                                           std::to_string(chunks.size()) +
+                                           ", so this document could not be indexed."
+                                     : "The embedding model changed vector size mid-document, so "
+                                       "this document could not be indexed.");
             ingested_content_hashes_.erase(content_hash);
             return false;
         }
@@ -320,6 +352,7 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     if (!doc_chunks.empty() && !vector_store_->add_chunks_batch(doc_chunks)) {
         LOGE("Failed to add chunks batch to vector store");
+        set_error(out_error, "The document index rejected this document's passages.");
         ingested_content_hashes_.erase(content_hash);
         return false;
     }
@@ -614,6 +647,94 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         sources.push_back(source);
     }
     out_metadata["sources"] = sources;
+    return RAC_SUCCESS;
+}
+
+rac_result_t RAGBackend::retrieve(const std::string& question,
+                                  std::vector<SearchResult>& out_sources, double* out_retrieval_ms,
+                                  const QueryOverrides* overrides) {
+    out_sources.clear();
+    if (out_retrieval_ms)
+        *out_retrieval_ms = 0.0;
+
+    auto request_cancel = std::make_shared<std::atomic<bool>>(false);
+    {
+        std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+        if (active_query_cancel_) {
+            LOGE("A RAG query is already active for this session");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        active_query_cancel_ = request_cancel;
+    }
+    std::unique_ptr<void, std::function<void(void*)>> request_scope(
+        reinterpret_cast<void*>(1), [this, request_cancel](void*) {
+            std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+            if (active_query_cancel_.get() == request_cancel.get()) {
+                active_query_cancel_.reset();
+            }
+        });
+
+    RAGGraphInputs g_in;
+    bool wants_llm_features = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!initialized_ || !embeddings_service_) {
+            LOGE("Pipeline not initialized or embeddings service not available");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        if (!vector_store_ || config_.embedding_dimension == 0) {
+            LOGE("RAG search requires at least one successfully embedded document");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        g_in.llm_service = llm_service_;
+        g_in.embeddings_service = embeddings_service_;
+        g_in.vector_store = vector_store_.get();
+        g_in.bm25_index = bm25_index_.get();
+        g_in.embedding_dimension = config_.embedding_dimension;
+        g_in.top_k = config_.top_k;
+        g_in.similarity_threshold = config_.similarity_threshold;
+        g_in.max_context_tokens = config_.max_context_tokens;
+        g_in.prompt_template = config_.prompt_template;
+        g_in.rerank = config_.rerank;
+        wants_llm_features = config_.rerank;
+    }
+
+    if (overrides != nullptr) {
+        if (overrides->retrieval_top_k > 0) {
+            g_in.top_k = static_cast<size_t>(overrides->retrieval_top_k);
+        }
+        if (overrides->has_similarity_threshold) {
+            g_in.similarity_threshold = overrides->similarity_threshold;
+        }
+        g_in.enable_multi_query = overrides->enable_multi_query;
+        if (overrides->multi_query_count > 0) {
+            g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
+        }
+        g_in.scope_prefix = overrides->scope_prefix;
+        wants_llm_features = wants_llm_features || overrides->enable_multi_query;
+    }
+
+    if (wants_llm_features && !g_in.llm_service) {
+        LOGE("RAG search multi-query/rerank requires a session LLM");
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    g_in.question = question;
+    g_in.llm_options = RAC_LLM_OPTIONS_DEFAULT;
+    g_in.system_prompt = kSystemPrompt;
+    g_in.cancel_requested = request_cancel.get();
+
+    auto t_start = std::chrono::high_resolution_clock::now();
+    RAGGraphResult g_out;
+    rac_result_t status = run_rag_retrieve(g_in, g_out);
+    auto t_end = std::chrono::high_resolution_clock::now();
+    if (out_retrieval_ms) {
+        *out_retrieval_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    }
+    if (status != RAC_SUCCESS)
+        return status;
+
+    out_sources = std::move(g_out.sources);
     return RAC_SUCCESS;
 }
 

@@ -89,21 +89,21 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
 // helpers: selecting a modality sets its `*_model_path` so `config_from_proto`
 // loads it, and `initialize_proto` runs the full VAD+STT+LLM+TTS init sequence.
 void init_mock_voice_agent(rac_voice_agent_handle_t agent, bool stt, bool llm, bool tts) {
+    // stt_model_name / llm_model_name / tts_voice_name were deleted from
+    // VoiceAgentComposeConfig: id (resolved via the model registry) and path
+    // (the escape hatch for a self-staged artifact) are the sole selectors now.
     runanywhere::v1::VoiceAgentComposeConfig cfg;
     if (stt) {
         cfg.set_stt_model_path("mock-stt");
         cfg.set_stt_model_id("mock-stt");
-        cfg.set_stt_model_name("Mock STT");
     }
     if (llm) {
         cfg.set_llm_model_path("mock-llm");
         cfg.set_llm_model_id("mock-llm");
-        cfg.set_llm_model_name("Mock LLM");
     }
     if (tts) {
         cfg.set_tts_voice_path("mock-tts");
         cfg.set_tts_voice_id("mock-voice");
-        cfg.set_tts_voice_name("Mock Voice");
     }
     std::vector<uint8_t> bytes;
     serialize(cfg, &bytes);
@@ -113,122 +113,23 @@ void init_mock_voice_agent(rac_voice_agent_handle_t agent, bool stt, bool llm, b
     rac_proto_buffer_free(&out);
 }
 
-int test_stt_generated_service_contract() {
-    const google::protobuf::FileDescriptor* file =
-        runanywhere::v1::STTTranscriptionRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("STT");
-    CHECK(service != nullptr, "generated STT service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated STT service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* transcribe = service->FindMethodByName("Transcribe");
-    CHECK(transcribe != nullptr, "STT Transcribe RPC exists");
-    if (transcribe) {
-        CHECK(transcribe->input_type()->full_name() == "runanywhere.v1.STTTranscriptionRequest",
-              "Transcribe accepts STTTranscriptionRequest");
-        CHECK(transcribe->output_type()->full_name() == "runanywhere.v1.STTOutput",
-              "Transcribe returns STTOutput");
-        CHECK(!transcribe->client_streaming() && !transcribe->server_streaming(),
-              "Transcribe is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "STT Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.STTTranscriptionRequest",
-              "Stream accepts STTTranscriptionRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.STTStreamEvent",
-              "Stream returns STTStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
-
-    return 0;
-}
-
-int test_tts_generated_service_contract() {
+int test_tts_stream_event_shape() {
     const google::protobuf::FileDescriptor* file =
         runanywhere::v1::TTSSynthesisRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("TTS");
-    CHECK(service != nullptr, "generated TTS service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated TTS service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* synthesize = service->FindMethodByName("Synthesize");
-    CHECK(synthesize != nullptr, "TTS Synthesize RPC exists");
-    if (synthesize) {
-        CHECK(synthesize->input_type()->full_name() == "runanywhere.v1.TTSSynthesisRequest",
-              "Synthesize accepts TTSSynthesisRequest");
-        CHECK(synthesize->output_type()->full_name() == "runanywhere.v1.TTSOutput",
-              "Synthesize returns TTSOutput");
-        CHECK(!synthesize->client_streaming() && !synthesize->server_streaming(),
-              "Synthesize is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "TTS Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.TTSSynthesisRequest",
-              "Stream accepts TTSSynthesisRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.TTSStreamEvent",
-              "Stream returns TTSStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
 
     const google::protobuf::EnumDescriptor* kind = file->FindEnumTypeByName("TTSStreamEventKind");
     CHECK(kind != nullptr, "TTS stream event kind enum exists");
     if (kind) {
         CHECK(kind->FindValueByName("TTS_STREAM_EVENT_KIND_AUDIO_CHUNK") != nullptr,
               "TTS stream supports audio chunk events");
-        CHECK(kind->FindValueByName("TTS_STREAM_EVENT_KIND_PROGRESS") != nullptr,
-              "TTS stream supports progress events");
+        // PROGRESS was reserved (never emitted by any backend); dropped from
+        // the enum in the API-simplification pass.
     }
 
     const google::protobuf::Descriptor* event = runanywhere::v1::TTSStreamEvent::descriptor();
     CHECK(event->FindFieldByName("output") != nullptr,
           "TTS stream event carries audio output chunks");
-    CHECK(event->FindFieldByName("progress") != nullptr, "TTS stream event carries progress");
-
-    return 0;
-}
-
-int test_vad_generated_service_contract() {
-    const google::protobuf::FileDescriptor* file =
-        runanywhere::v1::VADProcessRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("VAD");
-    CHECK(service != nullptr, "generated VAD service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated VAD service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* process_frame =
-        service->FindMethodByName("ProcessFrame");
-    CHECK(process_frame != nullptr, "VAD ProcessFrame RPC exists");
-    if (process_frame) {
-        CHECK(process_frame->input_type()->full_name() == "runanywhere.v1.VADProcessRequest",
-              "ProcessFrame accepts VADProcessRequest");
-        CHECK(process_frame->output_type()->full_name() == "runanywhere.v1.VADResult",
-              "ProcessFrame returns VADResult");
-        CHECK(!process_frame->client_streaming() && !process_frame->server_streaming(),
-              "ProcessFrame is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "VAD Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.VADProcessRequest",
-              "Stream accepts VADProcessRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.VADStreamEvent",
-              "Stream returns VADStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
+    // `progress` was reserved (dead field, never populated) and is gone.
 
     return 0;
 }
@@ -571,7 +472,9 @@ bool poll_sdk_until_failure() {
         runanywhere::v1::SDKEvent decoded;
         const bool ok = decoded.ParseFromArray(event.data, static_cast<int>(event.size));
         rac_proto_buffer_free(&event);
-        if (ok && decoded.has_failure())
+        // FailureEvent was deleted: a failure is any event whose envelope
+        // `error` is set, not a separate oneof arm.
+        if (ok && decoded.has_error())
             return true;
     }
     return false;
@@ -586,18 +489,17 @@ int test_parse_failure_and_missing_component() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_stt_component_transcribe_proto(stt, audio, sizeof(audio), bad, sizeof(bad), &out);
+    rac_result_t rc = rac_stt_component_transcribe_proto(stt, bad, sizeof(bad), &out);
     CHECK(rc == RAC_ERROR_DECODING_ERROR, "STT proto parse failure returns decoding error");
     CHECK(out.status == RAC_ERROR_DECODING_ERROR, "parse failure marks output error");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::STTOptions options;
+    runanywhere::v1::STTTranscriptionRequest request;
+    request.mutable_audio()->set_audio_data(audio, sizeof(audio));
     std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "empty STTOptions serializes");
+    CHECK(serialize(request, &bytes), "STTTranscriptionRequest serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_stt_component_transcribe_proto(
-        stt, audio, sizeof(audio), bytes.empty() ? nullptr : bytes.data(), bytes.size(), &out);
+    rc = rac_stt_component_transcribe_proto(stt, bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_ERROR_NOT_INITIALIZED, "missing STT lifecycle component fails");
     CHECK(out.status == RAC_ERROR_NOT_INITIALIZED, "missing STT marks output error");
     CHECK(poll_sdk_until_failure(), "missing STT publishes failure SDKEvent");
@@ -613,15 +515,15 @@ int test_mocked_stt() {
           "mock STT model loads");
 
     const int16_t audio[] = {0, 1, 2, 3};
-    runanywhere::v1::STTOptions options;
-    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    runanywhere::v1::STTTranscriptionRequest request;
+    request.mutable_options()->set_language("en");
+    request.mutable_audio()->set_audio_data(audio, sizeof(audio));
     std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "STTOptions serializes");
+    CHECK(serialize(request, &bytes), "STTTranscriptionRequest serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_stt_component_transcribe_proto(stt, audio, sizeof(audio), bytes.data(),
-                                                         bytes.size(), &out);
+    rac_result_t rc = rac_stt_component_transcribe_proto(stt, bytes.data(), bytes.size(), &out);
     runanywhere::v1::STTOutput result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "STTOutput parses");
     CHECK(result.text() == "hello mock", "STTOutput text matches mock");
@@ -648,8 +550,8 @@ int test_mocked_stt() {
                                  event.has_partial() && event.partial().is_final());
         }
     };
-    rc = rac_stt_component_transcribe_stream_proto(stt, audio, sizeof(audio), bytes.data(),
-                                                   bytes.size(), stream_cb, &events);
+    rc = rac_stt_component_transcribe_stream_proto(stt, bytes.data(), bytes.size(), stream_cb,
+                                                   &events);
     CHECK(rc == RAC_SUCCESS && events.count == 3 && events.saw_started && events.saw_final &&
               events.valid_envelope,
           "STT stream emits generated STTStreamEvent envelopes");
@@ -686,7 +588,8 @@ int test_mocked_tts() {
     runanywhere::v1::TTSOutput result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "TTSOutput parses");
     CHECK(result.duration_ms() == 1234, "TTS duration remains milliseconds");
-    CHECK(result.metadata().audio_duration_ms() == 1234, "TTS metadata duration is ms");
+    // TTSSynthesisMetadata.audio_duration_ms was reserved: it always equalled
+    // the parent TTSOutput.duration_ms, already checked above.
     rac_proto_buffer_free(&out);
 
     int chunks = 0;
@@ -722,15 +625,16 @@ int test_mocked_vad_and_activity() {
     CHECK(rac_vad_component_start(vad) == RAC_SUCCESS && g_last_mock_vad->active,
           "VAD start routes to the model backend");
 
-    runanywhere::v1::VADOptions options;
-    options.set_threshold(0.1f);
-    std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "VADOptions serializes");
     const float speech[] = {0.3f, 0.4f, 0.5f, 0.6f};
+    runanywhere::v1::VADProcessRequest vad_request;
+    vad_request.mutable_options()->set_activation_threshold(0.1f);
+    vad_request.mutable_audio()->set_audio_data(speech, sizeof(speech));
+    vad_request.mutable_audio()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(vad_request, &bytes), "VADProcessRequest serializes");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_vad_component_process_proto(vad, speech, 4, bytes.data(), bytes.size(), &out);
+    rac_result_t rc = rac_vad_component_process_proto(vad, bytes.data(), bytes.size(), &out);
     runanywhere::v1::VADResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VADResult parses");
     CHECK(result.is_speech(), "mock VAD detects speech");
@@ -771,7 +675,7 @@ int test_mocked_vad_and_activity() {
     runanywhere::v1::VADConfiguration config;
     config.set_sample_rate(16000);
     config.set_frame_length_ms(100);
-    config.set_threshold(0.01f);
+    config.set_activation_threshold(0.01f);
     std::vector<uint8_t> config_bytes;
     CHECK(serialize(config, &config_bytes), "VADConfiguration serializes");
     CHECK(rac_vad_component_configure_proto(energy_vad, config_bytes.data(), config_bytes.size()) ==
@@ -904,16 +808,18 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
           "D-7 voice agent initializes");
 
+    // VoiceAgentTurnRequest is now just {request_id, session_id, audio_data,
+    // language, metadata} -- sample_rate_hz/channels/encoding and
+    // session_config were dropped. audio_data must be PCM S16LE mono 16kHz
+    // (commons rejects any other encoding but does not check/resample rate
+    // or channel count); `language` is the per-turn override, replacing the
+    // deleted VoiceSessionConfig.language_code.
     runanywhere::v1::VoiceAgentTurnRequest request;
     request.set_request_id("req-d7-1");
     request.set_session_id("session-d7-1");
-    request.set_sample_rate_hz(16000);
-    request.set_channels(1);
-    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    auto* session_config = request.mutable_session_config();
-    session_config->set_language_code("en-US");
+    request.set_language("en-US");
     (*request.mutable_metadata())["source"] = "unit-test";
 
     std::vector<uint8_t> request_bytes;
@@ -1025,9 +931,6 @@ int test_voice_agent_d7_queued_cancel_and_next_request_isolation() {
     cancelled_request.set_session_id("session-cancel-queued");
     const int16_t audio[] = {0, 1, 2, 3};
     cancelled_request.set_audio_data(audio, sizeof(audio));
-    cancelled_request.set_sample_rate_hz(16000);
-    cancelled_request.set_channels(1);
-    cancelled_request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     std::vector<uint8_t> cancelled_bytes;
     CHECK(serialize(cancelled_request, &cancelled_bytes), "D-7 queued-cancel request serializes");
 
@@ -1092,9 +995,6 @@ int test_voice_agent_d7_active_llm_cancel() {
     request.set_session_id("session-cancel-active-llm");
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    request.set_sample_rate_hz(16000);
-    request.set_channels(1);
-    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     std::vector<uint8_t> request_bytes;
     CHECK(serialize(request, &request_bytes), "D-7 active-cancel request serializes");
 
@@ -1149,12 +1049,13 @@ int test_voice_agent_d7_transcribe_proto() {
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 transcribe agent creates");
     init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/false, /*tts=*/false);
 
+    // VoiceAgentTranscribeProtoRequest is {audio_data, session_id, language};
+    // sample_rate/channels were dropped and language_hint renamed to
+    // `language` (BCP-47, empty = auto-detect).
     runanywhere::v1::VoiceAgentTranscribeProtoRequest request;
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    request.set_sample_rate(16000);
-    request.set_channels(1);
-    request.set_language_hint("en-US");
+    request.set_language("en-US");
 
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "D-7 VoiceAgentTranscribeProtoRequest serializes");
@@ -1219,9 +1120,7 @@ int main() {
         std::fprintf(stdout, "  skip: speech proto ABI tests (no protobuf)\n");
         return 0;
 #else
-        test_stt_generated_service_contract();
-        test_tts_generated_service_contract();
-        test_vad_generated_service_contract();
+        test_tts_stream_event_shape();
         install_mock_plugin();
         test_stt_service_serializes_shared_engine();
         test_parse_failure_and_missing_component();

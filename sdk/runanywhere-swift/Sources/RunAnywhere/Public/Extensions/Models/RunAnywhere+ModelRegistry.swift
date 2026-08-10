@@ -2,53 +2,50 @@
 //  RunAnywhere+ModelRegistry.swift
 //  RunAnywhere SDK
 //
-//  Public proto-backed model registry API.
+//  Proto-backed model registry plumbing plus the deprecated flat verbs it used
+//  to be reached through. The v3 surface reaches this through
+//  `RunAnywhere.models`.
 //
 
+extension RunAnywhere {
 
-public extension RunAnywhere {
-    static func listModels(_ request: RAModelListRequest = RAModelListRequest()) async -> RAModelListResult {
-        guard isInitialized else {
+    // MARK: - Internal plumbing
+
+    internal static func performList(_ request: RAModelListRequest = RAModelListRequest()) async -> RAModelListResult {
+        guard isReady else {
             var result = RAModelListResult()
-            result.success = false
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         try? await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.list(request)
     }
 
-    static func queryModels(_ query: RAModelQuery) async -> RAModelListResult {
-        var request = RAModelListRequest()
-        request.query = query
-        return await listModels(request)
-    }
-
-    static func getModel(_ request: RAModelGetRequest) async -> RAModelGetResult {
-        guard isInitialized else {
+    internal static func performGet(_ request: RAModelGetRequest) async -> RAModelGetResult {
+        guard isReady else {
             var result = RAModelGetResult()
             result.found = false
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         try? await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.get(request)
     }
 
-    static func downloadedModels() async -> RAModelListResult {
-        var query = RAModelQuery()
-        query.downloadedOnly = true
-        return await queryModels(query)
-    }
-
-    /// Rescan managed model directories and reconcile downloaded state in the registry.
-    /// Mirrors Flutter `RunAnywhere.refreshModelRegistry()`.
-    static func refreshModelRegistry(
+    internal static func performRegistryRefresh(
         rescanLocal: Bool = true,
         includeRemoteCatalog: Bool = false,
         pruneOrphans: Bool = false
     ) async {
-        guard isInitialized else { return }
+        guard isReady else { return }
         try? await ensureServicesReady()
 
         if rescanLocal {
@@ -61,5 +58,47 @@ public extension RunAnywhere {
         request.pruneOrphans = pruneOrphans
         request.includeDownloadedState = true
         _ = await CppBridge.ModelRegistry.shared.refresh(request)
+    }
+
+    // MARK: - Deprecated flat verbs
+
+    @available(*, deprecated, renamed: "models.list(filter:)")
+    public static func listModels(_ request: RAModelListRequest = RAModelListRequest()) async -> RAModelListResult {
+        await performList(request)
+    }
+
+    @available(*, deprecated, renamed: "models.list(filter:)")
+    public static func queryModels(_ query: RAModelQuery) async -> RAModelListResult {
+        var request = RAModelListRequest()
+        request.query = query
+        return await performList(request)
+    }
+
+    @available(*, deprecated, renamed: "models.get(id:)")
+    public static func getModel(_ request: RAModelGetRequest) async -> RAModelGetResult {
+        await performGet(request)
+    }
+
+    @available(*, deprecated, renamed: "models.list(filter:)")
+    public static func downloadedModels() async -> RAModelListResult {
+        var query = RAModelQuery()
+        query.downloadedOnly = true
+        var request = RAModelListRequest()
+        request.query = query
+        return await performList(request)
+    }
+
+    /// Rescan managed model directories and reconcile downloaded state.
+    @available(*, deprecated, renamed: "models.refresh(rescanLocal:includeRemoteCatalog:pruneOrphans:)")
+    public static func refreshModelRegistry(
+        rescanLocal: Bool = true,
+        includeRemoteCatalog: Bool = false,
+        pruneOrphans: Bool = false
+    ) async {
+        await performRegistryRefresh(
+            rescanLocal: rescanLocal,
+            includeRemoteCatalog: includeRemoteCatalog,
+            pruneOrphans: pruneOrphans
+        )
     }
 }

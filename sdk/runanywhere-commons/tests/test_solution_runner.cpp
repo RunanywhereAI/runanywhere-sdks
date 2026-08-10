@@ -193,7 +193,10 @@ std::string make_sdk_event_bytes() {
 std::string make_voice_event_bytes() {
     runanywhere::v1::VoiceEvent event;
     event.set_seq(1);
-    event.set_timestamp_us(1);
+    // timestamp_us -> timestamp_ms (units changed, not just renamed); this
+    // test uses a placeholder value of 1 with no downstream unit-dependent
+    // arithmetic, so the rename alone is sufficient here.
+    event.set_timestamp_ms(1);
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
@@ -1178,9 +1181,9 @@ TEST(retrieve_without_session_handle_fails_honestly) {
     CHECK(had_retrieve_before);  // Built-in stand-in is always present.
 
     const std::size_t registered = rac::solutions::register_engine_backed_operators(registry);
-    // generate_text + transcribe + synthesize + detect_voice + embed +
-    // retrieve = 6 factories.
-    CHECK(registered == 6);
+    // generate_text + agent_loop + transcribe + synthesize + detect_voice +
+    // embed + retrieve = 7 factories.
+    CHECK(registered == 7);
 
     // Schema contract: text.utf8 in → text.utf8 out, output port "results".
     const auto& in_ports = registry.input_ports("retrieve");

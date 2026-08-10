@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -26,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -33,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,11 +48,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.ui.connect.ConnectClientViewModel
 import com.runanywhere.runanywhereai.ui.screens.models.huggingface.HuggingFaceSearchSheet
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectHost
+import com.runanywhere.sdk.public.connect.ConnectState
+import com.runanywhere.sdk.public.connect.ConnectStatus
 import ai.runanywhere.proto.v1.InferenceFramework
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -58,6 +67,7 @@ import kotlinx.coroutines.launch
 fun ModelSelectionSheet(
     viewModel: ModelSelectionViewModel,
     onDismiss: () -> Unit,
+    connectController: ConnectClientViewModel? = null,
 ) {
     val dimens = LocalDimens.current
     val state = viewModel.state
@@ -66,6 +76,29 @@ fun ModelSelectionSheet(
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
     var pendingDelete by remember { mutableStateOf<RAModelInfo?>(null) }
     var showHfSearch by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val connectState by connectController?.state?.collectAsState()
+        ?: remember { mutableStateOf(ConnectState()) }
+    var localNetworkDenied by remember { mutableStateOf(false) }
+    val localNetworkPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        localNetworkDenied = !granted
+        if (granted) connectController?.startDiscovery()
+    }
+    val startConnectDiscovery = {
+        localNetworkDenied = false
+        if (
+            Build.VERSION.SDK_INT >= 37 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_LOCAL_NETWORK) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        } else {
+            connectController?.startDiscovery()
+        }
+        Unit
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -84,20 +117,39 @@ fun ModelSelectionSheet(
         ) {
             Header(title = viewModel.title, onCancel = onDismiss)
 
-            device?.let {
-                SectionLabel("Your device")
-                DeviceStatusCard(it, Modifier.padding(horizontal = dimens.spacingLg))
-                Spacer(Modifier.height(dimens.spacingXs))
-            }
-
+            // Models first. Everything that used to sit above them — a local-network
+            // host connector, its permission disclaimer, and a Model/Chip/Memory/NPU
+            // spec table — put the one model this device had already downloaded four
+            // screens below the fold, so opening the picker to switch models began
+            // with scrolling past hardware trivia.
             when {
                 state.isLoading -> CenterNote("Loading models…", showSpinner = true)
                 state.models.isEmpty() -> CenterNote("No models available")
                 else -> PickerBody(
                     viewModel, state, device, scope, onDismiss,
+                    onSelectLocalModel = { connectController?.disconnect() },
                     onDelete = { pendingDelete = it },
                     onAddFromHuggingFace = { showHfSearch = true },
                 )
+            }
+
+            // Below the catalog: running a model on another machine is the most
+            // advanced thing this sheet offers, and it is the only one that asks for
+            // a permission.
+            if (viewModel.modality == ModelSelectionContext.LLM && connectController != null) {
+                Spacer(Modifier.height(dimens.spacingSm))
+                ConnectPickerSection(
+                    state = connectState,
+                    permissionDenied = localNetworkDenied,
+                    onFindHost = startConnectDiscovery,
+                    onConnect = { host -> connectController.connect(host, onDismiss) },
+                    onUseConnected = onDismiss,
+                )
+            }
+
+            device?.let {
+                Spacer(Modifier.height(dimens.spacingSm))
+                DeviceStatusCard(it, Modifier.padding(horizontal = dimens.spacingLg))
             }
 
             Text(
@@ -135,7 +187,9 @@ fun ModelSelectionSheet(
                 TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
             },
             title = { Text("Delete model") },
-            text = { Text("Delete ${model.name} from this device? You can download it again later.") },
+            // The same short name the row, the notification and the outcome report use. Naming the
+            // raw catalog id here made the dialog look like it was about a different model.
+            text = { Text("Delete ${model.displayTitle()} from this device? You can download it again later.") },
         )
     }
 
@@ -148,12 +202,122 @@ fun ModelSelectionSheet(
 }
 
 @Composable
+private fun ConnectPickerSection(
+    state: ConnectState,
+    permissionDenied: Boolean,
+    onFindHost: () -> Unit,
+    onConnect: (ConnectHost) -> Unit,
+    onUseConnected: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    SectionLabel("Connect")
+    val host = state.availableHosts.firstOrNull()
+    val title: String
+    val subtitle: String
+    val icon = when (state.status) {
+        ConnectStatus.CONNECTED -> RACIcons.Outline.Check
+        ConnectStatus.DISCONNECTED, ConnectStatus.FAILED -> RACIcons.Outline.Refresh
+        else -> RACIcons.Outline.Desktop
+    }
+    val action: (() -> Unit)?
+    val actionLabel: String?
+
+    when (state.status) {
+        ConnectStatus.IDLE -> {
+            title = "Connect to a Host"
+            subtitle = "Use a text model hosted on your local network"
+            action = onFindHost
+            actionLabel = "Find Host"
+        }
+        ConnectStatus.DISCOVERING -> if (host == null) {
+            title = "Looking for Hosts"
+            subtitle = "Searching your local network"
+            action = null
+            actionLabel = null
+        } else {
+            title = host.displayName
+            subtitle = "Text model available on this host"
+            action = { onConnect(host) }
+            actionLabel = "Connect"
+        }
+        ConnectStatus.CONNECTING -> {
+            title = "Connecting"
+            subtitle = state.connectingHost?.displayName ?: "Checking the selected host"
+            action = null
+            actionLabel = null
+        }
+        ConnectStatus.CONNECTED -> {
+            title = state.activeHost?.displayName ?: "Connected Host"
+            subtitle = state.activeModel?.displayName ?: "Hosted text model"
+            action = onUseConnected
+            actionLabel = "Use"
+        }
+        ConnectStatus.DISCONNECTED -> {
+            title = "Find a Host again"
+            subtitle = state.message ?: "The previous connection ended"
+            action = onFindHost
+            actionLabel = "Retry"
+        }
+        ConnectStatus.FAILED -> {
+            title = "Try Connect again"
+            subtitle = state.message ?: "Could not connect to the selected host"
+            action = onFindHost
+            actionLabel = "Retry"
+        }
+    }
+
+    ListItem(
+        headlineContent = {
+            Text(title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(subtitle, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+        trailingContent = {
+            when {
+                state.status == ConnectStatus.DISCOVERING && host == null ||
+                    state.status == ConnectStatus.CONNECTING -> CircularProgressIndicator(
+                    Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+                actionLabel != null -> Text(
+                    actionLabel,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+        modifier = Modifier
+            .padding(horizontal = dimens.spacingLg)
+            .then(if (action != null) Modifier.clickable(onClick = action) else Modifier),
+    )
+    Text(
+        if (permissionDenied) {
+            "Local Network access was denied. Allow it in Android settings to find a host."
+        } else {
+            "Local Network access is requested only after you choose to find a host."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (permissionDenied) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = Modifier.padding(horizontal = dimens.spacingLg),
+    )
+}
+
+@Composable
 private fun PickerBody(
     viewModel: ModelSelectionViewModel,
     state: ModelSelectionState,
     device: DeviceInfo?,
     scope: CoroutineScope,
     onDismiss: () -> Unit,
+    onSelectLocalModel: () -> Unit,
     onDelete: (RAModelInfo) -> Unit,
     onAddFromHuggingFace: () -> Unit,
 ) {
@@ -177,7 +341,14 @@ private fun PickerBody(
             .sortedBy { fw -> order.indexOf(fw).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
-    val onSelect: (RAModelInfo) -> Unit = { model -> scope.launch { if (viewModel.select(model)) onDismiss() } }
+    val onSelect: (RAModelInfo) -> Unit = { model ->
+        scope.launch {
+            if (viewModel.select(model)) {
+                onSelectLocalModel()
+                onDismiss()
+            }
+        }
+    }
 
     // The download runs in a `dataSync` foreground service whose progress
     // notification Android 13+ silently suppresses unless POST_NOTIFICATIONS is
@@ -215,21 +386,48 @@ private fun PickerBody(
     val scopedRecommended = remember(state.models, device) {
         if (isChat) null else ModelRecommendation.recommendedFor(viewModel.modality, tier, hasNpu, state.models)
     }
-    val surfacedIds = recommendation?.allIds ?: setOfNotNull(scopedRecommended?.id)
+    // Models already on disk, loaded one first. Nothing else in this sheet is one
+    // tap from working, so nothing else earns the top: a reader opening the picker
+    // to switch models is choosing among these, and a reader who owns none sees the
+    // section vanish rather than an empty shell. Suppressed while searching or
+    // filtering, both of which are explicit requests to see something else.
+    val readyModels = remember(state.models, state.currentModelId) {
+        state.models
+            .filter { viewModel.isReady(it) }
+            .sortedWith(
+                compareByDescending<RAModelInfo> { it.id == state.currentModelId }
+                    .thenBy { it.effectiveBytes() },
+            )
+    }
+    val showReadySection = !isSearching && selectedBackend == null && readyModels.isNotEmpty()
+    if (showReadySection) {
+        SectionLabel(if (readyModels.size == 1) "Ready to use" else "Ready to use · ${readyModels.size}")
+        readyModels.forEach { model ->
+            PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
+        }
+        Spacer(Modifier.height(dimens.spacingMd))
+    }
 
-    // Bring-your-own model: search Hugging Face for any GGUF and download it.
-    AddFromHuggingFaceRow(onClick = onAddFromHuggingFace)
-    Spacer(Modifier.height(dimens.spacingMd))
+    // Everything surfaced above the browse list, so the org cards below don't repeat
+    // it. Ready models count only when their section actually rendered.
+    val surfacedIds = (recommendation?.allIds ?: setOfNotNull(scopedRecommended?.id)) +
+        if (showReadySection) readyModels.map { it.id }.toSet() else emptySet()
 
     // Recommended section only in the default view — hidden while searching OR when a
     // backend filter is active (the filter is an explicit "show me only this backend").
+    // A recommendation the user already owns is dropped: it is one row higher under
+    // "Ready to use", where it says something stronger than "recommended".
     if (!isSearching && selectedBackend == null) {
+        val readyIds = if (showReadySection) readyModels.map { it.id }.toSet() else emptySet()
         when {
-            recommendation != null && recommendation.recommendedLLMs.isNotEmpty() -> {
-                RecommendedSection(recommendation, device, viewModel, state, onSelect, onDownload, onDelete)
+            recommendation != null && recommendation.recommendedLLMs.any { it.id !in readyIds } -> {
+                RecommendedSection(
+                    recommendation, viewModel, state, onSelect, onDownload, onDelete,
+                    excludedIds = readyIds,
+                )
                 Spacer(Modifier.height(dimens.spacingMd))
             }
-            scopedRecommended != null -> {
+            scopedRecommended != null && scopedRecommended.id !in readyIds -> {
                 SectionLabel("Recommended for your device")
                 PickerModelRow(
                     viewModel, state, scopedRecommended, onSelect, onDownload, onDelete,
@@ -240,9 +438,13 @@ private fun PickerBody(
         }
     }
 
-    SectionLabel("Browse by model")
+    SectionLabel(if (showReadySection) "Get another model" else "Browse by model")
     SearchField(query = query, onQueryChange = { query = it })
     Spacer(Modifier.height(dimens.spacingXs))
+
+    // Bring-your-own model: search Hugging Face for any GGUF and download it. Below
+    // the search field, where someone who did not find what they wanted is looking.
+    AddFromHuggingFaceRow(onClick = onAddFromHuggingFace)
 
     // Backend/NPU filter chips — only when the picker spans more than one backend.
     if (backends.size > 1) {
@@ -278,18 +480,26 @@ private fun PickerBody(
         return
     }
 
-    // Orgs with anything ready come first; everything else follows in org order.
+    // Orgs with anything ready come first; everything else follows in org order. In the
+    // default view every ready model was already pulled up top, so this partition only
+    // splits anything while searching or filtering — and the sole remaining group needs
+    // no second heading under one that already says what the list is for.
     val (installed, downloadable) = orgs.partition { it.hasReadyVariant }
     val sections = buildList {
         if (installed.isNotEmpty()) add("On this device" to installed)
         if (downloadable.isNotEmpty()) {
-            add((if (installed.isEmpty()) "All organisations" else "More organisations") to downloadable)
+            val label = when {
+                installed.isNotEmpty() -> "More organisations"
+                showReadySection -> null
+                else -> "All organisations"
+            }
+            add(label to downloadable)
         }
     }
 
     sections.forEachIndexed { index, (label, groups) ->
         if (index > 0) Spacer(modifier = Modifier.height(dimens.spacingSm))
-        SectionLabel(label)
+        label?.let { SectionLabel(it) }
         groups.forEach { group ->
             OrgCard(
                 group = group,
@@ -309,33 +519,39 @@ private fun PickerBody(
 @Composable
 private fun RecommendedSection(
     recommendation: RecommendedSelection,
-    device: DeviceInfo?,
     viewModel: ModelSelectionViewModel,
     state: ModelSelectionState,
     onSelect: (RAModelInfo) -> Unit,
     onDownload: (RAModelInfo) -> Unit,
     onDelete: (RAModelInfo) -> Unit,
+    /**
+     * Ids already shown under "Ready to use". Recommending a model the reader has
+     * already downloaded says less than the row above it does, so it is dropped.
+     */
+    excludedIds: Set<String> = emptySet(),
 ) {
     val dimens = LocalDimens.current
     SectionLabel("Recommended for your device")
 
-    val defaultId = recommendation.defaultModel?.id
-    recommendation.defaultModel?.let { model ->
+    val default = recommendation.defaultModel?.takeIf { it.id !in excludedIds }
+    default?.let { model ->
         PickerModelRow(
             viewModel, state, model, onSelect, onDownload, onDelete,
             highlightLabel = "Top pick",
         )
     }
-    recommendation.recommendedLLMs.filter { it.id != defaultId }.forEach { model ->
-        PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
-    }
+    recommendation.recommendedLLMs
+        .filter { it.id != default?.id && it.id !in excludedIds }
+        .forEach { model ->
+            PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
+        }
 
     val companions = listOfNotNull(
         recommendation.vlm,
         recommendation.asr,
         recommendation.tts,
         recommendation.embedding,
-    )
+    ).filter { it.id !in excludedIds }
     if (companions.isNotEmpty()) {
         Spacer(Modifier.height(dimens.spacingXs))
         SectionLabel("Also recommended")
@@ -361,11 +577,18 @@ private fun PickerModelRow(
         isCurrent = state.currentModelId == model.id,
         isReady = viewModel.isReady(model),
         isBusy = state.busyModelId == model.id,
-        progressPercent = if (state.busyModelId == model.id) state.progressPercent else null,
+        progress = state.downloadProgress.takeIf { state.downloadingModelId == model.id },
+        interruption = state.interruptionFor(model.id),
         highlightLabel = highlightLabel,
         onSelect = { onSelect(model) },
         onDownload = { onDownload(model) },
-        onCancel = { viewModel.cancelDownload(model.id) },
+        // Only a transfer can be cancelled: offering the control while the row is loading would
+        // be a button that does nothing.
+        onCancel = if (state.downloadingModelId == model.id) {
+            { viewModel.cancelDownload(model.id) }
+        } else {
+            null
+        },
         onDelete = if (viewModel.isDeletable(model)) ({ onDelete(model) }) else null,
         modifier = Modifier.padding(horizontal = dimens.spacingLg),
     )
@@ -399,7 +622,13 @@ private fun AddFromHuggingFaceRow(onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Search and download any GGUF model",
+                // A row's subtitle exists to tell a hesitant reader what is behind it, and
+                // "GGUF" is the one word that guarantees they stop — it names a container
+                // format nobody outside the field has heard of. The format constraint is
+                // real, so it is stated inside the search sheet as a consequence ("Only
+                // models this app can run are shown"), not as this row's promise. iOS and
+                // the web sheet carry the identical wording.
+                "Browse thousands of community chat models",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

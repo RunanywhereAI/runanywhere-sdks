@@ -1,9 +1,9 @@
 package com.runanywhere.runanywhereai
 
-import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadState
+import ai.runanywhere.proto.v1.LLMStreamEventKind
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.STTLanguage
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -11,9 +11,10 @@ import com.runanywhere.runanywhereai.data.ModelCatalog
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.embeddings
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
@@ -103,7 +104,7 @@ class PortableNvidiaE2ETest {
                                 lastPercent = percent
                                 Log.i(
                                     tag,
-                                    "DOWNLOAD id=$modelId state=${progress.state} stage=${progress.stage} " +
+                                    "DOWNLOAD id=$modelId state=${progress.state} " +
                                         "percent=$percent bytes=${progress.bytes_downloaded}/${progress.total_bytes}",
                                 )
                             }
@@ -112,10 +113,10 @@ class PortableNvidiaE2ETest {
                 val downloadMs = System.currentTimeMillis() - downloadStarted
                 fields["downloadMs"] = downloadMs.toString()
                 fields["downloadedBytes"] = terminal.total_bytes.toString()
-                val downloadOk =
-                    terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
-                        terminal.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED
-                check(downloadOk) { "download did not complete: state=${terminal.state} stage=${terminal.stage}" }
+                // DownloadStage was deleted outright; DownloadProgress.state (DownloadState)
+                // is the sole discriminator now.
+                val downloadOk = terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED
+                check(downloadOk) { "download did not complete: state=${terminal.state}" }
                 fields["memAvailKbAfterDownload"] = memAvailableKb().toString()
 
                 phase = "run"
@@ -162,7 +163,7 @@ class PortableNvidiaE2ETest {
         val loadStarted = System.currentTimeMillis()
         val load = withTimeout(600_000) { RunAnywhere.loadModel(registered) }
         fields["loadMs"] = (System.currentTimeMillis() - loadStarted).toString()
-        check(load.success) { load.error_message.ifBlank { "load failed" } }
+        check(load.error == null) { load.error?.message?.ifBlank { "load failed" } ?: "load failed" }
         fields["loadedFramework"] = load.framework.name
         fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
 
@@ -177,7 +178,7 @@ class PortableNvidiaE2ETest {
                 if (language == null) {
                     defaults
                 } else {
-                    defaults.copy(language = sttLanguage(language), language_code = language)
+                    defaults.copy(language = language)
                 }
             }
 
@@ -217,13 +218,14 @@ class PortableNvidiaE2ETest {
         val negative = "passage: The Pacific Ocean is the largest ocean on Earth."
         try {
             val firstStarted = System.currentTimeMillis()
-            val queryVector = embedOne(query, modelId)
-            // The first call carries the lazy load, so report it separately from steady-state.
+            RunAnywhere.models.load(modelId)
+            val queryVector = embedOne(query)
+            // The load is explicit in v3, so this span still covers load + first embed.
             fields["firstEmbedMsIncludingLoad"] = (System.currentTimeMillis() - firstStarted).toString()
             fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
             val warmStarted = System.currentTimeMillis()
-            val positiveVector = embedOne(positive, modelId)
-            val negativeVector = embedOne(negative, modelId)
+            val positiveVector = embedOne(positive)
+            val negativeVector = embedOne(negative)
             fields["twoWarmEmbedsMs"] = (System.currentTimeMillis() - warmStarted).toString()
 
             val vectors = listOf(queryVector, positiveVector, negativeVector)
@@ -238,7 +240,11 @@ class PortableNvidiaE2ETest {
             check(vectors.all { v -> v.all(Float::isFinite) }) { "non-finite embedding value" }
             check(positiveCosine > negativeCosine) { "distractor outranked the related passage" }
         } finally {
-            runCatching { withTimeout(300_000) { RunAnywhere.embeddings.unload() } }
+            runCatching {
+                withTimeout(300_000) {
+                    RunAnywhere.models.unload(ModelCategory.MODEL_CATEGORY_EMBEDDING)
+                }
+            }
         }
     }
 
@@ -254,14 +260,14 @@ class PortableNvidiaE2ETest {
         val loadStarted = System.currentTimeMillis()
         val load = withTimeout(900_000) { RunAnywhere.loadModel(registered) }
         fields["loadMs"] = (System.currentTimeMillis() - loadStarted).toString()
-        check(load.success) { load.error_message.ifBlank { "load failed" } }
+        check(load.error == null) { load.error?.message?.ifBlank { "load failed" } ?: "load failed" }
         fields["loadedFramework"] = load.framework.name
         fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
         try {
             val systemPrompt = args.getString("sys")?.takeIf { it.isNotBlank() }
             val options =
                 RALLMGenerationOptions(
-                    max_tokens = maxNew,
+                    max_output_tokens = maxNew,
                     temperature = 0f,
                     top_p = 1f,
                     system_prompt = systemPrompt,
@@ -274,10 +280,12 @@ class PortableNvidiaE2ETest {
             withTimeout(900_000) {
                 RunAnywhere.generateStream(prompt, options).collect { event ->
                     event.token?.let { if (it.isNotEmpty()) text.append(it) }
-                    if (event.is_final) {
+                    // LLMStreamEvent.is_final was deleted outright; event_kind
+                    // (COMPLETED/ERROR) is the sole terminal discriminator now.
+                    if (event.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                         event.result?.let {
-                            promptTokens = it.prompt_tokens
-                            completionTokens = it.completion_tokens
+                            promptTokens = it.usage?.input_tokens ?: 0
+                            completionTokens = it.usage?.output_tokens ?: 0
                         }
                     }
                 }
@@ -308,12 +316,10 @@ class PortableNvidiaE2ETest {
         }
     }
 
-    private suspend fun embedOne(text: String, modelId: String): FloatArray =
-        withTimeout(600_000) { RunAnywhere.embeddings.embed(text, modelId) }
-            .vectors
+    private suspend fun embedOne(text: String): FloatArray =
+        withTimeout(600_000) { RunAnywhere.embeddings.embed(listOf(text)) }
             .single()
-            .values
-            .toFloatArray()
+            .vector
 
     private fun readPcm(args: android.os.Bundle): ByteArray {
         args.getString("pcmPath")?.takeIf { it.isNotBlank() }?.let { return File(it).readBytes() }
@@ -354,16 +360,6 @@ class PortableNvidiaE2ETest {
                 .filter { it.isDigit() }
                 .toLong()
         }.getOrDefault(-1L)
-
-    private fun sttLanguage(tag: String): STTLanguage =
-        when (tag.lowercase().substringBefore('-')) {
-            "ja" -> STTLanguage.STT_LANGUAGE_JA
-            "es" -> STTLanguage.STT_LANGUAGE_ES
-            "fr" -> STTLanguage.STT_LANGUAGE_FR
-            "de" -> STTLanguage.STT_LANGUAGE_DE
-            "zh" -> STTLanguage.STT_LANGUAGE_ZH
-            else -> STTLanguage.STT_LANGUAGE_EN
-        }
 
     private fun l2Norm(vector: FloatArray): Double = sqrt(vector.sumOf { it.toDouble() * it })
 

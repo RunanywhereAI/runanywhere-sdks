@@ -17,13 +17,17 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
- * ---------------------------------------------------------------------------
+ * The required public spelling in every SDK is exactly "mean" / "cls" / "last".
+ * LAST is the final token's hidden state (llama.cpp --pooling last), which
+ * decoder-style embedders require. It is NOT max-pooling; no SDK may expose
+ * it as "max".
  */
 public enum class EmbeddingsPoolingStrategy(
   override val `value`: Int,
 ) : WireEnum {
+  /**
+   * inherit the bundle's pooling
+   */
   EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED(0),
   EMBEDDINGS_POOLING_STRATEGY_MEAN(1),
   EMBEDDINGS_POOLING_STRATEGY_CLS(2),

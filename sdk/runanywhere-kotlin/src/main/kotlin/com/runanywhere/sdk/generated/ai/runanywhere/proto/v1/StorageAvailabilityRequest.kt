@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Double
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -47,14 +46,21 @@ public class StorageAvailabilityRequest(
     schemaIndex = 1,
   )
   public val required_bytes: Long = 0L,
+  /**
+   * Absolute headroom the device must still have after the write. Same
+   * unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+   */
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "safetyMargin",
+    jsonName = "requiredFreeBytesAfterDownload",
     schemaIndex = 2,
   )
-  public val safety_margin: Double = 0.0,
+  public val required_free_bytes_after_download: Long = 0L,
+  /**
+   * Count bytes already occupied by this model as reclaimable.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -93,7 +99,7 @@ public class StorageAvailabilityRequest(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (required_bytes != other.required_bytes) return false
-    if (safety_margin != other.safety_margin) return false
+    if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
     if (include_existing_model_bytes != other.include_existing_model_bytes) return false
     if (include_delete_plan != other.include_delete_plan) return false
     if (allow_cache_reclamation != other.allow_cache_reclamation) return false
@@ -106,7 +112,7 @@ public class StorageAvailabilityRequest(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + required_bytes.hashCode()
-      result = result * 37 + safety_margin.hashCode()
+      result = result * 37 + required_free_bytes_after_download.hashCode()
       result = result * 37 + include_existing_model_bytes.hashCode()
       result = result * 37 + include_delete_plan.hashCode()
       result = result * 37 + allow_cache_reclamation.hashCode()
@@ -119,7 +125,7 @@ public class StorageAvailabilityRequest(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     result += """required_bytes=$required_bytes"""
-    result += """safety_margin=$safety_margin"""
+    result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
     result += """include_existing_model_bytes=$include_existing_model_bytes"""
     result += """include_delete_plan=$include_delete_plan"""
     result += """allow_cache_reclamation=$allow_cache_reclamation"""
@@ -129,12 +135,12 @@ public class StorageAvailabilityRequest(
   public fun copy(
     model_id: String = this.model_id,
     required_bytes: Long = this.required_bytes,
-    safety_margin: Double = this.safety_margin,
+    required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
     include_existing_model_bytes: Boolean = this.include_existing_model_bytes,
     include_delete_plan: Boolean = this.include_delete_plan,
     allow_cache_reclamation: Boolean = this.allow_cache_reclamation,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageAvailabilityRequest = StorageAvailabilityRequest(model_id, required_bytes, safety_margin, include_existing_model_bytes, include_delete_plan, allow_cache_reclamation, unknownFields)
+  ): StorageAvailabilityRequest = StorageAvailabilityRequest(model_id, required_bytes, required_free_bytes_after_download, include_existing_model_bytes, include_delete_plan, allow_cache_reclamation, unknownFields)
 
   public companion object {
     @JvmField
@@ -155,8 +161,8 @@ public class StorageAvailabilityRequest(
         if (value.required_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.required_bytes)
         }
-        if (!value.safety_margin.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(3, value.safety_margin)
+        if (value.required_free_bytes_after_download != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.required_free_bytes_after_download)
         }
         if (value.include_existing_model_bytes != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.include_existing_model_bytes)
@@ -177,8 +183,8 @@ public class StorageAvailabilityRequest(
         if (value.required_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.required_bytes)
         }
-        if (!value.safety_margin.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 3, value.safety_margin)
+        if (value.required_free_bytes_after_download != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.required_free_bytes_after_download)
         }
         if (value.include_existing_model_bytes != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.include_existing_model_bytes)
@@ -203,8 +209,8 @@ public class StorageAvailabilityRequest(
         if (value.include_existing_model_bytes != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.include_existing_model_bytes)
         }
-        if (!value.safety_margin.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 3, value.safety_margin)
+        if (value.required_free_bytes_after_download != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.required_free_bytes_after_download)
         }
         if (value.required_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.required_bytes)
@@ -217,7 +223,7 @@ public class StorageAvailabilityRequest(
       override fun decode(reader: ProtoReader): StorageAvailabilityRequest {
         var model_id: String = ""
         var required_bytes: Long = 0L
-        var safety_margin: Double = 0.0
+        var required_free_bytes_after_download: Long = 0L
         var include_existing_model_bytes: Boolean = false
         var include_delete_plan: Boolean = false
         var allow_cache_reclamation: Boolean = false
@@ -225,7 +231,7 @@ public class StorageAvailabilityRequest(
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> required_bytes = ProtoAdapter.INT64.decode(reader)
-            3 -> safety_margin = ProtoAdapter.DOUBLE.decode(reader)
+            7 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
             4 -> include_existing_model_bytes = ProtoAdapter.BOOL.decode(reader)
             5 -> include_delete_plan = ProtoAdapter.BOOL.decode(reader)
             6 -> allow_cache_reclamation = ProtoAdapter.BOOL.decode(reader)
@@ -235,7 +241,7 @@ public class StorageAvailabilityRequest(
         return StorageAvailabilityRequest(
           model_id = model_id,
           required_bytes = required_bytes,
-          safety_margin = safety_margin,
+          required_free_bytes_after_download = required_free_bytes_after_download,
           include_existing_model_bytes = include_existing_model_bytes,
           include_delete_plan = include_delete_plan,
           allow_cache_reclamation = allow_cache_reclamation,

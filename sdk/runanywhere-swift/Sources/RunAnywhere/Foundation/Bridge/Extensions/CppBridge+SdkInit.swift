@@ -90,24 +90,20 @@ extension CppBridge {
         // MARK: - Phase 2 (async services init step list owned by C++)
 
         /// Drive Phase 2 (services init step list) through the canonical C ABI.
-        /// Surfaces `http_configured`, `device_registered`, `linked_models_count`
-        /// and warning flags so the caller can decide which UI affordances to
-        /// enable. Failures in individual sub-steps are non-fatal — the C ABI
-        /// reports `success=true` with flags off.
+        ///
+        /// `forceRefreshAssignments`/`flushTelemetry`/`discoverDownloadedModels`/
+        /// `rescanLocalModels` were deleted outright from
+        /// `SdkInitPhase2Request` (idl/sdk_init.proto): the deterministic
+        /// step list — fetch cached assignments, always flush telemetry,
+        /// always reconcile the registry and rescan local files — now runs
+        /// unconditionally in commons with no per-call opt-out. Surfaces
+        /// `linked_models_count` and warning flags so the caller can decide
+        /// which UI affordances to enable. Failures in individual sub-steps
+        /// are non-fatal — the C ABI reports success with warnings appended.
         @discardableResult
-        public static func phase2(
-            buildToken: String? = nil,
-            forceRefreshAssignments: Bool = false,
-            flushTelemetry: Bool = true,
-            discoverDownloadedModels: Bool = true,
-            rescanLocalModels: Bool = true
-        ) throws -> RASdkInitResult {
+        public static func phase2(buildToken: String? = nil) throws -> RASdkInitResult {
             var request = RASdkInitPhase2Request()
             request.buildToken = buildToken ?? ""
-            request.forceRefreshAssignments = forceRefreshAssignments
-            request.flushTelemetry = flushTelemetry
-            request.discoverDownloadedModels = discoverDownloadedModels
-            request.rescanLocalModels = rescanLocalModels
 
             let result = try NativeProtoABI.invoke(
                 request,
@@ -143,7 +139,11 @@ extension CppBridge {
 
         // MARK: - Helpers
 
-        private static func mapEnvironment(_ env: SDKEnvironment) -> RASdkInitEnvironment {
+        // RASdkInitEnvironment was deleted outright (idl/sdk_init.proto):
+        // SdkInitPhase1Request.environment is typed model_types.proto's
+        // RASDKEnvironment directly (SDKEnvironment is already a typealias
+        // for it), so this used to be a needless enum-to-enum bridge.
+        private static func mapEnvironment(_ env: SDKEnvironment) -> RASDKEnvironment {
             switch env {
             case .development: return .development
             case .production:  return .production
@@ -153,18 +153,12 @@ extension CppBridge {
 
         /// Throw the embedded RASDKError when the C ABI signals a hard failure
         /// (validation/parse/state init). Soft failures (offline mode) come
-        /// back with `success=true` plus warnings — the caller decides how to
-        /// react to those.
+        /// back with no error submessage plus warnings — the caller decides how
+        /// to react to those.
         private static func assertSuccess(_ result: RASdkInitResult) throws {
-            guard !result.success else { return }
             if result.hasError {
                 throw SDKException(proto: result.error)
             }
-            throw SDKException(
-                code: .processingFailed,
-                message: "SDK init phase \(result.phase) failed without error detail",
-                category: .internal
-            )
         }
     }
 }

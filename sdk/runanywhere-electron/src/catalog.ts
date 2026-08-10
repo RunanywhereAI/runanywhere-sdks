@@ -1,7 +1,18 @@
-// catalog.ts — a curated built-in model catalog so callers can load by id
-// (`loadLLM('qwen2.5-1.5b')`) instead of hunting down files. Entries point at
-// verified HuggingFace / k2-fsa releases that work with the linked engines.
-// Callers can also pass a HuggingFace repo id, a direct URL, or a local path.
+// catalog.ts — the catalog REGISTRY, not a catalog.
+//
+// The SDK owns the entry SHAPE and the lookup surface; the APP owns WHICH models
+// it offers. That split matches every other platform in this repo (iOS
+// `ModelCatalogBootstrap.swift`, Android `ModelCatalog.kt`, web
+// `model-catalog.ts` — all in `examples/`, none in an SDK), and it is what lets
+// two apps ship different model lists against one SDK build.
+//
+// An app registers its table once per PROCESS, and there are two: the renderer
+// preload (which exposes `catalog()` to the page) and the forked utility host
+// (which downloads and resolves). See `examples/electron/RunAnywhereAI/`:
+// `preload.js` and `host.js` each register before loading the SDK entry point.
+//
+// Callers can also pass a HuggingFace repo id, a direct URL, or a local path, so
+// an app that registers nothing still resolves those.
 
 export type ModelType = 'llm' | 'vlm' | 'embedder' | 'stt' | 'tts';
 
@@ -28,72 +39,53 @@ export interface CatalogEntry {
   sizeMB?: number;
   /** Slow / memory-heavy on a CPU-only build. */
   heavy?: boolean;
+  /**
+   * The weights' licence. NOT all of these are open source — Gemma and Llama
+   * carry use restrictions the user accepts by downloading, so a UI that offers
+   * the model must be able to say which licence applies and link to it.
+   */
+  license?: string;
+  licenseUrl?: string;
+  /**
+   * The turn markup this model was trained on. Getting it wrong makes a model
+   * ignore the conversation and answer as if every turn were the first.
+   */
+  chatTemplate?: 'chatml' | 'llama3' | 'gemma' | 'mistral';
 }
 
-const HF = 'https://huggingface.co';
-const K2 = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
+/** A model table: catalog id -> entry. */
+export type Catalog = Record<string, CatalogEntry>;
 
-function llm(repo: string, file: string, label: string, params: string, sizeMB: number, heavy = false): CatalogEntry {
-  return { type: 'llm', files: [{ url: `${HF}/${repo}/resolve/main/${file}`, as: 'model.gguf' }], primary: 'model.gguf', label, params, sizeMB, heavy };
-}
-function vlm(repo: string, file: string, mm: string, label: string, params: string, sizeMB: number, heavy = false): CatalogEntry {
-  return {
-    type: 'vlm',
-    files: [
-      { url: `${HF}/${repo}/resolve/main/${file}`, as: 'model.gguf' },
-      { url: `${HF}/${repo}/resolve/main/${mm}`, as: 'mmproj.gguf' },
-    ],
-    primary: 'model.gguf', mmproj: 'mmproj.gguf', label, params, sizeMB, heavy,
-  };
-}
-function whisper(size: string, label: string, sizeMB: number): CatalogEntry {
-  return { type: 'stt', files: [{ url: `${K2}/asr-models/sherpa-onnx-whisper-${size}.tar.bz2`, as: 'whisper.tar.bz2' }], archive: true, primary: `sherpa-onnx-whisper-${size}`, label, sizeMB };
-}
-function piper(voice: string, label: string, sizeMB: number): CatalogEntry {
-  return { type: 'tts', files: [{ url: `${K2}/tts-models/vits-piper-en_US-${voice}-medium.tar.bz2`, as: 'piper.tar.bz2' }], archive: true, primary: `vits-piper-en_US-${voice}-medium`, label, sizeMB };
+// Null-prototype so an id can never collide with an Object.prototype member
+// (`toString`, `constructor`, `__proto__`); `isCatalogId` still goes through
+// Object.prototype.hasOwnProperty rather than trusting the map's own shape.
+const registry: Catalog = Object.create(null) as Catalog;
+
+/**
+ * Add an app's models to this process's registry. Merges, so it can be called
+ * more than once (last write wins per id) — e.g. a base table plus an opt-in
+ * extension. Registration is per-process: register in EVERY process that
+ * resolves or lists models.
+ */
+export function registerCatalog(entries: Catalog): void {
+  for (const [id, entry] of Object.entries(entries)) registry[id] = entry;
 }
 
-export const CATALOG: Record<string, CatalogEntry> = {
-  // ---- LLMs (GGUF, llama.cpp) ----
-  'smollm2-135m': llm('bartowski/SmolLM2-135M-Instruct-GGUF', 'SmolLM2-135M-Instruct-Q4_K_M.gguf', 'SmolLM2 135M', '135M', 92),
-  'smollm2-360m': llm('bartowski/SmolLM2-360M-Instruct-GGUF', 'SmolLM2-360M-Instruct-Q4_K_M.gguf', 'SmolLM2 360M', '360M', 258),
-  'smollm2-1.7b': llm('bartowski/SmolLM2-1.7B-Instruct-GGUF', 'SmolLM2-1.7B-Instruct-Q4_K_M.gguf', 'SmolLM2 1.7B', '1.7B', 1007),
-  'qwen2.5-0.5b': llm('bartowski/Qwen2.5-0.5B-Instruct-GGUF', 'Qwen2.5-0.5B-Instruct-Q4_K_M.gguf', 'Qwen2.5 0.5B', '0.5B', 398),
-  'qwen2.5-1.5b': llm('bartowski/Qwen2.5-1.5B-Instruct-GGUF', 'Qwen2.5-1.5B-Instruct-Q4_K_M.gguf', 'Qwen2.5 1.5B', '1.5B', 940),
-  'qwen2.5-3b': llm('bartowski/Qwen2.5-3B-Instruct-GGUF', 'Qwen2.5-3B-Instruct-Q4_K_M.gguf', 'Qwen2.5 3B', '3B', 1841, true),
-  'llama-3.2-1b': llm('bartowski/Llama-3.2-1B-Instruct-GGUF', 'Llama-3.2-1B-Instruct-Q4_K_M.gguf', 'Llama 3.2 1B', '1B', 770),
-  'llama-3.2-3b': llm('bartowski/Llama-3.2-3B-Instruct-GGUF', 'Llama-3.2-3B-Instruct-Q4_K_M.gguf', 'Llama 3.2 3B', '3B', 1926, true),
-  'gemma-2-2b': llm('bartowski/gemma-2-2b-it-GGUF', 'gemma-2-2b-it-Q4_K_M.gguf', 'Gemma 2 2B', '2B', 1629, true),
-  'phi-3.5-mini': llm('bartowski/Phi-3.5-mini-instruct-GGUF', 'Phi-3.5-mini-instruct-Q4_K_M.gguf', 'Phi 3.5 mini', '3.8B', 2283, true),
+/** Drop every registered model. For tests and for replacing a table wholesale. */
+export function clearCatalog(): void {
+  for (const id of Object.keys(registry)) delete registry[id];
+}
 
-  // ---- VLMs (GGUF + mmproj, llama.cpp mtmd) ----
-  'smolvlm-256m': vlm('ggml-org/SmolVLM-256M-Instruct-GGUF', 'SmolVLM-256M-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-256M-Instruct-Q8_0.gguf', 'SmolVLM 256M', '256M', 300),
-  'smolvlm-500m': vlm('ggml-org/SmolVLM-500M-Instruct-GGUF', 'SmolVLM-500M-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-500M-Instruct-Q8_0.gguf', 'SmolVLM 500M', '500M', 521),
-  'smolvlm-2.2b': vlm('ggml-org/SmolVLM-Instruct-GGUF', 'SmolVLM-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-Instruct-Q8_0.gguf', 'SmolVLM 2.2B', '2.2B', 2402, true),
-  'smolvlm2-500m': vlm('ggml-org/SmolVLM2-500M-Video-Instruct-GGUF', 'SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'SmolVLM2 500M (video)', '500M', 521),
-  'qwen2-vl-2b': vlm('ggml-org/Qwen2-VL-2B-Instruct-GGUF', 'Qwen2-VL-2B-Instruct-Q8_0.gguf', 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf', 'Qwen2-VL 2B', '2B', 2247, true),
+/** Every registered model, as a plain id -> entry map. */
+export function catalogEntries(): Readonly<Catalog> {
+  return registry;
+}
 
-  // ---- Embeddings (ONNX) ----
-  minilm: {
-    type: 'embedder',
-    files: [
-      { url: `${HF}/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx`, as: 'model.onnx' },
-      { url: `${HF}/sentence-transformers/all-MiniLM-L6-v2/resolve/main/vocab.txt`, as: 'vocab.txt' },
-    ],
-    primary: 'model.onnx', label: 'all-MiniLM-L6-v2', params: '22M', sizeMB: 90,
-  },
-
-  // ---- Speech-to-text (Whisper via sherpa-onnx) ----
-  'whisper-tiny': whisper('tiny.en', 'Whisper tiny (en)', 75),
-  'whisper-base': whisper('base.en', 'Whisper base (en)', 142),
-  'whisper-small': whisper('small.en', 'Whisper small (en)', 466),
-
-  // ---- Text-to-speech (Piper via sherpa-onnx) ----
-  'piper-lessac': piper('lessac', 'Piper · Lessac', 64),
-  'piper-amy': piper('amy', 'Piper · Amy', 64),
-  'piper-ryan': piper('ryan', 'Piper · Ryan', 64),
-};
+/** One entry, or undefined when `id` is not a registered catalog id. */
+export function catalogEntry(id: string): CatalogEntry | undefined {
+  return isCatalogId(id) ? registry[id] : undefined;
+}
 
 export function isCatalogId(idOrPath: string): boolean {
-  return Object.prototype.hasOwnProperty.call(CATALOG, idOrPath);
+  return Object.prototype.hasOwnProperty.call(registry, idOrPath);
 }

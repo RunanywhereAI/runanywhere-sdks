@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.stt
 
-import ai.runanywhere.proto.v1.STTLanguage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -15,16 +14,15 @@ import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.HybridCascade
 import com.runanywhere.sdk.hybrid.HybridFilter
 import com.runanywhere.sdk.hybrid.HybridModel
-import com.runanywhere.sdk.hybrid.HybridRank
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.sdk.hybrid.HybridRoutingPolicy
 import com.runanywhere.sdk.hybrid.HybridSTTRouter
 import com.runanywhere.sdk.hybrid.HybridTranscribeOptions
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.RASTTPartialResult
-import com.runanywhere.sdk.public.extensions.transcribe
-import com.runanywhere.sdk.public.extensions.transcribeStream
-import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.SttOptions
+import com.runanywhere.sdk.public.api.TranscriptionEvent
+import com.runanywhere.sdk.public.api.stt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -65,6 +63,44 @@ class SttViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * A recording finished and the engine recognised nothing in it.
+     *
+     * Distinct from "nothing recorded yet". Commons now publishes an engine's own
+     * no-speech marker ("(wind)", "[Music]") as empty text, so an honestly silent
+     * recording is an empty transcript and the screen has to say which of the two
+     * it is. Previously only the batch path could show that, because it inferred
+     * the state from `metrics`, which live mode never sets. Mirrors iOS
+     * `STTViewModel.noSpeechDetected`.
+     */
+    var noSpeechDetected by mutableStateOf(false)
+        private set
+
+    /**
+     * The recording that produced [noSpeechDetected] carried no usable signal —
+     * the input never varied, so there was nothing in it to recognise.
+     *
+     * "No speech detected" is the right answer to a room that stayed quiet and
+     * the wrong answer to a microphone that was muted, held by another app, or
+     * wired to nothing. Both of those are indistinguishable from silence to the
+     * recognizer, and telling them apart by hand costs hours — so the screen
+     * says which one it was, from evidence already in hand: [AudioRecorder]
+     * reports a normalised level per chunk, and *acoustic* audio always jitters
+     * frame to frame. A capture whose level never moved across
+     * [UNUSABLE_MIN_FRAMES] is not a quiet room; it is a dead input — whether it
+     * sat at the floor (muted, disconnected) or pinned at the ceiling (a stuck
+     * or synthetic source). Judging the range rather than the level alone is
+     * what catches both.
+     */
+    var micInputUnusable by mutableStateOf(false)
+        private set
+
+    // Level range observed across the capture in progress, and how many chunks
+    // it spans. See [micInputUnusable].
+    private var micPeakLevel = 0f
+    private var micFloorLevel = 1f
+    private var micFrames = 0
+
     var requireNetwork by mutableStateOf(true)
         private set
     var minBattery by mutableFloatStateOf(20f)
@@ -89,10 +125,10 @@ class SttViewModel : ViewModel() {
     private val buffer = ByteArrayOutputStream()
 
     // Live mode: mic chunks are fed straight into the SDK's streaming
-    // transcription (RunAnywhere.transcribeStream), which owns endpointing/
+    // transcription (RunAnywhere.stt.transcribeStream), which owns endpointing/
     // segmentation natively. No app-side silence detection. Mirrors iOS
     // STTViewModel.
-    private var liveAudio: Channel<ByteArray>? = null
+    private var liveAudio: Channel<AudioInput>? = null
     private var liveJob: Job? = null
     private var operationJob: Job? = null
     private var operationEpoch = 0
@@ -101,8 +137,23 @@ class SttViewModel : ViewModel() {
     private var routerOfflineId: String? = null
     private var routerOnlineId: String? = null
 
+    /**
+     * Switch mode, clearing the previous mode's output.
+     *
+     * Leaving a Batch transcript (and its stats) on screen under the Live mode's
+     * description attributes one mode's result to another — the reader has no way
+     * to tell which mode produced what. Same reset [start] already performs.
+     */
     fun selectMode(value: SttMode) {
-        if (!isRecording && !isTranscribing) mode = value
+        if (isRecording || isTranscribing || value == mode) return
+        mode = value
+        transcript = ""
+        committed = ""
+        metrics = null
+        routing = null
+        error = null
+        noSpeechDetected = false
+        micInputUnusable = false
     }
 
     fun onNetworkChange(value: Boolean) {
@@ -143,16 +194,27 @@ class SttViewModel : ViewModel() {
         metrics = null
         routing = null
         error = null
+        noSpeechDetected = false
+        micInputUnusable = false
         synchronized(buffer) { buffer.reset() }
         audioLevel = 0f
         isRecording = true
+        micPeakLevel = 0f
+        micFloorLevel = 1f
+        micFrames = 0
         if (mode == SttMode.LIVE) startLive()
         try {
             recorder.start(
                 onChunk = { chunk, level ->
+                    // Level range across the capture, so an empty result can say
+                    // whether the input carried anything at all. See
+                    // [micInputUnusable].
+                    if (level > micPeakLevel) micPeakLevel = level
+                    if (level < micFloorLevel) micFloorLevel = level
+                    micFrames += 1
                     // Batch/hybrid buffer locally; live feeds the SDK streaming session.
                     if (mode == SttMode.LIVE) {
-                        liveAudio?.trySend(chunk)
+                        liveAudio?.trySend(AudioInput.pcm16(chunk, AudioRecorder.SAMPLE_RATE))
                     } else {
                         synchronized(buffer) { buffer.write(chunk) }
                     }
@@ -179,10 +241,19 @@ class SttViewModel : ViewModel() {
     }
 
     private fun startLive() {
-        // A native fallback recognizer can spend seconds finalizing an
-        // utterance. Bound mic ingress so navigation/stop never leaves minutes
-        // of 100 ms chunks queued behind one blocking JNI call.
-        val channel = Channel<ByteArray>(
+        // Bound mic ingress so navigation/stop never leaves minutes of 100 ms
+        // chunks queued behind one blocking JNI call — but bound it by MEMORY,
+        // not by one flush. The session's native side is not ready when the mic
+        // opens: `transcribeStream` only resolves the model and loads the
+        // recognizer once it starts collecting this flow, and a cold load is
+        // seconds. Measured on the emulator, the first Live run of a session
+        // logged "STT model loaded" ~20 s after the record button — with the
+        // old 8-chunk (800 ms) bound, every chunk in between was dropped and
+        // the user's whole first sentence was gone before the recognizer
+        // existed to hear it. LIVE_CHANNEL_CAPACITY now holds
+        // LIVE_INGRESS_SECONDS of audio (~1 MB), which covers a cold start and
+        // still refuses to grow without limit.
+        val channel = Channel<AudioInput>(
             capacity = LIVE_CHANNEL_CAPACITY,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
@@ -190,10 +261,10 @@ class SttViewModel : ViewModel() {
         liveJob = viewModelScope.launch {
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
-                RunAnywhere.transcribeStream(
+                RunAnywhere.stt.transcribeStream(
                     channel.receiveAsFlow(),
-                    RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
-                ).collect { partial -> onLivePartial(partial) }
+                    SttOptions(language = "en", punctuation = true),
+                ).collect(::onLiveEvent)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -205,21 +276,20 @@ class SttViewModel : ViewModel() {
         }
     }
 
-    // Fold one streaming partial into the displayed transcript: non-final
-    // partials preview the current utterance, finals commit it as a line.
-    private fun onLivePartial(partial: RASTTPartialResult) {
-        val text = partial.text.trim()
-        if (partial.is_final) {
-            // Stream errors surface as a terminal partial carrying the
-            // failure text (see RunAnywhere.transcribeStream).
-            if (text.startsWith("STT stream failed")) {
-                error = text
-                return
+    // Fold one streaming event into the displayed transcript: partials preview
+    // the current utterance, the final result commits it as a line.
+    private fun onLiveEvent(event: TranscriptionEvent) {
+        when (event) {
+            is TranscriptionEvent.Partial -> {
+                val text = event.alternatives.firstOrNull()?.text?.trim().orEmpty()
+                if (text.isNotEmpty()) transcript = join(committed, text)
             }
-            if (text.isNotEmpty()) committed = join(committed, text)
-            transcript = committed
-        } else if (text.isNotEmpty()) {
-            transcript = join(committed, text)
+            is TranscriptionEvent.TranscriptFinal -> {
+                val text = event.segment.text.trim()
+                if (text.isNotEmpty()) committed = join(committed, text)
+                transcript = committed
+            }
+            else -> Unit
         }
     }
 
@@ -235,15 +305,18 @@ class SttViewModel : ViewModel() {
             isTranscribing = true
             val active = liveJob
             viewModelScope.launch {
-                try {
-                    // The native flush can wedge; bound the wait so the record
-                    // button can't stay disabled forever. On timeout the job is
-                    // left to finish on its own — we just stop blocking the UI.
-                    withTimeoutOrNull(LIVE_FLUSH_TIMEOUT_MS) { active?.join() }
-                } finally {
-                    if (liveJob === active) liveJob = null
-                    isTranscribing = false
-                }
+                // The native flush can wedge; bound the wait so the record
+                // button can't stay disabled forever. On timeout the job is
+                // left to finish on its own — we just stop blocking the UI.
+                val finished = withTimeoutOrNull(LIVE_FLUSH_TIMEOUT_MS) { active?.join() } != null
+                if (liveJob === active) liveJob = null
+                isTranscribing = false
+                // Only a flush we actually saw finish can testify that nothing
+                // was recognised. Measured: a final arrived 5.4 s after stop —
+                // past this timeout — so asserting "no speech" on the timeout
+                // told the user their recording was empty while its transcript
+                // was still on its way.
+                if (finished) reportSilenceIfEmpty()
             }
             return
         }
@@ -261,6 +334,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            reportSilenceIfEmpty()
                         }
                     }
                 }
@@ -275,6 +349,7 @@ class SttViewModel : ViewModel() {
                         if (operationEpoch == epoch) {
                             isTranscribing = false
                             operationJob = null
+                            reportSilenceIfEmpty()
                         }
                     }
                 }
@@ -346,11 +421,7 @@ class SttViewModel : ViewModel() {
                 policy = HybridRoutingPolicy(
                     hardFilters = filters,
                     cascade = HybridCascade.Confidence(confidenceThreshold),
-                    rank = if (preferLocalFirst) {
-                        HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
-                    } else {
-                        HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
-                    },
+                    preferLocal = preferLocalFirst,
                 ),
             )
         } catch (t: Throwable) {
@@ -366,16 +437,15 @@ class SttViewModel : ViewModel() {
     private suspend fun runTranscription(audio: ByteArray): String? = try {
         RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
         val started = System.currentTimeMillis()
-        val output = RunAnywhere.transcribe(
-            audio,
-            RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
+        val output = RunAnywhere.stt.transcribe(
+            AudioInput.pcm16(audio, AudioRecorder.SAMPLE_RATE),
+            SttOptions(language = "en", punctuation = true),
         )
         val elapsed = System.currentTimeMillis() - started
         val text = output.text.trim()
-        val audioMs = output.duration_ms.takeIf { it > 0 }
-            ?: output.metadata?.audio_length_ms?.takeIf { it > 0 }
+        val audioMs = output.durationMs.takeIf { it > 0 }
             ?: (audio.size.toLong() / (AudioRecorder.SAMPLE_RATE * 2L / 1000L))
-        val processingMs = output.metadata?.processing_time_ms?.takeIf { it > 0 } ?: elapsed
+        val processingMs = elapsed
         metrics = SttMetrics(
             audioSec = audioMs / 1000.0,
             processingMs = processingMs,
@@ -389,6 +459,19 @@ class SttViewModel : ViewModel() {
         RACLog.e("stt transcribe failed", e)
         error = e.message ?: "Transcription failed"
         null
+    }
+
+    /**
+     * Publish the empty-result state once an operation has genuinely finished,
+     * naming whichever of the two empty cases actually happened. See
+     * [micInputUnusable].
+     */
+    private fun reportSilenceIfEmpty() {
+        val empty = transcript.isBlank() && error == null
+        noSpeechDetected = empty
+        micInputUnusable = empty &&
+            micFrames >= UNUSABLE_MIN_FRAMES &&
+            micPeakLevel - micFloorLevel < UNUSABLE_LEVEL_RANGE
     }
 
     // Committed utterances stack as lines, mirroring iOS STTViewModel.
@@ -425,7 +508,23 @@ class SttViewModel : ViewModel() {
 
     private companion object {
         const val MIN_BYTES = 16000
-        const val LIVE_CHANNEL_CAPACITY = 8
+
+        // Mic ingress held for the live session, as seconds of 100 ms chunks.
+        // Sized to outlast a cold recognizer load rather than one flush — see
+        // the note in [startLive]. 30 s is ~1 MB of PCM.
+        const val LIVE_INGRESS_SECONDS = 30
+        const val LIVE_CHANNEL_CAPACITY = LIVE_INGRESS_SECONDS * 1000 / AudioRecorder.CHUNK_MS
+
         const val LIVE_FLUSH_TIMEOUT_MS = 5000L
+
+        // How still a capture's level has to be, on AudioRecorder's normalised
+        // 0..1 dB scale, before it reads as a dead input rather than a quiet
+        // room — and how many chunks that has to hold for. Measured on this
+        // emulator: a silent room still swung 0.36..0.48 chunk to chunk, while
+        // a disconnected input sat at a flat 0.950 for 126 consecutive chunks.
+        // 0.02 over 2 s sits far below the former and far above the latter.
+        // See [micInputUnusable].
+        const val UNUSABLE_LEVEL_RANGE = 0.02f
+        const val UNUSABLE_MIN_FRAMES = 2000 / AudioRecorder.CHUNK_MS
     }
 }

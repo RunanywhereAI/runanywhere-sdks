@@ -147,8 +147,8 @@ struct StreamSession {
     rac_handle_t service = nullptr;
     rac_handle_t backend_stream = nullptr;
     rac_diarization_options_t options = RAC_DIARIZATION_OPTIONS_DEFAULT;
-    runanywhere::v1::DiarizationAudioEncoding encoding =
-        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    runanywhere::v1::AudioEncoding encoding =
+        runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE;
     std::unique_ptr<ProviderCallbackContext> callback_context;
 
     std::mutex mutex;
@@ -656,8 +656,8 @@ rac_result_t rac_diarization_stream_start_proto(rac_handle_t handle,
         return RAC_ERROR_DECODING_ERROR;
     }
     rac_diarization_options_t options = RAC_DIARIZATION_OPTIONS_DEFAULT;
-    runanywhere::v1::DiarizationAudioEncoding encoding =
-        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    runanywhere::v1::AudioEncoding encoding =
+        runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE;
     rac_result_t rc = rac::diarization::options_from_proto(
         options_proto_size > 0 ? &parsed : nullptr, &options, &encoding);
     if (rc != RAC_SUCCESS) {

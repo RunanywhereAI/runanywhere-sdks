@@ -1,14 +1,13 @@
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   SpeechActivityEvent,
   VADConfiguration,
-  VADAudioEncoding,
   VADOptions,
   VADProcessRequest,
   VADResult,
   VADServiceState,
   VADStatistics,
   VADStreamEvent,
-  VADStreamEventKind,
   type SpeechActivityEvent as ProtoSpeechActivityEvent,
   type VADConfiguration as ProtoVADConfiguration,
   type VADOptions as ProtoVADOptions,
@@ -87,7 +86,26 @@ export class VADProtoAdapter {
     ]).length === 0;
   }
 
-  configureLifecycle(config: ProtoVADConfiguration): ProtoVADServiceState | null {
+  /**
+   * Apply the detector threshold / frame geometry to the loaded VAD service.
+   *
+   * The lifecycle VAD component lives in the heap that loaded the model. When
+   * the ONNX BackendWorker owns Silero, a main-thread configure reaches a
+   * module whose lifecycle map has no VAD component and returns
+   * NOT_INITIALIZED — which left the loaded detector permanently unusable and
+   * silently demoted the voice agent to energy VAD. Route it to the owning
+   * heap, exactly as `processLifecycle` already does.
+   */
+  async configureLifecycle(
+    config: ProtoVADConfiguration,
+  ): Promise<ProtoVADServiceState | null> {
+    const host = requireLiveOnnxWorkerOrMain('vad.configureLifecycle');
+    if (host) {
+      const response = await host.infer('vad.configure', {
+        requestBytes: VADConfiguration.encode(config).finish(),
+      });
+      return decodeWorkerInferResult(response, VADServiceState);
+    }
     if (!ensureExports(this.module, 'vad.configureLifecycle', [
       '_rac_vad_configure_lifecycle_proto',
     ])) {
@@ -114,16 +132,14 @@ export class VADProtoAdapter {
     sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): Promise<ProtoVADResult | null> {
     const request = VADProcessRequest.create({
-      requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
-        encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         sampleRate,
         channels: 1,
         frameOffsetMs: 0,
       },
       options,
-      metadata: {},
     });
     const host = requireLiveOnnxWorkerOrMain('vad.processLifecycle');
     if (host) {
@@ -152,27 +168,30 @@ export class VADProtoAdapter {
     );
   }
 
-  startLifecycle(): ProtoVADServiceState | null {
+  startLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.startLifecycle',
       '_rac_vad_start_lifecycle_proto',
       'rac_vad_start_lifecycle_proto',
+      'vad.start',
     );
   }
 
-  stopLifecycle(): ProtoVADServiceState | null {
+  stopLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.stopLifecycle',
       '_rac_vad_stop_lifecycle_proto',
       'rac_vad_stop_lifecycle_proto',
+      'vad.stop',
     );
   }
 
-  resetLifecycle(): ProtoVADServiceState | null {
+  resetLifecycle(): Promise<ProtoVADServiceState | null> {
     return this.callLifecycleState(
       'vad.resetLifecycle',
       '_rac_vad_reset_lifecycle_proto',
       'rac_vad_reset_lifecycle_proto',
+      'vad.reset',
     );
   }
 
@@ -192,29 +211,35 @@ export class VADProtoAdapter {
     handle: number,
     samples: Float32Array,
     options: ProtoVADOptions,
+    sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): ProtoVADResult | null {
     if (!ensureExports(this.module, 'vad.process', ['_rac_vad_component_process_proto'])) {
       return null;
     }
-    const sampleBytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-    const optionsBytes = VADOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return bridge.withHeapBytes(sampleBytes, (samplesPtr) => (
-      bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProto(
-          VADResult,
-          (outResult) => this.module._rac_vad_component_process_proto!(
-            handle,
-            samplesPtr,
-            samples.length,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_vad_component_process_proto',
+    const request = VADProcessRequest.create({
+      audio: {
+        audioData: float32ToLittleEndianBytes(samples),
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
+        sampleRate,
+        channels: 1,
+        frameOffsetMs: 0,
+      },
+      options,
+    });
+    return this.bridge().withEncodedRequest(
+      request,
+      VADProcessRequest,
+      VADResult,
+      (requestPtr, requestSize, outResult) => (
+        this.module._rac_vad_component_process_proto!(
+          handle,
+          requestPtr,
+          requestSize,
+          outResult,
         )
-      ))
-    ));
+      ),
+      'rac_vad_component_process_proto',
+    );
   }
 
   /**
@@ -353,15 +378,8 @@ export class VADProtoAdapter {
 
             const emitted = events.splice(0, events.length);
             for (const event of emitted) {
-              if (
-                event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR
-                || event.errorCode !== 0
-              ) {
-                throw SDKException.fromRACResult(
-                  event.errorCode || -1,
-                  event.errorMessage || 'VAD stream emitted an error event',
-                  { module, logger },
-                );
+              if (event.error) {
+                throw new SDKException(event.error);
               }
               if (event.result) yield event.result;
             }
@@ -456,14 +474,20 @@ export class VADProtoAdapter {
     return new ProtoWasmBridge(this.module, logger);
   }
 
-  private callLifecycleState(
+  private async callLifecycleState(
     feature: string,
     exportName:
       | '_rac_vad_start_lifecycle_proto'
       | '_rac_vad_stop_lifecycle_proto'
       | '_rac_vad_reset_lifecycle_proto',
     functionName: string,
-  ): ProtoVADServiceState | null {
+    workerKind: 'vad.start' | 'vad.stop' | 'vad.reset',
+  ): Promise<ProtoVADServiceState | null> {
+    const host = requireLiveOnnxWorkerOrMain(feature);
+    if (host) {
+      const response = await host.infer(workerKind, {});
+      return decodeWorkerInferResult(response, VADServiceState);
+    }
     if (!ensureExports(this.module, feature, [exportName])) return null;
     const call = this.module[exportName];
     if (typeof call !== 'function') return null;
@@ -495,11 +519,4 @@ function float32ToLittleEndianBytes(samples: Float32Array): Uint8Array {
     view.setFloat32(index * Float32Array.BYTES_PER_ELEMENT, samples[index] ?? 0, true);
   }
   return new Uint8Array(buffer);
-}
-
-function lifecycleRequestId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  return `vad-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

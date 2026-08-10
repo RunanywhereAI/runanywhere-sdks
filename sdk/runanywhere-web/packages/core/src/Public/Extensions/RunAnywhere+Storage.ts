@@ -9,13 +9,16 @@
  */
 
 import type {
+  ArchiveArtifact,
   ExpectedModelFiles,
   InferenceFramework,
   ModelFileDescriptor,
   ModelInfo,
   MultiFileArtifact,
+  SingleFileArtifact,
 } from '@runanywhere/proto-ts/model_types';
 import {
+  ArchiveType,
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
@@ -141,7 +144,8 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
       return this.delete(
         StorageDeleteRequestMessage.fromPartial({
           modelIds: [modelId],
-          deleteFiles: true,
+          // Files are deleted by default; keepFilesOnDisk=true is the
+          // opt-out. This is a full delete, so leave it unset (false).
           clearRegistryPaths: true,
           unloadIfLoaded: true,
           allowPlatformDelete: true,
@@ -168,6 +172,14 @@ export interface RegisterModelOptions {
   description?: string;
   format?: ModelFormat;
   modality?: ModelCategory;
+  /**
+   * When supplied, must be an archive type (`MODEL_ARTIFACT_TYPE_*_ARCHIVE`
+   * or `_TAR_*`); `buildSingleFileModelInfo` builds an `ArchiveArtifact`
+   * oneof arm from it instead of `SingleFileArtifact`. `ModelInfo` no
+   * longer carries a top-level `artifactType` field -- the active oneof
+   * case (`singleFile`/`archive`/`multiFile`/`builtIn`) is the sole
+   * artifact-kind signal now.
+   */
   artifactType?: ModelArtifactType;
   memoryRequirement?: number;
   downloadSizeBytes?: number;
@@ -175,6 +187,12 @@ export interface RegisterModelOptions {
   supportsThinking?: boolean;
   supportsLora?: boolean;
   source?: ModelSource;
+  /**
+   * Optional Computer-Use-Agent profile id (e.g. `'fara'`). Lands on
+   * `ModelInfo.cuaProfile` so callers can discover which registered models
+   * are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -189,6 +207,13 @@ export interface RegisterModelFile {
   filename: string;
   role: ModelFileRole;
   sizeBytes: number;
+  /**
+   * `ModelFileDescriptor.isOptional` was inverted from the old
+   * `isRequired`: the wire's zero-value default is "required" (isOptional
+   * = false). Callers of this Web-facing options bag keep the pre-inversion
+   * `isRequired` spelling/default (default `true`); `toMultiFileArtifact`
+   * inverts once at the proto-building boundary.
+   */
   isRequired?: boolean;
 }
 
@@ -206,6 +231,12 @@ export interface RegisterMultiFileOptions {
   supportsThinking?: boolean;
   supportsLora?: boolean;
   source?: ModelSource;
+  /**
+   * Optional Computer-Use-Agent profile id (e.g. `'fara'`). Lands on
+   * `ModelInfo.cuaProfile` so callers can discover which registered models
+   * are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -228,6 +259,24 @@ function schedulePostRegisterHydrate(): void {
     fn();
   } catch {
     /* hydrate is best-effort; failures are surfaced by hydrate itself */
+  }
+}
+
+/** Reverse of `archiveTypeToArtifactType` (ModelTypes+Artifacts.ts) -- maps a
+ * caller-supplied archive-flavored `ModelArtifactType` back onto the proto's
+ * `ArchiveType` enum for building an `ArchiveArtifact` oneof arm. */
+function artifactTypeToArchiveType(type: ModelArtifactType): ArchiveType {
+  switch (type) {
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+      return ArchiveType.ARCHIVE_TYPE_ZIP;
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+      return ArchiveType.ARCHIVE_TYPE_TAR_GZ;
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE:
+      return ArchiveType.ARCHIVE_TYPE_TAR_BZ2;
+    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE:
+      return ArchiveType.ARCHIVE_TYPE_TAR_XZ;
+    default:
+      return ArchiveType.ARCHIVE_TYPE_UNSPECIFIED;
   }
 }
 
@@ -254,7 +303,8 @@ function toMultiFileArtifact(
   const descriptors: ModelFileDescriptor[] = files.map((file) => ({
     url: file.url,
     filename: file.filename,
-    isRequired: file.isRequired ?? true,
+    // Polarity inversion: file.isRequired (default true) -> isOptional (default false).
+    isOptional: !(file.isRequired ?? true),
     sizeBytes: file.sizeBytes,
     relativePath: file.filename,
     destinationPath: file.filename,
@@ -265,8 +315,8 @@ function toMultiFileArtifact(
     expected: {
       files: descriptors,
       rootDirectory: '',
-      requiredPatterns: descriptors.filter((f) => f.isRequired).map((f) => f.filename),
-      optionalPatterns: descriptors.filter((f) => !f.isRequired).map((f) => f.filename),
+      requiredPatterns: descriptors.filter((f) => !f.isOptional).map((f) => f.filename),
+      optionalPatterns: descriptors.filter((f) => f.isOptional).map((f) => f.filename),
       description: '',
     },
     descriptors,
@@ -279,7 +329,7 @@ function toMultiFileArtifact(
  * (`ModelRegistry.registerModel` → `_rac_model_registry_register_proto`)
  * persists all of these fields, so one complete build + one save is enough.
  */
-function buildSingleFileModelInfo(
+export function buildSingleFileModelInfo(
   url: string,
   name: string,
   framework: InferenceFramework,
@@ -287,8 +337,15 @@ function buildSingleFileModelInfo(
 ): ModelInfo {
   const now = Date.now();
   const id = options.id ?? deriveIdFromUrlFallback(url);
-  const downloadSize = options.downloadSizeBytes ?? options.memoryRequirement ?? 0;
+  const downloadSize = options.downloadSizeBytes ?? 0;
   const category = options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
+  const artifactType = options.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE;
+  const isArchive = artifactType !== ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
+    && artifactType !== ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED;
+  const singleFile: SingleFileArtifact | undefined = isArchive ? undefined : {};
+  const archive: ArchiveArtifact | undefined = isArchive
+    ? { type: artifactTypeToArchiveType(artifactType), structure: 0 }
+    : undefined;
   return {
     id,
     name,
@@ -315,15 +372,23 @@ function buildSingleFileModelInfo(
     createdAtUnixMs: now,
     updatedAtUnixMs: now,
     memoryRequiredBytes: options.memoryRequirement,
-    artifactType: options.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+    // `ModelInfo.artifactType` was deleted outright; the active oneof arm
+    // (singleFile/archive/multiFile/builtIn) is the sole artifact-kind
+    // signal now (see `types/ModelTypes+Artifacts.ts`).
+    singleFile,
+    archive,
+    ...(options.cuaProfile ? { cuaProfile: options.cuaProfile } : {}),
   };
 }
 
-function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
+export function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
   const now = Date.now();
-  const { artifact, expected } = toMultiFileArtifact(options.files);
-  expected.rootDirectory = options.id;
-  expected.description = `${options.name} primary model and companion artifacts`;
+  // `MultiFileArtifact` carries only `files` (no nested `expectedFiles`
+  // manifest slot like `SingleFileArtifact`/`ArchiveArtifact`), so the
+  // manifest-shaping logic in `toMultiFileArtifact` is only used for its
+  // `artifact.files` descriptors here; `modelInfoExpectedArtifactFiles(...)`
+  // falls back to deriving a manifest from `multiFile.files` directly.
+  const { artifact } = toMultiFileArtifact(options.files);
   const downloadSize = options.downloadSizeBytes ?? totalFileSize(options.files);
   const category = options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
   // Pick the first PRIMARY_MODEL url for downloadUrl (or first file) so the
@@ -357,8 +422,7 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
     updatedAtUnixMs: now,
     memoryRequiredBytes: options.memoryRequirement,
     multiFile: artifact,
-    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
-    expectedFiles: expected,
+    ...(options.cuaProfile ? { cuaProfile: options.cuaProfile } : {}),
   };
 }
 

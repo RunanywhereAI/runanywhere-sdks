@@ -31,7 +31,6 @@ final class SegmentationPublicSurfaceTests: XCTestCase {
         var summary = RASegmentationClassSummary()
         summary.classID = 12
         summary.pixelCount = 2
-        summary.fraction = 1
         summary.label = "person"
 
         var result = RASegmentationResult()
@@ -52,8 +51,8 @@ final class SegmentationPublicSurfaceTests: XCTestCase {
     }
 
     func testRunAnywhereExposesCanonicalRequestFacade() {
-        let segment: (RASegmentationRequest) async throws -> RASegmentationResult =
-            RunAnywhere.segment
+        let segment: (ImageInput, SegmentationOptions?) async throws -> SegmentationResult =
+            RunAnywhere.segmentation.segment
 
         withExtendedLifetime(segment) {}
     }

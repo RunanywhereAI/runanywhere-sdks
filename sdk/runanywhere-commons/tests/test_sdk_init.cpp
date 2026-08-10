@@ -66,7 +66,7 @@ bool parse_result(const rac_proto_buffer_t& buffer, SdkInitResult* result) {
 void run_phase1_development() {
     std::fprintf(stdout, "-- phase1 development env (no api key required) --\n");
     SdkInitPhase1Request request;
-    request.set_environment(::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT);
+    request.set_environment(::runanywhere::v1::SDK_ENVIRONMENT_DEVELOPMENT);
     request.set_device_id("dev-device-uuid");
 
     std::vector<uint8_t> bytes;
@@ -79,9 +79,10 @@ void run_phase1_development() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase1 dev result parses");
-    CHECK(result.phase() == ::runanywhere::v1::SDK_INIT_PHASE_ONE,
-          "phase1 dev result reports SDK_INIT_PHASE_ONE");
-    CHECK(result.success(), "phase1 dev succeeds");
+    // SdkInitResult.phase / SDK_INIT_PHASE_ONE were deleted (SdkInitResult was
+    // cut to error/linked_models_count/warning/has_completed_http_setup/
+    // http_applicable) -- success is now just has_error() == false.
+    CHECK(result.has_error() == false, "phase1 dev succeeds");
     CHECK(rac_state_is_initialized(), "rac_state_is_initialized() after phase1");
     CHECK(rac_state_get_environment() == RAC_ENV_DEVELOPMENT,
           "rac_state_get_environment() == DEVELOPMENT");
@@ -104,9 +105,11 @@ void run_phase2_without_external_config() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase2 no-config result parses");
-    CHECK(result.success(), "phase2 no-config succeeds");
+    CHECK(result.has_error() == false, "phase2 no-config succeeds");
     CHECK(!result.http_applicable(), "phase2 no-config reports http_applicable=false");
-    CHECK(!result.device_registered(), "phase2 no-config reports device_registered=false");
+    // device_registered was deleted from SdkInitResult (idl/sdk_init.proto cut
+    // it to 5 fields); device registration success has no dedicated flag now,
+    // only a warning on failure, checked below.
     CHECK(result.warning().find("auth setup deferred") == std::string::npos,
           "phase2 no-config does not report deferred auth");
     CHECK(result.warning().find("device registration deferred") == std::string::npos,
@@ -121,7 +124,7 @@ void run_phase1_production_validation_failure() {
     rac_auth_reset();
 
     SdkInitPhase1Request request;
-    request.set_environment(::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION);
+    request.set_environment(::runanywhere::v1::SDK_ENVIRONMENT_PRODUCTION);
     // Intentionally omit api_key/base_url so validation rejects the input.
 
     std::vector<uint8_t> bytes;
@@ -134,7 +137,7 @@ void run_phase1_production_validation_failure() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase1 prod-missing-key result parses");
-    CHECK(!result.success(), "phase1 prod-missing-key reports success=false");
+    CHECK(!result.has_error() == false, "phase1 prod-missing-key reports success=false");
     CHECK(result.has_error(), "phase1 prod-missing-key carries SDKError");
     CHECK(result.error().c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
           "phase1 prod-missing-key carries RAC_ERROR_INVALID_ARGUMENT");
@@ -148,7 +151,7 @@ void run_phase1_production_success() {
     rac_auth_reset();
 
     SdkInitPhase1Request request;
-    request.set_environment(::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION);
+    request.set_environment(::runanywhere::v1::SDK_ENVIRONMENT_PRODUCTION);
     request.set_api_key("prod_api_key_xxxxxxxxxxxxxxxx");
     request.set_base_url("https://api.runanywhere.ai");
     request.set_device_id("prod-device-uuid");
@@ -163,8 +166,7 @@ void run_phase1_production_success() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase1 prod-valid result parses");
-    CHECK(result.success(), "phase1 prod-valid succeeds");
-    CHECK(result.phase() == ::runanywhere::v1::SDK_INIT_PHASE_ONE, "phase tagged");
+    CHECK(result.has_error() == false, "phase1 prod-valid succeeds");
     CHECK(rac_state_get_environment() == RAC_ENV_PRODUCTION,
           "rac_state_get_environment() == PRODUCTION");
 
@@ -191,12 +193,12 @@ void run_phase2_offline_mode() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase2 result parses");
-    CHECK(result.phase() == ::runanywhere::v1::SDK_INIT_PHASE_TWO,
-          "phase2 result reports SDK_INIT_PHASE_TWO");
-    CHECK(result.success(), "phase2 offline succeeds (offline tolerance)");
-    // No auth callbacks registered → http_configured=false is the expected
-    // offline-mode shape.
-    CHECK(!result.http_configured(), "phase2 reports http_configured=false offline");
+    CHECK(result.has_error() == false, "phase2 offline succeeds (offline tolerance)");
+    // http_configured/SDK_INIT_PHASE_TWO were deleted; has_completed_http_setup
+    // is the surviving cross-phase latched bit. No auth callbacks registered →
+    // it stays false in offline mode.
+    CHECK(!result.has_completed_http_setup(),
+          "phase2 reports has_completed_http_setup=false offline");
 
     rac_proto_buffer_free(&out);
 }
@@ -214,7 +216,7 @@ void run_phase2_without_phase1() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "phase2 missing-phase1 result parses");
-    CHECK(!result.success(), "phase2 missing-phase1 reports success=false");
+    CHECK(!result.has_error() == false, "phase2 missing-phase1 reports success=false");
     CHECK(result.error().c_abi_code() == RAC_ERROR_NOT_INITIALIZED,
           "phase2 missing-phase1 reports RAC_ERROR_NOT_INITIALIZED");
 
@@ -225,7 +227,7 @@ void run_retry_http_no_external_config() {
     std::fprintf(stdout, "-- retryHTTP no-op when no usable external config --\n");
     // Re-init in development env so retry is a no-op.
     SdkInitPhase1Request request;
-    request.set_environment(::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT);
+    request.set_environment(::runanywhere::v1::SDK_ENVIRONMENT_DEVELOPMENT);
     request.set_device_id("dev-device");
     std::vector<uint8_t> phase1_bytes;
     serialize_phase1(request, phase1_bytes);
@@ -242,12 +244,17 @@ void run_retry_http_no_external_config() {
 
     SdkInitResult result;
     CHECK(parse_result(out, &result), "retryHTTP result parses");
-    CHECK(result.phase() == ::runanywhere::v1::SDK_INIT_PHASE_RETRY_HTTP,
-          "retryHTTP result reports SDK_INIT_PHASE_RETRY_HTTP");
-    CHECK(result.success(), "retryHTTP no-op reports success=true");
-    CHECK(!result.http_configured(),
-          "retryHTTP without external config reports http_configured=false");
-    CHECK(!result.warning().empty(), "retryHTTP warning is set for the no-op branch");
+    // phase / SDK_INIT_PHASE_RETRY_HTTP / http_configured were deleted; the
+    // surviving cross-phase bit is has_completed_http_setup. Unlike the old
+    // http_configured (conditional on transport registration), commons has
+    // always set has_completed_http_setup unconditionally true on this
+    // keyless-development no-op branch (see perform_authentication's
+    // !rac_env_auth_expected early return) -- that did not change with the
+    // proto edit, so this is not a "false" case.
+    CHECK(result.has_error() == false, "retryHTTP no-op reports success=true");
+    CHECK(result.has_completed_http_setup(),
+          "retryHTTP without external config still reports has_completed_http_setup=true");
+    CHECK(result.warning().empty(), "retryHTTP no-op branch sets no warning");
 
     rac_proto_buffer_free(&out);
 }

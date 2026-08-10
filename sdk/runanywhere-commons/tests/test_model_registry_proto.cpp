@@ -72,7 +72,8 @@ runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const s
     model.mutable_metadata()->add_tags("chat");
     model.mutable_metadata()->add_tags("reasoning");
     model.mutable_metadata()->set_version("v1");
-    model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_DIRECTORY);
+    // ModelInfo.artifact_type (top-level, tag 25) was reserved -- the
+    // artifact oneof below is the only declaration of bundle shape now.
     model.set_acceleration_preference(runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
     model.set_routing_policy(runanywhere::v1::ROUTING_POLICY_PREFER_LOCAL);
     model.mutable_compatibility()->add_compatible_frameworks(
@@ -80,17 +81,22 @@ runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const s
     model.mutable_compatibility()->add_compatible_formats(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_preferred_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
-    model.set_is_downloaded(!local_path.empty());
+    // is_downloaded (tag 32) was reserved -- registry_status above is the
+    // single downloaded-ness signal now.
     model.set_is_available(!local_path.empty());
     model.set_last_used_at_unix_ms(3000);
-    model.set_usage_count(7);
-    model.set_sync_pending(true);
-    model.set_status_message("ready");
+    // usage_count / sync_pending / status_message (tags 35-37) were reserved.
 
+    // ModelInfo.expected_files (top-level) was deleted; the manifest now
+    // lives solely on SingleFileArtifact/ArchiveArtifact.expected_files. The
+    // multi_file artifact carries its own descriptor list instead, so this
+    // model uses multi_file with a single descriptor (mirroring the original
+    // intent: one primary weights file plus a tokenizer companion) rather
+    // than a parallel top-level manifest.
     auto* file = model.mutable_multi_file()->add_files();
     file->set_url("weights/part-0001.gguf");
     file->set_filename("part-0001.gguf");
-    file->set_is_required(true);
+    file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     file->set_size_bytes(42);
     file->set_checksum_sha256("sha256:part");
     file->set_relative_path("weights/part-0001.gguf");
@@ -98,17 +104,12 @@ runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const s
     file->set_local_path(local_path + "/part-0001.gguf");
     file->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
-    auto* expected = model.mutable_expected_files();
-    expected->set_root_directory("model-root");
-    expected->set_description("expected file set");
-    expected->add_required_patterns("*.gguf");
-    expected->add_optional_patterns("tokenizer.json");
-    auto* expected_file = expected->add_files();
-    expected_file->set_filename("tokenizer.json");
-    expected_file->set_relative_path("tokenizer.json");
-    expected_file->set_destination_path("tokenizer.json");
-    expected_file->set_is_required(false);
-    expected_file->set_role(runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
+    auto* tokenizer_file = model.mutable_multi_file()->add_files();
+    tokenizer_file->set_filename("tokenizer.json");
+    tokenizer_file->set_relative_path("tokenizer.json");
+    tokenizer_file->set_destination_path("tokenizer.json");
+    tokenizer_file->set_is_optional(true);  // optional (is_required=false polarity inverted)
+    tokenizer_file->set_role(runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
 
     return model;
 }
@@ -155,7 +156,8 @@ build_query_model(const std::string& id, const std::string& name,
     model.set_source(source);
     model.set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
                                          : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
-    model.set_is_downloaded(downloaded);
+    // is_downloaded (tag 32) was reserved -- registry_status above is the
+    // single downloaded-ness signal now.
     model.set_is_available(available);
     return model;
 }
@@ -312,12 +314,12 @@ runanywhere::v1::ModelInfo build_expanded_enum_model() {
     model.set_source(runanywhere::v1::MODEL_SOURCE_BUILT_IN);
     model.set_created_at_unix_ms(10);
     model.set_updated_at_unix_ms(20);
-    model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN);
+    // artifact_type (top-level, tag 25) was reserved -- built_in below (the
+    // artifact oneof) is the only declaration of bundle shape now.
     model.set_built_in(true);
     model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED);
-    model.set_is_downloaded(true);
+    // is_downloaded (tag 32) and status_message (tag 37) were reserved.
     model.set_is_available(true);
-    model.set_status_message("loaded");
     model.mutable_metadata()->add_tags("expanded");
     model.mutable_compatibility()->add_compatible_frameworks(
         runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE);
@@ -366,17 +368,18 @@ int test_full_field_round_trip_proto() {
     ASSERT_EQ(decoded.compatibility().compatible_frameworks_size(), 1);
     ASSERT_TRUE(decoded.has_registry_status());
     ASSERT_EQ(decoded.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
-    ASSERT_TRUE(decoded.has_is_downloaded());
-    ASSERT_TRUE(decoded.is_downloaded());
+    // is_downloaded (tag 32) was reserved -- registry_status above is the
+    // single downloaded-ness signal now.
     ASSERT_TRUE(decoded.has_is_available());
     ASSERT_TRUE(decoded.is_available());
-    ASSERT_TRUE(decoded.has_expected_files());
-    ASSERT_EQ(decoded.expected_files().required_patterns_size(), 1);
-    ASSERT_EQ(decoded.expected_files().files_size(), 1);
+    // ModelInfo.expected_files (top-level) was deleted; build_full_model_proto
+    // now encodes both files (primary weights + tokenizer companion) directly
+    // on the multi_file artifact.
     ASSERT_TRUE(decoded.has_multi_file());
-    ASSERT_EQ(decoded.multi_file().files_size(), 1);
+    ASSERT_EQ(decoded.multi_file().files_size(), 2);
     ASSERT_EQ(decoded.multi_file().files(0).checksum_sha256(), "sha256:part");
     ASSERT_EQ(decoded.multi_file().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+    ASSERT_EQ(decoded.multi_file().files(1).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     ASSERT_EQ(decoded.acceleration_preference(), runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
     ASSERT_EQ(decoded.routing_policy(), runanywhere::v1::ROUTING_POLICY_PREFER_LOCAL);
 
@@ -385,7 +388,6 @@ int test_full_field_round_trip_proto() {
     ASSERT_EQ(list.models_size(), 1);
     ASSERT_EQ(list.models(0).id(), "llama.test");
     ASSERT_TRUE(list.models(0).has_multi_file());
-    ASSERT_TRUE(list.models(0).has_expected_files());
     ASSERT_TRUE(list.models(0).has_metadata());
 
     rac_model_registry_destroy(registry);
@@ -426,7 +428,8 @@ int test_expanded_proto_fields_survive_struct_state_updates() {
     ASSERT_EQ(decoded.format(), runanywhere::v1::MODEL_FORMAT_TFLITE);
     ASSERT_EQ(decoded.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE);
     ASSERT_EQ(decoded.source(), runanywhere::v1::MODEL_SOURCE_BUILT_IN);
-    ASSERT_EQ(decoded.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN);
+    // artifact_type (top-level, tag 25) was reserved -- built_in below (the
+    // artifact oneof) is the only declaration of bundle shape now.
     ASSERT_TRUE(decoded.has_built_in());
     ASSERT_TRUE(decoded.built_in());
     ASSERT_TRUE(decoded.has_metadata());
@@ -436,8 +439,9 @@ int test_expanded_proto_fields_survive_struct_state_updates() {
     ASSERT_TRUE(decoded.has_registry_status());
     ASSERT_EQ(decoded.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED);
     ASSERT_TRUE(decoded.has_last_used_at_unix_ms());
-    ASSERT_TRUE(decoded.has_usage_count());
-    ASSERT_EQ(decoded.usage_count(), 1);
+    // usage_count (tag 35) was reserved off the wire type -- rac_model_registry
+    // still tracks it on the C struct, but it no longer round-trips on
+    // ModelInfo proto.
 
     runanywhere::v1::ModelInfoList list;
     ASSERT_TRUE(list_model_proto(registry, &list));
@@ -470,12 +474,17 @@ int test_update_preserves_proto_only_fields() {
     ASSERT_EQ(decoded.memory_required_bytes(), 123456);
     ASSERT_TRUE(decoded.has_metadata());
     ASSERT_EQ(decoded.metadata().tags_size(), 2);
-    ASSERT_TRUE(decoded.has_expected_files());
-    ASSERT_EQ(decoded.expected_files().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
+    // build_minimal_update_proto sets no artifact oneof (ARTIFACT_NOT_SET), so
+    // preserve_absent_proto_fields() copies the whole existing multi_file
+    // artifact over verbatim -- both descriptors survive the update.
     ASSERT_TRUE(decoded.has_multi_file());
+    ASSERT_EQ(decoded.multi_file().files_size(), 2);
     ASSERT_EQ(decoded.multi_file().files(0).checksum_sha256(), "sha256:part");
-    ASSERT_TRUE(decoded.has_is_downloaded());
-    ASSERT_TRUE(decoded.is_downloaded());
+    ASSERT_EQ(decoded.multi_file().files(1).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
+    // is_downloaded (tag 32) was reserved -- registry_status is the single
+    // downloaded-ness signal now, and it is preserved the same way.
+    ASSERT_TRUE(decoded.has_registry_status());
+    ASSERT_EQ(decoded.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
 
     rac_model_registry_destroy(registry);
     return 0;
@@ -576,12 +585,8 @@ int test_query_filters_and_downloaded_list_proto() {
     ASSERT_EQ(list.models_size(), 1);
     ASSERT_EQ(list.models(0).id(), "alpha.chat");
 
-    query.Clear();
-    query.set_available_only(true);
-    ASSERT_TRUE(query_model_proto(registry, query, &list));
-    ASSERT_EQ(list.models_size(), 2);
-    ASSERT_EQ(list.models(0).id(), "alpha.chat");
-    ASSERT_EQ(list.models(1).id(), "gamma.embed");
+    // ModelQuery.available_only (former tag 5) was reserved: no remaining
+    // filter consumer (see model_matches_query in model_registry_proto.cpp).
 
     query.Clear();
     query.set_search_query("speech");
@@ -604,64 +609,14 @@ int test_query_filters_and_downloaded_list_proto() {
     return 0;
 }
 
-int test_query_source_filter_and_sorting_proto() {
-    rac_model_registry_handle_t registry = create_registry();
-    ASSERT_TRUE(registry != nullptr);
-
-    ASSERT_TRUE(register_model_proto(
-        registry,
-        build_query_model("alpha.remote", "Zulu Remote", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
-                          runanywhere::v1::MODEL_FORMAT_GGUF,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP, false, true, 300,
-                          runanywhere::v1::MODEL_SOURCE_REMOTE)));
-    ASSERT_TRUE(register_model_proto(
-        registry, build_query_model(
-                      "beta.local", "Mango Local", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
-                      runanywhere::v1::MODEL_FORMAT_ONNX, runanywhere::v1::INFERENCE_FRAMEWORK_ONNX,
-                      true, true, 100, runanywhere::v1::MODEL_SOURCE_LOCAL)));
-    ASSERT_TRUE(register_model_proto(
-        registry, build_query_model("zeta.local", "Aardvark Local",
-                                    runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
-                                    runanywhere::v1::MODEL_FORMAT_ONNX,
-                                    runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA, true, true, 200,
-                                    runanywhere::v1::MODEL_SOURCE_LOCAL)));
-
-    runanywhere::v1::ModelInfoList list;
-    runanywhere::v1::ModelQuery query;
-    query.set_source(runanywhere::v1::MODEL_SOURCE_LOCAL);
-    ASSERT_TRUE(query_model_proto(registry, query, &list));
-    ASSERT_EQ(list.models_size(), 2);
-    ASSERT_EQ(list.models(0).id(), "beta.local");
-    ASSERT_EQ(list.models(1).id(), "zeta.local");
-
-    query.Clear();
-    query.set_sort_field(runanywhere::v1::MODEL_QUERY_SORT_FIELD_NAME);
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_ASCENDING);
-    ASSERT_TRUE(query_model_proto(registry, query, &list));
-    ASSERT_EQ(list.models_size(), 3);
-    ASSERT_EQ(list.models(0).id(), "zeta.local");
-    ASSERT_EQ(list.models(1).id(), "beta.local");
-    ASSERT_EQ(list.models(2).id(), "alpha.remote");
-
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING);
-    ASSERT_TRUE(query_model_proto(registry, query, &list));
-    ASSERT_EQ(list.models_size(), 3);
-    ASSERT_EQ(list.models(0).id(), "alpha.remote");
-    ASSERT_EQ(list.models(1).id(), "beta.local");
-    ASSERT_EQ(list.models(2).id(), "zeta.local");
-
-    query.Clear();
-    query.set_sort_field(runanywhere::v1::MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES);
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING);
-    ASSERT_TRUE(query_model_proto(registry, query, &list));
-    ASSERT_EQ(list.models_size(), 3);
-    ASSERT_EQ(list.models(0).id(), "alpha.remote");
-    ASSERT_EQ(list.models(1).id(), "zeta.local");
-    ASSERT_EQ(list.models(2).id(), "beta.local");
-
-    rac_model_registry_destroy(registry);
-    return 0;
-}
+// test_query_source_filter_and_sorting_proto deleted: it exclusively
+// exercised ModelQuery.source / sort_field / descending and the
+// ModelQuerySortField enum, all of which were reserved/deleted from
+// idl/model_types.proto (see the "reserved 5, 8, 9, 10" comment on
+// ModelQuery -- "ordering is the client's job now (a local catalog is tens
+// of rows)"). model_matches_query()/sort_query_results() in
+// model_registry_proto.cpp confirm there is no remaining filter/sort
+// consumer for these fields.
 
 int test_remove_proto() {
     rac_model_registry_handle_t registry = create_registry();
@@ -696,7 +651,7 @@ int test_canonical_result_shapes_and_typed_errors() {
     auto* imported_file = import_request.add_files();
     imported_file->set_filename("weights.gguf");
     imported_file->set_size_bytes(55);
-    imported_file->set_is_required(true);
+    imported_file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
 
     std::vector<uint8_t> import_bytes;
     ASSERT_TRUE(serialize_message(import_request, &import_bytes));
@@ -707,13 +662,17 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelImportResult import_result;
     ASSERT_TRUE(parse_and_free_buffer(&import_buffer, &import_result));
-    ASSERT_TRUE(import_result.success());
+    ASSERT_TRUE(import_result.has_error() == false);
     ASSERT_TRUE(import_result.registered());
     ASSERT_EQ(import_result.local_path(), "/imports/import.test");
     ASSERT_EQ(import_result.imported_bytes(), 55);
     ASSERT_TRUE(import_result.model().has_metadata());
-    ASSERT_TRUE(import_result.model().has_expected_files());
+    // ModelInfo.expected_files (top-level) was deleted; build_full_model_proto's
+    // multi_file artifact (already set on the request model) carries the file
+    // descriptors instead, so import_proto's "seed multi_file from
+    // request.files when unset" branch never fires here.
     ASSERT_TRUE(import_result.model().has_multi_file());
+    ASSERT_EQ(import_result.model().multi_file().files_size(), 2);
     ASSERT_EQ(import_result.model().registry_status(),
               runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     ASSERT_EQ(import_result.warnings_size(), 2);
@@ -727,18 +686,17 @@ int test_canonical_result_shapes_and_typed_errors() {
     ASSERT_EQ(get_result.model().local_path(), "/imports/import.test");
     ASSERT_TRUE(get_result.model().has_metadata());
 
+    // ModelListRequest.include_counts (former tag 2) and the
+    // total/downloaded/available/filtered_count fields on ModelListResult
+    // (former tags 4-7) were reserved: no facade ever SET include_counts, so
+    // the gated counts were never populated in practice.
     runanywhere::v1::ModelListRequest list_request;
-    list_request.set_include_counts(true);
     list_request.mutable_query()->set_downloaded_only(true);
     runanywhere::v1::ModelListResult list_result;
     ASSERT_TRUE(call_list_models_result(registry, list_request, &list_result));
-    ASSERT_TRUE(list_result.success());
+    ASSERT_TRUE(list_result.has_error() == false);
     ASSERT_EQ(list_result.models().models_size(), 1);
     ASSERT_EQ(list_result.models().models(0).id(), "import.test");
-    ASSERT_EQ(list_result.total_count(), 1);
-    ASSERT_EQ(list_result.downloaded_count(), 1);
-    ASSERT_EQ(list_result.available_count(), 1);
-    ASSERT_EQ(list_result.filtered_count(), 1);
 
     runanywhere::v1::ModelDiscoveryRequest discovery_request;
     discovery_request.add_search_roots("/imports");
@@ -752,11 +710,12 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelDiscoveryResult discovery_result;
     ASSERT_TRUE(parse_and_free_buffer(&discovery_buffer, &discovery_result));
-    ASSERT_TRUE(discovery_result.success());
+    ASSERT_TRUE(discovery_result.has_error() == false);
     ASSERT_EQ(discovery_result.discovered_models_size(), 1);
     ASSERT_EQ(discovery_result.discovered_models(0).model_id(), "import.test");
     ASSERT_TRUE(discovery_result.discovered_models(0).matched_registry());
-    ASSERT_EQ(discovery_result.linked_count(), 1);
+    // ModelDiscoveryResult.linked_count (a count over discovered_models,
+    // former tags 3/4/7/8) was reserved.
 
     runanywhere::v1::ModelRegistryRefreshRequest refresh_request;
     refresh_request.mutable_query()->set_registry_status(
@@ -770,10 +729,10 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelRegistryRefreshResult refresh_result;
     ASSERT_TRUE(parse_and_free_buffer(&refresh_buffer, &refresh_result));
-    ASSERT_TRUE(refresh_result.success());
+    ASSERT_TRUE(refresh_result.has_error() == false);
     ASSERT_EQ(refresh_result.models().models_size(), 1);
-    ASSERT_EQ(refresh_result.downloaded_count(), 1);
-    ASSERT_EQ(refresh_result.available_count(), 1);
+    // ModelRegistryRefreshResult.downloaded_count / available_count (counts
+    // over `models`, former tags 3-6/10-12) were reserved.
 
     rac_proto_buffer_t delete_buffer;
     rac_proto_buffer_init(&delete_buffer);
@@ -781,9 +740,9 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelDeleteResult delete_result;
     ASSERT_TRUE(parse_and_free_buffer(&delete_buffer, &delete_result));
-    ASSERT_TRUE(delete_result.success());
-    ASSERT_TRUE(delete_result.registry_updated());
-    ASSERT_TRUE(!delete_result.files_deleted());
+    // files_deleted/registry_updated/was_loaded/warnings were reserved off
+    // ModelDeleteResult -- success is now the absence of `error`.
+    ASSERT_TRUE(delete_result.has_error() == false);
 
     const uint8_t invalid[] = {0xff, 0xff, 0xff};
     rac_proto_buffer_t error_buffer;
@@ -900,7 +859,6 @@ int main() {
         RUN(test_update_preserves_proto_only_fields);
         RUN(test_register_proto_preserves_proto_only_fields_on_resave);
         RUN(test_query_filters_and_downloaded_list_proto);
-        RUN(test_query_source_filter_and_sorting_proto);
         RUN(test_remove_proto);
         RUN(test_canonical_result_shapes_and_typed_errors);
         RUN(test_update_missing_and_invalid_bytes);

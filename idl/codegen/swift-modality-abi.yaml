@@ -117,21 +117,16 @@ modalities:
         # ABI: (outBuffer*) -> rc, no request, no handle. Returns RASDKEvent.
 
   # --------------------------------------------------------------------------
-  # StructuredOutput  (lives on CppBridge.StructuredOutput, static method)
-  # --------------------------------------------------------------------------
-  - name: StructuredOutput
-    handle: ~
-    extension: CppBridge.StructuredOutput
-    methods:
-      - swift_name: generateStream
-        c_symbol: rac_structured_output_generate_stream_proto
-        request: RAStructuredOutputRequest
-        response: RAStructuredOutputStreamEvent
-        kind: stream
-        static: true
-        # Terminal-event factory on rc != RAC_SUCCESS:
-        #   kind=.error, errorMessage="Structured output stream failed: <rc>".
-
+  # StructuredOutput -- the generateStream entry (CppBridge.StructuredOutput,
+  # rac_structured_output_generate_stream_proto) was removed outright. Its
+  # request/response types, RAStructuredOutputRequest and
+  # RAStructuredOutputStreamEvent, were deleted from idl/structured_output.proto
+  # (so-p2): structured GENERATION is now LLMGenerationOptions.structured_output
+  # on the ordinary LLM generate/generateStream call, and the standalone
+  # rac_structured_output_generate_stream_proto C ABI is a permanent stub that
+  # reports RAC_ERROR_FEATURE_NOT_AVAILABLE. What remains of this domain
+  # (parse / prepare-prompt / validate over StructuredOutputParseRequest)
+  # stays hand-written in CppBridge+StructuredOutput.swift.
   # --------------------------------------------------------------------------
   # STT  (lifecycle-owned -- no Swift actor handle threaded through)
   # --------------------------------------------------------------------------
@@ -373,7 +368,14 @@ modalities:
         # Caller passes the handle explicitly: embedBatch(handle:, request:).
 
   # --------------------------------------------------------------------------
-  # RAG  (extension CppBridge.RAG -- session handle is owned by the actor)
+  # RAG  (extension CppBridge.RAG)
+  #
+  # Every method takes a caller-owned session handle: a `RagSession` actor owns
+  # the handle and passes it in, so these are `nonisolated` — they run in the
+  # caller's isolation, never hopping the `CppBridge.RAG` actor and never
+  # sending the non-Sendable `rac_handle_t` across an isolation boundary. The
+  # actor's own single-session facade (CppBridge+RAG.swift) still calls them
+  # from its isolated context, which a nonisolated method allows.
   # --------------------------------------------------------------------------
   - name: RAG
     handle: rac_handle_t
@@ -384,6 +386,7 @@ modalities:
         request: RARAGConfiguration
         response: ~
         kind: createHandle
+        nonisolated: true
         # ABI: (bytes, size, outHandle*) -> rc. Returns a fresh rac_handle_t.
         # Caller decides what to do with the handle (the RAG actor's facade
         # stashes it via setProtoSession()).
@@ -398,7 +401,7 @@ modalities:
         response: RARAGStatistics
         kind: invoke
         context: rac_handle_t
-        # Context is requireProtoSession() -- the session handle the actor owns.
+        nonisolated: true
 
       - swift_name: query
         c_symbol: rac_rag_query_proto
@@ -406,6 +409,15 @@ modalities:
         response: RARAGResult
         kind: invoke
         context: rac_handle_t
+        nonisolated: true
+
+      - swift_name: search
+        c_symbol: rac_rag_search_proto
+        request: RARAGSearchRequest
+        response: RARAGSearchResponse
+        kind: invoke
+        context: rac_handle_t
+        nonisolated: true
 
       - swift_name: clearProto
         c_symbol: rac_rag_clear_proto
@@ -413,6 +425,7 @@ modalities:
         response: RARAGStatistics
         kind: getWithContext
         context: rac_handle_t
+        nonisolated: true
 
       - swift_name: statsProto
         c_symbol: rac_rag_stats_proto
@@ -420,6 +433,7 @@ modalities:
         response: RARAGStatistics
         kind: getWithContext
         context: rac_handle_t
+        nonisolated: true
 
   # --------------------------------------------------------------------------
   # RAG -- top-level free functions (not on any extension)
@@ -451,34 +465,34 @@ modalities:
     methods:
       - swift_name: applyLoraAdapters
         c_symbol: rac_lora_apply_proto
-        request: RALoRAApplyRequest
-        response: RALoRAApplyResult
+        request: RALoraApplyRequest
+        response: RALoraApplyResult
         kind: invoke
 
       - swift_name: removeLoraAdapters
         c_symbol: rac_lora_remove_proto
-        request: RALoRARemoveRequest
-        response: RALoRAState
+        request: RALoraRemoveRequest
+        response: RALoraState
         kind: invoke
 
       - swift_name: listLoraAdapters
         c_symbol: rac_lora_list_proto
-        request: RALoRAState
-        response: RALoRAState
+        request: RALoraState
+        response: RALoraState
         kind: invoke
-        # Sentinel/empty request: facade passes RALoRAState() because the C
+        # Sentinel/empty request: facade passes RALoraState() because the C
         # ABI uses the LLMRequest shape but ignores the body.
 
       - swift_name: getLoraState
         c_symbol: rac_lora_state_proto
-        request: RALoRAState
-        response: RALoRAState
+        request: RALoraState
+        response: RALoraState
         kind: invoke
         # Sentinel/empty request -- see listLoraAdapters.
 
       - swift_name: checkLoraCompatibility
         c_symbol: rac_lora_compatibility_proto
-        request: RALoRAAdapterConfig
+        request: RALoraAdapterConfig
         response: RALoraCompatibilityResult
         kind: invoke
 
@@ -517,16 +531,14 @@ modalities:
         kind: invoke
         context: rac_lora_registry_handle_t
 
-      - swift_name: markDownloadCompleted
-        c_symbol: rac_lora_catalog_mark_download_completed_proto
-        request: RALoraAdapterDownloadCompletedRequest
-        response: RALoraAdapterDownloadCompletedResult
-        kind: invoke
-        context: rac_lora_registry_handle_t
-
-      - swift_name: importAdapter
-        c_symbol: rac_lora_adapter_import_proto
-        request: RALoraAdapterImportRequest
-        response: RALoraAdapterImportResult
-        kind: invoke
-        context: rac_lora_registry_handle_t
+      # markDownloadCompleted / importAdapter were removed
+      # (lora-delete-download-import-bookkeeping): LoraAdapterDownloadCompletedRequest/
+      # Result and LoraAdapterImportRequest/Result were deleted outright from
+      # idl/lora_options.proto. Adapter files are now acquired through the
+      # models domain's download/import verbs; this LoRA domain carries no
+      # download/import state of its own -- a non-empty
+      # LoraAdapterCatalogEntry.local_path is the only "downloaded" signal
+      # that survives. The corresponding C ABI entry points
+      # (rac_lora_catalog_mark_download_completed_proto /
+      # rac_lora_adapter_import_proto) are retired stubs that always report
+      # RAC_ERROR_NOT_IMPLEMENTED.

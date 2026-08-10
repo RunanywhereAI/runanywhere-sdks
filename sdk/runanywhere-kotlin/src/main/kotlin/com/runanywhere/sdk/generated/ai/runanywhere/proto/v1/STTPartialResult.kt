@@ -16,37 +16,24 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Streaming partial result emitted during live transcription.
- * Sources pre-IDL:
- *   Dart   generation_types.dart:184   STTPartialResult (transcript, conf, isFinal, lang, ts, alts)
- *   RN     STTTypes.ts:90              STTPartialResult (transcript, conf, ts, lang, alts, isFinal)
- *   C ABI  rac_stt_types.h:240         rac_stt_stream_callback_t (partial_text, is_final)
- *   Web    STTTypes.ts:31              STTStreamCallback (text, isFinal)
- *
- * Canonical minimal shape per spec: text, is_final, stability. Full word
- * timestamps + alternatives flow through STTOutput on the terminal event.
- * `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
- * 0.0 when backend does not provide one.
- * ---------------------------------------------------------------------------
+ * An in-progress hypothesis. `text` replaces the previous partial in full.
+ * The finished result arrives on STTStreamEvent.final_output and never here;
+ * correlation (request_id, seq) and failures live on the STTStreamEvent
+ * envelope.
  */
 public class STTPartialResult(
   @field:WireField(
@@ -65,98 +52,13 @@ public class STTPartialResult(
   )
   public val is_final: Boolean = false,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 2,
   )
-  public val stability: Float = 0f,
-  /**
-   * Additional partial-hypothesis fields carried by Dart/RN live streams.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val confidence: Float = 0f,
-  @field:WireField(
-    tag = 5,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "timestampMs",
-    schemaIndex = 5,
-  )
-  public val timestamp_ms: Long = 0L,
-  alternatives: List<TranscriptionAlternative> = emptyList(),
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 7,
-  )
-  public val language_code: String? = null,
-  /**
-   * Streaming correlation and endpointing metadata.
-   */
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "requestId",
-    schemaIndex = 8,
-  )
-  public val request_id: String = "",
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "segmentIndex",
-    schemaIndex = 9,
-  )
-  public val segment_index: Int = 0,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioStartMs",
-    schemaIndex = 10,
-  )
-  public val audio_start_ms: Long = 0L,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioEndMs",
-    schemaIndex = 11,
-  )
-  public val audio_end_ms: Long = 0L,
-  @field:WireField(
-    tag = 13,
-    adapter = "ai.runanywhere.proto.v1.STTOutput#ADAPTER",
-    jsonName = "finalOutput",
-    schemaIndex = 12,
-  )
-  public val final_output: STTOutput? = null,
+  public val language: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTPartialResult, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.TranscriptionAlternative#ADAPTER",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 6,
-  )
-  public val alternatives: List<TranscriptionAlternative> =
-      immutableCopyOf("alternatives", alternatives)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -169,17 +71,7 @@ public class STTPartialResult(
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
     if (is_final != other.is_final) return false
-    if (stability != other.stability) return false
-    if (confidence != other.confidence) return false
     if (language != other.language) return false
-    if (timestamp_ms != other.timestamp_ms) return false
-    if (alternatives != other.alternatives) return false
-    if (language_code != other.language_code) return false
-    if (request_id != other.request_id) return false
-    if (segment_index != other.segment_index) return false
-    if (audio_start_ms != other.audio_start_ms) return false
-    if (audio_end_ms != other.audio_end_ms) return false
-    if (final_output != other.final_output) return false
     return true
   }
 
@@ -189,17 +81,7 @@ public class STTPartialResult(
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
       result = result * 37 + is_final.hashCode()
-      result = result * 37 + stability.hashCode()
-      result = result * 37 + confidence.hashCode()
-      result = result * 37 + language.hashCode()
-      result = result * 37 + timestamp_ms.hashCode()
-      result = result * 37 + alternatives.hashCode()
-      result = result * 37 + (language_code?.hashCode() ?: 0)
-      result = result * 37 + request_id.hashCode()
-      result = result * 37 + segment_index.hashCode()
-      result = result * 37 + audio_start_ms.hashCode()
-      result = result * 37 + audio_end_ms.hashCode()
-      result = result * 37 + (final_output?.hashCode() ?: 0)
+      result = result * 37 + (language?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -209,36 +91,16 @@ public class STTPartialResult(
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
     result += """is_final=$is_final"""
-    result += """stability=$stability"""
-    result += """confidence=$confidence"""
-    result += """language=$language"""
-    result += """timestamp_ms=$timestamp_ms"""
-    if (alternatives.isNotEmpty()) result += """alternatives=$alternatives"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
-    result += """request_id=${sanitize(request_id)}"""
-    result += """segment_index=$segment_index"""
-    result += """audio_start_ms=$audio_start_ms"""
-    result += """audio_end_ms=$audio_end_ms"""
-    if (final_output != null) result += """final_output=$final_output"""
+    if (language != null) result += """language=${sanitize(language)}"""
     return result.joinToString(prefix = "STTPartialResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     text: String = this.text,
     is_final: Boolean = this.is_final,
-    stability: Float = this.stability,
-    confidence: Float = this.confidence,
-    language: STTLanguage = this.language,
-    timestamp_ms: Long = this.timestamp_ms,
-    alternatives: List<TranscriptionAlternative> = this.alternatives,
-    language_code: String? = this.language_code,
-    request_id: String = this.request_id,
-    segment_index: Int = this.segment_index,
-    audio_start_ms: Long = this.audio_start_ms,
-    audio_end_ms: Long = this.audio_end_ms,
-    final_output: STTOutput? = this.final_output,
+    language: String? = this.language,
     unknownFields: ByteString = this.unknownFields,
-  ): STTPartialResult = STTPartialResult(text, is_final, stability, confidence, language, timestamp_ms, alternatives, language_code, request_id, segment_index, audio_start_ms, audio_end_ms, final_output, unknownFields)
+  ): STTPartialResult = STTPartialResult(text, is_final, language, unknownFields)
 
   public companion object {
     @JvmField
@@ -258,33 +120,7 @@ public class STTPartialResult(
         if (value.is_final != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_final)
         }
-        if (!value.stability.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.stability)
-        }
-        if (!value.confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.confidence)
-        }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(5, value.language)
-        }
-        if (value.timestamp_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.timestamp_ms)
-        }
-        size += TranscriptionAlternative.ADAPTER.asRepeated().encodedSizeWithTag(7, value.alternatives)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.language_code)
-        if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.request_id)
-        }
-        if (value.segment_index != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.segment_index)
-        }
-        if (value.audio_start_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(11, value.audio_start_ms)
-        }
-        if (value.audio_end_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.audio_end_ms)
-        }
-        size += STTOutput.ADAPTER.encodedSizeWithTag(13, value.final_output)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.language)
         return size
       }
 
@@ -295,65 +131,13 @@ public class STTPartialResult(
         if (value.is_final != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
         }
-        if (!value.stability.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.stability)
-        }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
-        }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
-        }
-        if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
-        }
-        TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.request_id)
-        }
-        if (value.segment_index != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.segment_index)
-        }
-        if (value.audio_start_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 11, value.audio_start_ms)
-        }
-        if (value.audio_end_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 12, value.audio_end_ms)
-        }
-        STTOutput.ADAPTER.encodeWithTag(writer, 13, value.final_output)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTPartialResult) {
         writer.writeBytes(value.unknownFields)
-        STTOutput.ADAPTER.encodeWithTag(writer, 13, value.final_output)
-        if (value.audio_end_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 12, value.audio_end_ms)
-        }
-        if (value.audio_start_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 11, value.audio_start_ms)
-        }
-        if (value.segment_index != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.segment_index)
-        }
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.request_id)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
-        TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
-        if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
-        }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
-        }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
-        }
-        if (!value.stability.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.stability)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         if (value.is_final != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
         }
@@ -365,60 +149,24 @@ public class STTPartialResult(
       override fun decode(reader: ProtoReader): STTPartialResult {
         var text: String = ""
         var is_final: Boolean = false
-        var stability: Float = 0f
-        var confidence: Float = 0f
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
-        var timestamp_ms: Long = 0L
-        val alternatives = mutableListOf<TranscriptionAlternative>()
-        var language_code: String? = null
-        var request_id: String = ""
-        var segment_index: Int = 0
-        var audio_start_ms: Long = 0L
-        var audio_end_ms: Long = 0L
-        var final_output: STTOutput? = null
+        var language: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> is_final = ProtoAdapter.BOOL.decode(reader)
-            3 -> stability = ProtoAdapter.FLOAT.decode(reader)
-            4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
-            5 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            6 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
-            7 -> alternatives.add(TranscriptionAlternative.ADAPTER.decode(reader))
-            8 -> language_code = ProtoAdapter.STRING.decode(reader)
-            9 -> request_id = ProtoAdapter.STRING.decode(reader)
-            10 -> segment_index = ProtoAdapter.INT32.decode(reader)
-            11 -> audio_start_ms = ProtoAdapter.INT64.decode(reader)
-            12 -> audio_end_ms = ProtoAdapter.INT64.decode(reader)
-            13 -> final_output = STTOutput.ADAPTER.decode(reader)
+            14 -> language = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return STTPartialResult(
           text = text,
           is_final = is_final,
-          stability = stability,
-          confidence = confidence,
           language = language,
-          timestamp_ms = timestamp_ms,
-          alternatives = alternatives,
-          language_code = language_code,
-          request_id = request_id,
-          segment_index = segment_index,
-          audio_start_ms = audio_start_ms,
-          audio_end_ms = audio_end_ms,
-          final_output = final_output,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: STTPartialResult): STTPartialResult = value.copy(
-        alternatives = value.alternatives.redactElements(TranscriptionAlternative.ADAPTER),
-        final_output = value.final_output?.let(STTOutput.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -16,9 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -29,22 +26,11 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Full TTS output: synthesized audio plus metadata.
- *
- * Mirrors the C ABI rac_tts_output_t. `audio_data` is opaque bytes; bindings
- * adapt to native buffers (Swift Data, Kotlin ByteArray, Dart Uint8List,
- * JS ArrayBuffer/Float32Array, C void*). Sample rate is required because PCM
- * payloads are otherwise unparseable.
- * ---------------------------------------------------------------------------
- */
 public class TTSOutput(
   /**
-   * Synthesized audio bytes, encoded per `audio_format`.
+   * Encoded per audio_format.
    */
   @field:WireField(
     tag = 1,
@@ -54,9 +40,6 @@ public class TTSOutput(
     schemaIndex = 0,
   )
   public val audio_data: ByteString = ByteString.EMPTY,
-  /**
-   * Audio format of the bytes in `audio_data`.
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
@@ -66,9 +49,8 @@ public class TTSOutput(
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
   /**
-   * Sample rate in Hz. For PCM payloads this is required to interpret the
-   * bytes; for compressed formats (mp3, opus, …) it reflects the synthesis
-   * sample rate, not the container rate.
+   * Required to interpret PCM payloads. For compressed formats this is the
+   * synthesis rate, not the container rate.
    */
   @field:WireField(
     tag = 3,
@@ -78,9 +60,6 @@ public class TTSOutput(
     schemaIndex = 2,
   )
   public val sample_rate: Int = 0,
-  /**
-   * Audio duration in milliseconds (matches C ABI `duration_ms`).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -89,39 +68,33 @@ public class TTSOutput(
     schemaIndex = 3,
   )
   public val duration_ms: Long = 0L,
-  phoneme_timestamps: List<TTSPhonemeTimestamp> = emptyList(),
-  /**
-   * Per-pass synthesis metadata.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.TTSSynthesisMetadata#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val metadata: TTSSynthesisMetadata? = null,
   /**
-   * Wall-clock timestamp when the output was produced
-   * (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
-   * is_final=true when set by the producer.
+   * For one-shot synthesis, chunk_index=0 and is_final=true.
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chunkIndex",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val chunk_index: Int = 0,
   @field:WireField(
@@ -129,50 +102,17 @@ public class TTSOutput(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isFinal",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val is_final: Boolean = false,
   @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioSizeBytes",
-    schemaIndex = 9,
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 8,
   )
-  public val audio_size_bytes: Long = 0L,
-  /**
-   * Terminal error details for result-envelope APIs.
-   */
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 10,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 11,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSOutput, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Phoneme-level timestamps, if the engine produced them. May be empty.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "ai.runanywhere.proto.v1.TTSPhonemeTimestamp#ADAPTER",
-    label = WireField.Label.REPEATED,
-    jsonName = "phonemeTimestamps",
-    schemaIndex = 4,
-  )
-  public val phoneme_timestamps: List<TTSPhonemeTimestamp> =
-      immutableCopyOf("phoneme_timestamps", phoneme_timestamps)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -187,14 +127,11 @@ public class TTSOutput(
     if (audio_format != other.audio_format) return false
     if (sample_rate != other.sample_rate) return false
     if (duration_ms != other.duration_ms) return false
-    if (phoneme_timestamps != other.phoneme_timestamps) return false
     if (metadata != other.metadata) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (chunk_index != other.chunk_index) return false
     if (is_final != other.is_final) return false
-    if (audio_size_bytes != other.audio_size_bytes) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -206,14 +143,11 @@ public class TTSOutput(
       result = result * 37 + audio_format.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + duration_ms.hashCode()
-      result = result * 37 + phoneme_timestamps.hashCode()
       result = result * 37 + (metadata?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + chunk_index.hashCode()
       result = result * 37 + is_final.hashCode()
-      result = result * 37 + audio_size_bytes.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -225,14 +159,11 @@ public class TTSOutput(
     result += """audio_format=$audio_format"""
     result += """sample_rate=$sample_rate"""
     result += """duration_ms=$duration_ms"""
-    if (phoneme_timestamps.isNotEmpty()) result += """phoneme_timestamps=$phoneme_timestamps"""
     if (metadata != null) result += """metadata=$metadata"""
     result += """timestamp_ms=$timestamp_ms"""
     result += """chunk_index=$chunk_index"""
     result += """is_final=$is_final"""
-    result += """audio_size_bytes=$audio_size_bytes"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "TTSOutput{", separator = ", ", postfix = "}")
   }
 
@@ -241,16 +172,13 @@ public class TTSOutput(
     audio_format: AudioFormat = this.audio_format,
     sample_rate: Int = this.sample_rate,
     duration_ms: Long = this.duration_ms,
-    phoneme_timestamps: List<TTSPhonemeTimestamp> = this.phoneme_timestamps,
     metadata: TTSSynthesisMetadata? = this.metadata,
     timestamp_ms: Long = this.timestamp_ms,
     chunk_index: Int = this.chunk_index,
     is_final: Boolean = this.is_final,
-    audio_size_bytes: Long = this.audio_size_bytes,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSOutput = TTSOutput(audio_data, audio_format, sample_rate, duration_ms, phoneme_timestamps, metadata, timestamp_ms, chunk_index, is_final, audio_size_bytes, error_message, error_code, unknownFields)
+  ): TTSOutput = TTSOutput(audio_data, audio_format, sample_rate, duration_ms, metadata, timestamp_ms, chunk_index, is_final, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -276,7 +204,6 @@ public class TTSOutput(
         if (value.duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.duration_ms)
         }
-        size += TTSPhonemeTimestamp.ADAPTER.asRepeated().encodedSizeWithTag(5, value.phoneme_timestamps)
         if (value.metadata != null) {
           size += TTSSynthesisMetadata.ADAPTER.encodedSizeWithTag(6, value.metadata)
         }
@@ -289,13 +216,7 @@ public class TTSOutput(
         if (value.is_final != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.is_final)
         }
-        if (value.audio_size_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(10, value.audio_size_bytes)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(13, value.error)
         return size
       }
 
@@ -312,7 +233,6 @@ public class TTSOutput(
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.duration_ms)
         }
-        TTSPhonemeTimestamp.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.phoneme_timestamps)
         if (value.metadata != null) {
           TTSSynthesisMetadata.ADAPTER.encodeWithTag(writer, 6, value.metadata)
         }
@@ -325,25 +245,13 @@ public class TTSOutput(
         if (value.is_final != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_final)
         }
-        if (value.audio_size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.audio_size_bytes)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSOutput) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        if (value.audio_size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.audio_size_bytes)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         if (value.is_final != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_final)
         }
@@ -356,7 +264,6 @@ public class TTSOutput(
         if (value.metadata != null) {
           TTSSynthesisMetadata.ADAPTER.encodeWithTag(writer, 6, value.metadata)
         }
-        TTSPhonemeTimestamp.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.phoneme_timestamps)
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.duration_ms)
         }
@@ -376,14 +283,11 @@ public class TTSOutput(
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
         var sample_rate: Int = 0
         var duration_ms: Long = 0L
-        val phoneme_timestamps = mutableListOf<TTSPhonemeTimestamp>()
         var metadata: TTSSynthesisMetadata? = null
         var timestamp_ms: Long = 0L
         var chunk_index: Int = 0
         var is_final: Boolean = false
-        var audio_size_bytes: Long = 0L
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
@@ -394,14 +298,11 @@ public class TTSOutput(
             }
             3 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             4 -> duration_ms = ProtoAdapter.INT64.decode(reader)
-            5 -> phoneme_timestamps.add(TTSPhonemeTimestamp.ADAPTER.decode(reader))
             6 -> metadata = TTSSynthesisMetadata.ADAPTER.decode(reader)
             7 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             8 -> chunk_index = ProtoAdapter.INT32.decode(reader)
             9 -> is_final = ProtoAdapter.BOOL.decode(reader)
-            10 -> audio_size_bytes = ProtoAdapter.INT64.decode(reader)
-            11 -> error_message = ProtoAdapter.STRING.decode(reader)
-            12 -> error_code = ProtoAdapter.INT32.decode(reader)
+            13 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -410,21 +311,18 @@ public class TTSOutput(
           audio_format = audio_format,
           sample_rate = sample_rate,
           duration_ms = duration_ms,
-          phoneme_timestamps = phoneme_timestamps,
           metadata = metadata,
           timestamp_ms = timestamp_ms,
           chunk_index = chunk_index,
           is_final = is_final,
-          audio_size_bytes = audio_size_bytes,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: TTSOutput): TTSOutput = value.copy(
-        phoneme_timestamps = value.phoneme_timestamps.redactElements(TTSPhonemeTimestamp.ADAPTER),
         metadata = value.metadata?.let(TTSSynthesisMetadata.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

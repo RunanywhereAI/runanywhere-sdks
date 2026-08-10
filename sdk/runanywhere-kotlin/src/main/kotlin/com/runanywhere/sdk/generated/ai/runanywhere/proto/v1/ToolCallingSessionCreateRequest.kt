@@ -24,7 +24,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -33,14 +32,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Tool-calling session state machine.
- * ---------------------------------------------------------------------------
- */
 public class ToolCallingSessionCreateRequest(
   /**
-   * Prompt + LLM generation options inline (avoids cross-proto import cycle).
+   * The current turn's user prompt.
    */
   @field:WireField(
     tag = 1,
@@ -49,162 +43,36 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 0,
   )
   public val prompt: String = "",
+  history: List<ToolCallingHistoryTurn> = emptyList(),
+  /**
+   * THE single home for tool policy + sampling. No re-published copies:
+   * every knob that used to be duplicated on this message (tools, format,
+   * max_tool_calls, keep_tools_available, validate_calls, tool_choice,
+   * forced_tool_name, max_output_tokens, temperature, top_p, system_prompt,
+   * disable_thinking, auto_execute, replace_system_prompt,
+   * require_json_arguments, parallel_tool_calls) lives on ToolCallingOptions.
+   */
   @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxTokens",
-    schemaIndex = 1,
-  )
-  public val max_tokens: Int = 0,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    tag = 3,
+    adapter = "ai.runanywhere.proto.v1.ToolCallingOptions#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val temperature: Float = 0f,
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "topP",
-    schemaIndex = 3,
-  )
-  public val top_p: Float = 0f,
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "systemPrompt",
-    schemaIndex = 4,
-  )
-  public val system_prompt: String = "",
-  tools: List<ToolDefinition> = emptyList(),
-  @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.ToolCallFormatName#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
-  )
-  public val format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxToolCalls",
-    schemaIndex = 7,
-  )
-  public val max_tool_calls: Int = 0,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "keepToolsAvailable",
-    schemaIndex = 8,
-  )
-  public val keep_tools_available: Boolean = false,
-  /**
-   * proto3 `optional` enables presence detection (has_validate_calls()).
-   * When unset, commons defaults to validate_calls=true so unknown tool
-   * calls short-circuit before host execution.
-   * Callers that delegate validation/authorization to their executor or
-   * use dynamic tool registries must explicitly set validate_calls=false.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "validateCalls",
-    schemaIndex = 9,
-  )
-  public val validate_calls: Boolean? = null,
-  /**
-   * OpenAI-style tool_choice override surfaced through the high-level
-   * run-loop / session APIs. The same fields exist on ToolCallingOptions
-   * (fields 13/14); we re-publish them here so the canonical request
-   * envelope can carry the policy without forcing callers to pass an
-   * inline ToolCallingOptions. commons honors these on every
-   * format/validate primitive via build_options_snapshot.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.ToolChoiceMode#ADAPTER",
-    jsonName = "toolChoice",
-    schemaIndex = 10,
-  )
-  public val tool_choice: ToolChoiceMode? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "forcedToolName",
-    schemaIndex = 11,
-  )
-  public val forced_tool_name: String? = null,
-  /**
-   * When true, suppress the model's thinking phase for every generate in
-   * the loop/session (maps from ToolCallingOptions.disable_thinking; same
-   * contract as LLMGenerationOptions.disable_thinking). Default false.
-   */
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "disableThinking",
-    schemaIndex = 12,
-  )
-  public val disable_thinking: Boolean = false,
-  /**
-   * Default true when absent. False returns the parsed ToolCall without
-   * invoking the host executor.
-   */
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "autoExecute",
-    schemaIndex = 13,
-  )
-  public val auto_execute: Boolean? = null,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "replaceSystemPrompt",
-    schemaIndex = 14,
-  )
-  public val replace_system_prompt: Boolean = false,
-  @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "requireJsonArguments",
-    schemaIndex = 15,
-  )
-  public val require_json_arguments: Boolean = false,
-  history: List<String> = emptyList(),
+  public val options: ToolCallingOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.ToolDefinition#ADAPTER",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 5,
-  )
-  public val tools: List<ToolDefinition> = immutableCopyOf("tools", tools)
-
   /**
-   * Prior conversation turns as a flat alternating list \[user0, asst0, user1, asst1, ...\],
-   * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-   * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-   * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-   * cross-proto import cycle.
+   * Prior turns, EXCLUDING the current turn (which is `prompt`). commons
+   * threads these into every generate in the loop so multi-turn tool use
+   * keeps context.
    */
   @field:WireField(
-    tag = 19,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    tag = 2,
+    adapter = "ai.runanywhere.proto.v1.ToolCallingHistoryTurn#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 16,
+    schemaIndex = 1,
   )
-  public val history: List<String> = immutableCopyOf("history", history)
+  public val history: List<ToolCallingHistoryTurn> = immutableCopyOf("history", history)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -217,22 +85,8 @@ public class ToolCallingSessionCreateRequest(
     if (other !is ToolCallingSessionCreateRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (prompt != other.prompt) return false
-    if (max_tokens != other.max_tokens) return false
-    if (temperature != other.temperature) return false
-    if (top_p != other.top_p) return false
-    if (system_prompt != other.system_prompt) return false
-    if (tools != other.tools) return false
-    if (format != other.format) return false
-    if (max_tool_calls != other.max_tool_calls) return false
-    if (keep_tools_available != other.keep_tools_available) return false
-    if (validate_calls != other.validate_calls) return false
-    if (tool_choice != other.tool_choice) return false
-    if (forced_tool_name != other.forced_tool_name) return false
-    if (disable_thinking != other.disable_thinking) return false
-    if (auto_execute != other.auto_execute) return false
-    if (replace_system_prompt != other.replace_system_prompt) return false
-    if (require_json_arguments != other.require_json_arguments) return false
     if (history != other.history) return false
+    if (options != other.options) return false
     return true
   }
 
@@ -241,22 +95,8 @@ public class ToolCallingSessionCreateRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + prompt.hashCode()
-      result = result * 37 + max_tokens.hashCode()
-      result = result * 37 + temperature.hashCode()
-      result = result * 37 + top_p.hashCode()
-      result = result * 37 + system_prompt.hashCode()
-      result = result * 37 + tools.hashCode()
-      result = result * 37 + format.hashCode()
-      result = result * 37 + max_tool_calls.hashCode()
-      result = result * 37 + keep_tools_available.hashCode()
-      result = result * 37 + (validate_calls?.hashCode() ?: 0)
-      result = result * 37 + (tool_choice?.hashCode() ?: 0)
-      result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
-      result = result * 37 + disable_thinking.hashCode()
-      result = result * 37 + (auto_execute?.hashCode() ?: 0)
-      result = result * 37 + replace_system_prompt.hashCode()
-      result = result * 37 + require_json_arguments.hashCode()
       result = result * 37 + history.hashCode()
+      result = result * 37 + (options?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -265,45 +105,17 @@ public class ToolCallingSessionCreateRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """prompt=${sanitize(prompt)}"""
-    result += """max_tokens=$max_tokens"""
-    result += """temperature=$temperature"""
-    result += """top_p=$top_p"""
-    result += """system_prompt=${sanitize(system_prompt)}"""
-    if (tools.isNotEmpty()) result += """tools=$tools"""
-    result += """format=$format"""
-    result += """max_tool_calls=$max_tool_calls"""
-    result += """keep_tools_available=$keep_tools_available"""
-    if (validate_calls != null) result += """validate_calls=$validate_calls"""
-    if (tool_choice != null) result += """tool_choice=$tool_choice"""
-    if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
-    result += """disable_thinking=$disable_thinking"""
-    if (auto_execute != null) result += """auto_execute=$auto_execute"""
-    result += """replace_system_prompt=$replace_system_prompt"""
-    result += """require_json_arguments=$require_json_arguments"""
-    if (history.isNotEmpty()) result += """history=${sanitize(history)}"""
+    if (history.isNotEmpty()) result += """history=$history"""
+    if (options != null) result += """options=$options"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     prompt: String = this.prompt,
-    max_tokens: Int = this.max_tokens,
-    temperature: Float = this.temperature,
-    top_p: Float = this.top_p,
-    system_prompt: String = this.system_prompt,
-    tools: List<ToolDefinition> = this.tools,
-    format: ToolCallFormatName = this.format,
-    max_tool_calls: Int = this.max_tool_calls,
-    keep_tools_available: Boolean = this.keep_tools_available,
-    validate_calls: Boolean? = this.validate_calls,
-    tool_choice: ToolChoiceMode? = this.tool_choice,
-    forced_tool_name: String? = this.forced_tool_name,
-    disable_thinking: Boolean = this.disable_thinking,
-    auto_execute: Boolean? = this.auto_execute,
-    replace_system_prompt: Boolean = this.replace_system_prompt,
-    require_json_arguments: Boolean = this.require_json_arguments,
-    history: List<String> = this.history,
+    history: List<ToolCallingHistoryTurn> = this.history,
+    options: ToolCallingOptions? = this.options,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format, max_tool_calls, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, auto_execute, replace_system_prompt, require_json_arguments, history, unknownFields)
+  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, history, options, unknownFields)
 
   public companion object {
     @JvmField
@@ -321,42 +133,10 @@ public class ToolCallingSessionCreateRequest(
         if (value.prompt != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.max_tokens)
+        size += ToolCallingHistoryTurn.ADAPTER.asRepeated().encodedSizeWithTag(2, value.history)
+        if (value.options != null) {
+          size += ToolCallingOptions.ADAPTER.encodedSizeWithTag(3, value.options)
         }
-        if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(13, value.top_p)
-        }
-        if (value.system_prompt != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.system_prompt)
-        }
-        size += ToolDefinition.ADAPTER.asRepeated().encodedSizeWithTag(2, value.tools)
-        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
-          size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(3, value.format)
-        }
-        if (value.max_tool_calls != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.max_tool_calls)
-        }
-        if (value.keep_tools_available != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.keep_tools_available)
-        }
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.validate_calls)
-        size += ToolChoiceMode.ADAPTER.encodedSizeWithTag(7, value.tool_choice)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.forced_tool_name)
-        if (value.disable_thinking != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.disable_thinking)
-        }
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(16, value.auto_execute)
-        if (value.replace_system_prompt != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(17, value.replace_system_prompt)
-        }
-        if (value.require_json_arguments != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(18, value.require_json_arguments)
-        }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(19, value.history)
         return size
       }
 
@@ -364,83 +144,19 @@ public class ToolCallingSessionCreateRequest(
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_tokens)
+        ToolCallingHistoryTurn.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.history)
+        if (value.options != null) {
+          ToolCallingOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
         }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 13, value.top_p)
-        }
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.system_prompt)
-        }
-        ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.tools)
-        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
-          ToolCallFormatName.ADAPTER.encodeWithTag(writer, 3, value.format)
-        }
-        if (value.max_tool_calls != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_tool_calls)
-        }
-        if (value.keep_tools_available != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.keep_tools_available)
-        }
-        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
-        ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
-        }
-        ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.auto_execute)
-        if (value.replace_system_prompt != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.replace_system_prompt)
-        }
-        if (value.require_json_arguments != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 19, value.history)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 19, value.history)
-        if (value.require_json_arguments != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
+        if (value.options != null) {
+          ToolCallingOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
         }
-        if (value.replace_system_prompt != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.replace_system_prompt)
-        }
-        ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.auto_execute)
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
-        ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
-        if (value.keep_tools_available != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.keep_tools_available)
-        }
-        if (value.max_tool_calls != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_tool_calls)
-        }
-        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
-          ToolCallFormatName.ADAPTER.encodeWithTag(writer, 3, value.format)
-        }
-        ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.tools)
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.system_prompt)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 13, value.top_p)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.temperature)
-        }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_tokens)
-        }
+        ToolCallingHistoryTurn.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.history)
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
         }
@@ -448,76 +164,27 @@ public class ToolCallingSessionCreateRequest(
 
       override fun decode(reader: ProtoReader): ToolCallingSessionCreateRequest {
         var prompt: String = ""
-        var max_tokens: Int = 0
-        var temperature: Float = 0f
-        var top_p: Float = 0f
-        var system_prompt: String = ""
-        val tools = mutableListOf<ToolDefinition>()
-        var format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-        var max_tool_calls: Int = 0
-        var keep_tools_available: Boolean = false
-        var validate_calls: Boolean? = null
-        var tool_choice: ToolChoiceMode? = null
-        var forced_tool_name: String? = null
-        var disable_thinking: Boolean = false
-        var auto_execute: Boolean? = null
-        var replace_system_prompt: Boolean = false
-        var require_json_arguments: Boolean = false
-        val history = mutableListOf<String>()
+        val history = mutableListOf<ToolCallingHistoryTurn>()
+        var options: ToolCallingOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
-            11 -> max_tokens = ProtoAdapter.INT32.decode(reader)
-            12 -> temperature = ProtoAdapter.FLOAT.decode(reader)
-            13 -> top_p = ProtoAdapter.FLOAT.decode(reader)
-            14 -> system_prompt = ProtoAdapter.STRING.decode(reader)
-            2 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
-            3 -> try {
-              format = ToolCallFormatName.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            4 -> max_tool_calls = ProtoAdapter.UINT32.decode(reader)
-            5 -> keep_tools_available = ProtoAdapter.BOOL.decode(reader)
-            6 -> validate_calls = ProtoAdapter.BOOL.decode(reader)
-            7 -> try {
-              tool_choice = ToolChoiceMode.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            8 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
-            15 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
-            16 -> auto_execute = ProtoAdapter.BOOL.decode(reader)
-            17 -> replace_system_prompt = ProtoAdapter.BOOL.decode(reader)
-            18 -> require_json_arguments = ProtoAdapter.BOOL.decode(reader)
-            19 -> history.add(ProtoAdapter.STRING.decode(reader))
+            2 -> history.add(ToolCallingHistoryTurn.ADAPTER.decode(reader))
+            3 -> options = ToolCallingOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ToolCallingSessionCreateRequest(
           prompt = prompt,
-          max_tokens = max_tokens,
-          temperature = temperature,
-          top_p = top_p,
-          system_prompt = system_prompt,
-          tools = tools,
-          format = format,
-          max_tool_calls = max_tool_calls,
-          keep_tools_available = keep_tools_available,
-          validate_calls = validate_calls,
-          tool_choice = tool_choice,
-          forced_tool_name = forced_tool_name,
-          disable_thinking = disable_thinking,
-          auto_execute = auto_execute,
-          replace_system_prompt = replace_system_prompt,
-          require_json_arguments = require_json_arguments,
           history = history,
+          options = options,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolCallingSessionCreateRequest): ToolCallingSessionCreateRequest = value.copy(
-        tools = value.tools.redactElements(ToolDefinition.ADAPTER),
+        history = value.history.redactElements(ToolCallingHistoryTurn.ADAPTER),
+        options = value.options?.let(ToolCallingOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

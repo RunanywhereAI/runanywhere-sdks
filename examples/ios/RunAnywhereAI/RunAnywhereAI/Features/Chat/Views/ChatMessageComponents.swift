@@ -2,7 +2,23 @@
 //  ChatMessageComponents.swift
 //  RunAnywhereAI
 //
-//  Chat message components - extracted from ChatInterfaceView for file length compliance
+//  One turn in the transcript: the reasoning disclosure, the bubble, the meta
+//  row, and the actions.
+//
+//  Three decisions here are load-bearing:
+//
+//  1. **The meta row keys off `isStreamingTail`, not `isGenerating`.** It used to
+//     hide whenever *any* generation was running, so sending a second message
+//     made every earlier reply's timestamp and metrics vanish and then pop back.
+//     Only the message actually receiving tokens should hide its metrics.
+//  2. **Actions are visible, not just long-press.** A `.contextMenu` is the only
+//     way to copy or retry a reply today, and a long press on a wall of text is
+//     undiscoverable. The row below the last reply is the affordance; hover
+//     reveals it on the others; the context menu stays as the shortcut.
+//  3. **No `.animation(nil, ...)` on content.** Suppressing all animation on a
+//     streaming bubble was a blunt fix for the transcript's six competing scroll
+//     drivers (see `ChatMessageListView`). With one coalesced driver the tail can
+//     grow normally, so the kill switch is gone.
 //
 
 import SwiftUI
@@ -13,41 +29,12 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - Typing Indicator
-
-struct TypingIndicatorView: View {
-    @State private var animationPhase = 0
-
-    var body: some View {
-        HStack(spacing: AppSpacing.xSmall) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(AppColors.primaryAccent.opacity(0.7))
-                    .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
-                    .scaleEffect(animationPhase == index ? 1.3 : 0.8)
-                    .animation(
-                        Animation.easeInOut(duration: AppLayout.animationVerySlow)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.2),
-                        value: animationPhase
-                    )
-            }
-
-            Spacer(minLength: AppSpacing.padding60)
-        }
-        .padding(.vertical, AppSpacing.smallMedium)
-        .onAppear {
-            withAnimation {
-                animationPhase = 1
-            }
-        }
-    }
-}
-
 // MARK: - Streaming Cursor
 
 /// Pulsing brand dot shown while tokens stream into the tail message.
 struct StreamingCursorDot: View {
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
     @State private var pulsing = false
 
     var body: some View {
@@ -56,62 +43,82 @@ struct StreamingCursorDot: View {
             .frame(width: 9, height: 9)
             .scaleEffect(pulsing ? 0.75 : 1.0)
             .opacity(pulsing ? 0.4 : 1.0)
-            .animation(
-                .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
-                value: pulsing
-            )
-            .onAppear { pulsing = true }
+            // Suppressed rather than shortened under Reduce Motion: collapsing a
+            // `repeatForever` to a 0.15s fade still repeats forever.
+            .animation(Motion.resolveAmbient(reduceMotion: reduceMotion), value: pulsing)
+            .onAppear { pulsing = !reduceMotion }
+            .accessibilityLabel("Generating")
     }
+}
+
+// MARK: - Message Actions
+
+/// What a reader can do with one turn. A value of closures rather than a
+/// `LLMViewModel` reference: the bubble stays a pure function of its message, so
+/// a token arriving in the tail cannot invalidate all 200 earlier bubbles.
+struct MessageActions {
+    var regenerate: (() -> Void)?
+    var edit: (() -> Void)?
+    var delete: (() -> Void)?
+
+    static let none = MessageActions()
 }
 
 // MARK: - Message Bubble
 
 struct MessageBubbleView: View {
     let message: Message
-    let isGenerating: Bool
     /// True only for the assistant message currently receiving tokens.
     var isStreamingTail: Bool = false
+    /// True for the newest turn, which shows its actions without a hover.
+    var isLatestTurn: Bool = false
     /// True when the currently loaded model can emit reasoning; gates the
     /// "Thinking…" disclosure so non-thinking models never show it.
     var loadedModelSupportsThinking: Bool = false
+    var actions: MessageActions = .none
+
     @State private var showToolCallSheet = false
     @State private var previewAttachment: MessageAttachment?
+    @State private var isHovering = false
+    @State private var didCopy = false
 
-    var hasThinking: Bool {
-        message.thinkingContent != nil && !(message.thinkingContent?.isEmpty ?? true)
+    private var hasThinking: Bool {
+        !(message.thinkingContent ?? "").isEmpty
     }
 
-    var hasToolCall: Bool {
-        message.toolCallInfo != nil
-    }
+    private var isUser: Bool { message.role == .user }
+
+    /// Metrics and actions belong to a finished turn. The streaming tail hides
+    /// them because its numbers do not exist yet and its text is still moving.
+    private var isSettled: Bool { !isStreamingTail }
 
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer(minLength: AppSpacing.padding60)
-            }
+        HStack(spacing: 0) {
+            if isUser { Spacer(minLength: Space.xxl) }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                if message.role == .assistant && loadedModelSupportsThinking && (isStreamingTail || hasThinking) {
+            VStack(alignment: isUser ? .trailing : .leading, spacing: Space.sm) {
+                if !isUser && loadedModelSupportsThinking && (isStreamingTail || hasThinking) {
                     ReasoningDisclosureView(
                         reasoning: message.thinkingContent ?? "",
                         isStreaming: isStreamingTail
                     )
                 }
 
-                if message.role == .assistant && hasToolCall {
-                    toolCallSection
+                if !isUser, let toolCallInfo = message.toolCallInfo {
+                    ToolCallIndicator(toolCallInfo: toolCallInfo) { showToolCallSheet = true }
                 }
 
                 mainMessageBubble
 
-                timestampAndAnalyticsSection
+                if isSettled {
+                    metaRow
+                }
             }
 
-            if message.role != .user {
-                Spacer(minLength: AppSpacing.padding60)
-            }
+            if !isUser { Spacer(minLength: Space.xxl) }
         }
+        .onHover { isHovering = $0 }
+        .motionAware(Motion.microFade, value: isHovering)
         .adaptiveSheet(isPresented: $showToolCallSheet) {
             if let toolCallInfo = message.toolCallInfo {
                 ToolCallDetailSheet(toolCallInfo: toolCallInfo)
@@ -137,18 +144,268 @@ struct MessageBubbleView: View {
         Binding {
             previewAttachment != nil
         } set: { isPresented in
-            if !isPresented {
-                previewAttachment = nil
+            if !isPresented { previewAttachment = nil }
+        }
+    }
+
+    // MARK: - Bubble
+
+    /// User turns keep a brand bubble; assistant replies read as a document —
+    /// full width, no container. That is the consumer chat idiom, and it is also
+    /// what lets a long reply use the full reading measure instead of losing a
+    /// bubble's inset on both sides.
+    @ViewBuilder private var mainMessageBubble: some View {
+        if !message.content.isEmpty || message.attachment != nil {
+            Group {
+                if isUser { userBubble } else { assistantBody }
+            }
+            .contextMenu { messageMenu }
+        } else if isStreamingTail {
+            // The gap between Send and the first token. Without this the bubble
+            // is `EmptyView` until a token lands, so on a cold model the reader
+            // gets an empty screen for several seconds with nothing to say the
+            // request was even received. The caret alone is the right amount:
+            // it is the same glyph the reply will grow from, so nothing swaps
+            // out when the first token arrives.
+            assistantBody
+        }
+    }
+
+    /// The caret lives *inside* the text now (see `StreamingTextView`), not on its
+    /// own line below it. A status dot sitting under a paragraph reads as an
+    /// indicator light; a caret hard against the last token reads as a cursor,
+    /// which is what tells a reader where the next word will land.
+    private var assistantBody: some View {
+        StreamingTextView(
+            content: message.content.trimmingCharacters(in: .whitespacesAndNewlines),
+            isStreaming: isStreamingTail,
+            font: AppType.font(.body),
+            color: message.isError == true ? AppColors.dangerText : AppColors.textPrimary
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var userBubble: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            if let attachment = message.attachment {
+                MessageAttachmentInlineCard(attachment: attachment, role: message.role) {
+                    previewAttachment = attachment
+                }
+            }
+
+            if !message.content.isEmpty {
+                Text(message.content)
+                    .appType(.body)
+                    .foregroundStyle(AppColors.textWhite)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.md)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [AppColors.userBubbleGradientStart, AppColors.userBubbleGradientEnd],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+    }
+
+    // MARK: - Meta Row
+
+    /// Timestamp, metrics, and actions on one line.
+    ///
+    /// The actions show for the newest turn and on hover elsewhere. On a phone
+    /// there is no hover, so the newest turn — the one a reader actually wants to
+    /// copy or retry — is the one that always offers them, and the context menu
+    /// covers the rest.
+    private var metaRow: some View {
+        HStack(spacing: Space.sm) {
+            if isUser { Spacer(minLength: 0) }
+
+            if !isUser, message.analytics != nil || !message.content.isEmpty {
+                analyticsSummary
+            }
+
+            actionButtons
+                .opacity(isLatestTurn || isHovering ? 1 : 0)
+                .allowsHitTesting(isLatestTurn || isHovering)
+
+            if !isUser { Spacer(minLength: 0) }
+        }
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+
+    /// One dot-separated run rather than several sibling `Text`s: concatenated
+    /// `Text` wraps as a single paragraph, so a narrow phone breaks it between
+    /// metrics instead of clipping the last one.
+    ///
+    /// Three metrics, not five. All five (`+ 351 tok + 12ms to first token`) ran
+    /// past the four action buttons on a 393pt phone and truncated to `351 to…`,
+    /// which is worse than not showing them — verified on an iPhone 17 Pro. Token
+    /// count and TTFT stay in the analytics sheet, where there is room to label
+    /// them properly; the summary keeps what a reader can act on.
+    @ViewBuilder private var analyticsSummary: some View {
+        if let analytics = message.analytics {
+            Text(metricsRun(analytics))
+                .appType(.caption)
+                .monospacedDigit()
+                .foregroundStyle(AppColors.textTertiary)
+                .lineLimit(1)
+                // The numbers arrive in one step when the turn finalizes; without
+                // this they hard-cut in beside the timestamp.
+                .contentTransition(.numericText())
+                .accessibilityLabel(metricsAccessibilityLabel(analytics))
+
+            if analytics.wasThinkingMode {
+                Image(systemName: "lightbulb.min")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.primaryPurple.opacity(0.7))
+                    .accessibilityLabel("Used reasoning")
+            }
+        } else {
+            Text(message.timestamp, style: .time)
+                .appType(.caption)
+                .monospacedDigit()
+                .foregroundStyle(AppColors.textTertiary)
+        }
+    }
+
+    private func metricsRun(_ analytics: MessageAnalytics) -> String {
+        var parts: [String] = [message.timestamp.formatted(date: .omitted, time: .shortened)]
+        if analytics.averageTokensPerSecond > 0 {
+            parts.append("\(Int(analytics.averageTokensPerSecond)) tok/s")
+        }
+        parts.append(String(format: "%.1fs", analytics.totalGenerationTime))
+        return parts.joined(separator: " · ")
+    }
+
+    /// VoiceOver reads the numbers the row drops, since a screen reader has no
+    /// width limit and the analytics sheet is several taps away.
+    private func metricsAccessibilityLabel(_ analytics: MessageAnalytics) -> String {
+        var parts: [String] = [
+            "Replied at \(message.timestamp.formatted(date: .omitted, time: .shortened))"
+        ]
+        if analytics.averageTokensPerSecond > 0 {
+            parts.append("\(Int(analytics.averageTokensPerSecond)) tokens per second")
+        }
+        parts.append(String(format: "%.1f seconds", analytics.totalGenerationTime))
+        if analytics.outputTokens > 0 {
+            parts.append("\(analytics.outputTokens) tokens")
+        }
+        if let ttft = analytics.timeToFirstToken, ttft > 0 {
+            parts.append("\(Int(ttft * 1000)) milliseconds to first token")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    // MARK: - Actions
+
+    private var actionButtons: some View {
+        HStack(spacing: Space.xs) {
+            MessageActionButton(
+                icon: didCopy ? "checkmark" : "doc.on.doc",
+                label: didCopy ? "Copied" : "Copy",
+                action: copyMessageContent
+            )
+
+            if let regenerate = actions.regenerate {
+                MessageActionButton(icon: "arrow.clockwise", label: "Regenerate", action: regenerate)
+            }
+
+            if let edit = actions.edit {
+                MessageActionButton(icon: "pencil", label: "Edit", action: edit)
+            }
+
+            if let delete = actions.delete {
+                MessageActionButton(icon: "trash", label: "Delete", action: delete)
             }
         }
     }
 
-    @ViewBuilder var toolCallSection: some View {
-        if let toolCallInfo = message.toolCallInfo {
-            ToolCallIndicator(toolCallInfo: toolCallInfo) {
-                showToolCallSheet = true
+    @ViewBuilder private var messageMenu: some View {
+        Button(action: copyMessageContent) {
+            Label("Copy", systemImage: "doc.on.doc")
+        }
+
+        if let regenerate = actions.regenerate {
+            Button(action: regenerate) {
+                Label("Regenerate", systemImage: "arrow.clockwise")
             }
         }
+
+        if let edit = actions.edit {
+            Button(action: edit) {
+                Label("Edit and Resend", systemImage: "pencil")
+            }
+        }
+
+        if let delete = actions.delete {
+            Section {
+                Button(role: .destructive, action: delete) {
+                    Label(isUser ? "Delete Exchange" : "Delete Reply", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func copyMessageContent() {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = message.content
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+        #endif
+
+        Haptics.success()
+        // The clipboard gives no feedback of its own, so the button reports it.
+        // Reverting after two seconds keeps the row from claiming a copy the
+        // reader made minutes ago is still the one on the clipboard.
+        withMotion(Motion.snappy) { didCopy = true }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withMotion(Motion.snappy) { didCopy = false }
+        }
+    }
+}
+
+// MARK: - Action Button
+
+/// A 28pt icon button. Label-only in the accessibility tree and in the tooltip,
+/// so the row stays quiet without hiding what the buttons do.
+private struct MessageActionButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isHovering ? AppColors.textPrimary : AppColors.textTertiary)
+                .frame(width: 28, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
+                        .fill(isHovering ? AppColors.muted : .clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(label)
+        .accessibilityLabel(label)
+        // Requires the button keep its identity across the symbol change, which
+        // is why Copy swaps its `icon` rather than being replaced by a sibling.
+        .contentTransition(.symbolEffect(.replace))
+        .motionAware(Motion.microFade, value: isHovering)
     }
 }
 
@@ -163,533 +420,118 @@ struct ReasoningDisclosureView: View {
     let isStreaming: Bool
     @State private var isUserExpanded = false
 
-    private var isExpanded: Bool {
-        isStreaming || isUserExpanded
-    }
+    /// Roughly six lines — enough to read the model's current thought, small
+    /// enough that the answer below stays on screen on the shortest phone.
+    private static let streamingReasoningHeight: CGFloat = 132
+
+    private var isExpanded: Bool { isStreaming || isUserExpanded }
 
     private var hasReasoning: Bool {
         !reasoning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.small) {
-            Button {
-                guard !isStreaming else { return }
-                withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
-                    isUserExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.min")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryPurple)
-
-                    Text(headerTitle)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primaryPurple)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    if isStreaming {
-                        StreamingCursorDot()
-                    } else {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.right")
-                            .font(AppTypography.caption2)
-                            .foregroundColor(AppColors.primaryPurple.opacity(0.6))
-                    }
-                }
-                .padding(.horizontal, AppSpacing.regular)
-                .padding(.vertical, AppSpacing.padding9)
-                .background(headerBackground)
-            }
-            .buttonStyle(.plain)
-            .disabled(isStreaming)
-            .accessibilityLabel(headerTitle)
-            .accessibilityHint(
-                isStreaming
-                    ? "Reasoning is expanded while generation is active"
-                    : "Toggles reasoning"
-            )
+        VStack(alignment: .leading, spacing: Space.sm) {
+            disclosureHeader
 
             if isExpanded {
                 reasoningContent
-                .padding(AppSpacing.mediumLarge)
-                .background(
-                    RoundedRectangle(cornerRadius: AppSpacing.medium)
-                        .fill(AppColors.backgroundGray6)
-                )
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .slide),
-                    removal: .opacity.combined(with: .slide)
-                ))
+                    .padding(Space.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(AppColors.primaryPurple.opacity(0.06))
+                    )
+                    // Slides down from under its own header rather than in from
+                    // the side: reasoning belongs to the header above it, and a
+                    // horizontal slide reads as a page change.
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: -6)),
+                        removal: .opacity
+                    ))
             }
         }
+        .motionAware(Motion.snappy, value: isExpanded)
+    }
+
+    private var disclosureHeader: some View {
+        Button {
+            guard !isStreaming else { return }
+            isUserExpanded.toggle()
+        } label: {
+            HStack(spacing: Space.sm) {
+                Image(systemName: "lightbulb.min")
+                    .appType(.caption)
+
+                Text(headerTitle)
+                    .appType(.chip)
+                    .lineLimit(1)
+
+                if isStreaming {
+                    StreamingCursorDot()
+                } else {
+                    Image(systemName: "chevron.down")
+                        .appType(.caption)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                        .motionAware(Motion.snappy, value: isExpanded)
+                }
+            }
+            .foregroundStyle(AppColors.primaryPurple)
+            .padding(.horizontal, Space.md)
+            .padding(.vertical, Space.sm)
+            .background(Capsule().fill(AppColors.primaryPurple.opacity(0.10)))
+        }
+        .buttonStyle(.plain)
+        .disabled(isStreaming)
+        .accessibilityLabel(headerTitle)
+        .accessibilityHint(
+            isStreaming
+                ? "Reasoning stays expanded while the model is thinking"
+                : "Shows or hides the model's reasoning"
+        )
     }
 
     private var headerTitle: String {
         if isStreaming {
-            return hasReasoning ? "Thinking live…" : "Thinking…"
+            return hasReasoning ? "Thinking…" : "Starting to think…"
         }
         return isExpanded ? "Hide reasoning" : "Show reasoning"
     }
 
-    private var reasoningContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    if hasReasoning {
-                        Text(reasoning)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        HStack(spacing: AppSpacing.smallMedium) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Waiting for model output…")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-
-                    Color.clear
-                        .frame(height: 1)
-                        .id("reasoning-stream-end")
-                }
-            }
-            .frame(maxHeight: AppSpacing.minFrameHeight)
-            .onAppear {
-                scrollToLatestReasoning(using: proxy)
-            }
-            .onChange(of: reasoning) { _, _ in
-                scrollToLatestReasoning(using: proxy)
-            }
-        }
-    }
-
-    private func scrollToLatestReasoning(using proxy: ScrollViewProxy) {
-        guard isStreaming else { return }
-        proxy.scrollTo("reasoning-stream-end", anchor: .bottom)
-    }
-
-    private var headerBackground: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        AppColors.primaryPurple.opacity(0.1),
-                        AppColors.primaryPurple.opacity(0.05)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
-                    .strokeBorder(
-                        AppColors.primaryPurple.opacity(0.2),
-                        lineWidth: AppSpacing.strokeThin
-                    )
-            )
-    }
-}
-
-// MARK: - MessageBubbleView Badge and Analytics
-
-extension MessageBubbleView {
-    @ViewBuilder var timestampAndAnalyticsSection: some View {
-        // Only show timestamp for assistant messages when content exists and not generating
-        if message.role == .assistant && !message.content.isEmpty && !isGenerating {
-            HStack(spacing: 6) {
-                Spacer()
-
-                Text(message.timestamp, style: .time)
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-
-                if let analytics = message.analytics {
-                    analyticsContent(analytics)
-                }
-            }
-            .padding(.leading, AppSpacing.mediumLarge)
-        }
-    }
-
-    @ViewBuilder
-    private func analyticsContent(_ analytics: MessageAnalytics) -> some View {
-        Group {
-            Text("\u{2022}")
-                .foregroundColor(AppColors.textSecondary.opacity(0.5))
-
-            Text("\(String(format: "%.1f", analytics.totalGenerationTime))s")
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
-
-            if analytics.averageTokensPerSecond > 0 {
-                Text("\u{2022}")
-                    .foregroundColor(AppColors.textSecondary.opacity(0.5))
-
-                Text("\(Int(analytics.averageTokensPerSecond)) tok/s")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-
-            if analytics.wasThinkingMode {
-                Image(systemName: "lightbulb.min")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.primaryPurple.opacity(0.7))
-            }
-        }
-    }
-}
-
-// MARK: - MessageBubbleView Main Bubble
-
-extension MessageBubbleView {
-    var userBubbleGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                AppColors.userBubbleGradientStart,
-                AppColors.userBubbleGradientEnd
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    var assistantBubbleGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                AppColors.backgroundGray5,
-                AppColors.backgroundGray6
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    /// User turns keep a brand bubble; assistant replies read as a document
-    /// (full-width, no bubble) — the consumer chat idiom.
-    @ViewBuilder var messageBubbleBackground: some View {
-        if message.role == .user {
-            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                .fill(userBubbleGradient)
-                .shadow(color: AppColors.shadowLight, radius: 3, x: 0, y: 2)
-        } else {
-            Color.clear
-        }
-    }
-
-    var shouldPulse: Bool {
-        isGenerating && message.role == .assistant && message.content.count < 50
-    }
-
-    @ViewBuilder var mainMessageBubble: some View {
-        if !message.content.isEmpty || message.attachment != nil {
-            Group {
-                if message.role == .assistant {
-                    VStack(alignment: .leading, spacing: 0) {
-                        AdaptiveMarkdownText(
-                            message.content,
-                            font: AppTypography.body,
-                            color: AppColors.textPrimary
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                        if isStreamingTail {
-                            StreamingCursorDot()
-                                .padding(.top, AppSpacing.small)
-                        }
-                    }
-                    .padding(.vertical, AppSpacing.smallMedium)
-                } else {
-                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                        if let attachment = message.attachment {
-                            MessageAttachmentInlineCard(attachment: attachment, role: message.role) {
-                                previewAttachment = attachment
-                            }
-                        }
-
-                        if !message.content.isEmpty {
-                            Text(message.content)
-                                .foregroundColor(AppColors.textWhite)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(.horizontal, AppSpacing.large)
-                    .padding(.vertical, AppSpacing.mediumLarge)
-                }
-            }
-            .background(messageBubbleBackground)
-            .animation(nil, value: message.content)
-            .contextMenu {
-                Button {
-                    copyMessageContent()
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                }
-            }
-        }
-    }
-
-    private func copyMessageContent() {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = message.content
-        #elseif canImport(AppKit)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(message.content, forType: .string)
-        #endif
-    }
-}
-
-// MARK: - Message Attachments
-
-private struct MessageAttachmentInlineCard: View {
-    let attachment: MessageAttachment
-    let role: Message.Role
-    let onOpen: () -> Void
-
-    private var foreground: Color {
-        role == .user ? AppColors.textWhite : AppColors.textPrimary
-    }
-
-    private var secondary: Color {
-        role == .user ? AppColors.textWhite.opacity(0.8) : AppColors.textSecondary
-    }
-
-    private var background: Color {
-        role == .user ? AppColors.textWhite.opacity(0.16) : AppColors.backgroundTertiary
-    }
-
-    var body: some View {
-        Button(action: onOpen) {
-            HStack(spacing: AppSpacing.smallMedium) {
-                attachmentIcon
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(attachment.filename)
-                        .font(AppTypography.captionMedium)
-                        .foregroundColor(foreground)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Text(attachment.detail ?? defaultDetail)
-                        .font(AppTypography.caption2)
-                        .foregroundColor(secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: AppSpacing.xSmall)
-
-                Image(systemName: "arrow.up.right")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(secondary)
-            }
-            .padding(AppSpacing.smallMedium)
-            .background(background)
-            .cornerRadius(AppSpacing.cornerRadiusRegular)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open \(attachment.filename)")
-    }
-
-    @ViewBuilder private var attachmentIcon: some View {
-        switch attachment.kind {
-        case .image:
-            MessageAttachmentThumbnail(attachment: attachment)
-        case .document:
-            RoundedRectangle(cornerRadius: 7)
-                .fill(AppColors.primaryPurple.opacity(role == .user ? 0.28 : 0.14))
-                .frame(width: 42, height: 42)
-                .overlay(
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(role == .user ? AppColors.textWhite : AppColors.primaryPurple)
-                )
-        }
-    }
-
-    private var defaultDetail: String {
-        switch attachment.kind {
-        case .image:
-            return "Image"
-        case .document:
-            return "Document"
-        }
-    }
-}
-
-private struct MessageAttachmentThumbnail: View {
-    let attachment: MessageAttachment
-    @State private var imageData: Data?
-
-    var body: some View {
-        Group {
-            #if canImport(UIKit)
-            if let image = imageData.flatMap(UIImage.init(data:)) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                fallback
-            }
-            #elseif canImport(AppKit)
-            if let image = imageData.flatMap(NSImage.init(data:)) {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                fallback
-            }
-            #else
-            fallback
-            #endif
-        }
-        .frame(width: 42, height: 42)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-        .task(id: attachment.previewIdentity) {
-            imageData = await attachment.loadImageData()
-        }
-    }
-
-    private var fallback: some View {
-        RoundedRectangle(cornerRadius: 7)
-            .fill(AppColors.textWhite.opacity(0.2))
-            .overlay(
-                Image(systemName: "photo")
-                    .foregroundColor(AppColors.textWhite)
-            )
-    }
-}
-
-private struct MessageAttachmentPreviewSheet: View {
-    let attachment: MessageAttachment
-    @Environment(\.dismiss)
-    private var dismiss
-    @State private var imageData: Data?
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.large) {
-                    switch attachment.kind {
-                    case .image:
-                        imagePreview
-                    case .document:
-                        documentPreview
-                    }
-                }
-                .padding(AppSpacing.large)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(AppColors.backgroundPrimary)
-            .navigationTitle(attachment.filename)
-            #if os(iOS)
-            .navigationBarTitleDisplayModeCompat(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-        .task(id: attachment.previewIdentity) {
-            imageData = await attachment.loadImageData()
-        }
-    }
-
-    @ViewBuilder private var imagePreview: some View {
-        #if canImport(UIKit)
-        if let image = imageData.flatMap(UIImage.init(data:)) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .cornerRadius(AppSpacing.cornerRadiusRegular)
-        } else {
-            missingPreview
-        }
-        #elseif canImport(AppKit)
-        if let image = imageData.flatMap(NSImage.init(data:)) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .cornerRadius(AppSpacing.cornerRadiusRegular)
-        } else {
-            missingPreview
-        }
-        #else
-        missingPreview
-        #endif
-    }
-
-    private var documentPreview: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-            HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: "doc.text")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(AppColors.primaryPurple)
-                    .frame(width: 48, height: 48)
-                    .background(AppColors.primaryPurple.opacity(0.12))
-                    .cornerRadius(AppSpacing.cornerRadiusRegular)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(attachment.filename)
-                        .font(AppTypography.subheadlineMedium)
-                        .lineLimit(2)
-                    if let detail = attachment.detail {
-                        Text(detail)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-                }
-            }
-
-            Text(attachment.previewText ?? attachment.textFromDisk ?? "No preview text is available for this document.")
-                .font(AppTypography.body)
-                .foregroundColor(AppColors.textPrimary)
+    /// While streaming, the reasoning is capped and scrolls internally; once the
+    /// turn is done and the reader opens it deliberately, it sizes to its content.
+    ///
+    /// Uncapped streaming reasoning is what made the answer unreachable: a 0.6B
+    /// model emitted five paragraphs of thinking, the disclosure grew to fill the
+    /// viewport, and the reply arrived below the fold — verified on an iPhone 17
+    /// Pro. A bounded, bottom-anchored ticker shows the model is working without
+    /// taking the screen hostage.
+    @ViewBuilder private var reasoningContent: some View {
+        if hasReasoning {
+            let text = Text(reasoning.trimmingCharacters(in: .whitespacesAndNewlines))
+                .appType(.secondary)
+                .foregroundStyle(AppColors.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+
+            if isStreaming {
+                ScrollView {
+                    text
+                }
+                .frame(maxHeight: Self.streamingReasoningHeight)
+                .defaultScrollAnchor(.bottom)
+                .scrollIndicators(.hidden)
+            } else {
+                text
+            }
+        } else {
+            HStack(spacing: Space.sm) {
+                ProgressView().controlSize(.small)
+                Text("Waiting for the model…")
+                    .appType(.secondary)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var missingPreview: some View {
-        VStack(spacing: AppSpacing.mediumLarge) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundColor(AppColors.primaryOrange)
-            Text("Preview is unavailable")
-                .font(AppTypography.subheadlineMedium)
-                .foregroundColor(AppColors.textSecondary)
-        }
-        .frame(maxWidth: .infinity, minHeight: 220)
-    }
-}
-
-private extension MessageAttachment {
-    var previewIdentity: String {
-        relativePath ?? id.uuidString
-    }
-
-    func loadImageData() async -> Data? {
-        guard kind == .image, let fileURL else { return nil }
-        return await Task.detached(priority: .utility) {
-            try? Data(contentsOf: fileURL)
-        }.value
-    }
-
-    var textFromDisk: String? {
-        guard let fileURL,
-              let data = try? Data(contentsOf: fileURL),
-              let text = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-        return text
     }
 }

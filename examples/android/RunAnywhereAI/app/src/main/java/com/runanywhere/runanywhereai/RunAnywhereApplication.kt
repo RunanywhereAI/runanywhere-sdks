@@ -59,7 +59,10 @@ class RunAnywhereApplication : Application() {
         if (GlobalState.ready || !setupInProgress.compareAndSet(false, true)) return
         try {
             setupSDK()
+            // Unblock the UI here, not after the catalog. Everything the app needs
+            // to be *usable* is now up; seeding runs behind the visible app below.
             GlobalState.markReady()
+            seedCatalogInBackground()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -67,6 +70,38 @@ class RunAnywhereApplication : Application() {
             GlobalState.markInitFailed(e.message ?: e.javaClass.simpleName)
         } finally {
             setupInProgress.set(false)
+        }
+    }
+
+    /**
+     * Register the curated catalog after the app is on screen.
+     *
+     * Measured on a Snapdragon 8 Elite: `RunAnywhere.initialize()` returns in
+     * ~0.6 s, then 105 sequential `models.register()` calls take a further
+     * ~13.4 s of JNI round-trips. In front of the splash that was the single
+     * largest source of cold-start abandonment; behind it, it is invisible —
+     * chat with an already-downloaded model, voice, and vision are all live
+     * while it runs, and the only surface that reads the catalog (the model
+     * picker) already suspends on `awaitBootstrapComplete()` and shows its own
+     * loading state.
+     *
+     * A failure here is not fatal, unlike one in [setupSDK]: an unseeded catalog
+     * means a picker with fewer rows, not a broken app, so it must never swap the
+     * running UI for the init-error screen.
+     */
+    private suspend fun seedCatalogInBackground() {
+        val startTime = System.currentTimeMillis()
+        try {
+            ModelBootstrap.setupModels()
+            RACLog.i("catalog ready in ${System.currentTimeMillis() - startTime}ms (after first frame)")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            RACLog.e("catalog seeding failed; model picker will show fewer rows", e)
+        } finally {
+            // Signalled even on failure so the picker resolves its spinner into
+            // whatever the registry does hold instead of waiting forever.
+            GlobalState.markCatalogSeeded()
         }
     }
 
@@ -115,7 +150,7 @@ class RunAnywhereApplication : Application() {
             apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
-            baseURL = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
+            baseUrl = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
             environment = environment,
@@ -140,7 +175,6 @@ class RunAnywhereApplication : Application() {
         // model repos (e.g. gated NPU bundles) download across app restarts. Sourced only from
         // the user-provisioned token in protected app storage — never embedded in the APK.
         SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
-        ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()
         BuiltInTools.register(applicationContext)
         val initTime = System.currentTimeMillis() - startTime

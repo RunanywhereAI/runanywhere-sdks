@@ -5,13 +5,11 @@
 //   protoc               v7.35.1
 // source: pipeline.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PipelineStopResult = exports.PipelineHandle = exports.PipelineStartRequest = exports.PipelineCompileResult = exports.PipelineOptions = exports.EdgeSpec = exports.OperatorSpec_ParamsEntry = exports.OperatorSpec = exports.PipelineSpec = exports.PipelineStatus = exports.EdgePolicy = exports.DeviceAffinity = exports.protobufPackage = void 0;
+exports.PipelineOptions = exports.EdgeSpec = exports.OperatorSpec_ParamsEntry = exports.OperatorSpec = exports.PipelineSpec = exports.EdgePolicy = exports.DeviceAffinity = exports.protobufPackage = void 0;
 exports.deviceAffinityFromJSON = deviceAffinityFromJSON;
 exports.deviceAffinityToJSON = deviceAffinityToJSON;
 exports.edgePolicyFromJSON = edgePolicyFromJSON;
 exports.edgePolicyToJSON = edgePolicyToJSON;
-exports.pipelineStatusFromJSON = pipelineStatusFromJSON;
-exports.pipelineStatusToJSON = pipelineStatusToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
@@ -21,8 +19,11 @@ var DeviceAffinity;
     DeviceAffinity[DeviceAffinity["DEVICE_AFFINITY_ANY"] = 1] = "DEVICE_AFFINITY_ANY";
     DeviceAffinity[DeviceAffinity["DEVICE_AFFINITY_CPU"] = 2] = "DEVICE_AFFINITY_CPU";
     DeviceAffinity[DeviceAffinity["DEVICE_AFFINITY_GPU"] = 3] = "DEVICE_AFFINITY_GPU";
-    /** DEVICE_AFFINITY_ANE - Apple Neural Engine */
-    DeviceAffinity[DeviceAffinity["DEVICE_AFFINITY_ANE"] = 4] = "DEVICE_AFFINITY_ANE";
+    /**
+     * DEVICE_AFFINITY_NPU - Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+     * Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
+     */
+    DeviceAffinity[DeviceAffinity["DEVICE_AFFINITY_NPU"] = 4] = "DEVICE_AFFINITY_NPU";
     DeviceAffinity[DeviceAffinity["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DeviceAffinity || (exports.DeviceAffinity = DeviceAffinity = {}));
 function deviceAffinityFromJSON(object) {
@@ -40,8 +41,8 @@ function deviceAffinityFromJSON(object) {
         case "DEVICE_AFFINITY_GPU":
             return DeviceAffinity.DEVICE_AFFINITY_GPU;
         case 4:
-        case "DEVICE_AFFINITY_ANE":
-            return DeviceAffinity.DEVICE_AFFINITY_ANE;
+        case "DEVICE_AFFINITY_NPU":
+            return DeviceAffinity.DEVICE_AFFINITY_NPU;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -58,8 +59,8 @@ function deviceAffinityToJSON(object) {
             return "DEVICE_AFFINITY_CPU";
         case DeviceAffinity.DEVICE_AFFINITY_GPU:
             return "DEVICE_AFFINITY_GPU";
-        case DeviceAffinity.DEVICE_AFFINITY_ANE:
-            return "DEVICE_AFFINITY_ANE";
+        case DeviceAffinity.DEVICE_AFFINITY_NPU:
+            return "DEVICE_AFFINITY_NPU";
         case DeviceAffinity.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -68,11 +69,8 @@ function deviceAffinityToJSON(object) {
 var EdgePolicy;
 (function (EdgePolicy) {
     EdgePolicy[EdgePolicy["EDGE_POLICY_UNSPECIFIED"] = 0] = "EDGE_POLICY_UNSPECIFIED";
-    /** EDGE_POLICY_BLOCK - Producer blocks when channel is full (default, safest). */
     EdgePolicy[EdgePolicy["EDGE_POLICY_BLOCK"] = 1] = "EDGE_POLICY_BLOCK";
-    /** EDGE_POLICY_DROP_OLDEST - Oldest item is dropped when channel is full (audio routing only). */
     EdgePolicy[EdgePolicy["EDGE_POLICY_DROP_OLDEST"] = 2] = "EDGE_POLICY_DROP_OLDEST";
-    /** EDGE_POLICY_DROP_NEWEST - Newest item is dropped when channel is full (pager coalescing). */
     EdgePolicy[EdgePolicy["EDGE_POLICY_DROP_NEWEST"] = 3] = "EDGE_POLICY_DROP_NEWEST";
     EdgePolicy[EdgePolicy["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(EdgePolicy || (exports.EdgePolicy = EdgePolicy = {}));
@@ -107,48 +105,6 @@ function edgePolicyToJSON(object) {
         case EdgePolicy.EDGE_POLICY_DROP_NEWEST:
             return "EDGE_POLICY_DROP_NEWEST";
         case EdgePolicy.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Pipeline lifecycle status — shared by compile/start/stop results.
- * ---------------------------------------------------------------------------
- */
-var PipelineStatus;
-(function (PipelineStatus) {
-    PipelineStatus[PipelineStatus["PIPELINE_STATUS_UNSPECIFIED"] = 0] = "PIPELINE_STATUS_UNSPECIFIED";
-    PipelineStatus[PipelineStatus["PIPELINE_STATUS_OK"] = 1] = "PIPELINE_STATUS_OK";
-    PipelineStatus[PipelineStatus["PIPELINE_STATUS_FAILED"] = 2] = "PIPELINE_STATUS_FAILED";
-    PipelineStatus[PipelineStatus["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(PipelineStatus || (exports.PipelineStatus = PipelineStatus = {}));
-function pipelineStatusFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "PIPELINE_STATUS_UNSPECIFIED":
-            return PipelineStatus.PIPELINE_STATUS_UNSPECIFIED;
-        case 1:
-        case "PIPELINE_STATUS_OK":
-            return PipelineStatus.PIPELINE_STATUS_OK;
-        case 2:
-        case "PIPELINE_STATUS_FAILED":
-            return PipelineStatus.PIPELINE_STATUS_FAILED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return PipelineStatus.UNRECOGNIZED;
-    }
-}
-function pipelineStatusToJSON(object) {
-    switch (object) {
-        case PipelineStatus.PIPELINE_STATUS_UNSPECIFIED:
-            return "PIPELINE_STATUS_UNSPECIFIED";
-        case PipelineStatus.PIPELINE_STATUS_OK:
-            return "PIPELINE_STATUS_OK";
-        case PipelineStatus.PIPELINE_STATUS_FAILED:
-            return "PIPELINE_STATUS_FAILED";
-        case PipelineStatus.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -668,370 +624,6 @@ exports.PipelineOptions = {
         message.latencyBudgetMs = object.latencyBudgetMs ?? 0;
         message.emitMetrics = object.emitMetrics ?? false;
         message.strictValidation = object.strictValidation ?? false;
-        return message;
-    },
-};
-function createBasePipelineCompileResult() {
-    return { handleId: "", status: 0, errorMessage: undefined, errorCode: 0 };
-}
-exports.PipelineCompileResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.handleId !== "") {
-            writer.uint32(10).string(message.handleId);
-        }
-        if (message.status !== 0) {
-            writer.uint32(16).int32(message.status);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(26).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(32).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePipelineCompileResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.handleId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.status = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            handleId: isSet(object.handleId)
-                ? globalThis.String(object.handleId)
-                : isSet(object.handle_id)
-                    ? globalThis.String(object.handle_id)
-                    : "",
-            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.handleId !== "") {
-            obj.handleId = message.handleId;
-        }
-        if (message.status !== 0) {
-            obj.status = pipelineStatusToJSON(message.status);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PipelineCompileResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePipelineCompileResult();
-        message.handleId = object.handleId ?? "";
-        message.status = object.status ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
-        return message;
-    },
-};
-function createBasePipelineStartRequest() {
-    return { handleId: "" };
-}
-exports.PipelineStartRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.handleId !== "") {
-            writer.uint32(10).string(message.handleId);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePipelineStartRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.handleId = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            handleId: isSet(object.handleId)
-                ? globalThis.String(object.handleId)
-                : isSet(object.handle_id)
-                    ? globalThis.String(object.handle_id)
-                    : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.handleId !== "") {
-            obj.handleId = message.handleId;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PipelineStartRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePipelineStartRequest();
-        message.handleId = object.handleId ?? "";
-        return message;
-    },
-};
-function createBasePipelineHandle() {
-    return { handleId: "", status: 0, state: undefined };
-}
-exports.PipelineHandle = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.handleId !== "") {
-            writer.uint32(10).string(message.handleId);
-        }
-        if (message.status !== 0) {
-            writer.uint32(16).int32(message.status);
-        }
-        if (message.state !== undefined) {
-            writer.uint32(26).string(message.state);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePipelineHandle();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.handleId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.status = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.state = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            handleId: isSet(object.handleId)
-                ? globalThis.String(object.handleId)
-                : isSet(object.handle_id)
-                    ? globalThis.String(object.handle_id)
-                    : "",
-            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
-            state: isSet(object.state) ? globalThis.String(object.state) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.handleId !== "") {
-            obj.handleId = message.handleId;
-        }
-        if (message.status !== 0) {
-            obj.status = pipelineStatusToJSON(message.status);
-        }
-        if (message.state !== undefined) {
-            obj.state = message.state;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PipelineHandle.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePipelineHandle();
-        message.handleId = object.handleId ?? "";
-        message.status = object.status ?? 0;
-        message.state = object.state ?? undefined;
-        return message;
-    },
-};
-function createBasePipelineStopResult() {
-    return { handleId: "", status: 0, errorMessage: undefined, errorCode: 0 };
-}
-exports.PipelineStopResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.handleId !== "") {
-            writer.uint32(10).string(message.handleId);
-        }
-        if (message.status !== 0) {
-            writer.uint32(16).int32(message.status);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(26).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(32).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePipelineStopResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.handleId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.status = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            handleId: isSet(object.handleId)
-                ? globalThis.String(object.handleId)
-                : isSet(object.handle_id)
-                    ? globalThis.String(object.handle_id)
-                    : "",
-            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.handleId !== "") {
-            obj.handleId = message.handleId;
-        }
-        if (message.status !== 0) {
-            obj.status = pipelineStatusToJSON(message.status);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PipelineStopResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePipelineStopResult();
-        message.handleId = object.handleId ?? "";
-        message.status = object.status ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };

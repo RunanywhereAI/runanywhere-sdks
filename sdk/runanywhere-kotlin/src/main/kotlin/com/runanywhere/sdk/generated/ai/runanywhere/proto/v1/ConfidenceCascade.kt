@@ -29,7 +29,13 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * Below this on-device confidence, the router escalates to cloud.
+ */
 public class ConfidenceCascade(
+  @RacDefaultOption("0.5")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

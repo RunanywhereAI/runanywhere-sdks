@@ -3,27 +3,20 @@
  *
  * Mirrors the iOS `VoiceAgentViewModel` pattern (Swift source-of-truth):
  *
- *   1. The user loads three models from the other tabs (Chat for LLM,
- *      Transcribe for STT, Speak for TTS — backed by the same model registry
- *      and `RunAnywhere.loadModel(...)` lifecycle).
- *   2. We probe `RunAnywhere.componentLifecycleSnapshot(SDK_COMPONENT_*)` for
- *      LLM / STT / TTS readiness. When all three are READY, the Start
- *      button enables.
- *   3. Start: capture and endpoint 16 kHz mono audio through the SDK's
- *      `VoiceAgentMicDriver`,
- *      register backend models via
- *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
- *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
- *   4. Each VoiceEvent oneof arm drives a UI region (iOS parity:
- *      VoiceAgentViewModel.swift:505-584 `handleProtoEvent`):
- *        - `state`              → session status pill
- *        - `vad`                → speech-detected indicator
- *        - `userSaid`           → live transcript area
- *        - `assistantToken`     → streamed assistant response
- *        - `audio`              → SDK mic driver gates capture through playback
+ *   1. The view recommends (or the user picks) an STT / LLM / TTS trio from
+ *      the shared catalog.
+ *   2. `RunAnywhere.voice.createSession({ stt, llm, tts })` owns every
+ *      prerequisite: it downloads and loads those three models, ensures a VAD
+ *      is resident, and wires the pipeline. Nothing here pre-loads anything.
+ *   3. `session.start()` is the only thing that opens the microphone;
+ *      `session.events` is consumed as `AsyncIterable<VoiceEvent>`.
+ *   4. Each event variant drives one UI region:
+ *        - `agentStateChanged`  → session status pill
+ *        - `speechStarted`/`speechEnded` → speech-detected indicator
+ *        - `userTranscribed`    → live transcript area
+ *        - `agentResponse`      → assistant response
  *        - `error`              → inline error banner
- *   5. Stop: cancel the event-consumer task, stop capture/playback through the
- *      driver, and call `RunAnywhere.cleanupVoiceAgent()`.
+ *   5. Stop: `session.close()` releases the microphone and the pipeline.
  *
  * Backends (llamacpp + ONNX) are registered once at app init by `main.ts` —
  * this view assumes they exist and surfaces the SDK's typed error if a verb
@@ -34,17 +27,9 @@ import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
   ModelCategory,
-  TokenKind,
-  VoiceEventPipelineState,
-  VADStreamEventKind,
-  type AssistantTokenEvent,
-  type ErrorEvent,
-  type StateChangeEvent,
-  type UserSaidEvent,
-  type VADEvent,
   type VoiceEvent,
+  type VoiceSession,
 } from '@runanywhere/web';
-import { VoiceAgentMicDriver } from '@runanywhere/web/browser';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { appLogger } from '../services/app-logger';
@@ -55,19 +40,22 @@ import {
   type VoicePipelineSelection,
 } from '../services/model-recommendation';
 import {
-  cleanModelName,
-  formatBytes,
-  formatFramework,
-  modalityEmoji,
-  modelDisplaySizeBytes,
-} from '../services/model-display';
-import {
   ensureModelReady,
-  getModelStatus,
   isModelLoaded,
   onModelStateChange,
   openSheet,
+  runEngineRetry,
 } from '../components/model-selection';
+import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
+import { icon } from '../components/icons';
+import {
+  canRetryEngines,
+  describeFailures,
+  failuresForEntries,
+  isRetryingForEntries,
+  onEngineStateChange,
+  type EngineFailure,
+} from '../services/engine-availability';
 
 // ---------------------------------------------------------------------------
 // View state
@@ -89,15 +77,24 @@ type SessionState =
 let container: HTMLElement;
 let unmounted = false;
 
-let micDriver: VoiceAgentMicDriver | null = null;
+let session: VoiceSession | null = null;
 let eventConsumer: AbortController | null = null;
 let sessionState: SessionState = 'disconnected';
 let isSpeechDetected = false;
 let userTranscript = '';
+/**
+ * Whether `userTranscript` is a settled result or a live hypothesis.
+ *
+ * A partial hypothesis is a guess that will be revised — words visibly change
+ * under the reader as more audio arrives. Rendering it identically to the final
+ * transcript makes the panel look like it is malfunctioning. Every other app
+ * distinguishes the two, so this does too.
+ */
+let isTranscriptFinal = false;
 let assistantResponse = '';
 let lastError: string | null = null;
-let audioLevel = 0;
-let lastEventSummary = '';
+/** True from the moment interrupt() is called until the agent leaves `speaking`. */
+let interrupting = false;
 
 // Pre-selected best-for-device voice trio (+ VAD), computed once on first
 // activation. `null` until the async capability probe resolves.
@@ -105,6 +102,7 @@ let voicePipeline: VoicePipelineSelection | null = null;
 let pipelineProbePending = false;
 let settingUpPipeline = false;
 let unsubscribeModelState: (() => void) | null = null;
+let unsubscribeEngineState: (() => void) | null = null;
 
 /** The ordered pipeline slots surfaced in the setup card. */
 interface PipelineSlot {
@@ -126,9 +124,40 @@ function pipelineSlots(): PipelineSlot[] {
   ];
 }
 
+/** Adapt a pipeline slot to the shared setup-card row. */
+function slotView(slot: PipelineSlot): ModelSlotView {
+  return { ...slot, changeable: true };
+}
+
 /** Required (non-VAD) slots that have a resolved model entry. */
 function requiredSlots(): PipelineSlot[] {
   return pipelineSlots().filter((slot) => !slot.optional && slot.entry);
+}
+
+/**
+ * Engine failures that actually block *this* pipeline.
+ *
+ * Scoped to the models the card names, so a llama.cpp failure is reported here
+ * only because the chat slot needs it — not because some other tab does.
+ */
+function pipelineFailures(): readonly EngineFailure[] {
+  return failuresForEntries(pipelineEntries());
+}
+
+function pipelineEntries(): CatalogEntry[] {
+  return pipelineSlots()
+    .map((slot) => slot.entry)
+    .filter((entry): entry is CatalogEntry => entry !== null);
+}
+
+/** True while a retry is re-checking an engine this pipeline needs. */
+function pipelineRechecking(): boolean {
+  return isRetryingForEntries(pipelineEntries());
+}
+
+/** Blocked, or mid-recheck after being blocked — either way, not startable. */
+function pipelineBlocked(): boolean {
+  return pipelineFailures().length > 0 || pipelineRechecking();
 }
 
 /** Whether every required pipeline model is downloaded + loaded. */
@@ -162,12 +191,18 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
         // Reflect download/load progress driven by the shared model registry.
         unsubscribeModelState = onModelStateChange(() => scheduleRender());
       }
+      if (!unsubscribeEngineState) {
+        // A retry that succeeds has to unblock this card without a tab switch.
+        unsubscribeEngineState = onEngineStateChange(() => scheduleRender());
+      }
       renderView();
     },
     onDeactivate: () => {
       unmounted = true;
       unsubscribeModelState?.();
       unsubscribeModelState = null;
+      unsubscribeEngineState?.();
+      unsubscribeEngineState = null;
       void stopSession({ silent: true });
     },
   };
@@ -224,10 +259,19 @@ function renderView(): void {
 
   const isActive = isActiveState(sessionState);
   const allReady = pipelineReady();
+  // "Needs setup" would be a lie while the engine is missing: no amount of
+  // setting up helps, and the sentence sends the user back to a button that
+  // cannot finish.
+  const blocked = pipelineBlocked();
 
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Voice AI</div>
+      <!-- "Talk", matching this panel's nav row and Android's drawer row. Every other
+           panel's title is its nav label; this one said "Voice AI", so the reader
+           arrived somewhere apparently different from what they clicked. The setup card
+           below still carries "Voice AI" as the feature's own name, which is what the
+           iOS and Android setup cards call it too. -->
+      <div class="toolbar-title">Talk</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="voice-refresh-btn">Refresh</button>
       </div>
@@ -237,46 +281,64 @@ function renderView(): void {
 
       <div class="docs-section">
         <h3>Conversation</h3>
-        <p class="text-secondary">Speak naturally — after setup, voice capture
-        and AI inference run in this browser.</p>
+        <p class="text-secondary">Speak naturally. Your microphone opens only
+        while a conversation is running, and both speech recognition and the
+        reply are computed in this browser — no audio leaves the device.</p>
         <div class="toolbar-actions">
           <button
             class="btn btn-primary"
             id="voice-start-btn"
-            ${allReady && !isActive ? '' : 'disabled'}
+            ${allReady && !isActive && !blocked ? '' : 'disabled'}
           >${isActive ? 'Conversation active' : 'Start conversation'}</button>
-          <button
-            class="btn btn-secondary"
-            id="voice-stop-btn"
-            ${isActive ? '' : 'disabled'}
-          >Stop</button>
+          ${
+            /*
+             * The deterministic half of taking the turn back. `session.interrupt()`
+             * cuts the agent off mid-utterance and keeps the session open, which
+             * is what a person who has heard enough actually wants — not ending
+             * the call. The SDK has always exposed it and this view never called
+             * it, so the only way to stop a long-winded reply was Stop, which
+             * closes the session and releases the microphone. It replaces Stop
+             * while the agent is speaking because those are the same intent at
+             * that moment, and two adjacent stop-shaped buttons would be a coin
+             * toss.
+             *
+             * The other half is acoustic: the mic driver's barge-in gate cuts the
+             * same reply when the user simply speaks over it. The button is not a
+             * substitute for a missing capability — it is the version that works
+             * without having to out-shout the speaker, so it stays.
+             */
+            sessionState === 'speaking'
+              ? `<button class="btn btn-secondary" id="voice-interrupt-btn" ${interrupting ? 'disabled' : ''}>
+                   ${icon('stop', { size: 16 })}
+                   <span>${interrupting ? 'Stopping…' : 'Stop talking'}</span>
+                 </button>`
+              : `<button
+                  class="btn btn-secondary"
+                  id="voice-stop-btn"
+                  ${isActive ? '' : 'disabled'}
+                >End conversation</button>`
+          }
         </div>
-        <div class="docs-status">
-          <strong>State:</strong>
-          <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
-          ${isSpeechDetected ? '<span class="badge badge-green" style="margin-left:6px">Speech detected</span>' : ''}
-          <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
-        </div>
-        <div class="docs-status" id="voice-level-row">
-          <strong>Mic level:</strong>
-          <div class="progress-bar" style="display:inline-block;width:200px;margin-left:8px;vertical-align:middle">
-            <div class="progress-fill" style="width:${Math.round(audioLevel * 100)}%"></div>
-          </div>
+        <div class="docs-status" role="status" aria-live="polite">
+          <span id="voice-state-pill" class="badge ${blocked ? 'badge-yellow' : stateBadgeClass(sessionState, allReady)}">${blocked ? (pipelineRechecking() ? 'Re-checking engine' : 'Engine unavailable') : prettyState(sessionState, allReady)}</span>
+          ${isSpeechDetected ? '<span class="badge badge-green">Hearing you</span>' : ''}
         </div>
         ${lastError
-          ? `<div class="docs-status error">Error: ${escapeHtml(lastError)}</div>`
+          ? `<div class="docs-status error">${escapeHtml(lastError)}</div>`
           : ''}
       </div>
 
-      <div class="docs-section">
-        <h3>You said</h3>
-        <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || '(waiting for speech...)')}</pre>
-      </div>
+      ${userTranscript || assistantResponse || isActive
+        ? `<div class="docs-section">
+             <h3>You said</h3>
+             <pre id="voice-user-transcript" class="docs-pre${transcriptModifier()}">${escapeHtml(userTranscript || transcriptPlaceholder())}</pre>
+           </div>
 
-      <div class="docs-section">
-        <h3>Assistant</h3>
-        <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || '(no response yet)')}</pre>
-      </div>
+           <div class="docs-section">
+             <h3>Reply</h3>
+             <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || replyPlaceholder())}</pre>
+           </div>`
+        : ''}
     </div>
   `;
 
@@ -291,108 +353,65 @@ function renderView(): void {
 function renderSetupCard(allReady: boolean): string {
   if (!voicePipeline) {
     return `
-      <div class="voice-setup">
-        <div class="voice-setup__head">
-          <div class="voice-setup__title">Setting up Voice AI…</div>
-          <div class="voice-setup__subtitle">Finding the best models for your device.</div>
+      <div class="setup-card">
+        <div class="setup-card__head">
+          <div class="setup-card__title">Setting up Voice AI…</div>
+          <div class="setup-card__subtitle">Finding the best models for your device.</div>
         </div>
       </div>
     `;
   }
 
   const slots = pipelineSlots().filter((slot) => slot.entry || !slot.optional);
-  const rows = slots.map(renderSlotRow).join('');
+  const rows = slots.map((slot) => renderModelSlot(slotView(slot))).join('');
 
-  const primary = allReady
-    ? `<div class="voice-setup__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
-    : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
-         ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
-       </button>
-       <div class="voice-setup__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
+  // A "Set up Voice AI" button that downloads models whose engine never loaded
+  // spends the user's bandwidth to arrive back at the same dead card. Offer the
+  // only action that can change the outcome instead.
+  const failures = pipelineFailures();
+  const rechecking = pipelineRechecking();
+  const primary = failures.length > 0 || rechecking
+    ? `<div class="setup-card__note">${escapeHtml(
+        rechecking
+          ? 'Re-checking the on-device AI engine…'
+          : describeFailures(failures),
+      )}</div>
+       ${canRetryEngines()
+         ? `<button class="btn btn-secondary btn-lg" id="voice-engine-retry" ${rechecking ? 'disabled' : ''}>
+              ${rechecking ? 'Re-checking…' : 'Retry setup'}
+            </button>`
+         : ''}`
+    : allReady
+      ? `<div class="setup-card__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
+      : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
+           ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
+         </button>
+         <div class="setup-card__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
 
   return `
-    <div class="voice-setup">
-      <div class="voice-setup__head">
-        <div class="voice-setup__glyph">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-            <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
-          </svg>
+    <div class="setup-card">
+      <div class="setup-card__head">
+        <div class="setup-card__glyph">
+          ${icon('mic', { size: 24 })}
         </div>
         <div>
-          <div class="voice-setup__title">Voice AI</div>
-          <div class="voice-setup__subtitle">Talk to a fully on-device assistant — pre-tuned for your hardware.</div>
+          <div class="setup-card__title">Voice AI</div>
+          <div class="setup-card__subtitle">Talk to a fully on-device assistant — pre-tuned for your hardware.</div>
         </div>
       </div>
-      <div class="voice-setup__slots">${rows}</div>
-      <div class="voice-setup__actions">${primary}</div>
+      <div class="setup-card__slots">${rows}</div>
+      <div class="setup-card__actions">${primary}</div>
     </div>
   `;
-}
-
-/** One pipeline component row inside the setup card. */
-function renderSlotRow(slot: PipelineSlot): string {
-  const entry = slot.entry;
-  if (!entry) {
-    return `
-      <div class="voice-slot voice-slot--missing">
-        <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
-        <div class="voice-slot__body">
-          <div class="voice-slot__label">${escapeHtml(slot.label)}</div>
-          <div class="voice-slot__hint">No model available for this device.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  const status = getModelStatus(entry.id);
-  const stateHtml = renderSlotState(status);
-  const changeBtn = `<button type="button" class="voice-slot__change" data-change="${slot.key}">Change</button>`;
-
-  return `
-    <div class="voice-slot voice-slot--${status.status}" data-slot="${slot.key}">
-      <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
-      <div class="voice-slot__body">
-        <div class="voice-slot__label">${escapeHtml(slot.label)}${slot.optional ? ' <span class="voice-slot__opt">optional</span>' : ''}</div>
-        <div class="voice-slot__hint">
-          ${escapeHtml(cleanModelName(entry.name))}
-          · ${formatBytes(modelDisplaySizeBytes(entry))}
-          <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
-        </div>
-        ${status.status === 'downloading'
-          ? `<div class="progress-bar voice-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
-          : ''}
-      </div>
-      <div class="voice-slot__aside">
-        ${stateHtml}
-        ${changeBtn}
-      </div>
-    </div>
-  `;
-}
-
-function renderSlotState(status: ReturnType<typeof getModelStatus>): string {
-  switch (status.status) {
-    case 'loaded':
-      return '<span class="voice-slot__state voice-slot__state--ready">&#10003; Ready</span>';
-    case 'downloaded':
-      return '<span class="voice-slot__state">On device</span>';
-    case 'downloading':
-      return `<span class="voice-slot__state">${Math.round(status.progress * 100)}%</span>`;
-    case 'loading':
-      return '<span class="voice-slot__state">Loading…</span>';
-    case 'error':
-      return '<span class="voice-slot__state voice-slot__state--error">Failed</span>';
-    default:
-      return '<span class="voice-slot__state voice-slot__state--pending">Not set up</span>';
-  }
 }
 
 function attachHandlers(): void {
   container.querySelector('#voice-refresh-btn')?.addEventListener('click', () => renderView());
   container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
   container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
+  container.querySelector('#voice-interrupt-btn')?.addEventListener('click', () => void interruptAgent());
   container.querySelector('#voice-setup-btn')?.addEventListener('click', () => void setupPipeline());
+  container.querySelector('#voice-engine-retry')?.addEventListener('click', () => void runEngineRetry());
   container.querySelectorAll<HTMLElement>('[data-change]').forEach((el) => {
     el.addEventListener('click', () => {
       const slot = pipelineSlots().find((s) => s.key === el.dataset.change);
@@ -423,57 +442,69 @@ function updatePipelineSlot(
 
 async function startSession(): Promise<void> {
   if (isActiveState(sessionState)) return;
+  const pipeline = voicePipeline;
+  if (!pipeline?.stt || !pipeline.llm || !pipeline.tts) {
+    lastError = 'Pick an STT, LLM, and TTS model before starting a session.';
+    sessionState = 'error';
+    renderView();
+    return;
+  }
 
-  // Reset state (iOS parity: VoiceAgentViewModel.swift:452-456).
   userTranscript = '';
+  isTranscriptFinal = false;
   assistantResponse = '';
   lastError = null;
   isSpeechDetected = false;
+  interrupting = false;
   sessionState = 'connecting';
-  setEventSummary('Connecting...');
   renderView();
 
   try {
-    // Initialize against the currently-loaded LLM/STT/TTS components. The
-    // SDK owns the multi-step bootstrap (VAD auto-load + model composition).
-    await RunAnywhere.initializeVoiceAgentWithLoadedModels();
-
-    // Start consuming the proto event stream. We track the consumer via an
-    // `AbortController` so `stopSession()` can deterministically end it.
-    eventConsumer = new AbortController();
-    void consumeEvents(eventConsumer.signal);
-
-    // The browser-specific SDK driver owns microphone capture and utterance
-    // endpointing, then submits each completed utterance through the one-call
-    // `RunAnywhere.processVoiceTurn()` provider. The example only renders the
-    // resulting canonical VoiceEvents.
-    micDriver = new VoiceAgentMicDriver();
-    await micDriver.start({
-      onLevel: (level) => {
-        audioLevel = level;
-        updateLevelBar();
-      },
-      onPhase: (phase) => {
-        sessionState = phase === 'processing' ? 'processing' : 'listening';
-        if (phase === 'processing') isSpeechDetected = false;
-        scheduleRender();
-      },
-      onError: (error) => {
-        lastError = `Voice turn failed: ${formatError(error)}`;
-        sessionState = 'error';
-        scheduleRender();
-      },
+    // One entry point owns download, load, VAD, and pipeline wiring.
+    session = await RunAnywhere.voice.createSession({
+      stt: { id: pipeline.stt.id },
+      llm: { id: pipeline.llm.id },
+      tts: { id: pipeline.tts.id },
     });
 
+    // Subscribing never opens the mic; `start()` is what does.
+    eventConsumer = new AbortController();
+    void consumeEvents(eventConsumer.signal);
+    await session.start();
+
     sessionState = 'listening';
-    setEventSummary('Listening...');
     renderView();
   } catch (err) {
     lastError = `Failed to start voice session: ${formatError(err)}`;
     sessionState = 'error';
-    setEventSummary('Start failed.');
     await stopSession({ silent: true });
     renderView();
+  }
+}
+
+/**
+ * Cut the agent off mid-utterance and hand the turn back.
+ *
+ * `interrupt()` resolves only once the interrupted response, its tools, and its
+ * playout have all settled, so the button is disabled for that whole window
+ * rather than staying live and inviting a second press that would queue behind
+ * the first. The session stays open throughout — this is the difference between
+ * interrupting and hanging up.
+ */
+async function interruptAgent(): Promise<void> {
+  const active = session;
+  if (!active || interrupting) return;
+  interrupting = true;
+  renderView();
+  try {
+    await active.interrupt();
+  } catch (err) {
+    // A failed interrupt leaves the session usable, so this is a notice, not an
+    // error state — dropping to `error` would imply the conversation is over.
+    lastError = `Could not interrupt: ${formatError(err)}`;
+  } finally {
+    interrupting = false;
+    if (!unmounted) renderView();
   }
 }
 
@@ -483,25 +514,20 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   eventConsumer?.abort();
   eventConsumer = null;
 
-  if (micDriver) {
-    try { micDriver.stop(); } catch { /* ignore */ }
-    micDriver = null;
+  if (session) {
+    try {
+      await session.close();
+    } catch {
+      // Close is best-effort — the session releases the mic either way.
+    }
+    session = null;
   }
 
-  audioLevel = 0;
   isSpeechDetected = false;
+  interrupting = false;
 
-  try {
-    await RunAnywhere.cleanupVoiceAgent();
-  } catch {
-    // Cleanup is best-effort — silently swallow.
-  }
-
-  // iOS parity: VoiceAgentViewModel.swift:484-494 `stopConversation` returns
-  // to .disconnected ("Ready").
   if (wasActive && sessionState !== 'error') {
     sessionState = 'disconnected';
-    setEventSummary('Session stopped.');
   }
 
   if (!opts.silent) renderView();
@@ -512,26 +538,14 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function consumeEvents(signal: AbortSignal): Promise<void> {
+  const active = session;
+  if (!active) return;
   try {
-    // Swift parity: `streamVoiceAgent()` finishes EMPTY when the agent is not
-    // ready — no synthetic error events arrive on the iterator, so a stream
-    // that ends right away simply returns the UI to the Ready state below.
-    const stream = RunAnywhere.streamVoiceAgent({
-      eventFilter: '',
-      sessionId: 'web-voice-agent',
-      categories: [],
-      minSeverity: 0,
-      replayFromSeq: 0,
-      // The SDK mic driver plays the returned audio and keeps capture gated
-      // until playback completes, preventing speaker-to-mic feedback.
-      includeAudio: false,
-    }, signal);
-    for await (const event of stream) {
+    for await (const event of active.events) {
       if (signal.aborted || unmounted) break;
       handleVoiceEvent(event);
-      // Re-render incrementally; pre-compute the affected DOM regions to
-      // avoid replacing the whole panel on every token (which would jitter
-      // the user-input transcript while typing).
+      // Pre-compute the affected DOM regions so a token never replaces the
+      // whole panel and jitters the transcript.
       updateTextRegions();
     }
   } catch (err) {
@@ -541,120 +555,51 @@ async function consumeEvents(signal: AbortSignal): Promise<void> {
       renderView();
     }
   } finally {
-    if (!signal.aborted && !unmounted) {
-      // The stream finished on its own (agent stopped or was never ready).
-      if (sessionState !== 'error') {
-        sessionState = 'disconnected';
-        renderView();
-      }
+    if (!signal.aborted && !unmounted && sessionState !== 'error') {
+      sessionState = 'disconnected';
+      renderView();
     }
   }
 }
 
 function handleVoiceEvent(event: VoiceEvent): void {
-  if (event.state) {
-    applyStateChange(event.state);
-    setEventSummary(`state: ${pipelineStateName(event.state.current)}`);
-  }
-  if (event.vad) {
-    applyVadEvent(event.vad);
-  }
-  if (event.userSaid) {
-    applyUserSaid(event.userSaid);
-  }
-  if (event.assistantToken) {
-    applyAssistantToken(event.assistantToken);
-  }
-  if (event.error) {
-    applyErrorEvent(event.error);
-  }
-}
-
-/** iOS parity: VoiceAgentViewModel.swift:507-529 `.state` arm. */
-function applyStateChange(state: StateChangeEvent): void {
-  switch (state.current) {
-    case VoiceEventPipelineState.PIPELINE_STATE_IDLE:
-      sessionState = 'listening';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-      if (sessionState !== 'listening' && sessionState !== 'speaking' && sessionState !== 'processing') {
-        sessionState = 'listening';
-      }
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH:
-    case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
-    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE:
-      sessionState = 'processing';
-      isSpeechDetected = false;
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
-    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS:
-      sessionState = 'speaking';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-      sessionState = 'disconnected';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_ERROR:
-      sessionState = 'error';
-      break;
-    default:
-      break;
-  }
-  // The state pill is part of the full re-render path; queue one.
-  scheduleRender();
-}
-
-/** iOS parity: VoiceAgentViewModel.swift:531-548 `.vad` arm. */
-function applyVadEvent(vad: VADEvent): void {
-  switch (vad.type) {
-    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
-      if (vad.isSpeech) {
-        isSpeechDetected = true;
-      } else {
-        sessionState = 'processing';
-        isSpeechDetected = false;
-      }
+  switch (event.type) {
+    case 'agentStateChanged':
+      sessionState = event.state === 'thinking' ? 'processing' : event.state;
+      if (event.state !== 'listening') isSpeechDetected = false;
+      // Leaving `speaking` is what actually ends an interrupt, whether the
+      // interrupt caused it or the agent simply finished the sentence.
+      if (event.state !== 'speaking') interrupting = false;
       scheduleRender();
       break;
-    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED:
-      sessionState = 'processing';
+    case 'speechStarted':
+      isSpeechDetected = true;
+      scheduleRender();
+      break;
+    case 'speechEnded':
       isSpeechDetected = false;
       scheduleRender();
       break;
-    default:
+    case 'userTranscribed':
+      // Partial hypotheses overwrite; a final clears the previous answer.
+      userTranscript = event.text;
+      isTranscriptFinal = event.isFinal;
+      if (event.isFinal) assistantResponse = '';
       break;
-  }
-}
-
-function applyUserSaid(userSaid: UserSaidEvent): void {
-  // Partial hypotheses overwrite; finals stay until the next turn starts.
-  userTranscript = userSaid.text;
-  if (userSaid.isFinal) assistantResponse = '';
-}
-
-function applyAssistantToken(token: AssistantTokenEvent): void {
-  // Append ALL token text — thought tokens included — exactly like iOS
-  // (iOS parity: VoiceAgentViewModel.swift:553-555). Mark the token kind in
-  // the event summary only.
-  assistantResponse += token.text;
-  if (token.kind === TokenKind.TOKEN_KIND_THOUGHT) {
-    setEventSummary('assistant token (thought)');
-  }
-}
-
-function applyErrorEvent(err: ErrorEvent): void {
-  if (err.message) {
-    lastError = err.message;
+    case 'agentResponse':
+      assistantResponse = event.text;
+      break;
+    case 'error':
+      lastError = event.message;
+      if (!event.recoverable) sessionState = 'error';
+      scheduleRender();
+      break;
   }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function setEventSummary(text: string): void {
-  lastEventSummary = text;
-}
 
 let renderScheduled = false;
 function scheduleRender(): void {
@@ -666,63 +611,107 @@ function scheduleRender(): void {
   });
 }
 
-function updateTextRegions(): void {
-  const userPre = container.querySelector<HTMLPreElement>('#voice-user-transcript');
-  if (userPre) userPre.textContent = userTranscript || '(waiting for speech...)';
-  const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
-  if (respPre) respPre.textContent = assistantResponse || '(no response yet)';
-}
-
-function updateLevelBar(): void {
-  const fill = container.querySelector<HTMLDivElement>('#voice-level-row .progress-fill');
-  if (fill) fill.style.width = `${Math.round(audioLevel * 100)}%`;
-}
-
-function pipelineStateName(state: VoiceEventPipelineState): string {
-  switch (state) {
-    case VoiceEventPipelineState.PIPELINE_STATE_IDLE: return 'idle';
-    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING: return 'listening';
-    case VoiceEventPipelineState.PIPELINE_STATE_THINKING: return 'thinking';
-    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING: return 'speaking';
-    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED: return 'stopped';
-    case VoiceEventPipelineState.PIPELINE_STATE_WAITING_WAKEWORD: return 'waiting-wakeword';
-    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH: return 'processing-speech';
-    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE: return 'generating-response';
-    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS: return 'playing-tts';
-    case VoiceEventPipelineState.PIPELINE_STATE_COOLDOWN: return 'cooldown';
-    case VoiceEventPipelineState.PIPELINE_STATE_ERROR: return 'error';
-    default: return 'unspecified';
+/**
+ * What an empty transcript pane says, given what the agent is actually doing.
+ *
+ * These were two fixed strings, so an empty pane read "Listening…" while the
+ * agent was thinking and "Waiting for you to finish speaking…" while it was
+ * already talking — the panel contradicting the status pill directly above it.
+ * An empty state is still a claim about the system, and it has to be a true one.
+ */
+function transcriptPlaceholder(): string {
+  switch (sessionState) {
+    case 'connecting': return 'Getting ready…';
+    case 'listening': return isSpeechDetected ? 'Listening…' : 'Go ahead — say something.';
+    case 'processing': return 'Working out a reply…';
+    // Both affordances are real, so both are named. `VoiceAgentMicDriver.onChunk`
+    // tests `replyAudible` *before* the segmenter's `processing` gate and hands
+    // the frame to `evaluateBargeIn`, which stops playout and publishes
+    // `speechStarted` — talking over the reply genuinely takes the turn back.
+    // This line used to deny that, because the Stop-talking button landed one
+    // commit before the barge-in gate existed and the copy was never revisited;
+    // a placeholder that hides a working affordance is as untrue as one that
+    // promises a missing one. The button is still worth naming because the gate
+    // is deliberately hard to trip — it wants 3x ordinary speech level and 2.5x
+    // the reply's own measured echo, precisely so the agent can never interrupt
+    // itself — whereas a press is unconditional. "Take the turn back" is the
+    // phrase all four apps use for this moment.
+    case 'speaking': return 'Speaking. Talk over it to take the turn back, or use “Stop talking”.';
+    default: return 'Nothing heard yet.';
   }
 }
 
-/** iOS parity: VoiceAgentTypes.swift:34-44 `displayName`. */
-function prettyState(state: SessionState): string {
+function replyPlaceholder(): string {
+  switch (sessionState) {
+    case 'connecting': return 'Getting ready…';
+    case 'listening': return 'Waiting for you to finish speaking…';
+    case 'processing': return 'Thinking…';
+    case 'speaking': return 'Speaking…';
+    default: return 'No reply yet.';
+  }
+}
+
+/** `--partial` while the transcript is a revisable hypothesis. */
+function transcriptModifier(): string {
+  return userTranscript && !isTranscriptFinal ? ' docs-pre--partial' : '';
+}
+
+/**
+ * Patch just the two text regions.
+ *
+ * Per-token `renderView()` would rebuild the whole panel and reset scroll and
+ * focus on every partial hypothesis, so the streaming path writes textContent
+ * directly. `textContent` (never innerHTML) is what makes that safe for
+ * model-authored text.
+ */
+function updateTextRegions(): void {
+  const userPre = container.querySelector<HTMLPreElement>('#voice-user-transcript');
+  if (userPre) {
+    userPre.textContent = userTranscript || transcriptPlaceholder();
+    // Toggled here rather than only in renderView because the settle from
+    // partial to final arrives as an event, not a re-render.
+    userPre.classList.toggle('docs-pre--partial', Boolean(userTranscript) && !isTranscriptFinal);
+  }
+  const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
+  if (respPre) respPre.textContent = assistantResponse || replyPlaceholder();
+}
+
+/**
+ * iOS parity: VoiceAgentTypes.swift:34-44 `displayName`, with one divergence.
+ *
+ * iOS maps `.disconnected` to "Ready", which is true there because its voice
+ * screen is only reachable once models are resident. Here the same state is the
+ * *pre-setup* state, so echoing "Ready" put a green "Ready" pill directly below
+ * four rows reading "Not set up" — two opposite claims about the same thing, on
+ * one screen. `allReady` disambiguates: idle-and-unequipped is "Needs setup",
+ * idle-and-equipped is "Ready to talk".
+ */
+function prettyState(state: SessionState, allReady: boolean): string {
   switch (state) {
-    case 'disconnected': return 'Ready';
+    case 'disconnected':
+    case 'connected':
+      return allReady ? 'Ready to talk' : 'Needs setup';
     case 'connecting': return 'Connecting';
-    case 'connected': return 'Ready';
     case 'listening': return 'Listening';
     case 'processing': return 'Thinking';
     case 'speaking': return 'Speaking';
-    case 'error': return 'Error';
+    case 'error': return 'Something went wrong';
   }
 }
 
-function stateBadgeClass(state: SessionState): string {
+function stateBadgeClass(state: SessionState, allReady: boolean): string {
   switch (state) {
     case 'listening':
-    case 'connected':
       return 'badge-green';
     case 'processing':
     case 'speaking':
     case 'connecting':
       return 'badge-blue';
     case 'error':
-      // No `.badge-red` rule is shipped today; use the grey variant tinted
-      // by the inline `error` docs-status class below so failures still
-      // surface visibly without depending on a missing rule.
-      return 'badge-grey';
-    default:
-      return 'badge-grey';
+      return 'badge-red';
+    case 'disconnected':
+    case 'connected':
+      // Green only once the pipeline can actually start; grey while it can't.
+      return allReady ? 'badge-green' : 'badge-grey';
   }
 }

@@ -4,8 +4,6 @@ import {
   DownloadPlanRequest,
   DownloadPlanResult,
   DownloadProgress,
-  DownloadResumeRequest,
-  DownloadResumeResult,
   DownloadStartRequest,
   DownloadStartResult,
   DownloadSubscribeRequest,
@@ -14,13 +12,12 @@ import {
   type DownloadPlanRequest as ProtoDownloadPlanRequest,
   type DownloadPlanResult as ProtoDownloadPlanResult,
   type DownloadProgress as ProtoDownloadProgress,
-  type DownloadResumeRequest as ProtoDownloadResumeRequest,
-  type DownloadResumeResult as ProtoDownloadResumeResult,
   type DownloadStartRequest as ProtoDownloadStartRequest,
   type DownloadStartResult as ProtoDownloadStartResult,
   type DownloadSubscribeRequest as ProtoDownloadSubscribeRequest,
 } from '@runanywhere/proto-ts/download_service';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('DownloadAdapter');
@@ -43,11 +40,6 @@ export interface DownloadModule extends ProtoWasmModule {
     outResult: number,
   ): number;
   _rac_download_cancel_proto?(
-    requestBytes: number,
-    requestSize: number,
-    outResult: number,
-  ): number;
-  _rac_download_resume_proto?(
     requestBytes: number,
     requestSize: number,
     outResult: number,
@@ -88,14 +80,33 @@ export class DownloadAdapter {
     return this.missingExports().length === 0;
   }
 
-  plan(request: ProtoDownloadPlanRequest): ProtoDownloadPlanResult | null {
+  /**
+   * Plan a download. Asynchronous because the native planner reaches the
+   * network.
+   *
+   * `build_download_plan` runs a HEAD size probe (`rac_http_request_send`) to
+   * confirm the catalog's byte count before any bytes are fetched. On WASM that
+   * probe is served by the browser's fetch, so the export can suspend through
+   * Asyncify. Called as a plain synchronous export, the suspension unwinds the
+   * stack and returns immediately with the out-buffer still zero-initialised —
+   * which decodes to an all-default plan (no model id, zero files) that reads
+   * as "no files were resolved", and then corrupts the heap when the rewind
+   * writes into the buffer the caller has already freed. Every bare `.gguf` in
+   * the web catalog failed this way. `ccall({ async: true })` is the contract
+   * for a suspending export, exactly as HTTPAdapter documents.
+   */
+  async plan(request: ProtoDownloadPlanRequest): Promise<ProtoDownloadPlanResult | null> {
     if (!this.ensureExports('plan', ['_rac_download_plan_proto'])) return null;
-    return this.bridge().withEncodedRequest(
+    return this.bridge().withEncodedRequestAsync(
       request,
       DownloadPlanRequest,
       DownloadPlanResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_download_plan_proto!(requestPtr, requestSize, outResult)
+      (requestPtr, requestSize, outResult) => callEmscriptenAsyncNumber(
+        this.module,
+        'rac_download_plan_proto',
+        ['number', 'number', 'number'],
+        [requestPtr, requestSize, outResult],
+        () => this.module._rac_download_plan_proto!(requestPtr, requestSize, outResult),
       ),
       'rac_download_plan_proto',
     );
@@ -124,19 +135,6 @@ export class DownloadAdapter {
         this.module._rac_download_cancel_proto!(requestPtr, requestSize, outResult)
       ),
       'rac_download_cancel_proto',
-    );
-  }
-
-  resume(request: ProtoDownloadResumeRequest): ProtoDownloadResumeResult | null {
-    if (!this.ensureExports('resume', ['_rac_download_resume_proto'])) return null;
-    return this.bridge().withEncodedRequest(
-      request,
-      DownloadResumeRequest,
-      DownloadResumeResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_download_resume_proto!(requestPtr, requestSize, outResult)
-      ),
-      'rac_download_resume_proto',
     );
   }
 
@@ -197,7 +195,6 @@ export class DownloadAdapter {
       '_rac_download_plan_proto',
       '_rac_download_start_proto',
       '_rac_download_cancel_proto',
-      '_rac_download_resume_proto',
       '_rac_download_progress_poll_proto',
     ];
     return [

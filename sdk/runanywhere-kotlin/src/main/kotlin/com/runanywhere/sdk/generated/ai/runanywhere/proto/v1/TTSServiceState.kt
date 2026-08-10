@@ -17,7 +17,6 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -48,39 +47,21 @@ public class TTSServiceState(
     schemaIndex = 1,
   )
   public val current_voice: String? = null,
-  voices: List<TTSVoiceInfo> = emptyList(),
   supported_language_codes: List<String> = emptyList(),
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 4,
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 3,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 5,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSServiceState, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.TTSVoiceInfo#ADAPTER",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 2,
-  )
-  public val voices: List<TTSVoiceInfo> = immutableCopyOf("voices", voices)
-
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
     jsonName = "supportedLanguageCodes",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val supported_language_codes: List<String> =
       immutableCopyOf("supported_language_codes", supported_language_codes)
@@ -97,10 +78,8 @@ public class TTSServiceState(
     if (unknownFields != other.unknownFields) return false
     if (is_ready != other.is_ready) return false
     if (current_voice != other.current_voice) return false
-    if (voices != other.voices) return false
     if (supported_language_codes != other.supported_language_codes) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -110,10 +89,8 @@ public class TTSServiceState(
       result = unknownFields.hashCode()
       result = result * 37 + is_ready.hashCode()
       result = result * 37 + (current_voice?.hashCode() ?: 0)
-      result = result * 37 + voices.hashCode()
       result = result * 37 + supported_language_codes.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -123,22 +100,18 @@ public class TTSServiceState(
     val result = mutableListOf<String>()
     result += """is_ready=$is_ready"""
     if (current_voice != null) result += """current_voice=${sanitize(current_voice)}"""
-    if (voices.isNotEmpty()) result += """voices=$voices"""
     if (supported_language_codes.isNotEmpty()) result += """supported_language_codes=${sanitize(supported_language_codes)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "TTSServiceState{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     is_ready: Boolean = this.is_ready,
     current_voice: String? = this.current_voice,
-    voices: List<TTSVoiceInfo> = this.voices,
     supported_language_codes: List<String> = this.supported_language_codes,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSServiceState = TTSServiceState(is_ready, current_voice, voices, supported_language_codes, error_message, error_code, unknownFields)
+  ): TTSServiceState = TTSServiceState(is_ready, current_voice, supported_language_codes, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -156,12 +129,8 @@ public class TTSServiceState(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.is_ready)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.current_voice)
-        size += TTSVoiceInfo.ADAPTER.asRepeated().encodedSizeWithTag(3, value.voices)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.supported_language_codes)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -170,23 +139,15 @@ public class TTSServiceState(
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_ready)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.current_voice)
-        TTSVoiceInfo.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.voices)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.supported_language_codes)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSServiceState) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.supported_language_codes)
-        TTSVoiceInfo.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.voices)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.current_voice)
         if (value.is_ready != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_ready)
@@ -196,34 +157,28 @@ public class TTSServiceState(
       override fun decode(reader: ProtoReader): TTSServiceState {
         var is_ready: Boolean = false
         var current_voice: String? = null
-        val voices = mutableListOf<TTSVoiceInfo>()
         val supported_language_codes = mutableListOf<String>()
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_ready = ProtoAdapter.BOOL.decode(reader)
             2 -> current_voice = ProtoAdapter.STRING.decode(reader)
-            3 -> voices.add(TTSVoiceInfo.ADAPTER.decode(reader))
             4 -> supported_language_codes.add(ProtoAdapter.STRING.decode(reader))
-            5 -> error_message = ProtoAdapter.STRING.decode(reader)
-            6 -> error_code = ProtoAdapter.INT32.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return TTSServiceState(
           is_ready = is_ready,
           current_voice = current_voice,
-          voices = voices,
           supported_language_codes = supported_language_codes,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: TTSServiceState): TTSServiceState = value.copy(
-        voices = value.voices.redactElements(TTSVoiceInfo.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

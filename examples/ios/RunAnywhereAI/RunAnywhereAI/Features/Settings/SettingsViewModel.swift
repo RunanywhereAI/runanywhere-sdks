@@ -43,7 +43,7 @@ class SettingsViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [RAModelStorageMetrics] = []
+    @Published var storedModels: [ModelInfo] = []
 
     // UI State
     @Published var showApiKeyEntry: Bool = false
@@ -121,7 +121,7 @@ class SettingsViewModel: ObservableObject {
     private func subscribeToModelNotifications() {
         // The SDK's typed lifecycle stream covers every LLM load source
         // (chat, voice agent, RAG) with one subscription.
-        RunAnywhere.events.modelLifecycle
+        RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 Task { @MainActor in
@@ -494,7 +494,7 @@ class SettingsViewModel: ObservableObject {
     }
 
     /// Delete a stored model
-    func deleteModel(_ model: RAModelStorageMetrics) async {
+    func deleteModel(_ model: ModelInfo) async {
         await StorageViewModel.shared.deleteModel(model)
         await loadStorageData()
     }

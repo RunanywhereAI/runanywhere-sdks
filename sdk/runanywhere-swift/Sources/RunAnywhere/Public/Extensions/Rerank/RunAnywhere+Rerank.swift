@@ -2,47 +2,36 @@
 //  RunAnywhere+Rerank.swift
 //  RunAnywhere SDK
 //
+//  Deprecated flat rerank verbs. The v3 surface is `RunAnywhere.rerank`.
+//
 
 import Foundation
 
 public extension RunAnywhere {
-    /// Score every candidate against `query` with the currently-loaded
-    /// cross-encoder rerank model and return them ordered by descending
-    /// relevance.
+
+    /// Score documents against a query with the loaded cross-encoder.
     ///
-    /// The model must already have been imported/registered and loaded under
-    /// the rerank component (`RASDKComponent.rerank`); this call never
-    /// downloads weights or creates a second model owner.
+    /// `RerankCandidate` was deleted outright (idl/rerank.proto: "every
+    /// facade already builds it with id set to the stringified array
+    /// index, so the wrapper carried no information the flat `documents`
+    /// list below does not") — `RerankRequest.documents` is now a plain
+    /// `repeated string`, and `RerankScoredItem.index` points back into it.
+    @available(*, deprecated, renamed: "rerank.rerank(query:documents:topN:)")
     static func rerank(
         query: String,
-        candidates: [RARerankCandidate],
+        documents: [String],
         options: RARerankOptions = RARerankOptions()
     ) async throws -> RARerankResult {
         var request = RARerankRequest()
         request.query = query
-        request.candidates = candidates
+        request.documents = documents
         request.options = options
-        return try await rerank(request)
+        return try await rerankProto(request)
     }
 
     /// Canonical request-based cross-encoder reranking entry point.
+    @available(*, deprecated, renamed: "rerank.rerank(query:documents:topN:)")
     static func rerank(_ request: RARerankRequest) async throws -> RARerankResult {
-        guard isInitialized else {
-            throw SDKException(
-                code: .notInitialized,
-                message: "SDK not initialized",
-                category: .internal
-            )
-        }
-        try await ensureServicesReady()
-        guard let snapshot = componentLifecycleSnapshot(.rerank),
-              !(snapshot.modelID.isEmpty && snapshot.model.id.isEmpty) else {
-            throw SDKException(
-                code: .notInitialized,
-                message: "Rerank model not loaded",
-                category: .component
-            )
-        }
-        return try await CppBridge.Rerank.shared.rerank(request, loadedModel: snapshot)
+        try await rerankProto(request)
     }
 }

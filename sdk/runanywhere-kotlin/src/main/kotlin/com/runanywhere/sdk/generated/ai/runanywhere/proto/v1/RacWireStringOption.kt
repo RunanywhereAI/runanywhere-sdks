@@ -15,10 +15,8 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * Canonical wire-string override. When SDKs need to interop with a
- * hand-rolled string protocol (older JSON fixtures, third-party APIs),
- * codegen uses this string as the "wire name" instead of the proto
- * enum constant name.
+ * Wire-string override for interop with hand-rolled string protocols.
+ * Codegen uses this instead of the proto constant name.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

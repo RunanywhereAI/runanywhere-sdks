@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// VLM capability — uses proto VLMImage / VLMGenerationOptions / VLMResult.
+// VLM capability — uses proto VLMImage / LLMGenerationOptions / VLMResult.
+//
+// `VLMGenerationOptions` was deleted outright (idl/vlm_options.proto): its 11
+// sampling fields were name-for-name copies of `LLMGenerationOptions` with
+// drifted defaults, so VLM now shares the exact same generated options type
+// the text-generation path uses. `vision`/`VLMVisionOptions` carries the four
+// genuinely vision-specific knobs; this legacy capability class does not
+// surface them yet (parity with the v3 `RunAnywhere.vlm` namespace, which
+// also defaults `vision` unset).
 
 import 'dart:async';
 
@@ -9,6 +17,8 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -64,10 +74,10 @@ class RunAnywhereVLM {
           validateAvailability: true,
         ),
       );
-      if (!lifecycleResult.success) {
+      if (lifecycleResult.hasError()) {
         throw SDKException.vlmModelLoadFailed(
-          lifecycleResult.errorMessage.isNotEmpty
-              ? lifecycleResult.errorMessage
+          lifecycleResult.error.message.isNotEmpty
+              ? lifecycleResult.error.message
               : 'VLM lifecycle load failed',
         );
       }
@@ -99,10 +109,10 @@ class RunAnywhereVLM {
         category: category,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'VLM lifecycle unload failed',
       );
     }
@@ -118,29 +128,29 @@ class RunAnywhereVLM {
   /// Process an image with VLM (full result with metrics).
   ///
   /// Canonical cross-SDK shape (mirrors Swift
-  /// `RunAnywhere.processImage(_:options:)`): the prompt travels in
-  /// `options.prompt`. [prompt] is an ergonomic named parameter (RN-style)
-  /// applied onto the options when `options.prompt` is unset.
+  /// `RunAnywhere.vlm.generate(image:prompt:options:)`): the prompt travels
+  /// as [prompt], and sampling is the same generated `LLMGenerationOptions`
+  /// the text-generation path uses (`VLMGenerationOptions` was deleted
+  /// outright — idl/vlm_options.proto).
   Future<VLMResult> processImage(
     VLMImage image, {
     String? prompt,
-    VLMGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) async {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
-    final opts =
-        _effectiveOptions(prompt ?? '', options ?? VLMGenerationOptions());
+    final opts = _effectiveOptions(options);
 
     try {
       final result = await DartBridge.vlm.processImageProto(
-        _toGenerationRequest(image, opts, modelId),
+        _toGenerationRequest(image, prompt ?? '', opts, modelId),
       );
 
       logger.info(
-        'VLM processing complete: ${result.completionTokens} tokens, '
-        '${result.tokensPerSecond.toStringAsFixed(1)} tok/s',
+        'VLM processing complete: ${result.usage.outputTokens} tokens, '
+        '${result.usage.decodeTokensPerSecond.toStringAsFixed(1)} tok/s',
       );
 
       return result;
@@ -153,27 +163,23 @@ class RunAnywhereVLM {
   /// Stream image processing with generated VLM stream events.
   ///
   /// Canonical cross-SDK shape (mirrors Swift
-  /// `RunAnywhere.processImageStream(_:options:)`): the prompt travels in
-  /// `options.prompt`. [prompt] is an ergonomic named parameter (RN-style)
-  /// applied onto the options when `options.prompt` is unset.
+  /// `RunAnywhere.vlm.generateStream(image:prompt:options:)`): the prompt
+  /// travels as [prompt], sampling shares `LLMGenerationOptions` with the
+  /// text-generation path.
   Stream<VLMStreamEvent> processImageStream(
     VLMImage image, {
     String? prompt,
-    VLMGenerationOptions? options,
+    LLMGenerationOptions? options,
   }) async* {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');
-    final opts = _effectiveOptions(
-      prompt ?? '',
-      options ?? VLMGenerationOptions(),
-      streaming: true,
-    );
+    final opts = _effectiveOptions(options);
 
     try {
       yield* DartBridge.vlm.processImageStreamProto(
-        _toGenerationRequest(image, opts, modelId),
+        _toGenerationRequest(image, prompt ?? '', opts, modelId),
       );
     } catch (e) {
       logger.error('Failed to start VLM streaming: $e');
@@ -181,22 +187,14 @@ class RunAnywhereVLM {
     }
   }
 
-  VLMGenerationOptions _effectiveOptions(
-    String prompt,
-    VLMGenerationOptions options, {
-    bool streaming = false,
-  }) {
+  LLMGenerationOptions _effectiveOptions(LLMGenerationOptions? options) {
     // Fill unset fields from the generated defaults, which come from the
-    // rac_default annotations in idl/vlm_options.proto. The table this replaced
-    // capped maxTokens at 256 against the C layer's 2048 and set topK=40 where
-    // the C layer disables it.
-    final d = VLMGenerationOptionsConvenience.defaults();
-    final opts = options.deepCopy();
-    if (!opts.hasPrompt()) {
-      opts.prompt = prompt;
-    }
-    if (!opts.hasMaxTokens()) {
-      opts.maxTokens = d.maxTokens;
+    // rac_default annotations in idl/llm_options.proto (VLM shares the text
+    // path's sampling options now).
+    final d = LLMGenerationOptionsConvenience.defaults();
+    final opts = (options ?? LLMGenerationOptions()).deepCopy();
+    if (!opts.hasMaxOutputTokens()) {
+      opts.maxOutputTokens = d.maxOutputTokens;
     }
     if (!opts.hasTemperature()) {
       opts.temperature = d.temperature;
@@ -207,17 +205,18 @@ class RunAnywhereVLM {
     if (!opts.hasTopK()) {
       opts.topK = d.topK;
     }
-    opts.streamingEnabled = streaming;
     return opts;
   }
 
   VLMGenerationRequest _toGenerationRequest(
     VLMImage image,
-    VLMGenerationOptions options,
+    String prompt,
+    LLMGenerationOptions options,
     String modelId,
   ) {
     return VLMGenerationRequest(
       images: [image],
+      prompt: prompt,
       options: options,
       modelId: modelId,
     );

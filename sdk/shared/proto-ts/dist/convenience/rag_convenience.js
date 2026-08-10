@@ -13,16 +13,15 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateRAGQueryOptions = exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
+exports.validateRAGSearchRequest = exports.validateRAGQueryOptions = exports.validateRAGRetrievalOptions = exports.rAGRetrievalOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
     llmModelId: '',
     topK: 5,
-    similarityThreshold: 0.0,
+    scoreThreshold: 0.0,
     chunkSize: 512,
     chunkOverlap: 64,
-    persistIndex: false,
     rerankResults: false,
 });
 exports.rAGConfigurationDefaults = rAGConfigurationDefaults;
@@ -33,10 +32,10 @@ const validateRAGConfiguration = (m) => {
             message: `top_k must be >= 1 (got ${m.topK})`,
         });
     }
-    if (m.similarityThreshold !== undefined && (!Number.isFinite(m.similarityThreshold) || m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
+    if (m.scoreThreshold !== undefined && (!Number.isFinite(m.scoreThreshold) || m.scoreThreshold < 0.0 || m.scoreThreshold > 1.0)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'RAGConfiguration.similarity_threshold',
-            message: `similarity_threshold must be in 0.0...1.0 (got ${m.similarityThreshold})`,
+            fieldPath: 'RAGConfiguration.score_threshold',
+            message: `score_threshold must be in 0.0...1.0 (got ${m.scoreThreshold})`,
         });
     }
     if (m.chunkSize !== undefined && (m.chunkSize < 1)) {
@@ -53,25 +52,47 @@ const validateRAGConfiguration = (m) => {
     }
 };
 exports.validateRAGConfiguration = validateRAGConfiguration;
-const rAGQueryOptionsDefaults = () => ({
-    question: '',
-    maxTokens: 512,
-    temperature: 0.7,
-    topP: 1.0,
-    topK: 0,
-    retrievalTopK: 0,
-    stream: false,
-    disableThinking: false,
+const rAGRetrievalOptionsDefaults = () => ({
     enableMultiQuery: false,
     multiQueryCount: 3,
 });
-exports.rAGQueryOptionsDefaults = rAGQueryOptionsDefaults;
-const validateRAGQueryOptions = (m) => {
+exports.rAGRetrievalOptionsDefaults = rAGRetrievalOptionsDefaults;
+const validateRAGRetrievalOptions = (m) => {
+    if (m.topK !== undefined && (m.topK < 1)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGRetrievalOptions.top_k',
+            message: `top_k must be >= 1 (got ${m.topK})`,
+        });
+    }
+    if (m.scoreThreshold !== undefined && (!Number.isFinite(m.scoreThreshold) || m.scoreThreshold < 0.0 || m.scoreThreshold > 1.0)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGRetrievalOptions.score_threshold',
+            message: `score_threshold must be in 0.0...1.0 (got ${m.scoreThreshold})`,
+        });
+    }
     if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'RAGQueryOptions.multi_query_count',
+            fieldPath: 'RAGRetrievalOptions.multi_query_count',
             message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
         });
     }
 };
+exports.validateRAGRetrievalOptions = validateRAGRetrievalOptions;
+const validateRAGQueryOptions = (m) => {
+    if (m.query === '') {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGQueryOptions.query',
+            message: 'query is required',
+        });
+    }
+};
 exports.validateRAGQueryOptions = validateRAGQueryOptions;
+const validateRAGSearchRequest = (m) => {
+    if (m.query === '') {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGSearchRequest.query',
+            message: 'query is required',
+        });
+    }
+};
+exports.validateRAGSearchRequest = validateRAGSearchRequest;

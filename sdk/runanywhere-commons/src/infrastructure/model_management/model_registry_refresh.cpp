@@ -15,9 +15,11 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/download/partial_download_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -39,6 +41,18 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 namespace {
 
 constexpr size_t kRescanMaxEntryCapacity = 4096;
+
+// A directory entry that counts as evidence of a completed artifact.
+//
+// Regular file, not hidden, and not an in-flight "<final>.part" sidecar. The
+// partial is excluded because rac_http_download promotes it to the final name
+// with a single atomic rename only after validation, so its presence is proof
+// the transfer is unfinished — treating it as an artifact is what made a
+// process-killed download reappear as "downloaded".
+bool is_finished_artifact_entry(const rac_directory_entry_t& entry) {
+    return entry.is_dir != RAC_TRUE && entry.name[0] != '\0' && entry.name[0] != '.' &&
+           !rac::download::is_partial_download_filename(entry.name);
+}
 
 }  // namespace
 
@@ -150,17 +164,21 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             const std::string model_id = entry.name;
             const std::string model_path = std::string(framework_dir) + "/" + model_id;
 
-            // Verify the model folder contains at least one regular file —
+            // Verify the model folder contains at least one finished file —
             // mirrors the Kotlin self-heal heuristic (file existence is enough;
             // we don't filter by extension because each backend defines its own
-            // file shape).
+            // file shape). An in-flight ".part" sidecar is deliberately NOT
+            // enough: it is the one file whose presence proves the transfer did
+            // not finish, and counting it linked a killed download as a
+            // downloaded model that then failed at load with "no .gguf file
+            // found". See is_finished_artifact_entry.
             if (list_directory_via_adapter(adapter, model_path.c_str(), &model_entries) !=
                 RAC_SUCCESS) {
                 continue;
             }
             bool has_regular_file = false;
             for (const rac_directory_entry_t& child : model_entries) {
-                if (child.is_dir != RAC_TRUE && child.name[0] != '\0' && child.name[0] != '.') {
+                if (is_finished_artifact_entry(child)) {
                     has_regular_file = true;
                     break;
                 }
@@ -177,8 +195,7 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                     if (list_directory_via_adapter(adapter, nested_path.c_str(), &nested) ==
                         RAC_SUCCESS) {
                         for (const rac_directory_entry_t& leaf : nested) {
-                            if (leaf.is_dir != RAC_TRUE && leaf.name[0] != '\0' &&
-                                leaf.name[0] != '.') {
+                            if (is_finished_artifact_entry(leaf)) {
                                 has_regular_file = true;
                                 break;
                             }
@@ -190,6 +207,10 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                 }
             }
             if (!has_regular_file) {
+                RAC_LOG_INFO("ModelRegistry",
+                             "Refresh rescan: '%s' holds no finished artifact (interrupted "
+                             "download) — leaving unlinked so a retry can resume",
+                             model_id.c_str());
                 continue;
             }
 
@@ -216,9 +237,18 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                 ModelInfo snapshot;
                 std::error_code fs_ec;
                 if (get_model_snapshot_by_id(handle, model_id, &snapshot) &&
-                    (snapshot.has_expected_files() || snapshot.has_multi_file()) &&
                     std::filesystem::exists(model_path, fs_ec)) {
-                    if (!model_folder_is_complete(snapshot, model_path)) {
+                    // ModelInfo.expected_files (top-level) was deleted; the
+                    // per-artifact completeness check now applies whenever
+                    // the single_file/archive artifact declares its own
+                    // expected_files, or the artifact is multi_file.
+                    const bool has_expected_files_manifest =
+                        (snapshot.artifact_case() == ModelInfo::kSingleFile &&
+                         snapshot.single_file().has_expected_files()) ||
+                        (snapshot.artifact_case() == ModelInfo::kArchive &&
+                         snapshot.archive().has_expected_files());
+                    if ((has_expected_files_manifest || snapshot.has_multi_file()) &&
+                        !model_folder_is_complete(snapshot, model_path)) {
                         RAC_LOG_WARNING(
                             "ModelRegistry",
                             "Refresh rescan: '%s' folder is incomplete — leaving unlinked",
@@ -313,6 +343,12 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
             manifest_restored = restore_models_from_folder_manifests(handle);
             adapter_rescan_linked = rescan_local_via_platform_adapter(handle);
             adapter_rescan_ran = true;
+            // discovered_count/updated_count (derivations of these two
+            // figures) were reserved off ModelRegistryRefreshResult; log
+            // them instead of silently dropping the diagnostic.
+            RAC_LOG_INFO("ModelRegistry",
+                        "Refresh rescan: manifest_restored=%d adapter_rescan_linked=%d",
+                        manifest_restored, adapter_rescan_linked);
         }
     }
 
@@ -331,20 +367,15 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
         sort_query_results(request.query(), &filtered);
         models = std::move(filtered);
     }
-    const ModelCounts counts = count_models(models);
-
+    // registered_count/updated_count/discovered_count/pruned_count/
+    // downloaded_count/available_count/error_count were all reserved off
+    // ModelRegistryRefreshResult: pure derivations over `models` with no
+    // remaining consumer. `models`/refreshed_at_unix_ms/warnings/error are
+    // the only fields that survive.
     ModelRegistryRefreshResult result;
-    result.set_success(refresh_rc == RAC_SUCCESS);
-    result.set_registered_count(counts.total);
-    result.set_updated_count(adapter_rescan_linked);
-    result.set_discovered_count(adapter_rescan_linked + manifest_restored);
-    result.set_pruned_count(0);
     result.set_refreshed_at_unix_ms(rac_get_current_time_ms());
-    result.set_downloaded_count(counts.downloaded);
-    result.set_available_count(counts.available);
-    result.set_error_count(counts.errors);
     if (refresh_rc != RAC_SUCCESS) {
-        result.set_error_message(rac_error_message(refresh_rc));
+        rac::foundation::populate_sdk_error(result.mutable_error(), refresh_rc);
     }
     if (request.rescan_local() && !adapter_rescan_ran) {
         result.add_warnings(

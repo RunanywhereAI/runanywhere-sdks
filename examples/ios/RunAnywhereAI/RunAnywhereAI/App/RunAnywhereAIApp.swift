@@ -11,6 +11,9 @@ import RunAnywhere
 import LlamaCPPRuntime
 #endif
 import MLXRuntime
+#if canImport(NeuRTRuntime)
+import NeuRTRuntime
+#endif
 #if canImport(ONNXRuntime)
 import ONNXRuntime
 #endif
@@ -24,14 +27,37 @@ import os
 import AppKit
 #endif
 
+#if os(iOS)
+/// Forwards background URLSession relaunch events to the SDK so restored model
+/// downloads can finalize. No business logic lives here.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        RunAnywhere.handleBackgroundURLSessionEvents(identifier: identifier, completionHandler: completionHandler)
+    }
+}
+#endif
+
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
     #endif
     @State private var isSDKInitialized = false
+    /// True from the first line of `initializeSDK()` until it settles.
+    ///
+    /// `isSDKInitialized` is only written at the *end*, so it cannot gate a
+    /// second entry: on the Mac the scene goes `.active` while the `.task` is
+    /// still awaiting, and the app registered backends, initialized the SDK, and
+    /// walked the whole 86-model catalog twice. Measured at launch: "SDK
+    /// initialized" logged at 5.10s and again at 5.91s.
+    @State private var isInitializingSDK = false
     @State private var initializationError: Error?
     @Environment(\.scenePhase)
     private var scenePhase
@@ -71,7 +97,10 @@ struct RunAnywhereAIApp: App {
                 await initializeSDK()
             }
             .onChange(of: scenePhase) { _, phase in
-                guard phase == .active, !isSDKInitialized, initializationError == nil else { return }
+                guard phase == .active,
+                      !isSDKInitialized,
+                      !isInitializingSDK,
+                      initializationError == nil else { return }
                 Task {
                     _ = SettingsViewModel.shared
                     await initializeSDK()
@@ -81,12 +110,38 @@ struct RunAnywhereAIApp: App {
         #if os(macOS)
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
-        .defaultSize(width: 1200, height: 800)
-        .windowResizability(.contentSize)
+        .defaultSize(width: 1180, height: 780)
+        // `.contentSize` pinned the window to whatever its content asked for,
+        // which on a sidebar+detail layout means the user cannot make the window
+        // bigger than the transcript's ideal size. `.contentMinSize` keeps the
+        // floor and gives back the whole display.
+        .windowResizability(.contentMinSize)
+        .commands { AppCommands() }
+        #endif
+
+        #if os(macOS)
+        // The real preferences window, behind ⌘, where a Mac user looks for it.
+        // Settings used to be a sheet reached from a button inside the chat,
+        // which is both the wrong place and the wrong shape.
+        Settings {
+            CombinedSettingsView()
+        }
         #endif
     }
 
     private func initializeSDK() async {
+        // Claim the flag on the main actor, where every other read of it happens,
+        // so the `.task` and a `.active` scene phase arriving together cannot both
+        // pass the check. Cleared on both exits below, never by a `defer` — this
+        // function is nonisolated and a `defer` here could only hop back
+        // asynchronously, after a competing caller had already read a stale false.
+        let alreadyRunning = await MainActor.run { () -> Bool in
+            guard !isInitializingSDK else { return true }
+            isInitializingSDK = true
+            return false
+        }
+        guard !alreadyRunning else { return }
+
         do {
             // Register backends with C++ registry FIRST, before any await. Otherwise we can
             // suspend at the next line and another task may run loadModel() → ensureServicesReady()
@@ -97,6 +152,9 @@ struct RunAnywhereAIApp: App {
             let mlxRegistered = MLX.register(priority: 100)
             #if canImport(ONNXRuntime)
             ONNX.register(priority: 100)
+            #endif
+            #if canImport(NeuRTRuntime)
+            NeuRT.register(priority: 100)
             #endif
 
             await MainActor.run { initializationError = nil }
@@ -114,10 +172,16 @@ struct RunAnywhereAIApp: App {
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("SDK initialized in \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
 
-            await MainActor.run { isSDKInitialized = true }
+            await MainActor.run {
+                isSDKInitialized = true
+                isInitializingSDK = false
+            }
         } catch {
             logger.error("SDK initialization failed: \(error, privacy: .public)")
-            await MainActor.run { initializationError = error }
+            await MainActor.run {
+                initializationError = error
+                isInitializingSDK = false
+            }
         }
     }
 
@@ -127,12 +191,12 @@ struct RunAnywhereAIApp: App {
         if let credentials = storedCredentials() ?? bundledCredentials() {
             try RunAnywhere.initialize(
                 apiKey: credentials.apiKey,
-                baseURL: credentials.baseURL,
+                baseUrl: credentials.baseURL,
                 environment: .production
             )
         } else {
             #if DEBUG
-            try RunAnywhere.initialize()
+            try RunAnywhere.initialize(environment: .development)
             #else
             fatalError(
                 "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; " +
@@ -221,19 +285,23 @@ struct RunAnywhereAIApp: App {
     private func refreshSDKCatalogs() async {
         logger.info("Refreshing SDK model registry...")
 
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
-        let listResult = await RunAnywhere.listModels()
-        if listResult.success {
-            let models = listResult.models.models
-            let downloaded = models.filter(\.isDownloaded).count
+        do {
+            let models = try await RunAnywhere.models.list()
+            // ModelInfo.isDownloaded was deleted outright (idl/model_types.proto:
+            // "reserved 32; // was is_downloaded: a bool cannot express
+            // DOWNLOADING") -- a non-empty localPath is the simplest local
+            // proxy, same as every other read site in the SDK.
+            let downloaded = models.filter { !$0.localPath.isEmpty }.count
             let available = models.filter(\.isAvailableForUse).count
             logger.info(
                 "Model registry: registered=\(models.count), downloaded=\(downloaded), available=\(available)"
             )
-        } else {
-            let message = listResult.errorMessage.isEmpty ? "unknown error" : listResult.errorMessage
-            logger.warning("Model registry refresh incomplete: \(message, privacy: .public)")
+        } catch {
+            logger.warning(
+                "Model registry refresh incomplete: \(error.localizedDescription, privacy: .public)"
+            )
         }
 
         do {

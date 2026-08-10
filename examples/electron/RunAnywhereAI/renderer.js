@@ -5,7 +5,7 @@
 // and workbenches for structured output, tools, vision, embeddings, voice, and
 // VAD. Feature helpers are shared with the headless self-test.
 const ra = window.runanywhere;
-const store = window.demoStore;
+const store = window.appStore;
 const $ = (id) => document.getElementById(id);
 const setStatus = (s) => { $('status').textContent = s; $('statuswrap').classList.toggle('busy', s !== 'ready'); };
 // Escape quotes too: md() builds an <a href="…"> from (escaped) text, so an
@@ -14,13 +14,57 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB');
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
+// Tools the model can call. `execute` actually RUNS locally — a tool call that is
+// only parsed and never executed looks broken. get_weather has no offline data
+// source, so it returns an openly-labelled sample instead of pretending.
 const TOOLS = [
-  { name: 'get_weather', description: 'Get the current weather for a city', parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city', 'unit'] } },
-  { name: 'set_timer', description: 'Start a countdown timer', parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds', 'label'] } },
+  {
+    name: 'get_current_time',
+    description: "Get the user's current date and time",
+    parameters: { type: 'object', properties: { timezone: { type: 'string' } }, required: [] },
+    execute: () => new Date().toLocaleString(),
+  },
+  {
+    name: 'calculate',
+    description: 'Evaluate a basic arithmetic expression, e.g. "12 * (3 + 4)"',
+    parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] },
+    execute: ({ expression }) => {
+      // Arithmetic only — never eval() model output.
+      const src = String(expression || '');
+      if (!/^[\d\s+\-*/().%]+$/.test(src)) return 'unsupported expression (digits and + - * / ( ) only)';
+      try { return String(Function(`"use strict";return (${src})`)()); } catch { return 'could not evaluate'; }
+    },
+  },
+  {
+    name: 'set_timer',
+    description: 'Start a countdown timer',
+    parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds'] },
+    execute: ({ seconds, label }) => {
+      const secs = Math.max(1, Math.min(3600, Number(seconds) || 0));
+      setTimeout(() => flashToast(`Timer finished${label ? ': ' + label : ''}`), secs * 1000);
+      return `timer started for ${secs}s${label ? ` (${label})` : ''}`;
+    },
+  },
+  {
+    name: 'get_weather',
+    description: 'Get the current weather for a city',
+    parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city'] },
+    execute: ({ city, unit }) =>
+      `(sample data — this build has no weather source) 18°${unit === 'fahrenheit' ? 'F' : 'C'}, clear in ${city}`,
+  },
 ];
 
-// ---- settings + conversations + custom models (persisted via demoStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false };
+// ---- settings + conversations + custom models (persisted via appStore) ----
+// The system prompt has to establish WHO IS WHO — without it a small model
+// answers "what is my name" with its own identity. Temperature is low because
+// this is factual recall, not creative writing.
+const DEFAULT_SYSTEM_PROMPT =
+  'You are a helpful assistant talking with a user. ' +
+  'Facts the user states are about the USER, never about you. ' +
+  'When asked about their name, age or preferences, answer using what the user said earlier, ' +
+  'in the second person ("Your name is ..."). Never claim the user\'s details as your own. ' +
+  'Answer in one or two short sentences unless asked for more.';
+let settings = { systemPrompt: DEFAULT_SYSTEM_PROMPT, temperature: 0.3, maxTokens: 512, reasoning: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -29,19 +73,122 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const DEFAULT_LLM = 'qwen2.5-0.5b';
+// 2B rather than 0.8B: at 0.8B the model absorbs the user's facts but
+// re-attributes them to itself ("I am 21 years old"). Measured 1/3 vs 3/3 on a
+// multi-fact recall probe. 1.2GB is still a small download.
+const DEFAULT_LLM = 'qwen3.5-2b';
 // The chat's active LLM. Loading another LLM from the Models tab replaces it (the
 // backend keeps one loaded at a time), so we track it in loadedById/loadedType too
 // to keep the Models badges coherent — exactly one LLM ever shows "loaded".
-const llm = () => ensure('llm', async () => {
-  const h = await ra.loadLLM(DEFAULT_LLM);
-  loadedById[DEFAULT_LLM] = h; loadedType[DEFAULT_LLM] = 'llm';
-  return h;
-});
-const embedder = () => ensure('embedder', () => ra.loadEmbedder('minilm'));
-const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
-const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
-const tts = () => ensure('tts', () => ra.loadTTS('piper-lessac'));
+const llm = () => acquire('llm');
+const embedder = () => acquire('embedder');
+const vlm = () => acquire('vlm');
+const stt = () => acquire('stt');
+const tts = () => acquire('tts');
+
+// ---- per-tab model selection -------------------------------------------------
+// The backend keeps ONE slot PER MODALITY, so each tab can hold its own model and
+// tabs of different modalities never fight. `settings.models` is the user's choice
+// per modality (persisted); `acquire()` is the single place that turns a choice
+// into a loaded handle — download-if-needed, then load, memoized per modality.
+const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'qwen3.5-0.8b-vl', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac' };
+const MODALITY_LABEL = { llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text', tts: 'Text-to-speech' };
+const selectedModel = (m) => (settings.models && settings.models[m]) || DEFAULT_MODELS[m];
+
+// Unload a modality's model and forget its badges. Safe to call for a slot that
+// holds nothing.
+async function release(modality) {
+  const h = handles[modality];
+  delete handles[modality];
+  delete handles[`${modality}:id`];
+  if (h) {
+    try { await unloaders[modality](await h); } catch { /* already gone */ }
+  }
+  for (const k of Object.keys(loadedById)) if (loadedType[k] === modality) forgetLoaded(k);
+}
+
+/** Free every model the current screen does not need. */
+async function releaseUnneeded(acquiring) {
+  const loaded = Object.keys(loaders).filter((m) => handles[m]);
+  const drop = modalitiesToRelease(currentTab, acquiring, loaded);
+  for (const m of drop) {
+    setStatus(`releasing ${m}…`);
+    await release(m);
+  }
+  if (drop.length) renderModelChips();
+  return drop;
+}
+
+// A model is identified EVERYWHERE by its id (a catalog id, or the id of a custom
+// entry). Only the loader needs the underlying source — an HF repo, URL or file
+// path — so the mapping lives here and nowhere else. Persisting the source instead
+// would mean the Models tab and the chip picker stored different things for the
+// same model, and the saved choice would not resolve on restart.
+function modelSource(id) {
+  const custom = customModels.find((m) => m.id === id);
+  return custom ? custom.source : id;
+}
+
+async function acquire(modality) {
+  const id = selectedModel(modality);
+  // Re-loading is only needed when the choice changed or nothing is loaded yet.
+  if (handles[modality] && handles[`${modality}:id`] === id) return handles[modality];
+  handles[`${modality}:id`] = id;
+  const p = (async () => {
+    // Nothing evicts anything automatically — the backend keeps a slot per
+    // modality — so without this the app accumulates every model it has used
+    // (chat's LLM + a VLM + STT + TTS) until it exhausts memory.
+    await releaseUnneeded(modality);
+    setStatus(`loading ${id}…`);
+    try {
+      const h = await loaders[modality](modelSource(id));
+      loadedById[id] = h; loadedType[id] = modality;
+      return h;
+    } finally { setStatus('ready'); }
+  })();
+  // Don't memoize a rejection — one failed download would poison the modality
+  // for the rest of the session. Clear the slot ONLY if it still holds this
+  // attempt: a slow failing load can reject long after selectModel() + a fresh
+  // acquire() installed a healthy handle, and dropping that one would silently
+  // reload the model on next use.
+  const memo = p.catch((e) => {
+    if (handles[modality] === memo) { delete handles[modality]; delete handles[`${modality}:id`]; }
+    throw e;
+  });
+  handles[modality] = memo;
+  return memo;
+}
+
+// Switch a modality to another model: drop the old handle so the next acquire()
+// loads the new one. Persisted so the choice survives a restart.
+async function selectModel(modality, id) {
+  settings.models = { ...(settings.models || {}), [modality]: id };
+  try { await store.saveSettings(settings); } catch { /* optional */ }
+  await release(modality);
+  renderModelChips();
+  if (currentTab === 'models') renderModels();
+}
+
+// The backend keeps one slot PER MODALITY (verified on device: loading a VLM does
+// NOT disturb the LLM, but loading a second LLM evicts the first). So the memoized
+// handle above goes stale whenever another LLM is loaded, and every later call
+// fails with "No model loaded". A host respawn invalidates it too. EVERY LLM caller
+// must go through withLlm so the recovery lives in one place instead of only chat.
+// Anchored on the specific "your handle is gone" messages the host emits. A loose
+// /model.*load/ also matched real failures like "model failed to load: not enough
+// memory", so an OOM would immediately retry the same multi-GB load instead of
+// surfacing the error.
+const STALE_MODEL_RE = /no model loaded|model not loaded|no model is loaded|invalid handle|unknown handle|host exited|host is not running/i;
+async function withLlm(fn) {
+  try {
+    return await fn(await llm());
+  } catch (e) {
+    if (!STALE_MODEL_RE.test(e.message || '')) throw e;
+    delete handles.llm; delete handles['llm:id'];
+    for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale badges
+    return fn(await llm());
+  }
+}
 
 // ---- minimal, XSS-safe markdown (escape first, then format) ----
 // Code blocks are stashed behind private-use sentinels () so inline
@@ -110,23 +257,45 @@ function renderSidebar() {
 }
 function bubbleHtml(m) {
   const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
-  const metrics = m.metrics ? `<div class="metrics">⚡ ${m.metrics.tokens} tokens · ${m.metrics.tps.toFixed(1)} tok/s · TTFT ${Math.round(m.metrics.ttft)}ms</div>` : '';
-  const av = m.role === 'assistant' ? '✦' : 'U';
+  // No emoji: ⚡ is rendered by Segoe UI Emoji in its OWN colours, so it was the
+  // one bitmap glyph in an all-SVG interface. The .metrics flex gap separates.
+  const metrics = m.metrics ? `<div class="metrics"><span>${m.metrics.tokens} tokens</span><span>${m.metrics.tps.toFixed(1)} tok/s</span><span>TTFT ${Math.round(m.metrics.ttft)}ms</span></div>` : '';
+  // The assistant reply is typeset as PROSE — the stylesheet drops the avatar and
+  // the bubble fill, leaving a small-caps label above plain text. Only the user's
+  // turn keeps a bubble. This is the single biggest difference from a chat toy.
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
-  return `<div class="msg ${m.role}"><div class="av">${av}</div><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
+  return `<div class="msg ${m.role}"><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
 }
+// Four openers, each with an icon, a title and the prompt it prefills. Clicking
+// one PREFILLS and focuses the composer (it does not fire a request) so the user
+// can edit before sending.
 const SUGGESTIONS = [
-  ['Explain on-device AI', 'Explain on-device AI in one sentence.'],
-  ['Write a haiku', 'Write a haiku about the ocean.'],
-  ['Dinner ideas', 'Give me three quick dinner ideas with chicken.'],
+  { icon: '<path d="M8 2h8M9 2v4M15 2v4"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M8 12h8M8 16h5"/>',
+    title: 'Plan', sub: 'from messy notes', prompt: 'Turn these notes into a clear plan with next steps:\n' },
+  { icon: '<path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+    title: 'Rewrite', sub: 'clear and warm', prompt: 'Rewrite this to be clear and warm, keeping my meaning:\n' },
+  { icon: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    title: 'Compare', sub: 'weigh options', prompt: 'Compare these options and tell me which you would pick and why:\n' },
+  { icon: '<path d="M11 12H3M16 6H3M16 18H3"/><path d="m18 9 3 3-3 3"/>',
+    title: 'Summarize', sub: 'into next steps', prompt: 'Summarize this into the decisions and next steps:\n' },
 ];
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Still up?';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 function emptyStateHtml() {
-  const chips = SUGGESTIONS.map(([l, q], i) => `<button class="chip" data-i="${i}">${escapeHtml(l)}</button>`).join('');
+  const cards = SUGGESTIONS.map((s, i) => `<button class="sugg" data-i="${i}">
+      <span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></span>
+      <span class="st"><span class="s1">${escapeHtml(s.title)}</span><span class="s2">${escapeHtml(s.sub)}</span></span>
+    </button>`).join('');
   return `<div class="empty">
-    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></div>
-    <h3>On-device AI, privately</h3>
-    <p>Ask anything — everything runs locally on your machine, nothing leaves your device.</p>
-    <div class="chips">${chips}</div>
+    <div class="halo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l1.9 5.6 5.6 1.9-5.6 1.9L12 17.6l-1.9-5.6L4.5 10l5.6-1.9L12 2.6z"/><path d="M19 14.2l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" opacity=".7"/></svg></div>
+    <h3>${escapeHtml(greeting())}</h3>
+    <p>Ask anything — everything runs privately on your device.</p>
+    <div class="suggs">${cards}</div>
   </div>`;
 }
 function renderChat() {
@@ -135,21 +304,39 @@ function renderChat() {
     $('chatlog').innerHTML = '<div class="thread">' + conv.messages.map(bubbleHtml).join('') + '</div>';
   } else {
     $('chatlog').innerHTML = emptyStateHtml();
-    document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
-      $('chatinput').value = SUGGESTIONS[+c.dataset.i][1];
-      sendChat();
+    document.querySelectorAll('.sugg').forEach((c) => c.addEventListener('click', () => {
+      const inp = $('chatinput');
+      inp.value = SUGGESTIONS[+c.dataset.i].prompt;
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
     }));
   }
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
 }
-function buildPrompt(priorMessages, userText) {
+async function buildPrompt(priorMessages, userText) {
   let sys = settings.systemPrompt;
   // Reasoning mode: ask the model to think in <think></think> first. The SDK's
   // splitThinking (mirrored by assistantHtml) peels that back out for display.
   if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
-  let p = sys + '\n\n';
-  for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
-  return p + 'User: ' + userText + '\nAssistant:';
+  const turns = [{ role: 'system', content: sys }];
+  for (const m of priorMessages) turns.push({ role: m.role, content: m.content });
+  turns.push({ role: 'user', content: userText });
+  // formatChat renders the turn markup THIS model was trained on, and strips old
+  // <think> blocks so stale reasoning is never replayed as context.
+  return ra.formatChat(turns, await activeChatTemplate(), { suppressThinking: !settings.reasoning });
+}
+
+// The turn markup the ACTIVE model expects. Getting this wrong is why a chat
+// appears to lose its memory: llama.cpp wraps an unrecognised prompt as a SINGLE
+// user message, so the whole transcript collapses into one turn and the model
+// answers as if every message were the first.
+async function activeChatTemplate() {
+  // Awaited, not read from the possibly-empty cache: a message sent before
+  // wireUi()'s catalog fetch resolves would otherwise format a Llama-3 or Gemma
+  // model's prompt as ChatML — which is exactly the memory bug described above.
+  await ensureCatalog();
+  const entry = catalogEntry(selectedModel('llm'));
+  return (entry && entry.chatTemplate) || 'chatml';
 }
 let generating = false;
 async function sendChat() {
@@ -173,26 +360,15 @@ async function sendChat() {
   setStatus('generating…');
   try {
     let result = null;
-    const runGen = async () => {
+    const promptText = await buildPrompt(prior, text);
+    // withLlm re-loads once if the handle was evicted by another model.
+    await withLlm((h) => {
       asst.content = '';
-      const h = await llm();
-      await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+      return ra.generateStream(h, promptText, { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
         if (e.isFinal) { result = e.result; }
         else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
       });
-    };
-    try {
-      await runGen();
-    } catch (e) {
-      // The backend keeps ONE LLM loaded at a time, so loading a model from the
-      // Models tab evicts the chat model and our memoized handle goes stale. Drop
-      // it and reload the chat model once before surfacing an error.
-      if (/no model|not loaded|model.*load/i.test(e.message || '')) {
-        delete handles.llm;
-        for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale LLM badges
-        await runGen();
-      } else throw e;
-    }
+    });
     asst.content = asst.content.trim();
     if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
     bubble.classList.remove('streaming');
@@ -258,18 +434,14 @@ function buildCard(o) {
       try {
         if (loaded) {
           await unloaders[o.type](loaded); forgetLoaded(o.key);
-          if (o.type === 'llm') delete handles.llm; // chat reloads its default next time
+          delete handles[o.type]; delete handles[`${o.type}:id`];
         } else {
-          if (o.type === 'llm') {
-            // Backend keeps ONE LLM loaded — unload whichever is active first.
-            for (const k of Object.keys(loadedById)) {
-              if (loadedType[k] === 'llm') { try { await unloaders.llm(loadedById[k]); } catch { /* already gone */ } forgetLoaded(k); }
-            }
-            delete handles.llm;
-          }
-          loadedById[o.key] = await loaders[o.type](o.source);
-          loadedType[o.key] = o.type;
-          if (o.type === 'llm') handles.llm = Promise.resolve(loadedById[o.key]); // chat now uses this model
+          // Loading from here IS selecting: route through the same choke point the
+          // per-tab chips use, so the Models tab and the chips can't disagree.
+          // Select by id, exactly as the chip picker does — acquire() maps the
+          // id to its source. Storing o.source here made the two disagree.
+          await selectModel(o.type, o.key);
+          await acquire(o.type);
         }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
@@ -278,8 +450,20 @@ function buildCard(o) {
   }
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
-      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); if (o.type === 'llm') delete handles.llm; }
-      customModels = customModels.filter((m) => m.id !== o.key); persistCustom(); renderModels();
+      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); delete handles[o.type]; delete handles[`${o.type}:id`]; }
+      customModels = customModels.filter((m) => m.id !== o.key);
+      persistCustom();
+      // The choice is persisted by id, so a removed model would otherwise leave a
+      // dangling id in settings that modelSource() cannot resolve — every later
+      // load would fail, across restarts, with no way to recover from the UI.
+      if (settings.models && settings.models[o.type] === o.key) {
+        const models = { ...settings.models };
+        delete models[o.type];
+        settings.models = models;
+        try { await store.saveSettings(settings); } catch { /* optional */ }
+        renderModelChips();
+      }
+      renderModels();
     }));
   }
   return div;
@@ -303,6 +487,12 @@ async function renderModels() {
       else if (entry.sizeMB) bits.push('~' + fmtMB(entry.sizeMB));
       let sub = bits.join(' · ');
       if (entry.heavy) sub += ' <span class="badge heavy">heavy · CPU</span>';
+      // Non-Apache weights (Gemma, Llama, NVIDIA) restrict use; link the terms.
+      if (entry.license) {
+        sub += entry.licenseUrl
+          ? ` · <a href="${escapeHtml(entry.licenseUrl)}" title="Model licence">${escapeHtml(entry.license)}</a>`
+          : ` · ${escapeHtml(entry.license)}`;
+      }
       el.appendChild(buildCard({ key: id, type: entry.type, label: entry.label || id, sub, source: id, downloaded: st.downloaded, custom: false }));
     }
   }
@@ -338,10 +528,8 @@ function looksRemote(source) {
 function applyDeviceUi() {
   const device = new URLSearchParams(location.search).get('device') || 'cpu';
   if (device !== 'gpu') return;
-  const sel = $('device');
-  const gpuOpt = sel && sel.querySelector('option[value="gpu"]');
-  if (gpuOpt) { gpuOpt.disabled = false; gpuOpt.textContent = 'GPU · CUDA'; }
-  if (sel) sel.value = 'gpu';
+  const label = $('devicelabel');
+  if (label) label.textContent = 'GPU · CUDA';
   const pill = $('devicepill');
   if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
   const note = $('devicenote');
@@ -382,20 +570,49 @@ function applySettingsToUi() {
   if ($('setreason')) $('setreason').checked = !!settings.reasoning;
 }
 async function saveSettings() {
-  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256, reasoning: !!($('setreason') && $('setreason').checked) };
+  // MERGE, don't rebuild — a wholesale replace drops keys this panel doesn't own
+  // (e.g. the per-tab model choices) on every save.
+  settings = {
+    ...settings,
+    systemPrompt: $('setsystem').value,
+    temperature: parseFloat($('settemp').value),
+    maxTokens: parseInt($('setmax').value, 10) || 256,
+    reasoning: !!($('setreason') && $('setreason').checked),
+  };
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
 
 // ---- shared feature helpers (used by UI + self-test) ----
 async function runStructured(text) {
-  return ra.generateStructured(await llm(), `Extract the person as JSON. Text: "${text}"`, {
+  return withLlm((h) => ra.generateStructured(h, `Extract the person as JSON. Text: "${text}"`, {
     type: 'object',
     properties: { name: { type: 'string' }, age: { type: 'integer' }, interests: { type: 'array', items: { type: 'string' }, maxItems: 5 } },
     required: ['name', 'age', 'interests'],
-  });
+  }));
 }
-async function runTools(text) { return ra.generateToolCall(await llm(), text, TOOLS); }
+async function runTools(text) {
+  // Honour the user's Settings — the native default is only 100 tokens, which can
+  // truncate a longer tool call mid-JSON.
+  const call = await withLlm((h) => ra.generateToolCall(h, text, TOOLS.map(({ execute, ...t }) => t), {
+    temperature: settings.temperature, maxTokens: settings.maxTokens,
+  }));
+  // A tool call that is never executed is just a parse. Run it locally.
+  const tool = TOOLS.find((t) => t.name === call.name);
+  let result;
+  try { result = tool && tool.execute ? await tool.execute(call.arguments || {}) : '(no local handler)'; }
+  catch (e) { result = 'tool failed: ' + (e.message || e); }
+  return { ...call, result };
+}
+
+// Small transient toast (used by set_timer when it fires).
+function flashToast(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:200;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-size:13.5px;box-shadow:var(--shadow-3);animation:fadeUp .18s var(--ease)';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 async function runEmbeddings(a, b) {
   const h = await embedder();
   const [ea, eb] = await Promise.all([ra.embed(h, a), ra.embed(h, b)]);
@@ -426,7 +643,8 @@ async function ragEnsureSession() {
   return ragSessionPromise;
 }
 function ragStatsText(s) {
-  if (!s) return '';
+  // Never render nothing — an empty slot beside the buttons reads as a failed load.
+  if (!s || !s.indexedDocuments) return 'No documents yet';
   return `${s.indexedDocuments} document${s.indexedDocuments === 1 ? '' : 's'} · ${s.indexedChunks} chunk${s.indexedChunks === 1 ? '' : 's'} indexed`;
 }
 function renderRagSources(chunks) {
@@ -457,20 +675,170 @@ async function runVad() {
 }
 
 // ---- tabs ----
+let currentTab = 'chat';
 function showTab(name) {
+  currentTab = name;
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((x) => x.classList.toggle('active', x.id === name));
   const btn = document.querySelector(`.nav button[data-tab="${name}"]`);
-  if (btn) $('sectiontitle').textContent = btn.textContent.trim();
+  if (btn) {
+    $('sectiontitle').textContent = btn.textContent.trim();
+    // Selecting a workbench keeps the Developer group open so the active row is visible.
+    const grp = btn.closest('details');
+    if (grp) grp.open = true;
+  }
+  closePicker();
+  if (name !== 'voice' && voiceCleanup) voiceCleanup(); // release the mic on tab change
+  renderModelChips();
   if (name === 'models') renderModels();
+}
+
+// ---- model chip + picker ------------------------------------------------------
+// Which modalities each tab lets you choose. Slots are per-modality, so a tab only
+// ever shows the models it actually uses.
+// TAB_MODALITIES + modalitiesToRelease come from model-policy.js (unit-tested).
+const CHIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m8 12 3 3 5-6"/></svg>';
+
+let openPicker = null;
+function closePicker() {
+  if (openPicker) { openPicker.remove(); openPicker = null; }
+}
+document.addEventListener('click', (e) => {
+  if (openPicker && !openPicker.contains(e.target) && !e.target.closest('.modelchip')) closePicker();
+});
+
+function catalogEntry(id) {
+  const c = catalogCache || {};
+  if (c[id]) return c[id];
+  const custom = customModels.find((m) => m.id === id);
+  return custom ? { label: custom.label || id, type: custom.type } : null;
+}
+let catalogCache = null;
+let catalogPromise = null;
+/** Resolve the catalog once and cache it; callers that need it await this. */
+function ensureCatalog() {
+  if (catalogCache) return Promise.resolve(catalogCache);
+  if (!catalogPromise) {
+    catalogPromise = Promise.resolve(ra.catalog())
+      .then((c) => { catalogCache = c; return c; })
+      .catch((e) => { catalogPromise = null; throw e; });
+  }
+  return catalogPromise;
+}
+
+function renderModelChips() {
+  const slot = $('chipslot');
+  if (!slot) return;
+  const mods = TAB_MODALITIES[currentTab] || [];
+  slot.innerHTML = '';
+  for (const m of mods) {
+    const id = selectedModel(m);
+    const entry = catalogEntry(id);
+    const btn = document.createElement('button');
+    btn.className = 'modelchip';
+    btn.title = `${MODALITY_LABEL[m]} — click to change`;
+    btn.innerHTML =
+      `<span class="mark">${CHIP_ICON}</span>` +
+      `<span class="txt"><span class="t1">${escapeHtml((entry && entry.label) || id)}</span>` +
+      `<span class="t2">${escapeHtml(MODALITY_LABEL[m])}</span></span>` +
+      '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+    btn.onclick = (e) => { e.stopPropagation(); togglePicker(btn, m); };
+    slot.appendChild(btn);
+  }
+}
+
+async function togglePicker(anchor, modality) {
+  if (openPicker && openPicker.dataset.modality === modality) { closePicker(); return; }
+  closePicker();
+  const box = document.createElement('div');
+  box.className = 'picker';
+  box.dataset.modality = modality;
+  box.innerHTML = `<div class="phead">${escapeHtml(MODALITY_LABEL[modality])}</div><div class="note">Loading…</div>`;
+  document.body.appendChild(box);
+  const r = anchor.getBoundingClientRect();
+  box.style.top = `${r.bottom + 8}px`;
+  box.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - 352))}px`;
+  openPicker = box;
+
+  const [cat, status] = await Promise.all([ra.catalog(), ra.modelStatus()]);
+  catalogCache = cat;
+  if (openPicker !== box) return; // closed while loading
+  const items = Object.entries(cat).filter(([, e]) => e.type === modality)
+    .concat(customModels.filter((m) => m.type === modality).map((m) => [m.id, { label: m.label, type: m.type, custom: true }]));
+  const active = selectedModel(modality);
+
+  box.innerHTML = `<div class="phead">${escapeHtml(MODALITY_LABEL[modality])}</div>`;
+  for (const [id, entry] of items) {
+    const st = status[id] || {};
+    const isActive = id === active;
+    const stateCls = isActive ? 'active' : st.downloaded ? 'ready' : 'get';
+    const stateTxt = isActive ? 'Active' : st.downloaded ? 'Ready' : 'Download';
+    const bits = [entry.params, st.downloaded ? fmtSize(st.sizeBytes) : entry.sizeMB ? '~' + fmtMB(entry.sizeMB) : '', entry.license].filter(Boolean);
+    const row = document.createElement('button');
+    row.className = 'row';
+    row.innerHTML =
+      `<span class="info"><span class="nm">${escapeHtml(entry.label || id)}</span>` +
+      `<span class="meta">${escapeHtml(bits.join(' · '))}${entry.heavy ? ' · heavy' : ''}</span></span>` +
+      `<span class="state ${stateCls}">${stateTxt}</span>`;
+    row.onclick = async (e) => {
+      e.stopPropagation();
+      if (isActive) { closePicker(); return; }
+      const stateEl = row.querySelector('.state');
+      if (!st.downloaded) {
+        stateEl.textContent = '0%';
+        const bar = document.createElement('div');
+        bar.className = 'bar'; bar.innerHTML = '<div></div>';
+        row.after(bar);
+        try {
+          await ra.downloadModel(id, (p) => {
+            const pct = Math.round(p.percent || 0);
+            stateEl.textContent = pct + '%';
+            bar.firstElementChild.style.width = pct + '%';
+          });
+        } catch (err) { stateEl.textContent = 'Failed'; console.error(err); return; }
+        bar.remove();
+      }
+      await selectModel(modality, id);
+      closePicker();
+    };
+    box.appendChild(row);
+  }
+  if (!items.length) box.innerHTML += '<div class="note">No models of this type in the catalog yet.</div>';
 }
 document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
 // ---- UI wiring ----
+// Default to the OS preference; an explicit choice is remembered in settings.
+// Nothing in a UI should fail silently. Every handler catches its own errors;
+// this is the net that catches whatever a future one forgets.
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = (e.reason && e.reason.message) || String(e.reason || 'unknown error');
+  console.error('unhandled rejection:', e.reason);
+  try { flashToast('Something went wrong: ' + msg); } catch { /* toast is best-effort */ }
+});
+window.addEventListener('error', (e) => { console.error('renderer error:', e.error || e.message); });
+
+function applyTheme(mode) {
+  const os = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  document.documentElement.dataset.theme = mode === 'light' || mode === 'dark' ? mode : os;
+}
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  settings.theme = next;
+  applyTheme(next);
+  Promise.resolve(store.saveSettings(settings)).catch(() => {});
+}
+
 function wireUi() {
+  applyTheme(settings.theme);
+  const tt = $('themetoggle');
+  if (tt) tt.addEventListener('click', toggleTheme);
   applySettingsToUi();
   applyDeviceUi();
   renderSidebar(); renderChat();
+  // Warm the catalog so the model chips can show real labels immediately.
+  ensureCatalog().then(() => renderModelChips()).catch(() => {});
+  renderModelChips();
   wireModels();
   $('newchat').addEventListener('click', () => { newConversation(); showTab('chat'); $('chatinput').focus(); });
   $('chatsend').addEventListener('click', sendChat);
@@ -486,8 +854,25 @@ function wireUi() {
 
   const out = (id, fn) => async () => { setStatus('working…'); $(id).textContent = '…'; try { $(id).textContent = await fn(); } catch (e) { $(id).textContent = 'error: ' + e.message; } setStatus('ready'); };
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
-  $('toolsgo').addEventListener('click', out('toolsout', async () => { const c = await runTools($('toolstext').value); return `${c.name}(${JSON.stringify(c.arguments)})`; }));
-  $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
+  $('toolsgo').addEventListener('click', out('toolsout', async () => {
+    const c = await runTools($('toolstext').value);
+    return `${c.name}(${JSON.stringify(c.arguments)})
+→ ${c.result}`;
+  }));
+  $('embgo').addEventListener('click', async () => {
+    const a = $('emba').value || $('emba').placeholder;
+    const b = $('embb').value || $('embb').placeholder;
+    const el = $('embout');
+    $('embgo').disabled = true; el.textContent = '…'; setStatus('working…');
+    try {
+      const score = await runEmbeddings(a, b);
+      const pct = Math.max(0, Math.min(1, score)) * 100;
+      el.innerHTML = `<div><div class="figure">${score.toFixed(3)}</div>` +
+        `<div class="figcap">Cosine similarity</div>` +
+        `<div class="meter"><i style="width:${pct.toFixed(1)}%"></i></div></div>`;
+    } catch (e) { el.textContent = 'error: ' + e.message; }
+    finally { $('embgo').disabled = false; setStatus('ready'); }
+  });
 
   $('ragadd').addEventListener('click', async () => {
     const text = $('ragdoc').value.trim();
@@ -568,33 +953,255 @@ function captureController() {
       cap = { stream, ctx, node, chunks, onframe };
     },
     onFrame(cb) { cap && cap.onframe.push(cb); },
-    stop() { if (!cap) return null; const { stream, ctx, node, chunks } = cap; node.disconnect(); stream.getTracks().forEach((t) => t.stop()); ctx.close(); cap = null; let n = 0; for (const c of chunks) n += c.length; const m = new Float32Array(n); let o = 0; for (const c of chunks) { m.set(c, o); o += c.length; } return { samples: m, rate: ctx.sampleRate }; },
+    // Tearing down the graph must NEVER throw: a throw here used to escape
+    // finishTurn's try block and leave the turn flagged busy forever, which
+    // presents as a mic button that silently stops responding. Claim `cap`
+    // first so a re-entrant stop() is a no-op rather than a double-close.
+    stop() {
+      if (!cap) return null;
+      const { stream, ctx, node, chunks } = cap;
+      cap = null;
+      const rate = ctx.sampleRate; // read before close(); the context is unusable after
+      try { node.disconnect(); } catch { /* already detached */ }
+      try { stream.getTracks().forEach((t) => t.stop()); } catch { /* already stopped */ }
+      try { ctx.close(); } catch { /* already closed */ }
+      let n = 0;
+      for (const c of chunks) n += c.length;
+      const m = new Float32Array(n);
+      let o = 0;
+      for (const c of chunks) { m.set(c, o); o += c.length; }
+      return { samples: m, rate };
+    },
   };
 }
+// Mic float samples -> 16 kHz PCM16 bytes for STT. Uses the SDK's block-averaging
+// downsample, not a nearest-neighbour pick: at 48k->16k, dropping samples folds
+// everything above 8 kHz back into the band Whisper reads.
 function toPcm16At16k(samples, rate) {
-  const ratio = rate / 16000, outLen = Math.floor(samples.length / ratio), pcm = new Int16Array(outLen);
-  for (let i = 0; i < outLen; i++) { const s = Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)])); pcm[i] = Math.max(-32768, Math.min(32767, Math.round(s * 32768))); }
-  return new Uint8Array(pcm.buffer);
+  return ra.pcm16Bytes(rate === 16000 ? samples : ra.downsample(samples, rate, 16000));
 }
+
+// ---- voice: a 4-state machine (idle | listening | thinking | speaking) --------
+// Tap to start, tap to stop (or let it end itself on silence); tap while it is
+// speaking to barge in. All visual state is driven by data-state on the root, so
+// this code only sets state, a --level, and the transcript text.
 function wireVoice() {
-  const btn = $('voicebtn'); const cc = captureController();
-  const begin = async () => { setStatus('listening…'); await cc.start(); };
-  const end = async () => {
-    const rec = cc.stop(); if (!rec) return;
-    setStatus('thinking…');
-    const heard = await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate));
-    $('voiceheard').textContent = heard;
-    let reply = ''; $('voicereply').textContent = '';
-    await ra.generate(await llm(), `You are concise. Reply in one sentence.\n\n${heard}`, (t) => { reply += t; $('voicereply').textContent = reply; });
-    const audio = await ra.synthesize(await tts(), reply.trim());
-    setStatus('speaking…');
-    const pctx = new AudioContext(); const buf = pctx.createBuffer(1, audio.samples.length, audio.sampleRate); buf.getChannelData(0).set(audio.samples);
-    const s = pctx.createBufferSource(); s.buffer = buf; s.connect(pctx.destination);
-    await new Promise((r) => { s.onended = () => { pctx.close(); r(); }; s.start(); });
-    setStatus('ready');
+  const root = $('voiceroot');
+  const orb = $('voiceorb');
+  const statusEl = $('voicestatus');
+  const hintEl = $('voicehint');
+  const errEl = $('voiceerror');
+  const transcript = $('voicetranscript');
+  const cc = captureController();
+
+  // One long-lived output context so a reply can be interrupted (barge-in).
+  let playCtx = null;
+  let playing = null;
+  let state = 'idle';
+  let busy = false;          // a turn is in flight; ignore re-entrant taps
+  // Each turn takes a number so a cancelled-but-still-running turn can tell it is
+  // no longer current and must not touch shared state. See turn-guard.js for why
+  // a single `abandoned` boolean was not enough.
+  const turns = createTurnGuard();
+  let levelRaf = 0;
+  let level = 0;             // smoothed mic RMS, 0..1
+
+  let watchdog = 0;
+  // Replace the hint line with what the turn is actually doing, and start a
+  // watchdog so an unusually long step offers a way out instead of just sitting.
+  function phase(text) {
+    hintEl.textContent = text;
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      hintEl.textContent = text + ' (taking longer than usual — tap the orb to cancel)';
+    }, 20000);
+  }
+
+  const COPY = {
+    idle: ['Tap to talk', 'Speech, reasoning and speech-synthesis all run on this device.'],
+    listening: ['Listening…', 'Tap again when you are done — or just stop speaking.'],
+    thinking: ['Thinking…', 'Transcribing and composing a reply on-device.'],
+    speaking: ['Speaking…', 'Tap to interrupt.'],
   };
-  btn.addEventListener('mousedown', begin); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  function setVoiceState(s) {
+    state = s;
+    root.dataset.state = s;
+    statusEl.textContent = COPY[s][0];
+    hintEl.textContent = COPY[s][1];
+    orb.setAttribute('aria-label', COPY[s][0]);
+    setStatus(s === 'idle' ? 'ready' : s + '…');
+  }
+  const showError = (msg) => { errEl.hidden = false; errEl.textContent = msg; };
+  const clearError = () => { errEl.hidden = true; errEl.textContent = ''; };
+
+  function stopPlayback() {
+    if (playing) { try { playing.onended = null; playing.stop(); } catch { /* already ended */ } playing = null; }
+  }
+
+  // Level meter: painted from ONE rAF loop. Never write the DOM from the audio
+  // callback — that runs on the audio thread's cadence and thrashes layout.
+  function startLevelLoop() {
+    cancelAnimationFrame(levelRaf);
+    const tick = () => {
+      root.style.setProperty('--level', level.toFixed(3));
+      if (state === 'listening') levelRaf = requestAnimationFrame(tick);
+      else root.style.setProperty('--level', '0');
+    };
+    levelRaf = requestAnimationFrame(tick);
+  }
+
+  async function beginListening() {
+    clearError();
+    transcript.hidden = true;
+    try {
+      await cc.start();
+    } catch (e) {
+      showError('Could not open the microphone: ' + (e.message || e));
+      setVoiceState('idle');
+      return;
+    }
+    setVoiceState('listening');
+    startLevelLoop();
+
+    // Endpointing: learn the room's noise floor for ~400ms, then commit the turn
+    // after a stretch of silence. Self-contained (no calibration state to poison)
+    // and always overridable by tapping.
+    let noiseFloor = 1, heardSpeech = false, silentFor = 0, elapsed = 0;
+    const autoStop = $('voicevad');
+    cc.onFrame((frame, rate) => {
+      const r = ra.rms(frame);
+      level = Math.min(1, Math.max(level * 0.72, r * 9)); // smooth + scale for display
+      const ms = (frame.length / rate) * 1000;
+      elapsed += ms;
+      if (elapsed < 400) { noiseFloor = Math.min(noiseFloor, r); return; }
+      const gate = Math.max(noiseFloor * 3, 0.012);
+      if (r > gate) { heardSpeech = true; silentFor = 0; } else if (heardSpeech) silentFor += ms;
+      const done = (autoStop && autoStop.checked && heardSpeech && silentFor > 800) || elapsed > 30000;
+      if (done && state === 'listening') finishTurn();
+    });
+  }
+
+  async function finishTurn() {
+    if (busy) return;
+    busy = true;
+    const turn = turns.begin();
+    const mine = turn.current;               // false once this turn is superseded
+    // EVERYTHING from here on is inside try/finally: a throw before the guarded
+    // region used to leave busy=true forever, and the mic button simply stopped
+    // responding with no error anywhere.
+    try {
+      const rec = cc.stop();
+      level = 0;
+      if (!rec || !rec.samples.length) { setVoiceState('idle'); return; }
+      setVoiceState('thinking');
+      phase('Transcribing what you said…');
+      const heard = (await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate)) || '').trim();
+      if (!mine()) return;
+      if (!heard) { showError('I did not catch that — try again a little closer to the mic.'); setVoiceState('idle'); return; }
+      transcript.hidden = false;
+      $('voiceheard').textContent = heard;
+      $('voicereply').textContent = '';
+      let reply = '';
+      phase('Composing a reply…');
+      // Ask for speech, not a document — a spoken answer should have no markdown
+      // in it at all.
+      const spokenStyle = settings.systemPrompt +
+        ' You are answering out loud. Reply in one or two short spoken sentences, in plain words.' +
+        ' Never use markdown, asterisks, bullet points, headings or mathematical notation.';
+      // Same templating as chat — a raw "User:/Assistant:" string would be
+      // wrapped as one turn and answered generically.
+      // A spoken reply must never wait on visible deliberation.
+      const voicePrompt = ra.formatChat(
+        [{ role: 'system', content: spokenStyle }, { role: 'user', content: heard }],
+        await activeChatTemplate(),
+        { suppressThinking: true }
+      );
+      await withLlm((h) => ra.generate(h, voicePrompt, {
+        temperature: settings.temperature, maxTokens: settings.maxTokens,
+      }, (t) => {
+        reply += t;
+        if (mine()) $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response);
+      }));
+      if (!mine()) return;
+      // The prompt is a request, not a guarantee: a small model still emits
+      // "**Paris**", and the TTS voice pronounces that as "asterisk asterisk
+      // Paris". speakableText is what actually makes the audio clean — it also
+      // says "20 degrees Celsius" and "5 times 3" instead of spelling symbols.
+      reply = ra.speakableText(ra.splitThinking(reply).response);
+      $('voicereply').textContent = reply;
+      if (!reply) { setVoiceState('idle'); return; }
+
+      phase('Generating speech…');
+      const audio = await ra.synthesize(await tts(), reply);
+      // Synthesis is slow enough that the user can cancel during it — never speak
+      // over, or steal the orb from, whatever turn is current now.
+      if (!mine()) return;
+      if (!audio || !audio.samples || !audio.samples.length) { setVoiceState('idle'); return; } // createBuffer(0) throws
+      setVoiceState('speaking');
+      playCtx = playCtx || new AudioContext();
+      if (playCtx.state === 'suspended') await playCtx.resume();
+      const buf = playCtx.createBuffer(1, audio.samples.length, audio.sampleRate);
+      buf.getChannelData(0).set(audio.samples);
+      const src = playCtx.createBufferSource();
+      src.buffer = buf; src.connect(playCtx.destination);
+      playing = src;
+      await new Promise((r) => { src.onended = r; src.start(); });
+      playing = null;
+    } catch (e) {
+      if (mine()) showError(e.message || String(e));
+    } finally {
+      // A superseded turn owns none of this — the turn that replaced it does.
+      if (mine()) {
+        clearTimeout(watchdog);
+        busy = false;
+        if (state !== 'listening') setVoiceState('idle');
+      }
+    }
+  }
+
+  // One tap does the right thing for the current state.
+  // The orb must ALWAYS do something. Any state that cannot proceed is reset and
+  // a fresh turn starts, so a stale flag can never leave a dead button — the
+  // failure mode was a mic that silently stopped responding until app restart.
+  orb.addEventListener('click', () => {
+    if (state === 'listening') { finishTurn(); return; }
+    if (state === 'speaking') { stopPlayback(); setVoiceState('idle'); return; } // barge-in
+    if (state === 'thinking') {
+      // There is no cancel in the inference stack, so the work keeps running —
+      // but the user is never trapped. Abandon the turn; the result is discarded
+      // when it lands.
+      turns.cancel();         // the in-flight turn is no longer current
+      busy = false;
+      clearTimeout(watchdog);
+      showError('Turn cancelled.');
+      setVoiceState('idle');
+      return;
+    }
+    // idle, or any state we did not anticipate: self-heal and listen.
+    if (busy) { busy = false; turns.cancel(); }
+    stopPlayback();
+    beginListening();
+  });
+  orb.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); orb.click(); } });
+
+  // Leaving the tab must release the mic — otherwise the OS keeps showing the
+  // recording indicator and the capture keeps running in the background.
+  voiceCleanup = () => {
+    if (state === 'listening') { cc.stop(); level = 0; }
+    stopPlayback();
+    // Leaving the tab must also abandon a turn that is still transcribing or
+    // generating. Nothing in the inference stack cancels, so that turn keeps
+    // running; without this it would later write into the Voice DOM and start
+    // speaking out loud while the user is on another tab. Superseding it makes
+    // every one of its remaining guards fail closed.
+    turns.cancel();
+    clearTimeout(watchdog);
+    busy = false;
+    if (state !== 'idle') setVoiceState('idle');
+  };
+  setVoiceState('idle');
 }
+let voiceCleanup = null;
 function wireVad() {
   const btn = $('vadbtn'); const cc = captureController(); let vadHandle = null; let frames = 0, speech = 0;
   $('vadth').addEventListener('input', async () => { $('vadthval').textContent = $('vadth').value; if (vadHandle != null) await ra.vadSetThreshold(vadHandle, parseFloat($('vadth').value)); });
@@ -624,7 +1231,8 @@ async function selfTest() {
     conv.messages.push({ role: 'assistant', content: '' }); // exercise chat plumbing minimally
     conv.messages.pop();
     let reply = '';
-    await ra.generateStream(await llm(), buildPrompt([], 'Say hello in one short sentence.'), { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; });
+    const hello = await buildPrompt([], 'Say hello in one short sentence.');
+    await withLlm((h) => ra.generateStream(h, hello, { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; }));
     if (!reply.trim()) throw new Error('empty chat reply');
     log('[selftest] chat OK: ' + JSON.stringify(reply.trim().slice(0, 70)));
 
@@ -632,8 +1240,9 @@ async function selfTest() {
     if (typeof obj.name !== 'string' || typeof obj.age !== 'number' || !Array.isArray(obj.interests)) throw new Error('structured shape wrong');
     log('[selftest] structured OK: ' + JSON.stringify(obj));
 
-    const call = await runTools('What is the weather in Tokyo in celsius?');
+    const call = await runTools('What time is it right now?');
     if (!TOOLS.some((t) => t.name === call.name)) throw new Error('bad tool');
+    if (call.result == null) throw new Error('tool did not execute');
     log('[selftest] tools OK: ' + call.name + ' ' + JSON.stringify(call.arguments));
 
     const close = await runEmbeddings('a cat sat on the mat', 'a kitten rested on the rug');
@@ -642,9 +1251,9 @@ async function selfTest() {
     log(`[selftest] embeddings OK: close=${close.toFixed(3)} far=${far.toFixed(3)}`);
 
     const cat = await ra.catalog();
-    if (!cat['qwen2.5-0.5b']) throw new Error('catalog missing');
+    if (!cat['qwen3.5-0.8b']) throw new Error('catalog missing');
     const status = await ra.modelStatus();
-    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen2.5-0.5b'].downloaded);
+    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen3.5-0.8b'].downloaded);
 
     const image = new URLSearchParams(location.search).get('image');
     if (image) { const c = await runVision(image); if (!c || c.length < 3) throw new Error('empty caption'); log('[selftest] vision OK: ' + JSON.stringify(c.slice(0, 70))); }
@@ -665,9 +1274,20 @@ async function selfTest() {
 const IS_SELFTEST = new URLSearchParams(location.search).get('selftest') === '1';
 (async () => {
   await ra.ready();
-  await ra.initialize();
+  // Backend creds (telemetry/auth) come from the main process's .env reader; a
+  // desktop-control-plane build uses them, an inference-only build ignores them.
+  let backendCfg;
+  try { backendCfg = await window.appStore.backendConfig(); } catch { backendCfg = undefined; }
+  await ra.initialize(undefined, undefined, backendCfg);
   if (!IS_SELFTEST) {
-    try { const s = await store.loadSettings(); if (s && s.systemPrompt) settings = { ...settings, ...s }; } catch { /* ignore */ }
+    // Accept ANY persisted object — gating on systemPrompt discarded saved
+    // settings whose prompt was cleared, and would drop the model choices too.
+    try {
+      const s = await store.loadSettings();
+      // migrateSettings upgrades a persisted copy of a SUPERSEDED default while
+      // leaving anything the user actually customised alone.
+      if (s && typeof s === 'object') settings = store.migrateSettings(s, settings);
+    } catch { /* ignore */ }
     try { const c = await store.loadConversations(); if (c && Array.isArray(c.conversations)) { conversations = c.conversations; nextConvId = c.nextConvId || conversations.length + 1; activeId = conversations[0] ? conversations[0].id : null; } } catch { /* ignore */ }
     try { const cm = await store.loadCustomModels(); if (Array.isArray(cm)) customModels = cm; } catch { /* ignore */ }
   }

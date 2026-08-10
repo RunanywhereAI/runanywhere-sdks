@@ -36,12 +36,14 @@ extension RARAGConfiguration {
 // MARK: - RARAGQueryOptions
 
 extension RARAGQueryOptions {
-    /// Convenience factory that wraps the generated `defaults()` with a
-    /// required question string. Question is excluded from the proto
-    /// annotation because it has no semantic default (caller-supplied).
+    /// Convenience factory for the required query string. `question` was
+    /// renamed `query` (idl/rag.proto). `RARAGQueryOptions` has no generated
+    /// zero-arg `defaults()` (its only field-level annotation is
+    /// `rac_required`, not `rac_default`), so this builds the message
+    /// directly rather than wrapping a non-existent generated factory.
     public static func defaults(question: String) -> RARAGQueryOptions {
-        var options = RARAGQueryOptions.defaults()
-        options.question = question
+        var options = RARAGQueryOptions()
+        options.query = question
         return options
     }
 }
@@ -49,7 +51,10 @@ extension RARAGQueryOptions {
 // MARK: - RARAGResult
 
 extension RARAGResult {
-    public var totalTime: TimeInterval { TimeInterval(totalTimeMs) / 1000.0 }
+    /// `totalTimeMs` was deleted outright (idl/rag.proto); the sum of the
+    /// two surviving measured phases (retrieval + generation) is the
+    /// closest equivalent — never derived by subtraction from a wall clock.
+    public var totalTime: TimeInterval { TimeInterval(retrievalTimeMs + generationTimeMs) / 1000.0 }
 }
 
 // MARK: - RARAGStatistics

@@ -161,21 +161,21 @@ int test_cache_refresh_policy() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache One");
     ASSERT_EQ(fake.call_count, 1);
     ASSERT_TRUE(fake.saw_requires_auth);
 
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(false), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache One");
     ASSERT_EQ(fake.call_count, 1);
 
     rac_model_assignment_set_cache_timeout(0);
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(false), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache Two");
     ASSERT_EQ(fake.call_count, 2);
@@ -215,7 +215,7 @@ int test_metadata_normalization_into_model_info() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
 
     const auto& model = result.models().models(0);
@@ -227,13 +227,16 @@ int test_metadata_normalization_into_model_info() {
     ASSERT_EQ(model.preferred_framework(), runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     ASSERT_EQ(model.category(), runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     ASSERT_EQ(model.source(), runanywhere::v1::MODEL_SOURCE_REMOTE);
+    // ModelInfo.artifact_type (top-level) was reserved -- the artifact oneof
+    // (single_file/archive/multi_file/built_in) is the only declaration of
+    // bundle shape now; normalize_assignment_model() defaults an unset oneof
+    // to single_file.
     ASSERT_TRUE(model.has_single_file());
-    ASSERT_TRUE(model.has_artifact_type());
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
+    ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
     ASSERT_TRUE(model.has_registry_status());
     ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
-    ASSERT_TRUE(model.has_is_downloaded());
-    ASSERT_TRUE(!model.is_downloaded());
+    // ModelInfo.is_downloaded (tag 32) was reserved -- registry_status is now
+    // the only downloaded-ness signal (REGISTERED means not downloaded).
     ASSERT_TRUE(model.has_is_available());
     ASSERT_TRUE(!model.is_available());
     ASSERT_TRUE(model.has_metadata());
@@ -261,7 +264,7 @@ int test_json_diarization_and_segmentation_categories() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 4);
     ASSERT_EQ(result.models().models(0).category(),
               runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
@@ -287,7 +290,7 @@ int test_no_config_no_transport_returns_empty_result() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 0);
     ASSERT_TRUE(result.warnings_size() >= 1);
     ASSERT_TRUE(result.warnings(0).find("transport") != std::string::npos);

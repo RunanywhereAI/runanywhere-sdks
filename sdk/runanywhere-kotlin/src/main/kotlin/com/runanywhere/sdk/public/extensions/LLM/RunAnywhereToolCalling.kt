@@ -30,28 +30,33 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOrchestrator
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
-import com.runanywhere.sdk.public.extensions.LLM.defaults
 import com.runanywhere.sdk.public.extensions.LLM.toToolCallingOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 
+@Deprecated("Use RunAnywhere.llm.tools.register(tool, executor).")
 suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
     ToolCallingOrchestrator.registerTool(definition, executor)
 }
 
+@Deprecated("Use RunAnywhere.llm.tools.unregister(name).")
 suspend fun RunAnywhere.unregisterTool(toolName: String) {
     ToolCallingOrchestrator.unregisterTool(toolName)
 }
 
+@Deprecated("Use RunAnywhere.llm.tools.list().")
 suspend fun RunAnywhere.getRegisteredTools(): List<ToolDefinition> =
     ToolCallingOrchestrator.getRegisteredTools()
 
+@Deprecated("Unregister tools individually with RunAnywhere.llm.tools.unregister(name).")
 suspend fun RunAnywhere.clearTools() {
     ToolCallingOrchestrator.clearTools()
 }
 
+@Deprecated("Tool execution is driven by RunAnywhere.llm.generate when tools are registered.")
 suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult =
     ToolCallingOrchestrator.executeTool(toolCall)
 
+@Deprecated("Use RunAnywhere.llm.generate with LlmOptions.tools and LlmOptions.toolChoice.")
 suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: RALLMGenerationOptions?,
@@ -78,7 +83,7 @@ suspend fun RunAnywhere.generateWithTools(
     val baseToolOptions =
         toolOptions
             ?: options?.toToolCallingOptions()
-            ?: RAToolCallingOptions.defaults()
+            ?: RAToolCallingOptions()
     // Apply `toolChoice` / `forcedToolName` overrides on top of the resolved
     // options. Mirrors Swift's `RunAnywhere+ToolCalling.swift` `tcOpts`
     // mutation. These live on `ToolCallingOptions` proto (fields 13/14) so

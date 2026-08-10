@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:runanywhere/runanywhere.dart'
+import 'package:runanywhere/runanywhere_protos.dart'
     show
         ToolCallFormatName,
         ToolCallingOptions,
@@ -22,16 +22,17 @@ void main() {
     });
 
     test('session request carries execution and validation policy', () {
+      // `ToolCallingSessionCreateRequest.validateCalls` moved onto the
+      // nested `ToolCallingOptions.validateCalls` (idl/tool_calling.proto
+      // collapsed every generation knob onto `options`).
       final request = ToolCallingSessionCreateRequest(
-        autoExecute: false,
-        replaceSystemPrompt: true,
-        requireJsonArguments: true,
+        prompt: 'call the tool',
+        options: ToolCallingOptions(validateCalls: false),
       );
 
-      expect(request.hasAutoExecute(), isTrue);
-      expect(request.autoExecute, isFalse);
-      expect(request.replaceSystemPrompt, isTrue);
-      expect(request.requireJsonArguments, isTrue);
+      expect(request.options.hasValidateCalls(), isTrue);
+      expect(request.options.validateCalls, isFalse);
+      expect(request.prompt, 'call the tool');
     });
   });
 }

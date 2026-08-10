@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   synthesize: vi.fn(),
   generate: vi.fn(),
   cancelGeneration: vi.fn(),
-  detectVoiceAuto: vi.fn(),
+  detectVoice: vi.fn(),
   vadLifecycleAvailable: false,
   sttAvailable: true,
   ttsAvailable: true,
@@ -35,7 +35,7 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+TextGeneration', () => ({
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+VAD', () => ({
   VAD: {
     supportsLifecycleProtoVAD: () => mocks.vadLifecycleAvailable,
-    detectVoiceAuto: mocks.detectVoiceAuto,
+    detectVoice: mocks.detectVoice,
   },
 }));
 
@@ -91,7 +91,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
     mocks.sttAvailable = true;
     mocks.ttsAvailable = true;
     mocks.llmAvailable = true;
-    mocks.detectVoiceAuto.mockReset().mockResolvedValue({
+    mocks.detectVoice.mockReset().mockResolvedValue({
       isSpeech: true,
       confidence: 0.99,
       durationMs: 1_000,
@@ -103,34 +103,47 @@ describe('CrossWasmVoiceAgentProvider', () => {
   it('keeps energy and model-backed VAD thresholds in their native units', async () => {
     mocks.vadLifecycleAvailable = true;
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
+    // `VoiceAgentComposeConfig` has no `vadSampleRate`/`vadFrameLength`/
+    // `vadEnergyThreshold`/`sessionId` fields -- VAD tuning nests under
+    // `vadConfig: VADConfiguration` (sampleRate/frameLengthMs/
+    // activationThreshold), and `sessionId` was deleted outright (Web-only
+    // session bookkeeping lives in the provider, not the wire config).
     await provider.initializeVoiceAgent({
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.005,
-      sessionId: 'model-vad',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.005,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     });
 
     await provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
 
-    expect(mocks.detectVoiceAuto).toHaveBeenCalledOnce();
-    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).toMatchObject({
+    expect(mocks.detectVoice).toHaveBeenCalledOnce();
+    expect(mocks.detectVoice.mock.calls[0]?.[1]).toMatchObject({
       modelId: `model-${ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION}`,
       config: {
         sampleRate: 16_000,
         frameLengthMs: 100,
-        threshold: 0.5,
+        activationThreshold: 0.5,
       },
     });
-    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).not.toHaveProperty('threshold');
+    expect(mocks.detectVoice.mock.calls[0]?.[1]).not.toHaveProperty('activationThreshold');
   });
 
   it('applies the spoken system prompt and bounded conversational history', async () => {
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
     await provider.initializeVoiceAgent({
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.015,
-      sessionId: 'conversation',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.015,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     });
     const audio = new Float32Array(16_000).fill(0.2);
 
@@ -144,7 +157,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
     // which was Web's own voice-agent cap while the other four platforms
     // inherited 96 from the C++ orchestrator; re-pinning a number here would
     // just recreate that divergence in the test suite.
-    expect(firstOptions.maxTokens).toBe(voiceAgentDefaults.maxTokens);
+    expect(firstOptions.maxOutputTokens).toBe(voiceAgentDefaults.maxTokens);
     expect(firstOptions.history).toEqual([]);
     expect(secondOptions.history).toHaveLength(2);
     expect(secondOptions.history.map((message: { content: string }) => message.content))
@@ -155,17 +168,23 @@ describe('CrossWasmVoiceAgentProvider', () => {
     const pending = deferred<typeof transcript>();
     mocks.transcribe.mockReturnValueOnce(pending.promise);
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
+    // `VoiceAgentComposeConfig` has no `sessionId` field -- session identity
+    // is Web-provider-internal bookkeeping now, not part of the wire config.
     const config = {
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.015,
-      sessionId: 'old',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.015,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     };
     await provider.initializeVoiceAgent(config);
     const oldTurn = provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
 
     await Promise.resolve(provider.cleanupVoiceAgent());
-    await provider.initializeVoiceAgent({ ...config, sessionId: 'new' });
+    await provider.initializeVoiceAgent({ ...config });
     pending.resolve(transcript);
 
     await expect(oldTurn).rejects.toThrow(/session stopped or restarted/);

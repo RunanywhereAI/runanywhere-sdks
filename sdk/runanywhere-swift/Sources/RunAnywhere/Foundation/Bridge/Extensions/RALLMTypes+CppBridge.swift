@@ -17,41 +17,45 @@ public extension RALLMGenerationOptions {
     // point they happened to use.
 
     init(
-        maxTokens: Int = Int(RALLMGenerationOptions.defaults().maxTokens),
+        maxOutputTokens: Int = Int(RALLMGenerationOptions.defaults().maxOutputTokens),
         temperature: Float = RALLMGenerationOptions.defaults().temperature,
         topP: Float = RALLMGenerationOptions.defaults().topP,
         topK: Int = Int(RALLMGenerationOptions.defaults().topK),
-        repetitionPenalty: Float = RALLMGenerationOptions.defaults().repetitionPenalty,
+        // idl/llm_options.proto renamed repetition_penalty -> repeat_penalty
+        // (industry name: llama.cpp / Ollama both spell it repeat_penalty).
+        repeatPenalty: Float = RALLMGenerationOptions.defaults().repeatPenalty,
         stopSequences: [String] = [],
-        streamingEnabled: Bool = false,
         preferredFramework: RAInferenceFramework = .unspecified,
         systemPrompt: String? = nil,
+        reasoning: RAReasoningOptions? = nil,
         structuredOutput: RAStructuredOutputOptions? = nil
     ) {
         var options = RALLMGenerationOptions()
-        options.maxTokens = Int32(maxTokens)
+        options.maxOutputTokens = Int32(maxOutputTokens)
         options.temperature = temperature
         options.topP = topP
         options.topK = Int32(topK)
-        options.repetitionPenalty = repetitionPenalty
+        options.repeatPenalty = repeatPenalty
         options.stopSequences = stopSequences
-        options.streamingEnabled = streamingEnabled
         options.preferredFramework = preferredFramework
         if let prompt = systemPrompt { options.systemPrompt = prompt }
+        if let reasoning { options.reasoning = reasoning }
         if let so = structuredOutput { options.structuredOutput = so }
         self = options
     }
 
+    // RALLMGenerateRequest.prompt was deleted outright (idl/llm_service.proto):
+    // the single request envelope now carries `messages`
+    // ([RAChatMessage], oldest first, ending with the turn the model must
+    // answer) instead of a bare prompt string + separate history array.
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
-        request.prompt = prompt
-        // Commons already classifies streamed output into ANSWER / THOUGHT
-        // token kinds and resolves a model's thinking tags from the registry,
-        // so a request-local thinking pattern is NOT required. Surface thought
-        // events whenever thinking is enabled (i.e. not explicitly disabled) so
-        // default catalog models still stream reasoning.
-        request.emitThoughts = !disableThinking
-        // LLM generation controls have one canonical wire location.
+        var userTurn = RAChatMessage()
+        userTurn.role = .user
+        userTurn.content = prompt
+        request.messages = [userTurn]
+        // LLM generation controls have one canonical wire location; thought
+        // emission is governed by options.reasoning.includeInOutput.
         request.options = self
         return request
     }
@@ -66,9 +70,11 @@ public extension RALLMGenerationOptions {
 // path remains. Deleted per swift.md SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
 
 public extension RALLMGenerationResult {
-    var tokensUsed: Int { Int(tokensGenerated) }
+    var tokensUsed: Int { Int(usage.outputTokens) }
     var latencyMs: TimeInterval { generationTimeMs }
-    var timeToFirstTokenMs: Double? { hasTtftMs ? ttftMs : nil }
+    // ttftMs moved onto the shared RATokenUsage (token_usage.proto) and lost
+    // its explicit-presence tracking there (plain Int64, 0 = not reported).
+    var timeToFirstTokenMs: Double? { usage.ttftMs > 0 ? Double(usage.ttftMs) : nil }
 }
 
 // MARK: - RAThinkingTagPattern: defaults

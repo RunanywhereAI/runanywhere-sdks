@@ -11,9 +11,10 @@ import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.fromFilePath
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMGenerationRequest
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -55,14 +56,18 @@ class NpuLoadOnlyTest {
                     Thread.sleep(500)
                 }
                 val load = withTimeout(180_000) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = modelId, validate_availability = true)) }
-                if (!load.success) { line = "NPU_E2E id=$modelId phase=load status=FAIL detail=\"${load.error_message}\""; return@runBlocking }
+                if (load.error != null) { line = "NPU_E2E id=$modelId phase=load status=FAIL detail=\"${load.error?.message}\""; return@runBlocking }
                 if (mode == "llm") {
-                    val opts = RALLMGenerationOptions(max_tokens = maxNew, temperature = 0f, top_p = 1f)
+                    val opts = RALLMGenerationOptions(max_output_tokens = maxNew, temperature = 0f, top_p = 1f)
                     val sb = StringBuilder(); var inTok = 0; var outTok = 0
                     withTimeout(180_000) {
                         RunAnywhere.generateStream(text, opts).collect { ev ->
                             ev.token?.let { if (it.isNotEmpty()) sb.append(it) }
-                            if (ev.is_final) ev.result?.let { inTok = it.prompt_tokens; outTok = it.completion_tokens }
+                            // LLMStreamEvent.is_final was deleted outright; event_kind
+                            // (COMPLETED/ERROR) is the sole terminal discriminator now.
+                            if (ev.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
+                                ev.result?.let { inTok = it.usage?.input_tokens ?: 0; outTok = it.usage?.output_tokens ?: 0 }
+                            }
                         }
                     }
                     val out = sb.toString().trim().replace("\n", " ")
@@ -80,13 +85,22 @@ class NpuLoadOnlyTest {
                     val sys = args.getString("sys")?.takeIf { it.isNotBlank() }
                     val r = withTimeout(180_000) {
                         RunAnywhere.processImage(
-                            RAVLMImage.fromFilePath(f.absolutePath),
-                            RAVLMGenerationOptions(prompt = text, system_prompt = sys, max_tokens = maxNew, temperature = 0f, top_p = 0f, top_k = 0),
+                            RAVLMGenerationRequest(
+                                images = listOf(RAVLMImage.fromFilePath(f.absolutePath)),
+                                prompt = text,
+                                options = RALLMGenerationOptions(
+                                    system_prompt = sys,
+                                    max_output_tokens = maxNew,
+                                    temperature = 0f,
+                                    top_p = 0f,
+                                    top_k = 0,
+                                ),
+                            ),
                         )
                     }
                     val out = r.text.trim().replace("\n", " ")
                     line = "NPU_E2E id=$modelId phase=done status=PASS framework=${load.framework.name} " +
-                        "sys=${if (sys != null) "Y" else "N"} imgTok=${r.image_tokens} outTok=${r.completion_tokens} text=\"${out.take(240)}\""
+                        "sys=${if (sys != null) "Y" else "N"} imgTok=${r.image_tokens} outTok=${r.usage?.output_tokens ?: 0} text=\"${out.take(240)}\""
                     Log.i(tag, line); assertTrue(line, line.contains("status=PASS")); return@runBlocking
                 }
                 if (mode == "stt") {

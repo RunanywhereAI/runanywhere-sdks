@@ -8,12 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — ergonomic solution configs.
+// RunAnywhere IDL — prebuilt solution configs.
 //
-// Solution configs are sugar on top of PipelineSpec. The core converts each
-// solution config into a PipelineSpec internally. Frontends use these for
-// the "20-line developer API" — callers never construct PipelineSpec directly
-// for common use cases.
+// Consumed as the shape of the YAML solution config read by config_loader.cpp,
+// not as a wire message. Solution lifecycle verbs mirror rac_solution_handle_t.
 
 import SwiftProtobuf
 
@@ -27,19 +25,23 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionType — discriminator for the kind of solution backing a
-/// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
-/// oneof arms so frontends can switch on a single enum value rather than
-/// inspecting the oneof shape.
-/// ---------------------------------------------------------------------------
+/// Frontends switch on the SolutionConfig oneof case. This enum exists only
+/// for logs and handles, and its numbers now match the oneof tags.
 public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
+
+  /// SolutionConfig.voice_agent = 1
   case voiceAgent // = 1
+
+  /// SolutionConfig.rag         = 2
   case rag // = 2
-  case timeSeries // = 4
-  case agentLoop // = 5
+
+  /// SolutionConfig.agent_loop  = 4
+  case agentLoop // = 4
+
+  /// SolutionConfig.time_series = 5
+  case timeSeries // = 5
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -51,8 +53,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 0: self = .unspecified
     case 1: self = .voiceAgent
     case 2: self = .rag
-    case 4: self = .timeSeries
-    case 5: self = .agentLoop
+    case 4: self = .agentLoop
+    case 5: self = .timeSeries
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -62,8 +64,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .unspecified: return 0
     case .voiceAgent: return 1
     case .rag: return 2
-    case .timeSeries: return 4
-    case .agentLoop: return 5
+    case .agentLoop: return 4
+    case .timeSeries: return 5
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -73,8 +75,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     .unspecified,
     .voiceAgent,
     .rag,
-    .timeSeries,
     .agentLoop,
+    .timeSeries,
   ]
 
 }
@@ -82,14 +84,10 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
 public nonisolated enum RAAudioSource: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
-
-  /// Platform mic (default)
   case microphone // = 1
-
-  /// Path supplied in audio_file_path
   case file // = 2
 
-  /// Frontend feeds frames via C ABI
+  /// Frontend feeds frames through the C ABI
   case callback // = 3
   case UNRECOGNIZED(Int)
 
@@ -131,10 +129,10 @@ public nonisolated enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
-  /// default, in-process HNSW
+  /// in-process HNSW
   case usearch // = 1
 
-  /// remote, server deployments only
+  /// server deployments only, no on-device path
   case pgvector // = 2
   case UNRECOGNIZED(Int)
 
@@ -169,7 +167,6 @@ public nonisolated enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// Top-level union dispatched to the matching solution loader.
 public nonisolated struct RASolutionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -222,35 +219,18 @@ public nonisolated struct RASolutionConfig: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionHandle — opaque, serialisable descriptor for a started solution.
-///
-/// The native side owns a `rac_solution_handle_t`; this message is the
-/// language-agnostic shape that frontends (Swift `SolutionHandle` class,
-/// Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
-/// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
-/// are issued against the C handle keyed by `handle_id`.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RASolutionHandle: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Stable, opaque identifier minted by the core for this solution
-  /// instance. Used as the lookup key for lifecycle calls.
   public var handleID: String = String()
 
-  /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "time_series", "agent_loop". Free-form for
-  /// forward-compat with future solutions; canonical values match the
-  /// `SolutionType` enum names lower-cased.
   public var solutionType: String = String()
 
-  /// Wall-clock creation timestamp (ms since Unix epoch).
   public var createdAtMs: Int64 = 0
 
-  /// Optional engine-specific state string (e.g. "created", "running",
-  /// "stopped"). Empty when the host hasn't surfaced state.
+  /// Engine-specific, e.g. "running" or "stopped".
   public var state: String {
     get {_state ?? String()}
     set {_state = newValue}
@@ -267,196 +247,99 @@ public nonisolated struct RASolutionHandle: Sendable {
   fileprivate var _state: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// VoiceAgent — the canonical streaming voice AI loop.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAVoiceAgentConfig: @unchecked Sendable {
+public nonisolated struct RAVoiceAgentConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Model identifiers — resolved against the model registry.
-  public var llmModelID: String {
-    get {_storage._llmModelID}
-    set {_uniqueStorage()._llmModelID = newValue}
-  }
+  public var llmModelID: String = String()
 
-  /// e.g. "whisper-base"
-  public var sttModelID: String {
-    get {_storage._sttModelID}
-    set {_uniqueStorage()._sttModelID = newValue}
-  }
+  public var sttModelID: String = String()
 
-  /// e.g. "kokoro"
-  public var ttsModelID: String {
-    get {_storage._ttsModelID}
-    set {_uniqueStorage()._ttsModelID = newValue}
-  }
+  public var ttsModelID: String = String()
 
-  /// e.g. "silero-v5"
-  public var vadModelID: String {
-    get {_storage._vadModelID}
-    set {_uniqueStorage()._vadModelID = newValue}
-  }
+  public var vadModelID: String = String()
 
-  /// pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-  /// (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-  /// fall back to using tts_model_id as the voice id — correct for
-  /// single-voice engines, wrong for multi-voice. Aligns the caller-facing
-  /// VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-  /// (voice_agent_service.proto:214) which already exposes tts_voice_id.
-  public var ttsVoiceID: String {
-    get {_storage._ttsVoiceID}
-    set {_uniqueStorage()._ttsVoiceID = newValue}
-  }
+  public var ttsVoiceID: String = String()
 
-  /// Audio configuration.
-  public var sampleRateHz: Int32 {
-    get {_storage._sampleRateHz}
-    set {_uniqueStorage()._sampleRateHz = newValue}
-  }
+  public var sampleRateHz: Int32 = 0
 
-  /// default 20
-  public var chunkMs: Int32 {
-    get {_storage._chunkMs}
-    set {_uniqueStorage()._chunkMs = newValue}
-  }
+  public var chunkMs: Int32 = 0
 
-  public var audioSource: RAAudioSource {
-    get {_storage._audioSource}
-    set {_uniqueStorage()._audioSource = newValue}
-  }
+  /// audio_file_path applies when audio_source is FILE.
+  public var audioSource: RAAudioSource = .unspecified
 
-  /// Absolute path to an audio file. Required when `audio_source` is
-  /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
-  public var audioFilePath: String {
-    get {_storage._audioFilePath}
-    set {_uniqueStorage()._audioFilePath = newValue}
-  }
+  public var audioFilePath: String = String()
 
-  /// Barge-in behavior.
+  /// Unset means enabled.
   public var enableBargeIn: Bool {
-    get {_storage._enableBargeIn ?? false}
-    set {_uniqueStorage()._enableBargeIn = newValue}
+    get {_enableBargeIn ?? false}
+    set {_enableBargeIn = newValue}
   }
   /// Returns true if `enableBargeIn` has been explicitly set.
-  public var hasEnableBargeIn: Bool {_storage._enableBargeIn != nil}
+  public var hasEnableBargeIn: Bool {self._enableBargeIn != nil}
   /// Clears the value of `enableBargeIn`. Subsequent reads from it will return its default value.
-  public mutating func clearEnableBargeIn() {_uniqueStorage()._enableBargeIn = nil}
+  public mutating func clearEnableBargeIn() {self._enableBargeIn = nil}
 
-  /// default 200
-  public var bargeInThresholdMs: Int32 {
-    get {_storage._bargeInThresholdMs}
-    set {_uniqueStorage()._bargeInThresholdMs = newValue}
-  }
+  public var bargeInThresholdMs: Int32 = 0
 
-  /// LLM behavior.
-  public var systemPrompt: String {
-    get {_storage._systemPrompt}
-    set {_uniqueStorage()._systemPrompt = newValue}
+  public var generation: RALLMGenerationOptions {
+    get {_generation ?? RALLMGenerationOptions()}
+    set {_generation = newValue}
   }
+  /// Returns true if `generation` has been explicitly set.
+  public var hasGeneration: Bool {self._generation != nil}
+  /// Clears the value of `generation`. Subsequent reads from it will return its default value.
+  public mutating func clearGeneration() {self._generation = nil}
 
-  public var maxContextTokens: Int32 {
-    get {_storage._maxContextTokens}
-    set {_uniqueStorage()._maxContextTokens = newValue}
-  }
+  public var maxContextTokens: Int32 = 0
 
-  public var temperature: Float {
-    get {_storage._temperature}
-    set {_uniqueStorage()._temperature = newValue}
-  }
-
-  /// Emit partial transcripts as UserSaidEvent{is_final=false}.
-  public var emitPartials: Bool {
-    get {_storage._emitPartials}
-    set {_uniqueStorage()._emitPartials = newValue}
-  }
-
-  /// Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
-  public var emitThoughts: Bool {
-    get {_storage._emitThoughts}
-    set {_uniqueStorage()._emitThoughts = newValue}
-  }
-
-  /// Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-  /// oneof arm; provided so callers that pass this message standalone (or
-  /// log it) can read a single discriminator. Defaults to UNSPECIFIED.
-  public var typeKind: RASolutionType {
-    get {_storage._typeKind ?? .unspecified}
-    set {_uniqueStorage()._typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {_storage._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {_uniqueStorage()._typeKind = nil}
+  /// Emit partial transcripts as non-final user-said events.
+  public var emitPartials: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _enableBargeIn: Bool? = nil
+  fileprivate var _generation: RALLMGenerationOptions? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// RAG — retrieve → rerank → prompt → LLM.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// e.g. "bge-small-en-v1.5"
   public var embedModelID: String = String()
 
-  /// e.g. "bge-reranker-v2-m3"
   public var rerankModelID: String = String()
 
   public var llmModelID: String = String()
 
-  /// Vector store — USearch (in-process HNSW, default) or remote pgvector.
   public var vectorStore: RAVectorStore = .unspecified
 
-  /// Local path for USearch index
   public var vectorStorePath: String = String()
 
-  /// default 24
+  /// Retrieve this many candidates, then keep this many after reranking.
   public var retrieveK: Int32 = 0
 
-  /// default 6
   public var rerankTop: Int32 = 0
 
-  /// BM25 parameters.
+  /// BM25 term-saturation and length-normalization parameters.
   public var bm25K1: Float = 0
 
-  /// default 0.75
   public var bm25B: Float = 0
 
-  /// RRF fusion parameter.
+  /// Reciprocal-rank-fusion smoothing constant.
   public var rrfK: Int32 = 0
 
-  /// Prompt template. Supports {{context}} and {{query}} placeholders.
   public var promptTemplate: String = String()
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Agent loop — multi-turn LLM with tool calling.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAAgentLoopConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -468,26 +351,13 @@ public nonisolated struct RAAgentLoopConfig: Sendable {
 
   public var tools: [RAToolSpec] = []
 
-  /// default 10
   public var maxIterations: Int32 = 0
 
   public var maxContextTokens: Int32 = 0
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 public nonisolated struct RAToolSpec: Sendable {
@@ -499,7 +369,7 @@ public nonisolated struct RAToolSpec: Sendable {
 
   public var description_p: String = String()
 
-  /// Parameters schema, OpenAI-compatible
+  /// OpenAI-compatible parameters schema.
   public var jsonSchema: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -507,9 +377,6 @@ public nonisolated struct RAToolSpec: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Time series — window + anomaly_detect + generate_text.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RATimeSeriesConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -519,28 +386,16 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 
   public var llmModelID: String = String()
 
-  /// Samples per window
+  /// Samples per window, and how far the window advances each step.
   public var windowSize: Int32 = 0
 
   public var stride: Int32 = 0
 
   public var anomalyThreshold: Float = 0
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -548,7 +403,7 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASolutionType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{2}\u{2}SOLUTION_TYPE_TIME_SERIES\0\u{1}SOLUTION_TYPE_AGENT_LOOP\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{2}\u{2}SOLUTION_TYPE_AGENT_LOOP\0\u{1}SOLUTION_TYPE_TIME_SERIES\0")
 }
 
 nonisolated extension RAAudioSource: SwiftProtobuf._ProtoNameProviding {
@@ -561,7 +416,7 @@ nonisolated extension RAVectorStore: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SolutionConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{4}\u{2}agent_loop\0\u{3}time_series\0\u{b}wake_word\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{4}\u{2}agent_loop\0\u{3}time_series\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -711,181 +566,98 @@ nonisolated extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{3}system_prompt\0\u{3}max_context_tokens\0\u{1}temperature\0\u{3}emit_partials\0\u{3}emit_thoughts\0\u{3}audio_file_path\0\u{3}type_kind\0\u{3}tts_voice_id\0")
-
-  fileprivate class _StorageClass {
-    var _llmModelID: String = String()
-    var _sttModelID: String = String()
-    var _ttsModelID: String = String()
-    var _vadModelID: String = String()
-    var _ttsVoiceID: String = String()
-    var _sampleRateHz: Int32 = 0
-    var _chunkMs: Int32 = 0
-    var _audioSource: RAAudioSource = .unspecified
-    var _audioFilePath: String = String()
-    var _enableBargeIn: Bool? = nil
-    var _bargeInThresholdMs: Int32 = 0
-    var _systemPrompt: String = String()
-    var _maxContextTokens: Int32 = 0
-    var _temperature: Float = 0
-    var _emitPartials: Bool = false
-    var _emitThoughts: Bool = false
-    var _typeKind: RASolutionType? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _llmModelID = source._llmModelID
-      _sttModelID = source._sttModelID
-      _ttsModelID = source._ttsModelID
-      _vadModelID = source._vadModelID
-      _ttsVoiceID = source._ttsVoiceID
-      _sampleRateHz = source._sampleRateHz
-      _chunkMs = source._chunkMs
-      _audioSource = source._audioSource
-      _audioFilePath = source._audioFilePath
-      _enableBargeIn = source._enableBargeIn
-      _bargeInThresholdMs = source._bargeInThresholdMs
-      _systemPrompt = source._systemPrompt
-      _maxContextTokens = source._maxContextTokens
-      _temperature = source._temperature
-      _emitPartials = source._emitPartials
-      _emitThoughts = source._emitThoughts
-      _typeKind = source._typeKind
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}tts_voice_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}audio_file_path\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{1}generation\0\u{3}max_context_tokens\0\u{3}emit_partials\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._llmModelID) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._sttModelID) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._ttsModelID) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._vadModelID) }()
-        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._sampleRateHz) }()
-        case 6: try { try decoder.decodeSingularInt32Field(value: &_storage._chunkMs) }()
-        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._audioSource) }()
-        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._enableBargeIn) }()
-        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._bargeInThresholdMs) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._maxContextTokens) }()
-        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
-        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._emitPartials) }()
-        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._emitThoughts) }()
-        case 15: try { try decoder.decodeSingularStringField(value: &_storage._audioFilePath) }()
-        case 16: try { try decoder.decodeSingularEnumField(value: &_storage._typeKind) }()
-        case 17: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceID) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.llmModelID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sttModelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.ttsModelID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.vadModelID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.ttsVoiceID) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.chunkMs) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.audioSource) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.audioFilePath) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self._enableBargeIn) }()
+      case 11: try { try decoder.decodeSingularInt32Field(value: &self.bargeInThresholdMs) }()
+      case 12: try { try decoder.decodeSingularMessageField(value: &self._generation) }()
+      case 13: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
+      case 14: try { try decoder.decodeSingularBoolField(value: &self.emitPartials) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._llmModelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._llmModelID, fieldNumber: 1)
-      }
-      if !_storage._sttModelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._sttModelID, fieldNumber: 2)
-      }
-      if !_storage._ttsModelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._ttsModelID, fieldNumber: 3)
-      }
-      if !_storage._vadModelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._vadModelID, fieldNumber: 4)
-      }
-      if _storage._sampleRateHz != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._sampleRateHz, fieldNumber: 5)
-      }
-      if _storage._chunkMs != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._chunkMs, fieldNumber: 6)
-      }
-      if _storage._audioSource != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._audioSource, fieldNumber: 7)
-      }
-      try { if let v = _storage._enableBargeIn {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
-      } }()
-      if _storage._bargeInThresholdMs != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._bargeInThresholdMs, fieldNumber: 9)
-      }
-      if !_storage._systemPrompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._systemPrompt, fieldNumber: 10)
-      }
-      if _storage._maxContextTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxContextTokens, fieldNumber: 11)
-      }
-      if _storage._temperature.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 12)
-      }
-      if _storage._emitPartials != false {
-        try visitor.visitSingularBoolField(value: _storage._emitPartials, fieldNumber: 13)
-      }
-      if _storage._emitThoughts != false {
-        try visitor.visitSingularBoolField(value: _storage._emitThoughts, fieldNumber: 14)
-      }
-      if !_storage._audioFilePath.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._audioFilePath, fieldNumber: 15)
-      }
-      try { if let v = _storage._typeKind {
-        try visitor.visitSingularEnumField(value: v, fieldNumber: 16)
-      } }()
-      if !_storage._ttsVoiceID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._ttsVoiceID, fieldNumber: 17)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.llmModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 1)
+    }
+    if !self.sttModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sttModelID, fieldNumber: 2)
+    }
+    if !self.ttsModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.ttsModelID, fieldNumber: 3)
+    }
+    if !self.vadModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.vadModelID, fieldNumber: 4)
+    }
+    if !self.ttsVoiceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.ttsVoiceID, fieldNumber: 5)
+    }
+    if self.sampleRateHz != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 6)
+    }
+    if self.chunkMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.chunkMs, fieldNumber: 7)
+    }
+    if self.audioSource != .unspecified {
+      try visitor.visitSingularEnumField(value: self.audioSource, fieldNumber: 8)
+    }
+    if !self.audioFilePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.audioFilePath, fieldNumber: 9)
+    }
+    try { if let v = self._enableBargeIn {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+    } }()
+    if self.bargeInThresholdMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.bargeInThresholdMs, fieldNumber: 11)
+    }
+    try { if let v = self._generation {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+    } }()
+    if self.maxContextTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 13)
+    }
+    if self.emitPartials != false {
+      try visitor.visitSingularBoolField(value: self.emitPartials, fieldNumber: 14)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVoiceAgentConfig, rhs: RAVoiceAgentConfig) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._llmModelID != rhs_storage._llmModelID {return false}
-        if _storage._sttModelID != rhs_storage._sttModelID {return false}
-        if _storage._ttsModelID != rhs_storage._ttsModelID {return false}
-        if _storage._vadModelID != rhs_storage._vadModelID {return false}
-        if _storage._ttsVoiceID != rhs_storage._ttsVoiceID {return false}
-        if _storage._sampleRateHz != rhs_storage._sampleRateHz {return false}
-        if _storage._chunkMs != rhs_storage._chunkMs {return false}
-        if _storage._audioSource != rhs_storage._audioSource {return false}
-        if _storage._audioFilePath != rhs_storage._audioFilePath {return false}
-        if _storage._enableBargeIn != rhs_storage._enableBargeIn {return false}
-        if _storage._bargeInThresholdMs != rhs_storage._bargeInThresholdMs {return false}
-        if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
-        if _storage._maxContextTokens != rhs_storage._maxContextTokens {return false}
-        if _storage._temperature != rhs_storage._temperature {return false}
-        if _storage._emitPartials != rhs_storage._emitPartials {return false}
-        if _storage._emitThoughts != rhs_storage._emitThoughts {return false}
-        if _storage._typeKind != rhs_storage._typeKind {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.llmModelID != rhs.llmModelID {return false}
+    if lhs.sttModelID != rhs.sttModelID {return false}
+    if lhs.ttsModelID != rhs.ttsModelID {return false}
+    if lhs.vadModelID != rhs.vadModelID {return false}
+    if lhs.ttsVoiceID != rhs.ttsVoiceID {return false}
+    if lhs.sampleRateHz != rhs.sampleRateHz {return false}
+    if lhs.chunkMs != rhs.chunkMs {return false}
+    if lhs.audioSource != rhs.audioSource {return false}
+    if lhs.audioFilePath != rhs.audioFilePath {return false}
+    if lhs._enableBargeIn != rhs._enableBargeIn {return false}
+    if lhs.bargeInThresholdMs != rhs.bargeInThresholdMs {return false}
+    if lhs._generation != rhs._generation {return false}
+    if lhs.maxContextTokens != rhs.maxContextTokens {return false}
+    if lhs.emitPartials != rhs.emitPartials {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -893,7 +665,7 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embed_model_id\0\u{3}rerank_model_id\0\u{3}llm_model_id\0\u{3}vector_store\0\u{3}vector_store_path\0\u{3}retrieve_k\0\u{3}rerank_top\0\u{3}bm25_k1\0\u{3}bm25_b\0\u{3}rrf_k\0\u{3}prompt_template\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embed_model_id\0\u{3}rerank_model_id\0\u{3}llm_model_id\0\u{3}vector_store\0\u{3}vector_store_path\0\u{3}retrieve_k\0\u{3}rerank_top\0\u{3}bm25_k1\0\u{3}bm25_b\0\u{3}rrf_k\0\u{3}prompt_template\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -912,17 +684,12 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 9: try { try decoder.decodeSingularFloatField(value: &self.bm25B) }()
       case 10: try { try decoder.decodeSingularInt32Field(value: &self.rrfK) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self.promptTemplate) }()
-      case 12: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.embedModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.embedModelID, fieldNumber: 1)
     }
@@ -956,9 +723,6 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.promptTemplate.isEmpty {
       try visitor.visitSingularStringField(value: self.promptTemplate, fieldNumber: 11)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 12)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -974,7 +738,6 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.bm25B != rhs.bm25B {return false}
     if lhs.rrfK != rhs.rrfK {return false}
     if lhs.promptTemplate != rhs.promptTemplate {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -982,7 +745,7 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AgentLoopConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}system_prompt\0\u{1}tools\0\u{3}max_iterations\0\u{3}max_context_tokens\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}system_prompt\0\u{1}tools\0\u{3}max_iterations\0\u{3}max_context_tokens\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -995,17 +758,12 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxIterations) }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.llmModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 1)
     }
@@ -1021,9 +779,6 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
     if self.maxContextTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 5)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1033,7 +788,6 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.tools != rhs.tools {return false}
     if lhs.maxIterations != rhs.maxIterations {return false}
     if lhs.maxContextTokens != rhs.maxContextTokens {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1081,7 +835,7 @@ nonisolated extension RAToolSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TimeSeriesConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}anomaly_model_id\0\u{3}llm_model_id\0\u{3}window_size\0\u{1}stride\0\u{3}anomaly_threshold\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}anomaly_model_id\0\u{3}llm_model_id\0\u{3}window_size\0\u{1}stride\0\u{3}anomaly_threshold\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1094,17 +848,12 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.windowSize) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.stride) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.anomalyThreshold) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.anomalyModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.anomalyModelID, fieldNumber: 1)
     }
@@ -1120,9 +869,6 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if self.anomalyThreshold.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.anomalyThreshold, fieldNumber: 5)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1132,7 +878,6 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.windowSize != rhs.windowSize {return false}
     if lhs.stride != rhs.stride {return false}
     if lhs.anomalyThreshold != rhs.anomalyThreshold {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

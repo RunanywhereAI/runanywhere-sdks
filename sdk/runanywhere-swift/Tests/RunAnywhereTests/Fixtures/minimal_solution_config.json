@@ -6,9 +6,10 @@
     "vadModelId": "silero-v5",
     "sampleRateHz": 16000,
     "chunkMs": 20,
-    "systemPrompt": "You are a helpful assistant.",
-    "maxContextTokens": 4096,
-    "temperature": 0.7,
-    "typeKind": "SOLUTION_TYPE_VOICE_AGENT"
+    "generation": {
+      "systemPrompt": "You are a helpful assistant.",
+      "temperature": 0.7
+    },
+    "maxContextTokens": 4096
   }
 }

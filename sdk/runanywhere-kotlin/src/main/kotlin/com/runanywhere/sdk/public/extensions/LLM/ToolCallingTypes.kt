@@ -32,8 +32,10 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 typealias ToolValue = ai.runanywhere.proto.v1.ToolValue
 typealias ToolValueArray = ai.runanywhere.proto.v1.ToolValueArray
 typealias ToolValueObject = ai.runanywhere.proto.v1.ToolValueObject
-typealias ToolParameterType = ai.runanywhere.proto.v1.ToolParameterType
-typealias ToolParameter = ai.runanywhere.proto.v1.ToolParameter
+
+// ToolParameterType / ToolParameter are deleted: ToolDefinition.parameters is
+// now a single JSON-Schema string (OpenAI `parameters` / Anthropic
+// `input_schema` / MCP `inputSchema` shape) instead of a typed parameter list.
 typealias ToolDefinition = ai.runanywhere.proto.v1.ToolDefinition
 typealias ToolCall = ai.runanywhere.proto.v1.ToolCall
 typealias ToolResult = ai.runanywhere.proto.v1.ToolResult
@@ -70,42 +72,19 @@ internal data class RegisteredTool(
     val executor: ToolExecutor,
 )
 
-// RAToolCallingOptions.defaults() — Swift parity
-
-internal const val DEFAULT_MAX_TOOL_CALLS = 5
-
-/**
- * Default tool-calling options mirroring Swift's
- * `RAToolCallingOptions.defaults()`:
- * `maxToolCalls=5, autoExecute=true, format=.json`.
- */
-fun ai.runanywhere.proto.v1.ToolCallingOptions.Companion.defaults(): RAToolCallingOptions =
-    RAToolCallingOptions(
-        max_tool_calls = DEFAULT_MAX_TOOL_CALLS,
-        auto_execute = true,
-        format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-    )
-
 // LLMGenerationOptions -> ToolCallingOptions normalization
+//
+// Defaults come from generated/convenience/RAConvenience.kt
+// (`ToolCallingOptions.Companion.defaults()`), emitted from the rac_default
+// annotations in idl/tool_calling.proto. Sampling and system_prompt no longer
+// live on ToolCallingOptions — they stay on the LLMGenerationOptions envelope.
 
-internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions {
-    val generationOptions = this
-    val providedToolOptions = generationOptions?.tool_calling
-    val base = providedToolOptions ?: ToolCallingOptions()
-    return base.copy(
-        max_tool_calls =
-            base.max_tool_calls?.takeIf { it > 0 }
-                ?: if (providedToolOptions == null) DEFAULT_MAX_TOOL_CALLS else null,
-        auto_execute = if (providedToolOptions == null) true else base.auto_execute,
-        temperature =
-            base.temperature
-                ?: generationOptions?.temperature?.takeUnless { it == 0f },
-        max_tokens =
-            base.max_tokens
-                ?: generationOptions?.max_tokens?.takeIf { it > 0 },
-        system_prompt = base.system_prompt ?: generationOptions?.system_prompt,
-    )
-}
+internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions =
+    this?.tool_calling ?: ToolCallingOptions()
+
+// main's ToolCallingOptions has no rac_default for max_tool_calls; fall back to
+// the contract value of 5 when it is unset or non-positive.
+private const val DEFAULT_MAX_TOOL_CALLS = 5
 
 internal fun ToolCallingOptions.effectiveMaxToolCalls(): Int =
     max_tool_calls?.takeIf { it > 0 } ?: DEFAULT_MAX_TOOL_CALLS
@@ -239,3 +218,87 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
 fun ai.runanywhere.proto.v1.ToolValue.Companion.jsonString(
     from: Map<String, RAToolValue>,
 ): String = RAToolValue.`object`(from).toJSONString() ?: "{}"
+
+// MARK: Tool Definition Helpers --------------------------------------------
+
+/** JSON Schema primitive types (`"string"`, `"number"`, `"integer"`, `"boolean"`, `"array"`, `"object"`). */
+enum class ToolParameterType(
+    internal val wireValue: String,
+) {
+    STRING("string"),
+    NUMBER("number"),
+    INTEGER("integer"),
+    BOOLEAN("boolean"),
+    ARRAY("array"),
+    OBJECT("object"),
+}
+
+/**
+ * One parameter on a [ToolDefinition], expressed as a JSON Schema property.
+ *
+ * `ToolParameter`/`ToolParameterType` (the proto types) are deleted outright
+ * (idl/tool_calling.proto): `ToolDefinition.parameters` is now a single raw
+ * JSON Schema object STRING -- the same OpenAI `parameters` / Anthropic
+ * `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
+ * This class is a Kotlin-side convenience for building that schema; it never
+ * crosses the wire on its own. Mirrors Swift's `ToolParameter`.
+ */
+data class ToolParameter(
+    val name: String,
+    val type: ToolParameterType,
+    val description: String,
+    val required: Boolean = true,
+    val enumValues: List<String> = emptyList(),
+) {
+    /**
+     * This parameter's contribution to the enclosing JSON Schema `properties`
+     * object: `{"type": ..., "description": ...}`, plus `"enum"` when set.
+     */
+    internal fun schemaProperty(): RAToolValue {
+        val fields =
+            linkedMapOf(
+                "type" to RAToolValue.string(type.wireValue),
+                "description" to RAToolValue.string(description),
+            )
+        if (enumValues.isNotEmpty()) {
+            fields["enum"] = RAToolValue.array(enumValues.map(RAToolValue::string))
+        }
+        return RAToolValue.`object`(fields)
+    }
+}
+
+/**
+ * Build a [ToolDefinition] from Kotlin-side [ToolParameter]s, serializing
+ * them into the single JSON Schema object `parameters` now carries
+ * (idl/tool_calling.proto). Mirrors the OpenAI/Anthropic/MCP tool-schema
+ * shape: `{"type": "object", "properties": {...}, "required": [...]}`.
+ * Mirrors Swift's `RAToolDefinition.init(name:description:parameters:category:)`.
+ */
+fun ToolDefinition(
+    name: String,
+    description: String,
+    parameters: List<ToolParameter>,
+    category: String? = null,
+): ToolDefinition =
+    ai.runanywhere.proto.v1.ToolDefinition(
+        name = name,
+        description = description,
+        parameters = jsonSchema(parameters),
+        category = category,
+    )
+
+private fun jsonSchema(parameters: List<ToolParameter>): String {
+    if (parameters.isEmpty()) return "{}"
+    val properties =
+        parameters.associate { parameter -> parameter.name to parameter.schemaProperty() }
+    val required = parameters.filter { it.required }.map { it.name }
+    val schema =
+        linkedMapOf(
+            "type" to RAToolValue.string("object"),
+            "properties" to RAToolValue.`object`(properties),
+        )
+    if (required.isNotEmpty()) {
+        schema["required"] = RAToolValue.array(required.map(RAToolValue::string))
+    }
+    return RAToolValue.jsonString(from = schema)
+}

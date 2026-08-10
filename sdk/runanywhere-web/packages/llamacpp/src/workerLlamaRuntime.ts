@@ -132,11 +132,18 @@ export class WorkerLlamaRuntime {
     if (this.diagnosticsLog.length > 200) {
       this.diagnosticsLog.splice(0, this.diagnosticsLog.length - 200);
     }
-    if (level === 'err' || level === 'abort') {
-      logger.warning(line);
-    } else {
-      logger.info(line);
+    if (level === 'abort') {
+      logger.error(line);
+      return;
     }
+    // The stream is not the severity: commons sends every diagnostic to stderr,
+    // so typing the whole `printErr` stream as a warning promoted routine INFO
+    // chatter ("Current platform: …") into the console's warning count. `native`
+    // reads the level out of the line's own `[RAC][LEVEL]` prefix, which is why
+    // it gets the raw text — the `[err]`/`[out]` marker stays in the ring buffer
+    // above, where abort diagnosis needs it, rather than in front of the prefix
+    // where it would hide it.
+    logger.native(text, level === 'err' ? 'err' : 'out');
   }
 
   requireModule(): WorkerLlamaModule {

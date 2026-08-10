@@ -28,6 +28,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "features/stt/stt_transcript_text.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -121,8 +122,8 @@ void ensure_default_vad_loaded() {
     if (rc == RAC_SUCCESS && load_out.status == RAC_SUCCESS && load_out.data) {
         runanywhere::v1::ModelLoadResult load_result;
         if (load_result.ParseFromArray(load_out.data, static_cast<int>(load_out.size))) {
-            loaded = load_result.success();
-            error_message = load_result.error_message();
+            loaded = !load_result.has_error();
+            error_message = load_result.error().message();
         }
     }
     rac_proto_buffer_free(&load_out);
@@ -365,7 +366,24 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             error_message = "STT transcription failed";
             goto cleanup_and_return;
         }
-        if (!stt.text || stt.text[0] == '\0') {
+        // A no-speech engine marker is not something the user said. Whisper
+        // answers silence with `[BLANK_AUDIO]` / `[ Silence ]` / `(wind)`, which
+        // is non-empty, so it sailed straight past the emptiness check below and
+        // became the turn: emitted as TRANSCRIPTION_FINAL into the user's own
+        // bubble, then handed to the LLM as the prompt — so the agent answered a
+        // question nobody asked, out loud. Normalising first means the existing
+        // check catches it, with the correct meaning: there was no speech.
+        //
+        // This is the C-struct transcribe path. The proto paths
+        // (`fill_stt_output`, `dispatch_stream_result`) already filter; this one
+        // never did, and it is the one the voice agent calls.
+        // Tested with the predicate rather than by building the normalised
+        // string: `cleanup_and_return` is a label in this same block, and the
+        // earlier failure paths `goto` it — a local with a non-trivial
+        // initialiser here would make those jumps cross its initialisation,
+        // which is ill-formed. Past this guard `stt.text` is known to be real
+        // speech, so every use of it below stays correct as written.
+        if (rac::stt::transcript_is_non_speech(stt.text)) {
             rac_stt_result_free(&stt);
             if (have_lifecycle_stt) {
                 rac::lifecycle::release_lifecycle_stt(&stt_ref);

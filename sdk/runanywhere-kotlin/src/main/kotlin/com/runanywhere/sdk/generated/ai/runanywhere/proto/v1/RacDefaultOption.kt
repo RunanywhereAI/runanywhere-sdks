@@ -15,9 +15,8 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * String-form default value. Codegen parses per the field's declared
- * type — e.g. "3" for int32, "0.7" for float, "true" for bool, "auto"
- * for string, or the proto constant name for an enum field.
+ * Parsed per the field's declared type: "3" for int32, "0.7" for float,
+ * "true" for bool, "auto" for string, the constant name for an enum.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

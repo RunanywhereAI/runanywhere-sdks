@@ -147,9 +147,14 @@ int test_stt_stream_events() {
           "STT model loads");
 
     runanywhere::v1::STTOptions options;
-    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
-    std::vector<uint8_t> options_bytes;
-    CHECK(serialize(options, &options_bytes), "STTOptions serializes");
+    options.set_language("en");
+
+    const int16_t audio[] = {0, 1, 2, 3};
+    runanywhere::v1::STTTranscriptionRequest stream_request;
+    *stream_request.mutable_options() = options;
+    stream_request.mutable_audio()->set_audio_data(audio, sizeof(audio));
+    std::vector<uint8_t> request_bytes;
+    CHECK(serialize(stream_request, &request_bytes), "STTTranscriptionRequest serializes");
 
     std::vector<runanywhere::v1::STTStreamEvent> events;
     auto callback = [](const uint8_t* data, size_t size, void* user_data) {
@@ -160,9 +165,8 @@ int test_stt_stream_events() {
         }
     };
 
-    const int16_t audio[] = {0, 1, 2, 3};
     const rac_result_t rc = rac_stt_component_transcribe_stream_proto(
-        stt, audio, sizeof(audio), options_bytes.data(), options_bytes.size(), callback, &events);
+        stt, request_bytes.data(), request_bytes.size(), callback, &events);
     CHECK(rc == RAC_SUCCESS, "STT stream proto returns success");
     CHECK(events.size() == 3, "STT stream emits started, partial, final events");
     if (events.size() == 3) {
@@ -199,9 +203,10 @@ int test_stt_stream_events() {
             rac_stt_component_destroy(context->component);
         }
     };
-    CHECK(rac_stt_component_transcribe_stream_proto(
-              stt, audio, sizeof(audio), options_bytes.data(), options_bytes.size(),
-              reentrant_destroy_callback, &reentrant_destroy) == RAC_SUCCESS,
+    CHECK(rac_stt_component_transcribe_stream_proto(stt, request_bytes.data(),
+                                                    request_bytes.size(),
+                                                    reentrant_destroy_callback,
+                                                    &reentrant_destroy) == RAC_SUCCESS,
           "reentrant component destroy is refused without deadlocking its active operation");
     CHECK(reentrant_destroy.attempted.load(std::memory_order_acquire) &&
               rac_stt_component_is_loaded(stt) == RAC_TRUE,
@@ -209,6 +214,50 @@ int test_stt_stream_events() {
 
     rac_stt_component_destroy(stt);
     return 0;
+}
+
+// -----------------------------------------------------------------------------
+// Synthetic audio for the one-shot fallback segmenter.
+//
+// The segmenter in src/features/stt/rac_stt_stream.cpp decides speech by RATIO
+// to the room it has measured, not by an absolute level, so a fixture that hands
+// it speech and nothing else is not describing a stream — it is asking the
+// segmenter to judge a phrase against a room it was never given. A real capture
+// always supplies that room: the stream is armed when the user taps record, and
+// what arrives before they start talking is the room. These fixtures supply it
+// the same way, which is what makes the trailing-silence endpoint below a real
+// test rather than an accident of the buffer starting at zero.
+// -----------------------------------------------------------------------------
+
+// The segmenter's frame: 100 ms at 16 kHz (kFallbackFrameMs).
+constexpr size_t kFallbackFrameSamples = 1600;
+// Room tone, RMS 0.031 — the level measured in-app on the Android emulator, and
+// the room the 2.2x ambient multiplier was fitted against. It puts the gate at
+// 0.067, which the room itself sits well below: that is what lets trailing room
+// tone read as the silence that closes an utterance.
+constexpr int16_t kRoomToneAmplitude = 1000;
+// Speech, RMS 0.366 — some twelve times the room and far clear of that gate.
+constexpr int16_t kSpeechAmplitude = 12000;
+// Frames of room to hand over before expecting the gate to open at all. The
+// segmenter builds its estimate over the first kFallbackFloorWarmupFrames (8
+// today) and keeps the gate shut until then; feeding a few more than that keeps
+// these endpointing tests measuring endpointing, rather than turning red if that
+// window is ever retuned. Extra room frames are inert — once the estimate is
+// built they simply read as silence.
+constexpr int kFallbackWarmupFramesToFeed = 12;
+
+// Hand the segmenter the room it measures its gate from. Returns false if any
+// feed was rejected, so a caller can surface the whole warm-up as one CHECK.
+bool feed_fallback_room_warmup(uint64_t session_id) {
+    const std::vector<int16_t> room(kFallbackFrameSamples, kRoomToneAmplitude);
+    for (int i = 0; i < kFallbackWarmupFramesToFeed; ++i) {
+        if (rac_stt_stream_feed_audio_proto(session_id,
+                                            reinterpret_cast<const uint8_t*>(room.data()),
+                                            room.size() * sizeof(int16_t)) != RAC_SUCCESS) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int test_stt_one_shot_fallback_endpoint_and_final_flush() {
@@ -235,7 +284,7 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
           "fallback stream callback registers");
 
     runanywhere::v1::STTOptions options;
-    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    options.set_language("en");
     std::vector<uint8_t> options_bytes;
     CHECK(serialize(options, &options_bytes), "fallback STTOptions serializes");
 
@@ -243,7 +292,8 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "fallback stream session starts");
-    std::vector<int16_t> speech(1600, 12000);  // 100 ms at 16 kHz
+    CHECK(feed_fallback_room_warmup(session_id), "fallback stream session measures the room first");
+    std::vector<int16_t> speech(kFallbackFrameSamples, kSpeechAmplitude);  // 100 ms at 16 kHz
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -264,16 +314,22 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "fallback endpoint session starts");
+    CHECK(feed_fallback_room_warmup(session_id),
+          "fallback endpoint session measures the room first");
     for (int i = 0; i < 3; ++i) {
         (void)rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
                                               speech.size() * sizeof(int16_t));
     }
-    std::vector<int16_t> silence(1600, 0);
+    // The room, not digital silence: kFallbackEndSilenceMs of ordinary ambience
+    // has to read as the end of the phrase. Feeding true zeroes here would close
+    // the utterance even against a segmenter whose adaptive floor was broken,
+    // which is the failure this trailing window exists to catch.
+    std::vector<int16_t> trailing_room(kFallbackFrameSamples, kRoomToneAmplitude);
     for (int i = 0; i < 8; ++i) {
-        (void)rac_stt_stream_feed_audio_proto(session_id,
-                                              reinterpret_cast<const uint8_t*>(silence.data()),
-                                              silence.size() * sizeof(int16_t));
+        (void)rac_stt_stream_feed_audio_proto(
+            session_id, reinterpret_cast<const uint8_t*>(trailing_room.data()),
+            trailing_room.size() * sizeof(int16_t));
     }
     CHECK(g_fallback_transcribe_count == 1,
           "one-shot fallback infers once after the speech endpoint");
@@ -283,50 +339,6 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
           "endpointed fallback session stops cleanly");
     CHECK(g_fallback_transcribe_count == 1,
           "fallback stop does not duplicate an already-final utterance");
-
-    // Endpoint timing is expressed in milliseconds, not in a fixed number of
-    // 16 kHz bytes. Exercise both sides of the default so a future hard-coded
-    // frame size cannot make 48 kHz end 3x early or 8 kHz fail to reach the
-    // minimum-speech window.
-    for (const int32_t sample_rate : {8000, 48000}) {
-        runanywhere::v1::STTOptions rate_options;
-        rate_options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
-        rate_options.set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM_S16LE);
-        rate_options.set_sample_rate(sample_rate);
-        std::vector<uint8_t> rate_options_bytes;
-        const std::string rate_label = std::to_string(sample_rate) + " Hz";
-        CHECK(serialize(rate_options, &rate_options_bytes),
-              (rate_label + " STTOptions serializes").c_str());
-
-        g_fallback_transcribe_count = 0;
-        CHECK(rac_stt_stream_start_proto(stt, rate_options_bytes.data(), rate_options_bytes.size(),
-                                         &session_id) == RAC_SUCCESS,
-              (rate_label + " fallback session starts").c_str());
-        std::vector<int16_t> rate_speech(static_cast<size_t>(sample_rate / 10), 12000);
-        std::vector<int16_t> rate_silence(static_cast<size_t>(sample_rate / 10), 0);
-        for (int i = 0; i < 3; ++i) {
-            CHECK(rac_stt_stream_feed_audio_proto(
-                      session_id, reinterpret_cast<const uint8_t*>(rate_speech.data()),
-                      rate_speech.size() * sizeof(int16_t)) == RAC_SUCCESS,
-                  (rate_label + " speech frame accepted").c_str());
-        }
-        for (int i = 0; i < 7; ++i) {
-            CHECK(rac_stt_stream_feed_audio_proto(
-                      session_id, reinterpret_cast<const uint8_t*>(rate_silence.data()),
-                      rate_silence.size() * sizeof(int16_t)) == RAC_SUCCESS,
-                  (rate_label + " pre-endpoint silence accepted").c_str());
-        }
-        CHECK(g_fallback_transcribe_count == 0,
-              (rate_label + " does not endpoint before 800 ms silence").c_str());
-        CHECK(rac_stt_stream_feed_audio_proto(session_id,
-                                              reinterpret_cast<const uint8_t*>(rate_silence.data()),
-                                              rate_silence.size() * sizeof(int16_t)) == RAC_SUCCESS,
-              (rate_label + " endpoint silence accepted").c_str());
-        CHECK(g_fallback_transcribe_count == 1,
-              (rate_label + " endpoints after exactly 800 ms silence").c_str());
-        CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS,
-              (rate_label + " fallback session stops").c_str());
-    }
 
     // Stop snapshots a pending fallback utterance before admitting the
     // one-shot provider call. Pause at that exact boundary and let cancel win;
@@ -350,6 +362,8 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &session_id) == RAC_SUCCESS,
           "cancel-before-flush fallback session starts");
+    CHECK(feed_fallback_room_warmup(session_id),
+          "cancel-before-flush session measures the room first");
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -388,35 +402,6 @@ int test_stt_one_shot_fallback_endpoint_and_final_flush() {
           "cancel drops pending fallback audio before provider admission");
     CHECK(events.empty(), "cancelled pending fallback audio emits no transcript events");
 
-    g_fallback_transcribe_count = 0;
-    for (const auto format : {runanywhere::v1::AUDIO_FORMAT_MP3, runanywhere::v1::AUDIO_FORMAT_OGG,
-                              runanywhere::v1::AUDIO_FORMAT_M4A}) {
-        runanywhere::v1::STTOptions compressed_options;
-        compressed_options.set_audio_format(format);
-        compressed_options.set_sample_rate(16000);
-        std::vector<uint8_t> compressed_options_bytes;
-        CHECK(serialize(compressed_options, &compressed_options_bytes),
-              "compressed fallback STTOptions serializes");
-        CHECK(rac_stt_stream_start_proto(stt, compressed_options_bytes.data(),
-                                         compressed_options_bytes.size(),
-                                         &session_id) == RAC_SUCCESS,
-              "compressed fallback session starts");
-        events.clear();
-        const uint8_t container_bytes[] = {0x49, 0x44, 0x33, 0x04};
-        CHECK(
-            rac_stt_stream_feed_audio_proto(session_id, container_bytes, sizeof(container_bytes)) ==
-                RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
-            "one-shot fallback rejects container bytes with precise format error");
-        CHECK(events.size() == 1 &&
-                  events.front().kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR &&
-                  events.front().error_code() == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
-              "rejected container feed emits only the precise error event");
-        CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS,
-              "rejected compressed fallback session stops cleanly");
-        CHECK(g_fallback_transcribe_count == 0,
-              "rejected compressed fallback never invokes transcription");
-    }
-
     (void)rac_stt_unset_stream_proto_callback(stt);
     rac_stt_component_destroy(stt);
     (void)rac_plugin_unregister("cpp-stream-event-stt");
@@ -437,8 +422,6 @@ int test_stt_fallback_reload_cancels_buffered_session() {
           "reload-test first fallback model loads");
 
     runanywhere::v1::STTOptions options;
-    options.set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM_S16LE);
-    options.set_sample_rate(16000);
     std::vector<uint8_t> options_bytes;
     CHECK(serialize(options, &options_bytes), "reload-test STTOptions serializes");
 
@@ -446,7 +429,9 @@ int test_stt_fallback_reload_cancels_buffered_session() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &old_session_id) == RAC_SUCCESS,
           "reload-test fallback session starts on model A");
-    std::vector<int16_t> speech(1600, 12000);
+    CHECK(feed_fallback_room_warmup(old_session_id),
+          "reload-test model-A session measures the room first");
+    std::vector<int16_t> speech(kFallbackFrameSamples, kSpeechAmplitude);
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(old_session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -472,6 +457,8 @@ int test_stt_fallback_reload_cancels_buffered_session() {
     CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
                                      &new_session_id) == RAC_SUCCESS,
           "new fallback session starts after model reload");
+    CHECK(feed_fallback_room_warmup(new_session_id),
+          "reload-test model-B session measures the room first");
     for (int i = 0; i < 3; ++i) {
         CHECK(rac_stt_stream_feed_audio_proto(new_session_id,
                                               reinterpret_cast<const uint8_t*>(speech.data()),
@@ -751,7 +738,7 @@ int test_stt_persistent_stream_handle() {
           "stream proto callback registers");
 
     runanywhere::v1::STTOptions options;
-    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    options.set_language("en");
     std::vector<uint8_t> options_bytes;
     CHECK(serialize(options, &options_bytes), "persistent STTOptions serializes");
 
@@ -760,30 +747,6 @@ int test_stt_persistent_stream_handle() {
                                      &session_id) == RAC_SUCCESS,
           "stream session starts");
     CHECK(session_id != 0, "stream session id is non-zero");
-
-    // Non-PCM bytes are rejected before the persistent backend is created or
-    // any session accounting begins. OGG/M4A previously fell through to PCM.
-    runanywhere::v1::STTOptions compressed_options;
-    compressed_options.set_audio_format(runanywhere::v1::AUDIO_FORMAT_M4A);
-    std::vector<uint8_t> compressed_options_bytes;
-    CHECK(serialize(compressed_options, &compressed_options_bytes),
-          "persistent compressed STTOptions serializes");
-    uint64_t compressed_session_id = 0;
-    CHECK(rac_stt_stream_start_proto(stt, compressed_options_bytes.data(),
-                                     compressed_options_bytes.size(),
-                                     &compressed_session_id) == RAC_SUCCESS,
-          "persistent compressed stream session starts");
-    const uint8_t fake_m4a[] = {0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p'};
-    const size_t events_before_rejection = stream_events.size();
-    CHECK(rac_stt_stream_feed_audio_proto(compressed_session_id, fake_m4a, sizeof(fake_m4a)) ==
-              RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
-          "persistent stream rejects non-PCM before backend creation");
-    CHECK(g_stream_state.create_count == 0 && g_stream_state.feed_count == 0,
-          "rejected persistent input never reaches backend stream slots");
-    CHECK(stream_events.size() == events_before_rejection + 1,
-          "rejected persistent input emits only its error callback");
-    CHECK(rac_stt_stream_stop_proto(compressed_session_id) == RAC_SUCCESS,
-          "rejected persistent session stops without completion work");
 
     // Feed 100 chunks of 1ms audio at 16 kHz: 16 samples per chunk, Int16 PCM.
     const size_t kChunksToFeed = 100;
@@ -835,8 +798,6 @@ int test_stt_persistent_stream_termination_races() {
           "race-test STT model loads");
 
     runanywhere::v1::STTOptions options;
-    options.set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM_S16LE);
-    options.set_sample_rate(16000);
     std::vector<uint8_t> options_bytes;
     CHECK(serialize(options, &options_bytes), "race-test STTOptions serializes");
     const std::vector<int16_t> chunk(160, 1200);
@@ -1069,8 +1030,6 @@ int test_stt_component_owns_stream_lifecycle() {
           "lifecycle-test first model loads");
 
     runanywhere::v1::STTOptions options;
-    options.set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM_S16LE);
-    options.set_sample_rate(16000);
     std::vector<uint8_t> options_bytes;
     CHECK(serialize(options, &options_bytes), "lifecycle-test STTOptions serializes");
     const std::vector<int16_t> chunk(160, 1200);
@@ -1330,7 +1289,7 @@ int test_vad_activity_stream_event() {
     runanywhere::v1::VADConfiguration config;
     config.set_sample_rate(16000);
     config.set_frame_length_ms(100);
-    config.set_threshold(0.01f);
+    config.set_activation_threshold(0.01f);
     std::vector<uint8_t> config_bytes;
     CHECK(serialize(config, &config_bytes), "VADConfiguration serializes");
     CHECK(rac_vad_component_configure_proto(vad, config_bytes.data(), config_bytes.size()) ==

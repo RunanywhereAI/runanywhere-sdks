@@ -57,6 +57,19 @@ static const char* FORMAT_NAMES[] = {
     "Pythonic (bare)",  // RAC_TOOL_FORMAT_PYTHONIC
 };
 
+// Shared synthesis-turn grounding rule, appended wherever tool results are
+// handed back to the model for a final answer. Small models "helpfully"
+// fabricate a plausible number when the field they need is absent from the
+// result (observed live: a sleep query whose result carried only {"date":...}
+// was answered with an invented "7 hours"). Stating the rule at the exact
+// point of use — next to the result payload — is the strongest prompt-level
+// counter available, and living in commons it protects every SDK and every
+// model family, not just one example app.
+static const char* kToolResultGroundingRule =
+    "State only values literally present in the tool result. If the result lacks the value the "
+    "user asked for (or it is empty), say that data is unavailable - never estimate, invent, or "
+    "recall a plausible number.";
+
 static int64_t next_tool_call_id() {
     static std::atomic<int64_t> next{1};
     return next.fetch_add(1, std::memory_order_relaxed);
@@ -1598,6 +1611,14 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
 
         case RAC_TOOL_FORMAT_LFM2:
             parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+            // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
+            // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
+            // outputs and bails without allocating when the LFM2 tag is absent, so a
+            // fall-through to the default parser recovers a well-formed call in that shape
+            // rather than silently dropping it.
+            if (!parsed) {
+                parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+            }
             break;
 
         case RAC_TOOL_FORMAT_PYTHONIC:
@@ -1658,69 +1679,88 @@ tool_format_proto_from_rac(rac_tool_call_format_t format) {
     }
 }
 
-static std::string tool_parameter_type_name_from_proto(runanywhere::v1::ToolParameterType type) {
-    switch (type) {
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-            return "number";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-            return "boolean";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-            return "object";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-            return "array";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-        default:
-            return "string";
+// idl/tool_calling.proto (API-realignment tools-one-json-schema) deleted the
+// typed ToolParameter message and ToolParameterType enum outright:
+// ToolDefinition.parameters is now ONE JSON Schema object STRING (matching
+// OpenAI `parameters` / Anthropic `input_schema` / MCP `inputSchema`), not a
+// repeated ToolParameter list. The rest of this file's prompt-formatting and
+// validation logic still works over an array of
+// {name,type,description,required,enum_values} objects (the historical
+// tool_calling_internal.h rac_tool_parameter_t shape); this converts a JSON
+// Schema **object** (type=object, properties, required) into that array so
+// nothing downstream of this one conversion point needs to change. A
+// non-object schema (a zero-argument tool advertises "" or "{}") yields an
+// empty array.
+static json parameters_json_schema_to_legacy_array(const std::string& parameters_schema_json) {
+    json params = json::array();
+    if (parameters_schema_json.empty()) {
+        return params;
     }
+    json schema = json::parse(parameters_schema_json, nullptr, false);
+    if (schema.is_discarded() || !schema.is_object() || !schema.contains("properties") ||
+        !schema["properties"].is_object()) {
+        return params;
+    }
+
+    std::vector<std::string> required_names;
+    if (schema.contains("required") && schema["required"].is_array()) {
+        for (const auto& name : schema["required"]) {
+            if (name.is_string()) {
+                required_names.push_back(name.get<std::string>());
+            }
+        }
+    }
+
+    const json& properties = schema["properties"];
+    for (auto it = properties.begin(); it != properties.end(); ++it) {
+        const json& prop = it.value();
+        json param_object = json::object();
+        param_object["name"] = it.key();
+        param_object["type"] = (prop.is_object() && prop.contains("type") && prop["type"].is_string())
+                                   ? prop["type"].get<std::string>()
+                                   : std::string("string");
+        param_object["description"] =
+            (prop.is_object() && prop.contains("description") && prop["description"].is_string())
+                ? prop["description"].get<std::string>()
+                : std::string();
+        param_object["required"] = std::find(required_names.begin(), required_names.end(),
+                                             it.key()) != required_names.end();
+        if (prop.is_object() && prop.contains("enum") && prop["enum"].is_array()) {
+            param_object["enum_values"] = prop["enum"];
+        }
+        params.push_back(std::move(param_object));
+    }
+    return params;
 }
 
 static json tool_definition_proto_to_json(const runanywhere::v1::ToolDefinition& tool) {
     json object = json::object();
     object["name"] = tool.name();
     object["description"] = tool.description();
-    object["parameters"] = json::array();
-    for (const auto& param : tool.parameters()) {
-        json param_object = json::object();
-        param_object["name"] = param.name();
-        param_object["type"] = tool_parameter_type_name_from_proto(param.type());
-        param_object["description"] = param.description();
-        param_object["required"] = param.required();
-        if (param.enum_values_size() > 0) {
-            param_object["enum_values"] = json::array();
-            for (const auto& enum_value : param.enum_values()) {
-                param_object["enum_values"].push_back(enum_value);
-            }
-        }
-        if (param.has_json_schema()) {
-            param_object["json_schema"] = param.json_schema();
-        }
-        object["parameters"].push_back(std::move(param_object));
-    }
+    object["parameters"] = parameters_json_schema_to_legacy_array(tool.parameters());
     if (tool.has_category()) {
         object["category"] = tool.category();
-    }
-    if (tool.has_json_schema()) {
-        object["json_schema"] = tool.json_schema();
     }
     return object;
 }
 
-static json compact_tool_argument_placeholder(const runanywhere::v1::ToolParameter& parameter) {
-    switch (parameter.type()) {
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-            return 0;
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-            return false;
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-            return json::object();
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-            return json::array();
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-        default:
-            return "<value from user request>";
+// `parameter` is one entry of the legacy {name,type,...} array produced by
+// parameters_json_schema_to_legacy_array() above.
+static json compact_tool_argument_placeholder(const json& parameter) {
+    const std::string type = parameter.value("type", std::string("string"));
+    if (type == "number" || type == "integer") {
+        return 0;
     }
+    if (type == "boolean") {
+        return false;
+    }
+    if (type == "object") {
+        return json::object();
+    }
+    if (type == "array") {
+        return json::array();
+    }
+    return "<value from user request>";
 }
 
 // A SPECIFIC decision already knows which tool must be called. Reusing the
@@ -1730,6 +1770,8 @@ static json compact_tool_argument_placeholder(const runanywhere::v1::ToolParamet
 static std::string compact_specific_tool_prompt(const std::string& user_prompt,
                                                 const runanywhere::v1::ToolDefinition& tool,
                                                 rac_tool_call_format_t format) {
+    const json legacy_params = parameters_json_schema_to_legacy_array(tool.parameters());
+
     std::string call_example;
     if (format == RAC_TOOL_FORMAT_LFM2 || format == RAC_TOOL_FORMAT_PYTHONIC) {
         // Pythonic call syntax. LFM2 wraps it in tags; the bare grammar format
@@ -1738,46 +1780,40 @@ static std::string compact_specific_tool_prompt(const std::string& user_prompt,
         call_example = bare ? "[" : "<|tool_call_start|>[";
         call_example += tool.name() + "(";
         bool first = true;
-        for (const auto& parameter : tool.parameters()) {
-            if (!parameter.required()) {
+        for (const auto& parameter : legacy_params) {
+            if (!parameter.value("required", false)) {
                 continue;
             }
             if (!first) {
                 call_example += ", ";
             }
             first = false;
-            call_example += parameter.name();
+            call_example += parameter.value("name", std::string());
             call_example += "=";
-            switch (parameter.type()) {
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-                    call_example += "0";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-                    call_example += "true";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-                    call_example += "{}";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-                    call_example += "[]";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-                default:
-                    call_example += "\"<value from user request>\"";
-                    break;
+            const std::string type = parameter.value("type", std::string("string"));
+            if (type == "number" || type == "integer") {
+                call_example += "0";
+            } else if (type == "boolean") {
+                call_example += "true";
+            } else if (type == "object") {
+                call_example += "{}";
+            } else if (type == "array") {
+                call_example += "[]";
+            } else {
+                call_example += "\"<value from user request>\"";
             }
         }
         call_example += bare ? ")]" : ")]<|tool_call_end|>";
     } else {
         json arguments = json::object();
-        for (const auto& parameter : tool.parameters()) {
-            if (parameter.required()) {
-                arguments[parameter.name()] = compact_tool_argument_placeholder(parameter);
+        for (const auto& parameter : legacy_params) {
+            if (parameter.value("required", false)) {
+                arguments[parameter.value("name", std::string())] =
+                    compact_tool_argument_placeholder(parameter);
             }
         }
         call_example = "<tool_call>{\"tool\":" + json(tool.name()).dump();
-        if (!tool.parameters().empty()) {
+        if (!legacy_params.empty()) {
             call_example += ",\"arguments\":" + arguments.dump();
         }
         call_example += "}</tool_call>";
@@ -1831,15 +1867,32 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     ProtoToolCallingOptions converted;
     converted.tools_json = tool_definitions_proto_to_json(proto);
 
-    if (proto.auto_execute()) {
-        converted.options.auto_execute = RAC_TRUE;
-    }
-    if (proto.has_temperature()) {
-        converted.options.temperature = proto.temperature();
-    }
-    if (proto.has_max_tokens()) {
-        converted.options.max_tokens = proto.max_tokens();
-    }
+    // PR #605 review issue #7: `converted.options` starts from
+    // RAC_TOOL_CALLING_OPTIONS_DEFAULT (auto_execute = true); the missing
+    // `else` here meant a caller's explicit `auto_execute = false` on the
+    // wire was silently discarded and this always resolved to true. Safe to
+    // fix unconditionally: `converted.options.auto_execute` is not read by
+    // anything downstream of this function today (only `tools_json`,
+    // `system_prompt`, and `format` feed the prompt-formatting callers of
+    // `tool_calling_options_from_proto`), so trusting the wire value
+    // directly changes no observed behavior while fixing the function's own
+    // contract for whenever this does get consumed.
+    //
+    // ToolCallingOptions.auto_execute is a plain (non-optional) proto3 bool
+    // with no wire presence, unlike the sibling
+    // ToolCallingSessionCreateRequest.auto_execute (`optional`, defaults to
+    // true only when *absent* -- see tool_calling_run_loop.cpp /
+    // tool_calling_session.cpp). "Explicitly false" and "field omitted" are
+    // therefore indistinguishable on this specific field; restoring real
+    // presence would need an IDL change, out of scope here.
+    converted.options.auto_execute = proto.auto_execute() ? RAC_TRUE : RAC_FALSE;
+    // ToolCallingOptions.temperature/max_tokens were deleted outright
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow): they duplicated
+    // the enclosing LLMGenerationOptions.temperature/max_output_tokens in
+    // every embedding that had one, and were meaningless on the 3 standalone
+    // verbs that don't. converted.options.{temperature,max_tokens} now keep
+    // their RAC_TOOL_CALLING_OPTIONS_DEFAULT values from this struct's own
+    // (unrelated) default init.
     if (proto.has_system_prompt()) {
         converted.system_prompt = proto.system_prompt();
     }
@@ -2077,18 +2130,79 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     const bool has_tool_call = parsed.has_tool_call == RAC_TRUE;
     result.set_has_tool_call(has_tool_call);
     result.set_remaining_text(parsed.clean_text ? parsed.clean_text : request.text());
-    if (has_tool_call) {
-        const int64_t call_number = parsed.call_id != 0 ? parsed.call_id : next_tool_call_id();
+
+    const auto append_parsed_call = [&result, &request](const rac_tool_call_t& call) {
+        const int64_t call_number = call.call_id != 0 ? call.call_id : next_tool_call_id();
         const int64_t created_at_ms = static_cast<int64_t>(std::time(nullptr)) * 1000;
         std::string call_id = "call_";
         call_id += std::to_string(call_number);
         auto* tool_call = result.add_tool_calls();
         tool_call->set_id(call_id);
-        tool_call->set_name(parsed.tool_name ? parsed.tool_name : "");
-        tool_call->set_arguments_json(parsed.arguments_json ? parsed.arguments_json : "{}");
-        tool_call->set_type("function");
+        tool_call->set_name(call.tool_name ? call.tool_name : "");
+        tool_call->set_arguments_json(call.arguments_json ? call.arguments_json : "{}");
+        // ToolCall.type (was the constant "function") was deleted outright
+        // (idl/tool_calling.proto, tools-reserve-dead-fields) — no code reads
+        // it, so there is nothing to set.
         tool_call->set_created_at_ms(created_at_ms);
         tool_call->set_raw_text(request.text());
+    };
+
+    if (has_tool_call) {
+        append_parsed_call(parsed);
+
+        // parallel_tool_calls: one model turn may emit several envelopes.
+        // The C parser extracts one envelope per invocation, so re-parse the
+        // clean text it hands back until no envelope remains. Only the caller
+        // that opted in pays this cost; the default path stays single-parse.
+        //
+        // Guardrails against a real failure mode observed with small models
+        // under AUTO (no grammar constraint): the model repeats the SAME
+        // tool call verbatim several times instead of moving on (a known
+        // small-model repetition/looping artifact, not distinct intent).
+        // Without a stop condition, harvesting every envelope in the output
+        // turns one stutter into N "legitimate" parallel calls, burns the
+        // max_tool_calls budget on duplicates, and starves the rest of the
+        // user's request. Stop harvesting the moment a call repeats the
+        // immediately-preceding (name, arguments) pair, and never harvest
+        // more than the request's own max_tool_calls budget.
+        if (request.has_options() && request.options().parallel_tool_calls()) {
+            const int32_t budget =
+                request.options().has_max_tool_calls() && request.options().max_tool_calls() > 0
+                    ? request.options().max_tool_calls()
+                    : 5;
+            std::string last_name = parsed.tool_name ? parsed.tool_name : "";
+            std::string last_args = parsed.arguments_json ? parsed.arguments_json : "{}";
+            std::string remainder = parsed.clean_text ? parsed.clean_text : "";
+            while (!remainder.empty() && result.tool_calls_size() < budget) {
+                rac_tool_call_t next{};
+                const rac_result_t next_rc =
+                    use_explicit_format
+                        ? rac_tool_call_parse_with_format(
+                              remainder.c_str(),
+                              rac_tool_call_format_from_name(
+                                  tool_format_key_from_proto(request.options().format())),
+                              &next)
+                        : rac_tool_call_parse(remainder.c_str(), &next);
+                if (next_rc != RAC_SUCCESS || next.has_tool_call != RAC_TRUE) {
+                    rac_tool_call_free(&next);
+                    break;
+                }
+                const std::string next_name = next.tool_name ? next.tool_name : "";
+                const std::string next_args = next.arguments_json ? next.arguments_json : "{}";
+                if (next_name == last_name && next_args == last_args) {
+                    // Repetition, not a second distinct call — stop here
+                    // rather than treat the stutter as further intent.
+                    rac_tool_call_free(&next);
+                    break;
+                }
+                append_parsed_call(next);
+                remainder = next.clean_text ? next.clean_text : "";
+                last_name = next_name;
+                last_args = next_args;
+                rac_tool_call_free(&next);
+            }
+            result.set_remaining_text(remainder);
+        }
     }
     result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     rac_tool_call_free(&parsed);
@@ -2262,10 +2376,11 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             }
             followup += "\nUsing all results above, answer the original question. ";
             if (keep_tools == RAC_TRUE) {
-                followup += "You may use another tool if needed.";
+                followup += "You may use another tool if needed. ";
             } else {
-                followup += "Do not emit tool calls or tool tags.";
+                followup += "Do not emit tool calls or tool tags. ";
             }
+            followup += kToolResultGroundingRule;
             prompt = dup_owned_string(followup);
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
@@ -2881,6 +2996,29 @@ extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
     return finalize_tool_validation(out_validation, errors, &args, &matched_tool_json);
 }
 
+// Today's date in UTC, formatted YYYY-MM-DD. Embedded into every tool prompt
+// (and the final web-search synthesis turn) because on-device models have no
+// notion of "now": with a 2023-era training cutoff they confidently invent
+// dates like "2024-01-01" when a tool argument or an answer needs one.
+// Grounding the prompt itself is the only fix that works across every model
+// family and every SDK — it cannot be forgotten by an app author.
+static std::string current_utc_date() {
+    const std::time_t now = std::time(nullptr);
+    std::tm utc{};
+#if defined(_WIN32)
+    if (gmtime_s(&utc, &now) != 0) {
+        return "unknown";
+    }
+#else
+    if (gmtime_r(&now, &utc) == nullptr) {
+        return "unknown";
+    }
+#endif
+    char value[11]{};
+    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
+                                                                       : std::string("unknown");
+}
+
 /**
  * @brief Generate format-specific tool calling instructions
  *
@@ -3076,7 +3214,12 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
-    prompt += "# TOOLS\n";
+    // Date grounding must precede everything else: models fill date-shaped
+    // tool arguments from training-data memory unless the true current date
+    // is right in front of them (see current_utc_date's rationale).
+    prompt += "Current date (UTC): ";
+    prompt += current_utc_date();
+    prompt += "\n\n# TOOLS\n";
     prompt += tools_json;
     prompt += "\n\n";
 
@@ -3084,8 +3227,14 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += get_format_example_json(actual_format);
 
     prompt += "\n\n## RULES\n";
+    // Soft AUTO framing (RUN-80): do not hard-code per-tool "ALWAYS call"
+    // rules here — that reintroduces small-model over-calling. Date grounding
+    // is additive and tool-agnostic.
     prompt += "- Call a tool only when it is needed to answer; otherwise reply normally.\n";
     prompt += "- Use only the tools listed above, with their exact names and parameters.\n";
+    prompt +=
+        "- Any date argument MUST be derived from the Current date above or from a date the "
+        "user explicitly stated. NEVER guess or recall dates from memory.\n";
 
     // Format-specific tag instructions (the parser keys on these exact tags, so a
     // tool call must always be wrapped in them — but this does NOT mean a tool must
@@ -3274,23 +3423,6 @@ static std::string compact_web_evidence_json(const char* tool_result_json) {
     return compact.empty() ? std::string(tool_result_json) : compact.dump();
 }
 
-static std::string current_utc_date() {
-    const std::time_t now = std::time(nullptr);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &now) != 0) {
-        return "unknown";
-    }
-#else
-    if (gmtime_r(&now, &utc) == nullptr) {
-        return "unknown";
-    }
-#endif
-    char value[11]{};
-    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
-                                                                       : std::string("unknown");
-}
-
 extern "C" rac_result_t
 rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char* tools_prompt,
                                     const char* tool_name, const char* tool_result_json,
@@ -3348,11 +3480,13 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
 
     if (keep_tools_available != 0) {
         prompt += "Using this information, respond to the user's original question. ";
-        prompt += "You may use additional tools if needed.";
+        prompt += "You may use additional tools if needed. ";
+        prompt += kToolResultGroundingRule;
     } else if (!is_final_web_search) {
         prompt +=
             "Using this information, provide a natural response to the user's original question. ";
-        prompt += "Do not use any tool tags in your response - just respond naturally.";
+        prompt += "Do not use any tool tags in your response - just respond naturally. ";
+        prompt += kToolResultGroundingRule;
     }
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));

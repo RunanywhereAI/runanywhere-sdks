@@ -1,14 +1,17 @@
 import {
   LLMGenerateRequest,
   LLMStreamEvent,
+  LLMStreamEventKind,
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
+  FinishReason,
   LLMGenerationOptions,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
@@ -62,6 +65,15 @@ export function requireLlamaWorkerHost(
   return host;
 }
 
+/**
+ * `LLMStreamEvent` has no `isFinal` boolean; the terminal discriminator is
+ * `eventKind === COMPLETED | ERROR`.
+ */
+function isTerminalLLMStreamEvent(event: ProtoLLMStreamEvent): boolean {
+  return event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED
+    || event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR;
+}
+
 export class LLMProtoAdapter {
   static tryDefault(): LLMProtoAdapter | null {
     const mod = adapterState.modalitySlots.llm;
@@ -101,17 +113,11 @@ export class LLMProtoAdapter {
   }
 
   generateStream(request: ProtoLLMGenerateRequest): AsyncIterable<ProtoLLMStreamEvent> {
-    const options = request.options;
     const encoded = LLMGenerateRequest.encode({
       ...request,
       options: LLMGenerationOptions.fromPartial({
-        maxTokens: options?.maxTokens ?? 100,
-        temperature: options?.temperature ?? 0.8,
-        topP: options?.topP ?? 1.0,
-        topK: options?.topK ?? 0,
-        repetitionPenalty: options?.repetitionPenalty ?? 1.0,
-        ...options,
-        streamingEnabled: true,
+        ...lLMGenerationOptionsDefaults(),
+        ...request.options,
       }),
     }).finish();
 
@@ -134,7 +140,7 @@ export class LLMProtoAdapter {
         { kind: 'stream.llm.generate', handle: 0, requestBytes: encoded },
         LLMStreamEvent,
         {
-          stopWhen: (event) => event.isFinal,
+          stopWhen: isTerminalLLMStreamEvent,
           onCancel: () => { this.cancel(); },
         },
       );
@@ -153,7 +159,7 @@ export class LLMProtoAdapter {
           )
         ))
       ),
-      (event) => event.isFinal,
+      isTerminalLLMStreamEvent,
       () => {
         this.cancel();
       },
@@ -161,14 +167,13 @@ export class LLMProtoAdapter {
       // rc synthesizes a terminal error event instead of rejecting the
       // iterator.
       (rc) => LLMStreamEvent.fromPartial({
-        isFinal: true,
-        finishReason: 'error',
-        errorCode: rc,
-        errorMessage: SDKException.fromRACResult(
+        eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+        finishReason: FinishReason.FINISH_REASON_ERROR,
+        error: SDKException.fromRACResult(
           rc,
           `LLM stream failed: ${rc}`,
           { module: this.module, logger },
-        ).message,
+        ).proto,
       }),
     );
   }

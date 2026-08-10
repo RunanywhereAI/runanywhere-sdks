@@ -16,25 +16,9 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Speech-activity lifecycle kind.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:235               (started, ended)
- *   Kotlin VADTypes.kt:171                  (STARTED, ENDED)
- *   Dart   runanywhere_vad.dart:28          (started, ended)
- *   RN     VADTypes.ts:43                   ('started' | 'ended')
- *   Web    VADTypes.ts:8                    (Started, Ended, Ongoing)   ← only SDK with ONGOING
- *   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
- * Canonical union: STARTED, ENDED, ONGOING.
- * ---------------------------------------------------------------------------
- */
 public enum class SpeechActivityKind(
   override val `value`: Int,
 ) : WireEnum {
-  /**
-   * Reserved (proto3 default)
-   */
   SPEECH_ACTIVITY_KIND_UNSPECIFIED(0),
   SPEECH_ACTIVITY_KIND_SPEECH_STARTED(1),
   SPEECH_ACTIVITY_KIND_SPEECH_ENDED(2),

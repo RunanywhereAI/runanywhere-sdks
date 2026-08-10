@@ -19,6 +19,10 @@ import 'package:runanywhere/public/runanywhere.dart';
 void main() {
   group('Solutions generated surface', () {
     test('SolutionConfig carries voice agent oneof fields', () {
+      // `VoiceAgentConfig.typeKind` was deleted outright (idl/solutions.
+      // proto): `SolutionConfig`'s own `solution` oneof discriminator
+      // (`hasVoiceAgent()`) already says which solution type this is, so
+      // the redundant per-config type tag has no replacement field.
       final config = SolutionConfig()
         ..voiceAgent = (VoiceAgentConfig()
           ..llmModelId = 'qwen3-4b-q4_k_m'
@@ -27,8 +31,7 @@ void main() {
           ..vadModelId = 'silero-v5'
           ..sampleRateHz = 16000
           ..chunkMs = 20
-          ..maxContextTokens = 4096
-          ..typeKind = SolutionType.SOLUTION_TYPE_VOICE_AGENT);
+          ..maxContextTokens = 4096);
 
       expect(config.hasVoiceAgent(), isTrue);
       final voiceAgent = config.voiceAgent;
@@ -39,7 +42,6 @@ void main() {
       expect(voiceAgent.sampleRateHz, 16000);
       expect(voiceAgent.chunkMs, 20);
       expect(voiceAgent.maxContextTokens, 4096);
-      expect(voiceAgent.typeKind, SolutionType.SOLUTION_TYPE_VOICE_AGENT);
     });
 
     test('SolutionConfig round-trips through proto bytes', () {

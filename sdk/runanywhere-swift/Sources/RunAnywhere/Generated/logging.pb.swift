@@ -8,17 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — cross-platform logging configuration + records.
+// RunAnywhere IDL — cross-platform logging configuration and records.
 //
-// This file is the single source of truth for the structured logging types
-// consumed by every SDK. Platform loggers add only sink-specific behavior.
-//
-// LogLevel mirrors the C ABI `rac_log_level_t`
-// (sdk/runanywhere-commons/include/rac/core/rac_types.h:196) EXACTLY, so the
-// generated enum round-trips with the platform-adapter `log` callback
-// (rac_platform_adapter.h) without a translation table. Public SDK logging
-// APIs consume this canonical enum directly; platform-local adapters preserve
-// the same trace=0..fatal=5 numeric contract.
+// None of these types reach commons today: commons owns RAC_LOG_* and the
+// platform-adapter log callback, while this config is read SDK-side only.
 
 import SwiftProtobuf
 
@@ -32,12 +25,9 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
-/// 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
-/// same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
-/// SdkInitEnvironment (0=DEVELOPMENT).
-/// ---------------------------------------------------------------------------
+/// Mirrors rac_log_level_t exactly so the generated enum round-trips with the
+/// platform-adapter log callback without a translation table. 0 is TRACE, not
+/// UNSPECIFIED, to keep numeric parity with the C enum.
 public nonisolated enum RALogLevel: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case trace // = 0
@@ -88,28 +78,23 @@ public nonisolated enum RALogLevel: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// ---------------------------------------------------------------------------
-/// SDK logging configuration. Per-environment presets
-/// (development/staging/production) stay in each SDK as factory helpers.
-/// ---------------------------------------------------------------------------
+/// Per-environment presets stay in each SDK as factory helpers.
 public nonisolated struct RALoggingConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Write logs to the platform-local sink (os_log / Logcat / console).
+  /// The platform-local sink: os_log, Logcat, or console.
   public var enableLocalLogging: Bool = false
 
-  /// Minimum severity emitted. Messages below this level are dropped.
+  /// Records below this level are dropped.
   public var minLogLevel: RALogLevel = .trace
 
-  /// Attach file:line:function source location to each record.
   public var includeSourceLocation: Bool = false
 
-  /// Attach device/build metadata (model, os version, app build) to records.
+  /// Device model, OS version, app build.
   public var includeDeviceMetadata: Bool = false
 
-  /// Forward records to the remote logging pipeline.
   public var enableRemoteLogging: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -117,42 +102,35 @@ public nonisolated struct RALoggingConfiguration: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// A single structured log record. Mirrors the per-SDK LogEntry shape.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RALogEntry: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Wall-clock epoch milliseconds.
   public var timestampUnixMs: Int64 = 0
 
   public var level: RALogLevel = .trace
 
-  /// Subsystem/tag (e.g. "STT", "Download").
+  /// Subsystem tag, e.g. "STT".
   public var category: String = String()
 
   public var message: String = String()
 
-  /// Optional structured context.
   public var metadata: Dictionary<String,String> = [:]
 
-  /// Optional source location + context (Kotlin LogEntry carries these as
-  /// first-class fields; other SDKs leave them empty). `line`/`error_code`
-  /// use 0 as "unset".
+  /// Kotlin carries these as first-class fields; other SDKs leave them empty.
+  /// 0 means unset for line and error_code.
   public var file: String = String()
 
   public var line: Int32 = 0
 
   public var function: String = String()
 
-  /// SDKError code, when the record describes an error.
   public var errorCode: Int32 = 0
 
   public var modelID: String = String()
 
-  public var framework: String = String()
+  public var framework: RAInferenceFramework = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -169,7 +147,7 @@ nonisolated extension RALogLevel: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALoggingConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoggingConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}enable_local_logging\0\u{3}min_log_level\0\u{3}include_source_location\0\u{3}include_device_metadata\0\u{3}enable_remote_logging\0\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}enable_local_logging\0\u{3}min_log_level\0\u{3}include_source_location\0\u{3}include_device_metadata\0\u{3}enable_remote_logging\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -237,7 +215,7 @@ nonisolated extension RALogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 8: try { try decoder.decodeSingularStringField(value: &self.function) }()
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.framework) }()
+      case 11: try { try decoder.decodeSingularEnumField(value: &self.framework) }()
       default: break
       }
     }
@@ -274,8 +252,8 @@ nonisolated extension RALogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 10)
     }
-    if !self.framework.isEmpty {
-      try visitor.visitSingularStringField(value: self.framework, fieldNumber: 11)
+    if self.framework != .unspecified {
+      try visitor.visitSingularEnumField(value: self.framework, fieldNumber: 11)
     }
     try unknownFields.traverse(visitor: &visitor)
   }

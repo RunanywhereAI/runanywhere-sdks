@@ -74,20 +74,11 @@ public class STTStreamEvent(
   )
   public val final_output: STTOutput? = null,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 7,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -106,8 +97,7 @@ public class STTStreamEvent(
     if (kind != other.kind) return false
     if (partial != other.partial) return false
     if (final_output != other.final_output) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -121,8 +111,7 @@ public class STTStreamEvent(
       result = result * 37 + kind.hashCode()
       result = result * 37 + (partial?.hashCode() ?: 0)
       result = result * 37 + (final_output?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -136,8 +125,7 @@ public class STTStreamEvent(
     result += """kind=$kind"""
     if (partial != null) result += """partial=$partial"""
     if (final_output != null) result += """final_output=$final_output"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "STTStreamEvent{", separator = ", ", postfix = "}")
   }
 
@@ -148,10 +136,9 @@ public class STTStreamEvent(
     kind: STTStreamEventKind = this.kind,
     partial: STTPartialResult? = this.partial,
     final_output: STTOutput? = this.final_output,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): STTStreamEvent = STTStreamEvent(seq, timestamp_us, request_id, kind, partial, final_output, error_message, error_code, unknownFields)
+  ): STTStreamEvent = STTStreamEvent(seq, timestamp_us, request_id, kind, partial, final_output, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -179,10 +166,7 @@ public class STTStreamEvent(
         }
         size += STTPartialResult.ADAPTER.encodedSizeWithTag(5, value.partial)
         size += STTOutput.ADAPTER.encodedSizeWithTag(6, value.final_output)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -201,19 +185,13 @@ public class STTStreamEvent(
         }
         STTPartialResult.ADAPTER.encodeWithTag(writer, 5, value.partial)
         STTOutput.ADAPTER.encodeWithTag(writer, 6, value.final_output)
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         STTOutput.ADAPTER.encodeWithTag(writer, 6, value.final_output)
         STTPartialResult.ADAPTER.encodeWithTag(writer, 5, value.partial)
         if (value.kind != ai.runanywhere.proto.v1.STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED) {
@@ -237,8 +215,7 @@ public class STTStreamEvent(
         var kind: STTStreamEventKind = STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED
         var partial: STTPartialResult? = null
         var final_output: STTOutput? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -251,8 +228,7 @@ public class STTStreamEvent(
             }
             5 -> partial = STTPartialResult.ADAPTER.decode(reader)
             6 -> final_output = STTOutput.ADAPTER.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
-            8 -> error_code = ProtoAdapter.INT32.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -263,8 +239,7 @@ public class STTStreamEvent(
           kind = kind,
           partial = partial,
           final_output = final_output,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -272,6 +247,7 @@ public class STTStreamEvent(
       override fun redact(`value`: STTStreamEvent): STTStreamEvent = value.copy(
         partial = value.partial?.let(STTPartialResult.ADAPTER::redact),
         final_output = value.final_output?.let(STTOutput.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

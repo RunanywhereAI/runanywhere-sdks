@@ -115,12 +115,13 @@ void register_serve(CLI::App& app, GlobalOptions& options) {
     auto no_cors = std::make_shared<bool>(false);
     cmd->add_option("model", *ref,
                     "LLM to serve (default: " + std::string(kDefaultServeModel) + ")");
-    cmd->add_option("--host,-H", *host, "Bind address (default 127.0.0.1)");
-    cmd->add_option("--port,-p", *port, "Port (default 8080)");
-    cmd->add_option("--context,-c", *context, "Context window tokens (default 8192)");
-    cmd->add_option("--threads,-t", *threads, "Inference threads (default 4)");
-    cmd->add_option("--gpu-layers,--ngl", *gpu_layers, "GPU layers to offload (default 0)");
-    cmd->add_flag("--no-cors", *no_cors, "Disable CORS headers");
+    cmd->add_option("--host,-H", *host, "Bind to this address (default 127.0.0.1)");
+    cmd->add_option("--port,-p", *port, "Listen on this port (default 8080)");
+    cmd->add_option("--context-length,--context,-c", *context,
+                    "Size the context window in tokens (default 8192)");
+    cmd->add_option("--threads,-t", *threads, "Run inference on this many threads (default 4)");
+    cmd->add_option("--gpu-layers,--ngl", *gpu_layers, "Offload this many layers to the GPU");
+    cmd->add_flag("--no-cors", *no_cors, "Refuse cross-origin browser requests");
     cmd->callback([&options, ref, host, port, context, threads, gpu_layers, no_cors]() {
         const int exit_code = run_serve(options, *ref, *host, *port, *context, *threads,
                                         *gpu_layers, *no_cors);

@@ -28,17 +28,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Storage operation contracts.
- *
- * Platform callbacks own filesystem permissions, OS quota APIs, and any
- * sandbox-specific file handles. These messages carry normalized byte counts,
- * paths, model identifiers, and C++ workflow decisions/results so Swift,
- * Kotlin, Dart/Flutter, React Native, and Web can expose one generated API
- * surface for availability checks and deletion planning.
- * ---------------------------------------------------------------------------
- */
 public class StorageInfoRequest(
   @field:WireField(
     tag = 1,

@@ -51,6 +51,7 @@ class RunAnywhereStorage {
     String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -87,7 +88,11 @@ class RunAnywhereStorage {
     if (description != null) {
       request.description = description;
     }
-
+    // Computer-Use-Agent profile id (idl/cua.proto); lands on
+    // ModelInfo.cuaProfile so callers can discover CUA-drivable models.
+    if (cuaProfile != null && cuaProfile.isNotEmpty) {
+      request.cuaProfile = cuaProfile;
+    }
     final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
       request,
     );
@@ -120,6 +125,7 @@ class RunAnywhereStorage {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) async {
     // Map an explicit caller archive type to its artifact-type override.
     // When the caller passes none, leave the override unset so commons
@@ -162,6 +168,7 @@ class RunAnywhereStorage {
       memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
       supportsLora: supportsLora,
+      cuaProfile: cuaProfile,
     );
 
     // Preserve the caller-specified layout on the archive artifact. Commons
@@ -200,6 +207,7 @@ class RunAnywhereStorage {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? cuaProfile,
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -223,6 +231,9 @@ class RunAnywhereStorage {
     final resolvedDownloadSize = downloadSize ?? memoryRequirement;
     if (resolvedDownloadSize != null) {
       request.downloadSizeBytes = Int64(resolvedDownloadSize);
+    }
+    if (cuaProfile != null && cuaProfile.isNotEmpty) {
+      request.cuaProfile = cuaProfile;
     }
     final resolvedContextLength =
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
@@ -271,7 +282,7 @@ class RunAnywhereStorage {
   /// Execute a generated-proto storage delete request.
   ///
   /// Mirrors Swift `RunAnywhere.deleteStorage(_:)`; callers choose the typed
-  /// policy flags (`deleteFiles`, `clearRegistryPaths`, `unloadIfLoaded`,
+  /// policy flags (`keepFilesOnDisk`, `clearRegistryPaths`, `unloadIfLoaded`,
   /// `allowPlatformDelete`) while commons owns the actual plan/execution.
   static Future<StorageDeleteResult> deleteStorage(
     StorageDeleteRequest request,
@@ -287,11 +298,15 @@ class RunAnywhereStorage {
   /// entry returns to registered-not-downloaded (re-downloadable).
   /// Convenience over [deleteStorage] with the canonical flag set — mirrors
   /// Swift `RunAnywhere.deleteModel(_:)`.
+  ///
+  /// `delete_files` was renamed with an inverted polarity to
+  /// `keep_files_on_disk` (idl/storage_types.proto): the old
+  /// `deleteFiles: true` (do delete) is the new proto3 zero default, so it
+  /// is simply omitted below.
   static Future<StorageDeleteResult> deleteModel(String modelId) {
     return deleteStorage(
       StorageDeleteRequest(
         modelIds: [modelId],
-        deleteFiles: true,
         clearRegistryPaths: true,
         unloadIfLoaded: true,
         allowPlatformDelete: true,

@@ -4,16 +4,21 @@
 //
 //  Typed model-lifecycle stream over the raw SDK event bus.
 //
-//  Native commons signals "model loaded/unloaded" on THREE different proto
+//  Native commons signals "model loaded/unloaded" on TWO different proto
 //  channels depending on the path that performed the work:
 //    1. component-lifecycle events (EVENT_CATEGORY_COMPONENT,
 //       `event.componentLifecycle.currentState`) — the `loadModel` path,
-//    2. model events (`event.model.kind` load/unload completed),
-//    3. LLM generation events (`event.generation.kind` modelLoaded/Unloaded).
+//    2. model events (`event.model.kind` load/unload completed).
+//
+//  `GenerationEventKind.MODEL_LOADED`/`MODEL_UNLOADED` were deleted outright
+//  (idl/sdk_events.proto: "Model load/unload -> ModelEventKind") — the third
+//  channel this file used to fold in no longer exists; ModelEvent is now the
+//  sole channel for load/unload completions outside the component-lifecycle
+//  path.
 //
 //  Which channel fires when is an SDK-internal detail. Consumers should not
-//  need to know it — before this helper every app ViewModel hand-decoded all
-//  three with an identical switch. `EventBus.modelLifecycle` folds them into
+//  need to know it — before this helper every app ViewModel hand-decoded both
+//  with an identical switch. `EventBus.modelLifecycle` folds them into
 //  one typed stream; `modelLoaded` / `modelUnloaded` are pre-filtered views.
 //
 
@@ -50,7 +55,7 @@ public extension EventBus {
     /// Unified model load/unload stream across all native signal channels.
     ///
     /// ```swift
-    /// RunAnywhere.events.modelLifecycle
+    /// RunAnywhere.eventBus.modelLifecycle
     ///     .filter { $0.component == .llm }
     ///     .receive(on: DispatchQueue.main)
     ///     .sink { change in ... }
@@ -102,23 +107,21 @@ public extension EventBus {
             }
         }
 
-        // Channels 2 + 3: model events and LLM generation events.
-        let modelID = event.model.modelID.isEmpty
-            ? event.generation.modelID
-            : event.model.modelID
-
-        switch (event.model.kind, event.generation.kind) {
-        case (.loadCompleted, _), (_, .modelLoaded):
+        // Channel 2: model events. GenerationEventKind's own MODEL_LOADED/
+        // MODEL_UNLOADED cases were deleted outright (idl/sdk_events.proto),
+        // so this is the only remaining non-component-lifecycle channel.
+        switch event.model.kind {
+        case .loadCompleted:
             return RAModelLifecycleChange(
                 kind: .loaded,
-                modelID: modelID,
+                modelID: event.model.modelID,
                 component: event.component,
                 event: event
             )
-        case (.unloadCompleted, _), (_, .modelUnloaded):
+        case .unloadCompleted:
             return RAModelLifecycleChange(
                 kind: .unloaded,
-                modelID: modelID,
+                modelID: event.model.modelID,
                 component: event.component,
                 event: event
             )

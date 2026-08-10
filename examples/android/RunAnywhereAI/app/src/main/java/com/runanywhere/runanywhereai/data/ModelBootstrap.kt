@@ -1,9 +1,10 @@
 package com.runanywhere.runanywhereai.data
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.lora
+import com.runanywhere.sdk.public.extensions.loraCatalog
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -43,7 +44,7 @@ object ModelBootstrap {
     // checksums), so catalog metadata fixes reach existing installs without losing downloads.
     private suspend fun seedCatalog() {
         val regular = registerCatalogRows(ModelCatalog.models, "catalog")
-        val npu = registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
+        val npu = registerNpuCatalogRows()
         npuCatalogState.publish(npu.registeredIds)
         RACLog.i(
             "catalog seeded: ok=${regular.registered + npu.registered} " +
@@ -53,7 +54,7 @@ object ModelBootstrap {
     }
 
     suspend fun refreshNpuCatalog() {
-        val npu = registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
+        val npu = registerNpuCatalogRows()
         val registryRefreshed = try {
             RunAnywhere.refreshModelRegistry()
             true
@@ -71,6 +72,24 @@ object ModelBootstrap {
                 "skippedNative=${npu.skippedNative} " +
                 "registryRefreshed=$registryRefreshed",
         )
+    }
+
+    /**
+     * Probe once for the whole app-owned QHexRT list. This is only a device
+     * preflight: every supported row still registers its exact dedicated URL
+     * through the backend-neutral core API.
+     */
+    private suspend fun registerNpuCatalogRows(): CatalogSeedResult {
+        BackendAvailability.refresh()
+        if (!BackendAvailability.isAvailable(InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT)) {
+            return CatalogSeedResult(
+                registered = 0,
+                failed = 0,
+                skippedNative = ModelCatalog.npuCatalog.size,
+                registeredIds = emptySet(),
+            )
+        }
+        return registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
     }
 
     private suspend fun registerCatalogRows(
@@ -108,7 +127,7 @@ object ModelBootstrap {
     private suspend fun seedLora() {
         for (adapter in ModelCatalog.loraAdapters) {
             try {
-                RunAnywhere.lora.register(adapter)
+                RunAnywhere.loraCatalog.register(adapter)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

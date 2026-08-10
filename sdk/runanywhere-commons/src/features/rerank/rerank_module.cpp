@@ -148,29 +148,43 @@ rac_result_t protobuf_unavailable(rac_proto_buffer_t* out_result) {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
+// RerankCandidate was deleted from the proto: RerankRequest.candidates
+// (repeated RerankCandidate) was replaced by a flat `repeated string
+// documents` (fresh tag 4). The backend-facing rac_rerank_candidate_t still
+// carries an `id` slot, so this synthesizes the stringified array index as
+// the id -- exactly what every facade already did for RerankCandidate.id
+// before the wrapper was removed. `out_id_storage` owns the id strings for
+// the lifetime of the request; `out_candidates` borrows from it and from the
+// still-alive parsed request's document strings.
 rac_result_t validate_request(const runanywhere::v1::RerankRequest& request,
                               std::vector<rac_rerank_candidate_t>* out_candidates,
+                              std::vector<std::string>* out_id_storage,
                               rac_rerank_options_t* out_options) {
-    if (!out_candidates || !out_options) {
+    if (!out_candidates || !out_id_storage || !out_options) {
         return RAC_ERROR_NULL_POINTER;
     }
     out_candidates->clear();
+    out_id_storage->clear();
     *out_options = RAC_RERANK_OPTIONS_DEFAULT;
     if (request.query().empty()) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (static_cast<size_t>(request.candidates_size()) > kMaxCandidates) {
+    if (static_cast<size_t>(request.documents_size()) > kMaxCandidates) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     try {
-        out_candidates->reserve(static_cast<size_t>(request.candidates_size()));
+        out_candidates->reserve(static_cast<size_t>(request.documents_size()));
+        out_id_storage->reserve(static_cast<size_t>(request.documents_size()));
     } catch (...) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    for (const auto& candidate : request.candidates()) {
-        // Candidate strings are borrowed from the still-alive parsed request.
+    for (int i = 0; i < request.documents_size(); ++i) {
+        out_id_storage->push_back(std::to_string(i));
+    }
+    for (int i = 0; i < request.documents_size(); ++i) {
         out_candidates->push_back(
-            rac_rerank_candidate_t{candidate.id().c_str(), candidate.text().c_str()});
+            rac_rerank_candidate_t{(*out_id_storage)[static_cast<size_t>(i)].c_str(),
+                                   request.documents(i).c_str()});
     }
     if (request.has_options()) {
         out_options->top_n = request.options().top_n();
@@ -197,11 +211,13 @@ rac_result_t result_to_proto(const rac_rerank_result_t& source, size_t candidate
             out->Clear();
             return RAC_ERROR_ENCODING_ERROR;
         }
+        // RerankScoredItem.id and .rank were both deleted: id echoed a
+        // RerankCandidate.id that no longer exists (RerankCandidate is gone),
+        // and rank always equalled this item's position in
+        // RerankResult.items (already sorted by score descending).
         auto* destination = out->add_items();
-        destination->set_id(item.id ? item.id : "");
-        destination->set_score(item.score);
-        destination->set_original_index(item.original_index);
-        destination->set_rank(item.rank);
+        destination->set_relevance_score(item.score);
+        destination->set_index(item.original_index);
     }
     out->set_processing_time_ms(source.processing_time_ms);
     // Prefer the commons-known logical model id (the lifecycle-resolved id passed
@@ -233,8 +249,9 @@ rac_result_t rerank_with_service(rac_handle_t service, const char* model_id,
     }
 
     std::vector<rac_rerank_candidate_t> candidates;
+    std::vector<std::string> id_storage;
     rac_rerank_options_t options = RAC_RERANK_OPTIONS_DEFAULT;
-    rac_result_t rc = validate_request(request, &candidates, &options);
+    rac_result_t rc = validate_request(request, &candidates, &id_storage, &options);
     if (rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, rc, "invalid rerank request");
     }

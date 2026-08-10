@@ -270,7 +270,7 @@ export class SherpaONNXBridge {
       // from being overwritten.
       await this._initCommons(this._module, this._platformAdapter.getAdapterPtr());
       this._bridgeOwnedInit = true;
-      completeNativePhase1ForModule(this._module);
+      await completeNativePhase1ForModule(this._module);
 
       // Claim speech + embedding + semantic segmentation + RAG. The dedicated racommons-onnx-sherpa
       // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
@@ -418,8 +418,14 @@ export class SherpaONNXBridge {
     try {
       const factoryStartedAt = Date.now();
       module = await factory({
-        print: (text: string) => logger.info(text),
-        printErr: (text: string) => logger.error(text),
+        // Commons writes every diagnostic to stderr, so `printErr` carries
+        // INFO chatter as well as real faults; routing the whole stream to
+        // `logger.error` typed "Diffusion model registry initialized" as a
+        // page error and buried the genuine ones. `native()` reads the level
+        // out of the line's own `[RAC][LEVEL]` prefix and falls back to the
+        // stream for anything ONNX Runtime wrote itself.
+        print: (text: string) => logger.native(text, 'out'),
+        printErr: (text: string) => logger.native(text, 'err'),
         locateFile: (path: string) => baseUrl + path,
       });
       logTimedStep('racommons-onnx-sherpa factory()', factoryStartedAt);

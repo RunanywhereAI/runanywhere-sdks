@@ -166,8 +166,6 @@ class _RagDemoViewState extends State<RagDemoView> {
               const Divider(height: 1),
               _buildDocumentStatusBar(),
               const Divider(height: 1),
-              _buildRetrievalOptions(),
-              const Divider(height: 1),
               if (_viewModel.error != null) _buildErrorBanner(),
               Expanded(child: _buildMessagesArea()),
               _buildInputBar(),
@@ -205,30 +203,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     );
   }
 
-  // Retrieval-quality toggles backed by the public SDK RAG options: rerank
-  // (RAGConfiguration.rerankResults) and multi-query (RAGQueryOptions.enableMultiQuery).
-  Widget _buildRetrievalOptions() {
-    return Column(
-      children: [
-        SwitchListTile(
-          dense: true,
-          title: const Text('Rerank results'),
-          subtitle: const Text('LLM re-scores retrieved chunks for relevance'),
-          value: _viewModel.rerankEnabled,
-          onChanged: (value) => unawaited(_viewModel.setRerankEnabled(value)),
-        ),
-        SwitchListTile(
-          dense: true,
-          title: const Text('Multi-query expansion'),
-          subtitle: const Text(
-            'Rewrites the question into variants, fuses results',
-          ),
-          value: _viewModel.multiQueryEnabled,
-          onChanged: (value) => _viewModel.multiQueryEnabled = value,
-        ),
-      ],
-    );
-  }
 
   Widget _buildModelPickerRow({
     required String label,
@@ -678,7 +652,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
             // Expandable chunks section (assistant only)
             if (!_isUser &&
                 widget.message.result != null &&
-                widget.message.result!.retrievedChunks.isNotEmpty)
+                widget.message.result!.sources.isNotEmpty)
               _buildChunksSection(context, widget.message.result!),
           ],
         ),
@@ -686,16 +660,14 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildTimingMetrics(BuildContext context, sdk.RAGResult result) {
-    final retrievalMs = result.retrievalTimeMs.toInt();
-    final generationS = (result.generationTimeMs.toInt() / 1000)
-        .toStringAsFixed(1);
-    final totalS = (result.totalTimeMs.toInt() / 1000).toStringAsFixed(1);
+  Widget _buildTimingMetrics(BuildContext context, sdk.RagResult result) {
+    final ttft = result.metrics.timeToFirstTokenMs;
+    final tps = result.metrics.tokensPerSecond.toStringAsFixed(1);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xSmall),
       child: Text(
-        'Retrieved: ${retrievalMs}ms  Generated: ${generationS}s  Total: ${totalS}s',
+        'First token: ${ttft}ms  Throughput: $tps tok/s',
         style: AppTypography.caption(
           context,
         ).copyWith(color: AppColors.textSecondary(context)),
@@ -703,8 +675,8 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildChunksSection(BuildContext context, sdk.RAGResult result) {
-    final count = result.retrievedChunks.length;
+  Widget _buildChunksSection(BuildContext context, sdk.RagResult result) {
+    final count = result.sources.length;
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.smallMedium),
@@ -745,7 +717,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
           // Expanded chunk list
           if (_showChunks) ...[
             const SizedBox(height: AppSpacing.xSmall),
-            ...result.retrievedChunks.map(
+            ...result.sources.map(
               (chunk) => _buildChunkCard(context, chunk),
             ),
           ],
@@ -754,12 +726,12 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildChunkCard(BuildContext context, sdk.RAGSearchResult chunk) {
+  Widget _buildChunkCard(BuildContext context, sdk.Match chunk) {
     const maxSnippetLength = 200;
     final snippet = chunk.text.length > maxSnippetLength
         ? '${chunk.text.substring(0, maxSnippetLength)}...'
         : chunk.text;
-    final scorePercent = (chunk.similarityScore * 100).toStringAsFixed(1);
+    final scorePercent = (chunk.score * 100).toStringAsFixed(1);
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.xSmall),

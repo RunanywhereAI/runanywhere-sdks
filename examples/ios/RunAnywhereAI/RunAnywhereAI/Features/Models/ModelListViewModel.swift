@@ -14,13 +14,22 @@ import Combine
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
 
+    private static let lastLoadedModelKey = "chat.lastLoadedModelID"
+
     @Published var availableModels: [RAModelInfo] = []
-    @Published var currentModel: RAModelInfo?
+    @Published var currentModel: RAModelInfo? {
+        didSet {
+            if let id = currentModel?.id {
+                UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
+            }
+        }
+    }
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
     private var attemptedDefaultChatModelLoad = false
+    private var attemptedLastModelLoad = false
 
     // MARK: - Initialization
 
@@ -35,7 +44,7 @@ class ModelListViewModel: ObservableObject {
 
     /// Subscribe to the SDK's typed lifecycle stream for real-time model state
     private func subscribeToModelEvents() {
-        RunAnywhere.events.modelLifecycle
+        RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 guard let self = self else { return }
@@ -77,15 +86,7 @@ class ModelListViewModel: ObservableObject {
             // 2. Models from framework adapters
             // 3. Models from local storage
             // 4. User-added models
-            let listResult = await RunAnywhere.listModels()
-            guard listResult.success else {
-                throw SDKException(
-                    code: .processingFailed,
-                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
-                    category: .internal
-                )
-            }
-            let allModels = listResult.models.models
+            let allModels = try await RunAnywhere.models.list()
 
             // Filter based on iOS version if needed
             var filteredModels = allModels
@@ -108,6 +109,7 @@ class ModelListViewModel: ObservableObject {
 
             // Sync currentModel with SDK's current model state
             await syncCurrentModelWithSDK()
+            await loadLastModelIfAvailable()
             await loadDefaultChatModelIfAvailable()
         } catch {
             print("Failed to load models from SDK: \(error)")
@@ -120,9 +122,9 @@ class ModelListViewModel: ObservableObject {
 
     /// Sync current model state with SDK
     private func syncCurrentModelWithSDK() async {
-        let snapshot = RunAnywhere.currentModel()
-        if snapshot.found,
-           let matchingModel = availableModels.first(where: { $0.id == snapshot.modelID }) {
+        let state = await RunAnywhere.models.state()
+        if let loaded = state.loaded[.language],
+           let matchingModel = availableModels.first(where: { $0.id == loaded.id }) {
             currentModel = matchingModel
             print("ModelListViewModel: Restored currentModel from SDK: \(matchingModel.name)")
         }
@@ -130,6 +132,29 @@ class ModelListViewModel: ObservableObject {
 
     func setCurrentModel(_ model: RAModelInfo?) {
         currentModel = model
+    }
+
+    /// Auto-load the model the user last had loaded, so a relaunch restores the
+    /// chat without a manual pick. Only attempts once per session and only when
+    /// nothing is already loaded and the model is downloaded and ready.
+    func loadLastModelIfAvailable() async {
+        guard !isLoadingModel, currentModel == nil, !attemptedLastModelLoad else { return }
+        attemptedLastModelLoad = true
+
+        guard let lastID = UserDefaults.standard.string(forKey: Self.lastLoadedModelKey),
+              let model = availableModels.first(where: { $0.id == lastID && $0.isAvailableForUse }) else {
+            return
+        }
+
+        isLoadingModel = true
+        defer { isLoadingModel = false }
+
+        do {
+            try await loadModel(model)
+            print("ModelListViewModel: Auto-loaded last model \(model.name)")
+        } catch {
+            print("ModelListViewModel: Failed to auto-load last model: \(error.localizedDescription)")
+        }
     }
 
     func loadDefaultChatModelIfAvailable() async {
@@ -180,28 +205,13 @@ class ModelListViewModel: ObservableObject {
         }
     }
 
-    func downloadModel(_ model: RAModelInfo) async throws {
-        try await RunAnywhere.downloadModel(model) { progress in
-            print("Download progress: \(Int(Double(progress.overallProgress) * 100))%")
-        }
-
-        // Reload models after download
-        await loadModelsFromRegistry()
-    }
+    // `downloadModel(_:)` was removed: it had no callers, and its progress
+    // handler only `print`ed a percentage. Downloads go through
+    // `ModelDownloadTracker`, which keeps the cancellable task and the
+    // bytes/speed/ETA snapshot the UI shows.
 
     func deleteModel(_ model: RAModelInfo) async throws {
-        let result = await RunAnywhere.deleteModel(model.id)
-        guard result.success else {
-            throw NSError(
-                domain: "RunAnywhereAI.ModelListViewModel",
-                code: 1,
-                userInfo: [
-                    NSLocalizedDescriptionKey: result.errorMessage.isEmpty
-                        ? "Failed to delete model"
-                        : result.errorMessage
-                ]
-            )
-        }
+        try await RunAnywhere.models.delete(id: model.id)
         if currentModel?.id == model.id {
             currentModel = nil
         }
@@ -210,29 +220,22 @@ class ModelListViewModel: ObservableObject {
     }
 
     func loadModel(_ model: RAModelInfo) async throws {
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        if model.category != .unspecified {
-            request.category = model.category
-        }
-        let result = await RunAnywhere.loadModel(request)
-        guard result.success else {
-            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
-        }
+        try await RunAnywhere.models.load(id: model.id)
         currentModel = model
     }
 
-    /// Add a custom model from URL via the canonical `RunAnywhere.registerModel`
-    /// public API. The SDK composes the proto import request internally via
-    /// `rac_register_model_from_url_proto`; example side only collects user
-    /// input and reloads the registry.
+    /// Add a custom model from URL via the canonical `RunAnywhere.models.register`
+    /// public API. The SDK composes the proto import request internally; example
+    /// side only collects user input and reloads the registry.
     func addModelFromURL(name: String, url: URL, framework: InferenceFramework, estimatedSize: Int64?) async {
         do {
-            _ = try await RunAnywhere.registerModel(
-                name: name,
-                url: url.absoluteString,
-                framework: framework,
-                memoryRequirement: estimatedSize
+            _ = try await RunAnywhere.models.register(
+                .url(
+                    url.absoluteString,
+                    name: name,
+                    framework: framework,
+                    memoryRequirementBytes: estimatedSize
+                )
             )
         } catch {
             print("Failed to register model: \(error.localizedDescription)")

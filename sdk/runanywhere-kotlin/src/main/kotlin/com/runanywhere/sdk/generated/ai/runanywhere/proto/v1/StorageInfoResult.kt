@@ -33,35 +33,26 @@ import okio.ByteString
 
 public class StorageInfoResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.StorageInfo#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val info: StorageInfo? = null,
+  warnings: List<String> = emptyList(),
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 2,
   )
-  public val error_message: String = "",
-  warnings: List<String> = emptyList(),
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageInfoResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -75,10 +66,9 @@ public class StorageInfoResult(
     if (other === this) return true
     if (other !is StorageInfoResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (info != other.info) return false
-    if (error_message != other.error_message) return false
     if (warnings != other.warnings) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -86,10 +76,9 @@ public class StorageInfoResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (info?.hashCode() ?: 0)
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + warnings.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -97,20 +86,18 @@ public class StorageInfoResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (info != null) result += """info=$info"""
-    result += """error_message=${sanitize(error_message)}"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "StorageInfoResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     info: StorageInfo? = this.info,
-    error_message: String = this.error_message,
     warnings: List<String> = this.warnings,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageInfoResult = StorageInfoResult(success, info, error_message, warnings, unknownFields)
+  ): StorageInfoResult = StorageInfoResult(info, warnings, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -124,72 +111,55 @@ public class StorageInfoResult(
     ) {
       override fun encodedSize(`value`: StorageInfoResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.info != null) {
           size += StorageInfo.ADAPTER.encodedSizeWithTag(2, value.info)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
-        }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.warnings)
+        size += SDKError.ADAPTER.encodedSizeWithTag(5, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: StorageInfoResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.info != null) {
           StorageInfo.ADAPTER.encodeWithTag(writer, 2, value.info)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageInfoResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         if (value.info != null) {
           StorageInfo.ADAPTER.encodeWithTag(writer, 2, value.info)
-        }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
         }
       }
 
       override fun decode(reader: ProtoReader): StorageInfoResult {
-        var success: Boolean = false
         var info: StorageInfo? = null
-        var error_message: String = ""
         val warnings = mutableListOf<String>()
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> info = StorageInfo.ADAPTER.decode(reader)
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> warnings.add(ProtoAdapter.STRING.decode(reader))
+            5 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return StorageInfoResult(
-          success = success,
           info = info,
-          error_message = error_message,
           warnings = warnings,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: StorageInfoResult): StorageInfoResult = value.copy(
         info = value.info?.let(StorageInfo.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

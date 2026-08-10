@@ -23,7 +23,7 @@ import SwiftProtobuf
 // MARK: - Tool Registry (Thread-safe)
 
 /// Actor-based tool registry for thread-safe tool registration and lookup.
-private actor ToolRegistry {
+actor ToolRegistry {
     static let shared = ToolRegistry()
 
     private var tools: [String: RegisteredTool] = [:]
@@ -98,7 +98,7 @@ public extension RunAnywhere {
     ///         name: "get_weather",
     ///         description: "Gets current weather for a location",
     ///         parameters: [
-    ///             RAToolParameter(name: "location", type: .string, description: "City name")
+    ///             ToolParameter(name: "location", type: .string, description: "City name")
     ///         ]
     ///     )
     /// ) { args in
@@ -253,6 +253,11 @@ public extension RunAnywhere {
         toolChoice: RAToolChoiceMode? = nil,
         forcedToolName: String? = nil,
         validateCalls: Bool? = nil,
+        // TC-2: when true, one model turn may request multiple tools; commons
+        // executes the whole batch before one follow-up prompt instead of
+        // one LLM round-trip per tool. Default false preserves the
+        // historical single-call-per-turn behavior.
+        parallelToolCalls: Bool? = nil,
         history: [String] = []
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
@@ -260,22 +265,44 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        var tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions.defaults())
+        var tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions())
         if let toolChoice {
             tcOpts.toolChoice = toolChoice
         }
         if let forcedToolName {
             tcOpts.forcedToolName = forcedToolName
         }
+        if let parallelToolCalls {
+            tcOpts.parallelToolCalls = parallelToolCalls
+        }
+        if let validateCalls {
+            tcOpts.validateCalls = validateCalls
+        }
         let registeredTools = await ToolRegistry.shared.getAll()
-        let tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
+        tcOpts.tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
+
+        // idl/tool_calling.proto (tools-collapse-options-and-session-request)
+        // collapsed ToolCallingSessionCreateRequest to prompt/history/options:
+        // topP, systemPrompt, and disableThinking now live ONLY on
+        // ToolCallingOptions, so the outer LLMGenerationOptions values fall
+        // back onto tcOpts here rather than being re-published on the
+        // request envelope. temperature/maxOutputTokens have no home on the
+        // new request shape at all (commons keeps GenerationState's own
+        // greedy defaults for the tool loop) and are intentionally dropped.
+        if !tcOpts.hasTopP {
+            tcOpts.topP = options.topP
+        }
+        if !tcOpts.hasSystemPrompt || tcOpts.systemPrompt.isEmpty {
+            if options.hasSystemPrompt, !options.systemPrompt.isEmpty {
+                tcOpts.systemPrompt = options.systemPrompt
+            }
+        }
+        // Suppress thinking when either options surface asks for it.
+        tcOpts.disableThinking = tcOpts.disableThinking || (options.hasReasoning && options.reasoning.mode == .off)
 
         let request = makeRunLoopRequest(
             prompt: prompt,
-            options: options,
             toolOptions: tcOpts,
-            tools: tools,
-            validateCalls: validateCalls,
             history: history
         )
         let requestBytes = try request.serializedData()
@@ -370,9 +397,13 @@ public extension RunAnywhere {
         // The typed `result` map was removed — `resultJson` is the
         // canonical wire shape (the C++ tool-prompt formatter reads it
         // directly when building follow-up LLM prompts).
+        //
+        // `success` was deleted and replaced by `isError` with inverted
+        // polarity (idl/tool_calling.proto): a ToolResult nobody touched
+        // (isError == false, the proto3 zero value) reads as a good result.
         var toolResult = RAToolResult()
         toolResult.name = name
-        toolResult.success = success
+        toolResult.isError = !success
         toolResult.resultJson = RAToolValue.jsonString(from: result)
         if let error {
             toolResult.error = error
@@ -384,82 +415,39 @@ public extension RunAnywhere {
     }
 
     /// Build the `ToolCallingSessionCreateRequest` proto consumed by
-    /// `rac_tool_calling_run_loop_proto`. Applies `toolOptions`
-    /// overrides on top of the base LLM generation options and forwards the
-    /// registered tool list.
+    /// `rac_tool_calling_run_loop_proto`.
+    ///
+    /// idl/tool_calling.proto (tools-collapse-options-and-session-request)
+    /// collapsed this message to 3 fields — `prompt`, `history`
+    /// (`[RAToolCallingHistoryTurn]`), and `options`
+    /// (`RAToolCallingOptions`) — deleting the dozen knobs that used to be
+    /// re-published here (maxTokens, temperature, topP, tools, format,
+    /// maxToolCalls, autoExecute, replaceSystemPrompt,
+    /// requireJsonArguments, keepToolsAvailable, parallelToolCalls,
+    /// validateCalls, toolChoice, forcedToolName, disableThinking,
+    /// systemPrompt). Every one of them now lives exclusively on
+    /// `toolOptions`, which the caller has already merged with the
+    /// outer `LLMGenerationOptions` fallbacks.
     private static func makeRunLoopRequest(
         prompt: String,
-        options: RALLMGenerationOptions,
         toolOptions: RAToolCallingOptions,
-        tools: [RAToolDefinition],
-        validateCalls: Bool? = nil,
-        // Prior conversation turns as a flat alternating list
-        // `[user0, asst0, ...]`, EXCLUDING the current turn (which is `prompt`).
-        // commons threads these into every generate in the loop so multi-turn
-        // tool use keeps context. Same contract as the standard path's
-        // ChatMessage history, as strings.
+        // Prior conversation turns, EXCLUDING the current turn (which is
+        // `prompt`). commons threads these into every generate in the loop
+        // so multi-turn tool use keeps context. The wire shape moved from
+        // `repeated string` to `repeated ToolCallingHistoryTurn`
+        // (role + content); flat alternating [user0, asst0, ...] strings map
+        // onto alternating USER/ASSISTANT turns.
         history: [String] = []
     ) -> RAToolCallingSessionCreateRequest {
         var request = RAToolCallingSessionCreateRequest()
         request.prompt = prompt
-
-        let maxTokens: Int32
-        if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
-            maxTokens = toolOptions.maxTokens
-        } else {
-            maxTokens = options.maxTokens
+        request.options = toolOptions
+        request.history = history.enumerated().map { index, content in
+            var turn = RAToolCallingHistoryTurn()
+            turn.role = index.isMultiple(of: 2) ? .user : .assistant
+            turn.content = content
+            return turn
         }
-        request.maxTokens = maxTokens
-
-        let temperature: Float
-        if toolOptions.hasTemperature {
-            temperature = toolOptions.temperature
-        } else {
-            temperature = options.temperature
-        }
-        request.temperature = temperature
-        request.topP = options.topP
-
-        if toolOptions.hasSystemPrompt, !toolOptions.systemPrompt.isEmpty {
-            request.systemPrompt = toolOptions.systemPrompt
-        } else if options.hasSystemPrompt, !options.systemPrompt.isEmpty {
-            request.systemPrompt = options.systemPrompt
-        }
-
-        request.tools = tools
-        request.format = toolOptions.format
-        request.maxToolCalls = UInt32(toolOptions.maxToolCalls > 0 ? toolOptions.maxToolCalls : 5)
-        request.autoExecute = toolOptions.autoExecute
-        request.replaceSystemPrompt = toolOptions.replaceSystemPrompt
-        request.requireJsonArguments = toolOptions.requireJsonArguments
-        request.keepToolsAvailable = toolOptions.keepToolsAvailable
-        // `validate_calls` is `optional bool` on the proto so
-        // hosts that delegate validation/authorization to their executor (or
-        // use dynamic tool registries where argument inspection happens
-        // inside the executor) can opt out via `validateCalls: false`. When
-        // the caller did not supply a value, leave the field unset so
-        // commons applies its documented default (true).
-        if let validateCalls {
-            request.validateCalls = validateCalls
-        }
-        // Thread tool_choice / forced_tool_name
-        // all the way through to the commons request envelope (fields 7/8 on
-        // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
-        // them — not just the inline RAToolCallingOptions snapshot.
-        if toolOptions.toolChoice != .unspecified {
-            request.toolChoice = toolOptions.toolChoice
-        }
-        if toolOptions.hasForcedToolName, !toolOptions.forcedToolName.isEmpty {
-            request.forcedToolName = toolOptions.forcedToolName
-        }
-        // Suppress thinking when either options surface asks for it.
-        request.disableThinking = toolOptions.disableThinking || options.disableThinking
-        // Prior conversation turns (flat alternating [user, asst, ...] of prior
-        // turns, excluding the current turn) so the commons run-loop keeps
-        // multi-turn context. `history` is a swift-protobuf repeated field
-        // (proto field 19), assignable directly. Empty by default — a no-op
-        // for single-turn callers.
-        request.history = history
         return request
     }
 }
@@ -626,7 +614,7 @@ private final class HandleBox: @unchecked Sendable {
 private func failedResult(name: String, error: String) -> RAToolResult {
     var result = RAToolResult()
     result.name = name
-    result.success = false
+    result.isError = true
     result.resultJson = "{}"
     result.error = error
     return result

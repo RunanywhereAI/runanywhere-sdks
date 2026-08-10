@@ -15,7 +15,7 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * Inclusive numeric minimum used by validate() for integer fields.
+ * Inclusive bounds for integer fields.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

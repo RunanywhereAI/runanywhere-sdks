@@ -1,17 +1,23 @@
 /**
  * Segmentation Tab — semantic image segmentation over the canonical
- * `RunAnywhere.segment` facade (SegFormer / ADE20K-class models).
+ * `RunAnywhere.segmentation.segment` facade (SegFormer / ADE20K-class models).
  *
- * No browser segmentation engine or model ships in this build yet, so the shared
- * model sheet has nothing to offer and the run stays gated. This view is wired to
- * the canonical facade so it lights up automatically once a browser engine
- * registers a `.semanticSegmentation` model. Until then it:
+ * TWO SCREENS, ONE VIEW. No browser engine registers the segmentation
+ * capability in this build, so the model catalog has no `.semanticSegmentation`
+ * entry and the shared sheet would open empty. The view therefore renders the
+ * designed unavailable state (`components/modality-unavailable.ts`) whenever the
+ * catalog can offer nothing — rather than the previous arrangement, where the
+ * full working screen was drawn (a "Load Segmentation Model" button, an image
+ * picker, a permanently disabled Run) above a paragraph explaining that the
+ * picker it just showed was empty.
+ *
+ * When a catalog entry does exist, the working flow below is what runs:
  *
  *   1. Reports the SDK-owned lifecycle state for a loaded
  *      `.semanticSegmentation` model. Model supply/load is delegated to the SDK's
  *      model management (the shared model sheet) rather than reimplemented here.
  *   2. Accepts a user-picked image, decodes it to tightly-packed RGBA8 pixels,
- *      and runs `RunAnywhere.segment(request)`.
+ *      and runs `RunAnywhere.segmentation.segment(image)`.
  *   3. Renders the returned diagnostic mask overlaid on the source image and a
  *      per-class pixel summary.
  *
@@ -23,11 +29,13 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
-  SegmentationPixelFormat,
-  type SegmentationClassSummary,
+  type ClassInfo,
   type SegmentationResult,
 } from '@runanywhere/web';
+import { findLoadedModelForCategory } from '../components/model-selection';
 import { onModelStateChange, openSheet } from '../components/model-selection';
+import { renderModalityUnavailable } from '../components/modality-unavailable';
+import { getCatalogForCategories } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -85,6 +93,52 @@ export function initSegmentationTab(el: HTMLElement): TabLifecycle {
 
 function renderView(): void {
   const modelLoaded = isSegmentationModelLoaded();
+
+  // A picker can only offer what the catalog holds, and with no browser engine
+  // registering the capability the catalog holds nothing for it. Rendering the
+  // working screen anyway would put a "Load Segmentation Model" button in front
+  // of an empty sheet and a Run button that can never enable.
+  if (!modelLoaded && getCatalogForCategories(SEG_PICKER_FILTER).length === 0) {
+    renderUnavailable();
+    return;
+  }
+
+  renderWorkflow(modelLoaded);
+}
+
+function renderUnavailable(): void {
+  container.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-title">Segmentation</div>
+      <!-- Empty, but present: the toolbar is space-between, so without a
+           third child the shell's injected Back button and the title get
+           pushed to opposite edges. -->
+      <div class="toolbar-actions"></div>
+    </div>
+    <div class="scroll-area">
+      ${renderModalityUnavailable({
+        glyph: 'segments',
+        title: 'Segmentation',
+        summary:
+          'Segmentation labels every pixel of a photo with what it belongs to — sky, '
+          + 'road, a person — and hands back a coloured mask you can lay over the original.',
+        requirements: [
+          'No engine in this build serves it. The browser build ships llama.cpp for '
+            + 'text and vision and ONNX/Sherpa for speech; neither publishes a '
+            + 'segmentation capability.',
+          'With no engine, the model catalog has no segmentation model to list, so '
+            + 'there is nothing to choose and no download to start.',
+        ],
+        verb: 'RunAnywhere.segmentation.segment(image)',
+        elsewhere:
+          'Segmentation does run today in the iOS and Android RunAnywhere apps, where '
+          + 'the platform SDK ships an engine for it.',
+      })}
+    </div>
+  `;
+}
+
+function renderWorkflow(modelLoaded: boolean): void {
   const canRun = modelLoaded && image !== null && !isBusy;
 
   container.innerHTML = `
@@ -102,19 +156,15 @@ function renderView(): void {
         <ul class="feature-unavailable__list">
           <li><code>segmentation model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
         </ul>
-        <p class="text-secondary">
-          No browser segmentation engine or model ships in this build, so the picker
-          above stays empty and <code>RunAnywhere.segment</code> cannot be run here yet.
-          This flow lights up automatically once a browser engine registers a
-          <code>.semanticSegmentation</code> model; until then, run segmentation from a
-          native RunAnywhere app.
-        </p>
+        ${modelLoaded
+          ? ''
+          : '<p class="text-secondary">Choose a segmentation model from the button above to enable the run.</p>'}
       </div>
 
       <div class="docs-section">
         <h3>Image</h3>
         <p class="text-secondary">Pick a photo to segment. It is decoded to tightly-packed RGBA8 pixels for the SDK.</p>
-        <div class="toolbar-actions">
+        <div class="docs-actions">
           <button class="btn btn-secondary" id="seg-load-image-btn" ${!isBusy ? '' : 'disabled'}>
             Load image…
           </button>
@@ -127,10 +177,10 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Segment</h3>
         <p class="text-secondary">
-          Runs <code>RunAnywhere.segment(request)</code> on the loaded
+          Runs <code>RunAnywhere.segmentation.segment(image)</code> on the loaded
           <code>.semanticSegmentation</code> model and overlays the returned class mask.
         </p>
-        <div class="toolbar-actions">
+        <div class="docs-actions">
           <button class="btn btn-primary" id="seg-run-btn" ${canRun ? '' : 'disabled'}>
             ${isBusy ? 'Segmenting…' : 'Run segmentation'}
           </button>
@@ -273,18 +323,14 @@ async function onRun(): Promise<void> {
   renderView();
 
   try {
-    const result = await RunAnywhere.segment({
-      image: {
-        data: image.rgba,
-        width: image.width,
-        height: image.height,
-        pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8,
-      },
-      options: { includeDiagnosticRgba: true },
-    });
+    const startedAt = performance.now();
+    const result = await RunAnywhere.segmentation.segment(
+      RunAnywhere.ImageInput.rawRgba(image.rgba, image.width, image.height),
+      { includeDiagnosticImage: true },
+    );
     lastResult = result;
     setStatus(
-      `Done — ${result.classSummaries.length} classes in ${Math.round(result.processingTimeMs)}ms (${escapeHtml(result.modelId)}).`,
+      `Done — ${result.classes.length} classes in ${Math.round(performance.now() - startedAt)}ms.`,
     );
   } catch (err) {
     setStatus(`Segmentation failed: ${formatError(err)}`);
@@ -316,7 +362,7 @@ function buildOverlay(result: SegmentationResult, source: LoadedImage): HTMLElem
   base.src = source.previewUrl;
   base.onload = () => {
     ctx.drawImage(base, 0, 0, result.width, result.height);
-    const mask = result.diagnosticRgba;
+    const mask = result.diagnosticImage;
     if (mask && mask.byteLength === result.width * result.height * 4) {
       // Copy into a fresh ArrayBuffer-backed clamped array: the SDK bytes may
       // be backed by a SharedArrayBuffer (WASM heap), which ImageData rejects.
@@ -346,12 +392,12 @@ function buildClassSummary(result: SegmentationResult): HTMLElement {
 
   const list = document.createElement('ul');
   list.className = 'feature-unavailable__list';
-  const sorted = [...result.classSummaries].sort(
-    (a: SegmentationClassSummary, b: SegmentationClassSummary) => b.pixelCount - a.pixelCount,
+  const sorted = [...result.classes].sort(
+    (a: ClassInfo, b: ClassInfo) => b.pixelCount - a.pixelCount,
   );
   for (const summary of sorted) {
     const item = document.createElement('li');
-    const label = summary.label || `class ${summary.classId}`;
+    const label = summary.label || `class ${summary.id}`;
     const pct = (summary.fraction * 100).toFixed(1);
     item.innerHTML =
       `<strong>${escapeHtml(label)}</strong> — ${summary.pixelCount.toLocaleString()} px (${pct}%)`;
@@ -366,15 +412,7 @@ function buildClassSummary(result: SegmentationResult): HTMLElement {
 // ---------------------------------------------------------------------------
 
 function isSegmentationModelLoaded(): boolean {
-  try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
-      includeModelMetadata: false,
-    });
-    return Boolean(current?.found || current?.modelId);
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION) !== null;
 }
 
 function setStatus(text: string): void {

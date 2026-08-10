@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/storage_types.pb.dart' as storage_pb;
@@ -137,8 +138,9 @@ class DartBridgeStorage {
     );
     return result ??
         storage_pb.StorageInfoResult(
-          success: false,
-          errorMessage: 'Storage analyzer info proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Storage analyzer info proto API is unavailable',
+          ).error,
         );
   }
 
@@ -153,9 +155,9 @@ class DartBridgeStorage {
     );
     return result ??
         storage_pb.StorageAvailabilityResult(
-          success: false,
-          errorMessage:
-              'Storage analyzer availability proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Storage analyzer availability proto API is unavailable',
+          ).error,
         );
   }
 
@@ -170,7 +172,9 @@ class DartBridgeStorage {
     );
     return result ??
         storage_pb.StorageDeletePlan(
-          errorMessage: 'Storage analyzer delete-plan proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Storage analyzer delete-plan proto API is unavailable',
+          ).error,
         );
   }
 
@@ -185,8 +189,9 @@ class DartBridgeStorage {
     );
     return result ??
         storage_pb.StorageDeleteResult(
-          success: false,
-          errorMessage: 'Storage analyzer delete proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Storage analyzer delete proto API is unavailable',
+          ).error,
         );
   }
 

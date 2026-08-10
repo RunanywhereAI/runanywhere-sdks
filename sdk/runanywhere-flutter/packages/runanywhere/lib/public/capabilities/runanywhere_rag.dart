@@ -185,8 +185,8 @@ class RunAnywhereRAG {
       if (options != null) {
         effectiveOptions.mergeFromMessage(options);
       }
-      if (effectiveOptions.question.isEmpty) {
-        effectiveOptions.question = question;
+      if (effectiveOptions.query.isEmpty) {
+        effectiveOptions.query = question;
       }
 
       return await ragQuery(effectiveOptions);
@@ -218,8 +218,8 @@ class RunAnywhereRAG {
     if (options != null) {
       effectiveOptions.mergeFromMessage(options);
     }
-    if (effectiveOptions.question.isEmpty) {
-      effectiveOptions.question = question;
+    if (effectiveOptions.query.isEmpty) {
+      effectiveOptions.query = question;
     }
     return ragQueryStream(effectiveOptions);
   }
@@ -248,9 +248,9 @@ class RunAnywhereRAG {
           : null,
     );
     final result = await RunAnywhereModelLifecycle.shared.load(request);
-    if (!result.success) {
-      final message = result.errorMessage.isNotEmpty
-          ? result.errorMessage
+    if (result.hasError()) {
+      final message = result.error.message.isNotEmpty
+          ? result.error.message
           : '$errorLabel model lifecycle artifact resolution failed';
       throw SDKException.modelLoadFailed(model.id, message);
     }
@@ -274,12 +274,16 @@ extension RAGConfigurationResolvedArtifacts on RAGConfiguration {
 
 extension RAGQueryOptionsConvenience on RAGQueryOptions {
   static RAGQueryOptions defaultsForQuestion(String question) {
-    return RAGQueryOptions(question: question);
+    return RAGQueryOptions(query: question);
   }
 }
 
 extension RAGResultTimeConvenience on RAGResult {
-  Duration get totalTime => Duration(milliseconds: totalTimeMs.toInt());
+  /// `RAGResult.totalTimeMs` was deleted outright (idl/rag.proto) — the two
+  /// phase timers (`retrievalTimeMs` + `generationTimeMs`) survive; this sums
+  /// them so existing callers keep an aggregate wall-clock figure.
+  Duration get totalTime =>
+      Duration(milliseconds: retrievalTimeMs.toInt() + generationTimeMs.toInt());
 }
 
 extension RAGStatisticsTimeConvenience on RAGStatistics {

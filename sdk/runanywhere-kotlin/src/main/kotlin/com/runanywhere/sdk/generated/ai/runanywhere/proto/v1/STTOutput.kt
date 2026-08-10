@@ -33,22 +33,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Final STT output.
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:147          STTOutput (text, conf, words, lang, alts, meta, ts)
- *   Kotlin STTTypes.kt:100             STTOutput (text, conf, words, lang, alts, meta, ts)
- *   Dart   generation_types.dart:218   STTResult / STTOutput (text, conf, durMs, lang, words, alts, meta, ts)
- *   RN     STTTypes.ts:32              STTOutput (text, conf, words, lang, alts, meta)
- *   Web    STTTypes.ts:9               STTTranscriptionResult (text, conf, lang, procMs, words)
- *   C ABI  rac_stt_types.h:338         rac_stt_output_t (text, conf, words, lang, alts, meta, ts_ms)
- *
- * Drift reconciled:
- *   - language: detected language. Promoted to STTLanguage enum.
- *   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
- * ---------------------------------------------------------------------------
- */
 public class STTOutput(
   @field:WireField(
     tag = 1,
@@ -58,19 +42,21 @@ public class STTOutput(
   )
   public val text: String = "",
   @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-  @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val confidence: Float = 0f,
+  /**
+   * Detected language, BCP-47. Empty = unknown.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 2,
+  )
+  public val language: String? = null,
   words: List<WordTimestamp> = emptyList(),
   alternatives: List<TranscriptionAlternative> = emptyList(),
   @field:WireField(
@@ -81,68 +67,41 @@ public class STTOutput(
   )
   public val metadata: TranscriptionMetadata? = null,
   /**
-   * Free-form detected language tag, preserving regional variants.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 6,
-  )
-  public val language_code: String? = null,
-  /**
-   * Wall-clock output timestamp in milliseconds since Unix epoch.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampMs",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val timestamp_ms: Long = 0L,
-  /**
-   * Audio duration in milliseconds for SDKs that expose duration directly.
-   * Often duplicates metadata.audio_length_ms.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "durationMs",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val duration_ms: Long = 0L,
-  speaker_ids: List<String> = emptyList(),
   /**
-   * Terminal error details for result-envelope APIs.
-   */
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 10,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 11,
-  )
-  public val error_code: Int = 0,
-  /**
-   * Segment index for long-running/streaming transcription.
+   * For long-running or streaming transcription.
    */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "segmentIndex",
-    schemaIndex = 12,
+    schemaIndex = 8,
   )
   public val segment_index: Int = 0,
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 9,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOutput, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -162,18 +121,6 @@ public class STTOutput(
   public val alternatives: List<TranscriptionAlternative> =
       immutableCopyOf("alternatives", alternatives)
 
-  /**
-   * Diarization summary when available.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "speakerIds",
-    schemaIndex = 9,
-  )
-  public val speaker_ids: List<String> = immutableCopyOf("speaker_ids", speaker_ids)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -185,18 +132,15 @@ public class STTOutput(
     if (other !is STTOutput) return false
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
-    if (language != other.language) return false
     if (confidence != other.confidence) return false
+    if (language != other.language) return false
     if (words != other.words) return false
     if (alternatives != other.alternatives) return false
     if (metadata != other.metadata) return false
-    if (language_code != other.language_code) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (duration_ms != other.duration_ms) return false
-    if (speaker_ids != other.speaker_ids) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (segment_index != other.segment_index) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -205,18 +149,15 @@ public class STTOutput(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + language.hashCode()
       result = result * 37 + confidence.hashCode()
+      result = result * 37 + (language?.hashCode() ?: 0)
       result = result * 37 + words.hashCode()
       result = result * 37 + alternatives.hashCode()
       result = result * 37 + (metadata?.hashCode() ?: 0)
-      result = result * 37 + (language_code?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + duration_ms.hashCode()
-      result = result * 37 + speaker_ids.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + segment_index.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -225,37 +166,31 @@ public class STTOutput(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
-    result += """language=$language"""
     result += """confidence=$confidence"""
+    if (language != null) result += """language=${sanitize(language)}"""
     if (words.isNotEmpty()) result += """words=$words"""
     if (alternatives.isNotEmpty()) result += """alternatives=$alternatives"""
     if (metadata != null) result += """metadata=$metadata"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
     result += """timestamp_ms=$timestamp_ms"""
     result += """duration_ms=$duration_ms"""
-    if (speaker_ids.isNotEmpty()) result += """speaker_ids=${sanitize(speaker_ids)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """segment_index=$segment_index"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "STTOutput{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     text: String = this.text,
-    language: STTLanguage = this.language,
     confidence: Float = this.confidence,
+    language: String? = this.language,
     words: List<WordTimestamp> = this.words,
     alternatives: List<TranscriptionAlternative> = this.alternatives,
     metadata: TranscriptionMetadata? = this.metadata,
-    language_code: String? = this.language_code,
     timestamp_ms: Long = this.timestamp_ms,
     duration_ms: Long = this.duration_ms,
-    speaker_ids: List<String> = this.speaker_ids,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     segment_index: Int = this.segment_index,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): STTOutput = STTOutput(text, language, confidence, words, alternatives, metadata, language_code, timestamp_ms, duration_ms, speaker_ids, error_message, error_code, segment_index, unknownFields)
+  ): STTOutput = STTOutput(text, confidence, language, words, alternatives, metadata, timestamp_ms, duration_ms, segment_index, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -272,32 +207,25 @@ public class STTOutput(
         if (value.text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(2, value.language)
-        }
         if (!value.confidence.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.confidence)
         }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.language)
         size += WordTimestamp.ADAPTER.asRepeated().encodedSizeWithTag(4, value.words)
         size += TranscriptionAlternative.ADAPTER.asRepeated().encodedSizeWithTag(5, value.alternatives)
         if (value.metadata != null) {
           size += TranscriptionMetadata.ADAPTER.encodedSizeWithTag(6, value.metadata)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.language_code)
         if (value.timestamp_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.timestamp_ms)
         }
         if (value.duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.duration_ms)
         }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(10, value.speaker_ids)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.error_code)
-        }
         if (value.segment_index != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(13, value.segment_index)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(15, value.error)
         return size
       }
 
@@ -305,62 +233,48 @@ public class STTOutput(
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 2, value.language)
-        }
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
         }
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         WordTimestamp.ADAPTER.asRepeated().encodeWithTag(writer, 4, value.words)
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.alternatives)
         if (value.metadata != null) {
           TranscriptionMetadata.ADAPTER.encodeWithTag(writer, 6, value.metadata)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.language_code)
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.timestamp_ms)
         }
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 10, value.speaker_ids)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 13, value.segment_index)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTOutput) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 13, value.segment_index)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 10, value.speaker_ids)
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.timestamp_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.language_code)
         if (value.metadata != null) {
           TranscriptionMetadata.ADAPTER.encodeWithTag(writer, 6, value.metadata)
         }
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.alternatives)
         WordTimestamp.ADAPTER.asRepeated().encodeWithTag(writer, 4, value.words)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
-        }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 2, value.language)
         }
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
@@ -369,54 +283,41 @@ public class STTOutput(
 
       override fun decode(reader: ProtoReader): STTOutput {
         var text: String = ""
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
         var confidence: Float = 0f
+        var language: String? = null
         val words = mutableListOf<WordTimestamp>()
         val alternatives = mutableListOf<TranscriptionAlternative>()
         var metadata: TranscriptionMetadata? = null
-        var language_code: String? = null
         var timestamp_ms: Long = 0L
         var duration_ms: Long = 0L
-        val speaker_ids = mutableListOf<String>()
-        var error_message: String? = null
-        var error_code: Int = 0
         var segment_index: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
-            2 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             3 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            14 -> language = ProtoAdapter.STRING.decode(reader)
             4 -> words.add(WordTimestamp.ADAPTER.decode(reader))
             5 -> alternatives.add(TranscriptionAlternative.ADAPTER.decode(reader))
             6 -> metadata = TranscriptionMetadata.ADAPTER.decode(reader)
-            7 -> language_code = ProtoAdapter.STRING.decode(reader)
             8 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> speaker_ids.add(ProtoAdapter.STRING.decode(reader))
-            11 -> error_message = ProtoAdapter.STRING.decode(reader)
-            12 -> error_code = ProtoAdapter.INT32.decode(reader)
             13 -> segment_index = ProtoAdapter.INT32.decode(reader)
+            15 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return STTOutput(
           text = text,
-          language = language,
           confidence = confidence,
+          language = language,
           words = words,
           alternatives = alternatives,
           metadata = metadata,
-          language_code = language_code,
           timestamp_ms = timestamp_ms,
           duration_ms = duration_ms,
-          speaker_ids = speaker_ids,
-          error_message = error_message,
-          error_code = error_code,
           segment_index = segment_index,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -425,6 +326,7 @@ public class STTOutput(
         words = value.words.redactElements(WordTimestamp.ADAPTER),
         alternatives = value.alternatives.redactElements(TranscriptionAlternative.ADAPTER),
         metadata = value.metadata?.let(TranscriptionMetadata.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

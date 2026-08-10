@@ -47,10 +47,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_download_5fservice_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DownloadCancelResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_download_5fservice_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DownloadResumeRequest
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_download_5fservice_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DownloadResumeResult
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_download_5fservice_2eproto, /* tracker*/ nullptr,},
 };
 }  // namespace
 #endif
@@ -208,702 +204,6 @@ const ::_pbi::ClassData* DownloadSubscribeRequest_get_class_data() {
   return DownloadSubscribeRequest_globals_.GetClassData();
 #else
   return DownloadSubscribeRequest_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DownloadResumeRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DownloadResumeRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_._has_bits_);
-};
-
-constexpr DownloadResumeRequest::ParseTableT_ DownloadResumeRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadResumeRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string task_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.task_id_)}},
-      // string model_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.model_id_)}},
-      // int64 resume_from_bytes = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadResumeRequest, _impl_.resume_from_bytes_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.resume_from_bytes_)}},
-      // string resume_token = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.resume_token_)}},
-      // bool validate_partial_bytes = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadResumeRequest, _impl_.validate_partial_bytes_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.validate_partial_bytes_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string task_id = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_id = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 resume_from_bytes = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.resume_from_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string resume_token = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.resume_token_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool validate_partial_bytes = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.validate_partial_bytes_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    // no aux_entries
-    {{
-      "\44\7\10\0\14\0\0\0"
-      "runanywhere.v1.DownloadResumeRequest"
-      "task_id"
-      "model_id"
-      "resume_token"
-    }},
-  };
-}
-
-
-inline constexpr DownloadResumeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        task_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resume_from_bytes_{::int64_t{0}},
-        validate_partial_bytes_{false} {}
-
-template <typename>
-constexpr DownloadResumeRequest::DownloadResumeRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DownloadResumeRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DownloadResumeRequest(arena);
-}
-constexpr auto DownloadResumeRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadResumeRequest), alignof(DownloadResumeRequest));
-}
-constexpr auto DownloadResumeRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DownloadResumeRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DownloadResumeRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DownloadResumeRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DownloadResumeRequest>(), &DownloadResumeRequest::ByteSizeLong,
-              &DownloadResumeRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_download_5fservice_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DownloadResumeRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DownloadResumeRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DownloadResumeRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DownloadResumeRequest::InternalGenerateClassData_(
-            _default, &DownloadResumeRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadResumeRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DownloadResumeRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DownloadResumeRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadResumeRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DownloadResumeRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadResumeRequestGlobalsTypeInternal DownloadResumeRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DownloadResumeRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DownloadResumeRequest_globals_.GetClassData();
-#else
-  return DownloadResumeRequest_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DownloadProgress::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DownloadProgress>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._has_bits_);
-};
-
-constexpr DownloadProgress::ParseTableT_ DownloadProgress::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._has_bits_),
-      0, // no _extensions_
-      20, 248,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4293918720,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      20,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadProgress>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string model_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.model_id_)}},
-      // .runanywhere.v1.DownloadStage stage = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.stage_), 8>(),
-       {16, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_)}},
-      // int64 bytes_downloaded = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.bytes_downloaded_), 7>(),
-       {24, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_downloaded_)}},
-      // int64 total_bytes = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.total_bytes_), 10>(),
-       {32, 10, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_bytes_)}},
-      // float stage_progress = 5;
-      {::_pbi::TcParser::FastF32S1,
-       {45, 9, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_progress_)}},
-      // float overall_speed_bps = 6;
-      {::_pbi::TcParser::FastF32S1,
-       {53, 12, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_speed_bps_)}},
-      // int64 eta_seconds = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.eta_seconds_), 11>(),
-       {56, 11, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.eta_seconds_)}},
-      // .runanywhere.v1.DownloadState state = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.state_), 13>(),
-       {64, 13, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.state_)}},
-      // int32 retry_attempt = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.retry_attempt_), 14>(),
-       {72, 14, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.retry_attempt_)}},
-      // string error_message = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.error_message_)}},
-      // string task_id = 11;
-      {::_pbi::TcParser::FastUS1,
-       {90, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.task_id_)}},
-      // int32 current_file_index = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.current_file_index_), 15>(),
-       {96, 15, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_index_)}},
-      // int32 total_files = 13;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.total_files_), 16>(),
-       {104, 16, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_files_)}},
-      // string storage_key = 14;
-      {::_pbi::TcParser::FastUS1,
-       {114, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.storage_key_)}},
-      // string local_path = 15;
-      {::_pbi::TcParser::FastUS1,
-       {122, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.local_path_)}},
-      // float overall_progress = 16;
-      {::_pbi::TcParser::FastF32S2,
-       {389, 17, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_progress_)}},
-      // int64 started_at_unix_ms = 17;
-      {::_pbi::TcParser::FastV64S2,
-       {392, 18, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.started_at_unix_ms_)}},
-      // int64 updated_at_unix_ms = 18;
-      {::_pbi::TcParser::FastV64S2,
-       {400, 19, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.updated_at_unix_ms_)}},
-      // string current_file_name = 19;
-      {::_pbi::TcParser::FastUS2,
-       {410, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_name_)}},
-      // string resume_token = 20;
-      {::_pbi::TcParser::FastUS2,
-       {418, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.resume_token_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string model_id = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadStage stage = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int64 bytes_downloaded = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_downloaded_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 total_bytes = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_bytes_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float stage_progress = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_progress_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // float overall_speed_bps = 6;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_speed_bps_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int64 eta_seconds = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.eta_seconds_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // .runanywhere.v1.DownloadState state = 8;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.state_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int32 retry_attempt = 9;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.retry_attempt_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string error_message = 10;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string task_id = 11;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.task_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 current_file_index = 12;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_index_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 total_files = 13;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_files_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string storage_key = 14;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.storage_key_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string local_path = 15;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.local_path_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // float overall_progress = 16;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_progress_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int64 started_at_unix_ms = 17;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.started_at_unix_ms_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 updated_at_unix_ms = 18;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.updated_at_unix_ms_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string current_file_name = 19;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_name_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string resume_token = 20;
-      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.resume_token_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
-      "\37\10\0\0\0\0\0\0\0\0\15\7\0\0\13\12\0\0\0\21\14\0\0\0"
-      "runanywhere.v1.DownloadProgress"
-      "model_id"
-      "error_message"
-      "task_id"
-      "storage_key"
-      "local_path"
-      "current_file_name"
-      "resume_token"
-    }},
-  };
-}
-
-
-inline constexpr DownloadProgress::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        task_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        storage_key_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        local_path_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        current_file_name_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        bytes_downloaded_{::int64_t{0}},
-        stage_{static_cast< ::runanywhere::v1::DownloadStage >(0)},
-        stage_progress_{0},
-        total_bytes_{::int64_t{0}},
-        eta_seconds_{::int64_t{0}},
-        overall_speed_bps_{0},
-        state_{static_cast< ::runanywhere::v1::DownloadState >(0)},
-        retry_attempt_{0},
-        current_file_index_{0},
-        total_files_{0},
-        overall_progress_{0},
-        started_at_unix_ms_{::int64_t{0}},
-        updated_at_unix_ms_{::int64_t{0}} {}
-
-template <typename>
-constexpr DownloadProgress::DownloadProgress(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DownloadProgress::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DownloadProgress(arena);
-}
-constexpr auto DownloadProgress::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadProgress), alignof(DownloadProgress));
-}
-constexpr auto DownloadProgress::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DownloadProgress::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DownloadProgress>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DownloadProgress::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DownloadProgress>(), &DownloadProgress::ByteSizeLong,
-              &DownloadProgress::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[1],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_download_5fservice_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DownloadProgressGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DownloadProgressGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DownloadProgress_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DownloadProgress::InternalGenerateClassData_(
-            _default, &DownloadProgress_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadProgress>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DownloadProgressGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DownloadProgress _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadProgress>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DownloadProgressGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadProgressGlobalsTypeInternal DownloadProgress_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DownloadProgress_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DownloadProgress_globals_.GetClassData();
-#else
-  return DownloadProgress_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DownloadCancelResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DownloadCancelResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._has_bits_);
-};
-
-constexpr DownloadCancelResult::ParseTableT_ DownloadCancelResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._has_bits_),
-      0, // no _extensions_
-      8, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967040,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      8,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadCancelResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // string resume_token = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.resume_token_)}},
-      // bool success = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadCancelResult, _impl_.success_), 5>(),
-       {8, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.success_)}},
-      // string task_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.task_id_)}},
-      // string model_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.model_id_)}},
-      // int64 partial_bytes_deleted = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadCancelResult, _impl_.partial_bytes_deleted_), 4>(),
-       {32, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_deleted_)}},
-      // string error_message = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.error_message_)}},
-      // bool was_running = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadCancelResult, _impl_.was_running_), 6>(),
-       {48, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.was_running_)}},
-      // bool partial_bytes_preserved = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadCancelResult, _impl_.partial_bytes_preserved_), 7>(),
-       {56, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_preserved_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool success = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.success_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string task_id = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 partial_bytes_deleted = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_deleted_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string error_message = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool was_running = 6;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.was_running_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool partial_bytes_preserved = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_preserved_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string resume_token = 8;
-      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.resume_token_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
-      "\43\0\7\10\0\15\0\0\14\0\0\0\0\0\0\0"
-      "runanywhere.v1.DownloadCancelResult"
-      "task_id"
-      "model_id"
-      "error_message"
-      "resume_token"
-    }},
-  };
-}
-
-
-inline constexpr DownloadCancelResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        task_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        partial_bytes_deleted_{::int64_t{0}},
-        success_{false},
-        was_running_{false},
-        partial_bytes_preserved_{false} {}
-
-template <typename>
-constexpr DownloadCancelResult::DownloadCancelResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DownloadCancelResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DownloadCancelResult(arena);
-}
-constexpr auto DownloadCancelResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadCancelResult), alignof(DownloadCancelResult));
-}
-constexpr auto DownloadCancelResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DownloadCancelResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DownloadCancelResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DownloadCancelResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DownloadCancelResult>(), &DownloadCancelResult::ByteSizeLong,
-              &DownloadCancelResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_download_5fservice_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DownloadCancelResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DownloadCancelResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DownloadCancelResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DownloadCancelResult::InternalGenerateClassData_(
-            _default, &DownloadCancelResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadCancelResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DownloadCancelResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DownloadCancelResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadCancelResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DownloadCancelResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadCancelResultGlobalsTypeInternal DownloadCancelResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DownloadCancelResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DownloadCancelResult_globals_.GetClassData();
-#else
-  return DownloadCancelResult_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -1072,120 +372,213 @@ const ::_pbi::ClassData* DownloadCancelRequest_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class DownloadStartResult::_Internal {
+class DownloadProgress::_Internal {
  public:
-  using HasBits = decltype(::std::declval<DownloadStartResult>()._impl_._has_bits_);
+  using HasBits = decltype(::std::declval<DownloadProgress>()._impl_._has_bits_);
   static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._has_bits_);
+      8 * PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._has_bits_);
 };
 
-constexpr DownloadStartResult::ParseTableT_ DownloadStartResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+constexpr DownloadProgress::ParseTableT_ DownloadProgress::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
-      PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._has_bits_),
+      PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._has_bits_),
       0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
+      21, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
+      4293394946,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      18,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::GenericFallback,  // fallback
       #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadStartResult>(),  // to_prefetch
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadProgress>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // bool accepted = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadStartResult, _impl_.accepted_), 5>(),
-       {8, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.accepted_)}},
-      // string task_id = 2;
+      // string model_id = 1;
       {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.task_id_)}},
-      // string model_id = 3;
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.model_id_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // int64 bytes_downloaded = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.bytes_downloaded_), 6>(),
+       {24, 6, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_downloaded_)}},
+      // int64 total_bytes = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.total_bytes_), 7>(),
+       {32, 7, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_bytes_)}},
+      // float stage_progress = 5;
+      {::_pbi::TcParser::FastF32S1,
+       {45, 8, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_progress_)}},
+      // float bytes_per_second = 6;
+      {::_pbi::TcParser::FastF32S1,
+       {53, 9, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_per_second_)}},
+      // optional int64 eta_seconds = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadProgress, _impl_.eta_seconds_), 10>(),
+       {56, 10, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.eta_seconds_)}},
+      // .runanywhere.v1.DownloadState state = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.state_), 11>(),
+       {64, 11, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.state_)}},
+      // int32 retry_attempt = 9;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.retry_attempt_), 12>(),
+       {72, 12, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.retry_attempt_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // string task_id = 11;
       {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.model_id_)}},
-      // .runanywhere.v1.DownloadProgress initial_progress = 4;
-      {::_pbi::TcParser::FastMtS1,
-       {34, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.initial_progress_)}},
-      // string error_message = 5;
+       {90, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.task_id_)}},
+      // int32 current_file_index = 12;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.current_file_index_), 13>(),
+       {96, 13, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_index_)}},
+      // int32 total_files = 13;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadProgress, _impl_.total_files_), 14>(),
+       {104, 14, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_files_)}},
+      // string storage_key = 14;
       {::_pbi::TcParser::FastUS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.error_message_)}},
-      // string resume_token = 6;
+       {114, 2, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.storage_key_)}},
+      // string local_path = 15;
       {::_pbi::TcParser::FastUS1,
-       {50, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.resume_token_)}},
-      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadStartResult, _impl_.failure_reason_), 6>(),
-       {56, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.failure_reason_)}},
+       {122, 3, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.local_path_)}},
+      // float overall_progress = 16;
+      {::_pbi::TcParser::FastF32S2,
+       {389, 17, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_progress_)}},
+      // int64 started_at_unix_ms = 17;
+      {::_pbi::TcParser::FastV64S2,
+       {392, 15, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.started_at_unix_ms_)}},
+      // int64 updated_at_unix_ms = 18;
+      {::_pbi::TcParser::FastV64S2,
+       {400, 16, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.updated_at_unix_ms_)}},
+      // string current_file_name = 19;
+      {::_pbi::TcParser::FastUS2,
+       {410, 4, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_name_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 21;
+      {::_pbi::TcParser::FastMtS2,
+       {426, 5, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // bool accepted = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.accepted_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string task_id = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadProgress initial_progress = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.initial_progress_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string error_message = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string resume_token = 6;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.resume_token_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.failure_reason_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string model_id = 1;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 bytes_downloaded = 3;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_downloaded_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 total_bytes = 4;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_bytes_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // float stage_progress = 5;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.stage_progress_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // float bytes_per_second = 6;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_per_second_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional int64 eta_seconds = 7;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.eta_seconds_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // .runanywhere.v1.DownloadState state = 8;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.state_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int32 retry_attempt = 9;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.retry_attempt_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // string task_id = 11;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.task_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 current_file_index = 12;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_index_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 total_files = 13;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.total_files_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // string storage_key = 14;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.storage_key_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string local_path = 15;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.local_path_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // float overall_progress = 16;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_progress_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // int64 started_at_unix_ms = 17;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.started_at_unix_ms_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 updated_at_unix_ms = 18;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.updated_at_unix_ms_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // string current_file_name = 19;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.current_file_name_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 21;
+      {PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.error_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadProgress>()},
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
         #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DownloadProgress_globals_},
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
         #endif
     }},
     {{
-      "\42\0\7\10\0\15\14\0"
-      "runanywhere.v1.DownloadStartResult"
-      "task_id"
+      "\37\10\0\0\0\0\0\0\0\7\0\0\13\12\0\0\0\21\0\0\0\0\0\0"
+      "runanywhere.v1.DownloadProgress"
       "model_id"
-      "error_message"
-      "resume_token"
+      "task_id"
+      "storage_key"
+      "local_path"
+      "current_file_name"
     }},
   };
 }
 
 
-inline constexpr DownloadStartResult::Impl_::Impl_(
+inline constexpr DownloadProgress::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        task_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        error_message_(
+        task_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        resume_token_(
+        storage_key_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        initial_progress_{nullptr},
-        accepted_{false},
-        failure_reason_{static_cast< ::runanywhere::v1::DownloadFailureReason >(0)} {}
+        local_path_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        current_file_name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        bytes_downloaded_{::int64_t{0}},
+        total_bytes_{::int64_t{0}},
+        stage_progress_{0},
+        bytes_per_second_{0},
+        eta_seconds_{::int64_t{0}},
+        state_{static_cast< ::runanywhere::v1::DownloadState >(0)},
+        retry_attempt_{0},
+        current_file_index_{0},
+        total_files_{0},
+        started_at_unix_ms_{::int64_t{0}},
+        updated_at_unix_ms_{::int64_t{0}},
+        overall_progress_{0} {}
 
 template <typename>
-constexpr DownloadStartResult::DownloadStartResult(::_pbi::ConstantInitialized,
+constexpr DownloadProgress::DownloadProgress(::_pbi::ConstantInitialized,
                        const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
     : ::google::protobuf::Message(
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -1194,15 +587,15 @@ constexpr DownloadStartResult::DownloadStartResult(::_pbi::ConstantInitialized,
           ),
       _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
 }
-inline void* PROTOBUF_NONNULL DownloadStartResult::PlacementNew_(
+inline void* PROTOBUF_NONNULL DownloadProgress::PlacementNew_(
     const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DownloadStartResult(arena);
+  return ::new (mem) DownloadProgress(arena);
 }
-constexpr auto DownloadStartResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadStartResult), alignof(DownloadStartResult));
+constexpr auto DownloadProgress::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadProgress), alignof(DownloadProgress));
 }
-constexpr auto DownloadStartResult::InternalGenerateClassData_(
+constexpr auto DownloadProgress::InternalGenerateClassData_(
     const MessageLite& prototype,
     const ::google::protobuf::internal::TcParseTableBase* tc_table) {
   return ::google::protobuf::internal::ClassDataFull{
@@ -1214,18 +607,18 @@ constexpr auto DownloadStartResult::InternalGenerateClassData_(
           tc_table,
 #endif
           nullptr,  // IsInitialized
-          &DownloadStartResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DownloadStartResult>(),
+          &DownloadProgress::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DownloadProgress>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DownloadStartResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DownloadStartResult>(), &DownloadStartResult::ByteSizeLong,
-              &DownloadStartResult::_InternalSerialize,
+          &DownloadProgress::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DownloadProgress>(), &DownloadProgress::ByteSizeLong,
+              &DownloadProgress::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._cached_size_),
+          PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_._cached_size_),
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
+      &file_reflection_data[1],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_download_5fservice_2eproto,
@@ -1233,249 +626,45 @@ constexpr auto DownloadStartResult::InternalGenerateClassData_(
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   };
 }
-struct DownloadStartResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DownloadStartResultGlobalsTypeInternal()
+struct DownloadProgressGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DownloadProgressGlobalsTypeInternal()
       :
 #ifndef PROTOBUF_MESSAGE_GLOBALS
         _default(::_pbi::ConstantInitialized{},
-                 DownloadStartResult_class_data_.base())
+                 DownloadProgress_class_data_.base())
 #else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DownloadStartResult::InternalGenerateClassData_(
-            _default, &DownloadStartResult_globals_._table.header)),
+        MessageGlobalsBase(DownloadProgress::InternalGenerateClassData_(
+            _default, &DownloadProgress_globals_._table.header)),
         _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadStartResult>(
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadProgress>(
             GetClassData()))
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   {
   }
-  ~DownloadStartResultGlobalsTypeInternal() {}
+  ~DownloadProgressGlobalsTypeInternal() {}
   union {
-    alignas(::_pbi::kMaxMessageAlignment) DownloadStartResult _default;
+    alignas(::_pbi::kMaxMessageAlignment) DownloadProgress _default;
   };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadStartResult>(
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadProgress>(
       ::std::declval<const ::_pbi::ClassData*>())) _table;
 #endif
 };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DownloadStartResultGlobalsTypeInternal, _default) ==
+static_assert(PROTOBUF_FIELD_OFFSET(DownloadProgressGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadStartResultGlobalsTypeInternal DownloadStartResult_globals_
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadProgressGlobalsTypeInternal DownloadProgress_globals_
         PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 #if defined(PROTOBUF_CUSTOM_VTABLE)
 namespace {
-const ::_pbi::ClassData* DownloadStartResult_get_class_data() {
+const ::_pbi::ClassData* DownloadProgress_get_class_data() {
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DownloadStartResult_globals_.GetClassData();
+  return DownloadProgress_globals_.GetClassData();
 #else
-  return DownloadStartResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DownloadResumeResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DownloadResumeResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_._has_bits_);
-};
-
-constexpr DownloadResumeResult::ParseTableT_ DownloadResumeResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_._has_bits_),
-      0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadResumeResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // bool accepted = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadResumeResult, _impl_.accepted_), 5>(),
-       {8, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.accepted_)}},
-      // string task_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.task_id_)}},
-      // string model_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.model_id_)}},
-      // .runanywhere.v1.DownloadProgress initial_progress = 4;
-      {::_pbi::TcParser::FastMtS1,
-       {34, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.initial_progress_)}},
-      // string error_message = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.error_message_)}},
-      // string resume_token = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.resume_token_)}},
-      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadResumeResult, _impl_.failure_reason_), 6>(),
-       {56, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.failure_reason_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool accepted = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.accepted_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string task_id = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadProgress initial_progress = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.initial_progress_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string error_message = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string resume_token = 6;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.resume_token_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.failure_reason_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadProgress>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DownloadProgress_globals_},
-        #endif
-    }},
-    {{
-      "\43\0\7\10\0\15\14\0"
-      "runanywhere.v1.DownloadResumeResult"
-      "task_id"
-      "model_id"
-      "error_message"
-      "resume_token"
-    }},
-  };
-}
-
-
-inline constexpr DownloadResumeResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        task_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        initial_progress_{nullptr},
-        accepted_{false},
-        failure_reason_{static_cast< ::runanywhere::v1::DownloadFailureReason >(0)} {}
-
-template <typename>
-constexpr DownloadResumeResult::DownloadResumeResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DownloadResumeResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DownloadResumeResult(arena);
-}
-constexpr auto DownloadResumeResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadResumeResult), alignof(DownloadResumeResult));
-}
-constexpr auto DownloadResumeResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DownloadResumeResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DownloadResumeResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DownloadResumeResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DownloadResumeResult>(), &DownloadResumeResult::ByteSizeLong,
-              &DownloadResumeResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_download_5fservice_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DownloadResumeResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DownloadResumeResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DownloadResumeResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DownloadResumeResult::InternalGenerateClassData_(
-            _default, &DownloadResumeResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadResumeResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DownloadResumeResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DownloadResumeResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadResumeResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DownloadResumeResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadResumeResultGlobalsTypeInternal DownloadResumeResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DownloadResumeResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DownloadResumeResult_globals_.GetClassData();
-#else
-  return DownloadResumeResult_class_data_.base();
+  return DownloadProgress_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -1681,6 +870,198 @@ const ::_pbi::ClassData* DownloadFilePlan_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class DownloadCancelResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<DownloadCancelResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._has_bits_);
+};
+
+constexpr DownloadCancelResult::ParseTableT_ DownloadCancelResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._has_bits_),
+      0, // no _extensions_
+      9, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294966929,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      6,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadCancelResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 9;
+      {::_pbi::TcParser::FastMtS1,
+       {74, 2, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.error_)}},
+      // string task_id = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.task_id_)}},
+      // string model_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.model_id_)}},
+      // int64 partial_bytes_deleted = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadCancelResult, _impl_.partial_bytes_deleted_), 3>(),
+       {32, 3, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_deleted_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // bool was_running = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadCancelResult, _impl_.was_running_), 4>(),
+       {48, 4, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.was_running_)}},
+      // bool partial_bytes_preserved = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadCancelResult, _impl_.partial_bytes_preserved_), 5>(),
+       {56, 5, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_preserved_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string task_id = 2;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string model_id = 3;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 partial_bytes_deleted = 4;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_deleted_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // bool was_running = 6;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.was_running_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool partial_bytes_preserved = 7;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_preserved_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional .runanywhere.v1.SDKError error = 9;
+      {PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.error_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\43\7\10\0\0\0\0\0"
+      "runanywhere.v1.DownloadCancelResult"
+      "task_id"
+      "model_id"
+    }},
+  };
+}
+
+
+inline constexpr DownloadCancelResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        task_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        partial_bytes_deleted_{::int64_t{0}},
+        was_running_{false},
+        partial_bytes_preserved_{false} {}
+
+template <typename>
+constexpr DownloadCancelResult::DownloadCancelResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL DownloadCancelResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) DownloadCancelResult(arena);
+}
+constexpr auto DownloadCancelResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadCancelResult), alignof(DownloadCancelResult));
+}
+constexpr auto DownloadCancelResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &DownloadCancelResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DownloadCancelResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &DownloadCancelResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DownloadCancelResult>(), &DownloadCancelResult::ByteSizeLong,
+              &DownloadCancelResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[8],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_download_5fservice_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct DownloadCancelResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DownloadCancelResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 DownloadCancelResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(DownloadCancelResult::InternalGenerateClassData_(
+            _default, &DownloadCancelResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadCancelResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~DownloadCancelResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) DownloadCancelResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadCancelResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(DownloadCancelResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadCancelResultGlobalsTypeInternal DownloadCancelResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* DownloadCancelResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return DownloadCancelResult_globals_.GetClassData();
+#else
+  return DownloadCancelResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class DownloadPlanResult::_Internal {
  public:
   using HasBits = decltype(::std::declval<DownloadPlanResult>()._impl_._has_bits_);
@@ -1693,12 +1074,12 @@ constexpr DownloadPlanResult::ParseTableT_ DownloadPlanResult::InternalGenerateP
     {
       PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_._has_bits_),
       0, // no _extensions_
-      13, 120,  // max_field_number, fast_idx_mask
+      14, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294959104,  // skipmap
+      4294952192,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      13,  // num_field_entries
-      1,  // num_aux_entries
+      12,  // num_field_entries
+      2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -1709,8 +1090,8 @@ constexpr DownloadPlanResult::ParseTableT_ DownloadPlanResult::InternalGenerateP
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
       // bool can_start = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.can_start_), 7>(),
-       {8, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.can_start_), 6>(),
+       {8, 6, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_start_)}},
       // string model_id = 2;
       {::_pbi::TcParser::FastUS1,
@@ -1721,76 +1102,71 @@ constexpr DownloadPlanResult::ParseTableT_ DownloadPlanResult::InternalGenerateP
        {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.files_)}},
       // int64 total_bytes = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.total_bytes_), 6>(),
-       {32, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.total_bytes_), 5>(),
+       {32, 5, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.total_bytes_)}},
       // bool requires_extraction = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.requires_extraction_), 8>(),
-       {40, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.requires_extraction_), 7>(),
+       {40, 7, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.requires_extraction_)}},
       // bool can_resume = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.can_resume_), 9>(),
-       {48, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanResult, _impl_.can_resume_), 8>(),
+       {48, 8, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_resume_)}},
       // int64 resume_from_bytes = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.resume_from_bytes_), 11>(),
-       {56, 11, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.resume_from_bytes_), 10>(),
+       {56, 10, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.resume_from_bytes_)}},
       // repeated string warnings = 8;
       {::_pbi::TcParser::FastUR1,
        {66, 1, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.warnings_)}},
-      // string error_message = 9;
-      {::_pbi::TcParser::FastUS1,
-       {74, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.error_message_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // string storage_namespace = 10;
       {::_pbi::TcParser::FastUS1,
-       {82, 4, 0,
+       {82, 3, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.storage_namespace_)}},
-      // string resume_token = 11;
-      {::_pbi::TcParser::FastUS1,
-       {90, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.resume_token_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int64 required_free_bytes_after_download = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.required_free_bytes_after_download_), 12>(),
-       {96, 12, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanResult, _impl_.required_free_bytes_after_download_), 11>(),
+       {96, 11, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.required_free_bytes_after_download_)}},
       // .runanywhere.v1.DownloadFailureReason failure_reason = 13;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadPlanResult, _impl_.failure_reason_), 10>(),
-       {104, 10, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadPlanResult, _impl_.failure_reason_), 9>(),
+       {104, 9, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.failure_reason_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 14;
+      {::_pbi::TcParser::FastMtS1,
+       {114, 4, 1,
+        PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.error_)}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // bool can_start = 1;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_start_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_start_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // string model_id = 2;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.model_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // repeated .runanywhere.v1.DownloadFilePlan files = 3;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.files_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // int64 total_bytes = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.total_bytes_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.total_bytes_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // bool requires_extraction = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.requires_extraction_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.requires_extraction_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool can_resume = 6;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_resume_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.can_resume_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int64 resume_from_bytes = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.resume_from_bytes_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.resume_from_bytes_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // repeated string warnings = 8;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.warnings_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-      // string error_message = 9;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.error_message_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string storage_namespace = 10;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.storage_namespace_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string resume_token = 11;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.resume_token_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.storage_namespace_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int64 required_free_bytes_after_download = 12;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.required_free_bytes_after_download_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.required_free_bytes_after_download_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // .runanywhere.v1.DownloadFailureReason failure_reason = 13;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.failure_reason_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.failure_reason_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // optional .runanywhere.v1.SDKError error = 14;
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.error_), _Internal::kHasBitsOffset + 4, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1798,15 +1174,18 @@ constexpr DownloadPlanResult::ParseTableT_ DownloadPlanResult::InternalGenerateP
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DownloadFilePlan_globals_},
         #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
     }},
     {{
-      "\41\0\10\0\0\0\0\0\10\15\21\14\0\0\0\0"
+      "\41\0\10\0\0\0\0\0\10\21\0\0\0\0\0\0"
       "runanywhere.v1.DownloadPlanResult"
       "model_id"
       "warnings"
-      "error_message"
       "storage_namespace"
-      "resume_token"
     }},
   };
 }
@@ -1829,15 +1208,10 @@ inline constexpr DownloadPlanResult::Impl_::Impl_(
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         storage_namespace_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
         total_bytes_{::int64_t{0}},
         can_start_{false},
         requires_extraction_{false},
@@ -1938,6 +1312,211 @@ const ::_pbi::ClassData* DownloadPlanResult_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class DownloadStartResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<DownloadStartResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._has_bits_);
+};
+
+constexpr DownloadStartResult::ParseTableT_ DownloadStartResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._has_bits_),
+      0, // no _extensions_
+      9, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294966832,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      7,  // num_field_entries
+      3,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadStartResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // optional .runanywhere.v1.SDKError error = 8;
+      {::_pbi::TcParser::FastMtS1,
+       {66, 3, 1,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.error_)}},
+      // bool accepted = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadStartResult, _impl_.accepted_), 5>(),
+       {8, 5, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.accepted_)}},
+      // string task_id = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.task_id_)}},
+      // string model_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.model_id_)}},
+      // .runanywhere.v1.DownloadProgress initial_progress = 4;
+      {::_pbi::TcParser::FastMtS1,
+       {34, 2, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.initial_progress_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DownloadStartResult, _impl_.failure_reason_), 6>(),
+       {56, 6, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.failure_reason_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // bool accepted = 1;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.accepted_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // string task_id = 2;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.task_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string model_id = 3;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.DownloadProgress initial_progress = 4;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.initial_progress_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.failure_reason_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // optional .runanywhere.v1.SDKError error = 8;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.error_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.DownloadPlanResult plan = 9;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.plan_), _Internal::kHasBitsOffset + 4, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadProgress>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DownloadProgress_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadPlanResult>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DownloadPlanResult_globals_},
+        #endif
+    }},
+    {{
+      "\42\0\7\10\0\0\0\0"
+      "runanywhere.v1.DownloadStartResult"
+      "task_id"
+      "model_id"
+    }},
+  };
+}
+
+
+inline constexpr DownloadStartResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        task_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        initial_progress_{nullptr},
+        error_{nullptr},
+        plan_{nullptr},
+        accepted_{false},
+        failure_reason_{static_cast< ::runanywhere::v1::DownloadFailureReason >(0)} {}
+
+template <typename>
+constexpr DownloadStartResult::DownloadStartResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL DownloadStartResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) DownloadStartResult(arena);
+}
+constexpr auto DownloadStartResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DownloadStartResult), alignof(DownloadStartResult));
+}
+constexpr auto DownloadStartResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &DownloadStartResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DownloadStartResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &DownloadStartResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DownloadStartResult>(), &DownloadStartResult::ByteSizeLong,
+              &DownloadStartResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[6],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_download_5fservice_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct DownloadStartResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DownloadStartResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 DownloadStartResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(DownloadStartResult::InternalGenerateClassData_(
+            _default, &DownloadStartResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DownloadStartResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~DownloadStartResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) DownloadStartResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DownloadStartResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(DownloadStartResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DownloadStartResultGlobalsTypeInternal DownloadStartResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* DownloadStartResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return DownloadStartResult_globals_.GetClassData();
+#else
+  return DownloadStartResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class DownloadStartRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<DownloadStartRequest>()._impl_._has_bits_);
@@ -1950,11 +1529,11 @@ constexpr DownloadStartRequest::ParseTableT_ DownloadStartRequest::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      5, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967276,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      3,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1964,42 +1543,23 @@ constexpr DownloadStartRequest::ParseTableT_ DownloadStartRequest::InternalGener
       ::_pbi::TcParser::GetTable<::runanywhere::v1::DownloadStartRequest>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.DownloadPlanResult plan = 2;
+      {::_pbi::TcParser::FastMtS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.plan_)}},
       // string model_id = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.model_id_)}},
-      // .runanywhere.v1.DownloadPlanResult plan = 2;
-      {::_pbi::TcParser::FastMtS1,
-       {18, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.plan_)}},
-      // bool resume = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadStartRequest, _impl_.resume_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.resume_)}},
-      // string resume_token = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.resume_token_)}},
-      // bool update_registry_on_completion = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadStartRequest, _impl_.update_registry_on_completion_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.update_registry_on_completion_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // string model_id = 1;
       {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DownloadPlanResult plan = 2;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.plan_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool resume = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.resume_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string resume_token = 4;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.resume_token_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool update_registry_on_completion = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.update_registry_on_completion_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional .runanywhere.v1.DownloadPlanResult plan = 2;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.plan_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // bool skip_registry_update = 5;
+      {PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.skip_registry_update_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2009,10 +1569,9 @@ constexpr DownloadStartRequest::ParseTableT_ DownloadStartRequest::InternalGener
         #endif
     }},
     {{
-      "\43\10\0\0\14\0\0\0"
+      "\43\10\0\0\0\0\0\0"
       "runanywhere.v1.DownloadStartRequest"
       "model_id"
-      "resume_token"
     }},
   };
 }
@@ -2025,12 +1584,8 @@ inline constexpr DownloadStartRequest::Impl_::Impl_(
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        resume_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         plan_{nullptr},
-        resume_{false},
-        update_registry_on_completion_{false} {}
+        skip_registry_update_{false} {}
 
 template <typename>
 constexpr DownloadStartRequest::DownloadStartRequest(::_pbi::ConstantInitialized,
@@ -2138,9 +1693,9 @@ constexpr DownloadPlanRequest::ParseTableT_ DownloadPlanRequest::InternalGenerat
       0, // no _extensions_
       9, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294966788,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      8,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -2159,30 +1714,27 @@ constexpr DownloadPlanRequest::ParseTableT_ DownloadPlanRequest::InternalGenerat
       {::_pbi::TcParser::FastMtS1,
        {18, 2, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.model_)}},
-      // bool resume_existing = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.resume_existing_), 5>(),
-       {24, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.resume_existing_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int64 available_storage_bytes = 4;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanRequest, _impl_.available_storage_bytes_), 3>(),
        {32, 3, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.available_storage_bytes_)}},
       // bool allow_metered_network = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.allow_metered_network_), 6>(),
-       {40, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.allow_metered_network_), 5>(),
+       {40, 5, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.allow_metered_network_)}},
       // string storage_namespace = 6;
       {::_pbi::TcParser::FastUS1,
        {50, 1, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.storage_namespace_)}},
       // bool validate_existing_bytes = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.validate_existing_bytes_), 7>(),
-       {56, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.validate_existing_bytes_), 6>(),
+       {56, 6, 0,
         PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.validate_existing_bytes_)}},
-      // bool verify_checksums = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.verify_checksums_), 8>(),
-       {64, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.verify_checksums_)}},
+      // bool skip_checksum_verification = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DownloadPlanRequest, _impl_.skip_checksum_verification_), 7>(),
+       {64, 7, 0,
+        PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.skip_checksum_verification_)}},
       // int64 required_free_bytes_after_download = 9;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DownloadPlanRequest, _impl_.required_free_bytes_after_download_), 4>(),
        {72, 4, 0,
@@ -2200,18 +1752,16 @@ constexpr DownloadPlanRequest::ParseTableT_ DownloadPlanRequest::InternalGenerat
       {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional .runanywhere.v1.ModelInfo model = 2;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.model_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool resume_existing = 3;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.resume_existing_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int64 available_storage_bytes = 4;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.available_storage_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // bool allow_metered_network = 5;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.allow_metered_network_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.allow_metered_network_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // string storage_namespace = 6;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.storage_namespace_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // bool validate_existing_bytes = 7;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.validate_existing_bytes_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool verify_checksums = 8;
-      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.verify_checksums_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.validate_existing_bytes_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool skip_checksum_verification = 8;
+      {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.skip_checksum_verification_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int64 required_free_bytes_after_download = 9;
       {PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.required_free_bytes_after_download_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
@@ -2223,7 +1773,7 @@ constexpr DownloadPlanRequest::ParseTableT_ DownloadPlanRequest::InternalGenerat
         #endif
     }},
     {{
-      "\42\10\0\0\0\0\21\0\0\0\0\0\0\0\0\0"
+      "\42\10\0\0\0\21\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.DownloadPlanRequest"
       "model_id"
       "storage_namespace"
@@ -2245,10 +1795,9 @@ inline constexpr DownloadPlanRequest::Impl_::Impl_(
         model_{nullptr},
         available_storage_bytes_{::int64_t{0}},
         required_free_bytes_after_download_{::int64_t{0}},
-        resume_existing_{false},
         allow_metered_network_{false},
         validate_existing_bytes_{false},
-        verify_checksums_{false} {}
+        skip_checksum_verification_{false} {}
 
 template <typename>
 constexpr DownloadPlanRequest::DownloadPlanRequest(::_pbi::ConstantInitialized,
@@ -2345,7 +1894,7 @@ const ::_pbi::ClassData* DownloadPlanRequest_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_download_5fservice_2eproto[4];
+    file_level_enum_descriptors_download_5fservice_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_download_5fservice_2eproto = nullptr;
 const ::uint32_t
@@ -2360,17 +1909,15 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_._has_bits_),
-        23, // hasbit index offset
+        21, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.stage_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.bytes_downloaded_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.total_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.stage_progress_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.overall_speed_bps_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.bytes_per_second_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.eta_seconds_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.retry_attempt_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.task_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.current_file_index_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.total_files_),
@@ -2380,47 +1927,43 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.started_at_unix_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.updated_at_unix_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.current_file_name_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.resume_token_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadProgress, _impl_.error_),
         0,
-        8,
+        6,
         7,
-        10,
+        8,
         9,
-        12,
+        10,
         11,
+        12,
+        1,
         13,
         14,
-        1,
         2,
+        3,
+        17,
         15,
         16,
-        3,
         4,
-        17,
-        18,
-        19,
         5,
-        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_._has_bits_),
-        12, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.model_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.resume_existing_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.available_storage_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.allow_metered_network_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.storage_namespace_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.validate_existing_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.verify_checksums_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.skip_checksum_verification_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanRequest, _impl_.required_free_bytes_after_download_),
         0,
         2,
-        5,
         3,
-        6,
+        5,
         1,
+        6,
         7,
-        8,
         4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadFilePlan, _impl_._has_bits_),
@@ -2441,7 +1984,7 @@ const ::uint32_t
         6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_._has_bits_),
-        16, // hasbit index offset
+        15, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.can_start_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.files_),
@@ -2450,37 +1993,31 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.can_resume_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.resume_from_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.warnings_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.storage_namespace_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.resume_token_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.required_free_bytes_after_download_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.failure_reason_),
-        7,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadPlanResult, _impl_.error_),
+        6,
         2,
         0,
-        6,
+        5,
+        7,
         8,
-        9,
-        11,
+        10,
         1,
         3,
+        11,
+        9,
         4,
-        5,
-        12,
-        10,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_._has_bits_),
-        8, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.plan_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.resume_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.resume_token_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.update_registry_on_completion_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartRequest, _impl_.skip_registry_update_),
         0,
-        2,
-        3,
         1,
-        4,
+        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_._has_bits_),
         10, // hasbit index offset
@@ -2488,16 +2025,16 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.task_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.initial_progress_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.resume_token_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.failure_reason_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.error_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadStartResult, _impl_.plan_),
         5,
         0,
         1,
-        4,
         2,
-        3,
         6,
+        3,
+        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelRequest, _impl_._has_bits_),
         6, // hasbit index offset
@@ -2509,68 +2046,32 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_._has_bits_),
-        11, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.success_),
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.task_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.partial_bytes_deleted_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.was_running_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.partial_bytes_preserved_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.resume_token_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadCancelResult, _impl_.error_),
+        0,
+        1,
+        3,
+        4,
         5,
-        0,
-        1,
-        4,
         2,
-        6,
-        7,
-        3,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_._has_bits_),
-        8, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_.task_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_.resume_from_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_.resume_token_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeRequest, _impl_.validate_partial_bytes_),
-        0,
-        1,
-        3,
-        2,
-        4,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_._has_bits_),
-        10, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.accepted_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.task_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.initial_progress_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.resume_token_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DownloadResumeResult, _impl_.failure_reason_),
-        5,
-        0,
-        1,
-        4,
-        2,
-        3,
-        6,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::DownloadSubscribeRequest)},
         {7, sizeof(::runanywhere::v1::DownloadProgress)},
-        {50, sizeof(::runanywhere::v1::DownloadPlanRequest)},
-        {71, sizeof(::runanywhere::v1::DownloadFilePlan)},
-        {88, sizeof(::runanywhere::v1::DownloadPlanResult)},
-        {117, sizeof(::runanywhere::v1::DownloadStartRequest)},
-        {130, sizeof(::runanywhere::v1::DownloadStartResult)},
-        {147, sizeof(::runanywhere::v1::DownloadCancelRequest)},
-        {156, sizeof(::runanywhere::v1::DownloadCancelResult)},
-        {175, sizeof(::runanywhere::v1::DownloadResumeRequest)},
-        {188, sizeof(::runanywhere::v1::DownloadResumeResult)},
+        {46, sizeof(::runanywhere::v1::DownloadPlanRequest)},
+        {65, sizeof(::runanywhere::v1::DownloadFilePlan)},
+        {82, sizeof(::runanywhere::v1::DownloadPlanResult)},
+        {109, sizeof(::runanywhere::v1::DownloadStartRequest)},
+        {118, sizeof(::runanywhere::v1::DownloadStartResult)},
+        {135, sizeof(::runanywhere::v1::DownloadCancelRequest)},
+        {144, sizeof(::runanywhere::v1::DownloadCancelResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2583,144 +2084,123 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::DownloadStartResult_globals_,
         &::runanywhere::v1::DownloadCancelRequest_globals_,
         &::runanywhere::v1::DownloadCancelResult_globals_,
-        &::runanywhere::v1::DownloadResumeRequest_globals_,
-        &::runanywhere::v1::DownloadResumeResult_globals_,
 };
 const char descriptor_table_protodef_download_5fservice_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\026download_service.proto\022\016runanywhere.v1"
-    "\032\021model_types.proto\"=\n\030DownloadSubscribe"
-    "Request\022\020\n\010model_id\030\001 \001(\t\022\017\n\007task_id\030\002 \001"
-    "(\t\"\223\004\n\020DownloadProgress\022\020\n\010model_id\030\001 \001("
-    "\t\022,\n\005stage\030\002 \001(\0162\035.runanywhere.v1.Downlo"
-    "adStage\022\030\n\020bytes_downloaded\030\003 \001(\003\022\023\n\013tot"
-    "al_bytes\030\004 \001(\003\022\026\n\016stage_progress\030\005 \001(\002\022\031"
-    "\n\021overall_speed_bps\030\006 \001(\002\022\023\n\013eta_seconds"
-    "\030\007 \001(\003\022,\n\005state\030\010 \001(\0162\035.runanywhere.v1.D"
-    "ownloadState\022\025\n\rretry_attempt\030\t \001(\005\022\025\n\re"
-    "rror_message\030\n \001(\t\022\017\n\007task_id\030\013 \001(\t\022\032\n\022c"
-    "urrent_file_index\030\014 \001(\005\022\023\n\013total_files\030\r"
-    " \001(\005\022\023\n\013storage_key\030\016 \001(\t\022\022\n\nlocal_path\030"
-    "\017 \001(\t\022\030\n\020overall_progress\030\020 \001(\002\022\032\n\022start"
-    "ed_at_unix_ms\030\021 \001(\003\022\032\n\022updated_at_unix_m"
-    "s\030\022 \001(\003\022\031\n\021current_file_name\030\023 \001(\t\022\024\n\014re"
-    "sume_token\030\024 \001(\t\"\273\002\n\023DownloadPlanRequest"
-    "\022\020\n\010model_id\030\001 \001(\t\022-\n\005model\030\002 \001(\0132\031.runa"
-    "nywhere.v1.ModelInfoH\000\210\001\001\022\027\n\017resume_exis"
-    "ting\030\003 \001(\010\022\037\n\027available_storage_bytes\030\004 "
-    "\001(\003\022\035\n\025allow_metered_network\030\005 \001(\010\022\031\n\021st"
-    "orage_namespace\030\006 \001(\t\022\037\n\027validate_existi"
-    "ng_bytes\030\007 \001(\010\022\030\n\020verify_checksums\030\010 \001(\010"
-    "\022*\n\"required_free_bytes_after_download\030\t"
-    " \001(\003B\010\n\006_model\"\337\001\n\020DownloadFilePlan\0221\n\004f"
+    "\032\014errors.proto\032\021model_types.proto\"=\n\030Dow"
+    "nloadSubscribeRequest\022\020\n\010model_id\030\001 \001(\t\022"
+    "\017\n\007task_id\030\002 \001(\t\"\245\004\n\020DownloadProgress\022\020\n"
+    "\010model_id\030\001 \001(\t\022\030\n\020bytes_downloaded\030\003 \001("
+    "\003\022\023\n\013total_bytes\030\004 \001(\003\022\026\n\016stage_progress"
+    "\030\005 \001(\002\022\030\n\020bytes_per_second\030\006 \001(\002\022\030\n\013eta_"
+    "seconds\030\007 \001(\003H\000\210\001\001\022,\n\005state\030\010 \001(\0162\035.runa"
+    "nywhere.v1.DownloadState\022\025\n\rretry_attemp"
+    "t\030\t \001(\005\022\017\n\007task_id\030\013 \001(\t\022\032\n\022current_file"
+    "_index\030\014 \001(\005\022\023\n\013total_files\030\r \001(\005\022\023\n\013sto"
+    "rage_key\030\016 \001(\t\022\022\n\nlocal_path\030\017 \001(\t\022\030\n\020ov"
+    "erall_progress\030\020 \001(\002\022\032\n\022started_at_unix_"
+    "ms\030\021 \001(\003\022\032\n\022updated_at_unix_ms\030\022 \001(\003\022\031\n\021"
+    "current_file_name\030\023 \001(\t\022,\n\005error\030\025 \001(\0132\030"
+    ".runanywhere.v1.SDKErrorH\001\210\001\001B\016\n\014_eta_se"
+    "condsB\010\n\006_errorJ\004\010\002\020\003J\004\010\024\020\025R\005stageR\014resu"
+    "me_token\"\303\002\n\023DownloadPlanRequest\022\020\n\010mode"
+    "l_id\030\001 \001(\t\022-\n\005model\030\002 \001(\0132\031.runanywhere."
+    "v1.ModelInfoH\000\210\001\001\022\037\n\027available_storage_b"
+    "ytes\030\004 \001(\003\022\035\n\025allow_metered_network\030\005 \001("
+    "\010\022\031\n\021storage_namespace\030\006 \001(\t\022\037\n\027validate"
+    "_existing_bytes\030\007 \001(\010\022\"\n\032skip_checksum_v"
+    "erification\030\010 \001(\010\022*\n\"required_free_bytes"
+    "_after_download\030\t \001(\003B\010\n\006_modelJ\004\010\003\020\004R\017r"
+    "esume_existing\"\337\001\n\020DownloadFilePlan\0221\n\004f"
     "ile\030\001 \001(\0132#.runanywhere.v1.ModelFileDesc"
     "riptor\022\023\n\013storage_key\030\002 \001(\t\022\030\n\020destinati"
     "on_path\030\003 \001(\t\022\026\n\016expected_bytes\030\004 \001(\003\022\033\n"
     "\023requires_extraction\030\005 \001(\010\022\027\n\017checksum_s"
     "ha256\030\006 \001(\t\022\033\n\023is_resume_candidate\030\007 \001(\010"
-    "\"\220\003\n\022DownloadPlanResult\022\021\n\tcan_start\030\001 \001"
+    "\"\257\003\n\022DownloadPlanResult\022\021\n\tcan_start\030\001 \001"
     "(\010\022\020\n\010model_id\030\002 \001(\t\022/\n\005files\030\003 \003(\0132 .ru"
     "nanywhere.v1.DownloadFilePlan\022\023\n\013total_b"
     "ytes\030\004 \001(\003\022\033\n\023requires_extraction\030\005 \001(\010\022"
     "\022\n\ncan_resume\030\006 \001(\010\022\031\n\021resume_from_bytes"
-    "\030\007 \001(\003\022\020\n\010warnings\030\010 \003(\t\022\025\n\rerror_messag"
-    "e\030\t \001(\t\022\031\n\021storage_namespace\030\n \001(\t\022\024\n\014re"
-    "sume_token\030\013 \001(\t\022*\n\"required_free_bytes_"
-    "after_download\030\014 \001(\003\022=\n\016failure_reason\030\r"
-    " \001(\0162%.runanywhere.v1.DownloadFailureRea"
-    "son\"\247\001\n\024DownloadStartRequest\022\020\n\010model_id"
-    "\030\001 \001(\t\0220\n\004plan\030\002 \001(\0132\".runanywhere.v1.Do"
-    "wnloadPlanResult\022\016\n\006resume\030\003 \001(\010\022\024\n\014resu"
-    "me_token\030\004 \001(\t\022%\n\035update_registry_on_com"
-    "pletion\030\005 \001(\010\"\362\001\n\023DownloadStartResult\022\020\n"
-    "\010accepted\030\001 \001(\010\022\017\n\007task_id\030\002 \001(\t\022\020\n\010mode"
-    "l_id\030\003 \001(\t\022:\n\020initial_progress\030\004 \001(\0132 .r"
-    "unanywhere.v1.DownloadProgress\022\025\n\rerror_"
-    "message\030\005 \001(\t\022\024\n\014resume_token\030\006 \001(\t\022=\n\016f"
-    "ailure_reason\030\007 \001(\0162%.runanywhere.v1.Dow"
-    "nloadFailureReason\"X\n\025DownloadCancelRequ"
-    "est\022\017\n\007task_id\030\001 \001(\t\022\020\n\010model_id\030\002 \001(\t\022\034"
-    "\n\024delete_partial_bytes\030\003 \001(\010\"\314\001\n\024Downloa"
-    "dCancelResult\022\017\n\007success\030\001 \001(\010\022\017\n\007task_i"
-    "d\030\002 \001(\t\022\020\n\010model_id\030\003 \001(\t\022\035\n\025partial_byt"
-    "es_deleted\030\004 \001(\003\022\025\n\rerror_message\030\005 \001(\t\022"
-    "\023\n\013was_running\030\006 \001(\010\022\037\n\027partial_bytes_pr"
-    "eserved\030\007 \001(\010\022\024\n\014resume_token\030\010 \001(\t\"\213\001\n\025"
-    "DownloadResumeRequest\022\017\n\007task_id\030\001 \001(\t\022\020"
-    "\n\010model_id\030\002 \001(\t\022\031\n\021resume_from_bytes\030\003 "
-    "\001(\003\022\024\n\014resume_token\030\004 \001(\t\022\036\n\026validate_pa"
-    "rtial_bytes\030\005 \001(\010\"\363\001\n\024DownloadResumeResu"
-    "lt\022\020\n\010accepted\030\001 \001(\010\022\017\n\007task_id\030\002 \001(\t\022\020\n"
-    "\010model_id\030\003 \001(\t\022:\n\020initial_progress\030\004 \001("
-    "\0132 .runanywhere.v1.DownloadProgress\022\025\n\re"
-    "rror_message\030\005 \001(\t\022\024\n\014resume_token\030\006 \001(\t"
-    "\022=\n\016failure_reason\030\007 \001(\0162%.runanywhere.v"
-    "1.DownloadFailureReason*\253\001\n\rDownloadStag"
-    "e\022\036\n\032DOWNLOAD_STAGE_UNSPECIFIED\020\000\022\036\n\032DOW"
-    "NLOAD_STAGE_DOWNLOADING\020\001\022\035\n\031DOWNLOAD_ST"
-    "AGE_EXTRACTING\020\002\022\035\n\031DOWNLOAD_STAGE_VALID"
-    "ATING\020\003\022\034\n\030DOWNLOAD_STAGE_COMPLETED\020\004*\266\002"
-    "\n\rDownloadState\022\036\n\032DOWNLOAD_STATE_UNSPEC"
-    "IFIED\020\000\022\032\n\026DOWNLOAD_STATE_PENDING\020\001\022\036\n\032D"
-    "OWNLOAD_STATE_DOWNLOADING\020\002\022\035\n\031DOWNLOAD_"
-    "STATE_EXTRACTING\020\003\022\033\n\027DOWNLOAD_STATE_RET"
-    "RYING\020\004\022\034\n\030DOWNLOAD_STATE_COMPLETED\020\005\022\031\n"
-    "\025DOWNLOAD_STATE_FAILED\020\006\022\034\n\030DOWNLOAD_STA"
-    "TE_CANCELLED\020\007\022\031\n\025DOWNLOAD_STATE_PAUSED\020"
-    "\010\022\033\n\027DOWNLOAD_STATE_RESUMING\020\t*\326\002\n\025Downl"
-    "oadFailureReason\022\'\n#DOWNLOAD_FAILURE_REA"
-    "SON_UNSPECIFIED\020\000\0222\n.DOWNLOAD_FAILURE_RE"
-    "ASON_OVERSIZE_PARTIAL_BYTES\020\001\022:\n6DOWNLOA"
-    "D_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_E"
-    "XPECTED\020\002\0227\n3DOWNLOAD_FAILURE_REASON_PAR"
-    "TIAL_SMALLER_THAN_OFFSET\020\003\0229\n5DOWNLOAD_F"
-    "AILURE_REASON_PARTIAL_CHANGED_BEFORE_RES"
-    "UME\020\004\0220\n,DOWNLOAD_FAILURE_REASON_INSUFFI"
-    "CIENT_STORAGE\020\005*\202\004\n\022HttpDownloadStatus\022\033"
-    "\n\027HTTP_DOWNLOAD_STATUS_OK\020\000\022&\n\"HTTP_DOWN"
-    "LOAD_STATUS_NETWORK_ERROR\020\001\022#\n\037HTTP_DOWN"
-    "LOAD_STATUS_FILE_ERROR\020\002\022-\n)HTTP_DOWNLOA"
-    "D_STATUS_INSUFFICIENT_STORAGE\020\003\022$\n HTTP_"
-    "DOWNLOAD_STATUS_INVALID_URL\020\004\022(\n$HTTP_DO"
-    "WNLOAD_STATUS_CHECKSUM_FAILED\020\005\022\"\n\036HTTP_"
-    "DOWNLOAD_STATUS_CANCELLED\020\006\022%\n!HTTP_DOWN"
-    "LOAD_STATUS_SERVER_ERROR\020\007\022 \n\034HTTP_DOWNL"
-    "OAD_STATUS_TIMEOUT\020\010\022,\n(HTTP_DOWNLOAD_ST"
-    "ATUS_NETWORK_UNAVAILABLE\020\t\022\"\n\036HTTP_DOWNL"
-    "OAD_STATUS_DNS_ERROR\020\n\022\"\n\036HTTP_DOWNLOAD_"
-    "STATUS_SSL_ERROR\020\013\022 \n\034HTTP_DOWNLOAD_STAT"
-    "US_UNKNOWN\020c2\270\003\n\010Download\022O\n\004Plan\022#.runa"
-    "nywhere.v1.DownloadPlanRequest\032\".runanyw"
-    "here.v1.DownloadPlanResult\022R\n\005Start\022$.ru"
-    "nanywhere.v1.DownloadStartRequest\032#.runa"
-    "nywhere.v1.DownloadStartResult\022Y\n\tSubscr"
-    "ibe\022(.runanywhere.v1.DownloadSubscribeRe"
-    "quest\032 .runanywhere.v1.DownloadProgress0"
-    "\001\022U\n\006Cancel\022%.runanywhere.v1.DownloadCan"
-    "celRequest\032$.runanywhere.v1.DownloadCanc"
-    "elResult\022U\n\006Resume\022%.runanywhere.v1.Down"
-    "loadResumeRequest\032$.runanywhere.v1.Downl"
-    "oadResumeResultB\217\001\n\027ai.runanywhere.proto"
-    ".v1B\024DownloadServiceProtoP\001Z<github.com/"
-    "runanywhere/runanywhere-sdks/idl/v1;runa"
-    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
-    "Ab\006proto3"
+    "\030\007 \001(\003\022\020\n\010warnings\030\010 \003(\t\022\031\n\021storage_name"
+    "space\030\n \001(\t\022*\n\"required_free_bytes_after"
+    "_download\030\014 \001(\003\022=\n\016failure_reason\030\r \001(\0162"
+    "%.runanywhere.v1.DownloadFailureReason\022,"
+    "\n\005error\030\016 \001(\0132\030.runanywhere.v1.SDKErrorH"
+    "\000\210\001\001B\010\n\006_errorJ\004\010\013\020\014R\014resume_token\"\250\001\n\024D"
+    "ownloadStartRequest\022\020\n\010model_id\030\001 \001(\t\0225\n"
+    "\004plan\030\002 \001(\0132\".runanywhere.v1.DownloadPla"
+    "nResultH\000\210\001\001\022\034\n\024skip_registry_update\030\005 \001"
+    "(\010B\007\n\005_planJ\004\010\003\020\004J\004\010\004\020\005R\006resumeR\014resume_"
+    "token\"\321\002\n\023DownloadStartResult\022\020\n\010accepte"
+    "d\030\001 \001(\010\022\017\n\007task_id\030\002 \001(\t\022\020\n\010model_id\030\003 \001"
+    "(\t\022:\n\020initial_progress\030\004 \001(\0132 .runanywhe"
+    "re.v1.DownloadProgress\022=\n\016failure_reason"
+    "\030\007 \001(\0162%.runanywhere.v1.DownloadFailureR"
+    "eason\022,\n\005error\030\010 \001(\0132\030.runanywhere.v1.SD"
+    "KErrorH\000\210\001\001\0225\n\004plan\030\t \001(\0132\".runanywhere."
+    "v1.DownloadPlanResultH\001\210\001\001B\010\n\006_errorB\007\n\005"
+    "_planJ\004\010\006\020\007R\014resume_token\"X\n\025DownloadCan"
+    "celRequest\022\017\n\007task_id\030\001 \001(\t\022\020\n\010model_id\030"
+    "\002 \001(\t\022\034\n\024delete_partial_bytes\030\003 \001(\010\"\332\001\n\024"
+    "DownloadCancelResult\022\017\n\007task_id\030\002 \001(\t\022\020\n"
+    "\010model_id\030\003 \001(\t\022\035\n\025partial_bytes_deleted"
+    "\030\004 \001(\003\022\023\n\013was_running\030\006 \001(\010\022\037\n\027partial_b"
+    "ytes_preserved\030\007 \001(\010\022,\n\005error\030\t \001(\0132\030.ru"
+    "nanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006_errorJ\004\010\010"
+    "\020\tR\014resume_token*\325\002\n\rDownloadState\022\036\n\032DO"
+    "WNLOAD_STATE_UNSPECIFIED\020\000\022\032\n\026DOWNLOAD_S"
+    "TATE_PENDING\020\001\022\036\n\032DOWNLOAD_STATE_DOWNLOA"
+    "DING\020\002\022\035\n\031DOWNLOAD_STATE_EXTRACTING\020\003\022\033\n"
+    "\027DOWNLOAD_STATE_RETRYING\020\004\022\034\n\030DOWNLOAD_S"
+    "TATE_COMPLETED\020\005\022\031\n\025DOWNLOAD_STATE_FAILE"
+    "D\020\006\022\034\n\030DOWNLOAD_STATE_CANCELLED\020\007\022\031\n\025DOW"
+    "NLOAD_STATE_PAUSED\020\010\022\033\n\027DOWNLOAD_STATE_R"
+    "ESUMING\020\t\022\035\n\031DOWNLOAD_STATE_VALIDATING\020\n"
+    "*\326\002\n\025DownloadFailureReason\022\'\n#DOWNLOAD_F"
+    "AILURE_REASON_UNSPECIFIED\020\000\0222\n.DOWNLOAD_"
+    "FAILURE_REASON_OVERSIZE_PARTIAL_BYTES\020\001\022"
+    ":\n6DOWNLOAD_FAILURE_REASON_RESUME_OFFSET"
+    "_EXCEEDS_EXPECTED\020\002\0227\n3DOWNLOAD_FAILURE_"
+    "REASON_PARTIAL_SMALLER_THAN_OFFSET\020\003\0229\n5"
+    "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_"
+    "BEFORE_RESUME\020\004\0220\n,DOWNLOAD_FAILURE_REAS"
+    "ON_INSUFFICIENT_STORAGE\020\005*\202\004\n\022HttpDownlo"
+    "adStatus\022\033\n\027HTTP_DOWNLOAD_STATUS_OK\020\000\022&\n"
+    "\"HTTP_DOWNLOAD_STATUS_NETWORK_ERROR\020\001\022#\n"
+    "\037HTTP_DOWNLOAD_STATUS_FILE_ERROR\020\002\022-\n)HT"
+    "TP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE\020"
+    "\003\022$\n HTTP_DOWNLOAD_STATUS_INVALID_URL\020\004\022"
+    "(\n$HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED\020"
+    "\005\022\"\n\036HTTP_DOWNLOAD_STATUS_CANCELLED\020\006\022%\n"
+    "!HTTP_DOWNLOAD_STATUS_SERVER_ERROR\020\007\022 \n\034"
+    "HTTP_DOWNLOAD_STATUS_TIMEOUT\020\010\022,\n(HTTP_D"
+    "OWNLOAD_STATUS_NETWORK_UNAVAILABLE\020\t\022\"\n\036"
+    "HTTP_DOWNLOAD_STATUS_DNS_ERROR\020\n\022\"\n\036HTTP"
+    "_DOWNLOAD_STATUS_SSL_ERROR\020\013\022 \n\034HTTP_DOW"
+    "NLOAD_STATUS_UNKNOWN\020cB\217\001\n\027ai.runanywher"
+    "e.proto.v1B\024DownloadServiceProtoP\001Z<gith"
+    "ub.com/runanywhere/runanywhere-sdks/idl/"
+    "v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere"
+    ".V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_download_5fservice_2eproto_deps[1] = {
+    descriptor_table_download_5fservice_2eproto_deps[2] = {
+        &::descriptor_table_errors_2eproto,
         &::descriptor_table_model_5ftypes_2eproto,
 };
 static ::absl::once_flag descriptor_table_download_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_download_5fservice_2eproto = {
     false,
     false,
-    4649,
+    3856,
     descriptor_table_protodef_download_5fservice_2eproto,
     "download_service.proto",
     &descriptor_table_download_5fservice_2eproto_once,
     descriptor_table_download_5fservice_2eproto_deps,
-    1,
-    11,
+    2,
+    9,
     schemas,
     file_message_globals,
     TableStruct_download_5fservice_2eproto::offsets,
@@ -2730,30 +2210,23 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_download_5fser
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DownloadStage_descriptor() {
+DownloadState_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_download_5fservice_2eproto);
   return file_level_enum_descriptors_download_5fservice_2eproto[0];
 }
-PROTOBUF_CONSTINIT const uint32_t DownloadStage_internal_data_[] = {
-    327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DownloadState_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_download_5fservice_2eproto);
-  return file_level_enum_descriptors_download_5fservice_2eproto[1];
-}
 PROTOBUF_CONSTINIT const uint32_t DownloadState_internal_data_[] = {
-    655360u, 0u, };
+    720896u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 DownloadFailureReason_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_download_5fservice_2eproto);
-  return file_level_enum_descriptors_download_5fservice_2eproto[2];
+  return file_level_enum_descriptors_download_5fservice_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t DownloadFailureReason_internal_data_[] = {
     393216u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 HttpDownloadStatus_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_download_5fservice_2eproto);
-  return file_level_enum_descriptors_download_5fservice_2eproto[3];
+  return file_level_enum_descriptors_download_5fservice_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t HttpDownloadStatus_internal_data_[] = {
     786432u, 65536u, 99u, };
@@ -3011,6 +2484,11 @@ void DownloadSubscribeRequest::InternalSwap(DownloadSubscribeRequest* PROTOBUF_R
 }
 // ===================================================================
 
+void DownloadProgress::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
 DownloadProgress::DownloadProgress(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, DownloadProgress_get_class_data()) {
@@ -3027,12 +2505,10 @@ PROTOBUF_NDEBUG_INLINE DownloadProgress::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
         task_id_(arena, from.task_id_),
         storage_key_(arena, from.storage_key_),
         local_path_(arena, from.local_path_),
-        current_file_name_(arena, from.current_file_name_),
-        resume_token_(arena, from.resume_token_) {}
+        current_file_name_(arena, from.current_file_name_) {}
 
 DownloadProgress::DownloadProgress(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3048,13 +2524,17 @@ DownloadProgress::DownloadProgress(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000020U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, bytes_downloaded_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, bytes_downloaded_),
-           offsetof(Impl_, updated_at_unix_ms_) -
+           offsetof(Impl_, overall_progress_) -
                offsetof(Impl_, bytes_downloaded_) +
-               sizeof(Impl_::updated_at_unix_ms_));
+               sizeof(Impl_::overall_progress_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DownloadProgress)
 }
@@ -3063,21 +2543,19 @@ PROTOBUF_NDEBUG_INLINE DownloadProgress::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         model_id_(arena),
-        error_message_(arena),
         task_id_(arena),
         storage_key_(arena),
         local_path_(arena),
-        current_file_name_(arena),
-        resume_token_(arena) {}
+        current_file_name_(arena) {}
 
 inline void DownloadProgress::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, bytes_downloaded_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, updated_at_unix_ms_) -
-               offsetof(Impl_, bytes_downloaded_) +
-               sizeof(Impl_::updated_at_unix_ms_));
+           offsetof(Impl_, overall_progress_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::overall_progress_));
 }
 DownloadProgress::~DownloadProgress() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DownloadProgress)
@@ -3091,12 +2569,11 @@ inline void DownloadProgress::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   this_._impl_.task_id_.Destroy();
   this_._impl_.storage_key_.Destroy();
   this_._impl_.local_path_.Destroy();
   this_._impl_.current_file_name_.Destroy();
-  this_._impl_.resume_token_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -3134,39 +2611,41 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.task_id_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.storage_key_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.local_path_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _impl_.current_file_name_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  _impl_.bytes_downloaded_ = ::int64_t{0};
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    ::memset(&_impl_.stage_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.current_file_index_) -
-        reinterpret_cast<char*>(&_impl_.stage_)) + sizeof(_impl_.current_file_index_));
+  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
+    ::memset(&_impl_.bytes_downloaded_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.total_bytes_) -
+        reinterpret_cast<char*>(&_impl_.bytes_downloaded_)) + sizeof(_impl_.total_bytes_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    ::memset(&_impl_.total_files_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.updated_at_unix_ms_) -
-        reinterpret_cast<char*>(&_impl_.total_files_)) + sizeof(_impl_.updated_at_unix_ms_));
+  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+    ::memset(&_impl_.stage_progress_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.started_at_unix_ms_) -
+        reinterpret_cast<char*>(&_impl_.stage_progress_)) + sizeof(_impl_.started_at_unix_ms_));
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    ::memset(&_impl_.updated_at_unix_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.overall_progress_) -
+        reinterpret_cast<char*>(&_impl_.updated_at_unix_ms_)) + sizeof(_impl_.overall_progress_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3201,17 +2680,8 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
     }
   }
 
-  // .runanywhere.v1.DownloadStage stage = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_stage() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          2, this_._internal_stage(), target);
-    }
-  }
-
   // int64 bytes_downloaded = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_bytes_downloaded() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
@@ -3220,7 +2690,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int64 total_bytes = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_total_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
@@ -3229,7 +2699,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // float stage_progress = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_stage_progress()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -3237,26 +2707,24 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
     }
   }
 
-  // float overall_speed_bps = 6;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_overall_speed_bps()) != 0) {
+  // float bytes_per_second = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_bytes_per_second()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          6, this_._internal_overall_speed_bps(), target);
+          6, this_._internal_bytes_per_second(), target);
     }
   }
 
-  // int64 eta_seconds = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_eta_seconds() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
-              stream, this_._internal_eta_seconds(), target);
-    }
+  // optional int64 eta_seconds = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+            stream, this_._internal_eta_seconds(), target);
   }
 
   // .runanywhere.v1.DownloadState state = 8;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -3265,7 +2733,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int32 retry_attempt = 9;
-  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (this_._internal_retry_attempt() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
@@ -3273,18 +2741,8 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
     }
   }
 
-  // string error_message = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadProgress.error_message");
-      target = stream->WriteStringMaybeAliased(10, _s, target);
-    }
-  }
-
   // string task_id = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (!this_._internal_task_id().empty()) {
       const ::std::string& _s = this_._internal_task_id();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -3294,7 +2752,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int32 current_file_index = 12;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     if (this_._internal_current_file_index() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
@@ -3303,7 +2761,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int32 total_files = 13;
-  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
     if (this_._internal_total_files() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<13>(
@@ -3312,7 +2770,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // string storage_key = 14;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (!this_._internal_storage_key().empty()) {
       const ::std::string& _s = this_._internal_storage_key();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -3322,7 +2780,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // string local_path = 15;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (!this_._internal_local_path().empty()) {
       const ::std::string& _s = this_._internal_local_path();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -3341,7 +2799,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int64 started_at_unix_ms = 17;
-  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
     if (this_._internal_started_at_unix_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -3350,7 +2808,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // int64 updated_at_unix_ms = 18;
-  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
     if (this_._internal_updated_at_unix_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -3359,7 +2817,7 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
   }
 
   // string current_file_name = 19;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (!this_._internal_current_file_name().empty()) {
       const ::std::string& _s = this_._internal_current_file_name();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -3368,14 +2826,11 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
     }
   }
 
-  // string resume_token = 20;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadProgress.resume_token");
-      target = stream->WriteStringMaybeAliased(20, _s, target);
-    }
+  // optional .runanywhere.v1.SDKError error = 21;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        21, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -3411,138 +2866,120 @@ PROTOBUF_NOINLINE void DownloadProgress::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error_message = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
     // string task_id = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!this_._internal_task_id().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_task_id());
       }
     }
     // string storage_key = 14;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!this_._internal_storage_key().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_storage_key());
       }
     }
     // string local_path = 15;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!this_._internal_local_path().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_local_path());
       }
     }
     // string current_file_name = 19;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!this_._internal_current_file_name().empty()) {
         total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_current_file_name());
       }
     }
-    // string resume_token = 20;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
+    // optional .runanywhere.v1.SDKError error = 21;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 bytes_downloaded = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_bytes_downloaded() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_bytes_downloaded());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // .runanywhere.v1.DownloadStage stage = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_stage() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_stage());
-      }
-    }
-    // float stage_progress = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_stage_progress()) != 0) {
-        total_size += 5;
-      }
-    }
     // int64 total_bytes = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_total_bytes() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_total_bytes());
       }
     }
-    // int64 eta_seconds = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_eta_seconds() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_eta_seconds());
-      }
-    }
-    // float overall_speed_bps = 6;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_overall_speed_bps()) != 0) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+    // float stage_progress = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_stage_progress()) != 0) {
         total_size += 5;
       }
     }
+    // float bytes_per_second = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_bytes_per_second()) != 0) {
+        total_size += 5;
+      }
+    }
+    // optional int64 eta_seconds = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+          this_._internal_eta_seconds());
+    }
     // .runanywhere.v1.DownloadState state = 8;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_state());
       }
     }
     // int32 retry_attempt = 9;
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (this_._internal_retry_attempt() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_retry_attempt());
       }
     }
     // int32 current_file_index = 12;
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (this_._internal_current_file_index() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_current_file_index());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
     // int32 total_files = 13;
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (this_._internal_total_files() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_total_files());
+      }
+    }
+    // int64 started_at_unix_ms = 17;
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+      if (this_._internal_started_at_unix_ms() != 0) {
+        total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
+                                        this_._internal_started_at_unix_ms());
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    // int64 updated_at_unix_ms = 18;
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+      if (this_._internal_updated_at_unix_ms() != 0) {
+        total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
+                                        this_._internal_updated_at_unix_ms());
       }
     }
     // float overall_progress = 16;
     if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_overall_progress()) != 0) {
         total_size += 6;
-      }
-    }
-    // int64 started_at_unix_ms = 17;
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (this_._internal_started_at_unix_ms() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
-                                        this_._internal_started_at_unix_ms());
-      }
-    }
-    // int64 updated_at_unix_ms = 18;
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (this_._internal_updated_at_unix_ms() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
-                                        this_._internal_updated_at_unix_ms());
       }
     }
   }
@@ -3557,6 +2994,7 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DownloadProgress)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
@@ -3574,15 +3012,6 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!from._internal_task_id().empty()) {
         _this->_internal_set_task_id(from._internal_task_id());
       } else {
@@ -3591,7 +3020,7 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!from._internal_storage_key().empty()) {
         _this->_internal_set_storage_key(from._internal_storage_key());
       } else {
@@ -3600,7 +3029,7 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!from._internal_local_path().empty()) {
         _this->_internal_set_local_path(from._internal_local_path());
       } else {
@@ -3609,7 +3038,7 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!from._internal_current_file_name().empty()) {
         _this->_internal_set_current_file_name(from._internal_current_file_name());
       } else {
@@ -3618,82 +3047,74 @@ void DownloadProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_bytes_downloaded() != 0) {
+        _this->_impl_.bytes_downloaded_ = from._impl_.bytes_downloaded_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_bytes_downloaded() != 0) {
-        _this->_impl_.bytes_downloaded_ = from._impl_.bytes_downloaded_;
+      if (from._internal_total_bytes() != 0) {
+        _this->_impl_.total_bytes_ = from._impl_.total_bytes_;
       }
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_stage() != 0) {
-        _this->_impl_.stage_ = from._impl_.stage_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_stage_progress()) != 0) {
         _this->_impl_.stage_progress_ = from._impl_.stage_progress_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_total_bytes() != 0) {
-        _this->_impl_.total_bytes_ = from._impl_.total_bytes_;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_bytes_per_second()) != 0) {
+        _this->_impl_.bytes_per_second_ = from._impl_.bytes_per_second_;
       }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      _this->_impl_.eta_seconds_ = from._impl_.eta_seconds_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_eta_seconds() != 0) {
-        _this->_impl_.eta_seconds_ = from._impl_.eta_seconds_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_overall_speed_bps()) != 0) {
-        _this->_impl_.overall_speed_bps_ = from._impl_.overall_speed_bps_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (from._internal_state() != 0) {
         _this->_impl_.state_ = from._impl_.state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (from._internal_retry_attempt() != 0) {
         _this->_impl_.retry_attempt_ = from._impl_.retry_attempt_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (from._internal_current_file_index() != 0) {
         _this->_impl_.current_file_index_ = from._impl_.current_file_index_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (from._internal_total_files() != 0) {
         _this->_impl_.total_files_ = from._impl_.total_files_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+      if (from._internal_started_at_unix_ms() != 0) {
+        _this->_impl_.started_at_unix_ms_ = from._impl_.started_at_unix_ms_;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+      if (from._internal_updated_at_unix_ms() != 0) {
+        _this->_impl_.updated_at_unix_ms_ = from._impl_.updated_at_unix_ms_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_overall_progress()) != 0) {
         _this->_impl_.overall_progress_ = from._impl_.overall_progress_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (from._internal_started_at_unix_ms() != 0) {
-        _this->_impl_.started_at_unix_ms_ = from._impl_.started_at_unix_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (from._internal_updated_at_unix_ms() != 0) {
-        _this->_impl_.updated_at_unix_ms_ = from._impl_.updated_at_unix_ms_;
       }
     }
   }
@@ -3717,18 +3138,16 @@ void DownloadProgress::InternalSwap(DownloadProgress* PROTOBUF_RESTRICT PROTOBUF
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.task_id_, &other->_impl_.task_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.storage_key_, &other->_impl_.storage_key_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.local_path_, &other->_impl_.local_path_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_file_name_, &other->_impl_.current_file_name_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.updated_at_unix_ms_)
-      + sizeof(DownloadProgress::_impl_.updated_at_unix_ms_)
-      - PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.bytes_downloaded_)>(
-          reinterpret_cast<char*>(&_impl_.bytes_downloaded_),
-          reinterpret_cast<char*>(&other->_impl_.bytes_downloaded_));
+      PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.overall_progress_)
+      + sizeof(DownloadProgress::_impl_.overall_progress_)
+      - PROTOBUF_FIELD_OFFSET(DownloadProgress, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata DownloadProgress::GetMetadata() const {
@@ -3781,9 +3200,9 @@ DownloadPlanRequest::DownloadPlanRequest(
                offsetof(Impl_, available_storage_bytes_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, available_storage_bytes_),
-           offsetof(Impl_, verify_checksums_) -
+           offsetof(Impl_, skip_checksum_verification_) -
                offsetof(Impl_, available_storage_bytes_) +
-               sizeof(Impl_::verify_checksums_));
+               sizeof(Impl_::skip_checksum_verification_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DownloadPlanRequest)
 }
@@ -3799,9 +3218,9 @@ inline void DownloadPlanRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE aren
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, model_),
            0,
-           offsetof(Impl_, verify_checksums_) -
+           offsetof(Impl_, skip_checksum_verification_) -
                offsetof(Impl_, model_) +
-               sizeof(Impl_::verify_checksums_));
+               sizeof(Impl_::skip_checksum_verification_));
 }
 DownloadPlanRequest::~DownloadPlanRequest() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DownloadPlanRequest)
@@ -3868,10 +3287,9 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
     ::memset(&_impl_.available_storage_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.validate_existing_bytes_) -
-        reinterpret_cast<char*>(&_impl_.available_storage_bytes_)) + sizeof(_impl_.validate_existing_bytes_));
+        reinterpret_cast<char*>(&_impl_.skip_checksum_verification_) -
+        reinterpret_cast<char*>(&_impl_.available_storage_bytes_)) + sizeof(_impl_.skip_checksum_verification_));
   }
-  _impl_.verify_checksums_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -3912,15 +3330,6 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
         stream);
   }
 
-  // bool resume_existing = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_resume_existing() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_resume_existing(), target);
-    }
-  }
-
   // int64 available_storage_bytes = 4;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_available_storage_bytes() != 0) {
@@ -3931,7 +3340,7 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
   }
 
   // bool allow_metered_network = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_allow_metered_network() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -3950,7 +3359,7 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
   }
 
   // bool validate_existing_bytes = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_validate_existing_bytes() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -3958,12 +3367,12 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
     }
   }
 
-  // bool verify_checksums = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_verify_checksums() != 0) {
+  // bool skip_checksum_verification = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_skip_checksum_verification() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          8, this_._internal_verify_checksums(), target);
+          8, this_._internal_skip_checksum_verification(), target);
     }
   }
 
@@ -4035,29 +3444,21 @@ PROTOBUF_NOINLINE void DownloadPlanRequest::Clear() {
             this_._internal_required_free_bytes_after_download());
       }
     }
-    // bool resume_existing = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_resume_existing() != 0) {
-        total_size += 2;
-      }
-    }
     // bool allow_metered_network = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_allow_metered_network() != 0) {
         total_size += 2;
       }
     }
     // bool validate_existing_bytes = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_validate_existing_bytes() != 0) {
         total_size += 2;
       }
     }
-  }
-   {
-    // bool verify_checksums = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_verify_checksums() != 0) {
+    // bool skip_checksum_verification = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_skip_checksum_verification() != 0) {
         total_size += 2;
       }
     }
@@ -4118,24 +3519,19 @@ void DownloadPlanRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_resume_existing() != 0) {
-        _this->_impl_.resume_existing_ = from._impl_.resume_existing_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_allow_metered_network() != 0) {
         _this->_impl_.allow_metered_network_ = from._impl_.allow_metered_network_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_validate_existing_bytes() != 0) {
         _this->_impl_.validate_existing_bytes_ = from._impl_.validate_existing_bytes_;
       }
     }
-  }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_verify_checksums() != 0) {
-      _this->_impl_.verify_checksums_ = from._impl_.verify_checksums_;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_skip_checksum_verification() != 0) {
+        _this->_impl_.skip_checksum_verification_ = from._impl_.skip_checksum_verification_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -4160,8 +3556,8 @@ void DownloadPlanRequest::InternalSwap(DownloadPlanRequest* PROTOBUF_RESTRICT PR
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.storage_namespace_, &other->_impl_.storage_namespace_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.verify_checksums_)
-      + sizeof(DownloadPlanRequest::_impl_.verify_checksums_)
+      PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.skip_checksum_verification_)
+      + sizeof(DownloadPlanRequest::_impl_.skip_checksum_verification_)
       - PROTOBUF_FIELD_OFFSET(DownloadPlanRequest, _impl_.model_)>(
           reinterpret_cast<char*>(&_impl_.model_),
           reinterpret_cast<char*>(&other->_impl_.model_));
@@ -4577,6 +3973,11 @@ void DownloadFilePlan::InternalSwap(DownloadFilePlan* PROTOBUF_RESTRICT PROTOBUF
 }
 // ===================================================================
 
+void DownloadPlanResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
 DownloadPlanResult::DownloadPlanResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, DownloadPlanResult_get_class_data()) {
@@ -4607,9 +4008,7 @@ PROTOBUF_NDEBUG_INLINE DownloadPlanResult::Impl_::Impl_(
         }
         ,
         model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
-        storage_namespace_(arena, from.storage_namespace_),
-        resume_token_(arena, from.resume_token_) {}
+        storage_namespace_(arena, from.storage_namespace_) {}
 
 DownloadPlanResult::DownloadPlanResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4625,6 +4024,10 @@ DownloadPlanResult::DownloadPlanResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000010U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, total_bytes_),
            reinterpret_cast<const char*>(&from._impl_) +
@@ -4650,17 +4053,15 @@ PROTOBUF_NDEBUG_INLINE DownloadPlanResult::Impl_::Impl_(
          }
         ,
         model_id_(arena),
-        error_message_(arena),
-        storage_namespace_(arena),
-        resume_token_(arena) {}
+        storage_namespace_(arena) {}
 
 inline void DownloadPlanResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, total_bytes_),
+               offsetof(Impl_, error_),
            0,
            offsetof(Impl_, required_free_bytes_after_download_) -
-               offsetof(Impl_, total_bytes_) +
+               offsetof(Impl_, error_) +
                sizeof(Impl_::required_free_bytes_after_download_));
 }
 DownloadPlanResult::~DownloadPlanResult() {
@@ -4675,9 +4076,8 @@ inline void DownloadPlanResult::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   this_._impl_.storage_namespace_.Destroy();
-  this_._impl_.resume_token_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -4715,7 +4115,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.files_.Clear();
     }
@@ -4726,24 +4126,22 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _impl_.storage_namespace_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
     ::memset(&_impl_.total_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.can_start_) -
-        reinterpret_cast<char*>(&_impl_.total_bytes_)) + sizeof(_impl_.can_start_));
+        reinterpret_cast<char*>(&_impl_.requires_extraction_) -
+        reinterpret_cast<char*>(&_impl_.total_bytes_)) + sizeof(_impl_.requires_extraction_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    ::memset(&_impl_.requires_extraction_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    ::memset(&_impl_.can_resume_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.required_free_bytes_after_download_) -
-        reinterpret_cast<char*>(&_impl_.requires_extraction_)) + sizeof(_impl_.required_free_bytes_after_download_));
+        reinterpret_cast<char*>(&_impl_.can_resume_)) + sizeof(_impl_.required_free_bytes_after_download_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4769,7 +4167,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // bool can_start = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_can_start() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -4801,7 +4199,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   }
 
   // int64 total_bytes = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_total_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
@@ -4810,7 +4208,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   }
 
   // bool requires_extraction = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_requires_extraction() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -4819,7 +4217,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   }
 
   // bool can_resume = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_can_resume() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -4828,7 +4226,7 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   }
 
   // int64 resume_from_bytes = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_resume_from_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
@@ -4846,18 +4244,8 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
     }
   }
 
-  // string error_message = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadPlanResult.error_message");
-      target = stream->WriteStringMaybeAliased(9, _s, target);
-    }
-  }
-
   // string storage_namespace = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (!this_._internal_storage_namespace().empty()) {
       const ::std::string& _s = this_._internal_storage_namespace();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -4866,18 +4254,8 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
     }
   }
 
-  // string resume_token = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadPlanResult.resume_token");
-      target = stream->WriteStringMaybeAliased(11, _s, target);
-    }
-  }
-
   // int64 required_free_bytes_after_download = 12;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_required_free_bytes_after_download() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<12>(
@@ -4886,12 +4264,19 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
   }
 
   // .runanywhere.v1.DownloadFailureReason failure_reason = 13;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_failure_reason() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           13, this_._internal_failure_reason(), target);
     }
+  }
+
+  // optional .runanywhere.v1.SDKError error = 14;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        14, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -4943,70 +4328,61 @@ PROTOBUF_NOINLINE void DownloadPlanResult::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error_message = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
     // string storage_namespace = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!this_._internal_storage_namespace().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_storage_namespace());
       }
     }
-    // string resume_token = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
+    // optional .runanywhere.v1.SDKError error = 14;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 total_bytes = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_total_bytes() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_total_bytes());
       }
     }
     // bool can_start = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_can_start() != 0) {
         total_size += 2;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
     // bool requires_extraction = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_requires_extraction() != 0) {
         total_size += 2;
       }
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
     // bool can_resume = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_can_resume() != 0) {
         total_size += 2;
       }
     }
     // .runanywhere.v1.DownloadFailureReason failure_reason = 13;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_failure_reason() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_failure_reason());
       }
     }
     // int64 resume_from_bytes = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_resume_from_bytes() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_resume_from_bytes());
       }
     }
     // int64 required_free_bytes_after_download = 12;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_required_free_bytes_after_download() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_required_free_bytes_after_download());
@@ -5052,15 +4428,6 @@ void DownloadPlanResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!from._internal_storage_namespace().empty()) {
         _this->_internal_set_storage_namespace(from._internal_storage_namespace());
       } else {
@@ -5069,48 +4436,47 @@ void DownloadPlanResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_total_bytes() != 0) {
         _this->_impl_.total_bytes_ = from._impl_.total_bytes_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_can_start() != 0) {
         _this->_impl_.can_start_ = from._impl_.can_start_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_requires_extraction() != 0) {
         _this->_impl_.requires_extraction_ = from._impl_.requires_extraction_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (from._internal_can_resume() != 0) {
         _this->_impl_.can_resume_ = from._impl_.can_resume_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_failure_reason() != 0) {
         _this->_impl_.failure_reason_ = from._impl_.failure_reason_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (from._internal_resume_from_bytes() != 0) {
         _this->_impl_.resume_from_bytes_ = from._impl_.resume_from_bytes_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_required_free_bytes_after_download() != 0) {
         _this->_impl_.required_free_bytes_after_download_ = from._impl_.required_free_bytes_after_download_;
       }
@@ -5138,15 +4504,13 @@ void DownloadPlanResult::InternalSwap(DownloadPlanResult* PROTOBUF_RESTRICT PROT
   _impl_.files_.InternalSwap(&other->_impl_.files_);
   _impl_.warnings_.InternalSwap(&other->_impl_.warnings_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.storage_namespace_, &other->_impl_.storage_namespace_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.required_free_bytes_after_download_)
       + sizeof(DownloadPlanResult::_impl_.required_free_bytes_after_download_)
-      - PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.total_bytes_)>(
-          reinterpret_cast<char*>(&_impl_.total_bytes_),
-          reinterpret_cast<char*>(&other->_impl_.total_bytes_));
+      - PROTOBUF_FIELD_OFFSET(DownloadPlanResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata DownloadPlanResult::GetMetadata() const {
@@ -5169,8 +4533,7 @@ PROTOBUF_NDEBUG_INLINE DownloadStartRequest::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::DownloadStartRequest& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        model_id_(arena, from.model_id_),
-        resume_token_(arena, from.resume_token_) {}
+        model_id_(arena, from.model_id_) {}
 
 DownloadStartRequest::DownloadStartRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5187,16 +4550,10 @@ DownloadStartRequest::DownloadStartRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.plan_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.plan_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.plan_)
                 : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, resume_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, resume_),
-           offsetof(Impl_, update_registry_on_completion_) -
-               offsetof(Impl_, resume_) +
-               sizeof(Impl_::update_registry_on_completion_));
+  _impl_.skip_registry_update_ = from._impl_.skip_registry_update_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DownloadStartRequest)
 }
@@ -5204,17 +4561,16 @@ PROTOBUF_NDEBUG_INLINE DownloadStartRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        model_id_(arena),
-        resume_token_(arena) {}
+        model_id_(arena) {}
 
 inline void DownloadStartRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, plan_),
            0,
-           offsetof(Impl_, update_registry_on_completion_) -
+           offsetof(Impl_, skip_registry_update_) -
                offsetof(Impl_, plan_) +
-               sizeof(Impl_::update_registry_on_completion_));
+               sizeof(Impl_::skip_registry_update_));
 }
 DownloadStartRequest::~DownloadStartRequest() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DownloadStartRequest)
@@ -5228,7 +4584,6 @@ inline void DownloadStartRequest::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.resume_token_.Destroy();
   delete this_._impl_.plan_;
   this_._impl_.~Impl_();
 }
@@ -5267,21 +4622,16 @@ PROTOBUF_NOINLINE void DownloadStartRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.plan_ != nullptr);
       _impl_.plan_->Clear();
     }
   }
-  ::memset(&_impl_.resume_, 0, static_cast<::size_t>(
-      reinterpret_cast<char*>(&_impl_.update_registry_on_completion_) -
-      reinterpret_cast<char*>(&_impl_.resume_)) + sizeof(_impl_.update_registry_on_completion_));
+  _impl_.skip_registry_update_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -5315,38 +4665,19 @@ PROTOBUF_NOINLINE void DownloadStartRequest::Clear() {
     }
   }
 
-  // .runanywhere.v1.DownloadPlanResult plan = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  // optional .runanywhere.v1.DownloadPlanResult plan = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         2, *this_._impl_.plan_, this_._impl_.plan_->GetCachedSize(), target,
         stream);
   }
 
-  // bool resume = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_resume() != 0) {
+  // bool skip_registry_update = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_skip_registry_update() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_resume(), target);
-    }
-  }
-
-  // string resume_token = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadStartRequest.resume_token");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
-    }
-  }
-
-  // bool update_registry_on_completion = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_update_registry_on_completion() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_update_registry_on_completion(), target);
+          5, this_._internal_skip_registry_update(), target);
     }
   }
 
@@ -5375,7 +4706,7 @@ PROTOBUF_NOINLINE void DownloadStartRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     // string model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -5383,27 +4714,14 @@ PROTOBUF_NOINLINE void DownloadStartRequest::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string resume_token = 4;
+    // optional .runanywhere.v1.DownloadPlanResult plan = 2;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
-    }
-    // .runanywhere.v1.DownloadPlanResult plan = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.plan_);
     }
-    // bool resume = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_resume() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool update_registry_on_completion = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_update_registry_on_completion() != 0) {
+    // bool skip_registry_update = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_skip_registry_update() != 0) {
         total_size += 2;
       }
     }
@@ -5426,7 +4744,7 @@ void DownloadStartRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -5437,15 +4755,6 @@ void DownloadStartRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
-      } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.plan_ != nullptr);
       if (_this->_impl_.plan_ == nullptr) {
         _this->_impl_.plan_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.plan_);
@@ -5453,14 +4762,9 @@ void DownloadStartRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.plan_->MergeFrom(*from._impl_.plan_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_resume() != 0) {
-        _this->_impl_.resume_ = from._impl_.resume_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_update_registry_on_completion() != 0) {
-        _this->_impl_.update_registry_on_completion_ = from._impl_.update_registry_on_completion_;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_skip_registry_update() != 0) {
+        _this->_impl_.skip_registry_update_ = from._impl_.skip_registry_update_;
       }
     }
   }
@@ -5484,10 +4788,9 @@ void DownloadStartRequest::InternalSwap(DownloadStartRequest* PROTOBUF_RESTRICT 
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.update_registry_on_completion_)
-      + sizeof(DownloadStartRequest::_impl_.update_registry_on_completion_)
+      PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.skip_registry_update_)
+      + sizeof(DownloadStartRequest::_impl_.skip_registry_update_)
       - PROTOBUF_FIELD_OFFSET(DownloadStartRequest, _impl_.plan_)>(
           reinterpret_cast<char*>(&_impl_.plan_),
           reinterpret_cast<char*>(&other->_impl_.plan_));
@@ -5498,6 +4801,11 @@ void DownloadStartRequest::InternalSwap(DownloadStartRequest* PROTOBUF_RESTRICT 
 }
 // ===================================================================
 
+void DownloadStartResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
 DownloadStartResult::DownloadStartResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, DownloadStartResult_get_class_data()) {
@@ -5514,9 +4822,7 @@ PROTOBUF_NDEBUG_INLINE DownloadStartResult::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         task_id_(arena, from.task_id_),
-        model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
-        resume_token_(arena, from.resume_token_) {}
+        model_id_(arena, from.model_id_) {}
 
 DownloadStartResult::DownloadStartResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5533,8 +4839,14 @@ DownloadStartResult::DownloadStartResult(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.initial_progress_ = (CheckHasBit(cached_has_bits, 0x00000010U))
+  _impl_.initial_progress_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.initial_progress_)
+                : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
+  _impl_.plan_ = (CheckHasBit(cached_has_bits, 0x00000010U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.plan_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, accepted_),
@@ -5551,9 +4863,7 @@ PROTOBUF_NDEBUG_INLINE DownloadStartResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         task_id_(arena),
-        model_id_(arena),
-        error_message_(arena),
-        resume_token_(arena) {}
+        model_id_(arena) {}
 
 inline void DownloadStartResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -5577,9 +4887,9 @@ inline void DownloadStartResult::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.task_id_.Destroy();
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  this_._impl_.resume_token_.Destroy();
   delete this_._impl_.initial_progress_;
+  delete this_._impl_.error_;
+  delete this_._impl_.plan_;
   this_._impl_.~Impl_();
 }
 
@@ -5625,14 +4935,16 @@ PROTOBUF_NOINLINE void DownloadStartResult::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       ABSL_DCHECK(_impl_.initial_progress_ != nullptr);
       _impl_.initial_progress_->Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      ABSL_DCHECK(_impl_.plan_ != nullptr);
+      _impl_.plan_->Clear();
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00000060U)) {
@@ -5693,30 +5005,10 @@ PROTOBUF_NOINLINE void DownloadStartResult::Clear() {
   }
 
   // .runanywhere.v1.DownloadProgress initial_progress = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         4, *this_._impl_.initial_progress_, this_._impl_.initial_progress_->GetCachedSize(), target,
         stream);
-  }
-
-  // string error_message = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadStartResult.error_message");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
-  }
-
-  // string resume_token = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadStartResult.resume_token");
-      target = stream->WriteStringMaybeAliased(6, _s, target);
-    }
   }
 
   // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
@@ -5726,6 +5018,20 @@ PROTOBUF_NOINLINE void DownloadStartResult::Clear() {
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           7, this_._internal_failure_reason(), target);
     }
+  }
+
+  // optional .runanywhere.v1.SDKError error = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        8, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.DownloadPlanResult plan = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        9, *this_._impl_.plan_, this_._impl_.plan_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5768,24 +5074,20 @@ PROTOBUF_NOINLINE void DownloadStartResult::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error_message = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
-    // string resume_token = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
-    }
     // .runanywhere.v1.DownloadProgress initial_progress = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.initial_progress_);
+    }
+    // optional .runanywhere.v1.SDKError error = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
+    }
+    // optional .runanywhere.v1.DownloadPlanResult plan = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.plan_);
     }
     // bool accepted = 1;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
@@ -5839,29 +5141,27 @@ void DownloadStartResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
-      } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       ABSL_DCHECK(from._impl_.initial_progress_ != nullptr);
       if (_this->_impl_.initial_progress_ == nullptr) {
         _this->_impl_.initial_progress_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.initial_progress_);
       } else {
         _this->_impl_.initial_progress_->MergeFrom(*from._impl_.initial_progress_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      ABSL_DCHECK(from._impl_.plan_ != nullptr);
+      if (_this->_impl_.plan_ == nullptr) {
+        _this->_impl_.plan_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.plan_);
+      } else {
+        _this->_impl_.plan_->MergeFrom(*from._impl_.plan_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
@@ -5896,8 +5196,6 @@ void DownloadStartResult::InternalSwap(DownloadStartResult* PROTOBUF_RESTRICT PR
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.task_id_, &other->_impl_.task_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(DownloadStartResult, _impl_.failure_reason_)
       + sizeof(DownloadStartResult::_impl_.failure_reason_)
@@ -6187,6 +5485,11 @@ void DownloadCancelRequest::InternalSwap(DownloadCancelRequest* PROTOBUF_RESTRIC
 }
 // ===================================================================
 
+void DownloadCancelResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
 DownloadCancelResult::DownloadCancelResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, DownloadCancelResult_get_class_data()) {
@@ -6203,9 +5506,7 @@ PROTOBUF_NDEBUG_INLINE DownloadCancelResult::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         task_id_(arena, from.task_id_),
-        model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
-        resume_token_(arena, from.resume_token_) {}
+        model_id_(arena, from.model_id_) {}
 
 DownloadCancelResult::DownloadCancelResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -6221,6 +5522,10 @@ DownloadCancelResult::DownloadCancelResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, partial_bytes_deleted_),
            reinterpret_cast<const char*>(&from._impl_) +
@@ -6236,17 +5541,15 @@ PROTOBUF_NDEBUG_INLINE DownloadCancelResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         task_id_(arena),
-        model_id_(arena),
-        error_message_(arena),
-        resume_token_(arena) {}
+        model_id_(arena) {}
 
 inline void DownloadCancelResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, partial_bytes_deleted_),
+               offsetof(Impl_, error_),
            0,
            offsetof(Impl_, partial_bytes_preserved_) -
-               offsetof(Impl_, partial_bytes_deleted_) +
+               offsetof(Impl_, error_) +
                sizeof(Impl_::partial_bytes_preserved_));
 }
 DownloadCancelResult::~DownloadCancelResult() {
@@ -6262,8 +5565,7 @@ inline void DownloadCancelResult::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.task_id_.Destroy();
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  this_._impl_.resume_token_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -6301,7 +5603,7 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.task_id_.ClearNonDefaultToEmpty();
     }
@@ -6309,13 +5611,11 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000038U)) {
     ::memset(&_impl_.partial_bytes_deleted_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.partial_bytes_preserved_) -
         reinterpret_cast<char*>(&_impl_.partial_bytes_deleted_)) + sizeof(_impl_.partial_bytes_preserved_));
@@ -6343,15 +5643,6 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // bool success = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_success() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_success(), target);
-    }
-  }
-
   // string task_id = 2;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_task_id().empty()) {
@@ -6373,7 +5664,7 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
   }
 
   // int64 partial_bytes_deleted = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_partial_bytes_deleted() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
@@ -6381,18 +5672,8 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
     }
   }
 
-  // string error_message = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadCancelResult.error_message");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
-  }
-
   // bool was_running = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_was_running() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -6401,7 +5682,7 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
   }
 
   // bool partial_bytes_preserved = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_partial_bytes_preserved() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -6409,14 +5690,11 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
     }
   }
 
-  // string resume_token = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadCancelResult.resume_token");
-      target = stream->WriteStringMaybeAliased(8, _s, target);
-    }
+  // optional .runanywhere.v1.SDKError error = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        9, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -6444,7 +5722,7 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string task_id = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_task_id().empty()) {
@@ -6459,41 +5737,26 @@ PROTOBUF_NOINLINE void DownloadCancelResult::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error_message = 5;
+    // optional .runanywhere.v1.SDKError error = 9;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
-    // string resume_token = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 partial_bytes_deleted = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_partial_bytes_deleted() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_partial_bytes_deleted());
       }
     }
-    // bool success = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_success() != 0) {
-        total_size += 2;
-      }
-    }
     // bool was_running = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_was_running() != 0) {
         total_size += 2;
       }
     }
     // bool partial_bytes_preserved = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_partial_bytes_preserved() != 0) {
         total_size += 2;
       }
@@ -6510,13 +5773,14 @@ void DownloadCancelResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DownloadCancelResult)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_task_id().empty()) {
         _this->_internal_set_task_id(from._internal_task_id());
@@ -6536,39 +5800,24 @@ void DownloadCancelResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
-      } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_partial_bytes_deleted() != 0) {
         _this->_impl_.partial_bytes_deleted_ = from._impl_.partial_bytes_deleted_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_success() != 0) {
-        _this->_impl_.success_ = from._impl_.success_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_was_running() != 0) {
         _this->_impl_.was_running_ = from._impl_.was_running_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_partial_bytes_preserved() != 0) {
         _this->_impl_.partial_bytes_preserved_ = from._impl_.partial_bytes_preserved_;
       }
@@ -6595,780 +5844,15 @@ void DownloadCancelResult::InternalSwap(DownloadCancelResult* PROTOBUF_RESTRICT 
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.task_id_, &other->_impl_.task_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_preserved_)
       + sizeof(DownloadCancelResult::_impl_.partial_bytes_preserved_)
-      - PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.partial_bytes_deleted_)>(
-          reinterpret_cast<char*>(&_impl_.partial_bytes_deleted_),
-          reinterpret_cast<char*>(&other->_impl_.partial_bytes_deleted_));
+      - PROTOBUF_FIELD_OFFSET(DownloadCancelResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata DownloadCancelResult::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-DownloadResumeRequest::DownloadResumeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DownloadResumeRequest_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DownloadResumeRequest)
-}
-PROTOBUF_NDEBUG_INLINE DownloadResumeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DownloadResumeRequest& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        task_id_(arena, from.task_id_),
-        model_id_(arena, from.model_id_),
-        resume_token_(arena, from.resume_token_) {}
-
-DownloadResumeRequest::DownloadResumeRequest(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DownloadResumeRequest& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DownloadResumeRequest_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DownloadResumeRequest* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, resume_from_bytes_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, resume_from_bytes_),
-           offsetof(Impl_, validate_partial_bytes_) -
-               offsetof(Impl_, resume_from_bytes_) +
-               sizeof(Impl_::validate_partial_bytes_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DownloadResumeRequest)
-}
-PROTOBUF_NDEBUG_INLINE DownloadResumeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        task_id_(arena),
-        model_id_(arena),
-        resume_token_(arena) {}
-
-inline void DownloadResumeRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, resume_from_bytes_),
-           0,
-           offsetof(Impl_, validate_partial_bytes_) -
-               offsetof(Impl_, resume_from_bytes_) +
-               sizeof(Impl_::validate_partial_bytes_));
-}
-DownloadResumeRequest::~DownloadResumeRequest() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DownloadResumeRequest)
-  SharedDtor(*this);
-}
-inline void DownloadResumeRequest::SharedDtor(MessageLite& self) {
-  DownloadResumeRequest& this_ = static_cast<DownloadResumeRequest&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.task_id_.Destroy();
-  this_._impl_.model_id_.Destroy();
-  this_._impl_.resume_token_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DownloadResumeRequest_class_data_ =
-        DownloadResumeRequest::InternalGenerateClassData_(DownloadResumeRequest_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DownloadResumeRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DownloadResumeRequest_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DownloadResumeRequest_class_data_.tc_table);
-  return DownloadResumeRequest_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DownloadResumeRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DownloadResumeRequest_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DownloadResumeRequest_globals_));
-  return DownloadResumeRequest_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DownloadResumeRequest::ParseTableT_
-    DownloadResumeRequest::_table_ =
-        DownloadResumeRequest::InternalGenerateParseTable_(DownloadResumeRequest_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DownloadResumeRequest::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DownloadResumeRequest)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.task_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.model_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
-    ::memset(&_impl_.resume_from_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.validate_partial_bytes_) -
-        reinterpret_cast<char*>(&_impl_.resume_from_bytes_)) + sizeof(_impl_.validate_partial_bytes_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DownloadResumeRequest::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DownloadResumeRequest& this_ = static_cast<const DownloadResumeRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DownloadResumeRequest::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DownloadResumeRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DownloadResumeRequest)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string task_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_task_id().empty()) {
-      const ::std::string& _s = this_._internal_task_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeRequest.task_id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // string model_id = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_model_id().empty()) {
-      const ::std::string& _s = this_._internal_model_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeRequest.model_id");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // int64 resume_from_bytes = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_resume_from_bytes() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
-              stream, this_._internal_resume_from_bytes(), target);
-    }
-  }
-
-  // string resume_token = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeRequest.resume_token");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
-    }
-  }
-
-  // bool validate_partial_bytes = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_validate_partial_bytes() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_validate_partial_bytes(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DownloadResumeRequest)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DownloadResumeRequest::ByteSizeLong(const MessageLite& base) {
-  const DownloadResumeRequest& this_ = static_cast<const DownloadResumeRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DownloadResumeRequest::ByteSizeLong() const {
-  const DownloadResumeRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DownloadResumeRequest)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // string task_id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_task_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_task_id());
-      }
-    }
-    // string model_id = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_model_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_id());
-      }
-    }
-    // string resume_token = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
-    }
-    // int64 resume_from_bytes = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_resume_from_bytes() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_resume_from_bytes());
-      }
-    }
-    // bool validate_partial_bytes = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_validate_partial_bytes() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DownloadResumeRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DownloadResumeRequest*>(&to_msg);
-  auto& from = static_cast<const DownloadResumeRequest&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DownloadResumeRequest)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_task_id().empty()) {
-        _this->_internal_set_task_id(from._internal_task_id());
-      } else {
-        if (_this->_impl_.task_id_.IsDefault()) {
-          _this->_internal_set_task_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_model_id().empty()) {
-        _this->_internal_set_model_id(from._internal_model_id());
-      } else {
-        if (_this->_impl_.model_id_.IsDefault()) {
-          _this->_internal_set_model_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
-      } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_resume_from_bytes() != 0) {
-        _this->_impl_.resume_from_bytes_ = from._impl_.resume_from_bytes_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_validate_partial_bytes() != 0) {
-        _this->_impl_.validate_partial_bytes_ = from._impl_.validate_partial_bytes_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DownloadResumeRequest::CopyFrom(const DownloadResumeRequest& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DownloadResumeRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DownloadResumeRequest::InternalSwap(DownloadResumeRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.task_id_, &other->_impl_.task_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.validate_partial_bytes_)
-      + sizeof(DownloadResumeRequest::_impl_.validate_partial_bytes_)
-      - PROTOBUF_FIELD_OFFSET(DownloadResumeRequest, _impl_.resume_from_bytes_)>(
-          reinterpret_cast<char*>(&_impl_.resume_from_bytes_),
-          reinterpret_cast<char*>(&other->_impl_.resume_from_bytes_));
-}
-
-::google::protobuf::Metadata DownloadResumeRequest::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-DownloadResumeResult::DownloadResumeResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DownloadResumeResult_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DownloadResumeResult)
-}
-PROTOBUF_NDEBUG_INLINE DownloadResumeResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DownloadResumeResult& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        task_id_(arena, from.task_id_),
-        model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
-        resume_token_(arena, from.resume_token_) {}
-
-DownloadResumeResult::DownloadResumeResult(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DownloadResumeResult& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DownloadResumeResult_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DownloadResumeResult* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.initial_progress_ = (CheckHasBit(cached_has_bits, 0x00000010U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.initial_progress_)
-                : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, accepted_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, accepted_),
-           offsetof(Impl_, failure_reason_) -
-               offsetof(Impl_, accepted_) +
-               sizeof(Impl_::failure_reason_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DownloadResumeResult)
-}
-PROTOBUF_NDEBUG_INLINE DownloadResumeResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        task_id_(arena),
-        model_id_(arena),
-        error_message_(arena),
-        resume_token_(arena) {}
-
-inline void DownloadResumeResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, initial_progress_),
-           0,
-           offsetof(Impl_, failure_reason_) -
-               offsetof(Impl_, initial_progress_) +
-               sizeof(Impl_::failure_reason_));
-}
-DownloadResumeResult::~DownloadResumeResult() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DownloadResumeResult)
-  SharedDtor(*this);
-}
-inline void DownloadResumeResult::SharedDtor(MessageLite& self) {
-  DownloadResumeResult& this_ = static_cast<DownloadResumeResult&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.task_id_.Destroy();
-  this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  this_._impl_.resume_token_.Destroy();
-  delete this_._impl_.initial_progress_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DownloadResumeResult_class_data_ =
-        DownloadResumeResult::InternalGenerateClassData_(DownloadResumeResult_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DownloadResumeResult::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DownloadResumeResult_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DownloadResumeResult_class_data_.tc_table);
-  return DownloadResumeResult_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DownloadResumeResult::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DownloadResumeResult_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DownloadResumeResult_globals_));
-  return DownloadResumeResult_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DownloadResumeResult::ParseTableT_
-    DownloadResumeResult::_table_ =
-        DownloadResumeResult::InternalGenerateParseTable_(DownloadResumeResult_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DownloadResumeResult::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DownloadResumeResult)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.task_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.model_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.resume_token_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      ABSL_DCHECK(_impl_.initial_progress_ != nullptr);
-      _impl_.initial_progress_->Clear();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000060U)) {
-    ::memset(&_impl_.accepted_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.failure_reason_) -
-        reinterpret_cast<char*>(&_impl_.accepted_)) + sizeof(_impl_.failure_reason_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DownloadResumeResult::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DownloadResumeResult& this_ = static_cast<const DownloadResumeResult&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DownloadResumeResult::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DownloadResumeResult& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DownloadResumeResult)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // bool accepted = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_accepted() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_accepted(), target);
-    }
-  }
-
-  // string task_id = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_task_id().empty()) {
-      const ::std::string& _s = this_._internal_task_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeResult.task_id");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // string model_id = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_model_id().empty()) {
-      const ::std::string& _s = this_._internal_model_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeResult.model_id");
-      target = stream->WriteStringMaybeAliased(3, _s, target);
-    }
-  }
-
-  // .runanywhere.v1.DownloadProgress initial_progress = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        4, *this_._impl_.initial_progress_, this_._impl_.initial_progress_->GetCachedSize(), target,
-        stream);
-  }
-
-  // string error_message = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeResult.error_message");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
-  }
-
-  // string resume_token = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_resume_token().empty()) {
-      const ::std::string& _s = this_._internal_resume_token();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DownloadResumeResult.resume_token");
-      target = stream->WriteStringMaybeAliased(6, _s, target);
-    }
-  }
-
-  // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_failure_reason() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          7, this_._internal_failure_reason(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DownloadResumeResult)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DownloadResumeResult::ByteSizeLong(const MessageLite& base) {
-  const DownloadResumeResult& this_ = static_cast<const DownloadResumeResult&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DownloadResumeResult::ByteSizeLong() const {
-  const DownloadResumeResult& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DownloadResumeResult)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
-    // string task_id = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_task_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_task_id());
-      }
-    }
-    // string model_id = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_model_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_id());
-      }
-    }
-    // string error_message = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
-    // string resume_token = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!this_._internal_resume_token().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_resume_token());
-      }
-    }
-    // .runanywhere.v1.DownloadProgress initial_progress = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.initial_progress_);
-    }
-    // bool accepted = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_accepted() != 0) {
-        total_size += 2;
-      }
-    }
-    // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_failure_reason() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_failure_reason());
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DownloadResumeResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DownloadResumeResult*>(&to_msg);
-  auto& from = static_cast<const DownloadResumeResult&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DownloadResumeResult)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_task_id().empty()) {
-        _this->_internal_set_task_id(from._internal_task_id());
-      } else {
-        if (_this->_impl_.task_id_.IsDefault()) {
-          _this->_internal_set_task_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_model_id().empty()) {
-        _this->_internal_set_model_id(from._internal_model_id());
-      } else {
-        if (_this->_impl_.model_id_.IsDefault()) {
-          _this->_internal_set_model_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!from._internal_resume_token().empty()) {
-        _this->_internal_set_resume_token(from._internal_resume_token());
-      } else {
-        if (_this->_impl_.resume_token_.IsDefault()) {
-          _this->_internal_set_resume_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      ABSL_DCHECK(from._impl_.initial_progress_ != nullptr);
-      if (_this->_impl_.initial_progress_ == nullptr) {
-        _this->_impl_.initial_progress_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.initial_progress_);
-      } else {
-        _this->_impl_.initial_progress_->MergeFrom(*from._impl_.initial_progress_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_accepted() != 0) {
-        _this->_impl_.accepted_ = from._impl_.accepted_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_failure_reason() != 0) {
-        _this->_impl_.failure_reason_ = from._impl_.failure_reason_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DownloadResumeResult::CopyFrom(const DownloadResumeResult& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DownloadResumeResult)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DownloadResumeResult::InternalSwap(DownloadResumeResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.task_id_, &other->_impl_.task_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resume_token_, &other->_impl_.resume_token_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.failure_reason_)
-      + sizeof(DownloadResumeResult::_impl_.failure_reason_)
-      - PROTOBUF_FIELD_OFFSET(DownloadResumeResult, _impl_.initial_progress_)>(
-          reinterpret_cast<char*>(&_impl_.initial_progress_),
-          reinterpret_cast<char*>(&other->_impl_.initial_progress_));
-}
-
-::google::protobuf::Metadata DownloadResumeResult::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

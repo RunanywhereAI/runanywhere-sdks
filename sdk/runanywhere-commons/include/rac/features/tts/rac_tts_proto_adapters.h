@@ -23,7 +23,6 @@ namespace runanywhere::v1 {
 class TTSConfiguration;
 class TTSOptions;
 class TTSOutput;
-class TTSPhonemeTimestamp;
 class TTSSynthesisMetadata;
 class TTSSpeakResult;
 }  // namespace runanywhere::v1
@@ -32,10 +31,9 @@ namespace rac::foundation {
 
 bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out);
 
-bool rac_tts_phoneme_timestamp_to_proto(const rac_tts_phoneme_timestamp_t* in,
-                                        ::runanywhere::v1::TTSPhonemeTimestamp* out);
-bool rac_tts_phoneme_timestamp_from_proto(const ::runanywhere::v1::TTSPhonemeTimestamp& in,
-                                          rac_tts_phoneme_timestamp_t* out);
+// rac_tts_phoneme_timestamp_to_proto / _from_proto deleted along with
+// TTSPhonemeTimestamp (idl/tts_options.proto) -- never produced, wrong
+// granularity.
 
 bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
                                          ::runanywhere::v1::TTSSynthesisMetadata* out);

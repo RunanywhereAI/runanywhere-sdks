@@ -108,16 +108,22 @@ class _ChatLoRASheetState extends State<ChatLoRASheet> {
     final isApplied = viewModel.isAdapterApplied(adapter);
     final isDownloaded = viewModel.isAdapterDownloaded(adapter);
 
+    // `description`/`sizeBytes` were deleted from LoraAdapterCatalogEntry
+    // (idl/lora_options.proto: generic artifact facts now live on a
+    // companion ModelInfo, not on the catalog entry) — the catalog listing
+    // this tile renders from does not carry that companion record, so the
+    // subtitle is limited to what the entry actually has.
+    final compatibleModels = adapter.compatibleModels.join(', ');
+
     return ListTile(
       title: Text(adapter.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          if (adapter.description.isNotEmpty) adapter.description,
-          if (adapter.sizeBytes > 0) _formatBytes(adapter.sizeBytes.toInt()),
-        ].join(' • '),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: compatibleModels.isEmpty
+          ? null
+          : Text(
+              'Compatible with: $compatibleModels',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
       trailing: isApplied
           ? const Chip(
               label: Text('Applied'),
@@ -140,9 +146,9 @@ class _ChatLoRASheetState extends State<ChatLoRASheet> {
 
   Widget _loadedAdapterTile(
     BuildContext context,
-    sdk.LoRAAdapterInfo adapter,
+    sdk.AppliedAdapter adapter,
   ) {
-    final fileName = adapter.adapterPath.split('/').last;
+    final fileName = adapter.id.split('/').last;
 
     return ListTile(
       title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -151,18 +157,8 @@ class _ChatLoRASheetState extends State<ChatLoRASheet> {
         icon: const Icon(Icons.cancel_outlined),
         tooltip: 'Remove adapter',
         onPressed: () =>
-            unawaited(widget.viewModel.removeAdapter(adapter.adapterPath)),
+            unawaited(widget.viewModel.removeAdapter(adapter.id)),
       ),
     );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes >= 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-    }
-    if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / 1024).toStringAsFixed(0)} KB';
   }
 }

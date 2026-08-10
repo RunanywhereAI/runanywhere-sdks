@@ -67,19 +67,10 @@ public class StructuredOutputPromptResult(
   public val grammar: String? = null,
   @field:WireField(
     tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 5,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 6,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputPromptResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,8 +88,7 @@ public class StructuredOutputPromptResult(
     if (json_schema != other.json_schema) return false
     if (regex_pattern != other.regex_pattern) return false
     if (grammar != other.grammar) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -111,8 +101,7 @@ public class StructuredOutputPromptResult(
       result = result * 37 + (json_schema?.hashCode() ?: 0)
       result = result * 37 + (regex_pattern?.hashCode() ?: 0)
       result = result * 37 + (grammar?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -125,8 +114,7 @@ public class StructuredOutputPromptResult(
     if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
     if (regex_pattern != null) result += """regex_pattern=${sanitize(regex_pattern)}"""
     if (grammar != null) result += """grammar=${sanitize(grammar)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "StructuredOutputPromptResult{", separator = ", ", postfix = "}")
   }
 
@@ -136,10 +124,9 @@ public class StructuredOutputPromptResult(
     json_schema: String? = this.json_schema,
     regex_pattern: String? = this.regex_pattern,
     grammar: String? = this.grammar,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputPromptResult = StructuredOutputPromptResult(prepared_prompt, system_prompt, json_schema, regex_pattern, grammar, error_message, error_code, unknownFields)
+  ): StructuredOutputPromptResult = StructuredOutputPromptResult(prepared_prompt, system_prompt, json_schema, regex_pattern, grammar, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -161,10 +148,7 @@ public class StructuredOutputPromptResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.json_schema)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.regex_pattern)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.grammar)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -176,19 +160,13 @@ public class StructuredOutputPromptResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.json_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.grammar)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputPromptResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.grammar)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.json_schema)
@@ -204,8 +182,7 @@ public class StructuredOutputPromptResult(
         var json_schema: String? = null
         var regex_pattern: String? = null
         var grammar: String? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prepared_prompt = ProtoAdapter.STRING.decode(reader)
@@ -213,8 +190,7 @@ public class StructuredOutputPromptResult(
             3 -> json_schema = ProtoAdapter.STRING.decode(reader)
             4 -> regex_pattern = ProtoAdapter.STRING.decode(reader)
             5 -> grammar = ProtoAdapter.STRING.decode(reader)
-            6 -> error_message = ProtoAdapter.STRING.decode(reader)
-            7 -> error_code = ProtoAdapter.INT32.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -224,13 +200,13 @@ public class StructuredOutputPromptResult(
           json_schema = json_schema,
           regex_pattern = regex_pattern,
           grammar = grammar,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: StructuredOutputPromptResult): StructuredOutputPromptResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

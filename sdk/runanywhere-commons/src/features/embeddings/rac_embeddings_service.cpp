@@ -101,6 +101,40 @@ rac_result_t rac::embeddings::create_service(const char* model_id, const char* c
     }
 
     EMBED_LOGI("Embeddings service created via model_path=%s", model_ref.path.c_str());
+
+    // Backends disagree on where the weights are loaded, and this factory used
+    // to assume they all load inside `create`. ONNX and QHexRT do (their
+    // `initialize` is a no-op returning success), but MLX and llama.cpp only
+    // allocate an empty session there and load in `initialize` — which nothing
+    // in commons called. A GGUF or MLX embedding model was therefore handed out
+    // as a *created but unloaded* service, and every embed returned an empty
+    // vector: that is what made RAG report "Embedding provider returned an
+    // empty vector; cannot resolve RAG dimension" and fail 100% of document
+    // Q&A on the Apple SDKs.
+    //
+    // Ask the backend whether it is ready and initialize it only when it is
+    // not, so the backends that already loaded are not asked to load twice.
+    rac_embeddings_info_t info = {};
+    const bool already_ready = service->ops->get_info != nullptr &&
+                               service->ops->get_info(service->impl, &info) == RAC_SUCCESS &&
+                               info.is_ready == RAC_TRUE;
+    if (!already_ready) {
+        if (service->ops->initialize == nullptr) {
+            EMBED_LOGE("Embeddings backend is not ready and exposes no initialize: %s", model_id);
+            rac_embeddings_destroy(service);
+            return RAC_ERROR_BACKEND_NOT_READY;
+        }
+        const rac_result_t init_result =
+            service->ops->initialize(service->impl, model_ref.path.c_str());
+        if (init_result != RAC_SUCCESS) {
+            EMBED_LOGE("Embedding model failed to load: path=%s result=%d", model_ref.path.c_str(),
+                       init_result);
+            rac_embeddings_destroy(service);
+            return init_result;
+        }
+        EMBED_LOGI("Embedding model loaded: %s", model_ref.path.c_str());
+    }
+
     *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "Embeddings service created");

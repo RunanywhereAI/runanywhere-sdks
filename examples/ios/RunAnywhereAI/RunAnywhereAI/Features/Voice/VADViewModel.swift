@@ -7,6 +7,9 @@ import os
 /// Manages microphone capture, VAD model loading, and real-time speech detection
 @MainActor
 class VADViewModel: VoiceComponentViewModelBase {
+    /// `AudioCaptureManager` delivers mono Int16 PCM at this rate.
+    private static let captureSampleRate = 16_000
+
     private let audioCapture = AudioCaptureManager()
 
     // MARK: - Component Identity
@@ -27,9 +30,9 @@ class VADViewModel: VoiceComponentViewModelBase {
 
     // MARK: - Private Properties
 
-    /// Mic chunks are fed straight into the SDK's `streamVAD` session; the
-    /// SDK owns model framing — no app-side buffer math.
-    private var vadAudioContinuation: AsyncStream<Data>.Continuation?
+    /// Mic chunks are fed straight into the SDK's `vad.detectStream` session;
+    /// the SDK owns model framing — no app-side buffer math.
+    private var vadAudioContinuation: AsyncStream<AudioInput>.Continuation?
     private var detectionTask: Task<Void, Never>?
     private var hasSubscribedToAudioLevel = false
 
@@ -141,13 +144,13 @@ class VADViewModel: VoiceComponentViewModelBase {
             return
         }
 
-        startDetectionStream()
+        guard await startDetectionStream() else { return }
 
         do {
             try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] audioData in
                 guard let self else { return }
-                // SDK expects Float32 PCM; framing is handled natively.
-                self.vadAudioContinuation?.yield(RunAnywhere.pcm16ToFloat32(audioData))
+                // Encoding and framing are handled natively.
+                self.vadAudioContinuation?.yield(.pcm16(audioData, sampleRate: Self.captureSampleRate))
             }
 
             isListening = true
@@ -170,36 +173,52 @@ class VADViewModel: VoiceComponentViewModelBase {
         audioLevel = 0.0
     }
 
-    /// Consume the SDK's streaming VAD session: one `RAVADResult` per mic
-    /// chunk, with speech-state transitions logged for the activity list.
-    private func startDetectionStream() {
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
+    /// Consume the SDK's streaming VAD session. The SDK emits the
+    /// speech-start/end transitions that drive the activity list, plus a
+    /// per-chunk frame result for the live indicator.
+    ///
+    /// - Returns: `false` when the session could not be opened, in which case
+    ///   the caller must not start audio capture.
+    private func startDetectionStream() async -> Bool {
+        let (stream, continuation) = AsyncStream<AudioInput>.makeStream()
+
+        let events: AsyncThrowingStream<VadEvent, Error>
+        do {
+            events = try await RunAnywhere.vad.detectStream(stream)
+        } catch {
+            continuation.finish()
+            logger.error("VAD stream failed to start: \(error.localizedDescription)")
+            errorMessage = "VAD stream failed to start: \(error.localizedDescription)"
+            return false
+        }
+
         vadAudioContinuation = continuation
-
         detectionTask = Task { [weak self] in
-            var wasSpeechActive = false
-
-            for await result in RunAnywhere.streamVAD(audio: stream) {
-                guard let self, !Task.isCancelled else { break }
-
-                if !result.errorMessage.isEmpty {
-                    self.logger.error("VAD processing error: \(result.errorMessage)")
-                    continue
+            do {
+                for try await event in events {
+                    guard let self, !Task.isCancelled else { break }
+                    switch event {
+                    case .speechStarted:
+                        self.isSpeechDetected = true
+                        self.addLogEntry(.speechStarted)
+                    case .speechEnded:
+                        self.isSpeechDetected = false
+                        self.addLogEntry(.speechEnded)
+                    case .activity(let isSpeech, _, _):
+                        self.isSpeechDetected = isSpeech
+                    case .failed(let error):
+                        self.errorMessage = "VAD failed: \(error.localizedDescription)"
+                    case .completed:
+                        break
+                    }
                 }
-
-                let speechDetected = result.isSpeech
-                self.isSpeechDetected = speechDetected
-
-                // Log state transitions
-                if speechDetected && !wasSpeechActive {
-                    self.addLogEntry(.speechStarted)
-                    wasSpeechActive = true
-                } else if !speechDetected && wasSpeechActive {
-                    self.addLogEntry(.speechEnded)
-                    wasSpeechActive = false
-                }
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                self.logger.error("VAD stream failed: \(error.localizedDescription)")
+                self.errorMessage = "VAD failed: \(error.localizedDescription)"
             }
         }
+        return true
     }
 
     private func stopDetectionStream() {

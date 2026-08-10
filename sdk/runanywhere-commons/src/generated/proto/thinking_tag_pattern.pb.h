@@ -29,6 +29,7 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
+#include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 // @@protoc_insertion_point(includes)
 
@@ -55,6 +56,16 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_thin
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum ReasoningMode : int;
+extern const uint32_t ReasoningMode_internal_data_[];
+class ReasoningOptions;
+struct ReasoningOptionsGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern ReasoningOptionsGlobalsTypeInternal ReasoningOptions_globals_;
+extern const ::google::protobuf::internal::ClassDataFull ReasoningOptions_class_data_;
+#else
+extern const ReasoningOptionsGlobalsTypeInternal ReasoningOptions_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
 class ThinkingTagPattern;
 struct ThinkingTagPatternGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -67,11 +78,57 @@ extern const ThinkingTagPatternGlobalsTypeInternal ThinkingTagPattern_globals_;
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::ReasoningMode_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::ReasoningMode>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
+enum ReasoningMode : int {
+  REASONING_MODE_UNSPECIFIED = 0,
+  REASONING_MODE_OFF = 1,
+  REASONING_MODE_ON = 2,
+  ReasoningMode_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  ReasoningMode_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t ReasoningMode_internal_data_[];
+inline constexpr ReasoningMode ReasoningMode_MIN =
+    static_cast<ReasoningMode>(0);
+inline constexpr ReasoningMode ReasoningMode_MAX =
+    static_cast<ReasoningMode>(2);
+[[nodiscard]] inline bool ReasoningMode_IsValid(int value) {
+  return 0 <= value && value <= 2;
+}
+inline constexpr int ReasoningMode_ARRAYSIZE = 2 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ReasoningMode_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ReasoningMode) {
+  return ReasoningMode_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& ReasoningMode_Name(T value) {
+  static_assert(::std::is_same<T, ReasoningMode>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to ReasoningMode_Name().");
+  return ReasoningMode_Name(static_cast<ReasoningMode>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& ReasoningMode_Name(ReasoningMode value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<ReasoningMode_descriptor, 0, 2>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool ReasoningMode_Parse(
+    ::absl::string_view name, ReasoningMode* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<ReasoningMode>(ReasoningMode_descriptor(), name,
+                                           value);
+}
+using ::google::protobuf::internal::generated_enum::AbslParseFlag;
+using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
@@ -299,6 +356,237 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ThinkingTagPattern final : public :
   union { Impl_ _impl_; };
   friend struct ::TableStruct_thinking_5ftag_5fpattern_2eproto;
 };
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ReasoningOptions final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ReasoningOptions) */ {
+ public:
+  inline ReasoningOptions() : ReasoningOptions(nullptr) {}
+  ~ReasoningOptions() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ReasoningOptions* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ReasoningOptions));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ReasoningOptions(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline ReasoningOptions(const ReasoningOptions& from) : ReasoningOptions(nullptr, from) {}
+  inline ReasoningOptions(ReasoningOptions&& from) noexcept : ReasoningOptions(nullptr, ::std::move(from)) {}
+  inline ReasoningOptions& operator=(const ReasoningOptions& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ReasoningOptions& operator=(ReasoningOptions&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ReasoningOptions& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ReasoningOptions>(&ReasoningOptions_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(ReasoningOptions& a, ReasoningOptions& b) { a.Swap(&b); }
+  inline void Swap(ReasoningOptions* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ReasoningOptions* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ReasoningOptions* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ReasoningOptions>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ReasoningOptions& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ReasoningOptions& from) { ReasoningOptions::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ReasoningOptions* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ReasoningOptions"; }
+
+  explicit ReasoningOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ReasoningOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ReasoningOptions& from);
+  ReasoningOptions(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ReasoningOptions&& from) noexcept
+      : ReasoningOptions(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kPatternFieldNumber = 3,
+    kModeFieldNumber = 1,
+    kIncludeInOutputFieldNumber = 2,
+  };
+  // optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+  [[nodiscard]] bool has_pattern()
+      const;
+  void clear_pattern() ;
+  [[nodiscard]] const ::runanywhere::v1::ThinkingTagPattern& pattern() const;
+  [[nodiscard]] ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE release_pattern();
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL mutable_pattern();
+  void set_allocated_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE unsafe_arena_release_pattern();
+
+  private:
+  const ::runanywhere::v1::ThinkingTagPattern& _internal_pattern() const;
+  ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL _internal_mutable_pattern();
+
+  public:
+  // .runanywhere.v1.ReasoningMode mode = 1;
+  void clear_mode() ;
+  [[nodiscard]] ::runanywhere::v1::ReasoningMode mode() const;
+  void set_mode(::runanywhere::v1::ReasoningMode value);
+
+  private:
+  ::runanywhere::v1::ReasoningMode _internal_mode() const;
+  void _internal_set_mode(::runanywhere::v1::ReasoningMode value);
+
+  public:
+  // bool include_in_output = 2;
+  void clear_include_in_output() ;
+  [[nodiscard]] bool include_in_output() const;
+  void set_include_in_output(bool value);
+
+  private:
+  bool _internal_include_in_output() const;
+  void _internal_set_include_in_output(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ReasoningOptions)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<2, 3,
+                          1, 0,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ReasoningOptions& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE pattern_;
+    int mode_;
+    bool include_in_output_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_thinking_5ftag_5fpattern_2eproto;
+};
 
 // ===================================================================
 
@@ -444,6 +732,156 @@ inline void ThinkingTagPattern::set_allocated_close_tag(::std::string* PROTOBUF_
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ThinkingTagPattern.close_tag)
 }
 
+// -------------------------------------------------------------------
+
+// ReasoningOptions
+
+// .runanywhere.v1.ReasoningMode mode = 1;
+inline void ReasoningOptions::clear_mode() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.mode_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline ::runanywhere::v1::ReasoningMode ReasoningOptions::mode() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ReasoningOptions.mode)
+  return _internal_mode();
+}
+inline void ReasoningOptions::set_mode(::runanywhere::v1::ReasoningMode value) {
+  _internal_set_mode(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ReasoningOptions.mode)
+}
+inline ::runanywhere::v1::ReasoningMode ReasoningOptions::_internal_mode() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ReasoningMode>(_impl_.mode_);
+}
+inline void ReasoningOptions::_internal_set_mode(::runanywhere::v1::ReasoningMode value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.mode_ = value;
+}
+
+// bool include_in_output = 2;
+inline void ReasoningOptions::clear_include_in_output() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_in_output_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline bool ReasoningOptions::include_in_output() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ReasoningOptions.include_in_output)
+  return _internal_include_in_output();
+}
+inline void ReasoningOptions::set_include_in_output(bool value) {
+  _internal_set_include_in_output(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ReasoningOptions.include_in_output)
+}
+inline bool ReasoningOptions::_internal_include_in_output() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.include_in_output_;
+}
+inline void ReasoningOptions::_internal_set_include_in_output(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_in_output_ = value;
+}
+
+// optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+inline bool ReasoningOptions::has_pattern() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  PROTOBUF_ASSUME(!value || _impl_.pattern_ != nullptr);
+  return value;
+}
+inline void ReasoningOptions::clear_pattern() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.pattern_ != nullptr) _impl_.pattern_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::runanywhere::v1::ThinkingTagPattern& ReasoningOptions::_internal_pattern() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::ThinkingTagPattern* p = _impl_.pattern_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::ThinkingTagPattern>(&::runanywhere::v1::ThinkingTagPattern_globals_);
+}
+inline const ::runanywhere::v1::ThinkingTagPattern& ReasoningOptions::pattern() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ReasoningOptions.pattern)
+  return _internal_pattern();
+}
+inline void ReasoningOptions::unsafe_arena_set_allocated_pattern(
+    ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.pattern_);
+  }
+  _impl_.pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ReasoningOptions.pattern)
+}
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE ReasoningOptions::release_pattern() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::ThinkingTagPattern* released = _impl_.pattern_;
+  _impl_.pattern_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE ReasoningOptions::unsafe_arena_release_pattern() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ReasoningOptions.pattern)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::ThinkingTagPattern* temp = _impl_.pattern_;
+  _impl_.pattern_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL ReasoningOptions::_internal_mutable_pattern() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.pattern_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ThinkingTagPattern>(GetArena());
+    _impl_.pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(p);
+  }
+  return _impl_.pattern_;
+}
+inline ::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NONNULL ReasoningOptions::mutable_pattern()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::ThinkingTagPattern* _msg = _internal_mutable_pattern();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ReasoningOptions.pattern)
+  return _msg;
+}
+inline void ReasoningOptions::set_allocated_pattern(::runanywhere::v1::ThinkingTagPattern* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.pattern_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+
+  _impl_.pattern_ = reinterpret_cast<::runanywhere::v1::ThinkingTagPattern*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ReasoningOptions.pattern)
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -452,6 +890,19 @@ inline void ThinkingTagPattern::set_allocated_close_tag(::std::string* PROTOBUF_
 }  // namespace v1
 }  // namespace runanywhere
 
+
+namespace google {
+namespace protobuf {
+
+template <>
+struct is_proto_enum<::runanywhere::v1::ReasoningMode> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::ReasoningMode>() {
+  return ::runanywhere::v1::ReasoningMode_descriptor();
+}
+
+}  // namespace protobuf
+}  // namespace google
 
 // @@protoc_insertion_point(global_scope)
 

@@ -6,6 +6,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/ra_result_codes.dart';
@@ -427,8 +428,9 @@ class DartBridgeModelRegistry {
     final handle = _registryHandle;
     if (handle == null) {
       return model_pb.ModelImportResult(
-        success: false,
-        errorMessage: 'Model registry not initialized',
+        error: SDKException.componentNotReady(
+          'Model registry not initialized',
+        ).error,
       );
     }
     final fn = RacNative.bindings.rac_model_registry_import_proto;
@@ -445,8 +447,7 @@ class DartBridgeModelRegistry {
     } catch (e) {
       _logger.debug('rac_model_registry_import_proto error: $e');
       return model_pb.ModelImportResult(
-        success: false,
-        errorMessage: e.toString(),
+        error: SDKException.internalError(e.toString()).error,
       );
     }
   }
@@ -563,7 +564,7 @@ class DartBridgeModelRegistry {
             decode: model_pb.ModelRegistryRefreshResult.fromBuffer,
             symbol: 'rac_model_registry_refresh_proto',
           );
-      return result.success;
+      return !result.hasError();
     } catch (e) {
       _logger.debug('rac_model_registry_refresh_proto error: $e');
       return false;
@@ -587,7 +588,11 @@ class DartBridgeModelRegistry {
   ]) async {
     final handle = _registryHandle;
     if (handle == null) {
-      return model_pb.ModelDiscoveryResult(success: false);
+      return model_pb.ModelDiscoveryResult(
+        error: SDKException.componentNotReady(
+          'Model registry not initialized',
+        ).error,
+      );
     }
 
     final discoverFn = RacNative.bindings.rac_model_registry_discover_proto;
@@ -606,8 +611,7 @@ class DartBridgeModelRegistry {
     } catch (e) {
       _logger.debug('rac_model_registry_discover_proto error: $e');
       return model_pb.ModelDiscoveryResult(
-        success: false,
-        errorMessage: e.toString(),
+        error: SDKException.internalError(e.toString()).error,
       );
     }
   }
@@ -682,20 +686,20 @@ class DartBridgeModelFormat {
     model_pb.ModelInfo model, [
     String? url,
   ]) {
-    if (model.hasArtifactType() ||
-        model.hasSingleFile() ||
+    // `artifact_type`/`custom_strategy_id` are reserved on `ModelInfo`
+    // (idl/model_types.proto: "restates the oneof" / "undocumented
+    // registry") — the `artifact` oneof (`hasSingleFile`/`hasArchive`/
+    // `hasMultiFile`/`hasBuiltIn`) is the only source of truth for whether
+    // an artifact variant is already set.
+    if (model.hasSingleFile() ||
         model.hasArchive() ||
         model.hasMultiFile() ||
-        model.hasBuiltIn() ||
-        model.hasCustomStrategyId()) {
+        model.hasBuiltIn()) {
       return model;
     }
 
     if (_isBuiltIn(model)) {
-      return model.deepCopy()
-        ..artifactType =
-            model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
-        ..builtIn = true;
+      return model.deepCopy()..builtIn = true;
     }
 
     final effectiveUrl = url ?? model.downloadUrl;
@@ -703,7 +707,7 @@ class DartBridgeModelFormat {
 
     final inference = inferArtifact(effectiveUrl, modelId: model.id);
 
-    final copy = model.deepCopy()..artifactType = inference.artifactType;
+    final copy = model.deepCopy();
     switch (inference.artifactType) {
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
@@ -732,10 +736,7 @@ class DartBridgeModelFormat {
   }
 
   model_pb.ModelInfo _asSingleFile(model_pb.ModelInfo model) {
-    return model.deepCopy()
-      ..artifactType =
-          model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
-      ..singleFile = model_pb.SingleFileArtifact();
+    return model.deepCopy()..singleFile = model_pb.SingleFileArtifact();
   }
 
   /// Mirrors the `ProtoModelInfoHelpers.isBuiltIn` extension in

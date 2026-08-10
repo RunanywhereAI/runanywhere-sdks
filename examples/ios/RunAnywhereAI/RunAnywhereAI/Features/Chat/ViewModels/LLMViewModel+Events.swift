@@ -18,7 +18,7 @@ extension LLMViewModel {
     func subscribeToModelLifecycle() {
         // Typed lifecycle stream: the SDK folds all native load/unload
         // channels into one publisher.
-        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+        lifecycleCancellable = RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 guard let self = self else { return }
@@ -29,7 +29,7 @@ extension LLMViewModel {
 
         // Generation analytics (TTFT, completion metrics) are chat-screen
         // analytics, not lifecycle — they stay on the raw event bus.
-        generationCancellable = RunAnywhere.events.events
+        generationCancellable = RunAnywhere.eventBus.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
@@ -37,20 +37,40 @@ extension LLMViewModel {
                     self.handleGenerationEvent(event)
                 }
             }
+
+        subscribeToStoredTitle()
+    }
+
+    /// Follow the open chat's name in the store.
+    ///
+    /// The view model keeps its own `Conversation` copy, and the Mac window
+    /// title, the iOS top bar, and the details sheet all read *that* copy. So a
+    /// name written by anyone else — the model naming a new chat, or Rename… in
+    /// the sidebar — landed in the sidebar row and the header kept the old one
+    /// until the user switched chats and back.
+    ///
+    /// Only the title is adopted. Taking the whole stored conversation would
+    /// also replace `messages`, and the store's copy is a turn behind while a
+    /// reply is still streaming into the visible transcript.
+    private func subscribeToStoredTitle() {
+        storedTitleCancellable = conversationStore.$conversations
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] conversations in
+                guard let self,
+                      let id = self.currentConversation?.id,
+                      let stored = conversations.first(where: { $0.id == id }),
+                      stored.title != self.currentConversation?.title else { return }
+                self.adoptStoredTitle(stored.title)
+            }
     }
 
     func checkModelStatusFromSDK() async {
-        // Resolve currently-loaded LLM via canonical proto snapshot API.
-        var request = RACurrentModelRequest()
-        request.category = .language
-        let snapshot = RunAnywhere.currentModel(request)
-        let isLoaded = snapshot.found
-        let modelId = snapshot.found ? snapshot.modelID : nil
+        let loadedModelId = await RunAnywhere.models.state().loaded[.language]?.id
 
         await MainActor.run {
-            self.updateModelLoadedState(isLoaded: isLoaded)
-            if let id = modelId,
-               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
+            self.updateModelLoadedState(isLoaded: loadedModelId != nil)
+            if let loadedModelId,
+               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == loadedModelId }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
                 self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
             }
@@ -81,12 +101,19 @@ extension LLMViewModel {
 
         switch event.generation.kind {
         case .firstTokenGenerated:
-            let ttft = Double(event.generation.firstTokenLatencyMs)
+            // `firstTokenLatencyMs` was deleted outright (idl/sdk_events.proto):
+            // `timeToFirstTokenMs` ("Time to first token, whichever kind
+            // reports it.") is the single field for both FIRST_TOKEN_GENERATED
+            // and COMPLETED now.
+            let ttft = Double(event.generation.timeToFirstTokenMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case .completed, .streamCompleted:
-            let outputTokens = Int(event.generation.tokensUsed)
-            let durationMs = Double(event.generation.latencyMs)
+        case .completed:
+            // `tokensUsed`/`latencyMs` were renamed `outputTokens`/`totalDurationMs`
+            // (idl/sdk_events.proto); `streamCompleted` was deleted outright —
+            // `.completed` is the single success terminal for both paths now.
+            let outputTokens = Int(event.generation.outputTokens)
+            let durationMs = Double(event.generation.totalDurationMs)
             let tps = durationMs > 0 && outputTokens > 0
                 ? Double(outputTokens) / (durationMs / 1000.0)
                 : 0

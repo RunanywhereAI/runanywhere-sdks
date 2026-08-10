@@ -68,6 +68,7 @@ let package = Package(
         .library(name: "RunAnywhereLlamaCPP", type: .static, targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", type: .static, targets: ["ONNXRuntime"]),
         .library(name: "RunAnywhereMLX", type: .static, targets: ["MLXRuntime"]),
+        .library(name: "RunAnywhereNeuRT", type: .static, targets: ["NeuRTRuntime"]),
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -143,6 +144,19 @@ let package = Package(
                 "RABackendSherpaBinary",
             ],
             path: "Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // -------------------------------------------------------------------
+        // C Bridge Module — NeuRT Backend Headers
+        // -------------------------------------------------------------------
+        .target(
+            name: "NeuRTBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendNeuRTBinary",
+            ],
+            path: "Sources/NeuRTRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -245,7 +259,7 @@ let package = Package(
         // ONNX Runtime Backend (STT/TTS/VAD)
         //
         // Also carries the Apple CoreML Stable-Diffusion engine
-        // (RABackendCoreMLBinary): `ONNX.register()` bundles the Apple
+        // (RABackendNeuRTBinary): `ONNX.register()` bundles the Apple
         // secondary backends, and this target already links CoreML + Accelerate,
         // so it is the natural home for the diffusion engine archive. The
         // coreml plugin auto-wins the DIFFUSION slot (priority 100) once linked.
@@ -257,7 +271,7 @@ let package = Package(
                 "ONNXBackend",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
-                "RABackendCoreMLBinary",
+                "RABackendNeuRTBinary",
             ],
             path: "Sources/ONNXRuntime",
             exclude: [
@@ -272,6 +286,31 @@ let package = Package(
                 .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
+            ]
+        ),
+
+        // -------------------------------------------------------------------
+        // NeuRT Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
+        //
+        // Links RABackendNeuRTBinary and registers the `neurt` engine plugin
+        // via `NeuRT.register()`. NeuRT stays bundled in ONNXRuntime too, so
+        // existing ONNX/diffusion consumers are unaffected; this standalone
+        // product lets the example apps and external consumers opt into NeuRT
+        // directly.
+        // -------------------------------------------------------------------
+        .target(
+            name: "NeuRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "NeuRTBackend",
+                "RABackendNeuRTBinary",
+            ],
+            path: "Sources/NeuRTRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
             ]
         ),
 
@@ -318,6 +357,14 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
+                // Backend runtimes so BackendRegistrationTests can exercise the
+                // real plugin registry through each shipped XCFramework. MLX is
+                // omitted: its MLXBackend module re-exposes commons headers whose
+                // rac_vlm_result has drifted in the shipped RABackendMLX
+                // xcframework, which clangs against CRACommons in one module.
+                "LlamaCPPRuntime",
+                "ONNXRuntime",
+                "NeuRTRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "Tests/RunAnywhereTests",
@@ -344,8 +391,8 @@ let package = Package(
             path: "Binaries/RABackendSherpa.xcframework"
         ),
         .binaryTarget(
-            name: "RABackendCoreMLBinary",
-            path: "Binaries/RABackendCoreML.xcframework"
+            name: "RABackendNeuRTBinary",
+            path: "Binaries/RABackendNeuRT.xcframework"
         ),
         .binaryTarget(
             name: "RABackendMLXBinary",

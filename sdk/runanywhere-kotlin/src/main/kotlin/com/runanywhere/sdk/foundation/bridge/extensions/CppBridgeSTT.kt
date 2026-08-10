@@ -22,6 +22,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.STTAudioSource
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTPartialResult
+import ai.runanywhere.proto.v1.STTServiceState
 import ai.runanywhere.proto.v1.STTStreamEvent
 import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
@@ -38,6 +39,7 @@ import com.squareup.wire.ProtoAdapter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
+import java.util.concurrent.atomic.AtomicReference
 
 private fun <M : Message<M, *>> decodeOrThrow(
     adapter: ProtoAdapter<M>,
@@ -149,6 +151,17 @@ object CppBridgeSTT {
     }
 
     /**
+     * Snapshot the lifecycle STT service state. Mirrors iOS Swift's
+     * `rac_stt_state_lifecycle_proto` call site — no handle is threaded.
+     */
+    suspend fun state(): STTServiceState =
+        decodeOrThrow(
+            STTServiceState.ADAPTER,
+            RunAnywhereBridge.racSttStateLifecycleProto(),
+            "racSttStateLifecycleProto",
+        )
+
+    /**
      * One-shot transcription via lifecycle-loaded STT model.
      *
      * Mirrors iOS Swift's `RunAnywhere.transcribe(...)` which builds an
@@ -215,11 +228,26 @@ object CppBridgeSTT {
         val handle = prepareStreamingHandle(loadedModel)
         var sessionId = 0L
         var shouldCancel = false
+        // A native ERROR envelope used to be handed to `onPartial` as an
+        // `is_final = true` partial whose text was the error message, so the
+        // consumer read "STT stream failed" as recognized speech and then saw the
+        // session succeed. It is recorded here and raised as an exception once the
+        // session unwinds — an exception cannot be thrown out of a native callback.
+        // AtomicReference because the callback runs on the native thread and this
+        // is read on the collecting one.
+        val nativeFailure = AtomicReference<String?>(null)
 
         val listener =
             NativeProtoProgressListener { bytes ->
-                val partial = partialFromEvent(STTStreamEvent.ADAPTER.decode(bytes))
-                partial?.let(onPartial) ?: true
+                val event = STTStreamEvent.ADAPTER.decode(bytes)
+                if (event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+                    nativeFailure.compareAndSet(
+                        null,
+                        event.error?.message?.takeIf { it.isNotBlank() } ?: "STT stream failed",
+                    )
+                    return@NativeProtoProgressListener false
+                }
+                partialFromEvent(event)?.let(onPartial) ?: true
             }
 
         checkRc(
@@ -238,7 +266,9 @@ object CppBridgeSTT {
                 if (chunk.isEmpty()) return@collect
                 val feedRc = RunAnywhereBridge.racSttStreamFeedAudioProto(sessionId, chunk)
                 if (feedRc != RunAnywhereBridge.RAC_SUCCESS) {
-                    onPartial(errorPartial("STT stream feed failed: $feedRc", feedRc))
+                    // The throw is the whole report. This also pushed the message
+                    // through `onPartial` as a final transcript, which put the
+                    // failure text in front of the user as their own words.
                     shouldCancel = true
                     throw SDKException.operation("racSttStreamFeedAudioProto failed with rc=$feedRc")
                 }
@@ -246,8 +276,12 @@ object CppBridgeSTT {
 
             val stopRc = RunAnywhereBridge.racSttStreamStopProto(sessionId)
             if (stopRc != RunAnywhereBridge.RAC_SUCCESS) {
-                onPartial(errorPartial("STT stream stop failed: $stopRc", stopRc))
+                throw SDKException.operation("racSttStreamStopProto failed with rc=$stopRc")
             }
+            // Raised after the finals the session did produce have been delivered,
+            // so a failed session reports its transcripts and then fails, rather
+            // than reporting the failure as one more transcript.
+            nativeFailure.get()?.let { throw SDKException.stt(it) }
         } catch (e: CancellationException) {
             shouldCancel = true
             throw e
@@ -292,6 +326,18 @@ object CppBridgeSTT {
         return getHandle()
     }
 
+    /**
+     * `STTPartialResult` collapsed to `text`/`is_final`/`language`
+     * (idl/stt_options.proto): `final_output`/`confidence`/`audio_start_ms`/
+     * `audio_end_ms` no longer exist on it, so a FINAL event now only
+     * back-fills `text` from `STTStreamEvent.final_output` (a distinct,
+     * still-live field) when the partial's own text is empty. Mirrors
+     * Swift's `CppBridge+STT.swift` `yield(_:)`.
+     *
+     * ERROR is deliberately not representable here: this function's return type
+     * is a transcript, and an error is not one. The caller records it and throws
+     * (see `nativeFailure` in `transcribeSessionStream`).
+     */
     private fun partialFromEvent(event: STTStreamEvent): STTPartialResult? =
         when (event.kind) {
             STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL,
@@ -301,26 +347,14 @@ object CppBridgeSTT {
                 val basis = event.partial ?: STTPartialResult()
                 basis.copy(
                     is_final = true,
-                    final_output = event.final_output ?: basis.final_output,
                     text = basis.text.ifEmpty { event.final_output?.text.orEmpty() },
                 )
             }
-            STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR ->
-                errorPartial(
-                    event.error_message ?: "STT stream failed",
-                    event.error_code,
-                )
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR,
             STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
             STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
             -> null
         }
-
-    private fun errorPartial(message: String, code: Int): STTPartialResult =
-        STTPartialResult(
-            text = message,
-            is_final = true,
-            final_output = STTOutput(text = message, error_message = message, error_code = code),
-        )
 
     private fun InferenceFramework.toCFramework(): Int =
         when (this) {

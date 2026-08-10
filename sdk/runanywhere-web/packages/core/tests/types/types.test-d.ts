@@ -1,55 +1,54 @@
 /**
  * Type-level tests for @runanywhere/web public API.
  * Run with: npx tsd
+ *
+ * Rewritten against the v3 Swift-shaped public surface
+ * (`Public/API/RunAnywhere.ts`): the v2 proto-shaped verbs this file used
+ * to exercise (`DownloadStage`, `LoRAApplyRequest`, `ToolParameterType`,
+ * `RunAnywhere.lora.catalog.markDownloadCompleted`, ...) were either
+ * deleted outright by the API realignment or never were part of the public
+ * `@runanywhere/web` root export in the first place -- they lived only on
+ * internal proto-ts modules or Web-only extension namespaces, not on
+ * `RunAnywhere` itself.
  */
 import { expectNotAssignable, expectType } from 'tsd';
 import {
   RunAnywhere,
-  SDKEnvironment,
   SDKException,
   ProtoErrorCode,
   isSDKException,
-  DownloadStage,
-  DownloadState,
-  ChatMessageStatus,
-  MessageRole,
-  ToolParameterType,
-  type LLMGenerationOptions,
+  InferenceFramework,
+  ModelCategory,
+  ModelFormat,
+  formatFramework,
+  type Environment,
+  type InitializeOptions,
   type ChatMessage,
-  type DownloadProgress,
-  type LoRAAdapterConfig,
-  type LoRAApplyRequest,
-  type LoRAApplyResult,
-  type LoRARemoveRequest,
-  type LoRAState,
-  type LoraAdapterCatalogEntry,
-  type LoraAdapterCatalogGetRequest,
-  type LoraAdapterCatalogGetResult,
-  type LoraAdapterCatalogListRequest,
-  type LoraAdapterCatalogListResult,
-  type LoraAdapterCatalogQuery,
-  type LoraAdapterDownloadCompletedRequest,
-  type LoraAdapterDownloadCompletedResult,
-  type LoraCompatibilityResult,
+  type ChatRole,
+  type LlmOptions,
+  type LoraState,
+  type AppliedAdapter,
   type ToolDefinition,
-  type ToolValue,
 } from '@runanywhere/web';
 
-// initialize options must accept the proto-canonical environment enum.
+// initialize options must accept the v3 string-union environment, not the
+// proto SDKEnvironment enum directly (Environment = 'production' | 'development').
 type InitOptions = Parameters<(typeof RunAnywhere)['initialize']>[0];
+expectType<InitOptions>({} as InitializeOptions | undefined);
 const opts: InitOptions = {
-  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+  environment: 'development',
 };
 expectType<Promise<void>>(RunAnywhere.initialize(opts));
+expectNotAssignable<Environment>('staging');
 expectNotAssignable<InitOptions>({
   webgpuWasmUrl: 'https://example.com/racommons-llamacpp-webgpu.js',
 });
 
 // LLM generation options can be supplied partially by public convenience calls.
-const genOpts: Partial<LLMGenerationOptions> = { temperature: 0.8 };
+const genOpts: LlmOptions = { temperature: 0.8 };
 expectType<number | undefined>(genOpts.temperature);
 
-// isSDKException must be a type guard
+// isSDKException must be a type guard.
 const e: unknown = new SDKException(-ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED, 'test');
 if (isSDKException(e)) {
   // `.code` is the positive proto ErrorCode (Swift parity); `.cAbiCode` is the
@@ -59,135 +58,45 @@ if (isSDKException(e)) {
   expectType<number>(cAbiCode);
 }
 
+// ChatMessage is the Web-local, string-role convenience shape (Public/API/Inputs.ts),
+// not the generated proto ChatMessage — role is a string union, not MessageRole.
+const role: ChatRole = 'user';
 const msg: ChatMessage = {
-  id: 'm1',
-  role: MessageRole.MESSAGE_ROLE_USER,
+  role,
   content: 'Hello',
-  timestampUs: 0,
-  toolCalls: [],
-  status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
-  metadata: {},
-  attachments: [],
 };
-expectType<MessageRole>(msg.role);
+expectType<ChatRole>(msg.role);
+expectNotAssignable<ChatRole>('narrator');
 
-const prog: DownloadProgress = {
-  modelId: 'm1',
-  stage: DownloadStage.DOWNLOAD_STAGE_DOWNLOADING,
-  bytesDownloaded: 100,
-  totalBytes: 200,
-  stageProgress: 0.5,
-  overallSpeedBps: 1000,
-  etaSeconds: 1,
-  state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
-  retryAttempt: 0,
-  errorMessage: '',
-  taskId: 'task-1',
-  currentFileIndex: 0,
-  totalFiles: 1,
-  storageKey: 'models/m1',
-  localPath: '',
-  overallProgress: 0.5,
-  startedAtUnixMs: 0,
-  updatedAtUnixMs: 0,
-  currentFileName: 'model.gguf',
-  resumeToken: '',
-};
-expectType<number>(prog.stageProgress);
+// Generated enums referenced by public option/result fields are re-exported directly.
+expectType<InferenceFramework>(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+expectType<ModelCategory>(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+expectType<ModelFormat>(ModelFormat.MODEL_FORMAT_GGUF);
+expectType<string>(formatFramework(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP));
 
-const loraConfig: LoRAAdapterConfig = {
-  adapterPath: '/models/adapters/style.gguf',
-  scale: 0.75,
-  adapterId: 'style',
-  metadata: {},
-  targetModules: [],
-};
-const loraApplyRequest: LoRAApplyRequest = {
-  requestId: 'apply-1',
-  adapters: [loraConfig],
-  replaceExisting: true,
-};
-const loraRemoveRequest: LoRARemoveRequest = {
-  requestId: 'remove-1',
-  adapterIds: ['style'],
-  adapterPaths: [],
-  clearAll: false,
-};
-const loraStateRequest: LoRAState = {
-  loadedAdapters: [],
-  hasActiveAdapters: false,
-  errorCode: 0,
-};
-const loraCatalogEntry: LoraAdapterCatalogEntry = {
-  id: 'style',
-  name: 'Style',
-  description: '',
-  url: 'https://example.com/style.gguf',
-  filename: 'style.gguf',
-  compatibleModels: ['base'],
-  sizeBytes: 0,
-  defaultScale: 0.75,
-  tags: [],
-  metadata: {},
-};
-const loraCatalogListRequest: LoraAdapterCatalogListRequest = {
-  query: { modelId: 'base', tags: [] },
-  includeCounts: true,
-};
-const loraCatalogQuery: LoraAdapterCatalogQuery = {
-  modelId: 'base',
-  downloadedOnly: true,
-  tags: ['style'],
-};
-const loraCatalogGetRequest: LoraAdapterCatalogGetRequest = {
-  adapterId: 'style',
-};
-const loraDownloadCompletedRequest: LoraAdapterDownloadCompletedRequest = {
-  adapterId: 'style',
-  localPath: 'opfs://runanywhere/lora/style.gguf',
-  imported: false,
-  statusMessage: 'download completed',
-};
-expectType<boolean>(RunAnywhere.lora.supportsNative());
-expectType<string[]>(RunAnywhere.lora.missingExports());
-expectType<boolean>(RunAnywhere.lora.catalog.supportsNative());
-expectType<string[]>(RunAnywhere.lora.catalog.missingExports());
-expectType<Promise<LoRAApplyResult>>(RunAnywhere.lora.apply(loraApplyRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.remove(loraRemoveRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.list(loraStateRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.state(loraStateRequest));
-expectType<Promise<LoraCompatibilityResult>>(
-  RunAnywhere.lora.checkCompatibility(loraConfig),
-);
-expectType<Promise<LoraAdapterCatalogEntry>>(
-  RunAnywhere.lora.catalog.register(loraCatalogEntry),
-);
-expectType<Promise<LoraAdapterCatalogListResult>>(
-  RunAnywhere.lora.catalog.list(loraCatalogListRequest),
-);
-expectType<Promise<LoraAdapterCatalogListResult>>(
-  RunAnywhere.lora.catalog.query(loraCatalogQuery),
-);
-expectType<Promise<LoraAdapterCatalogGetResult>>(
-  RunAnywhere.lora.catalog.get(loraCatalogGetRequest),
-);
-expectType<Promise<LoraAdapterDownloadCompletedResult>>(
-  RunAnywhere.lora.catalog.markDownloadCompleted(loraDownloadCompletedRequest),
-);
+// RunAnywhere.lora is the flat Swift-shaped surface: apply(adapterId, scale?),
+// remove(adapterId | null), removeAll(), list(). It has no `catalog`
+// sub-namespace and no request/result proto types — those live on the
+// Web-only `RunAnywhere+LoRA.ts` extension, not the cross-SDK v3 root.
+expectType<(adapterId: string, scale?: number) => Promise<void>>(RunAnywhere.lora.apply);
+expectType<(adapterId: string | null) => Promise<void>>(RunAnywhere.lora.remove);
+expectType<() => Promise<void>>(RunAnywhere.lora.removeAll);
+expectType<Promise<LoraState>>(RunAnywhere.lora.list());
 
-const toolValue: ToolValue = { stringValue: 'San Francisco' };
-expectType<string | undefined>(toolValue.stringValue);
+const applied: AppliedAdapter = { id: 'style', scale: 0.75 };
+expectType<string>(applied.id);
+expectType<number>(applied.scale);
 
+// `ToolDefinition` is re-exported straight from the generated proto module;
+// `parameters` is a single JSON-Schema string now, not a structured list
+// (idl/tool_calling.proto — ToolParameterType was deleted outright).
 const toolDefinition: ToolDefinition = {
   name: 'get_weather',
   description: 'Get weather',
-  parameters: [{
-    name: 'location',
-    type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-    description: 'City',
-    required: true,
-    enumValues: [],
-  }],
-  metadata: {},
+  parameters: JSON.stringify({
+    type: 'object',
+    properties: { location: { type: 'string', description: 'City' } },
+    required: ['location'],
+  }),
 };
-expectType<ToolParameterType>(toolDefinition.parameters[0].type);
+expectType<string>(toolDefinition.parameters);

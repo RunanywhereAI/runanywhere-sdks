@@ -43,13 +43,25 @@ public extension RAExpectedModelFiles {
 }
 
 public extension RAModelFileDescriptor {
+    /// `is_required` was reserved off the wire outright (idl/model_types.proto:
+    /// "proto3 cannot say [required] with a bool" — files are required by
+    /// default) and replaced by an inverted-polarity `is_optional` at a NEW
+    /// tag, so this initializer keeps its historical `isRequired` name/default
+    /// for API stability while inverting onto the wire field internally.
     init(url: URL, filename: String, isRequired: Bool = true) {
         self.init()
         self.url = url.absoluteString
         self.filename = filename
-        self.isRequired = isRequired
+        self.isOptional = !isRequired
         self.relativePath = url.lastPathComponent
         self.destinationPath = filename
+    }
+
+    /// `true` unless the descriptor explicitly opts into `isOptional`,
+    /// mirroring the deleted `isRequired` field's default-required semantics.
+    var isRequired: Bool {
+        get { !isOptional }
+        set { isOptional = !newValue }
     }
 
     var urlValue: URL? {
@@ -193,12 +205,16 @@ public extension RAModelArtifactType {
 }
 
 public extension RAModelInfo.OneOf_Artifact {
+    // customStrategyID (tag 23) was reserved off the wire outright
+    // (idl/model_types.proto comment: "custom_strategy_id (undocumented
+    // registry)") along with artifactType/expected_files, which "restates
+    // the oneof"/"belongs on the variant" respectively. The oneof now only
+    // has singleFile/archive/multiFile/builtIn cases.
     var artifactType: RAModelArtifactType {
         switch self {
         case .singleFile:               return .singleFile
         case .archive(let archive):     return archive.type.artifactType
         case .multiFile:                return .multiFile
-        case .customStrategyID:         return .custom
         case .builtIn(let enabled):     return enabled ? .builtIn : .unspecified
         }
     }
@@ -221,8 +237,6 @@ public extension RAModelInfo.OneOf_Artifact {
             return "\(artifact.type.displayName) Archive"
         case .multiFile(let artifact):
             return "Multi-File (\(artifact.files.count) files)"
-        case .customStrategyID(let strategyId):
-            return strategyId.isEmpty ? "Custom" : "Custom (\(strategyId))"
         case .builtIn:
             return RAModelArtifactType.builtIn.displayName
         }
@@ -325,7 +339,6 @@ public extension RAModelInfo {
 
     var isBuiltIn: Bool {
         if case .builtIn(let enabled)? = artifact, enabled { return true }
-        if artifactType == .builtIn { return true }
         if localPath.hasPrefix("builtin:") { return true }
         return framework == .foundationModels || framework == .systemTts
     }
@@ -346,17 +359,21 @@ public extension RAModelInfo {
         isBuiltIn || isDownloadedOnDisk || isAvailable
     }
 
+    // The top-level `artifact_type` field was reserved off the wire outright
+    // (idl/model_types.proto: "restates the oneof"), so with no artifact set
+    // these fall back to `RAModelArtifactType.unspecified`'s defaults rather
+    // than a cached top-level enum.
     var requiresExtraction: Bool {
-        artifact?.requiresExtraction ?? artifactType.requiresExtraction
+        artifact?.requiresExtraction ?? RAModelArtifactType.unspecified.requiresExtraction
     }
 
     var requiresDownload: Bool {
         if isBuiltIn { return false }
-        return artifact?.requiresDownload ?? artifactType.requiresDownload
+        return artifact?.requiresDownload ?? RAModelArtifactType.unspecified.requiresDownload
     }
 
     var artifactDisplayName: String {
-        artifact?.displayName ?? artifactType.displayName
+        artifact?.displayName ?? RAModelArtifactType.unspecified.displayName
     }
 
     var archiveArtifact: RAArchiveArtifact? {
@@ -368,12 +385,13 @@ public extension RAModelInfo {
     }
 
     /// Canonical expected-files manifest. Routes through
-    /// `rac_artifact_expected_files_proto`, using the canonical precedence
-    /// (top-level manifest → artifact-attached manifest →
-    /// pattern shorthand → multi-file descriptor seed).
+    /// `rac_artifact_expected_files_proto`. The top-level `ModelInfo.
+    /// expected_files` short-circuit was reserved off the wire outright
+    /// (idl/model_types.proto: "belongs on the variant") — the artifact
+    /// oneof (SingleFileArtifact/ArchiveArtifact.expected_files, or a
+    /// synthesized manifest for MultiFileArtifact) is now the ONLY source.
     var expectedArtifactFiles: RAExpectedModelFiles {
-        if hasExpectedFiles { return expectedFiles }
-        return (try? NativeProtoABI.invoke(
+        (try? NativeProtoABI.invoke(
             self,
             symbol: ArtifactProtoABI.expectedFiles,
             symbolName: "rac_artifact_expected_files_proto",
@@ -386,25 +404,25 @@ public extension RAModelInfo {
     }
 
     mutating func setLocalPath(_ url: URL?) {
+        // isDownloaded was deleted outright (idl/model_types.proto: "reserved
+        // 32; // was is_downloaded: a bool cannot express DOWNLOADING").
+        // registryStatus is the sole downloaded-ness signal now; a
+        // non-empty localPath is the simplest local proxy, matching every
+        // other read site in this SDK (ModelsNamespace.swift).
         localPath = url.map(Self.registryPathString(from:)) ?? ""
-        isDownloaded = isDownloadedOnDisk
+        if isDownloadedOnDisk {
+            registryStatus = .downloaded
+        }
         isAvailable = isAvailableForUse
     }
 
     mutating func setArtifact(_ artifact: RAModelInfo.OneOf_Artifact) {
         self.artifact = artifact
-        artifactType = artifact.artifactType
-        // Derive strictly from the new artifact (clear top-level so the ABI
-        // skips its hasExpectedFiles short-circuit and walks the artifact
-        // branch). Restore previous manifest if the artifact yields nothing.
-        let prior = hasExpectedFiles ? expectedFiles : nil
-        clearExpectedFiles()
-        let derived = expectedArtifactFiles
-        if !derived.isEmptyManifest {
-            expectedFiles = derived
-        } else if let prior {
-            expectedFiles = prior
-        }
+        // artifactType/expected_files (top-level) were both reserved off the
+        // wire outright (idl/model_types.proto: "restates the oneof"/"belongs
+        // on the variant") — expectedArtifactFiles now derives purely from
+        // `self.artifact` via `rac_artifact_expected_files_proto`, with no
+        // top-level cache to write back onto. Nothing left to sync here.
     }
 
     /// Pure-Swift archive-type inference. Wraps `RAArchiveType.from(url:)`

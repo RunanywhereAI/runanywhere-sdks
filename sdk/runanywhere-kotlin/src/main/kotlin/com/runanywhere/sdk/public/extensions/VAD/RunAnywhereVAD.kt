@@ -44,6 +44,7 @@ private fun notInitializedException(): SDKException =
         shouldLog = false,
     )
 
+@Deprecated("Use RunAnywhere.vad.detect(audio, options).")
 suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
     options: RAVADOptions? = null,
@@ -75,7 +76,8 @@ suspend fun RunAnywhere.detectVoiceActivity(
     val result = CppBridgeVAD.processLifecycle(request)
 
     if (result.is_speech) {
-        vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", result.confidence)})")
+        // `confidence` renamed `probability` (idl/vad_options.proto).
+        vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", result.probability)})")
     }
 
     return result
@@ -91,6 +93,7 @@ suspend fun RunAnywhere.detectVoiceActivity(
  * `error_code`) and the flow finishes so callers do not silently keep
  * pumping audio into a dead detector.
  */
+@Deprecated("Use RunAnywhere.vad.detectStream(audio, options).")
 fun RunAnywhere.streamVAD(
     audio: Flow<ByteArray>,
     options: RAVADOptions? = null,
@@ -102,12 +105,17 @@ fun RunAnywhere.streamVAD(
             val sdkError = SDKException.from(error, ErrorCategory.ERROR_CATEGORY_COMPONENT)
             emit(
                 RAVADResult(
-                    error_message = "VAD stream failed: ${sdkError.error.message}",
-                    error_code = sdkError.code.value,
+                    error =
+                        ai.runanywhere.proto.v1.SDKError(
+                            code = sdkError.code,
+                            category = sdkError.category,
+                            message = "VAD stream failed: ${sdkError.error.message}",
+                        ),
                 ),
             )
         }
 
+@Deprecated("Cancel the Flow returned by RunAnywhere.vad.detectStream instead.")
 suspend fun RunAnywhere.resetVAD() {
     if (!isInitialized) {
         throw notInitializedException()

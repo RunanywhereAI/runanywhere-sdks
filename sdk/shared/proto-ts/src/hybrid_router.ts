@@ -6,261 +6,75 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { AudioFormat, audioFormatFromJSON, audioFormatToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * Capability under hybrid routing. Only STT is wired today.
- * ---------------------------------------------------------------------------
+ * Firebase AI Logic / developer.android.com InferenceMode, verbatim.
+ * PREFER_* falls back silently across the boundary; ONLY_* fails instead.
  */
-export enum HybridCapability {
-  HYBRID_CAPABILITY_UNSPECIFIED = 0,
-  HYBRID_CAPABILITY_LLM = 1,
-  HYBRID_CAPABILITY_VLM = 2,
-  HYBRID_CAPABILITY_STT = 3,
-  HYBRID_CAPABILITY_TTS = 4,
-  HYBRID_CAPABILITY_VAD = 5,
+export enum HybridInferenceMode {
+  /** HYBRID_INFERENCE_MODE_UNSPECIFIED - Treated as PREFER_ON_DEVICE, so the proto3 zero is the private default. */
+  HYBRID_INFERENCE_MODE_UNSPECIFIED = 0,
+  HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE = 1,
+  HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE = 2,
+  HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD = 3,
+  HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD = 4,
   UNRECOGNIZED = -1,
 }
 
-export function hybridCapabilityFromJSON(object: any): HybridCapability {
+export function hybridInferenceModeFromJSON(object: any): HybridInferenceMode {
   switch (object) {
     case 0:
-    case "HYBRID_CAPABILITY_UNSPECIFIED":
-      return HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED;
+    case "HYBRID_INFERENCE_MODE_UNSPECIFIED":
+      return HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED;
     case 1:
-    case "HYBRID_CAPABILITY_LLM":
-      return HybridCapability.HYBRID_CAPABILITY_LLM;
+    case "HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE":
+      return HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE;
     case 2:
-    case "HYBRID_CAPABILITY_VLM":
-      return HybridCapability.HYBRID_CAPABILITY_VLM;
+    case "HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE":
+      return HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE;
     case 3:
-    case "HYBRID_CAPABILITY_STT":
-      return HybridCapability.HYBRID_CAPABILITY_STT;
+    case "HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD":
+      return HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD;
     case 4:
-    case "HYBRID_CAPABILITY_TTS":
-      return HybridCapability.HYBRID_CAPABILITY_TTS;
-    case 5:
-    case "HYBRID_CAPABILITY_VAD":
-      return HybridCapability.HYBRID_CAPABILITY_VAD;
+    case "HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD":
+      return HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD;
     case -1:
     case "UNRECOGNIZED":
     default:
-      return HybridCapability.UNRECOGNIZED;
+      return HybridInferenceMode.UNRECOGNIZED;
   }
 }
 
-export function hybridCapabilityToJSON(object: HybridCapability): string {
+export function hybridInferenceModeToJSON(object: HybridInferenceMode): string {
   switch (object) {
-    case HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED:
-      return "HYBRID_CAPABILITY_UNSPECIFIED";
-    case HybridCapability.HYBRID_CAPABILITY_LLM:
-      return "HYBRID_CAPABILITY_LLM";
-    case HybridCapability.HYBRID_CAPABILITY_VLM:
-      return "HYBRID_CAPABILITY_VLM";
-    case HybridCapability.HYBRID_CAPABILITY_STT:
-      return "HYBRID_CAPABILITY_STT";
-    case HybridCapability.HYBRID_CAPABILITY_TTS:
-      return "HYBRID_CAPABILITY_TTS";
-    case HybridCapability.HYBRID_CAPABILITY_VAD:
-      return "HYBRID_CAPABILITY_VAD";
-    case HybridCapability.UNRECOGNIZED:
+    case HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED:
+      return "HYBRID_INFERENCE_MODE_UNSPECIFIED";
+    case HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE:
+      return "HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE";
+    case HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE:
+      return "HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE";
+    case HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD:
+      return "HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD";
+    case HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD:
+      return "HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD";
+    case HybridInferenceMode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
- * the descriptor's `provider` field, not from a distinct enum kind.
- * ---------------------------------------------------------------------------
- */
-export enum HybridBackendKind {
-  HYBRID_BACKEND_UNSPECIFIED = 0,
-  HYBRID_BACKEND_LLAMACPP = 1,
-  HYBRID_BACKEND_OPENROUTER = 2,
-  HYBRID_BACKEND_SHERPA = 3,
-  /**
-   * HYBRID_BACKEND_CLOUD - Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-   * the generic "cloud_stt" backend; the provider is carried out-of-band.
-   */
-  HYBRID_BACKEND_CLOUD = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function hybridBackendKindFromJSON(object: any): HybridBackendKind {
-  switch (object) {
-    case 0:
-    case "HYBRID_BACKEND_UNSPECIFIED":
-      return HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED;
-    case 1:
-    case "HYBRID_BACKEND_LLAMACPP":
-      return HybridBackendKind.HYBRID_BACKEND_LLAMACPP;
-    case 2:
-    case "HYBRID_BACKEND_OPENROUTER":
-      return HybridBackendKind.HYBRID_BACKEND_OPENROUTER;
-    case 3:
-    case "HYBRID_BACKEND_SHERPA":
-      return HybridBackendKind.HYBRID_BACKEND_SHERPA;
-    case 4:
-    case "HYBRID_BACKEND_CLOUD":
-      return HybridBackendKind.HYBRID_BACKEND_CLOUD;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return HybridBackendKind.UNRECOGNIZED;
-  }
-}
-
-export function hybridBackendKindToJSON(object: HybridBackendKind): string {
-  switch (object) {
-    case HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED:
-      return "HYBRID_BACKEND_UNSPECIFIED";
-    case HybridBackendKind.HYBRID_BACKEND_LLAMACPP:
-      return "HYBRID_BACKEND_LLAMACPP";
-    case HybridBackendKind.HYBRID_BACKEND_OPENROUTER:
-      return "HYBRID_BACKEND_OPENROUTER";
-    case HybridBackendKind.HYBRID_BACKEND_SHERPA:
-      return "HYBRID_BACKEND_SHERPA";
-    case HybridBackendKind.HYBRID_BACKEND_CLOUD:
-      return "HYBRID_BACKEND_CLOUD";
-    case HybridBackendKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Whether a model runs on-device or in the cloud. The router decides which
- * of its two registered candidates to invoke based on policy.
- * ---------------------------------------------------------------------------
- */
-export enum HybridModelType {
-  HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
-  HYBRID_MODEL_TYPE_OFFLINE = 1,
-  HYBRID_MODEL_TYPE_ONLINE = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function hybridModelTypeFromJSON(object: any): HybridModelType {
-  switch (object) {
-    case 0:
-    case "HYBRID_MODEL_TYPE_UNSPECIFIED":
-      return HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED;
-    case 1:
-    case "HYBRID_MODEL_TYPE_OFFLINE":
-      return HybridModelType.HYBRID_MODEL_TYPE_OFFLINE;
-    case 2:
-    case "HYBRID_MODEL_TYPE_ONLINE":
-      return HybridModelType.HYBRID_MODEL_TYPE_ONLINE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return HybridModelType.UNRECOGNIZED;
-  }
-}
-
-export function hybridModelTypeToJSON(object: HybridModelType): string {
-  switch (object) {
-    case HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED:
-      return "HYBRID_MODEL_TYPE_UNSPECIFIED";
-    case HybridModelType.HYBRID_MODEL_TYPE_OFFLINE:
-      return "HYBRID_MODEL_TYPE_OFFLINE";
-    case HybridModelType.HYBRID_MODEL_TYPE_ONLINE:
-      return "HYBRID_MODEL_TYPE_ONLINE";
-    case HybridModelType.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Rank — comparator used to sort eligible candidates. Exactly one rank
- * per policy.
- * ---------------------------------------------------------------------------
- */
-export enum HybridRank {
-  HYBRID_RANK_UNSPECIFIED = 0,
-  HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
-  HYBRID_RANK_PREFER_ONLINE_FIRST = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function hybridRankFromJSON(object: any): HybridRank {
-  switch (object) {
-    case 0:
-    case "HYBRID_RANK_UNSPECIFIED":
-      return HybridRank.HYBRID_RANK_UNSPECIFIED;
-    case 1:
-    case "HYBRID_RANK_PREFER_LOCAL_FIRST":
-      return HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST;
-    case 2:
-    case "HYBRID_RANK_PREFER_ONLINE_FIRST":
-      return HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return HybridRank.UNRECOGNIZED;
-  }
-}
-
-export function hybridRankToJSON(object: HybridRank): string {
-  switch (object) {
-    case HybridRank.HYBRID_RANK_UNSPECIFIED:
-      return "HYBRID_RANK_UNSPECIFIED";
-    case HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST:
-      return "HYBRID_RANK_PREFER_LOCAL_FIRST";
-    case HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST:
-      return "HYBRID_RANK_PREFER_ONLINE_FIRST";
-    case HybridRank.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Hard filter — drops a candidate from consideration when the predicate
- * fails. Filters compose with AND semantics. The wire kinds match
- * thoughts/file.txt's Routing Conditions list verbatim.
- * ---------------------------------------------------------------------------
- */
+/** A candidate must pass every hard filter to stay in the running. */
 export interface HybridFilter {
-  /**
-   * True iff the host has working network. Disqualifies online
-   * candidates when false; offline candidates are unaffected.
-   */
-  network?:
-    | boolean
-    | undefined;
-  /**
-   * Discrete quality tier required from the candidate. Candidates
-   * declaring a lower tier in their descriptor are filtered out.
-   */
-  qualityTier?:
-    | number
-    | undefined;
-  /**
-   * Disqualifies cloud candidates when the device is below the
-   * given battery percent (0–100).
-   */
-  battery?:
-    | BatteryFilter
-    | undefined;
-  /**
-   * Caller-supplied predicate, evaluated host-side via the
-   * registered custom-filter callback table.
-   */
+  network?: boolean | undefined;
+  battery?: BatteryFilter | undefined;
   custom?: CustomFilter | undefined;
 }
 
 export interface BatteryFilter {
+  /** Charge floor, 0-100, below which the on-device candidate is dropped. */
   minBatteryPercent: number;
 }
 
@@ -269,166 +83,109 @@ export interface CustomFilter {
   description: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Cascade — triggers fallback from the primary candidate to the next
- * candidate mid-request. Matches the file.txt Confidence policy.
- * ---------------------------------------------------------------------------
- */
 export interface HybridCascade {
-  /**
-   * Cascade when the primary's confidence/logprob signal falls below
-   * `threshold`, or when the primary returns an error (treated as
-   * "no confidence").
-   */
   confidence?: ConfidenceCascade | undefined;
 }
 
+/** Below this on-device confidence, the router escalates to cloud. */
 export interface ConfidenceCascade {
   threshold: number;
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Full routing policy attached to a model pair. `simple` mode collapses
- * to a single filter; `advanced` mode allows composition.
- * ---------------------------------------------------------------------------
+ * The candidate chain for one routed request: tried first to last, first
+ * success wins, position IS the priority. `mode` still governs whether the
+ * chain may cross the on-device/cloud line.
  */
 export interface HybridRoutingPolicy {
   hardFilters: HybridFilter[];
   cascade?: HybridCascade | undefined;
-  rank: HybridRank;
+  mode: HybridInferenceMode;
+  /**
+   * Per-ATTEMPT deadline, not the overall request deadline. When a candidate
+   * has produced nothing within this many milliseconds it is abandoned and
+   * the next candidate is tried. 0 = no per-attempt deadline.
+   */
+  attemptTimeoutMs: number;
+  /** Ordered candidates, priority first. Replaces the offline/online pair. */
+  models: HybridModelDescriptor[];
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Descriptor for a single registered model on one side of the pair.
- * ---------------------------------------------------------------------------
- */
 export interface HybridModelDescriptor {
   modelId: string;
-  modelType: HybridModelType;
-  backend: HybridBackendKind;
   /**
-   * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
+   * True = this candidate runs ON DEVICE (and is exempt from the network and
+   * battery filters). False = it runs IN CLOUD. Firebase/Android vocabulary.
    */
-  provider: string;
+  isOnDevice: boolean;
+  /**
+   * The plugin-registry engine name the runtime already pins on: "sherpa",
+   * "llamacpp", "onnx", "qhexrt", "mlx", "cloud", or any name passed to
+   * registerCloudProvider(). Empty = let the registry pick by priority.
+   */
+  engine: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Metadata returned alongside the capability result describing what the
- * router did. Always populated even on success.
- * ---------------------------------------------------------------------------
- */
+/** What the router actually did, including the failed primary attempt. */
 export interface HybridRoutedMetadata {
   chosenModelId: string;
   wasFallback: boolean;
   attemptCount: number;
-  /**
-   * Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-   * the primary served the request or no fallback occurred.
-   */
   primaryErrorCode: number;
   primaryErrorMessage: string;
+  /** Absent (not NaN, not 0.0) when the engine reports no quality score. */
+  confidence?:
+    | number
+    | undefined;
+  /** Absent unless a confidence cascade discarded a primary answer. */
+  primaryConfidence?:
+    | number
+    | undefined;
   /**
-   * Final confidence of the result that was actually returned. NaN when
-   * the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
+   * True when the answer was produced ON DEVICE. This is the field an app
+   * reads to truthfully claim "processed on your device"; never infer it by
+   * comparing chosen_model_id.
    */
-  confidence: number;
-  /**
-   * Primary's confidence captured BEFORE cascading to the secondary.
-   * Populated only when `was_fallback = true` AND the fallback fired on
-   * confidence (not on an error). NaN otherwise.
-   */
-  primaryConfidence: number;
+  servedOnDevice: boolean;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Per-request routing context — caller-supplied hints only.
- *
- * Device state lives behind the rac_hybrid_device_state C ABI vtable in
- * commons; callers do not serialize platform state into this message.
- * ---------------------------------------------------------------------------
- */
-export interface HybridRoutingContext {
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Cloud STT backend registration config. Replaces the hand-built
- * `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
- * HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
- * (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
- * across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
- * these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
- * the same keys out of the JSON blob (`config_json["provider"]` etc., see
- * HybridModelDescriptor.provider).
- * ---------------------------------------------------------------------------
- */
 export interface CloudSttBackendConfig {
-  /** HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam". */
   provider: string;
-  /** Provider-side model id (e.g. "saarika:v2"). */
   model: string;
-  /** Provider API key / credential. */
+  /**
+   * SECRET. Held in memory only; never logged, never persisted, never
+   * included in a toString()/toJSON() dump.
+   */
   apiKey: string;
-  /** BCP-47 language hint forwarded to the provider (empty = auto-detect). */
   languageCode: string;
-  /** Override the provider base URL (empty = provider default). */
   baseUrl: string;
-  /** Request timeout in milliseconds (0 = engine default). */
   timeoutMs: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * STT transcription options carried through the router. Sample rate and
- * audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
- * caller-supplied BCP-47 hint (empty = backend auto-detect).
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeOptions {
   language: string;
   sampleRate: number;
-  /** Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC. */
-  audioFormat: number;
+  /**
+   * Container the bytes are already in. UNSPECIFIED (the proto3 zero) means
+   * headerless PCM16, which commons wraps in a WAV container.
+   */
+  audioFormat: AudioFormat;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Request handed to the JNI transcribe thunk. Audio bytes are passed
- * verbatim to the chosen backend; each engine is responsible for parsing
- * the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
- * file part; sherpa decodes the WAV/PCM bytes).
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeRequest {
   audioBytes: Uint8Array;
-  context?: HybridRoutingContext | undefined;
   options?: HybridSttTranscribeOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Response returned by the JNI transcribe thunk. Carries the transcript,
- * the detected (or hinted) language, the routing decision metadata, the
- * native rc, and a human-readable error message when rc != 0.
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeResponse {
   rc: number;
   text: string;
   detectedLanguage: string;
   routing?: HybridRoutedMetadata | undefined;
-  errorMsg: string;
 }
 
 function createBaseHybridFilter(): HybridFilter {
-  return { network: undefined, qualityTier: undefined, battery: undefined, custom: undefined };
+  return { network: undefined, battery: undefined, custom: undefined };
 }
 
 export const HybridFilter: MessageFns<HybridFilter> = {
@@ -436,14 +193,11 @@ export const HybridFilter: MessageFns<HybridFilter> = {
     if (message.network !== undefined) {
       writer.uint32(8).bool(message.network);
     }
-    if (message.qualityTier !== undefined) {
-      writer.uint32(24).int32(message.qualityTier);
-    }
     if (message.battery !== undefined) {
-      BatteryFilter.encode(message.battery, writer.uint32(34).fork()).join();
+      BatteryFilter.encode(message.battery, writer.uint32(18).fork()).join();
     }
     if (message.custom !== undefined) {
-      CustomFilter.encode(message.custom, writer.uint32(42).fork()).join();
+      CustomFilter.encode(message.custom, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -463,24 +217,16 @@ export const HybridFilter: MessageFns<HybridFilter> = {
           message.network = reader.bool();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.qualityTier = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
           message.battery = BatteryFilter.decode(reader, reader.uint32());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
@@ -499,11 +245,6 @@ export const HybridFilter: MessageFns<HybridFilter> = {
   fromJSON(object: any): HybridFilter {
     return {
       network: isSet(object.network) ? globalThis.Boolean(object.network) : undefined,
-      qualityTier: isSet(object.qualityTier)
-        ? globalThis.Number(object.qualityTier)
-        : isSet(object.quality_tier)
-        ? globalThis.Number(object.quality_tier)
-        : undefined,
       battery: isSet(object.battery) ? BatteryFilter.fromJSON(object.battery) : undefined,
       custom: isSet(object.custom) ? CustomFilter.fromJSON(object.custom) : undefined,
     };
@@ -513,9 +254,6 @@ export const HybridFilter: MessageFns<HybridFilter> = {
     const obj: any = {};
     if (message.network !== undefined) {
       obj.network = message.network;
-    }
-    if (message.qualityTier !== undefined) {
-      obj.qualityTier = Math.round(message.qualityTier);
     }
     if (message.battery !== undefined) {
       obj.battery = BatteryFilter.toJSON(message.battery);
@@ -532,7 +270,6 @@ export const HybridFilter: MessageFns<HybridFilter> = {
   fromPartial<I extends Exact<DeepPartial<HybridFilter>, I>>(object: I): HybridFilter {
     const message = createBaseHybridFilter();
     message.network = object.network ?? undefined;
-    message.qualityTier = object.qualityTier ?? undefined;
     message.battery = (object.battery !== undefined && object.battery !== null)
       ? BatteryFilter.fromPartial(object.battery)
       : undefined;
@@ -802,7 +539,7 @@ export const ConfidenceCascade: MessageFns<ConfidenceCascade> = {
 };
 
 function createBaseHybridRoutingPolicy(): HybridRoutingPolicy {
-  return { hardFilters: [], cascade: undefined, rank: 0 };
+  return { hardFilters: [], cascade: undefined, mode: 0, attemptTimeoutMs: 0, models: [] };
 }
 
 export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
@@ -813,8 +550,14 @@ export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
     if (message.cascade !== undefined) {
       HybridCascade.encode(message.cascade, writer.uint32(18).fork()).join();
     }
-    if (message.rank !== 0) {
-      writer.uint32(24).int32(message.rank);
+    if (message.mode !== 0) {
+      writer.uint32(24).int32(message.mode);
+    }
+    if (message.attemptTimeoutMs !== 0) {
+      writer.uint32(32).int32(message.attemptTimeoutMs);
+    }
+    for (const v of message.models) {
+      HybridModelDescriptor.encode(v!, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -847,7 +590,23 @@ export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
             break;
           }
 
-          message.rank = reader.int32() as any;
+          message.mode = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.attemptTimeoutMs = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.models.push(HybridModelDescriptor.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -867,7 +626,15 @@ export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
         ? object.hard_filters.map((e: any) => HybridFilter.fromJSON(e))
         : [],
       cascade: isSet(object.cascade) ? HybridCascade.fromJSON(object.cascade) : undefined,
-      rank: isSet(object.rank) ? hybridRankFromJSON(object.rank) : 0,
+      mode: isSet(object.mode) ? hybridInferenceModeFromJSON(object.mode) : 0,
+      attemptTimeoutMs: isSet(object.attemptTimeoutMs)
+        ? globalThis.Number(object.attemptTimeoutMs)
+        : isSet(object.attempt_timeout_ms)
+        ? globalThis.Number(object.attempt_timeout_ms)
+        : 0,
+      models: globalThis.Array.isArray(object?.models)
+        ? object.models.map((e: any) => HybridModelDescriptor.fromJSON(e))
+        : [],
     };
   },
 
@@ -879,8 +646,14 @@ export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
     if (message.cascade !== undefined) {
       obj.cascade = HybridCascade.toJSON(message.cascade);
     }
-    if (message.rank !== 0) {
-      obj.rank = hybridRankToJSON(message.rank);
+    if (message.mode !== 0) {
+      obj.mode = hybridInferenceModeToJSON(message.mode);
+    }
+    if (message.attemptTimeoutMs !== 0) {
+      obj.attemptTimeoutMs = Math.round(message.attemptTimeoutMs);
+    }
+    if (message.models?.length) {
+      obj.models = message.models.map((e) => HybridModelDescriptor.toJSON(e));
     }
     return obj;
   },
@@ -894,13 +667,15 @@ export const HybridRoutingPolicy: MessageFns<HybridRoutingPolicy> = {
     message.cascade = (object.cascade !== undefined && object.cascade !== null)
       ? HybridCascade.fromPartial(object.cascade)
       : undefined;
-    message.rank = object.rank ?? 0;
+    message.mode = object.mode ?? 0;
+    message.attemptTimeoutMs = object.attemptTimeoutMs ?? 0;
+    message.models = object.models?.map((e) => HybridModelDescriptor.fromPartial(e)) || [];
     return message;
   },
 };
 
 function createBaseHybridModelDescriptor(): HybridModelDescriptor {
-  return { modelId: "", modelType: 0, backend: 0, provider: "" };
+  return { modelId: "", isOnDevice: false, engine: "" };
 }
 
 export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
@@ -908,14 +683,11 @@ export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
     }
-    if (message.modelType !== 0) {
-      writer.uint32(16).int32(message.modelType);
+    if (message.isOnDevice !== false) {
+      writer.uint32(16).bool(message.isOnDevice);
     }
-    if (message.backend !== 0) {
-      writer.uint32(24).int32(message.backend);
-    }
-    if (message.provider !== "") {
-      writer.uint32(34).string(message.provider);
+    if (message.engine !== "") {
+      writer.uint32(26).string(message.engine);
     }
     return writer;
   },
@@ -940,23 +712,15 @@ export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
             break;
           }
 
-          message.modelType = reader.int32() as any;
+          message.isOnDevice = reader.bool();
           continue;
         }
         case 3: {
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.backend = reader.int32() as any;
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.provider = reader.string();
+          message.engine = reader.string();
           continue;
         }
       }
@@ -975,13 +739,12 @@ export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      modelType: isSet(object.modelType)
-        ? hybridModelTypeFromJSON(object.modelType)
-        : isSet(object.model_type)
-        ? hybridModelTypeFromJSON(object.model_type)
-        : 0,
-      backend: isSet(object.backend) ? hybridBackendKindFromJSON(object.backend) : 0,
-      provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+      isOnDevice: isSet(object.isOnDevice)
+        ? globalThis.Boolean(object.isOnDevice)
+        : isSet(object.is_on_device)
+        ? globalThis.Boolean(object.is_on_device)
+        : false,
+      engine: isSet(object.engine) ? globalThis.String(object.engine) : "",
     };
   },
 
@@ -990,14 +753,11 @@ export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.modelType !== 0) {
-      obj.modelType = hybridModelTypeToJSON(message.modelType);
+    if (message.isOnDevice !== false) {
+      obj.isOnDevice = message.isOnDevice;
     }
-    if (message.backend !== 0) {
-      obj.backend = hybridBackendKindToJSON(message.backend);
-    }
-    if (message.provider !== "") {
-      obj.provider = message.provider;
+    if (message.engine !== "") {
+      obj.engine = message.engine;
     }
     return obj;
   },
@@ -1008,9 +768,8 @@ export const HybridModelDescriptor: MessageFns<HybridModelDescriptor> = {
   fromPartial<I extends Exact<DeepPartial<HybridModelDescriptor>, I>>(object: I): HybridModelDescriptor {
     const message = createBaseHybridModelDescriptor();
     message.modelId = object.modelId ?? "";
-    message.modelType = object.modelType ?? 0;
-    message.backend = object.backend ?? 0;
-    message.provider = object.provider ?? "";
+    message.isOnDevice = object.isOnDevice ?? false;
+    message.engine = object.engine ?? "";
     return message;
   },
 };
@@ -1022,8 +781,9 @@ function createBaseHybridRoutedMetadata(): HybridRoutedMetadata {
     attemptCount: 0,
     primaryErrorCode: 0,
     primaryErrorMessage: "",
-    confidence: 0,
-    primaryConfidence: 0,
+    confidence: undefined,
+    primaryConfidence: undefined,
+    servedOnDevice: false,
   };
 }
 
@@ -1044,11 +804,14 @@ export const HybridRoutedMetadata: MessageFns<HybridRoutedMetadata> = {
     if (message.primaryErrorMessage !== "") {
       writer.uint32(42).string(message.primaryErrorMessage);
     }
-    if (message.confidence !== 0) {
+    if (message.confidence !== undefined) {
       writer.uint32(53).float(message.confidence);
     }
-    if (message.primaryConfidence !== 0) {
+    if (message.primaryConfidence !== undefined) {
       writer.uint32(61).float(message.primaryConfidence);
+    }
+    if (message.servedOnDevice !== false) {
+      writer.uint32(64).bool(message.servedOnDevice);
     }
     return writer;
   },
@@ -1116,6 +879,14 @@ export const HybridRoutedMetadata: MessageFns<HybridRoutedMetadata> = {
           message.primaryConfidence = reader.float();
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.servedOnDevice = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1152,12 +923,17 @@ export const HybridRoutedMetadata: MessageFns<HybridRoutedMetadata> = {
         : isSet(object.primary_error_message)
         ? globalThis.String(object.primary_error_message)
         : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : undefined,
       primaryConfidence: isSet(object.primaryConfidence)
         ? globalThis.Number(object.primaryConfidence)
         : isSet(object.primary_confidence)
         ? globalThis.Number(object.primary_confidence)
-        : 0,
+        : undefined,
+      servedOnDevice: isSet(object.servedOnDevice)
+        ? globalThis.Boolean(object.servedOnDevice)
+        : isSet(object.served_on_device)
+        ? globalThis.Boolean(object.served_on_device)
+        : false,
     };
   },
 
@@ -1178,11 +954,14 @@ export const HybridRoutedMetadata: MessageFns<HybridRoutedMetadata> = {
     if (message.primaryErrorMessage !== "") {
       obj.primaryErrorMessage = message.primaryErrorMessage;
     }
-    if (message.confidence !== 0) {
+    if (message.confidence !== undefined) {
       obj.confidence = message.confidence;
     }
-    if (message.primaryConfidence !== 0) {
+    if (message.primaryConfidence !== undefined) {
       obj.primaryConfidence = message.primaryConfidence;
+    }
+    if (message.servedOnDevice !== false) {
+      obj.servedOnDevice = message.servedOnDevice;
     }
     return obj;
   },
@@ -1197,51 +976,9 @@ export const HybridRoutedMetadata: MessageFns<HybridRoutedMetadata> = {
     message.attemptCount = object.attemptCount ?? 0;
     message.primaryErrorCode = object.primaryErrorCode ?? 0;
     message.primaryErrorMessage = object.primaryErrorMessage ?? "";
-    message.confidence = object.confidence ?? 0;
-    message.primaryConfidence = object.primaryConfidence ?? 0;
-    return message;
-  },
-};
-
-function createBaseHybridRoutingContext(): HybridRoutingContext {
-  return {};
-}
-
-export const HybridRoutingContext: MessageFns<HybridRoutingContext> = {
-  encode(_: HybridRoutingContext, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): HybridRoutingContext {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseHybridRoutingContext();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(_: any): HybridRoutingContext {
-    return {};
-  },
-
-  toJSON(_: HybridRoutingContext): unknown {
-    const obj: any = {};
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<HybridRoutingContext>, I>>(base?: I): HybridRoutingContext {
-    return HybridRoutingContext.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<HybridRoutingContext>, I>>(_: I): HybridRoutingContext {
-    const message = createBaseHybridRoutingContext();
+    message.confidence = object.confidence ?? undefined;
+    message.primaryConfidence = object.primaryConfidence ?? undefined;
+    message.servedOnDevice = object.servedOnDevice ?? false;
     return message;
   },
 };
@@ -1448,7 +1185,7 @@ export const HybridSttTranscribeOptions: MessageFns<HybridSttTranscribeOptions> 
             break;
           }
 
-          message.audioFormat = reader.int32();
+          message.audioFormat = reader.int32() as any;
           continue;
         }
       }
@@ -1469,9 +1206,9 @@ export const HybridSttTranscribeOptions: MessageFns<HybridSttTranscribeOptions> 
         ? globalThis.Number(object.sample_rate)
         : 0,
       audioFormat: isSet(object.audioFormat)
-        ? globalThis.Number(object.audioFormat)
+        ? audioFormatFromJSON(object.audioFormat)
         : isSet(object.audio_format)
-        ? globalThis.Number(object.audio_format)
+        ? audioFormatFromJSON(object.audio_format)
         : 0,
     };
   },
@@ -1485,7 +1222,7 @@ export const HybridSttTranscribeOptions: MessageFns<HybridSttTranscribeOptions> 
       obj.sampleRate = Math.round(message.sampleRate);
     }
     if (message.audioFormat !== 0) {
-      obj.audioFormat = Math.round(message.audioFormat);
+      obj.audioFormat = audioFormatToJSON(message.audioFormat);
     }
     return obj;
   },
@@ -1503,7 +1240,7 @@ export const HybridSttTranscribeOptions: MessageFns<HybridSttTranscribeOptions> 
 };
 
 function createBaseHybridSttTranscribeRequest(): HybridSttTranscribeRequest {
-  return { audioBytes: new Uint8Array(0), context: undefined, options: undefined };
+  return { audioBytes: new Uint8Array(0), options: undefined };
 }
 
 export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> = {
@@ -1511,11 +1248,8 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
     if (message.audioBytes.length !== 0) {
       writer.uint32(10).bytes(message.audioBytes);
     }
-    if (message.context !== undefined) {
-      HybridRoutingContext.encode(message.context, writer.uint32(18).fork()).join();
-    }
     if (message.options !== undefined) {
-      HybridSttTranscribeOptions.encode(message.options, writer.uint32(26).fork()).join();
+      HybridSttTranscribeOptions.encode(message.options, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -1540,14 +1274,6 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
             break;
           }
 
-          message.context = HybridRoutingContext.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
           message.options = HybridSttTranscribeOptions.decode(reader, reader.uint32());
           continue;
         }
@@ -1567,7 +1293,6 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
         : isSet(object.audio_bytes)
         ? bytesFromBase64(object.audio_bytes)
         : new Uint8Array(0),
-      context: isSet(object.context) ? HybridRoutingContext.fromJSON(object.context) : undefined,
       options: isSet(object.options) ? HybridSttTranscribeOptions.fromJSON(object.options) : undefined,
     };
   },
@@ -1576,9 +1301,6 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
     const obj: any = {};
     if (message.audioBytes.length !== 0) {
       obj.audioBytes = base64FromBytes(message.audioBytes);
-    }
-    if (message.context !== undefined) {
-      obj.context = HybridRoutingContext.toJSON(message.context);
     }
     if (message.options !== undefined) {
       obj.options = HybridSttTranscribeOptions.toJSON(message.options);
@@ -1592,9 +1314,6 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
   fromPartial<I extends Exact<DeepPartial<HybridSttTranscribeRequest>, I>>(object: I): HybridSttTranscribeRequest {
     const message = createBaseHybridSttTranscribeRequest();
     message.audioBytes = object.audioBytes ?? new Uint8Array(0);
-    message.context = (object.context !== undefined && object.context !== null)
-      ? HybridRoutingContext.fromPartial(object.context)
-      : undefined;
     message.options = (object.options !== undefined && object.options !== null)
       ? HybridSttTranscribeOptions.fromPartial(object.options)
       : undefined;
@@ -1603,7 +1322,7 @@ export const HybridSttTranscribeRequest: MessageFns<HybridSttTranscribeRequest> 
 };
 
 function createBaseHybridSttTranscribeResponse(): HybridSttTranscribeResponse {
-  return { rc: 0, text: "", detectedLanguage: "", routing: undefined, errorMsg: "" };
+  return { rc: 0, text: "", detectedLanguage: "", routing: undefined };
 }
 
 export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse> = {
@@ -1619,9 +1338,6 @@ export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse
     }
     if (message.routing !== undefined) {
       HybridRoutedMetadata.encode(message.routing, writer.uint32(34).fork()).join();
-    }
-    if (message.errorMsg !== "") {
-      writer.uint32(42).string(message.errorMsg);
     }
     return writer;
   },
@@ -1665,14 +1381,6 @@ export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse
           message.routing = HybridRoutedMetadata.decode(reader, reader.uint32());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.errorMsg = reader.string();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1692,11 +1400,6 @@ export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse
         ? globalThis.String(object.detected_language)
         : "",
       routing: isSet(object.routing) ? HybridRoutedMetadata.fromJSON(object.routing) : undefined,
-      errorMsg: isSet(object.errorMsg)
-        ? globalThis.String(object.errorMsg)
-        : isSet(object.error_msg)
-        ? globalThis.String(object.error_msg)
-        : "",
     };
   },
 
@@ -1714,9 +1417,6 @@ export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse
     if (message.routing !== undefined) {
       obj.routing = HybridRoutedMetadata.toJSON(message.routing);
     }
-    if (message.errorMsg !== "") {
-      obj.errorMsg = message.errorMsg;
-    }
     return obj;
   },
 
@@ -1731,7 +1431,6 @@ export const HybridSttTranscribeResponse: MessageFns<HybridSttTranscribeResponse
     message.routing = (object.routing !== undefined && object.routing !== null)
       ? HybridRoutedMetadata.fromPartial(object.routing)
       : undefined;
-    message.errorMsg = object.errorMsg ?? "";
     return message;
   },
 };

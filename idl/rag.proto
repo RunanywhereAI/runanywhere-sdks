@@ -1,22 +1,17 @@
-// RunAnywhere v2 IDL — RAG (Retrieval-Augmented Generation) runtime types.
+// RunAnywhere IDL — retrieval-augmented generation.
 //
-// Companion to solutions.proto::RAGConfig (which is the *solution-spec* sugar
-// fed into PipelineSpec). This file holds the *runtime* types — the inputs
-// and outputs that flow through the RAG pipeline at query time:
-//   - RAGConfiguration   (low-level pipeline config, carries model ids)
-//   - RAGQueryOptions    (per-query sampling options)
-//   - RAGSearchResult    (a single retrieved chunk)
-//   - RAGResult          (full query result: answer + chunks + timings)
-//   - RAGStatistics      (index-level counters)
-//
-// All SDKs consume these generated messages directly so configuration,
-// metadata, results, and statistics have one portable shape.
+// Commons resolves model ids to on-disk paths through the global model
+// registry, so callers must register their embedding and LLM models
+// before configuring a session.
 
 syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "rac_options.proto";
+import "llm_options.proto";
+import "token_usage.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -27,349 +22,179 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// RAGConfiguration — low-level pipeline config.
-//
-// This message carries *model ids*, not filesystem paths.
-// The commons RAG session ABI (rac_rag_session_create_proto) is responsible
-// for resolving those ids to on-disk paths through the canonical model
-// registry. SDK callers MUST register the embedding / LLM / reranker models
-// first and pass only their ids here.
-// ---------------------------------------------------------------------------
 message RAGConfiguration {
-    // Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
-    // Commons resolves this to the primary artifact path via the model registry.
     string embedding_model_id    = 1;
-
-    // Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
-    // leave empty to create an embed-only / retrieval-only pipeline.
     string llm_model_id          = 2;
-
-    // Embedding vector dimension — must match the embedding model.
-    // Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-    // Leave UNSET: commons derives the dimension from the loaded embedding
-    // model at session create (rac_embeddings_get_info). Set only to
-    // override. No rac_default on purpose — a generated defaults() that
-    // stamped 384 would mark the field present and defeat the derivation.
     optional int32 embedding_dimension   = 3;
 
-    // Number of top chunks to retrieve per query.
-    // Optional so callers can distinguish "unset" from an explicit value.
+    // Retrieval depth, not sampling top_k.
     optional int32 top_k                 = 4 [
         (runanywhere.v1.rac_default) = "5",
         (runanywhere.v1.rac_min) = 1
     ];
 
-    // Minimum cosine similarity threshold (0.0–1.0). Chunks below this
-    // score are discarded before being passed to the LLM as context.
-    // Optional so callers can distinguish "unset" from explicit 0.0
-    // (accept-everything) without losing the canonical default.
-    // Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
-    // produce cosine similarities that rarely exceed ~0.5 even for relevant
-    // chunks, and chunking a document lowers each chunk's similarity further, so
-    // any positive floor filters out real matches — a multi-chunk document then
-    // retrieves nothing and the answer model reports "no information". top_k
-    // bounds the result count instead of a similarity floor.
-    optional float similarity_threshold  = 5 [
+    // Drop hits scoring below this. 0.0 = no filtering.
+    optional float score_threshold       = 5 [
         (runanywhere.v1.rac_default) = "0.0",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
-    // Tokens per chunk when splitting documents during ingestion.
-    // Optional so callers can distinguish "unset" from an explicit value.
+    // Tokens per chunk, and the overlap carried between adjacent chunks.
     optional int32 chunk_size            = 6 [
         (runanywhere.v1.rac_default) = "512",
         (runanywhere.v1.rac_min) = 1
     ];
-
-    // Overlap tokens between consecutive chunks. Must be < chunk_size.
-    // Optional so callers can explicitly request zero overlap (no overlap)
-    // without it being silently replaced by the canonical default of 64.
     optional int32 chunk_overlap         = 7 [
         (runanywhere.v1.rac_default) = "64",
         (runanywhere.v1.rac_min) = 0
     ];
 
-    // Maximum tokens of retrieved context passed to the LLM.
-    // Optional so callers can distinguish "unset" from an explicit value.
     optional int32 max_context_tokens    = 8;
-
-    // Prompt template with `{context}` and `{query}` placeholders.
     optional string prompt_template = 9;
-
-    // Backend-specific config JSON passed to the embedding model/provider.
     optional string embedding_config_json = 10;
 
-    // Backend-specific config JSON passed to the LLM provider.
-    optional string llm_config_json = 11;
-
-    // Index persistence and retrieval behavior. Empty path = in-memory index.
-    optional string index_path = 12;
-    bool persist_index = 13;
-    bool rerank_results = 14;
-        // Registered id of the reranker model (optional).
-    optional string reranker_model_id = 15;
+    // Pointwise rerank of the retrieved chunks using the session LLM.
+    bool rerank_results = 11;
 }
 
-// ---------------------------------------------------------------------------
-// RAGDocument — batch-ingest input item.
-// ---------------------------------------------------------------------------
 message RAGDocument {
-    // Optional caller-supplied document id.
+    // Caller-owned stable id. Re-ingesting an existing id REPLACES its chunks.
     string id = 1;
-
-    // Plain text content to chunk/embed.
     string text = 2;
+    map<string, string> metadata = 3;
 
-    reserved 3;
-
-    // Typed metadata map for generated-proto callers.
-    map<string, string> metadata = 4;
-
-    // Adapter-normalized document source. Pickers, sandbox bookmarks, and
-    // platform file access remain SDK-owned.
-    optional string source_uri = 5;
-    optional string adapter_handle = 6;
-    optional string media_type = 7;
-    int64 size_bytes = 8;
+    // Where this document came from. Copied into every chunk's metadata as
+    // "source" and returned as RAGSearchResult.source_document.
+    optional string source_uri = 4;
 }
 
-message RAGIngestRequest {
-    string request_id = 1;
-    repeated RAGDocument documents = 2;
-    bool replace_existing = 3;
-    map<string, string> metadata = 4;
+// Remove whole documents from the index for `rac_rag_delete_proto`.
+message RAGDeleteRequest {
+    // RAGDocument.id values given at ingest. Empty is an error — use clear().
+    repeated string document_ids = 1 [(runanywhere.v1.rac_required) = true];
 }
 
-// ---------------------------------------------------------------------------
-// RAGQueryOptions — per-query sampling and prompt overrides.
-// ---------------------------------------------------------------------------
-message RAGQueryOptions {
-    // The user question to answer. Required (empty = no-op).
-    string question              = 1;
+message RAGDeleteResponse {
+    int64 deleted_chunks = 1;
 
-    // Optional system prompt override. Unset uses the pipeline default.
-    optional string system_prompt = 2;
+    // Ids that were not in the index. Not an error.
+    repeated string missing_ids = 2;
 
-    // Maximum tokens to generate in the answer.
-    int32  max_tokens            = 3 [(runanywhere.v1.rac_default) = "512"];
+    optional SDKError error = 3;
+}
 
-    // Sampling temperature. 0.0 = greedy, higher = more random.
-    float  temperature           = 4 [(runanywhere.v1.rac_default) = "0.7"];
+// The retrieval knobs, declared once. Every field unset = inherit RAGConfiguration.
+message RAGRetrievalOptions {
+    // Retrieval depth for this call. Unset inherits RAGConfiguration.top_k.
+    optional int32 top_k = 1 [(runanywhere.v1.rac_min) = 1];
 
-    // Nucleus (top-p) sampling parameter. 1.0 = disabled.
-    float  top_p                 = 5 [(runanywhere.v1.rac_default) = "1.0"];
+    // Drop hits scoring below this. Unset inherits RAGConfiguration.score_threshold.
+    optional float score_threshold = 2 [
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 
-    // Top-k sampling parameter. 0 = disabled.
-    int32  top_k                 = 6;
-
-    // Retrieval overrides. 0/unset = use RAGConfiguration defaults.
-    int32 retrieval_top_k        = 7;
-    // Per-query similarity floor. `optional` so an explicit 0.0 (accept
-    // everything) is distinguishable from "unset" and can override a positive
-    // session-level default; unset falls back to RAGConfiguration.
-    optional float similarity_threshold = 8;
-    bool  stream                 = 9;
-
-    // When true, suppress the answer model's thinking phase (maps to
-    // LLMGenerationOptions.disable_thinking so commons prepends the no-think
-    // directive instead of the app injecting "/no_think"). Default false.
-    bool  disable_thinking       = 10;
-
-    // Multi-query expansion: when true, the answer LLM rewrites the question
-    // into `multi_query_count` variants; retrieval runs for the original plus
-    // each variant and the rankings are RRF-fused before rerank. Falls back to
-    // a single query if expansion yields nothing.
-    bool  enable_multi_query     = 11;
-    optional int32 multi_query_count = 12 [
+    // Expand the query into several phrasings and merge the results.
+    // Requires a session LLM.
+    bool enable_multi_query = 3;
+    optional int32 multi_query_count = 4 [
         (runanywhere.v1.rac_default) = "3",
         (runanywhere.v1.rac_min) = 1,
         (runanywhere.v1.rac_max) = 8
     ];
 
-    // Scoped retrieval: when set, only chunks whose document id begins with
-    // this prefix are eligible (e.g. a chat/collection namespace). Unset =
-    // search the whole index.
-    optional string scope_prefix = 13;
+    // Keep only chunks whose document id starts with this prefix.
+    optional string scope_prefix = 5;
 }
 
-message RAGQueryRequest {
-    string request_id = 1;
-    optional RAGQueryOptions options = 2;
-    map<string, string> metadata = 3;
+message RAGQueryOptions {
+    string query                 = 1 [(runanywhere.v1.rac_required) = true];
+    optional RAGRetrievalOptions retrieval = 2;
+    optional LLMGenerationOptions generation = 3;
 }
 
-// ---------------------------------------------------------------------------
-// RAGSearchResult — a single retrieved document chunk with similarity score.
-// ---------------------------------------------------------------------------
+// Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
+// Intentionally omits generation options — that is `RAGQueryOptions` /
+// `rac_rag_query_proto` / SDK `rag.query()`.
+message RAGSearchRequest {
+    string query                 = 1 [(runanywhere.v1.rac_required) = true];
+    optional RAGRetrievalOptions retrieval = 2;
+}
+
 message RAGSearchResult {
-    // Unique identifier of the chunk (assigned at ingestion time).
     string chunk_id              = 1;
-
-    // Text content of the chunk (the actual snippet shown to the LLM).
     string text                  = 2;
 
-    // Cosine similarity score (0.0–1.0). Higher = more relevant.
-    float  similarity_score      = 3;
+    // Relevance, higher-is-better, normalised to 0..1. Fused dense + BM25 (RRF),
+    // not a raw cosine similarity.
+    float  score                 = 3;
 
-    // Optional source document identifier (filename, URL, or document ID).
-    // Set when the chunk's origin is tracked at ingestion time.
     optional string source_document = 4;
-
-    // Free-form metadata associated with the chunk (e.g. page number, section,
-    // ingestion timestamp).
     map<string, string> metadata = 5;
 
-    reserved 6;
+    // Character offsets into the source document.
+    int32 start_offset = 6;
+    int32 end_offset = 7;
 
-    int32 rank = 7;
-    int32 start_offset = 8;
-    int32 end_offset = 9;
-    int32 token_count = 10;
+    int32 token_count = 8;
 }
 
-// ---------------------------------------------------------------------------
-// RAGResult — the full result of a RAG query.
-// ---------------------------------------------------------------------------
+// Retrieval-only response for `rac_rag_search_proto`.
+message RAGSearchResponse {
+    repeated RAGSearchResult chunks = 1;
+    int64  retrieval_time_ms        = 2;
+    string request_id               = 3;
+    optional SDKError error         = 4;
+}
+
 message RAGResult {
-    // The LLM-generated answer grounded in the retrieved context.
     string answer                = 1;
-
-    // Document chunks retrieved during vector search and used as context.
-    // Order matches retrieval rank (highest similarity first).
     repeated RAGSearchResult retrieved_chunks = 2;
-
-    // Full context string passed to the LLM (chunks joined into a prompt).
-    // May be empty for queries with no matching chunks.
     string context_used          = 3;
 
-    // Time spent in the retrieval phase (vector search), in milliseconds.
+    // Measured directly, not by subtraction: embed the query + search + fuse.
     int64  retrieval_time_ms     = 4;
-
-    // Time spent in the LLM generation phase, in milliseconds.
     int64  generation_time_ms    = 5;
 
-    // Total end-to-end query time (retrieval + generation + overhead),
-    // in milliseconds.
-    int64  total_time_ms         = 6;
+    // MUST be set by rac_rag_proto_abi (event_id()).
+    string request_id            = 6;
+    optional string thinking_content = 7;
 
-    int32 prompt_tokens          = 7;
-    int32 completion_tokens      = 8;
-    int32 total_tokens           = 9;
-    optional string error_message = 10;
-    int32 error_code             = 11;
-    string request_id            = 12;
+    // MUST be copied from the LLM result the pipeline already holds.
+    TokenUsage usage             = 8;
 
-    // Optional thinking/reasoning content extracted from the answer.
-    optional string thinking_content = 13;
+    optional SDKError error      = 9;
 }
 
-// ---------------------------------------------------------------------------
-// RAGStatistics — index-level counters for the RAG pipeline.
-//
-// Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
-// ---------------------------------------------------------------------------
 message RAGStatistics {
-    // Total number of documents ever ingested into the index.
     int64  indexed_documents     = 1;
-
-    // Total number of chunks across all indexed documents.
     int64  indexed_chunks        = 2;
-
-    // Approximate total token count across all indexed chunks.
     int64  total_tokens_indexed  = 3;
 
-    // Wall-clock timestamp of the most recent ingestion, in milliseconds
-    // since Unix epoch. 0 = no ingestion yet.
+    // Milliseconds since the Unix epoch when the index last changed.
     int64  last_updated_ms       = 4;
 
-    // Filesystem path to the on-disk index, when applicable. Unset for
-    // in-memory-only indexes.
-    optional string index_path   = 5;
+    // Bytes the index occupies (industry: VectorStore.usage_bytes).
+    // MUST be populated by make_stats() — it is surfaced as RagStats.indexSizeBytes.
+    int64  vector_store_size_bytes = 5;
 
-    // Raw backend statistics JSON for implementations that cannot yet project
-    // every counter into typed fields.
-    optional string stats_json   = 6;
-
-    // Approximate vector-store footprint in bytes, when known.
-    int64 vector_store_size_bytes = 7;
-
-    bool is_persistent = 8;
-    int64 last_query_ms = 9;
-    optional string error_message = 10;
-    int32 error_code = 11;
-}
-
-message RAGIngestResult {
-    string request_id = 1;
-    int64 documents_ingested = 2;
-    int64 chunks_ingested = 3;
-    optional RAGStatistics statistics = 4;
-    optional string error_message = 5;
-    int32 error_code = 6;
+    optional SDKError error       = 6;
 }
 
 enum RAGStreamEventKind {
     RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0;
-    RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED = 1;
-    RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED = 2;
-    RAG_STREAM_EVENT_KIND_CONTEXT_READY = 3;
-    RAG_STREAM_EVENT_KIND_TOKEN = 4;
-    RAG_STREAM_EVENT_KIND_COMPLETED = 5;
-    RAG_STREAM_EVENT_KIND_ERROR = 6;
+    RAG_STREAM_EVENT_KIND_TOKEN = 1;
+    RAG_STREAM_EVENT_KIND_COMPLETED = 2;
+    RAG_STREAM_EVENT_KIND_ERROR = 3;
 }
 
 message RAGStreamEvent {
-    uint64 seq = 1;
-    int64 timestamp_us = 2;
-    string request_id = 3;
-    RAGStreamEventKind kind = 4;
-    optional RAGSearchResult chunk = 5;
-    string token = 6;
-    optional RAGResult result = 7;
-    optional string error_message = 8;
-    int32 error_code = 9;
-}
-
-message RAGServiceState {
-    bool is_ready = 1;
-    optional RAGStatistics statistics = 2;
-    bool is_indexing = 3;
-    bool is_querying = 4;
-    optional string active_request_id = 5;
-    optional string error_message = 6;
-    int32 error_code = 7;
-}
-
-// Logical RAG service contract. Native file pickers, sandbox handles, browser
-// File System Access handles, and backend execution remain adapter-owned; C++
-// consumes only serialized configuration/request/result/state/event messages.
-service RAG {
-    // Create or reconfigure the logical RAG session from registered model ids
-    // and index settings. Commons resolves model ids → on-disk paths via the
-    // global model registry; SDK callers MUST register their embedding /
-    // LLM / reranker models before invoking Create.
-    rpc Create(RAGConfiguration) returns (RAGServiceState);
-
-    // Ingest caller-provided documents into the current logical index.
-    rpc Ingest(RAGIngestRequest) returns (RAGIngestResult);
-
-    // Retrieval-augmented generation returning grounded answer text, chunks,
-    // and timing/token metrics.
-    rpc Query(RAGQueryRequest) returns (RAGResult);
-
-    // Retrieval-only search. The returned RAGResult carries retrieved_chunks and
-    // request/timing fields; answer/context fields may be empty.
-    rpc Search(RAGQueryRequest) returns (RAGResult);
-
-    // Snapshot current index statistics from the logical service state.
-    rpc Stats(RAGServiceState) returns (RAGStatistics);
-
-    // Clear the current logical index and return the post-clear state.
-    rpc Clear(RAGServiceState) returns (RAGServiceState);
-
-    // Server-streaming query events: retrieval start, chunks, context readiness,
-    // token deltas, terminal completion, and errors.
-    rpc Stream(RAGQueryRequest) returns (stream RAGStreamEvent);
+    // Microseconds since the Unix epoch, matching every other modality.
+    int64 timestamp_us = 1;
+    string request_id = 2;
+    RAGStreamEventKind kind = 3;
+    string token = 4;
+    optional RAGResult result = 5;
+    optional SDKError error = 6;
 }

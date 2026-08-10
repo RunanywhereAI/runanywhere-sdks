@@ -20,7 +20,7 @@ class _StorageViewState extends State<StorageView> {
   bool _isLoading = false;
   int _totalUsageBytes = 0;
   int _availableBytes = 0;
-  List<sdk.ModelStorageMetrics> _models = [];
+  List<sdk.ModelInfo> _models = [];
   String? _errorMessage;
 
   @override
@@ -40,12 +40,14 @@ class _StorageViewState extends State<StorageView> {
       if (ModelListViewModel.shared.availableModels.isEmpty) {
         await ModelListViewModel.shared.loadModelsFromRegistry();
       }
-      final storageInfo = await sdk.RunAnywhere.downloads.getStorageInfo();
-      final models = await sdk.RunAnywhere.downloads.list();
+      final state = await sdk.RunAnywhere.models.state();
+      final models = await sdk.RunAnywhere.models.list(
+        const sdk.ModelFilter(downloadedOnly: true),
+      );
       if (!mounted) return;
       setState(() {
-        _totalUsageBytes = storageInfo.app.totalBytes.toInt();
-        _availableBytes = storageInfo.device.freeBytes.toInt();
+        _totalUsageBytes = state.storageUsedBytes;
+        _availableBytes = state.storageFreeBytes;
         _models = models;
       });
     } catch (e) {
@@ -58,17 +60,9 @@ class _StorageViewState extends State<StorageView> {
     }
   }
 
-  Future<void> _clearCache() async {
-    await _runAction('Cache cleared', sdk.RunAnywhere.downloads.clearCache);
-  }
-
-  Future<void> _cleanTempFiles() async {
-    await _runAction('Temporary files cleaned', sdk.RunAnywhere.cleanTempFiles);
-  }
-
-  Future<void> _deleteModel(sdk.ModelStorageMetrics model) async {
-    await _runAction('${_modelDisplayName(model.modelId)} deleted', () async {
-      await sdk.RunAnywhere.deleteModel(model.modelId);
+  Future<void> _deleteModel(sdk.ModelInfo model) async {
+    await _runAction('${_modelDisplayName(model.id)} deleted', () async {
+      await sdk.RunAnywhere.models.delete(model.id);
     });
   }
 
@@ -95,7 +89,7 @@ class _StorageViewState extends State<StorageView> {
   Widget build(BuildContext context) {
     final modelBytes = _models.fold<int>(
       0,
-      (total, model) => total + model.sizeOnDiskBytes.toInt(),
+      (total, model) => total + model.downloadSizeBytes.toInt(),
     );
 
     return Scaffold(
@@ -124,11 +118,6 @@ class _StorageViewState extends State<StorageView> {
             availableBytes: _availableBytes,
             modelBytes: modelBytes,
             modelCount: _models.length,
-          ),
-          const SizedBox(height: AppSpacing.large),
-          _ActionCard(
-            onClearCache: _isLoading ? null : _clearCache,
-            onCleanTemp: _isLoading ? null : _cleanTempFiles,
           ),
           const SizedBox(height: AppSpacing.large),
           Text(
@@ -244,69 +233,10 @@ class _StorageRow extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({required this.onClearCache, required this.onCleanTemp});
-
-  final Future<void> Function()? onClearCache;
-  final Future<void> Function()? onCleanTemp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          children: [
-            _ActionRow(
-              icon: Icons.delete_outline,
-              title: 'Clear Cache',
-              subtitle: 'Remove cached SDK files',
-              onTap: onClearCache,
-            ),
-            const Divider(),
-            _ActionRow(
-              icon: Icons.cleaning_services_outlined,
-              title: 'Clean Temp Files',
-              subtitle: 'Remove temporary files',
-              onTap: onCleanTemp,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Future<void> Function()? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: AppColors.primaryRed),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      enabled: onTap != null,
-      onTap: onTap == null ? null : () => unawaited(onTap!()),
-    );
-  }
-}
-
 class _ModelStorageMetricsRow extends StatefulWidget {
   const _ModelStorageMetricsRow({required this.model, required this.onDelete});
 
-  final sdk.ModelStorageMetrics model;
+  final sdk.ModelInfo model;
   final Future<void> Function() onDelete;
 
   @override
@@ -322,7 +252,7 @@ class _ModelStorageMetricsRowState extends State<_ModelStorageMetricsRow> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Model'),
-        content: Text('Delete ${_modelDisplayName(widget.model.modelId)}?'),
+        content: Text('Delete ${_modelDisplayName(widget.model.id)}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -350,15 +280,15 @@ class _ModelStorageMetricsRowState extends State<_ModelStorageMetricsRow> {
 
   @override
   Widget build(BuildContext context) {
-    final catalogModel = _catalogModelFor(widget.model.modelId);
+    final catalogModel = _catalogModelFor(widget.model.id);
     final framework = catalogModel?.backendFramework;
     return Card(
       child: ListTile(
-        title: Text(_modelDisplayName(widget.model.modelId)),
+        title: Text(_modelDisplayName(widget.model.id)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.model.sizeOnDiskBytes.toInt().formattedFileSize),
+            Text(widget.model.downloadSizeBytes.toInt().formattedFileSize),
             if (framework != null) ...[
               const SizedBox(height: AppSpacing.xxSmall),
               Row(

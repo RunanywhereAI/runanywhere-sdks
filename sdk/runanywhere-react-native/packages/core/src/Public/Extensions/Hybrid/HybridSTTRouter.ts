@@ -76,7 +76,7 @@ interface AttachedService {
  *   offlineSherpa('sherpa-onnx-whisper-tiny.en'),
  *   onlineCloud('saaras'),
  *   { hardFilters: [Filters.network()], cascade: Cascades.confidence(0.5),
- *     rank: HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST }
+ *     preferLocal: true }
  * );
  * const result = await router.transcribe(audio, { audioFormat: 1 });
  * await router.close();
@@ -240,7 +240,6 @@ export class HybridSTTRouter {
 
     const request = HybridSttTranscribeRequest.fromPartial({
       audioBytes: audio,
-      context: {},
       options: {
         language: options.language ?? '',
         sampleRate: options.sampleRate ?? 0,
@@ -320,13 +319,21 @@ export class HybridSTTRouter {
     return handle;
   }
 
-  /** Encode a `HybridModelDescriptor` for the router setters. */
+  /**
+   * Encode a `HybridModelDescriptor` for the router setters.
+   *
+   * `isLocal`/`backend`/`provider` are deleted from the wire descriptor
+   * outright: `isOnDevice` replaces `isLocal` (same meaning, Firebase/Android
+   * vocabulary), `engine` (the plugin-registry name) replaces the
+   * `HybridBackendKind` enum, and `provider` has no wire slot here — it
+   * already reaches the router through `createService`'s `configJson`
+   * (`CloudSTT.configJSON`), independent of this descriptor.
+   */
   private descriptorBytes(model: HybridModel): ArrayBuffer {
     const descriptor = HybridModelDescriptor.fromPartial({
       modelId: model.id,
-      modelType: model.modelType,
-      backend: model.backend,
-      provider: model.provider,
+      isOnDevice: model.isLocal,
+      engine: pinnedEngineName(model.backend),
     });
     return encodeProtoMessage(descriptor, HybridModelDescriptor);
   }
@@ -364,7 +371,14 @@ export class HybridSTTRouter {
     }
   }
 
-  /** Decode a `HybridSttTranscribeResponse`, raising the native rc as an exception. */
+  /**
+   * Decode a `HybridSttTranscribeResponse`, raising the native rc as an
+   * exception.
+   *
+   * `HybridSttTranscribeResponse.errorMsg` is deleted from the wire outright
+   * — the only failure detail left is `routing.primaryErrorMessage`, which
+   * this falls back to before the generic rc-only message.
+   */
   private decodeResponse(buffer: ArrayBuffer): HybridTranscribeResult {
     const bytes = arrayBufferToBytes(buffer);
     if (bytes.byteLength === 0) {
@@ -374,7 +388,9 @@ export class HybridSTTRouter {
     }
     const message = HybridSttTranscribeResponse.decode(bytes);
     if (message.rc !== RAC_SUCCESS) {
-      const reason = message.errorMsg || `Hybrid STT transcribe failed (rc=${message.rc})`;
+      const reason =
+        message.routing?.primaryErrorMessage ||
+        `Hybrid STT transcribe failed (rc=${message.rc})`;
       logger.warning(reason);
       // Swift parity: decodeResponse throws .serviceNotAvailable
       // (HybridSTTRouter.swift:291-300).
@@ -392,6 +408,7 @@ export class HybridSTTRouter {
         primaryErrorMessage: routing?.primaryErrorMessage ?? '',
         confidence: routing?.confidence ?? Number.NaN,
         primaryConfidence: routing?.primaryConfidence ?? Number.NaN,
+        servedOnDevice: routing?.servedOnDevice ?? false,
       },
     };
   }

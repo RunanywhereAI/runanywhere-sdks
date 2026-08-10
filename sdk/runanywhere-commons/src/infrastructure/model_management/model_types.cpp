@@ -297,7 +297,12 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama.cpp";
         case RAC_FRAMEWORK_COREML:
-            return "Core ML";
+            // Named for the ENGINE that executes these models, not Apple's framework —
+            // the same convention RAC_FRAMEWORK_QHEXRT already follows by displaying
+            // "QHexRT". The enum tag stays COREML (it is the wire value); only the
+            // human-readable label changes, and it changes here so every SDK — Swift,
+            // Kotlin, Flutter, React Native, Web — inherits it from one place.
+            return "NeuRT";
         case RAC_FRAMEWORK_MLX:
             return "MLX";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
@@ -451,7 +456,7 @@ const char* inference_framework_display_name_value(rac_inference_framework_t f) 
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
         case RAC_FRAMEWORK_COREML:
-            return "Core ML";
+            return "NeuRT";
         case RAC_FRAMEWORK_MLX:
             return "MLX";
         case RAC_FRAMEWORK_QHEXRT:
@@ -578,6 +583,23 @@ rac_result_t rac_inference_framework_from_string(const char* s, rac_inference_fr
             *out = fw;
             return RAC_SUCCESS;
         }
+    }
+
+    // LEGACY DISPLAY-NAME ALIASES. This function resolves a framework from any of its three
+    // representations, so a value that was parseable yesterday must stay parseable today —
+    // otherwise renaming a DISPLAY string silently breaks reading back persisted records.
+    //
+    // `RAC_FRAMEWORK_COREML`'s display name became "NeuRT" when the Apple engine was renamed
+    // (the engine is NeuRT; COREML remains the wire value and Apple's framework name). "Core ML"
+    // is what older stored model entries and API payloads still carry, and it matches none of the
+    // three current spellings — the wire string is `INFERENCE_FRAMEWORK_COREML` and the analytics
+    // key is `coreml`, neither of which has the space. Without this it returns NOT_FOUND.
+    //
+    // `coreml` (no space) already matches the analytics key case-insensitively, so only the
+    // spaced form needs an alias here.
+    if (equals_case_insensitive(input, "Core ML")) {
+        *out = RAC_FRAMEWORK_COREML;
+        return RAC_SUCCESS;
     }
 
     return RAC_ERROR_NOT_FOUND;

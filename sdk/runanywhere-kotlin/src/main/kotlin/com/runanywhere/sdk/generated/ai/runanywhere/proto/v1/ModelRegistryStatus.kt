@@ -17,14 +17,8 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Model registry lifecycle state. This is durable/catalog state, not a live
- * transfer progress stream. Per-download byte counters and transient progress
- * events stay in download_service.proto.
- * Sources pre-IDL:
- *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
- *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
- * ---------------------------------------------------------------------------
+ * Durable catalog state, not a live transfer stream. Byte counters and
+ * progress events live in download_service.proto.
  */
 public enum class ModelRegistryStatus(
   override val `value`: Int,

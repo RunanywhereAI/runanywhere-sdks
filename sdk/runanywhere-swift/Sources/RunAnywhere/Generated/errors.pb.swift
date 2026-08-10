@@ -10,165 +10,9 @@
 
 // RunAnywhere IDL — error types (codes, categories, structured errors).
 //
-// Errors are catastrophic to drift on. This file is the single source of truth
-// for the error surface every SDK exposes; codegen must produce identical
-// numeric values, names, and category mappings everywhere.
-//
-// Every enum below is the *union* of cases currently declared by hand across
-// the C ABI (`runanywhere-commons`), Swift, Kotlin, Dart, React Native, and
-// Web SDKs. The canonical numeric values come from the C ABI header
-// `sdk/runanywhere-commons/include/rac/core/rac_error.h` (the C ABI is the
-// system's only ABI-stable wire format — Swift, Kotlin, Dart, RN, Web all map
-// onto it via `CommonsErrorMapping`-style adapters).
-//
-// === Pre-IDL drift summary (why exhaustive enumeration matters) ===
-//
-//   C ABI     rac_error.h:50-415        ~120 RAC_ERROR_* codes in -100..-899
-//                                       organized in 16 contiguous ranges:
-//                                         init      -100..-109
-//                                         model     -110..-129
-//                                         gen       -130..-149
-//                                         net       -150..-179
-//                                         storage   -180..-219
-//                                         hardware  -220..-229
-//                                         component -230..-249
-//                                         validation -250..-279
-//                                         audio     -280..-299
-//                                         lang/voice -300..-319
-//                                         auth      -320..-329
-//                                         security  -330..-349
-//                                         extraction -350..-369
-//                                         calibration -370..-379
-//                                         cancel    -380..-389
-//                                         module/svc -400..-499
-//                                         platform  -500..-599
-//                                         backend   -600..-699
-//                                         events    -700..-799
-//                                         other     -800..-899
-//                                       Several codes are *value aliases*
-//                                       (e.g. RAC_ERROR_OUT_OF_MEMORY = -221 =
-//                                       RAC_ERROR_INSUFFICIENT_MEMORY;
-//                                       RAC_ERROR_FILE_DELETE_FAILED = -187 =
-//                                       RAC_ERROR_DELETE_FAILED). The proto
-//                                       picks one canonical name per numeric
-//                                       value; aliases are documented inline.
-//
-//   C ABI     rac_structured_error.h:46 15-case `rac_error_category_t`
-//                                       (general, stt, tts, llm, vad, vlm,
-//                                       speakerDiarization, wakeWord,
-//                                       voiceAgent, download, fileManagement,
-//                                       network, authentication, security,
-//                                       runtime). NOTE: NO `rag` category in
-//                                       C ABI; Swift and Dart add it.
-//
-//   Swift     ErrorCode.swift:12        `enum ErrorCode: String` — ~85 cases,
-//                                       string-valued. No numeric raw value;
-//                                       Swift loses the negative C codes when
-//                                       serialised. SDKs must round-trip the
-//                                       numeric `c_abi_code` separately
-//                                       (hence the `c_abi_code` field on
-//                                       SDKError below).
-//             ErrorCategory.swift:11    `enum ErrorCategory: String` —
-//                                       16 cases incl. `rag`.
-//
-//   Kotlin    ErrorCode.kt:19           `enum class ErrorCode(rawValue: Int)`
-//                                       — 27 cases mapped to *condensed*
-//                                       integer values 0,-1..-13,-100..-105,
-//                                       -200..-202, -300..-302. This is a
-//                                       smaller, lossy sub-set of the C ABI
-//                                       canonical -100..-899 numbering and
-//                                       MUST be regenerated against this
-//                                       proto. Note ErrorCode.MODEL_NOT_FOUND
-//                                       and ErrorCode.FILE_NOT_FOUND in
-//                                       current Kotlin both map to rawValue
-//                                       = -6 (a duplicate-value bug).
-//             ErrorCategory.kt:19       18 cases incl. CONFIGURATION,
-//                                       INITIALIZATION, FILE_RESOURCE,
-//                                       MEMORY, STORAGE, OPERATION,
-//                                       PLATFORM. NO STT/TTS/LLM/VAD/VLM
-//                                       overlap with Swift names; Kotlin also
-//                                       has VOICE_AGENT but no
-//                                       SPEAKER_DIARIZATION, WAKE_WORD or
-//                                       RAG.
-//             SDKError.kt:27            `data class SDKError(code, category,
-//                                       message, cause)`. No source location
-//                                       fields (uses Throwable.cause).
-//             CommonsErrorMapping.kt    Maps C ABI rawValue → ErrorCode
-//                                       (lossy because the Kotlin enum is
-//                                       smaller).
-//
-//   Dart      error_code.dart:3         `enum ErrorCode(rawValue: int)` —
-//                                       43 cases in ranges 1000..2103
-//                                       (POSITIVE!) — totally different
-//                                       numbering from Swift / Kotlin / C ABI.
-//                                       Dart codes are platform-internal only
-//                                       and DO NOT round-trip with the C ABI.
-//                                       SDKs using Dart must convert via the
-//                                       canonical (negative) `c_abi_code`.
-//             error_category.dart:3     27-case enum incl. STT/TTS/VAD/LLM/
-//                                       VLM/SPEAKER_DIARIZATION/WAKE_WORD/
-//                                       VOICE_AGENT/RAG/DOWNLOAD/
-//                                       FILE_MANAGEMENT/SECURITY/RUNTIME +
-//                                       INITIALIZATION/GENERAL/MODEL/
-//                                       GENERATION/NETWORK/STORAGE/MEMORY/
-//                                       HARDWARE/VALIDATION/AUTHENTICATION/
-//                                       COMPONENT/FRAMEWORK/UNKNOWN. The
-//                                       superset across all SDKs.
-//             error_context.dart:4      `class ErrorContext { stackTrace,
-//                                       file, line, function, timestamp,
-//                                       threadInfo }`.
-//             sdk_error.dart:13         `class SDKError { message, type,
-//                                       underlyingError, context }` plus
-//                                       57-case `enum SDKErrorType`. Maps
-//                                       SDKErrorType → ErrorCode (1000..2103)
-//                                       and → ErrorCategory.
-//
-//   RN        ErrorCodes.ts:17          `enum ErrorCode` — ~38 cases in
-//                                       1000..1799 (positive, like Dart).
-//             ErrorCategory.ts:10       12-case `enum ErrorCategory` (string
-//                                       values: 'initialization', 'model',
-//                                       'generation', 'network', 'storage',
-//                                       'memory', 'hardware', 'validation',
-//                                       'authentication', 'component',
-//                                       'framework', 'unknown'). Misses
-//                                       STT/TTS/VAD/LLM/VLM etc.
-//             SDKError.ts:31            Has a *legacy* `enum SDKErrorCode`
-//                                       (string-keyed, 27 cases) plus the new
-//                                       numeric `ErrorCode` for backward
-//                                       compat. SDKError.ts:64 maps legacy
-//                                       string → numeric ErrorCode.
-//             ErrorContext.ts:11        `interface ErrorContext { stackTrace,
-//                                       file, line, function, timestamp,
-//                                       threadInfo }`.
-//
-//   Web       ErrorTypes.ts:9           `enum SDKErrorCode` — ~30 cases with
-//                                       NEGATIVE values matching the C ABI
-//                                       (-100..-903). Closer to canonical
-//                                       than RN/Dart but still partial.
-//                                       NOTE: Web adds WASM-specific codes
-//                                       (-900..-903) that the C ABI does not
-//                                       reserve there (C ABI uses -900..-999
-//                                       as "Reserved"). These are kept under
-//                                       a Web-only block at the bottom.
-//             ErrorTypes.ts:68          `class SDKError extends Error
-//                                       { code, details? }`. No category
-//                                       enum on web. (An ErrorCategory enum
-//                                       must be introduced when codegen
-//                                       runs against this proto.)
-//
-// === Why this proto matters ===
-// SDKError travels across the WASM/JNI/SwiftPM boundary as the structured
-// payload of failed `ra_*` calls. The C ABI exposes the negative numeric
-// `rac_result_t` codes; everything above that is a name + category +
-// human-readable message + (optional) source location. Codegen MUST:
-//   1. emit identical positive-valued enum constants for `ErrorCode`
-//      (proto3 forbids negative enum values),
-//   2. preserve the negative `rac_result_t` value in the SDKError.c_abi_code
-//      field for round-tripping with the C ABI,
-//   3. emit identical category mappings,
-//   4. produce a non-lossy `c_abi_code` ↔ ErrorCode lookup table on every
-//      target so platforms that previously condensed codes (Kotlin) or
-//      remapped to positive ranges (Dart, RN) stop drifting.
+// Canonical numeric values come from
+// sdk/runanywhere-commons/include/rac/core/rac_error.h. Changing a value is a
+// wire break across every SDK; adding one is safe.
 
 import SwiftProtobuf
 
@@ -182,33 +26,11 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// ErrorCategory — coarse-grained logical grouping for filtering / analytics.
+/// Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+/// into COMPONENT; use SDKError.component to tell them apart.
 ///
-/// This is the union of all categories declared across SDKs, condensed to the
-/// minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
-/// VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
-/// covers every category currently in use except for the per-modality ones
-/// (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
-/// COMPONENT. Per-modality routing is recovered at runtime from the source
-/// of the failure (the `c_abi_code` numeric value uniquely identifies the
-/// component) and from `ErrorContext.operation` — there is no need to encode
-/// modality twice.
-///
-/// Sources pre-IDL:
-///   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
-///                                      stt/tts/llm/vad/vlm/etc.
-///   Swift   ErrorCategory.swift:11     16 cases incl. rag.
-///   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
-///                                      INITIALIZATION, FILE_RESOURCE,
-///                                      OPERATION, PLATFORM (no per-modality).
-///   Dart    error_category.dart:3      27 cases (superset).
-///   RN      ErrorCategory.ts:10        12 cases.
-///   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
-///
-/// The drift here is severe — every SDK uses a different category vocabulary.
-/// Codegen MUST collapse to the 9 canonical buckets below.
-/// ---------------------------------------------------------------------------
+/// The rac_wire_string values are the one form every SDK prints, so a crash
+/// report written by Swift and one written by Web say the same word.
 public nonisolated enum RAErrorCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -337,35 +159,13 @@ public nonisolated enum RAErrorSeverity: SwiftProtobuf.Enum, Swift.CaseIterable 
 
 }
 
-/// ---------------------------------------------------------------------------
-/// ErrorCode — exhaustive enumeration of every distinct numeric error code in
-/// the C ABI (`rac_result_t`).
+/// proto3 forbids negative enum values, so each constant is the absolute
+/// magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+/// SDKError.c_abi_code carries the signed original.
 ///
-/// proto3 forbids negative enum values, so the proto enum holds POSITIVE
-/// values that mirror the *absolute* magnitude of each C ABI code. The signed
-/// `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
-/// platforms can round-trip the original C ABI integer. The naming scheme is:
-///
-///     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
-///
-/// (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
-///
-/// `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
-/// C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
-/// SDKError.code (an SDKError implies a failure; success is signalled by the
-/// absence of an SDKError). The zero-value enum entry exists only because
-/// proto3 mandates it.
-///
-/// CRITICAL: Do not change the numeric values without coordinated
-/// migrations across every SDK *and* the C ABI. Adding new values is safe;
-/// removing or renumbering is a wire-format break.
-///
-/// All values below are sourced from
-/// `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
-/// where the C ABI defines two distinct macro names for the same numeric
-/// value) are documented inline; we pick one canonical name per numeric value
-/// to keep proto enum values unique.
-/// ---------------------------------------------------------------------------
+/// The trailing macro names below are kept because they are the cross-reference
+/// into rac_error.h; where the C ABI defines two names for one value, the alias
+/// is noted.
 public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -1169,149 +969,12 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// ---------------------------------------------------------------------------
-/// ErrorContext — debugging metadata captured at the throw site.
+/// The unified error payload every SDK throws or returns.
 ///
-/// Sources pre-IDL:
-///   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
-///                                       source_line, source_function plus a
-///                                       rac_stack_frame_t[32] fixed-size
-///                                       stack capture and 3 custom k/v slots
-///                                       (custom_key1..3 / custom_value1..3).
-///                                       The fixed-shape custom slots flatten
-///                                       to a `metadata` map<string,string> in
-///                                       proto.
-///   Swift   ErrorContext.swift          (matches Dart equivalent).
-///   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
-///                                       only. Will pick up source location
-///                                       from this proto on regeneration.
-///   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
-///                                       int line, String function, DateTime
-///                                       timestamp, String threadInfo.
-///   RN      ErrorContext.ts:11          stackTrace[], file, line, function,
-///                                       timestamp, threadInfo.
-///   Web     ErrorTypes.ts               (no context type).
-///
-/// Stack traces are intentionally NOT modeled here — they are platform-shaped
-/// (string lines on RN/Dart, rac_stack_frame_t[] on C, StackTrace on Dart) and
-/// belong in a platform-local logging path, not in the wire IDL. If the C ABI
-/// ever ships symbolicated frames, add a `repeated StackFrame frames` field
-/// guarded by a feature flag.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAErrorContext: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
-  /// three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
-  /// (after string-coercion).
-  public var metadata: Dictionary<String,String> = [:]
-
-  /// __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256).
-  public var sourceFile: String {
-    get {_sourceFile ?? String()}
-    set {_sourceFile = newValue}
-  }
-  /// Returns true if `sourceFile` has been explicitly set.
-  public var hasSourceFile: Bool {self._sourceFile != nil}
-  /// Clears the value of `sourceFile`. Subsequent reads from it will return its default value.
-  public mutating func clearSourceFile() {self._sourceFile = nil}
-
-  /// __LINE__ at the throw site.
-  public var sourceLine: Int32 {
-    get {_sourceLine ?? 0}
-    set {_sourceLine = newValue}
-  }
-  /// Returns true if `sourceLine` has been explicitly set.
-  public var hasSourceLine: Bool {self._sourceLine != nil}
-  /// Clears the value of `sourceLine`. Subsequent reads from it will return its default value.
-  public mutating func clearSourceLine() {self._sourceLine = nil}
-
-  /// Logical operation name ("loadModel", "generate", "transcribeStream",
-  /// ...). Lets clients route on operation without parsing free-text.
-  /// Maps roughly onto Dart's `function` field and C ABI's source_function;
-  /// we use the more generic "operation" name because some platforms (C++,
-  /// Swift) symbolicate the function name from the stack frame instead.
-  public var operation: String {
-    get {_operation ?? String()}
-    set {_operation = newValue}
-  }
-  /// Returns true if `operation` has been explicitly set.
-  public var hasOperation: Bool {self._operation != nil}
-  /// Clears the value of `operation`. Subsequent reads from it will return its default value.
-  public mutating func clearOperation() {self._operation = nil}
-
-  /// The structured field path a validation error refers to
-  /// ("<Message>.<field>"). First-class replacement for the
-  /// metadata["field_path"] magic key all five SDKs read/write today; the
-  /// generated convenience validate() already emits this path.
-  public var fieldPath: String {
-    get {_fieldPath ?? String()}
-    set {_fieldPath = newValue}
-  }
-  /// Returns true if `fieldPath` has been explicitly set.
-  public var hasFieldPath: Bool {self._fieldPath != nil}
-  /// Clears the value of `fieldPath`. Subsequent reads from it will return its default value.
-  public mutating func clearFieldPath() {self._fieldPath = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _sourceFile: String? = nil
-  fileprivate var _sourceLine: Int32? = nil
-  fileprivate var _operation: String? = nil
-  fileprivate var _fieldPath: String? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// SDKError — the unified error payload every SDK throws / returns.
-///
-/// Sources pre-IDL:
-///   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
-///                                       source location, stack trace,
-///                                       underlying_code, underlying_message,
-///                                       model_id, framework, session_id,
-///                                       timestamp_ms, 3 custom k/v slots).
-///   Swift   (no concrete SDKError type was located; Swift code uses
-///           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
-///           matches this message; the migrated Swift SDK in sdk/swift/ will
-///           be regenerated from this proto).
-///   Kotlin  SDKError.kt:27              data class (code, category, message,
-///                                       cause).
-///   Dart    sdk_error.dart:13           class SDKError (message, type,
-///                                       underlyingError, context).
-///   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
-///                                       category, underlyingError, context,
-///                                       details?).
-///   Web     ErrorTypes.ts:68            class SDKError (code, details?).
-///
-/// Wire contract:
-///   * `code` — required. Always non-zero (zero indicates success and there
-///     should be no SDKError to begin with). Codegen MUST refuse to emit
-///     ERROR_CODE_UNSPECIFIED at runtime.
-///   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
-///     when `code` itself doesn't fit any bucket cleanly (rare).
-///   * `message` — required, human-readable, non-localized. Localization is a
-///     consumer concern.
-///   * `context` — optional. Source location + telemetry metadata.
-///   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
-///     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
-///     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
-///     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
-///     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
-///     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
-///   * `nested_message` — optional. Underlying-error message as captured at
-///     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
-///     and Kotlin's Throwable.cause.message.
-///   * `retryable` — canonical retry hint. This is business-policy metadata
-///     owned by the portable layer; the platform adapter still decides how to
-///     schedule the retry through native/background APIs when appropriate.
-///   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
-///     also carries this field so callers can join success/progress/failure
-///     events without parsing free-form properties.
-/// ---------------------------------------------------------------------------
+/// `code` is always non-zero: an SDKError implies failure, and success is
+/// signalled by its absence. `message` is non-localized; localization is a
+/// consumer concern. Stack traces are deliberately absent: they are
+/// platform-shaped and belong in platform-local logging.
 public nonisolated struct RASDKError: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1323,18 +986,9 @@ public nonisolated struct RASDKError: Sendable {
 
   public var message: String = String()
 
-  public var context: RAErrorContext {
-    get {_context ?? RAErrorContext()}
-    set {_context = newValue}
-  }
-  /// Returns true if `context` has been explicitly set.
-  public var hasContext: Bool {self._context != nil}
-  /// Clears the value of `context`. Subsequent reads from it will return its default value.
-  public mutating func clearContext() {self._context = nil}
-
-  /// Negative rac_result_t value from the C ABI. May be negative; preserved
-  /// via int32 (proto3 int32 is signed). Unset when the failure originated
-  /// outside the C ABI (e.g. a pure-Web WASM failure).
+  /// Signed rac_result_t. Equals -code for codes <= 899. Unset for the
+  /// Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
+  /// failures originating outside the C ABI.
   public var cAbiCode: Int32 {
     get {_cAbiCode ?? 0}
     set {_cAbiCode = newValue}
@@ -1344,7 +998,7 @@ public nonisolated struct RASDKError: Sendable {
   /// Clears the value of `cAbiCode`. Subsequent reads from it will return its default value.
   public mutating func clearCAbiCode() {self._cAbiCode = nil}
 
-  /// Underlying error's message (the "caused by" chain), if any.
+  /// The "caused by" chain.
   public var nestedMessage: String {
     get {_nestedMessage ?? String()}
     set {_nestedMessage = newValue}
@@ -1354,28 +1008,40 @@ public nonisolated struct RASDKError: Sendable {
   /// Clears the value of `nestedMessage`. Subsequent reads from it will return its default value.
   public mutating func clearNestedMessage() {self._nestedMessage = nil}
 
-  /// Envelope metadata for canonical error emission. `component` is a stable
-  /// lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
-  /// "download", "storage", ...); SDKEvent carries the enum-typed component.
   public var timestampMs: Int64 = 0
 
   public var severity: RAErrorSeverity = .unspecified
 
+  /// Which subsystem raised the error, written as SDKComponent's
+  /// rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+  /// the wire string, never the proto constant name. Errors raised outside
+  /// any SDKComponent may carry their own lowercase key.
   public var component: String = String()
 
   public var retryable: Bool = false
 
-  public var remediationHint: String = String()
+  /// Ties this failure to the operation that produced it. Named for
+  /// Anthropic's body-level `request_id`. Producers MUST set it.
+  public var requestID: String = String()
 
-  public var correlationID: String = String()
+  /// "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+  /// OpenAI's `param`. The generated validate() emits this.
+  public var param: String {
+    get {_param ?? String()}
+    set {_param = newValue}
+  }
+  /// Returns true if `param` has been explicitly set.
+  public var hasParam: Bool {self._param != nil}
+  /// Clears the value of `param`. Subsequent reads from it will return its default value.
+  public mutating func clearParam() {self._param = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _context: RAErrorContext? = nil
   fileprivate var _cAbiCode: Int32? = nil
   fileprivate var _nestedMessage: String? = nil
+  fileprivate var _param: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -1394,63 +1060,9 @@ nonisolated extension RAErrorCode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{2}d\u{1}ERROR_CODE_NOT_INITIALIZED\0\u{1}ERROR_CODE_ALREADY_INITIALIZED\0\u{1}ERROR_CODE_INITIALIZATION_FAILED\0\u{1}ERROR_CODE_INVALID_CONFIGURATION\0\u{1}ERROR_CODE_INVALID_API_KEY\0\u{1}ERROR_CODE_ENVIRONMENT_MISMATCH\0\u{1}ERROR_CODE_INVALID_PARAMETER\0\u{2}\u{4}ERROR_CODE_MODEL_NOT_FOUND\0\u{1}ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}ERROR_CODE_MODEL_VALIDATION_FAILED\0\u{1}ERROR_CODE_MODEL_INCOMPATIBLE\0\u{1}ERROR_CODE_INVALID_MODEL_FORMAT\0\u{1}ERROR_CODE_MODEL_STORAGE_CORRUPTED\0\u{1}ERROR_CODE_MODEL_NOT_LOADED\0\u{2}\u{e}ERROR_CODE_GENERATION_FAILED\0\u{1}ERROR_CODE_GENERATION_TIMEOUT\0\u{1}ERROR_CODE_CONTEXT_TOO_LONG\0\u{1}ERROR_CODE_TOKEN_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_COST_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_INFERENCE_FAILED\0\u{1}ERROR_CODE_GENERATION_CANCELLED\0\u{2}\u{e}ERROR_CODE_NETWORK_UNAVAILABLE\0\u{1}ERROR_CODE_NETWORK_ERROR\0\u{1}ERROR_CODE_REQUEST_FAILED\0\u{1}ERROR_CODE_DOWNLOAD_FAILED\0\u{1}ERROR_CODE_SERVER_ERROR\0\u{1}ERROR_CODE_TIMEOUT\0\u{1}ERROR_CODE_INVALID_RESPONSE\0\u{1}ERROR_CODE_HTTP_ERROR\0\u{1}ERROR_CODE_CONNECTION_LOST\0\u{1}ERROR_CODE_PARTIAL_DOWNLOAD\0\u{1}ERROR_CODE_HTTP_REQUEST_FAILED\0\u{1}ERROR_CODE_HTTP_NOT_SUPPORTED\0\u{2}\u{13}ERROR_CODE_INSUFFICIENT_STORAGE\0\u{1}ERROR_CODE_STORAGE_FULL\0\u{1}ERROR_CODE_STORAGE_ERROR\0\u{1}ERROR_CODE_FILE_NOT_FOUND\0\u{1}ERROR_CODE_FILE_READ_FAILED\0\u{1}ERROR_CODE_FILE_WRITE_FAILED\0\u{1}ERROR_CODE_PERMISSION_DENIED\0\u{1}ERROR_CODE_DELETE_FAILED\0\u{1}ERROR_CODE_MOVE_FAILED\0\u{1}ERROR_CODE_DIRECTORY_CREATION_FAILED\0\u{1}ERROR_CODE_DIRECTORY_NOT_FOUND\0\u{1}ERROR_CODE_INVALID_PATH\0\u{1}ERROR_CODE_INVALID_FILE_NAME\0\u{1}ERROR_CODE_TEMP_FILE_CREATION_FAILED\0\u{2}\u{1b}ERROR_CODE_HARDWARE_UNSUPPORTED\0\u{1}ERROR_CODE_INSUFFICIENT_MEMORY\0\u{2}\u{9}ERROR_CODE_COMPONENT_NOT_READY\0\u{1}ERROR_CODE_INVALID_STATE\0\u{1}ERROR_CODE_SERVICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_SERVICE_BUSY\0\u{1}ERROR_CODE_PROCESSING_FAILED\0\u{1}ERROR_CODE_START_FAILED\0\u{1}ERROR_CODE_NOT_SUPPORTED\0\u{2}\u{e}ERROR_CODE_VALIDATION_FAILED\0\u{1}ERROR_CODE_INVALID_INPUT\0\u{1}ERROR_CODE_INVALID_FORMAT\0\u{1}ERROR_CODE_EMPTY_INPUT\0\u{1}ERROR_CODE_TEXT_TOO_LONG\0\u{1}ERROR_CODE_INVALID_SSML\0\u{1}ERROR_CODE_INVALID_SPEAKING_RATE\0\u{1}ERROR_CODE_INVALID_PITCH\0\u{1}ERROR_CODE_INVALID_VOLUME\0\u{1}ERROR_CODE_INVALID_ARGUMENT\0\u{1}ERROR_CODE_NULL_POINTER\0\u{1}ERROR_CODE_BUFFER_TOO_SMALL\0\u{1}ERROR_CODE_OUTPUT_TRUNCATED\0\u{2}\u{12}ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED\0\u{1}ERROR_CODE_AUDIO_SESSION_FAILED\0\u{1}ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}ERROR_CODE_INSUFFICIENT_AUDIO_DATA\0\u{1}ERROR_CODE_EMPTY_AUDIO_BUFFER\0\u{1}ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED\0\u{2}\u{f}ERROR_CODE_LANGUAGE_NOT_SUPPORTED\0\u{1}ERROR_CODE_VOICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_STREAMING_NOT_SUPPORTED\0\u{1}ERROR_CODE_STREAM_CANCELLED\0\u{2}\u{11}ERROR_CODE_AUTHENTICATION_FAILED\0\u{1}ERROR_CODE_UNAUTHORIZED\0\u{1}ERROR_CODE_FORBIDDEN\0\u{2}\u{8}ERROR_CODE_KEYCHAIN_ERROR\0\u{1}ERROR_CODE_ENCODING_ERROR\0\u{1}ERROR_CODE_DECODING_ERROR\0\u{1}ERROR_CODE_SECURE_STORAGE_FAILED\0\u{2}\u{11}ERROR_CODE_EXTRACTION_FAILED\0\u{1}ERROR_CODE_CHECKSUM_MISMATCH\0\u{1}ERROR_CODE_UNSUPPORTED_ARCHIVE\0\u{2}\u{12}ERROR_CODE_CALIBRATION_FAILED\0\u{1}ERROR_CODE_CALIBRATION_TIMEOUT\0\u{2}\u{9}ERROR_CODE_CANCELLED\0\u{2}\u{14}ERROR_CODE_MODULE_NOT_FOUND\0\u{1}ERROR_CODE_MODULE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_MODULE_LOAD_FAILED\0\u{2}\u{8}ERROR_CODE_SERVICE_NOT_FOUND\0\u{1}ERROR_CODE_SERVICE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_SERVICE_CREATE_FAILED\0\u{2}\u{8}ERROR_CODE_CAPABILITY_NOT_FOUND\0\u{1}ERROR_CODE_PROVIDER_NOT_FOUND\0\u{1}ERROR_CODE_NO_CAPABLE_PROVIDER\0\u{1}ERROR_CODE_NOT_FOUND\0\u{2}M\u{1}ERROR_CODE_ADAPTER_NOT_SET\0\u{2}d\u{1}ERROR_CODE_BACKEND_NOT_FOUND\0\u{1}ERROR_CODE_BACKEND_NOT_READY\0\u{1}ERROR_CODE_BACKEND_INIT_FAILED\0\u{1}ERROR_CODE_BACKEND_BUSY\0\u{1}ERROR_CODE_BACKEND_UNAVAILABLE\0\u{1}ERROR_CODE_RUNTIME_UNAVAILABLE\0\u{1}ERROR_CODE_BACKEND_ERROR\0\u{2}\u{4}ERROR_CODE_INVALID_HANDLE\0\u{2}Z\u{1}ERROR_CODE_EVENT_INVALID_CATEGORY\0\u{1}ERROR_CODE_EVENT_SUBSCRIPTION_FAILED\0\u{1}ERROR_CODE_EVENT_PUBLISH_FAILED\0\u{2}b\u{1}ERROR_CODE_NOT_IMPLEMENTED\0\u{1}ERROR_CODE_FEATURE_NOT_AVAILABLE\0\u{1}ERROR_CODE_FRAMEWORK_NOT_AVAILABLE\0\u{1}ERROR_CODE_UNSUPPORTED_MODALITY\0\u{1}ERROR_CODE_UNKNOWN\0\u{1}ERROR_CODE_INTERNAL\0\u{2}\u{5}ERROR_CODE_ABI_VERSION_MISMATCH\0\u{1}ERROR_CODE_CAPABILITY_UNSUPPORTED\0\u{1}ERROR_CODE_PLUGIN_DUPLICATE\0\u{2}\u{8}ERROR_CODE_PLUGIN_LOAD_FAILED\0\u{1}ERROR_CODE_PLUGIN_BUSY\0\u{2}O\u{1}ERROR_CODE_WASM_LOAD_FAILED\0\u{1}ERROR_CODE_WASM_NOT_LOADED\0\u{1}ERROR_CODE_WASM_CALLBACK_ERROR\0\u{1}ERROR_CODE_WASM_MEMORY_ERROR\0")
 }
 
-nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ErrorContext"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}metadata\0\u{3}source_file\0\u{3}source_line\0\u{1}operation\0\u{3}field_path\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._sourceFile) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self._sourceLine) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._operation) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._fieldPath) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 1)
-    }
-    try { if let v = self._sourceFile {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._sourceLine {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._operation {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._fieldPath {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAErrorContext, rhs: RAErrorContext) -> Bool {
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs._sourceFile != rhs._sourceFile {return false}
-    if lhs._sourceLine != rhs._sourceLine {return false}
-    if lhs._operation != rhs._operation {return false}
-    if lhs._fieldPath != rhs._fieldPath {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKError"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0\u{1}retryable\0\u{3}remediation_hint\0\u{3}correlation_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0\u{1}retryable\0\u{3}request_id\0\u{1}param\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1461,15 +1073,14 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 1: try { try decoder.decodeSingularEnumField(value: &self.code) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.category) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.message) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._context) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self._cAbiCode) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._nestedMessage) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.component) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.retryable) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.remediationHint) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.correlationID) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self._cAbiCode) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._nestedMessage) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.component) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.retryable) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._param) }()
       default: break
       }
     }
@@ -1489,33 +1100,30 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.message.isEmpty {
       try visitor.visitSingularStringField(value: self.message, fieldNumber: 3)
     }
-    try { if let v = self._context {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
     try { if let v = self._cAbiCode {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 5)
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 4)
     } }()
     try { if let v = self._nestedMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
     if self.timestampMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 7)
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 6)
     }
     if self.severity != .unspecified {
-      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 8)
+      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 7)
     }
     if !self.component.isEmpty {
-      try visitor.visitSingularStringField(value: self.component, fieldNumber: 9)
+      try visitor.visitSingularStringField(value: self.component, fieldNumber: 8)
     }
     if self.retryable != false {
-      try visitor.visitSingularBoolField(value: self.retryable, fieldNumber: 10)
+      try visitor.visitSingularBoolField(value: self.retryable, fieldNumber: 9)
     }
-    if !self.remediationHint.isEmpty {
-      try visitor.visitSingularStringField(value: self.remediationHint, fieldNumber: 11)
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 10)
     }
-    if !self.correlationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.correlationID, fieldNumber: 12)
-    }
+    try { if let v = self._param {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1523,15 +1131,14 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.code != rhs.code {return false}
     if lhs.category != rhs.category {return false}
     if lhs.message != rhs.message {return false}
-    if lhs._context != rhs._context {return false}
     if lhs._cAbiCode != rhs._cAbiCode {return false}
     if lhs._nestedMessage != rhs._nestedMessage {return false}
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.severity != rhs.severity {return false}
     if lhs.component != rhs.component {return false}
     if lhs.retryable != rhs.retryable {return false}
-    if lhs.remediationHint != rhs.remediationHint {return false}
-    if lhs.correlationID != rhs.correlationID {return false}
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs._param != rhs._param {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

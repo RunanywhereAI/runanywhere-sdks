@@ -13,14 +13,14 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ToolDefinition
-import ai.runanywhere.proto.v1.ToolParameter
-import ai.runanywhere.proto.v1.ToolParameterType
 import ai.runanywhere.proto.v1.ToolValue
 import ai.runanywhere.proto.v1.ToolValueArray
 import ai.runanywhere.proto.v1.ToolValueObject
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameter
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameterType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -94,7 +94,7 @@ private object WebSearchTool {
                 listOf(
                     ToolParameter(
                         name = Parameter.QUERY,
-                        type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+                        type = ToolParameterType.STRING,
                         description = Parameter.QUERY_DESCRIPTION,
                     ),
                 ),

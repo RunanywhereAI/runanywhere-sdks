@@ -32,9 +32,7 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
- * per-voice callback pattern used by the legacy handle-based ABI so the
- * lifecycle-driven listing call returns a single serialized message.
+ * enum TTSVoiceGender deleted -- its only field is gone.
  */
 public class TTSVoiceList(
   voices: List<TTSVoiceInfo> = emptyList(),

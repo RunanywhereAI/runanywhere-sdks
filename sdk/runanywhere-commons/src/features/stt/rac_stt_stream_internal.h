@@ -16,6 +16,24 @@ namespace rac::stt {
 void register_stream_component(rac_handle_t handle);
 void unregister_stream_component(rac_handle_t handle);
 
+// Sample rate the component was configured with (STTConfiguration.sample_rate),
+// or RAC_STT_DEFAULT_SAMPLE_RATE when the handle is unknown.
+//
+// A stream session needs this and cannot get it from its own options:
+// STTOptions carries no sample rate (audio properties moved to STTAudioSource,
+// which the streaming feed ABI has no envelope for), so the session assumed
+// 16 kHz. Every SDK resamples its capture to 16 kHz today, so that assumption
+// happens to hold — but a component configured for 48 kHz would make each
+// "100 ms" analysis frame 33 ms of real audio, running the fallback endpointing
+// 3x fast and handing the recognizer fragments too short to be words. The
+// configured rate is the one number the frame clock and the backend options
+// both have to agree on.
+//
+// MUST be called without the stream registry mutex held: it takes the component
+// lease and then the component mutex, and a backend feed running under that
+// same component mutex dispatches events that take the stream registry mutex.
+int32_t configured_stream_sample_rate(rac_handle_t handle);
+
 // Close the component's start gate, cancel every existing session, and wait
 // until its provider calls and callbacks have drained. The caller must not
 // hold the component mutex: persistent stream destruction re-enters the

@@ -11,6 +11,7 @@ import {
   type CurrentModelRequest as ProtoCurrentModelRequest,
   type ModelUnloadRequest as ProtoModelUnloadRequest,
 } from '@runanywhere/proto-ts/model_types';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { Embeddings } from '../../../../src/Public/Extensions/RunAnywhere+Embeddings';
@@ -89,7 +90,7 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       modelId: 'llama-chat',
       unloadAll: false,
     })).resolves.toMatchObject({
-      success: true,
+      error: undefined,
       unloadedModelIds: ['llama-chat'],
     });
 
@@ -102,7 +103,7 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       modelId: 'sherpa-stt',
       unloadAll: false,
     })).resolves.toMatchObject({
-      success: true,
+      error: undefined,
       unloadedModelIds: ['sherpa-stt'],
     });
     expect(onnx.unloadRequests).toHaveLength(1);
@@ -128,9 +129,8 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     });
 
     expect(result).toEqual({
-      success: true,
       unloadedModelIds: ['a-stt', 'm-tts', 'z-llama'],
-      errorMessage: '',
+      error: undefined,
       unloadedAtUnixMs: 1,
       warnings: [],
     });
@@ -184,7 +184,8 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       modelId: 'not-registered',
       unloadAll: false,
     });
-    expect(missing).toMatchObject({ success: false, unloadedModelIds: [] });
+    expect(missing).toMatchObject({ unloadedModelIds: [] });
+    expect(missing?.error).toBeDefined();
     expect(llama.unloadRequests).toHaveLength(1);
     expect(onnx.unloadRequests).toHaveLength(1);
 
@@ -316,10 +317,10 @@ function fakeLifecycleRuntime(
       const match = Array.from(loaded).find(([, category]) => (
         request.category === undefined || request.category === category
       ));
+      // `CurrentModelResult.errorMessage` was deleted outright -- `error?: SDKError` replaced it.
       const resultBytes = CurrentModelResult.encode(CurrentModelResult.create({
         modelId: match?.[0] ?? '',
         found: Boolean(match),
-        errorMessage: '',
         category: match?.[1] ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
         framework: request.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
         resolvedPath: '',
@@ -352,11 +353,10 @@ function fakeLifecycleRuntime(
       }
       unloadedModelIds.sort((left, right) => left.localeCompare(right));
       const resultBytes = ModelUnloadResult.encode(ModelUnloadResult.create({
-        success: unloadedModelIds.length > 0,
         unloadedModelIds,
-        errorMessage: unloadedModelIds.length > 0
-          ? ''
-          : 'no loaded model matched unload request',
+        error: unloadedModelIds.length > 0
+          ? undefined
+          : SDKError.create({ message: 'no loaded model matched unload request' }),
         unloadedAtUnixMs: 1,
         warnings: [],
       })).finish();

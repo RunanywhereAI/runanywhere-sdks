@@ -56,14 +56,16 @@ void print_json_result(const std::string& model_id, const std::vector<std::strin
         .field("tokens_used", static_cast<int64_t>(result.tokens_used()))
         .field("total_ms", static_cast<int64_t>(result.processing_time_ms()));
     json.begin_array("vectors");
+    // EmbeddingVector.text/dimension are gone: text is looked up by
+    // input_index (the batch position this vector answers, always set) and
+    // dimension is the one shared EmbeddingsResult.dimension above.
     for (int i = 0; i < result.vectors_size(); ++i) {
         const auto& vector = result.vectors(i);
-        const std::string text = vector.has_text() ? vector.text()
-                                 : (static_cast<size_t>(i) < texts.size() ? texts[static_cast<size_t>(i)]
-                                                                          : std::string());
+        const size_t index = static_cast<size_t>(vector.input_index());
+        const std::string text = index < texts.size() ? texts[index] : std::string();
         json.begin_array_object()
             .field("text", text)
-            .field("dimension", static_cast<int64_t>(vector.dimension()));
+            .field("dimension", static_cast<int64_t>(result.dimension()));
         json.begin_array("values");
         for (const float value : vector.values()) {
             json.value(static_cast<double>(value));
@@ -110,10 +112,10 @@ bool load_embeddings_model(const GlobalOptions& options, const std::string& mode
         out::error_line("embedding model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
+    if (!result.has_error() == false) {
         out::error_line("embedding model load failed: " +
-                        (result.error_message().empty() ? "unknown error"
-                                                        : result.error_message()));
+                        (result.error().message().empty() ? "unknown error"
+                                                        : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -122,8 +124,38 @@ bool load_embeddings_model(const GlobalOptions& options, const std::string& mode
     return true;
 }
 
+bool parse_normalize(const std::string& mode, bool* out, bool* has_value) {
+    *has_value = !mode.empty();
+    if (mode.empty()) {
+        *out = false;
+    } else if (mode == "l2") {
+        *out = true;
+    } else if (mode == "none") {
+        *out = false;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+bool parse_pooling(const std::string& mode, v1::EmbeddingsPoolingStrategy* out) {
+    if (mode.empty()) {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED;
+    } else if (mode == "mean") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_MEAN;
+    } else if (mode == "cls") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_CLS;
+    } else if (mode == "last") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_LAST;
+    } else {
+        return false;
+    }
+    return true;
+}
+
 int run_embed(const GlobalOptions& options, const std::string& ref, const std::string& engine,
-              const std::vector<std::string>& texts) {
+              const std::vector<std::string>& texts, const std::string& normalize,
+              const std::string& pooling) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
@@ -152,9 +184,13 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
         return 1;
     }
 
-    const v1::InferenceFramework load_framework =
-        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
-    if (!load_embeddings_model(options, resolved.model_id, load_framework)) {
+    // An explicit --engine is honoured whatever the ref resolved to. This used to
+    // read `resolved.from_catalog ? UNSPECIFIED : engine_hint.framework`, which
+    // silently DISCARDED the flag for built-in catalog entries — contradicting the
+    // `--engine` help text. When the flag is absent engine_hint.framework is
+    // UNSPECIFIED, so catalog entries still fall back to their own declared
+    // framework exactly as before. Mirrors cmd_run.cpp.
+    if (!load_embeddings_model(options, resolved.model_id, engine_hint.framework)) {
         return 1;
     }
 
@@ -163,22 +199,31 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
     for (const auto& text : texts) {
         request.add_texts(text);
     }
+    bool normalize_value = false;
+    bool normalize_set = false;
+    v1::EmbeddingsPoolingStrategy pooling_strategy;
+    if (!parse_normalize(normalize, &normalize_value, &normalize_set) ||
+        !parse_pooling(pooling, &pooling_strategy)) {
+        out::error_line("--normalize expects l2|none and --pooling expects mean|cls|last");
+        return 2;
+    }
+    if (normalize_set) {
+        request.mutable_options()->set_normalize(normalize_value);
+    }
+    if (pooling_strategy != v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
+        request.mutable_options()->set_pooling(pooling_strategy);
+    }
 
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t out_buffer;
     rac_proto_buffer_init(&out_buffer);
     v1::EmbeddingsResult result;
+    // EmbeddingsResult carries no error field: failures travel out-of-band on
+    // the rac_proto_buffer_t status envelope, already checked here.
     if (rac_embeddings_embed_batch_lifecycle_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
                                                    bytes.size(), &out_buffer) != RAC_SUCCESS ||
         !proto::parse_proto_buffer(&out_buffer, &result, &error)) {
         out::error_line("embedding failed: " + error);
-        return 1;
-    }
-
-    if (result.error_code() != 0 || !result.error_message().empty()) {
-        out::error_line("embedding failed: " +
-                        (result.error_message().empty() ? std::to_string(result.error_code())
-                                                        : result.error_message()));
         return 1;
     }
     if (options.json) {
@@ -192,26 +237,34 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
 }  // namespace
 
 void register_embed(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("embed", "Generate text embeddings");
+    CLI::App* cmd = app.add_subcommand("embed", "Turn text into embedding vectors");
     auto model = std::make_shared<std::string>(kDefaultEmbeddingModel);
     auto engine = std::make_shared<std::string>();
     auto positional_text = std::make_shared<std::string>();
     auto option_texts = std::make_shared<std::vector<std::string>>();
+    auto normalize = std::make_shared<std::string>();
+    auto pooling = std::make_shared<std::string>();
     cmd->add_option("input", *positional_text, "Text to embed");
     cmd->add_option("--model,-m", *model,
-                    "Embedding model (default: " + std::string(kDefaultEmbeddingModel) + ")")
+                    "Embedding model to use (default: " + std::string(kDefaultEmbeddingModel) + ")")
         ->default_val(kDefaultEmbeddingModel);
     cmd->add_option("--engine", *engine,
-                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
     cmd->add_option("--text,-t", *option_texts,
-                    "Additional text to embed; repeat for batch embeddings");
-    cmd->callback([&options, model, engine, positional_text, option_texts]() {
+                    "Embed this text too; repeat to batch several");
+    cmd->add_option("--normalize", *normalize, "Scale vectors to unit length or leave them raw")
+        ->check(CLI::IsMember({"l2", "none"}));
+    cmd->add_option("--pooling", *pooling, "Collapse token vectors with this strategy")
+        ->check(CLI::IsMember({"mean", "cls", "last"}));
+    cmd->callback([&options, model, engine, positional_text, option_texts, normalize, pooling]() {
         std::vector<std::string> texts;
         if (!positional_text->empty()) {
             texts.push_back(*positional_text);
         }
         texts.insert(texts.end(), option_texts->begin(), option_texts->end());
-        const int exit_code = run_embed(options, *model, *engine, texts);
+        const int exit_code =
+            run_embed(options, *model, *engine, texts, *normalize, *pooling);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

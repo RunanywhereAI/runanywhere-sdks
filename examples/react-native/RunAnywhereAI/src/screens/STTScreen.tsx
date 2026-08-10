@@ -26,22 +26,20 @@ import { STTMode } from '../types/voice';
 import {
   RunAnywhere,
   AudioCaptureManager,
+  AudioInputs,
   createPushableAudioStream,
+  type AudioInput,
   type PushableAudioStream,
+  type TranscriptionEvent,
 } from '@runanywhere/core';
 import {
-  AudioFormat,
   ModelCategory,
-  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import {
-  STTLanguage,
-  type STTPartialResult,
-} from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 const CAPTURE_SAMPLE_RATE = 16000;
 const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
@@ -80,15 +78,38 @@ function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
   return wav;
 }
 
-async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
-  return RunAnywhere.transcribe(wrapPcm16InWav(pcmChunks), {
-    language: STTLanguage.STT_LANGUAGE_EN,
-    audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
-    sampleRate: CAPTURE_SAMPLE_RATE,
-  });
+function pcmAudioInputs(
+  chunks: AsyncIterable<Uint8Array>
+): AsyncIterable<AudioInput> {
+  return {
+    [Symbol.asyncIterator]() {
+      const iterator = chunks[Symbol.asyncIterator]();
+      return {
+        async next() {
+          const step = await iterator.next();
+          if (step.done) {
+            return { value: undefined as unknown as AudioInput, done: true };
+          }
+          return {
+            value: AudioInputs.pcm16(step.value, CAPTURE_SAMPLE_RATE),
+            done: false,
+          };
+        },
+        async return() {
+          await iterator.return?.();
+          return { value: undefined as unknown as AudioInput, done: true };
+        },
+      };
+    },
+  };
 }
 
-const loadModelWithRequest = RunAnywhere.loadModel;
+async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
+  return RunAnywhere.stt.transcribe(
+    AudioInputs.wav(wrapPcm16InWav(pcmChunks), CAPTURE_SAMPLE_RATE),
+    { language: 'en' }
+  );
+}
 
 export const STTScreen: React.FC = () => {
   const { colors, typography, dimens } = useTheme();
@@ -157,7 +178,7 @@ export const STTScreen: React.FC = () => {
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
-      const loaded = await RunAnywhere.modelInfoForCategory(
+      const loaded = await RunAnywhere.models.loaded(
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
@@ -180,29 +201,15 @@ export const STTScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
-      const result = await loadModelWithRequest(
-        ModelLoadRequest.fromPartial({
-          modelId: model.id,
-          category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-          forceReload: false,
-          validateAvailability: true,
-        })
-      );
-      if (result.success) {
-        const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
-        if (isLoaded) {
-          const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
-          setCurrentModel(
-            visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-          );
-        }
-      } else {
-        const error = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';
-        Alert.alert('Error', `Failed to load model: ${error || 'Unknown error'}`);
+      await RunAnywhere.models.load(model.id);
+      const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+      if (isLoaded) {
+        const loaded = await RunAnywhere.models.loaded(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+        setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded) ?? model);
       }
     } catch (error) {
       Alert.alert('Error', `Failed to load model: ${error}`);
@@ -334,12 +341,11 @@ export const STTScreen: React.FC = () => {
 
       const audioStream = createPushableAudioStream();
       liveAudioStreamRef.current = audioStream;
-      const partials = RunAnywhere.transcribeStream(audioStream.iterable, {
-        language: STTLanguage.STT_LANGUAGE_EN,
-        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-        sampleRate: CAPTURE_SAMPLE_RATE,
-      });
-      liveTranscriptionTaskRef.current = consumeLiveTranscription(partials);
+      const events = RunAnywhere.stt.transcribeStream(
+        pcmAudioInputs(audioStream.iterable),
+        { language: 'en' }
+      );
+      liveTranscriptionTaskRef.current = consumeLiveTranscription(events);
       await beginCapture((chunk) => audioStream.push(chunk));
       setIsRecording(true);
     } catch (error) {
@@ -349,23 +355,25 @@ export const STTScreen: React.FC = () => {
     }
   };
 
-  const consumeLiveTranscription = async (partials: AsyncIterable<STTPartialResult>) => {
-    const iterator = partials[Symbol.asyncIterator]();
+  const consumeLiveTranscription = async (
+    events: AsyncIterable<TranscriptionEvent>
+  ) => {
+    const iterator = events[Symbol.asyncIterator]();
     try {
       let step = await iterator.next();
       while (!step.done) {
-        const partial = step.value;
-        const finalText = partial.finalOutput?.text?.trim();
-        const text = (finalText || partial.text || '').trim();
-        if (text) {
-          if (partial.isFinal || finalText) {
+        const event = step.value;
+        if (event.type === 'transcriptFinal') {
+          const text = event.segment.text.trim();
+          if (text) {
             accumulatedTranscriptRef.current = text;
             setTranscript(text);
             setPartialTranscript('');
-            setConfidence(partial.finalOutput?.confidence ?? null);
-          } else {
-            setPartialTranscript(text);
+            setConfidence(event.segment.confidence);
           }
+        } else if (event.type === 'partial') {
+          const text = (event.alternatives[0]?.text ?? '').trim();
+          if (text) setPartialTranscript(text);
         }
         step = await iterator.next();
       }

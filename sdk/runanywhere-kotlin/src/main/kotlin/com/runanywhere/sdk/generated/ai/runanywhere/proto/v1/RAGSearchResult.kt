@@ -33,15 +33,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGSearchResult — a single retrieved document chunk with similarity score.
- * ---------------------------------------------------------------------------
- */
 public class RAGSearchResult(
-  /**
-   * Unique identifier of the chunk (assigned at ingestion time).
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -50,9 +42,6 @@ public class RAGSearchResult(
     schemaIndex = 0,
   )
   public val chunk_id: String = "",
-  /**
-   * Text content of the chunk (the actual snippet shown to the LLM).
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -61,20 +50,16 @@ public class RAGSearchResult(
   )
   public val text: String = "",
   /**
-   * Cosine similarity score (0.0–1.0). Higher = more relevant.
+   * Relevance, higher-is-better, normalised to 0..1. Fused dense + BM25 (RRF),
+   * not a raw cosine similarity.
    */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "similarityScore",
     schemaIndex = 2,
   )
-  public val similarity_score: Float = 0f,
-  /**
-   * Optional source document identifier (filename, URL, or document ID).
-   * Set when the chunk's origin is tracked at ingestion time.
-   */
+  public val score: Float = 0f,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -83,43 +68,35 @@ public class RAGSearchResult(
   )
   public val source_document: String? = null,
   metadata: Map<String, String> = emptyMap(),
+  /**
+   * Character offsets into the source document.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startOffset",
+    schemaIndex = 5,
+  )
+  public val start_offset: Int = 0,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    jsonName = "endOffset",
+    schemaIndex = 6,
   )
-  public val rank: Int = 0,
+  public val end_offset: Int = 0,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "startOffset",
-    schemaIndex = 6,
-  )
-  public val start_offset: Int = 0,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "endOffset",
-    schemaIndex = 7,
-  )
-  public val end_offset: Int = 0,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokenCount",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val token_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGSearchResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Free-form metadata associated with the chunk (e.g. page number, section,
-   * ingestion timestamp).
-   */
   @field:WireField(
     tag = 5,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -140,10 +117,9 @@ public class RAGSearchResult(
     if (unknownFields != other.unknownFields) return false
     if (chunk_id != other.chunk_id) return false
     if (text != other.text) return false
-    if (similarity_score != other.similarity_score) return false
+    if (score != other.score) return false
     if (source_document != other.source_document) return false
     if (metadata != other.metadata) return false
-    if (rank != other.rank) return false
     if (start_offset != other.start_offset) return false
     if (end_offset != other.end_offset) return false
     if (token_count != other.token_count) return false
@@ -156,10 +132,9 @@ public class RAGSearchResult(
       result = unknownFields.hashCode()
       result = result * 37 + chunk_id.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + similarity_score.hashCode()
+      result = result * 37 + score.hashCode()
       result = result * 37 + (source_document?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
-      result = result * 37 + rank.hashCode()
       result = result * 37 + start_offset.hashCode()
       result = result * 37 + end_offset.hashCode()
       result = result * 37 + token_count.hashCode()
@@ -172,10 +147,9 @@ public class RAGSearchResult(
     val result = mutableListOf<String>()
     result += """chunk_id=${sanitize(chunk_id)}"""
     result += """text=${sanitize(text)}"""
-    result += """similarity_score=$similarity_score"""
+    result += """score=$score"""
     if (source_document != null) result += """source_document=${sanitize(source_document)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
-    result += """rank=$rank"""
     result += """start_offset=$start_offset"""
     result += """end_offset=$end_offset"""
     result += """token_count=$token_count"""
@@ -185,15 +159,14 @@ public class RAGSearchResult(
   public fun copy(
     chunk_id: String = this.chunk_id,
     text: String = this.text,
-    similarity_score: Float = this.similarity_score,
+    score: Float = this.score,
     source_document: String? = this.source_document,
     metadata: Map<String, String> = this.metadata,
-    rank: Int = this.rank,
     start_offset: Int = this.start_offset,
     end_offset: Int = this.end_offset,
     token_count: Int = this.token_count,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGSearchResult = RAGSearchResult(chunk_id, text, similarity_score, source_document, metadata, rank, start_offset, end_offset, token_count, unknownFields)
+  ): RAGSearchResult = RAGSearchResult(chunk_id, text, score, source_document, metadata, start_offset, end_offset, token_count, unknownFields)
 
   public companion object {
     @JvmField
@@ -216,22 +189,19 @@ public class RAGSearchResult(
         if (value.text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.text)
         }
-        if (!value.similarity_score.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.similarity_score)
+        if (!value.score.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.score)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.source_document)
         size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
-        if (value.rank != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.rank)
-        }
         if (value.start_offset != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.start_offset)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.start_offset)
         }
         if (value.end_offset != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.end_offset)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.end_offset)
         }
         if (value.token_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.token_count)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.token_count)
         }
         return size
       }
@@ -243,22 +213,19 @@ public class RAGSearchResult(
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
         }
-        if (!value.similarity_score.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.similarity_score)
+        if (!value.score.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.score)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
-        if (value.rank != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.rank)
-        }
         if (value.start_offset != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.start_offset)
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.start_offset)
         }
         if (value.end_offset != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.end_offset)
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.end_offset)
         }
         if (value.token_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.token_count)
+          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.token_count)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -266,21 +233,18 @@ public class RAGSearchResult(
       override fun encode(writer: ReverseProtoWriter, `value`: RAGSearchResult) {
         writer.writeBytes(value.unknownFields)
         if (value.token_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.token_count)
+          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.token_count)
         }
         if (value.end_offset != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.end_offset)
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.end_offset)
         }
         if (value.start_offset != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.start_offset)
-        }
-        if (value.rank != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.rank)
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.start_offset)
         }
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
-        if (!value.similarity_score.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.similarity_score)
+        if (!value.score.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.score)
         }
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
@@ -293,10 +257,9 @@ public class RAGSearchResult(
       override fun decode(reader: ProtoReader): RAGSearchResult {
         var chunk_id: String = ""
         var text: String = ""
-        var similarity_score: Float = 0f
+        var score: Float = 0f
         var source_document: String? = null
         val metadata = mutableMapOf<String, String>()
-        var rank: Int = 0
         var start_offset: Int = 0
         var end_offset: Int = 0
         var token_count: Int = 0
@@ -304,23 +267,21 @@ public class RAGSearchResult(
           when (tag) {
             1 -> chunk_id = ProtoAdapter.STRING.decode(reader)
             2 -> text = ProtoAdapter.STRING.decode(reader)
-            3 -> similarity_score = ProtoAdapter.FLOAT.decode(reader)
+            3 -> score = ProtoAdapter.FLOAT.decode(reader)
             4 -> source_document = ProtoAdapter.STRING.decode(reader)
             5 -> metadata.putAll(metadataAdapter.decode(reader))
-            7 -> rank = ProtoAdapter.INT32.decode(reader)
-            8 -> start_offset = ProtoAdapter.INT32.decode(reader)
-            9 -> end_offset = ProtoAdapter.INT32.decode(reader)
-            10 -> token_count = ProtoAdapter.INT32.decode(reader)
+            6 -> start_offset = ProtoAdapter.INT32.decode(reader)
+            7 -> end_offset = ProtoAdapter.INT32.decode(reader)
+            8 -> token_count = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RAGSearchResult(
           chunk_id = chunk_id,
           text = text,
-          similarity_score = similarity_score,
+          score = score,
           source_document = source_document,
           metadata = metadata,
-          rank = rank,
           start_offset = start_offset,
           end_offset = end_offset,
           token_count = token_count,

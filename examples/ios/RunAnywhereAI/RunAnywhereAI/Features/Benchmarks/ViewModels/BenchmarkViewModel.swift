@@ -72,14 +72,12 @@ final class BenchmarkViewModel {
 
     /// Resync registry paths from disk, then rebuild the grouped model picker state.
     private func reloadAvailableModels() async {
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
-        let listResult = await RunAnywhere.listModels()
-        guard listResult.success else {
+        guard let allModels = try? await RunAnywhere.models.list() else {
             availableModels = [:]
             return
         }
-        let allModels = listResult.models.models
         var grouped: [BenchmarkCategory: [RAModelInfo]] = [:]
         for category in BenchmarkCategory.allCases {
             let models = BenchmarkRunner.downloadedModels(for: category, in: allModels)

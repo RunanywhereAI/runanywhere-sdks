@@ -17,15 +17,6 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * Logical hardware service contract. Mirrors the C ABI in
- * sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
- *   - rac_hardware_profile_get → GetProfile
- *   - rac_hardware_get_accelerators → GetAccelerators
- *   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
- *
- * Native device probes (chip detection, neural engine queries, GPU
- * discovery, memory/cores) remain platform-adapter owned. C++ caches and
- * serves the normalized HardwareProfile/AcceleratorInfo messages.
  * Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
  * (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
  * rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number

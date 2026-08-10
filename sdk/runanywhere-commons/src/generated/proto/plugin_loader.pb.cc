@@ -31,8 +31,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::runanywhere::v1::PluginInfo
         {&::_pbi::kDescriptorMethods, &::descriptor_table_plugin_5floader_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::PluginInfoList
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_plugin_5floader_2eproto, /* tracker*/ nullptr,},
 };
 }  // namespace
 #endif
@@ -194,157 +192,6 @@ const ::_pbi::ClassData* PluginInfo_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class PluginInfoList::_Internal {
- public:
-  using HasBits = decltype(::std::declval<PluginInfoList>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(PluginInfoList, _impl_._has_bits_);
-};
-
-constexpr PluginInfoList::ParseTableT_ PluginInfoList::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(PluginInfoList, _impl_._has_bits_),
-      0, // no _extensions_
-      1, 0,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967294,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      1,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::PluginInfoList>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // repeated .runanywhere.v1.PluginInfo plugins = 1;
-      {::_pbi::TcParser::FastMtR1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(PluginInfoList, _impl_.plugins_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // repeated .runanywhere.v1.PluginInfo plugins = 1;
-      {PROTOBUF_FIELD_OFFSET(PluginInfoList, _impl_.plugins_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::PluginInfo>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::PluginInfo_globals_},
-        #endif
-    }},
-    {{
-    }},
-  };
-}
-
-
-inline constexpr PluginInfoList::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        plugins_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::PluginInfoList,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfoList, _impl_.plugins_)>()
-         }
-     {}
-
-template <typename>
-constexpr PluginInfoList::PluginInfoList(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL PluginInfoList::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) PluginInfoList(arena);
-}
-constexpr auto PluginInfoList::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PluginInfoList), alignof(PluginInfoList));
-}
-constexpr auto PluginInfoList::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &PluginInfoList::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<PluginInfoList>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &PluginInfoList::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<PluginInfoList>(), &PluginInfoList::ByteSizeLong,
-              &PluginInfoList::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(PluginInfoList, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[1],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_plugin_5floader_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct PluginInfoListGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr PluginInfoListGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 PluginInfoList_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(PluginInfoList::InternalGenerateClassData_(
-            _default, &PluginInfoList_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<PluginInfoList>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~PluginInfoListGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) PluginInfoList _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<PluginInfoList>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(PluginInfoListGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST PluginInfoListGlobalsTypeInternal PluginInfoList_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* PluginInfoList_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return PluginInfoList_globals_.GetClassData();
-#else
-  return PluginInfoList_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 }  // namespace v1
 }  // namespace runanywhere
 static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
@@ -361,45 +208,36 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfo, _impl_.path_),
         0,
         1,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfoList, _impl_._has_bits_),
-        4, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfoList, _impl_.plugins_),
-        0,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::PluginInfo)},
-        {7, sizeof(::runanywhere::v1::PluginInfoList)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::runanywhere::v1::PluginInfo_globals_,
-        &::runanywhere::v1::PluginInfoList_globals_,
 };
 const char descriptor_table_protodef_plugin_5floader_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\023plugin_loader.proto\022\016runanywhere.v1\"(\n"
-    "\nPluginInfo\022\014\n\004name\030\001 \001(\t\022\014\n\004path\030\002 \001(\t\""
-    "=\n\016PluginInfoList\022+\n\007plugins\030\001 \003(\0132\032.run"
-    "anywhere.v1.PluginInfoB\214\001\n\027ai.runanywher"
-    "e.proto.v1B\021PluginLoaderProtoP\001Z<github."
-    "com/runanywhere/runanywhere-sdks/idl/v1;"
-    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
-    "\272\002\002RAb\006proto3"
+    "\nPluginInfo\022\014\n\004name\030\001 \001(\t\022\014\n\004path\030\002 \001(\tB"
+    "\214\001\n\027ai.runanywhere.proto.v1B\021PluginLoade"
+    "rProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_plugin_5floader_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_plugin_5floader_2eproto = {
     false,
     false,
-    293,
+    230,
     descriptor_table_protodef_plugin_5floader_2eproto,
     "plugin_loader.proto",
     &descriptor_table_plugin_5floader_2eproto_once,
     nullptr,
     0,
-    2,
+    1,
     schemas,
     file_message_globals,
     TableStruct_plugin_5floader_2eproto::offsets,
@@ -658,228 +496,6 @@ void PluginInfo::InternalSwap(PluginInfo* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
 }
 
 ::google::protobuf::Metadata PluginInfo::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-PluginInfoList::PluginInfoList(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, PluginInfoList_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PluginInfoList)
-}
-PROTOBUF_NDEBUG_INLINE PluginInfoList::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::PluginInfoList& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        plugins_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::PluginInfoList,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfoList, _impl_.plugins_)>()
-          , from.plugins_
-        }
-     {}
-
-PluginInfoList::PluginInfoList(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const PluginInfoList& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, PluginInfoList_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  PluginInfoList* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PluginInfoList)
-}
-PROTOBUF_NDEBUG_INLINE PluginInfoList::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        plugins_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::PluginInfoList,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PluginInfoList, _impl_.plugins_)>()
-         }
-     {}
-
-inline void PluginInfoList::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-}
-PluginInfoList::~PluginInfoList() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.PluginInfoList)
-  SharedDtor(*this);
-}
-inline void PluginInfoList::SharedDtor(MessageLite& self) {
-  PluginInfoList& this_ = static_cast<PluginInfoList&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull PluginInfoList_class_data_ =
-        PluginInfoList::InternalGenerateClassData_(PluginInfoList_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-PluginInfoList::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&PluginInfoList_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(PluginInfoList_class_data_.tc_table);
-  return PluginInfoList_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-PluginInfoList::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&PluginInfoList_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&PluginInfoList_globals_));
-  return PluginInfoList_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const PluginInfoList::ParseTableT_
-    PluginInfoList::_table_ =
-        PluginInfoList::InternalGenerateParseTable_(PluginInfoList_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void PluginInfoList::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.PluginInfoList)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.plugins_.Clear();
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL PluginInfoList::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const PluginInfoList& this_ = static_cast<const PluginInfoList&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL PluginInfoList::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const PluginInfoList& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.PluginInfoList)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // repeated .runanywhere.v1.PluginInfo plugins = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    for (unsigned i = 0, n = static_cast<unsigned>(
-                             this_._internal_plugins_size());
-         i < n; i++) {
-      const auto& repfield = this_._internal_plugins().Get(i);
-      target =
-          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-              1, repfield, repfield.GetCachedSize(),
-              target, stream);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.PluginInfoList)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t PluginInfoList::ByteSizeLong(const MessageLite& base) {
-  const PluginInfoList& this_ = static_cast<const PluginInfoList&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t PluginInfoList::ByteSizeLong() const {
-  const PluginInfoList& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.PluginInfoList)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-   {
-    // repeated .runanywhere.v1.PluginInfo plugins = 1;
-    cached_has_bits = this_._impl_._has_bits_[0];
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1UL * this_._internal_plugins_size();
-      for (const auto& msg : this_._internal_plugins()) {
-        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void PluginInfoList::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<PluginInfoList*>(&to_msg);
-  auto& from = static_cast<const PluginInfoList&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PluginInfoList)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _this->_internal_mutable_plugins()->InternalMergeFromWithArena(
-        ::google::protobuf::MessageLite::internal_visibility(), arena,
-        from._internal_plugins());
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void PluginInfoList::CopyFrom(const PluginInfoList& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.PluginInfoList)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void PluginInfoList::InternalSwap(PluginInfoList* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.plugins_.InternalSwap(&other->_impl_.plugins_);
-}
-
-::google::protobuf::Metadata PluginInfoList::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

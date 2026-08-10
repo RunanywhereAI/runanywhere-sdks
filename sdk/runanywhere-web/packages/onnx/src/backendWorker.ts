@@ -108,6 +108,41 @@ async function callLifecycle(
   }
 }
 
+/**
+ * Lifecycle ABI whose only argument is the out-buffer (VAD start/stop/reset).
+ * Same contract as `callLifecycle`, minus the request payload.
+ */
+async function callLifecycleStateOnly(
+  module: WorkerOnnxModule,
+  exportName: string,
+): Promise<Uint8Array> {
+  const fn = module[`_${exportName}`] as
+    | ((outPtr: number) => number | Promise<number>)
+    | undefined;
+  if (!fn) throw new Error(`Worker WASM missing ${exportName}`);
+  const buffer = requireProtoBuffer(module);
+  const outPtr = module._malloc(Math.max(buffer.size(), 1));
+  if (!outPtr) throw new Error('Worker out-buffer allocation failed');
+  try {
+    buffer.init(outPtr);
+    const rc = await callEmscriptenAsyncNumber(
+      module as unknown as EmscriptenRunanywhereModule,
+      exportName,
+      ['number'],
+      [outPtr],
+      () => fn(outPtr),
+    );
+    if (rc !== 0) throw new Error(`${exportName} failed with code ${rc}`);
+    const dataPtr = module.getValue(outPtr + buffer.dataOffset(), '*');
+    const dataSize = module.getValue(outPtr + buffer.sizeOffset(), 'i32');
+    if (!dataPtr || dataSize <= 0) throw new Error(`${exportName} returned an empty result buffer`);
+    return module.HEAPU8.slice(dataPtr, dataPtr + dataSize);
+  } finally {
+    buffer.free(outPtr);
+    module._free(outPtr);
+  }
+}
+
 async function callLoad(module: WorkerOnnxModule, requestBytes: Uint8Array): Promise<Uint8Array> {
   const registry = (module._rac_get_model_registry as (() => number) | undefined)?.();
   const fn = module._rac_model_lifecycle_load_proto as
@@ -183,7 +218,7 @@ async function callRAGSessionCreate(
 
 async function callRAGWithRequest(
   module: WorkerOnnxModule,
-  exportName: 'rac_rag_ingest_proto' | 'rac_rag_query_proto',
+  exportName: 'rac_rag_ingest_proto' | 'rac_rag_query_proto' | 'rac_rag_search_proto',
   session: number,
   requestBytes: Uint8Array,
 ): Promise<Uint8Array> {
@@ -375,9 +410,13 @@ runBackendWorker(workerScope, {
         destroy(body.session);
         return { ok: true };
       }
-      if (kind === 'rag.ingest' || kind === 'rag.query') {
+      if (kind === 'rag.ingest' || kind === 'rag.query' || kind === 'rag.search') {
         if (!body.requestBytes) throw new Error(`${kind} requires requestBytes`);
-        const exportName = kind === 'rag.ingest' ? 'rac_rag_ingest_proto' : 'rac_rag_query_proto';
+        const exportName = kind === 'rag.ingest'
+          ? 'rac_rag_ingest_proto'
+          : kind === 'rag.search'
+            ? 'rac_rag_search_proto'
+            : 'rac_rag_query_proto';
         return { resultBytes: await callRAGWithRequest(module, exportName, body.session, body.requestBytes) };
       }
       if (kind === 'rag.clear' || kind === 'rag.stats') {
@@ -386,12 +425,23 @@ runBackendWorker(workerScope, {
       }
       throw new Error(`Unsupported ONNX infer kind: ${kind}`);
     }
+    // VAD session verbs carry no request payload — the detector they act on is
+    // the one this worker's lifecycle already owns.
+    const stateOnlyExport = ({
+      'vad.start': 'rac_vad_start_lifecycle_proto',
+      'vad.stop': 'rac_vad_stop_lifecycle_proto',
+      'vad.reset': 'rac_vad_reset_lifecycle_proto',
+    } as Partial<Record<string, string>>)[kind];
+    if (stateOnlyExport) {
+      return { resultBytes: await callLifecycleStateOnly(runtime.requireModule(), stateOnlyExport) };
+    }
     const body = payload as WorkerRequestPayload;
     if (!body?.requestBytes) throw new Error('infer requires requestBytes');
     const exportName = ({
       'stt.transcribe': 'rac_stt_transcribe_lifecycle_proto',
       'tts.synthesize': 'rac_tts_synthesize_lifecycle_proto',
       'vad.process': 'rac_vad_process_lifecycle_proto',
+      'vad.configure': 'rac_vad_configure_lifecycle_proto',
       'embeddings.embed': 'rac_embeddings_embed_batch_lifecycle_proto',
     } as Partial<Record<string, string>>)[kind];
     if (!exportName) throw new Error(`Unsupported ONNX infer kind: ${kind}`);

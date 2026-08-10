@@ -33,7 +33,9 @@
 #include "google/protobuf/map_type_handler.h"  // IWYU pragma: export
 #include "google/protobuf/map_entry.h"
 #include "google/protobuf/map_field.h"
+#include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -59,6 +61,12 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_devi
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum BatteryState : int;
+extern const uint32_t BatteryState_internal_data_[];
+enum FormFactor : int;
+extern const uint32_t FormFactor_internal_data_[];
+enum Platform : int;
+extern const uint32_t Platform_internal_data_[];
 class DeviceInfo;
 struct DeviceInfoGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -79,11 +87,158 @@ extern const DeviceInfo_PlatformExtrasEntry_DoNotUseGlobalsTypeInternal DeviceIn
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::BatteryState_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::BatteryState>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::FormFactor_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::FormFactor>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::Platform_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::Platform>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
+enum Platform : int {
+  PLATFORM_UNSPECIFIED = 0,
+  PLATFORM_IOS = 1,
+  PLATFORM_ANDROID = 2,
+  PLATFORM_MACOS = 3,
+  PLATFORM_WEB = 4,
+  PLATFORM_LINUX = 5,
+  PLATFORM_WINDOWS = 6,
+  PLATFORM_TVOS = 7,
+  PLATFORM_WATCHOS = 8,
+  PLATFORM_VISIONOS = 9,
+  Platform_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  Platform_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t Platform_internal_data_[];
+inline constexpr Platform Platform_MIN =
+    static_cast<Platform>(0);
+inline constexpr Platform Platform_MAX =
+    static_cast<Platform>(9);
+[[nodiscard]] inline bool Platform_IsValid(int value) {
+  return 0 <= value && value <= 9;
+}
+inline constexpr int Platform_ARRAYSIZE = 9 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+Platform_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(Platform) {
+  return Platform_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& Platform_Name(T value) {
+  static_assert(::std::is_same<T, Platform>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to Platform_Name().");
+  return Platform_Name(static_cast<Platform>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& Platform_Name(Platform value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<Platform_descriptor, 0, 9>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool Platform_Parse(
+    ::absl::string_view name, Platform* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<Platform>(Platform_descriptor(), name,
+                                           value);
+}
+enum FormFactor : int {
+  FORM_FACTOR_UNSPECIFIED = 0,
+  FORM_FACTOR_PHONE = 1,
+  FORM_FACTOR_TABLET = 2,
+  FORM_FACTOR_DESKTOP = 3,
+  FORM_FACTOR_LAPTOP = 4,
+  FORM_FACTOR_TV = 5,
+  FORM_FACTOR_WATCH = 6,
+  FORM_FACTOR_HEADSET = 7,
+  FormFactor_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  FormFactor_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t FormFactor_internal_data_[];
+inline constexpr FormFactor FormFactor_MIN =
+    static_cast<FormFactor>(0);
+inline constexpr FormFactor FormFactor_MAX =
+    static_cast<FormFactor>(7);
+[[nodiscard]] inline bool FormFactor_IsValid(int value) {
+  return 0 <= value && value <= 7;
+}
+inline constexpr int FormFactor_ARRAYSIZE = 7 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+FormFactor_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(FormFactor) {
+  return FormFactor_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& FormFactor_Name(T value) {
+  static_assert(::std::is_same<T, FormFactor>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to FormFactor_Name().");
+  return FormFactor_Name(static_cast<FormFactor>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& FormFactor_Name(FormFactor value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<FormFactor_descriptor, 0, 7>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool FormFactor_Parse(
+    ::absl::string_view name, FormFactor* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<FormFactor>(FormFactor_descriptor(), name,
+                                           value);
+}
+enum BatteryState : int {
+  BATTERY_STATE_UNSPECIFIED = 0,
+  BATTERY_STATE_CHARGING = 1,
+  BATTERY_STATE_UNPLUGGED = 2,
+  BATTERY_STATE_FULL = 3,
+  BatteryState_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  BatteryState_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t BatteryState_internal_data_[];
+inline constexpr BatteryState BatteryState_MIN =
+    static_cast<BatteryState>(0);
+inline constexpr BatteryState BatteryState_MAX =
+    static_cast<BatteryState>(3);
+[[nodiscard]] inline bool BatteryState_IsValid(int value) {
+  return 0 <= value && value <= 3;
+}
+inline constexpr int BatteryState_ARRAYSIZE = 3 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+BatteryState_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(BatteryState) {
+  return BatteryState_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& BatteryState_Name(T value) {
+  static_assert(::std::is_same<T, BatteryState>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to BatteryState_Name().");
+  return BatteryState_Name(static_cast<BatteryState>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& BatteryState_Name(BatteryState value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<BatteryState_descriptor, 0, 3>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool BatteryState_Parse(
+    ::absl::string_view name, BatteryState* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<BatteryState>(BatteryState_descriptor(), name,
+                                           value);
+}
+using ::google::protobuf::internal::generated_enum::AbslParseFlag;
+using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
@@ -288,25 +443,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   // accessors -------------------------------------------------------
   enum : int {
     kDeviceModelFieldNumber = 1,
-    kDeviceNameFieldNumber = 2,
-    kPlatformFieldNumber = 3,
-    kOsVersionFieldNumber = 4,
-    kFormFactorFieldNumber = 5,
-    kArchitectureFieldNumber = 6,
-    kChipNameFieldNumber = 7,
-    kGpuFamilyFieldNumber = 12,
-    kBatteryStateFieldNumber = 14,
-    kDeviceFingerprintFieldNumber = 19,
-    kTotalMemoryFieldNumber = 8,
-    kAvailableMemoryFieldNumber = 9,
-    kNeuralEngineCoresFieldNumber = 11,
-    kHasNeuralEngineFieldNumber = 10,
-    kIsLowPowerModeFieldNumber = 15,
-    kBatteryLevelFieldNumber = 13,
-    kCoreCountFieldNumber = 16,
-    kPerformanceCoresFieldNumber = 17,
-    kEfficiencyCoresFieldNumber = 18,
-    kPlatformExtrasFieldNumber = 20,
+    kOsVersionFieldNumber = 3,
+    kArchitectureFieldNumber = 5,
+    kChipNameFieldNumber = 6,
+    kGpuFamilyFieldNumber = 11,
+    kDeviceFingerprintFieldNumber = 17,
+    kPlatformFieldNumber = 2,
+    kFormFactorFieldNumber = 4,
+    kTotalMemoryBytesFieldNumber = 7,
+    kAvailableMemoryBytesFieldNumber = 8,
+    kNpuCoresFieldNumber = 10,
+    kHasNpuFieldNumber = 9,
+    kIsLowPowerModeFieldNumber = 14,
+    kBatteryLevelFieldNumber = 12,
+    kBatteryStateFieldNumber = 13,
+    kCoreCountFieldNumber = 15,
+    kPerformanceCoresFieldNumber = 16,
+    kPlatformExtrasFieldNumber = 18,
   };
   // string device_model = 1;
   void clear_device_model() ;
@@ -323,37 +476,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_device_model();
 
   public:
-  // string device_name = 2;
-  void clear_device_name() ;
-  [[nodiscard]] const ::std::string& device_name() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_device_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_device_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_device_name();
-  void set_allocated_device_name(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_device_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_device_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_device_name();
-
-  public:
-  // string platform = 3;
-  void clear_platform() ;
-  [[nodiscard]] const ::std::string& platform() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_platform(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_platform();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_platform();
-  void set_allocated_platform(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_platform() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_platform(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_platform();
-
-  public:
-  // string os_version = 4;
+  // string os_version = 3;
   void clear_os_version() ;
   [[nodiscard]] const ::std::string& os_version() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -368,22 +491,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_os_version();
 
   public:
-  // string form_factor = 5;
-  void clear_form_factor() ;
-  [[nodiscard]] const ::std::string& form_factor() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_form_factor(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_form_factor();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_form_factor();
-  void set_allocated_form_factor(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_form_factor() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_form_factor(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_form_factor();
-
-  public:
-  // string architecture = 6;
+  // string architecture = 5;
   void clear_architecture() ;
   [[nodiscard]] const ::std::string& architecture() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -398,7 +506,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_architecture();
 
   public:
-  // string chip_name = 7;
+  // string chip_name = 6;
   void clear_chip_name() ;
   [[nodiscard]] const ::std::string& chip_name() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -413,7 +521,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_chip_name();
 
   public:
-  // string gpu_family = 12;
+  // string gpu_family = 11;
   void clear_gpu_family() ;
   [[nodiscard]] const ::std::string& gpu_family() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -428,24 +536,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_gpu_family();
 
   public:
-  // optional string battery_state = 14;
-  [[nodiscard]] bool has_battery_state()
-      const;
-  void clear_battery_state() ;
-  [[nodiscard]] const ::std::string& battery_state() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_battery_state(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_battery_state();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_battery_state();
-  void set_allocated_battery_state(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_battery_state() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_battery_state(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_battery_state();
-
-  public:
-  // optional string device_fingerprint = 19;
+  // optional string device_fingerprint = 17;
   [[nodiscard]] bool has_device_fingerprint()
       const;
   void clear_device_fingerprint() ;
@@ -462,47 +553,67 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_device_fingerprint();
 
   public:
-  // int64 total_memory = 8;
-  void clear_total_memory() ;
-  [[nodiscard]] ::int64_t total_memory() const;
-  void set_total_memory(::int64_t value);
+  // .runanywhere.v1.Platform platform = 2;
+  void clear_platform() ;
+  [[nodiscard]] ::runanywhere::v1::Platform platform() const;
+  void set_platform(::runanywhere::v1::Platform value);
 
   private:
-  ::int64_t _internal_total_memory() const;
-  void _internal_set_total_memory(::int64_t value);
+  ::runanywhere::v1::Platform _internal_platform() const;
+  void _internal_set_platform(::runanywhere::v1::Platform value);
 
   public:
-  // int64 available_memory = 9;
-  void clear_available_memory() ;
-  [[nodiscard]] ::int64_t available_memory() const;
-  void set_available_memory(::int64_t value);
+  // .runanywhere.v1.FormFactor form_factor = 4;
+  void clear_form_factor() ;
+  [[nodiscard]] ::runanywhere::v1::FormFactor form_factor() const;
+  void set_form_factor(::runanywhere::v1::FormFactor value);
 
   private:
-  ::int64_t _internal_available_memory() const;
-  void _internal_set_available_memory(::int64_t value);
+  ::runanywhere::v1::FormFactor _internal_form_factor() const;
+  void _internal_set_form_factor(::runanywhere::v1::FormFactor value);
 
   public:
-  // int32 neural_engine_cores = 11;
-  void clear_neural_engine_cores() ;
-  [[nodiscard]] ::int32_t neural_engine_cores() const;
-  void set_neural_engine_cores(::int32_t value);
+  // int64 total_memory_bytes = 7;
+  void clear_total_memory_bytes() ;
+  [[nodiscard]] ::int64_t total_memory_bytes() const;
+  void set_total_memory_bytes(::int64_t value);
 
   private:
-  ::int32_t _internal_neural_engine_cores() const;
-  void _internal_set_neural_engine_cores(::int32_t value);
+  ::int64_t _internal_total_memory_bytes() const;
+  void _internal_set_total_memory_bytes(::int64_t value);
 
   public:
-  // bool has_neural_engine = 10;
-  void clear_has_neural_engine() ;
-  [[nodiscard]] bool has_neural_engine() const;
-  void set_has_neural_engine(bool value);
+  // int64 available_memory_bytes = 8;
+  void clear_available_memory_bytes() ;
+  [[nodiscard]] ::int64_t available_memory_bytes() const;
+  void set_available_memory_bytes(::int64_t value);
 
   private:
-  bool _internal_has_neural_engine() const;
-  void _internal_set_has_neural_engine(bool value);
+  ::int64_t _internal_available_memory_bytes() const;
+  void _internal_set_available_memory_bytes(::int64_t value);
 
   public:
-  // bool is_low_power_mode = 15;
+  // int32 npu_cores = 10;
+  void clear_npu_cores() ;
+  [[nodiscard]] ::int32_t npu_cores() const;
+  void set_npu_cores(::int32_t value);
+
+  private:
+  ::int32_t _internal_npu_cores() const;
+  void _internal_set_npu_cores(::int32_t value);
+
+  public:
+  // bool has_npu = 9;
+  void clear_has_npu() ;
+  [[nodiscard]] bool has_npu() const;
+  void set_has_npu(bool value);
+
+  private:
+  bool _internal_has_npu() const;
+  void _internal_set_has_npu(bool value);
+
+  public:
+  // bool is_low_power_mode = 14;
   void clear_is_low_power_mode() ;
   [[nodiscard]] bool is_low_power_mode() const;
   void set_is_low_power_mode(bool value);
@@ -512,7 +623,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   void _internal_set_is_low_power_mode(bool value);
 
   public:
-  // optional float battery_level = 13;
+  // optional float battery_level = 12 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   [[nodiscard]] bool has_battery_level()
       const;
   void clear_battery_level() ;
@@ -524,7 +635,19 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   void _internal_set_battery_level(float value);
 
   public:
-  // int32 core_count = 16;
+  // optional .runanywhere.v1.BatteryState battery_state = 13;
+  [[nodiscard]] bool has_battery_state()
+      const;
+  void clear_battery_state() ;
+  [[nodiscard]] ::runanywhere::v1::BatteryState battery_state() const;
+  void set_battery_state(::runanywhere::v1::BatteryState value);
+
+  private:
+  ::runanywhere::v1::BatteryState _internal_battery_state() const;
+  void _internal_set_battery_state(::runanywhere::v1::BatteryState value);
+
+  public:
+  // int32 core_count = 15;
   void clear_core_count() ;
   [[nodiscard]] ::int32_t core_count() const;
   void set_core_count(::int32_t value);
@@ -534,7 +657,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   void _internal_set_core_count(::int32_t value);
 
   public:
-  // int32 performance_cores = 17;
+  // int32 performance_cores = 16;
   void clear_performance_cores() ;
   [[nodiscard]] ::int32_t performance_cores() const;
   void set_performance_cores(::int32_t value);
@@ -544,17 +667,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
   void _internal_set_performance_cores(::int32_t value);
 
   public:
-  // int32 efficiency_cores = 18;
-  void clear_efficiency_cores() ;
-  [[nodiscard]] ::int32_t efficiency_cores() const;
-  void set_efficiency_cores(::int32_t value);
-
-  private:
-  ::int32_t _internal_efficiency_cores() const;
-  void _internal_set_efficiency_cores(::int32_t value);
-
-  public:
-  // map<string, string> platform_extras = 20;
+  // map<string, string> platform_extras = 18;
   [[nodiscard]] int platform_extras_size()
       const;
   private:
@@ -574,8 +687,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 20,
-                          1, 179,
+      ::google::protobuf::internal::TcParseTable<5, 18,
+                          1, 136,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -604,24 +717,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DeviceInfo final : public ::google:
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr device_model_;
-    ::google::protobuf::internal::ArenaStringPtr device_name_;
-    ::google::protobuf::internal::ArenaStringPtr platform_;
     ::google::protobuf::internal::ArenaStringPtr os_version_;
-    ::google::protobuf::internal::ArenaStringPtr form_factor_;
     ::google::protobuf::internal::ArenaStringPtr architecture_;
     ::google::protobuf::internal::ArenaStringPtr chip_name_;
     ::google::protobuf::internal::ArenaStringPtr gpu_family_;
-    ::google::protobuf::internal::ArenaStringPtr battery_state_;
     ::google::protobuf::internal::ArenaStringPtr device_fingerprint_;
-    ::int64_t total_memory_;
-    ::int64_t available_memory_;
-    ::int32_t neural_engine_cores_;
-    bool has_neural_engine_;
+    int platform_;
+    int form_factor_;
+    ::int64_t total_memory_bytes_;
+    ::int64_t available_memory_bytes_;
+    ::int32_t npu_cores_;
+    bool has_npu_;
     bool is_low_power_mode_;
     float battery_level_;
+    int battery_state_;
     ::int32_t core_count_;
     ::int32_t performance_cores_;
-    ::int32_t efficiency_cores_;
     ::google::protobuf::internal::MapField<DeviceInfo_PlatformExtrasEntry_DoNotUse, ::std::string, ::std::string> platform_extras_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -711,139 +822,35 @@ inline void DeviceInfo::set_allocated_device_model(::std::string* PROTOBUF_NULLA
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.device_model)
 }
 
-// string device_name = 2;
-inline void DeviceInfo::clear_device_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.device_name_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& DeviceInfo::device_name() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.device_name)
-  return _internal_device_name();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_device_name(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.device_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.device_name)
-}
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_device_name()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_device_name();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.device_name)
-  return _s;
-}
-inline const ::std::string& DeviceInfo::_internal_device_name() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.device_name_.Get();
-}
-inline void DeviceInfo::_internal_set_device_name(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.device_name_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_device_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.device_name_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_device_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.device_name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.device_name_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.device_name_.Set("", GetArena());
-  }
-  return released;
-}
-inline void DeviceInfo::set_allocated_device_name(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.device_name_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.device_name_.IsDefault()) {
-    _impl_.device_name_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.device_name)
-}
-
-// string platform = 3;
+// .runanywhere.v1.Platform platform = 2;
 inline void DeviceInfo::clear_platform() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.platform_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.platform_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
-inline const ::std::string& DeviceInfo::platform() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline ::runanywhere::v1::Platform DeviceInfo::platform() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.platform)
   return _internal_platform();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_platform(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.platform_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+inline void DeviceInfo::set_platform(::runanywhere::v1::Platform value) {
+  _internal_set_platform(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.platform)
 }
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_platform()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_platform();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.platform)
-  return _s;
-}
-inline const ::std::string& DeviceInfo::_internal_platform() const {
+inline ::runanywhere::v1::Platform DeviceInfo::_internal_platform() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.platform_.Get();
+  return static_cast<::runanywhere::v1::Platform>(_impl_.platform_);
 }
-inline void DeviceInfo::_internal_set_platform(const ::std::string& value) {
+inline void DeviceInfo::_internal_set_platform(::runanywhere::v1::Platform value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.platform_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_platform() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.platform_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_platform() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.platform)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.platform_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.platform_.Set("", GetArena());
-  }
-  return released;
-}
-inline void DeviceInfo::set_allocated_platform(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.platform_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.platform_.IsDefault()) {
-    _impl_.platform_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.platform)
+  _impl_.platform_ = value;
 }
 
-// string os_version = 4;
+// string os_version = 3;
 inline void DeviceInfo::clear_os_version() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.os_version_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::std::string& DeviceInfo::os_version() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -853,13 +860,13 @@ inline const ::std::string& DeviceInfo::os_version() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_os_version(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.os_version_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.os_version)
 }
 inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_os_version()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_os_version();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.os_version)
   return _s;
@@ -879,10 +886,10 @@ inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_os_version(
 inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_os_version() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.os_version)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   auto* released = _impl_.os_version_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.os_version_.Set("", GetArena());
@@ -892,9 +899,9 @@ inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_os_version() {
 inline void DeviceInfo::set_allocated_os_version(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   _impl_.os_version_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.os_version_.IsDefault()) {
@@ -903,75 +910,35 @@ inline void DeviceInfo::set_allocated_os_version(::std::string* PROTOBUF_NULLABL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.os_version)
 }
 
-// string form_factor = 5;
+// .runanywhere.v1.FormFactor form_factor = 4;
 inline void DeviceInfo::clear_form_factor() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.form_factor_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.form_factor_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
-inline const ::std::string& DeviceInfo::form_factor() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline ::runanywhere::v1::FormFactor DeviceInfo::form_factor() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.form_factor)
   return _internal_form_factor();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_form_factor(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  _impl_.form_factor_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+inline void DeviceInfo::set_form_factor(::runanywhere::v1::FormFactor value) {
+  _internal_set_form_factor(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.form_factor)
 }
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_form_factor()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::std::string* _s = _internal_mutable_form_factor();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.form_factor)
-  return _s;
-}
-inline const ::std::string& DeviceInfo::_internal_form_factor() const {
+inline ::runanywhere::v1::FormFactor DeviceInfo::_internal_form_factor() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.form_factor_.Get();
+  return static_cast<::runanywhere::v1::FormFactor>(_impl_.form_factor_);
 }
-inline void DeviceInfo::_internal_set_form_factor(const ::std::string& value) {
+inline void DeviceInfo::_internal_set_form_factor(::runanywhere::v1::FormFactor value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.form_factor_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_form_factor() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.form_factor_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_form_factor() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.form_factor)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.form_factor_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.form_factor_.Set("", GetArena());
-  }
-  return released;
-}
-inline void DeviceInfo::set_allocated_form_factor(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  }
-  _impl_.form_factor_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.form_factor_.IsDefault()) {
-    _impl_.form_factor_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.form_factor)
+  _impl_.form_factor_ = value;
 }
 
-// string architecture = 6;
+// string architecture = 5;
 inline void DeviceInfo::clear_architecture() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.architecture_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::std::string& DeviceInfo::architecture() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -981,13 +948,13 @@ inline const ::std::string& DeviceInfo::architecture() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_architecture(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.architecture_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.architecture)
 }
 inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_architecture()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_architecture();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.architecture)
   return _s;
@@ -1007,10 +974,10 @@ inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_architectur
 inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_architecture() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.architecture)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.architecture_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.architecture_.Set("", GetArena());
@@ -1020,9 +987,9 @@ inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_architecture() {
 inline void DeviceInfo::set_allocated_architecture(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.architecture_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.architecture_.IsDefault()) {
@@ -1031,11 +998,11 @@ inline void DeviceInfo::set_allocated_architecture(::std::string* PROTOBUF_NULLA
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.architecture)
 }
 
-// string chip_name = 7;
+// string chip_name = 6;
 inline void DeviceInfo::clear_chip_name() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.chip_name_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline const ::std::string& DeviceInfo::chip_name() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1045,13 +1012,13 @@ inline const ::std::string& DeviceInfo::chip_name() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_chip_name(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   _impl_.chip_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.chip_name)
 }
 inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_chip_name()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::std::string* _s = _internal_mutable_chip_name();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.chip_name)
   return _s;
@@ -1071,10 +1038,10 @@ inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_chip_name()
 inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_chip_name() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.chip_name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   auto* released = _impl_.chip_name_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.chip_name_.Set("", GetArena());
@@ -1084,9 +1051,9 @@ inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_chip_name() {
 inline void DeviceInfo::set_allocated_chip_name(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   _impl_.chip_name_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.chip_name_.IsDefault()) {
@@ -1095,107 +1062,107 @@ inline void DeviceInfo::set_allocated_chip_name(::std::string* PROTOBUF_NULLABLE
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.chip_name)
 }
 
-// int64 total_memory = 8;
-inline void DeviceInfo::clear_total_memory() {
+// int64 total_memory_bytes = 7;
+inline void DeviceInfo::clear_total_memory_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.total_memory_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  _impl_.total_memory_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
-inline ::int64_t DeviceInfo::total_memory() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.total_memory)
-  return _internal_total_memory();
+inline ::int64_t DeviceInfo::total_memory_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.total_memory_bytes)
+  return _internal_total_memory_bytes();
 }
-inline void DeviceInfo::set_total_memory(::int64_t value) {
-  _internal_set_total_memory(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.total_memory)
+inline void DeviceInfo::set_total_memory_bytes(::int64_t value) {
+  _internal_set_total_memory_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.total_memory_bytes)
 }
-inline ::int64_t DeviceInfo::_internal_total_memory() const {
+inline ::int64_t DeviceInfo::_internal_total_memory_bytes() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.total_memory_;
+  return _impl_.total_memory_bytes_;
 }
-inline void DeviceInfo::_internal_set_total_memory(::int64_t value) {
+inline void DeviceInfo::_internal_set_total_memory_bytes(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.total_memory_ = value;
+  _impl_.total_memory_bytes_ = value;
 }
 
-// int64 available_memory = 9;
-inline void DeviceInfo::clear_available_memory() {
+// int64 available_memory_bytes = 8;
+inline void DeviceInfo::clear_available_memory_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.available_memory_ = ::int64_t{0};
+  _impl_.available_memory_bytes_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline ::int64_t DeviceInfo::available_memory_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.available_memory_bytes)
+  return _internal_available_memory_bytes();
+}
+inline void DeviceInfo::set_available_memory_bytes(::int64_t value) {
+  _internal_set_available_memory_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.available_memory_bytes)
+}
+inline ::int64_t DeviceInfo::_internal_available_memory_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.available_memory_bytes_;
+}
+inline void DeviceInfo::_internal_set_available_memory_bytes(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.available_memory_bytes_ = value;
+}
+
+// bool has_npu = 9;
+inline void DeviceInfo::clear_has_npu() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.has_npu_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
-inline ::int64_t DeviceInfo::available_memory() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.available_memory)
-  return _internal_available_memory();
+inline bool DeviceInfo::has_npu() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.has_npu)
+  return _internal_has_npu();
 }
-inline void DeviceInfo::set_available_memory(::int64_t value) {
-  _internal_set_available_memory(value);
+inline void DeviceInfo::set_has_npu(bool value) {
+  _internal_set_has_npu(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000800U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.available_memory)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.has_npu)
 }
-inline ::int64_t DeviceInfo::_internal_available_memory() const {
+inline bool DeviceInfo::_internal_has_npu() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.available_memory_;
+  return _impl_.has_npu_;
 }
-inline void DeviceInfo::_internal_set_available_memory(::int64_t value) {
+inline void DeviceInfo::_internal_set_has_npu(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.available_memory_ = value;
+  _impl_.has_npu_ = value;
 }
 
-// bool has_neural_engine = 10;
-inline void DeviceInfo::clear_has_neural_engine() {
+// int32 npu_cores = 10;
+inline void DeviceInfo::clear_npu_cores() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.has_neural_engine_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  _impl_.npu_cores_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
-inline bool DeviceInfo::has_neural_engine() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.has_neural_engine)
-  return _internal_has_neural_engine();
+inline ::int32_t DeviceInfo::npu_cores() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.npu_cores)
+  return _internal_npu_cores();
 }
-inline void DeviceInfo::set_has_neural_engine(bool value) {
-  _internal_set_has_neural_engine(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.has_neural_engine)
+inline void DeviceInfo::set_npu_cores(::int32_t value) {
+  _internal_set_npu_cores(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.npu_cores)
 }
-inline bool DeviceInfo::_internal_has_neural_engine() const {
+inline ::int32_t DeviceInfo::_internal_npu_cores() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.has_neural_engine_;
+  return _impl_.npu_cores_;
 }
-inline void DeviceInfo::_internal_set_has_neural_engine(bool value) {
+inline void DeviceInfo::_internal_set_npu_cores(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.has_neural_engine_ = value;
+  _impl_.npu_cores_ = value;
 }
 
-// int32 neural_engine_cores = 11;
-inline void DeviceInfo::clear_neural_engine_cores() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.neural_engine_cores_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
-}
-inline ::int32_t DeviceInfo::neural_engine_cores() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.neural_engine_cores)
-  return _internal_neural_engine_cores();
-}
-inline void DeviceInfo::set_neural_engine_cores(::int32_t value) {
-  _internal_set_neural_engine_cores(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.neural_engine_cores)
-}
-inline ::int32_t DeviceInfo::_internal_neural_engine_cores() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.neural_engine_cores_;
-}
-inline void DeviceInfo::_internal_set_neural_engine_cores(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.neural_engine_cores_ = value;
-}
-
-// string gpu_family = 12;
+// string gpu_family = 11;
 inline void DeviceInfo::clear_gpu_family() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.gpu_family_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline const ::std::string& DeviceInfo::gpu_family() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1205,13 +1172,13 @@ inline const ::std::string& DeviceInfo::gpu_family() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_gpu_family(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.gpu_family_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.gpu_family)
 }
 inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_gpu_family()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_gpu_family();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.gpu_family)
   return _s;
@@ -1231,10 +1198,10 @@ inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_gpu_family(
 inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_gpu_family() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.gpu_family)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.gpu_family_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.gpu_family_.Set("", GetArena());
@@ -1244,9 +1211,9 @@ inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_gpu_family() {
 inline void DeviceInfo::set_allocated_gpu_family(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.gpu_family_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.gpu_family_.IsDefault()) {
@@ -1255,15 +1222,15 @@ inline void DeviceInfo::set_allocated_gpu_family(::std::string* PROTOBUF_NULLABL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.gpu_family)
 }
 
-// optional float battery_level = 13;
+// optional float battery_level = 12 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline bool DeviceInfo::has_battery_level() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00008000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00002000U);
   return value;
 }
 inline void DeviceInfo::clear_battery_level() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.battery_level_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
 }
 inline float DeviceInfo::battery_level() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.battery_level)
@@ -1271,7 +1238,7 @@ inline float DeviceInfo::battery_level() const {
 }
 inline void DeviceInfo::set_battery_level(float value) {
   _internal_set_battery_level(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.battery_level)
 }
 inline float DeviceInfo::_internal_battery_level() const {
@@ -1283,79 +1250,39 @@ inline void DeviceInfo::_internal_set_battery_level(float value) {
   _impl_.battery_level_ = value;
 }
 
-// optional string battery_state = 14;
+// optional .runanywhere.v1.BatteryState battery_state = 13;
 inline bool DeviceInfo::has_battery_state() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00004000U);
   return value;
 }
 inline void DeviceInfo::clear_battery_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.battery_state_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  _impl_.battery_state_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
 }
-inline const ::std::string& DeviceInfo::battery_state() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline ::runanywhere::v1::BatteryState DeviceInfo::battery_state() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.battery_state)
   return _internal_battery_state();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_battery_state(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  _impl_.battery_state_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+inline void DeviceInfo::set_battery_state(::runanywhere::v1::BatteryState value) {
+  _internal_set_battery_state(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.battery_state)
 }
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_battery_state()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  ::std::string* _s = _internal_mutable_battery_state();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.battery_state)
-  return _s;
-}
-inline const ::std::string& DeviceInfo::_internal_battery_state() const {
+inline ::runanywhere::v1::BatteryState DeviceInfo::_internal_battery_state() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.battery_state_.Get();
+  return static_cast<::runanywhere::v1::BatteryState>(_impl_.battery_state_);
 }
-inline void DeviceInfo::_internal_set_battery_state(const ::std::string& value) {
+inline void DeviceInfo::_internal_set_battery_state(::runanywhere::v1::BatteryState value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.battery_state_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_battery_state() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.battery_state_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_battery_state() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.battery_state)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000100U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-  auto* released = _impl_.battery_state_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.battery_state_.Set("", GetArena());
-  }
-  return released;
-}
-inline void DeviceInfo::set_allocated_battery_state(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-  }
-  _impl_.battery_state_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.battery_state_.IsDefault()) {
-    _impl_.battery_state_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.battery_state)
+  _impl_.battery_state_ = value;
 }
 
-// bool is_low_power_mode = 15;
+// bool is_low_power_mode = 14;
 inline void DeviceInfo::clear_is_low_power_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_low_power_mode_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline bool DeviceInfo::is_low_power_mode() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.is_low_power_mode)
@@ -1363,7 +1290,7 @@ inline bool DeviceInfo::is_low_power_mode() const {
 }
 inline void DeviceInfo::set_is_low_power_mode(bool value) {
   _internal_set_is_low_power_mode(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.is_low_power_mode)
 }
 inline bool DeviceInfo::_internal_is_low_power_mode() const {
@@ -1375,11 +1302,11 @@ inline void DeviceInfo::_internal_set_is_low_power_mode(bool value) {
   _impl_.is_low_power_mode_ = value;
 }
 
-// int32 core_count = 16;
+// int32 core_count = 15;
 inline void DeviceInfo::clear_core_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.core_count_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
 }
 inline ::int32_t DeviceInfo::core_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.core_count)
@@ -1387,7 +1314,7 @@ inline ::int32_t DeviceInfo::core_count() const {
 }
 inline void DeviceInfo::set_core_count(::int32_t value) {
   _internal_set_core_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.core_count)
 }
 inline ::int32_t DeviceInfo::_internal_core_count() const {
@@ -1399,11 +1326,11 @@ inline void DeviceInfo::_internal_set_core_count(::int32_t value) {
   _impl_.core_count_ = value;
 }
 
-// int32 performance_cores = 17;
+// int32 performance_cores = 16;
 inline void DeviceInfo::clear_performance_cores() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.performance_cores_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
 }
 inline ::int32_t DeviceInfo::performance_cores() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.performance_cores)
@@ -1411,7 +1338,7 @@ inline ::int32_t DeviceInfo::performance_cores() const {
 }
 inline void DeviceInfo::set_performance_cores(::int32_t value) {
   _internal_set_performance_cores(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.performance_cores)
 }
 inline ::int32_t DeviceInfo::_internal_performance_cores() const {
@@ -1423,39 +1350,15 @@ inline void DeviceInfo::_internal_set_performance_cores(::int32_t value) {
   _impl_.performance_cores_ = value;
 }
 
-// int32 efficiency_cores = 18;
-inline void DeviceInfo::clear_efficiency_cores() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.efficiency_cores_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00040000U);
-}
-inline ::int32_t DeviceInfo::efficiency_cores() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DeviceInfo.efficiency_cores)
-  return _internal_efficiency_cores();
-}
-inline void DeviceInfo::set_efficiency_cores(::int32_t value) {
-  _internal_set_efficiency_cores(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.efficiency_cores)
-}
-inline ::int32_t DeviceInfo::_internal_efficiency_cores() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.efficiency_cores_;
-}
-inline void DeviceInfo::_internal_set_efficiency_cores(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.efficiency_cores_ = value;
-}
-
-// optional string device_fingerprint = 19;
+// optional string device_fingerprint = 17;
 inline bool DeviceInfo::has_device_fingerprint() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void DeviceInfo::clear_device_fingerprint() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.device_fingerprint_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline const ::std::string& DeviceInfo::device_fingerprint() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1465,13 +1368,13 @@ inline const ::std::string& DeviceInfo::device_fingerprint() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DeviceInfo::set_device_fingerprint(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   _impl_.device_fingerprint_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DeviceInfo.device_fingerprint)
 }
 inline ::std::string* PROTOBUF_NONNULL DeviceInfo::mutable_device_fingerprint()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::std::string* _s = _internal_mutable_device_fingerprint();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DeviceInfo.device_fingerprint)
   return _s;
@@ -1491,10 +1394,10 @@ inline ::std::string* PROTOBUF_NONNULL DeviceInfo::_internal_mutable_device_fing
 inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_device_fingerprint() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DeviceInfo.device_fingerprint)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000200U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   auto* released = _impl_.device_fingerprint_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.device_fingerprint_.Set("", GetArena());
@@ -1504,9 +1407,9 @@ inline ::std::string* PROTOBUF_NULLABLE DeviceInfo::release_device_fingerprint()
 inline void DeviceInfo::set_allocated_device_fingerprint(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   _impl_.device_fingerprint_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.device_fingerprint_.IsDefault()) {
@@ -1515,7 +1418,7 @@ inline void DeviceInfo::set_allocated_device_fingerprint(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DeviceInfo.device_fingerprint)
 }
 
-// map<string, string> platform_extras = 20;
+// map<string, string> platform_extras = 18;
 inline int DeviceInfo::_internal_platform_extras_size() const {
   return _internal_platform_extras().size();
 }
@@ -1525,7 +1428,7 @@ inline int DeviceInfo::platform_extras_size() const {
 inline void DeviceInfo::clear_platform_extras() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.platform_extras_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
 }
 inline const ::google::protobuf::Map<::std::string, ::std::string>& DeviceInfo::_internal_platform_extras() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1541,7 +1444,7 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL D
 }
 inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL DeviceInfo::mutable_platform_extras()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.DeviceInfo.platform_extras)
   return _internal_mutable_platform_extras();
 }
@@ -1554,6 +1457,31 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL D
 }  // namespace v1
 }  // namespace runanywhere
 
+
+namespace google {
+namespace protobuf {
+
+template <>
+struct is_proto_enum<::runanywhere::v1::Platform> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::Platform>() {
+  return ::runanywhere::v1::Platform_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::FormFactor> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::FormFactor>() {
+  return ::runanywhere::v1::FormFactor_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::BatteryState> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::BatteryState>() {
+  return ::runanywhere::v1::BatteryState_descriptor();
+}
+
+}  // namespace protobuf
+}  // namespace google
 
 // @@protoc_insertion_point(global_scope)
 

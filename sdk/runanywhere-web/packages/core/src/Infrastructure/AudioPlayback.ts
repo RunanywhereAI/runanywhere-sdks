@@ -105,6 +105,66 @@ export class AudioPlayback {
   }
 
   /**
+   * Play a self-describing encoded audio buffer (e.g. WAV) by decoding it
+   * through the browser's own `AudioContext.decodeAudioData`. Used for the
+   * voice-agent's `VoiceAgentResult.synthesizedAudio`, which commons
+   * packages as a WAV container specifically so callers do not need to track
+   * a separate raw PCM sample rate/encoding out-of-band.
+   *
+   * @param bytes - A complete encoded audio file (WAV).
+   * @returns Promise that resolves when playback completes.
+   */
+  async playEncoded(bytes: Uint8Array): Promise<void> {
+    this.stop();
+
+    // decodeAudioData needs its own throwaway context: it can run before
+    // this.audioContext exists and reports the file's own encoded sample
+    // rate, which may differ from `this.config.sampleRate`.
+    const decodeContext = new AudioContext();
+    let audioBuffer: AudioBuffer;
+    try {
+      const copy = new Uint8Array(bytes).buffer;
+      audioBuffer = await decodeContext.decodeAudioData(copy);
+    } finally {
+      await decodeContext.close();
+    }
+
+    const rate = audioBuffer.sampleRate;
+    const durationMs = audioBuffer.duration * 1000;
+
+    if (!this.audioContext || this.audioContext.state === 'closed') {
+      this.audioContext = new AudioContext({ sampleRate: rate });
+    }
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+    if (!this.gainNode || this.gainNode.context !== this.audioContext) {
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.connect(this.audioContext.destination);
+    }
+    this.gainNode.gain.value = this.config.volume;
+
+    return new Promise<void>((resolve) => {
+      const source = this.audioContext!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.gainNode!);
+
+      source.onended = () => {
+        this._isPlaying = false;
+        this.currentSource = null;
+        EventBus.shared.publish('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
+        resolve();
+      };
+
+      this.currentSource = source;
+      this._isPlaying = true;
+
+      EventBus.shared.publish('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
+      source.start();
+    });
+  }
+
+  /**
    * Stop playback immediately.
    */
   stop(): void {

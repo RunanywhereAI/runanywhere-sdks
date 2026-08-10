@@ -189,10 +189,13 @@ bool poll_sdk_event(runanywhere::v1::SDKEvent* out) {
     return parsed;
 }
 
+// StorageLifecycleEvent/StorageLifecycleEventKind were deleted: their kinds
+// moved into StorageEventKind and their result oneof into StorageEvent.result
+// (idl/sdk_events.proto), reached via SDKEvent.storage (not storage_lifecycle).
 bool storage_event_has_kind(const runanywhere::v1::SDKEvent& event,
-                            runanywhere::v1::StorageLifecycleEventKind kind) {
-    return event.category() == runanywhere::v1::EVENT_CATEGORY_STORAGE &&
-           event.has_storage_lifecycle() && event.storage_lifecycle().kind() == kind;
+                            runanywhere::v1::StorageEventKind kind) {
+    return event.category() == runanywhere::v1::EVENT_CATEGORY_STORAGE && event.has_storage() &&
+           event.storage().kind() == kind;
 }
 
 int test_info_aggregation_and_model_breakdown() {
@@ -234,32 +237,40 @@ int test_info_aggregation_and_model_breakdown() {
 
     runanywhere::v1::StorageInfoResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.info().device().total_bytes(), 1000);
     ASSERT_EQ(result.info().device().free_bytes(), 400);
     ASSERT_EQ(result.info().device().used_bytes(), 600);
-    ASSERT_TRUE(result.info().device().used_percent() > 59.9f);
+    // DeviceStorageInfo.used_percent (former tag 4) was reserved: derivable
+    // from used_bytes/total_bytes.
+    ASSERT_TRUE(static_cast<double>(result.info().device().used_bytes()) /
+                    static_cast<double>(result.info().device().total_bytes()) >
+                0.599);
     ASSERT_EQ(result.info().app().documents_bytes(), 175);
     ASSERT_EQ(result.info().app().cache_bytes(), 25);
     ASSERT_EQ(result.info().app().app_support_bytes(), 10);
     ASSERT_EQ(result.info().app().total_bytes(), 210);
-    ASSERT_EQ(result.info().total_models(), 2);
-    ASSERT_EQ(result.info().total_models_bytes(), 150);
+    // StorageInfo.total_models (former tag 4) was reserved: derivable as
+    // models_size().
     ASSERT_EQ(result.info().models_size(), 2);
-    bool found_last_used = false;
+    ASSERT_EQ(result.info().total_models_bytes(), 150);
+    // ModelStorageMetrics.last_used_ms (former tag 3) was reserved --
+    // ModelInfo.last_used_at_unix_ms is the one home for this now, so the
+    // per-file storage breakdown no longer carries it. Verify the model's
+    // size_on_disk_bytes lines up with its registered download_size instead.
+    bool found_m2 = false;
     for (const auto& metrics : result.info().models()) {
-        if (metrics.model_id() == "m2" && metrics.has_last_used_ms() &&
-            metrics.last_used_ms() == 20) {
-            found_last_used = true;
+        if (metrics.model_id() == "m2" && metrics.size_on_disk_bytes() == 50) {
+            found_m2 = true;
         }
     }
-    ASSERT_TRUE(found_last_used);
+    ASSERT_TRUE(found_m2);
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));
     ASSERT_TRUE(storage_event_has_kind(
-        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED));
-    ASSERT_TRUE(event.storage_lifecycle().has_info_result());
+        event, runanywhere::v1::STORAGE_EVENT_KIND_INFO_RETRIEVED));
+    ASSERT_TRUE(event.storage().has_info_result());
 
     rac_proto_buffer_free(&buffer);
     rac_model_registry_destroy(registry);
@@ -298,17 +309,22 @@ int test_availability_offsets_existing_model_bytes() {
 
     runanywhere::v1::StorageAvailabilityResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.availability().required_bytes(), 450);
     ASSERT_EQ(result.availability().available_bytes(), 500);
     ASSERT_TRUE(result.availability().is_available());
-    ASSERT_EQ(result.availability().shortfall_bytes(), 0);
-    ASSERT_TRUE(result.availability().required_to_available_ratio() > 0.89f);
+    // StorageAvailability.shortfall_bytes / required_to_available_ratio
+    // (former tags 6, 7) were reserved: both derivable from
+    // required_bytes/available_bytes.
+    ASSERT_TRUE(result.availability().required_bytes() <= result.availability().available_bytes());
+    ASSERT_TRUE(static_cast<double>(result.availability().required_bytes()) /
+                    static_cast<double>(result.availability().available_bytes()) >
+                0.89);
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));
     ASSERT_TRUE(storage_event_has_kind(
-        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED));
+        event, runanywhere::v1::STORAGE_EVENT_KIND_AVAILABILITY_CHECKED));
 
     rac_proto_buffer_free(&buffer);
     rac_model_registry_destroy(registry);
@@ -350,14 +366,19 @@ int test_availability_includes_cache_delete_plan() {
 
     runanywhere::v1::StorageAvailabilityResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_TRUE(!result.availability().is_available());
-    ASSERT_EQ(result.availability().shortfall_bytes(), 200);
+    // StorageAvailability.shortfall_bytes (former tag 6) was reserved:
+    // derivable as required_bytes - available_bytes.
+    ASSERT_EQ(result.availability().required_bytes() - result.availability().available_bytes(),
+              200);
     ASSERT_TRUE(result.has_delete_plan());
     ASSERT_TRUE(result.delete_plan().can_reclaim_required_bytes());
     ASSERT_EQ(result.delete_plan().required_bytes(), 200);
     ASSERT_EQ(result.delete_plan().reclaimable_bytes(), 275);
-    ASSERT_EQ(result.delete_plan().candidate_count(), 3);
+    // StorageDeletePlan.candidate_count (former tag 9) was reserved:
+    // candidate_count == candidates.size().
+    ASSERT_EQ(result.delete_plan().candidates_size(), 3);
     ASSERT_TRUE(result.delete_plan().requires_platform_delete());
     ASSERT_EQ(result.delete_plan().candidates(0).storage_key(), "cache");
 
@@ -410,17 +431,18 @@ int test_delete_plan_blocks_loaded_missing_and_missing_path() {
     ASSERT_EQ(plan.candidates(0).storage_key(), "model:m1");
     ASSERT_TRUE(plan.candidates(0).requires_platform_delete());
     ASSERT_EQ(plan.reclaimable_bytes(), 100);
-    ASSERT_EQ(plan.candidate_count(), 1);
+    // StorageDeletePlan.candidate_count (former tag 9) was reserved:
+    // candidate_count == candidates.size() (already asserted above).
     ASSERT_TRUE(plan.requires_platform_delete());
     ASSERT_TRUE(!plan.requires_unload());
     ASSERT_TRUE(!plan.can_reclaim_required_bytes());
     ASSERT_TRUE(plan.warnings_size() >= 3);
-    ASSERT_TRUE(!plan.error_message().empty());
+    ASSERT_TRUE(!plan.error().message().empty());
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));
     ASSERT_TRUE(storage_event_has_kind(
-        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED));
+        event, runanywhere::v1::STORAGE_EVENT_KIND_DELETE_PLAN_FAILED));
     ASSERT_TRUE(event.has_error());
     ASSERT_EQ(event.error().c_abi_code(), RAC_ERROR_INSUFFICIENT_STORAGE);
 
@@ -477,9 +499,13 @@ int test_delete_dry_run_vs_execute() {
     ASSERT_EQ(rac_model_registry_create(&registry), RAC_SUCCESS);
     ASSERT_EQ(save_model(registry, "m1", "Model 1", kModelFolder, 100, 20), 0);
 
+    // StorageDeleteRequest.delete_files was renamed to keep_files_on_disk
+    // with INVERTED polarity: files are deleted by default now, so opting IN
+    // to deletion (the old delete_files=true) means leaving
+    // keep_files_on_disk at its false default rather than setting it.
     runanywhere::v1::StorageDeleteRequest request;
     request.add_model_ids("m1");
-    request.set_delete_files(true);
+    request.set_keep_files_on_disk(false);
     request.set_clear_registry_paths(true);
     request.set_dry_run(true);
     std::string request_bytes = serialize(request);
@@ -492,7 +518,7 @@ int test_delete_dry_run_vs_execute() {
               RAC_SUCCESS);
     runanywhere::v1::StorageDeleteResult dry_run;
     ASSERT_TRUE(parse_buffer(buffer, &dry_run));
-    ASSERT_TRUE(dry_run.success());
+    ASSERT_TRUE(dry_run.has_error() == false);
     ASSERT_EQ(dry_run.deleted_bytes(), 100);
     ASSERT_EQ(dry_run.deleted_model_ids_size(), 1);
     ASSERT_TRUE(dry_run.dry_run());
@@ -510,7 +536,7 @@ int test_delete_dry_run_vs_execute() {
               RAC_SUCCESS);
     runanywhere::v1::StorageDeleteResult executed;
     ASSERT_TRUE(parse_buffer(buffer, &executed));
-    ASSERT_TRUE(!executed.success());
+    ASSERT_TRUE(!executed.has_error() == false);
     ASSERT_EQ(executed.skipped_model_ids_size(), 1);
     ASSERT_EQ(executed.skipped_model_ids(0), "m1");
     ASSERT_TRUE(storage.deleted_paths.empty());
@@ -524,7 +550,7 @@ int test_delete_dry_run_vs_execute() {
                   request_bytes.size(), &buffer),
               RAC_SUCCESS);
     ASSERT_TRUE(parse_buffer(buffer, &executed));
-    ASSERT_TRUE(executed.success());
+    ASSERT_TRUE(executed.has_error() == false);
     ASSERT_EQ(executed.deleted_bytes(), 100);
     ASSERT_TRUE(executed.files_deleted());
     ASSERT_TRUE(executed.registry_updated());
@@ -562,11 +588,13 @@ int test_empty_storage_info() {
 
     runanywhere::v1::StorageInfoResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.info().device().total_bytes(), 0);
     ASSERT_EQ(result.info().device().free_bytes(), 0);
     ASSERT_EQ(result.info().device().used_bytes(), 0);
-    ASSERT_EQ(result.info().total_models(), 0);
+    // StorageInfo.total_models (former tag 4) was reserved: derivable as
+    // models_size().
+    ASSERT_EQ(result.info().models_size(), 0);
     ASSERT_EQ(result.info().total_models_bytes(), 0);
 
     rac_proto_buffer_free(&buffer);
@@ -594,12 +622,12 @@ int test_invalid_request_publishes_typed_storage_error() {
 
     runanywhere::v1::StorageDeletePlan plan;
     ASSERT_TRUE(parse_buffer(buffer, &plan));
-    ASSERT_TRUE(!plan.error_message().empty());
+    ASSERT_TRUE(!plan.error().message().empty());
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));
     ASSERT_TRUE(storage_event_has_kind(
-        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED));
+        event, runanywhere::v1::STORAGE_EVENT_KIND_DELETE_PLAN_FAILED));
     ASSERT_TRUE(event.has_error());
     ASSERT_EQ(event.error().c_abi_code(), RAC_ERROR_DECODING_ERROR);
     ASSERT_EQ(event.error().category(), runanywhere::v1::ERROR_CATEGORY_VALIDATION);

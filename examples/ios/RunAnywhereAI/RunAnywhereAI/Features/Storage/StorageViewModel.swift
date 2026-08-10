@@ -19,42 +19,42 @@ class StorageViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [RAModelStorageMetrics] = []
+    @Published var storedModels: [ModelInfo] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// Byte counts, formatted once here rather than at each of the call sites
+    /// that used to reach for `ByteCountFormatter` themselves — the storage
+    /// screen and the Settings storage pane were free to disagree.
+    var formattedModelStorage: String { Self.formatBytes(modelStorageSize) }
+    var formattedAvailableSpace: String { Self.formatBytes(availableSpace) }
+    var formattedTotalStorage: String { Self.formatBytes(totalStorageSize) }
+
+    static func formatBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
     func loadData() async {
         isLoading = true
         errorMessage = nil
 
-        // Use public API to get storage info
-        var request = RAStorageInfoRequest()
-        request.includeDevice = true
-        request.includeApp = true
-        request.includeModels = true
-        request.includeCache = true
+        let state = await RunAnywhere.models.state()
+        totalStorageSize = state.storageUsedBytes
+        availableSpace = state.storageFreeBytes
+        modelStorageSize = state.storageUsedBytes
 
-        let storageResult = await RunAnywhere.getStorageInfo(request)
-        guard storageResult.success else {
-            errorMessage = storageResult.errorMessage.isEmpty
-                ? "Failed to load storage data"
-                : storageResult.errorMessage
-            isLoading = false
-            return
+        do {
+            let downloaded = try await RunAnywhere.models.list(
+                filter: ModelFilter(downloadedOnly: true)
+            )
+            // Filter out registry-only / pseudo-model entries that have no on-disk
+            // artifact (Apple system models, built-in pseudo-models, etc.).
+            storedModels = downloaded.filter { $0.downloadSizeBytes > 0 }
+        } catch {
+            errorMessage = "Failed to load storage data: \(error.localizedDescription)"
         }
-
-        let storageInfo = storageResult.info
-
-        // Update storage sizes from the public API
-        totalStorageSize = storageInfo.appStorage.totalBytes
-        availableSpace = storageInfo.deviceStorage.freeBytes
-        modelStorageSize = storageInfo.totalModelsSize
-
-        // Filter out registry-only / pseudo-model entries that have no on-disk
-        // artifact (Apple system models, built-in pseudo-models, etc.).
-        storedModels = storageInfo.models.filter { $0.sizeOnDiskBytes > 0 }
 
         isLoading = false
     }
@@ -81,12 +81,11 @@ class StorageViewModel: ObservableObject {
         }
     }
 
-    func deleteModel(_ model: RAModelStorageMetrics) async {
-        let result = await RunAnywhere.deleteModel(model.modelID)
-        guard result.success else {
-            errorMessage = result.errorMessage.isEmpty
-                ? "Failed to delete model"
-                : result.errorMessage
+    func deleteModel(_ model: ModelInfo) async {
+        do {
+            try await RunAnywhere.models.delete(id: model.id)
+        } catch {
+            errorMessage = "Failed to delete model: \(error.localizedDescription)"
             return
         }
 

@@ -19,9 +19,11 @@ import {
 import {
   ModelArtifactType,
   ModelCategory,
+  ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import { artifactCaseType, modelInfoArtifact } from '../types/ModelTypes+Artifacts.js';
 import {
   RAC_ERROR_DELETE_FAILED,
   RAC_ERROR_INVALID_ARGUMENT,
@@ -433,6 +435,16 @@ const MODEL_CATEGORIES: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION,
   ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
 ];
+/**
+ * ModelInfo.isDownloaded was deleted outright; registryStatus is the single
+ * durable downloaded-ness signal. Commons treats both DOWNLOADED and LOADED
+ * as "on disk" (model_registry.cpp:99-100).
+ */
+function isDownloadedRegistryStatus(status: ModelRegistryStatus | undefined): boolean {
+  return status === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+    || status === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+}
+
 const DIRECTORY_ARTIFACT_TYPES = new Set<ModelArtifactType>([
   ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
@@ -657,8 +669,12 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     this.persistentDeleteFailures.clear();
     this.refreshStorageState();
     if (request.dryRun) return;
-    if (!request.deleteFiles && !request.clearRegistryPaths) return;
-    if (request.deleteFiles && !request.allowPlatformDelete) return;
+    // StorageDeleteRequest.deleteFiles was inverted to keepFilesOnDisk on
+    // the wire: files are deleted by default, and keepFilesOnDisk=true is
+    // the opt-out.
+    const deleteFiles = !request.keepFilesOnDisk;
+    if (!deleteFiles && !request.clearRegistryPaths) return;
+    if (deleteFiles && !request.allowPlatformDelete) return;
     if (request.requirePlanMatch && !request.plan) return;
 
     // Match native's plan-candidate semantics before performing any browser
@@ -677,7 +693,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
               modelId,
               unloadAll: false,
             });
-            if (!result?.success) this.unloadFailures.add(modelId);
+            if (!result || result.error) this.unloadFailures.add(modelId);
           } catch {
             this.unloadFailures.add(modelId);
           }
@@ -686,7 +702,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
       this.refreshLoadedModelState();
     }
 
-    if (!request.deleteFiles) return;
+    if (!deleteFiles) return;
     for (const [modelId, localPath] of targets) {
       if (this.loadedModelIds.has(modelId) || this.unloadFailures.has(modelId)) continue;
       // Remove the persisted OPFS copy at the framework-specific canonical
@@ -962,7 +978,10 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     }
     for (const model of models) {
       const localPath = model.localPath.trim();
-      if (!localPath || model.isDownloaded === false) continue;
+      // ModelInfo.isDownloaded was deleted outright; registryStatus is the
+      // single durable downloaded-ness signal now (commons treats both
+      // DOWNLOADED and LOADED as "on disk" -- model_registry.cpp:99-100).
+      if (!localPath || !isDownloadedRegistryStatus(model.registryStatus)) continue;
       const isDirectory = this.isDirectoryModel(model);
       const descriptorBytes = (model.multiFile?.files ?? []).reduce(
         (total, file) => total + finiteStorageBytes(file.sizeBytes),
@@ -995,8 +1014,11 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   }
 
   private isDirectoryModel(model: ModelInfo): boolean {
-    return (model.multiFile?.files?.length ?? 0) > 1
-      || (model.artifactType !== undefined && DIRECTORY_ARTIFACT_TYPES.has(model.artifactType));
+    if ((model.multiFile?.files?.length ?? 0) > 1) return true;
+    // ModelInfo.artifactType was deleted as a top-level field; derive it
+    // from the artifact oneof case instead.
+    const artifact = modelInfoArtifact(model);
+    return artifact !== null && DIRECTORY_ARTIFACT_TYPES.has(artifactCaseType(artifact));
   }
 
   private metadataSize(path: string): number {

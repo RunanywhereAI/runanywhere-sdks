@@ -86,13 +86,11 @@ class VoiceComponentViewModelBase: ObservableObject {
         logger.info("Loading \(String(describing: self.component)) model: \(model.name)")
         errorMessage = nil
 
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = modelCategory
-        let result = await RunAnywhere.loadModel(request)
-        guard result.success else {
-            logger.error("Model load failed: \(result.errorMessage)")
-            errorMessage = "Failed to load model: \(result.errorMessage)"
+        do {
+            try await RunAnywhere.models.load(id: model.id)
+        } catch {
+            logger.error("Model load failed: \(error.localizedDescription)")
+            errorMessage = "Failed to load model: \(error.localizedDescription)"
             return false
         }
         applyLoadedModel(model)
@@ -112,7 +110,7 @@ class VoiceComponentViewModelBase: ObservableObject {
         // The SDK's typed lifecycle stream folds the three native load/unload
         // channels into one publisher; the base just applies it to this
         // component's published state.
-        RunAnywhere.events.modelLifecycle
+        RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 // Defer state modifications to avoid "Publishing changes
@@ -145,25 +143,16 @@ class VoiceComponentViewModelBase: ObservableObject {
     // MARK: - Initial Model State
 
     func checkInitialModelState() async {
-        applyCurrentModelSnapshot(reason: "already loaded")
+        await applyCurrentModelSnapshot(reason: "already loaded")
     }
 
-    /// Resolve the current model for this modality via the SDK snapshot and
-    /// apply it to published state. Shared by `checkInitialModelState()` (cold
-    /// start). Lifecycle-loaded events resolve from the event's model id to
-    /// avoid a current-model query feeding back into the lifecycle stream.
-    func applyCurrentModelSnapshot(reason: String) {
-        var request = RACurrentModelRequest()
-        request.category = modelCategory
-        let snapshot = RunAnywhere.currentModel(request)
-        guard snapshot.found else { return }
-
-        // When the snapshot omits model metadata, `model.id` is empty; fall
-        // back to the top-level `modelID` so the id is always populated.
-        var model = snapshot.model
-        if model.id.isEmpty {
-            model.id = snapshot.modelID
-        }
+    /// Resolve the current model for this modality from the SDK's models state
+    /// and apply it to published state. Shared by `checkInitialModelState()`
+    /// (cold start). Lifecycle-loaded events resolve from the event's model id
+    /// to avoid a models-state query feeding back into the lifecycle stream.
+    func applyCurrentModelSnapshot(reason: String) async {
+        let state = await RunAnywhere.models.state()
+        guard let model = state.loaded[modelCategory] else { return }
         applyLoadedModel(model)
         logger.info("Voice component model \(reason): \(model.id)")
     }

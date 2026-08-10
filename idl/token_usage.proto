@@ -1,0 +1,40 @@
+// RunAnywhere IDL — shared token accounting.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "TokenUsageProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// One token-accounting shape embedded by every result and metrics message,
+// replacing the input/output/total/throughput quadruple that was copied inline
+// across LLM, VLM, and RAG results. Names follow the OpenAI Responses API; the
+// timing fields follow llama.cpp's `timings` object, which names the phase it
+// measures.
+message TokenUsage {
+    int32  input_tokens      = 1;
+    int32  output_tokens     = 2;
+    int32  total_tokens      = 3;
+
+    // Decode-phase throughput only: output_tokens / decode_ms. Excludes
+    // prefill. cf. llama.cpp timings.predicted_per_second.
+    double decode_tokens_per_second = 4;
+
+    // Prefill (prompt eval) wall time. cf. llama.cpp timings.prompt_ms,
+    // Ollama prompt_eval_duration. 0 when the backend does not report it.
+    int64  prefill_ms       = 5;
+
+    // Request start to first output token. The canonical spelling for every
+    // result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
+    // report TTFT here and nowhere else. SDKEvent's own telemetry fields
+    // (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
+    // their separate event-stream spelling.
+    int64  ttft_ms          = 6;
+}

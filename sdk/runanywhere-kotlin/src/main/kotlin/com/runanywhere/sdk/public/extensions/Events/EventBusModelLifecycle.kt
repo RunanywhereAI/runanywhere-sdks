@@ -4,16 +4,20 @@
  *
  * Typed model-lifecycle stream over the raw SDK event bus.
  *
- * Native commons signals "model loaded/unloaded" on THREE different proto
+ * Native commons signals "model loaded/unloaded" on TWO different proto
  * channels depending on the path that performed the work:
  *   1. component-lifecycle events (EVENT_CATEGORY_COMPONENT,
  *      `component_lifecycle.current_state`) — the `loadModel` path,
- *   2. model events (`model.kind` load/unload completed),
- *   3. LLM generation events (`generation.kind` modelLoaded/Unloaded).
+ *   2. model events (`model.kind` load/unload completed).
+ *
+ * `GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED`/`_UNLOADED` are
+ * deleted outright (idl/sdk_events.proto, reserved 1/2 on
+ * `GenerationEventKind`): the third "generation" channel this file used to
+ * fold in no longer exists on the wire.
  *
  * Which channel fires when is an SDK-internal detail. Consumers should not
- * need to know it — before this helper every app ViewModel hand-decoded all
- * three with an identical switch. `EventBus.modelLifecycle` folds them into
+ * need to know it — before this helper every app ViewModel hand-decoded both
+ * with an identical switch. `EventBus.modelLifecycle` folds them into
  * one typed stream; `modelLoaded` / `modelUnloaded` are pre-filtered views.
  *
  * Mirrors Swift `EventBus+ModelLifecycle.swift` exactly.
@@ -23,7 +27,6 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.EventCategory
-import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.events.EventBus
@@ -111,24 +114,19 @@ fun EventBus.modelLifecycleChange(event: SDKEvent): RAModelLifecycleChange? {
         }
     }
 
-    // Channels 2 + 3: model events and LLM generation events.
+    // Channel 2: model events.
     val modelKind = event.model?.kind
-    val generationKind = event.generation?.kind
-    val modelId =
-        event.model?.model_id?.takeIf { it.isNotEmpty() }
-            ?: event.generation?.model_id.orEmpty()
+    val modelId = event.model?.model_id.orEmpty()
 
-    return when {
-        modelKind == ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||
-            generationKind == GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED ->
+    return when (modelKind) {
+        ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ->
             RAModelLifecycleChange(
                 kind = RAModelLifecycleChange.Kind.LOADED,
                 modelId = modelId,
                 component = event.component,
                 event = event,
             )
-        modelKind == ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ||
-            generationKind == GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED ->
+        ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ->
             RAModelLifecycleChange(
                 kind = RAModelLifecycleChange.Kind.UNLOADED,
                 modelId = modelId,

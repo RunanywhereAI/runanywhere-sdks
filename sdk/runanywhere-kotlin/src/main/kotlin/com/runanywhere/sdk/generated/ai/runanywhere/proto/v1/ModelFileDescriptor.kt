@@ -45,18 +45,14 @@ public class ModelFileDescriptor(
   )
   public val filename: String = "",
   @field:WireField(
-    tag = 3,
+    tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isRequired",
+    jsonName = "isOptional",
     schemaIndex = 2,
   )
-  public val is_required: Boolean = false,
+  public val is_optional: Boolean = false,
   /**
-   * Extended descriptor fields (Flutter model_types.dart:~350,
-   * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-   * canonical "required" flag — the documented `required` boolean from
-   * newer SDK sources maps onto it (default true, mirrored in Swift).
    * Exact on-disk artifact size, verified after download.
    */
   @field:WireField(
@@ -122,7 +118,7 @@ public class ModelFileDescriptor(
     if (unknownFields != other.unknownFields) return false
     if (url != other.url) return false
     if (filename != other.filename) return false
-    if (is_required != other.is_required) return false
+    if (is_optional != other.is_optional) return false
     if (size_bytes != other.size_bytes) return false
     if (relative_path != other.relative_path) return false
     if (destination_path != other.destination_path) return false
@@ -138,7 +134,7 @@ public class ModelFileDescriptor(
       result = unknownFields.hashCode()
       result = result * 37 + url.hashCode()
       result = result * 37 + filename.hashCode()
-      result = result * 37 + is_required.hashCode()
+      result = result * 37 + is_optional.hashCode()
       result = result * 37 + (size_bytes?.hashCode() ?: 0)
       result = result * 37 + (relative_path?.hashCode() ?: 0)
       result = result * 37 + (destination_path?.hashCode() ?: 0)
@@ -154,7 +150,7 @@ public class ModelFileDescriptor(
     val result = mutableListOf<String>()
     result += """url=${sanitize(url)}"""
     result += """filename=${sanitize(filename)}"""
-    result += """is_required=$is_required"""
+    result += """is_optional=$is_optional"""
     if (size_bytes != null) result += """size_bytes=$size_bytes"""
     if (relative_path != null) result += """relative_path=${sanitize(relative_path)}"""
     if (destination_path != null) result += """destination_path=${sanitize(destination_path)}"""
@@ -167,7 +163,7 @@ public class ModelFileDescriptor(
   public fun copy(
     url: String = this.url,
     filename: String = this.filename,
-    is_required: Boolean = this.is_required,
+    is_optional: Boolean = this.is_optional,
     size_bytes: Long? = this.size_bytes,
     relative_path: String? = this.relative_path,
     destination_path: String? = this.destination_path,
@@ -175,7 +171,7 @@ public class ModelFileDescriptor(
     local_path: String? = this.local_path,
     checksum_sha256: String? = this.checksum_sha256,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, relative_path, destination_path, role, local_path, checksum_sha256, unknownFields)
+  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_optional, size_bytes, relative_path, destination_path, role, local_path, checksum_sha256, unknownFields)
 
   public companion object {
     @JvmField
@@ -196,8 +192,8 @@ public class ModelFileDescriptor(
         if (value.filename != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.filename)
         }
-        if (value.is_required != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.is_required)
+        if (value.is_optional != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(12, value.is_optional)
         }
         size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.size_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.relative_path)
@@ -215,8 +211,8 @@ public class ModelFileDescriptor(
         if (value.filename != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.filename)
         }
-        if (value.is_required != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.is_required)
+        if (value.is_optional != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 12, value.is_optional)
         }
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
@@ -235,8 +231,8 @@ public class ModelFileDescriptor(
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
-        if (value.is_required != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.is_required)
+        if (value.is_optional != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 12, value.is_optional)
         }
         if (value.filename != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.filename)
@@ -249,7 +245,7 @@ public class ModelFileDescriptor(
       override fun decode(reader: ProtoReader): ModelFileDescriptor {
         var url: String = ""
         var filename: String = ""
-        var is_required: Boolean = false
+        var is_optional: Boolean = false
         var size_bytes: Long? = null
         var relative_path: String? = null
         var destination_path: String? = null
@@ -260,7 +256,7 @@ public class ModelFileDescriptor(
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
             2 -> filename = ProtoAdapter.STRING.decode(reader)
-            3 -> is_required = ProtoAdapter.BOOL.decode(reader)
+            12 -> is_optional = ProtoAdapter.BOOL.decode(reader)
             4 -> size_bytes = ProtoAdapter.INT64.decode(reader)
             6 -> relative_path = ProtoAdapter.STRING.decode(reader)
             7 -> destination_path = ProtoAdapter.STRING.decode(reader)
@@ -277,7 +273,7 @@ public class ModelFileDescriptor(
         return ModelFileDescriptor(
           url = url,
           filename = filename,
-          is_required = is_required,
+          is_optional = is_optional,
           size_bytes = size_bytes,
           relative_path = relative_path,
           destination_path = destination_path,

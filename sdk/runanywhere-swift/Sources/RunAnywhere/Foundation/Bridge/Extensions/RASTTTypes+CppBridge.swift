@@ -10,64 +10,31 @@ import Foundation
 // MARK: - RASTTOptions: C-bridge + convenience
 
 public extension RASTTOptions {
-    var languageString: String {
-        switch language {
-        case .auto:    return "auto"
-        case .en:      return "en"
-        case .es:      return "es"
-        case .fr:      return "fr"
-        case .de:      return "de"
-        case .zh:      return "zh"
-        case .ja:      return "ja"
-        case .ko:      return "ko"
-        case .it:      return "it"
-        case .pt:      return "pt"
-        case .ar:      return "ar"
-        case .ru:      return "ru"
-        case .hi:      return "hi"
-        default:       return "en"
-        }
-    }
-
+    // enableDiarization -> diarize, maxSpeakers -> speakersExpected (now
+    // optional presence-tracked), vocabularyList deleted outright (no
+    // replacement) — all idl/stt_options.proto renames/removals. No live
+    // caller of this initializer exists; kept only so callers that
+    // construct via named args at the old spelling still compile.
     init(
         language: String = "en",
         detectLanguage: Bool = false,
         enablePunctuation: Bool = true,
-        enableDiarization: Bool = false,
-        maxSpeakers: Int = 0,
-        enableTimestamps: Bool = true,
-        vocabularyFilter: [String] = []
+        diarize: Bool = false,
+        speakersExpected: Int? = nil,
+        enableTimestamps: Bool = true
     ) {
         var options = RASTTOptions()
-        options.language = detectLanguage ? .auto : RASTTOptions.languageFromString(language)
+        // `language` is an optional BCP-47 string; leaving it unset asks the
+        // backend to auto-detect.
+        if !detectLanguage, !language.isEmpty {
+            options.language = language
+        }
         options.enablePunctuation = enablePunctuation
-        options.enableDiarization = enableDiarization
-        options.maxSpeakers = Int32(maxSpeakers)
+        options.diarize = diarize
+        if let speakersExpected { options.speakersExpected = Int32(speakersExpected) }
         options.enableWordTimestamps = enableTimestamps
-        options.vocabularyList = vocabularyFilter
         self = options
     }
-
-    static func languageFromString(_ raw: String) -> RASTTLanguage {
-        let base = raw.split(separator: "-").first.map(String.init)?.lowercased() ?? raw.lowercased()
-        switch base {
-        case "auto": return .auto
-        case "en":   return .en
-        case "es":   return .es
-        case "fr":   return .fr
-        case "de":   return .de
-        case "zh":   return .zh
-        case "ja":   return .ja
-        case "ko":   return .ko
-        case "it":   return .it
-        case "pt":   return .pt
-        case "ar":   return .ar
-        case "ru":   return .ru
-        case "hi":   return .hi
-        default:     return .en
-        }
-    }
-
 }
 
 // MARK: - RASTTOutput

@@ -15,16 +15,96 @@
 
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/device_info.pb.dart';
 import 'package:runanywhere/generated/diarization.pb.dart';
+import 'package:runanywhere/generated/diffusion_options.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart';
+import 'package:runanywhere/generated/hybrid_router.pb.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart';
 import 'package:runanywhere/generated/logging.pb.dart';
+import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
+import 'package:runanywhere/generated/rerank.pb.dart';
+import 'package:runanywhere/generated/sdk_events.pbenum.dart';
+import 'package:runanywhere/generated/sdk_init.pb.dart';
+import 'package:runanywhere/generated/segmentation.pb.dart';
+import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
+import 'package:runanywhere/generated/tool_calling.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
-import 'package:runanywhere/generated/vlm_options.pb.dart';
+
+extension ToolCallingOptionsConvenience on ToolCallingOptions {
+  static ToolCallingOptions defaults() {
+    final r = ToolCallingOptions();
+    r.maxToolCalls = 5;
+    return r;
+  }
+}
+
+extension ToolCallingOptionsValidate on ToolCallingOptions {
+  void validate() {
+    final effectiveMaxToolCalls = hasMaxToolCalls() ? maxToolCalls : 5;
+    if (effectiveMaxToolCalls < 1) {
+      throw SDKException.validationFailed(
+        'max_tool_calls must be >= 1 (got $effectiveMaxToolCalls)',
+        fieldPath: 'ToolCallingOptions.max_tool_calls',
+      );
+    }
+  }
+}
+
+extension ErrorCategoryWireString on ErrorCategory {
+  String get wireString {
+    switch (this) {
+      case ErrorCategory.ERROR_CATEGORY_UNSPECIFIED:
+        return 'unspecified';
+      case ErrorCategory.ERROR_CATEGORY_NETWORK:
+        return 'network_error';
+      case ErrorCategory.ERROR_CATEGORY_VALIDATION:
+        return 'invalid_request_error';
+      case ErrorCategory.ERROR_CATEGORY_MODEL:
+        return 'model_error';
+      case ErrorCategory.ERROR_CATEGORY_COMPONENT:
+        return 'component_error';
+      case ErrorCategory.ERROR_CATEGORY_IO:
+        return 'io_error';
+      case ErrorCategory.ERROR_CATEGORY_AUTH:
+        return 'authentication_error';
+      case ErrorCategory.ERROR_CATEGORY_INTERNAL:
+        return 'internal_error';
+      case ErrorCategory.ERROR_CATEGORY_CONFIGURATION:
+        return 'configuration_error';
+    }
+    return '';
+  }
+}
+
+ErrorCategory? errorCategoryFromWireString(String value) {
+  switch (value.toLowerCase()) {
+    case 'unspecified':
+      return ErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
+    case 'network_error':
+      return ErrorCategory.ERROR_CATEGORY_NETWORK;
+    case 'invalid_request_error':
+      return ErrorCategory.ERROR_CATEGORY_VALIDATION;
+    case 'model_error':
+      return ErrorCategory.ERROR_CATEGORY_MODEL;
+    case 'component_error':
+      return ErrorCategory.ERROR_CATEGORY_COMPONENT;
+    case 'io_error':
+      return ErrorCategory.ERROR_CATEGORY_IO;
+    case 'authentication_error':
+      return ErrorCategory.ERROR_CATEGORY_AUTH;
+    case 'internal_error':
+      return ErrorCategory.ERROR_CATEGORY_INTERNAL;
+    case 'configuration_error':
+      return ErrorCategory.ERROR_CATEGORY_CONFIGURATION;
+  }
+  return null;
+}
 
 extension AudioFormatWireString on AudioFormat {
   String get wireString {
@@ -107,6 +187,8 @@ extension ModelCategoryWireString on ModelCategory {
         return 'speaker-diarization';
       case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
         return 'semantic-segmentation';
+      case ModelCategory.MODEL_CATEGORY_RERANK:
+        return 'rerank';
     }
     return '';
   }
@@ -138,6 +220,8 @@ ModelCategory? modelCategoryFromWireString(String value) {
       return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
     case 'semantic-segmentation':
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+    case 'rerank':
+      return ModelCategory.MODEL_CATEGORY_RERANK;
   }
   return null;
 }
@@ -232,48 +316,119 @@ ArchiveStructure? archiveStructureFromWireString(String value) {
   return null;
 }
 
+extension AcceleratorPolicyWireString on AcceleratorPolicy {
+  String get wireString {
+    switch (this) {
+      case AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED:
+        return 'unspecified';
+      case AcceleratorPolicy.ACCELERATOR_POLICY_AUTO:
+        return 'auto';
+      case AcceleratorPolicy.ACCELERATOR_POLICY_CPU:
+        return 'cpu';
+      case AcceleratorPolicy.ACCELERATOR_POLICY_GPU:
+        return 'gpu';
+      case AcceleratorPolicy.ACCELERATOR_POLICY_NPU:
+        return 'npu';
+    }
+    return '';
+  }
+}
+
+AcceleratorPolicy? acceleratorPolicyFromWireString(String value) {
+  switch (value.toLowerCase()) {
+    case 'unspecified':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED;
+    case 'auto':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+    case 'cpu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+    case 'gpu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+    case 'npu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
+  }
+  return null;
+}
+
+extension StructuredOutputOptionsConvenience on StructuredOutputOptions {
+  static StructuredOutputOptions defaults() {
+    final r = StructuredOutputOptions();
+    r.includeSchemaInPrompt = true;
+    return r;
+  }
+}
+
 extension LLMGenerationOptionsConvenience on LLMGenerationOptions {
   static LLMGenerationOptions defaults() {
     final r = LLMGenerationOptions();
-    r.maxTokens = 100;
-    r.temperature = 0.8;
+    r.maxOutputTokens = 512;
+    r.temperature = 0.7;
     r.topP = 1.0;
-    r.topK = 0;
-    r.repetitionPenalty = 1.0;
+    r.topK = 40;
+    r.repeatPenalty = 1.1;
+    r.seed = Int64(0);
+    r.frequencyPenalty = 0.0;
+    r.presencePenalty = 0.0;
+    r.repeatLastN = 0;
+    r.minP = 0.05;
     return r;
   }
 }
 
 extension LLMGenerationOptionsValidate on LLMGenerationOptions {
   void validate() {
-    if (maxTokens < 0) {
+    final effectiveMaxOutputTokens = hasMaxOutputTokens() ? maxOutputTokens : 512;
+    if (effectiveMaxOutputTokens < 0) {
       throw SDKException.validationFailed(
-        'max_tokens must be >= 0 (got $maxTokens)',
-        fieldPath: 'LLMGenerationOptions.max_tokens',
+        'max_output_tokens must be >= 0 (got $effectiveMaxOutputTokens)',
+        fieldPath: 'LLMGenerationOptions.max_output_tokens',
       );
     }
-    if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {
+    final effectiveTemperature = hasTemperature() ? temperature : 0.7;
+    if (!effectiveTemperature.isFinite || effectiveTemperature < 0.0 || effectiveTemperature > 2.0) {
       throw SDKException.validationFailed(
-        'temperature must be in 0.0...2.0 (got $temperature)',
+        'temperature must be in 0.0...2.0 (got $effectiveTemperature)',
         fieldPath: 'LLMGenerationOptions.temperature',
       );
     }
-    if (!topP.isFinite || topP < 0.0 || topP > 1.0) {
+    final effectiveTopP = hasTopP() ? topP : 1.0;
+    if (!effectiveTopP.isFinite || effectiveTopP < 0.0 || effectiveTopP > 1.0) {
       throw SDKException.validationFailed(
-        'top_p must be in 0.0...1.0 (got $topP)',
+        'top_p must be in 0.0...1.0 (got $effectiveTopP)',
         fieldPath: 'LLMGenerationOptions.top_p',
       );
     }
-    if (topK < 0) {
+    final effectiveTopK = hasTopK() ? topK : 40;
+    if (effectiveTopK < 0) {
       throw SDKException.validationFailed(
-        'top_k must be >= 0 (got $topK)',
+        'top_k must be >= 0 (got $effectiveTopK)',
         fieldPath: 'LLMGenerationOptions.top_k',
       );
     }
-    if (!repetitionPenalty.isFinite || repetitionPenalty < 0.0) {
+    final effectiveRepeatPenalty = hasRepeatPenalty() ? repeatPenalty : 1.1;
+    if (!effectiveRepeatPenalty.isFinite || effectiveRepeatPenalty < 0.0) {
       throw SDKException.validationFailed(
-        'repetition_penalty must be >= 0.0 (got $repetitionPenalty)',
-        fieldPath: 'LLMGenerationOptions.repetition_penalty',
+        'repeat_penalty must be >= 0.0 (got $effectiveRepeatPenalty)',
+        fieldPath: 'LLMGenerationOptions.repeat_penalty',
+      );
+    }
+  }
+}
+
+extension LLMConfigurationConvenience on LLMConfiguration {
+  static LLMConfiguration defaults() {
+    final r = LLMConfiguration();
+    r.contextLength = 2048;
+    return r;
+  }
+}
+
+extension DeviceInfoValidate on DeviceInfo {
+  void validate() {
+    if (hasBatteryLevel() && (!batteryLevel.isFinite || batteryLevel < 0.0 || batteryLevel > 1.0)) {
+      throw SDKException.validationFailed(
+        'battery_level must be in 0.0...1.0 (got $batteryLevel)',
+        fieldPath: 'DeviceInfo.battery_level',
       );
     }
   }
@@ -282,9 +437,9 @@ extension LLMGenerationOptionsValidate on LLMGenerationOptions {
 extension DiarizationOptionsConvenience on DiarizationOptions {
   static DiarizationOptions defaults() {
     final r = DiarizationOptions();
-    r.sampleRateHz = 16000;
-    r.channelCount = 1;
-    r.encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    r.sampleRate = 16000;
+    r.channels = 1;
+    r.encoding = AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
     r.threshold = 0.5;
     return r;
   }
@@ -292,18 +447,18 @@ extension DiarizationOptionsConvenience on DiarizationOptions {
 
 extension DiarizationOptionsValidate on DiarizationOptions {
   void validate() {
-    final effectiveSampleRateHz = hasSampleRateHz() ? sampleRateHz : 16000;
-    if (effectiveSampleRateHz < 8000 || effectiveSampleRateHz > 48000) {
+    final effectiveSampleRate = hasSampleRate() ? sampleRate : 16000;
+    if (effectiveSampleRate < 16000 || effectiveSampleRate > 16000) {
       throw SDKException.validationFailed(
-        'sample_rate_hz must be in 8000...48000 (got $effectiveSampleRateHz)',
-        fieldPath: 'DiarizationOptions.sample_rate_hz',
+        'sample_rate must be in 16000...16000 (got $effectiveSampleRate)',
+        fieldPath: 'DiarizationOptions.sample_rate',
       );
     }
-    final effectiveChannelCount = hasChannelCount() ? channelCount : 1;
-    if (effectiveChannelCount < 1 || effectiveChannelCount > 1) {
+    final effectiveChannels = hasChannels() ? channels : 1;
+    if (effectiveChannels < 1 || effectiveChannels > 1) {
       throw SDKException.validationFailed(
-        'channel_count must be in 1...1 (got $effectiveChannelCount)',
-        fieldPath: 'DiarizationOptions.channel_count',
+        'channels must be in 1...1 (got $effectiveChannels)',
+        fieldPath: 'DiarizationOptions.channels',
       );
     }
     final effectiveThreshold = hasThreshold() ? threshold : 0.5;
@@ -325,37 +480,60 @@ extension DiarizationOptionsValidate on DiarizationOptions {
         fieldPath: 'DiarizationOptions.merge_gap_ms',
       );
     }
+    if (hasMaxSpeakers() && (maxSpeakers < 1)) {
+      throw SDKException.validationFailed(
+        'max_speakers must be >= 1 (got $maxSpeakers)',
+        fieldPath: 'DiarizationOptions.max_speakers',
+      );
+    }
   }
 }
 
-extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
-  static EmbeddingsConfiguration defaults() {
-    final r = EmbeddingsConfiguration();
-    r.embeddingDimension = 384;
-    r.maxSequenceLength = 512;
-    r.normalize = true;
+extension DiffusionGenerationOptionsConvenience on DiffusionGenerationOptions {
+  static DiffusionGenerationOptions defaults() {
+    final r = DiffusionGenerationOptions();
+    r.width = 0;
+    r.height = 0;
+    r.steps = 0;
+    r.guidanceScale = 0.0;
+    r.strength = 0.75;
+    r.n = 1;
+    r.outputFormat = DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_PNG;
     return r;
   }
 }
 
-extension EmbeddingsConfigurationValidate on EmbeddingsConfiguration {
+extension DiffusionGenerationOptionsValidate on DiffusionGenerationOptions {
   void validate() {
-    if (modelId.isEmpty) {
+    if (prompt.isEmpty) {
       throw SDKException.validationFailed(
-        'model_id is required',
-        fieldPath: 'EmbeddingsConfiguration.model_id',
+        'prompt is required',
+        fieldPath: 'DiffusionGenerationOptions.prompt',
       );
     }
-    if (embeddingDimension < 1) {
+    if (steps < 0 || steps > 50) {
       throw SDKException.validationFailed(
-        'embedding_dimension must be >= 1 (got $embeddingDimension)',
-        fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
+        'steps must be in 0...50 (got $steps)',
+        fieldPath: 'DiffusionGenerationOptions.steps',
       );
     }
-    if (maxSequenceLength < 1) {
+    if (!guidanceScale.isFinite || guidanceScale < 0.0 || guidanceScale > 20.0) {
       throw SDKException.validationFailed(
-        'max_sequence_length must be >= 1 (got $maxSequenceLength)',
-        fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
+        'guidance_scale must be in 0.0...20.0 (got $guidanceScale)',
+        fieldPath: 'DiffusionGenerationOptions.guidance_scale',
+      );
+    }
+    if (!strength.isFinite || strength < 0.0 || strength > 1.0) {
+      throw SDKException.validationFailed(
+        'strength must be in 0.0...1.0 (got $strength)',
+        fieldPath: 'DiffusionGenerationOptions.strength',
+      );
+    }
+    final effectiveN = hasN() ? n : 1;
+    if (effectiveN < 1 || effectiveN > 8) {
+      throw SDKException.validationFailed(
+        'n must be in 1...8 (got $effectiveN)',
+        fieldPath: 'DiffusionGenerationOptions.n',
       );
     }
   }
@@ -365,45 +543,80 @@ extension EmbeddingsOptionsConvenience on EmbeddingsOptions {
   static EmbeddingsOptions defaults() {
     final r = EmbeddingsOptions();
     r.normalize = true;
+    r.nThreads = 0;
     return r;
   }
 }
 
-extension VADConfigurationConvenience on VADConfiguration {
-  static VADConfiguration defaults() {
-    final r = VADConfiguration();
-    r.sampleRate = 16000;
-    r.frameLengthMs = 100;
-    r.threshold = 0.015;
-    r.calibrationMultiplier = 2.0;
-    return r;
-  }
-}
-
-extension VADConfigurationValidate on VADConfiguration {
+extension EmbeddingsOptionsValidate on EmbeddingsOptions {
   void validate() {
-    if (sampleRate < 1 || sampleRate > 48000) {
+    if (hasBatchSize() && (batchSize < 1 || batchSize > 8192)) {
       throw SDKException.validationFailed(
-        'sample_rate must be in 1...48000 (got $sampleRate)',
-        fieldPath: 'VADConfiguration.sample_rate',
+        'batch_size must be in 1...8192 (got $batchSize)',
+        fieldPath: 'EmbeddingsOptions.batch_size',
       );
     }
-    if (frameLengthMs < 1 || frameLengthMs > 1000) {
+    if (hasDimensions() && (dimensions < 1)) {
       throw SDKException.validationFailed(
-        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
-        fieldPath: 'VADConfiguration.frame_length_ms',
+        'dimensions must be >= 1 (got $dimensions)',
+        fieldPath: 'EmbeddingsOptions.dimensions',
       );
     }
+  }
+}
+
+extension BatteryFilterConvenience on BatteryFilter {
+  static BatteryFilter defaults() {
+    final r = BatteryFilter();
+    r.minBatteryPercent = 20;
+    return r;
+  }
+}
+
+extension BatteryFilterValidate on BatteryFilter {
+  void validate() {
+    if (minBatteryPercent < 0 || minBatteryPercent > 100) {
+      throw SDKException.validationFailed(
+        'min_battery_percent must be in 0...100 (got $minBatteryPercent)',
+        fieldPath: 'BatteryFilter.min_battery_percent',
+      );
+    }
+  }
+}
+
+extension ConfidenceCascadeConvenience on ConfidenceCascade {
+  static ConfidenceCascade defaults() {
+    final r = ConfidenceCascade();
+    r.threshold = 0.5;
+    return r;
+  }
+}
+
+extension ConfidenceCascadeValidate on ConfidenceCascade {
+  void validate() {
     if (!threshold.isFinite || threshold < 0.0 || threshold > 1.0) {
       throw SDKException.validationFailed(
         'threshold must be in 0.0...1.0 (got $threshold)',
-        fieldPath: 'VADConfiguration.threshold',
+        fieldPath: 'ConfidenceCascade.threshold',
       );
     }
-    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
+  }
+}
+
+extension HybridRoutingPolicyConvenience on HybridRoutingPolicy {
+  static HybridRoutingPolicy defaults() {
+    final r = HybridRoutingPolicy();
+    r.attemptTimeoutMs = 0;
+    return r;
+  }
+}
+
+extension HybridRoutingPolicyValidate on HybridRoutingPolicy {
+  void validate() {
+    if (attemptTimeoutMs < 0) {
       throw SDKException.validationFailed(
-        'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
-        fieldPath: 'VADConfiguration.calibration_multiplier',
+        'attempt_timeout_ms must be >= 0 (got $attemptTimeoutMs)',
+        fieldPath: 'HybridRoutingPolicy.attempt_timeout_ms',
       );
     }
   }
@@ -475,11 +688,38 @@ extension LoggingConfigurationConvenience on LoggingConfiguration {
   }
 }
 
+extension LoraAdapterConfigConvenience on LoraAdapterConfig {
+  static LoraAdapterConfig defaults() {
+    final r = LoraAdapterConfig();
+    r.scale = 1.0;
+    return r;
+  }
+}
+
+extension LoraAdapterConfigValidate on LoraAdapterConfig {
+  void validate() {
+    if (adapterId.isEmpty) {
+      throw SDKException.validationFailed(
+        'adapter_id is required',
+        fieldPath: 'LoraAdapterConfig.adapter_id',
+      );
+    }
+  }
+}
+
+extension LoraAdapterCatalogEntryConvenience on LoraAdapterCatalogEntry {
+  static LoraAdapterCatalogEntry defaults() {
+    final r = LoraAdapterCatalogEntry();
+    r.defaultScale = 1.0;
+    return r;
+  }
+}
+
 extension RAGConfigurationConvenience on RAGConfiguration {
   static RAGConfiguration defaults() {
     final r = RAGConfiguration();
     r.topK = 5;
-    r.similarityThreshold = 0.0;
+    r.scoreThreshold = 0.0;
     r.chunkSize = 512;
     r.chunkOverlap = 64;
     return r;
@@ -495,11 +735,11 @@ extension RAGConfigurationValidate on RAGConfiguration {
         fieldPath: 'RAGConfiguration.top_k',
       );
     }
-    final effectiveSimilarityThreshold = hasSimilarityThreshold() ? similarityThreshold : 0.0;
-    if (!effectiveSimilarityThreshold.isFinite || effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0) {
+    final effectiveScoreThreshold = hasScoreThreshold() ? scoreThreshold : 0.0;
+    if (!effectiveScoreThreshold.isFinite || effectiveScoreThreshold < 0.0 || effectiveScoreThreshold > 1.0) {
       throw SDKException.validationFailed(
-        'similarity_threshold must be in 0.0...1.0 (got $effectiveSimilarityThreshold)',
-        fieldPath: 'RAGConfiguration.similarity_threshold',
+        'score_threshold must be in 0.0...1.0 (got $effectiveScoreThreshold)',
+        fieldPath: 'RAGConfiguration.score_threshold',
       );
     }
     final effectiveChunkSize = hasChunkSize() ? chunkSize : 512;
@@ -519,101 +759,275 @@ extension RAGConfigurationValidate on RAGConfiguration {
   }
 }
 
-extension RAGQueryOptionsConvenience on RAGQueryOptions {
-  static RAGQueryOptions defaults() {
-    final r = RAGQueryOptions();
-    r.maxTokens = 512;
-    r.temperature = 0.7;
-    r.topP = 1.0;
+extension RAGRetrievalOptionsConvenience on RAGRetrievalOptions {
+  static RAGRetrievalOptions defaults() {
+    final r = RAGRetrievalOptions();
     r.multiQueryCount = 3;
     return r;
   }
 }
 
-extension RAGQueryOptionsValidate on RAGQueryOptions {
+extension RAGRetrievalOptionsValidate on RAGRetrievalOptions {
   void validate() {
+    if (hasTopK() && (topK < 1)) {
+      throw SDKException.validationFailed(
+        'top_k must be >= 1 (got $topK)',
+        fieldPath: 'RAGRetrievalOptions.top_k',
+      );
+    }
+    if (hasScoreThreshold() && (!scoreThreshold.isFinite || scoreThreshold < 0.0 || scoreThreshold > 1.0)) {
+      throw SDKException.validationFailed(
+        'score_threshold must be in 0.0...1.0 (got $scoreThreshold)',
+        fieldPath: 'RAGRetrievalOptions.score_threshold',
+      );
+    }
     final effectiveMultiQueryCount = hasMultiQueryCount() ? multiQueryCount : 3;
     if (effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8) {
       throw SDKException.validationFailed(
         'multi_query_count must be in 1...8 (got $effectiveMultiQueryCount)',
-        fieldPath: 'RAGQueryOptions.multi_query_count',
+        fieldPath: 'RAGRetrievalOptions.multi_query_count',
       );
     }
   }
 }
 
-extension STTLanguageWireString on STTLanguage {
+extension RAGQueryOptionsValidate on RAGQueryOptions {
+  void validate() {
+    if (query.isEmpty) {
+      throw SDKException.validationFailed(
+        'query is required',
+        fieldPath: 'RAGQueryOptions.query',
+      );
+    }
+  }
+}
+
+extension RAGSearchRequestValidate on RAGSearchRequest {
+  void validate() {
+    if (query.isEmpty) {
+      throw SDKException.validationFailed(
+        'query is required',
+        fieldPath: 'RAGSearchRequest.query',
+      );
+    }
+  }
+}
+
+extension RerankOptionsConvenience on RerankOptions {
+  static RerankOptions defaults() {
+    final r = RerankOptions();
+    r.topN = 0;
+    r.maxTokensPerDoc = 0;
+    return r;
+  }
+}
+
+extension RerankRequestValidate on RerankRequest {
+  void validate() {
+    if (query.isEmpty) {
+      throw SDKException.validationFailed(
+        'query is required',
+        fieldPath: 'RerankRequest.query',
+      );
+    }
+  }
+}
+
+extension VADConfigurationConvenience on VADConfiguration {
+  static VADConfiguration defaults() {
+    final r = VADConfiguration();
+    r.sampleRate = 16000;
+    r.frameLengthMs = 100;
+    r.activationThreshold = 0.5;
+    r.calibrationMultiplier = 2.0;
+    return r;
+  }
+}
+
+extension VADConfigurationValidate on VADConfiguration {
+  void validate() {
+    if (sampleRate < 8000 || sampleRate > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate must be in 8000...48000 (got $sampleRate)',
+        fieldPath: 'VADConfiguration.sample_rate',
+      );
+    }
+    if (frameLengthMs < 20 || frameLengthMs > 1000) {
+      throw SDKException.validationFailed(
+        'frame_length_ms must be in 20...1000 (got $frameLengthMs)',
+        fieldPath: 'VADConfiguration.frame_length_ms',
+      );
+    }
+    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
+        fieldPath: 'VADConfiguration.activation_threshold',
+      );
+    }
+    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0) {
+      throw SDKException.validationFailed(
+        'calibration_multiplier must be in 1.2...4.0 (got $calibrationMultiplier)',
+        fieldPath: 'VADConfiguration.calibration_multiplier',
+      );
+    }
+  }
+}
+
+extension VADOptionsConvenience on VADOptions {
+  static VADOptions defaults() {
+    final r = VADOptions();
+    r.activationThreshold = 0.5;
+    r.minSpeechDurationMs = 250;
+    r.minSilenceDurationMs = 500;
+    r.prefixPaddingMs = 300;
+    r.sampleRate = 16000;
+    return r;
+  }
+}
+
+extension VADOptionsValidate on VADOptions {
+  void validate() {
+    final effectiveActivationThreshold = hasActivationThreshold() ? activationThreshold : 0.5;
+    if (!effectiveActivationThreshold.isFinite || effectiveActivationThreshold < 0.0 || effectiveActivationThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'activation_threshold must be in 0.0...1.0 (got $effectiveActivationThreshold)',
+        fieldPath: 'VADOptions.activation_threshold',
+      );
+    }
+    if (sampleRate < 8000 || sampleRate > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate must be in 8000...48000 (got $sampleRate)',
+        fieldPath: 'VADOptions.sample_rate',
+      );
+    }
+  }
+}
+
+extension SDKComponentWireString on SDKComponent {
   String get wireString {
     switch (this) {
-      case STTLanguage.STT_LANGUAGE_UNSPECIFIED:
-        return '';
-      case STTLanguage.STT_LANGUAGE_AUTO:
-        return 'auto';
-      case STTLanguage.STT_LANGUAGE_EN:
-        return 'en';
-      case STTLanguage.STT_LANGUAGE_ES:
-        return 'es';
-      case STTLanguage.STT_LANGUAGE_FR:
-        return 'fr';
-      case STTLanguage.STT_LANGUAGE_DE:
-        return 'de';
-      case STTLanguage.STT_LANGUAGE_ZH:
-        return 'zh';
-      case STTLanguage.STT_LANGUAGE_JA:
-        return 'ja';
-      case STTLanguage.STT_LANGUAGE_KO:
-        return 'ko';
-      case STTLanguage.STT_LANGUAGE_IT:
-        return 'it';
-      case STTLanguage.STT_LANGUAGE_PT:
-        return 'pt';
-      case STTLanguage.STT_LANGUAGE_AR:
-        return 'ar';
-      case STTLanguage.STT_LANGUAGE_RU:
-        return 'ru';
-      case STTLanguage.STT_LANGUAGE_HI:
-        return 'hi';
+      case SDKComponent.SDK_COMPONENT_UNSPECIFIED:
+        return 'unspecified';
+      case SDKComponent.SDK_COMPONENT_STT:
+        return 'stt';
+      case SDKComponent.SDK_COMPONENT_TTS:
+        return 'tts';
+      case SDKComponent.SDK_COMPONENT_VAD:
+        return 'vad';
+      case SDKComponent.SDK_COMPONENT_LLM:
+        return 'llm';
+      case SDKComponent.SDK_COMPONENT_VLM:
+        return 'vlm';
+      case SDKComponent.SDK_COMPONENT_DIFFUSION:
+        return 'diffusion';
+      case SDKComponent.SDK_COMPONENT_RAG:
+        return 'rag';
+      case SDKComponent.SDK_COMPONENT_EMBEDDINGS:
+        return 'embeddings';
+      case SDKComponent.SDK_COMPONENT_VOICE_AGENT:
+        return 'voice_agent';
+      case SDKComponent.SDK_COMPONENT_WAKEWORD:
+        return 'wakeword';
+      case SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION:
+        return 'speaker_diarization';
+      case SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION:
+        return 'semantic_segmentation';
+      case SDKComponent.SDK_COMPONENT_RERANK:
+        return 'rerank';
     }
     return '';
   }
 }
 
-STTLanguage? sttLanguageFromWireString(String value) {
+SDKComponent? sdkComponentFromWireString(String value) {
   switch (value.toLowerCase()) {
-    case 'auto':
-      return STTLanguage.STT_LANGUAGE_AUTO;
-    case 'en':
-      return STTLanguage.STT_LANGUAGE_EN;
-    case 'es':
-      return STTLanguage.STT_LANGUAGE_ES;
-    case 'fr':
-      return STTLanguage.STT_LANGUAGE_FR;
-    case 'de':
-      return STTLanguage.STT_LANGUAGE_DE;
-    case 'zh':
-      return STTLanguage.STT_LANGUAGE_ZH;
-    case 'ja':
-      return STTLanguage.STT_LANGUAGE_JA;
-    case 'ko':
-      return STTLanguage.STT_LANGUAGE_KO;
-    case 'it':
-      return STTLanguage.STT_LANGUAGE_IT;
-    case 'pt':
-      return STTLanguage.STT_LANGUAGE_PT;
-    case 'ar':
-      return STTLanguage.STT_LANGUAGE_AR;
-    case 'ru':
-      return STTLanguage.STT_LANGUAGE_RU;
-    case 'hi':
-      return STTLanguage.STT_LANGUAGE_HI;
+    case 'unspecified':
+      return SDKComponent.SDK_COMPONENT_UNSPECIFIED;
+    case 'stt':
+      return SDKComponent.SDK_COMPONENT_STT;
+    case 'tts':
+      return SDKComponent.SDK_COMPONENT_TTS;
+    case 'vad':
+      return SDKComponent.SDK_COMPONENT_VAD;
+    case 'llm':
+      return SDKComponent.SDK_COMPONENT_LLM;
+    case 'vlm':
+      return SDKComponent.SDK_COMPONENT_VLM;
+    case 'diffusion':
+      return SDKComponent.SDK_COMPONENT_DIFFUSION;
+    case 'rag':
+      return SDKComponent.SDK_COMPONENT_RAG;
+    case 'embeddings':
+      return SDKComponent.SDK_COMPONENT_EMBEDDINGS;
+    case 'voice_agent':
+      return SDKComponent.SDK_COMPONENT_VOICE_AGENT;
+    case 'wakeword':
+      return SDKComponent.SDK_COMPONENT_WAKEWORD;
+    case 'speaker_diarization':
+      return SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION;
+    case 'semantic_segmentation':
+      return SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+    case 'rerank':
+      return SDKComponent.SDK_COMPONENT_RERANK;
   }
   return null;
+}
+
+extension SdkInitPhase1RequestValidate on SdkInitPhase1Request {
+  void validate() {
+    if (hasRequestTimeoutMs() && (requestTimeoutMs < 1000)) {
+      throw SDKException.validationFailed(
+        'request_timeout_ms must be >= 1000 (got $requestTimeoutMs)',
+        fieldPath: 'SdkInitPhase1Request.request_timeout_ms',
+      );
+    }
+    if (hasMaxRetries() && (maxRetries < 0 || maxRetries > 10)) {
+      throw SDKException.validationFailed(
+        'max_retries must be in 0...10 (got $maxRetries)',
+        fieldPath: 'SdkInitPhase1Request.max_retries',
+      );
+    }
+  }
+}
+
+extension SegmentationImageValidate on SegmentationImage {
+  void validate() {
+    if (width == 0) {
+      throw SDKException.validationFailed(
+        'width is required',
+        fieldPath: 'SegmentationImage.width',
+      );
+    }
+    if (width < 1 || width > 4096) {
+      throw SDKException.validationFailed(
+        'width must be in 1...4096 (got $width)',
+        fieldPath: 'SegmentationImage.width',
+      );
+    }
+    if (height == 0) {
+      throw SDKException.validationFailed(
+        'height is required',
+        fieldPath: 'SegmentationImage.height',
+      );
+    }
+    if (height < 1 || height > 4096) {
+      throw SDKException.validationFailed(
+        'height must be in 1...4096 (got $height)',
+        fieldPath: 'SegmentationImage.height',
+      );
+    }
+    if (pixelFormat.value == 0) {
+      throw SDKException.validationFailed(
+        'pixel_format is required',
+        fieldPath: 'SegmentationImage.pixel_format',
+      );
+    }
+  }
 }
 
 extension STTConfigurationConvenience on STTConfiguration {
   static STTConfiguration defaults() {
     final r = STTConfiguration();
-    r.language = STTLanguage.STT_LANGUAGE_EN;
     r.sampleRate = 16000;
     r.enablePunctuation = true;
     r.enableWordTimestamps = true;
@@ -635,23 +1049,9 @@ extension STTConfigurationValidate on STTConfiguration {
 extension STTOptionsConvenience on STTOptions {
   static STTOptions defaults() {
     final r = STTOptions();
-    r.language = STTLanguage.STT_LANGUAGE_EN;
     r.enablePunctuation = true;
     r.enableWordTimestamps = true;
-    return r;
-  }
-}
-
-extension TTSConfigurationConvenience on TTSConfiguration {
-  static TTSConfiguration defaults() {
-    final r = TTSConfiguration();
-    r.voice = 'default';
-    r.languageCode = 'en-US';
-    r.speakingRate = 1.0;
-    r.pitch = 1.0;
-    r.volume = 1.0;
-    r.sampleRate = 22050;
-    r.enableNeuralVoice = true;
+    r.silenceDurationMs = 0;
     return r;
   }
 }
@@ -660,59 +1060,27 @@ extension TTSOptionsConvenience on TTSOptions {
   static TTSOptions defaults() {
     final r = TTSOptions();
     r.languageCode = 'en-US';
-    r.speakingRate = 1.0;
+    r.speed = 1.0;
     r.pitch = 1.0;
     r.volume = 1.0;
     r.audioFormat = AudioFormat.AUDIO_FORMAT_PCM;
-    r.sampleRate = 22050;
+    r.sampleRate = 0;
     return r;
   }
 }
 
-extension VLMGenerationOptionsConvenience on VLMGenerationOptions {
-  static VLMGenerationOptions defaults() {
-    final r = VLMGenerationOptions();
-    r.maxTokens = 2048;
-    r.temperature = 0.7;
-    r.topP = 0.9;
-    r.topK = 0;
-    r.streamingEnabled = true;
-    r.useGpu = true;
-    r.repetitionPenalty = 1.1;
-    return r;
-  }
-}
-
-extension VLMGenerationOptionsValidate on VLMGenerationOptions {
+extension TTSOptionsValidate on TTSOptions {
   void validate() {
-    if (maxTokens < 0) {
+    if (!speed.isFinite || speed < 0.5 || speed > 2.0) {
       throw SDKException.validationFailed(
-        'max_tokens must be >= 0 (got $maxTokens)',
-        fieldPath: 'VLMGenerationOptions.max_tokens',
+        'speed must be in 0.5...2.0 (got $speed)',
+        fieldPath: 'TTSOptions.speed',
       );
     }
-    if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {
+    if (!pitch.isFinite || pitch < 0.5 || pitch > 2.0) {
       throw SDKException.validationFailed(
-        'temperature must be in 0.0...2.0 (got $temperature)',
-        fieldPath: 'VLMGenerationOptions.temperature',
-      );
-    }
-    if (!topP.isFinite || topP < 0.0 || topP > 1.0) {
-      throw SDKException.validationFailed(
-        'top_p must be in 0.0...1.0 (got $topP)',
-        fieldPath: 'VLMGenerationOptions.top_p',
-      );
-    }
-    if (topK < 0) {
-      throw SDKException.validationFailed(
-        'top_k must be >= 0 (got $topK)',
-        fieldPath: 'VLMGenerationOptions.top_k',
-      );
-    }
-    if (!repetitionPenalty.isFinite || repetitionPenalty < 0.0) {
-      throw SDKException.validationFailed(
-        'repetition_penalty must be >= 0.0 (got $repetitionPenalty)',
-        fieldPath: 'VLMGenerationOptions.repetition_penalty',
+        'pitch must be in 0.5...2.0 (got $pitch)',
+        fieldPath: 'TTSOptions.pitch',
       );
     }
   }

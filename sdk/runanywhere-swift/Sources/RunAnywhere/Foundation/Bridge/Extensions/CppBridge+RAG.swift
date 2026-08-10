@@ -96,14 +96,28 @@ extension CppBridge {
         /// stream's cooperative backpressure path still applies).
         public func cancelActiveQuery() {
             guard let protoSession else { return }
+            cancelActiveQuery(handle: protoSession)
+        }
+
+        /// Session-scoped cancel for a caller-owned handle. `nonisolated`: the
+        /// caller (a `RagSession` actor) owns the handle, so this runs in the
+        /// caller's isolation rather than sending a non-Sendable handle across
+        /// the actor boundary.
+        nonisolated func cancelActiveQuery(handle: rac_handle_t) {
             guard let cancel = RAGCancelProtoABI.cancel else {
                 logger.debug("rac_rag_cancel_proto unavailable; relying on cooperative cancellation")
                 return
             }
-            let rc = cancel(protoSession)
+            let rc = cancel(handle)
             if rc != RAC_SUCCESS {
                 logger.warning("rac_rag_cancel_proto failed: \(rc)")
             }
+        }
+
+        /// Release a caller-owned session handle. `nonisolated` for the same
+        /// reason as `cancelActiveQuery(handle:)`.
+        nonisolated func destroySession(handle: rac_handle_t) {
+            destroyRAGProtoSessionIfAvailable(handle)
         }
 
         private func setProtoSession(_ session: rac_handle_t) {
@@ -155,7 +169,18 @@ extension CppBridge {
         /// cancelling the owning task) stops native generation via the
         /// backpressure return, so callers do not need a wall-clock timeout.
         func runQueryStream(_ options: RARAGQueryOptions) throws -> AsyncStream<RARAGStreamEvent> {
-            let handleBox = RAGSessionHandleBox(handle: try requireProtoSession())
+            try runQueryStream(handle: try requireProtoSession(), options)
+        }
+
+        /// Same contract as `runQueryStream(_:)`, scoped to a caller-owned
+        /// session handle so independent `RagSession`s can run side by side.
+        /// `nonisolated`: the owning `RagSession` actor passes its handle in,
+        /// so this must not hop the `CppBridge.RAG` actor.
+        nonisolated func runQueryStream(
+            handle: rac_handle_t,
+            _ options: RARAGQueryOptions
+        ) throws -> AsyncStream<RARAGStreamEvent> {
+            let handleBox = RAGSessionHandleBox(handle: handle)
             _ = try NativeProtoABI.require(RAGStreamProtoABI.stream, named: RAGStreamProtoABI.streamName)
             let requestData = try options.serializedData()
             return AsyncStream { continuation in

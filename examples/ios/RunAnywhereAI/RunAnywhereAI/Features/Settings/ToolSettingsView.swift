@@ -9,6 +9,9 @@ import SwiftUI
 import Foundation
 import RunAnywhere
 import os
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Tool Settings View Model
 
@@ -29,6 +32,49 @@ class ToolSettingsViewModel: ObservableObject {
         }
     }
 
+    #if os(iOS)
+    // Apple Health is opt-in separately from the other built-in tools since
+    // it requires its own OS permission prompt (HealthKit) rather than just
+    // being added to the in-memory tool registry. HealthKit only exists on
+    // iOS — this app also ships as a native macOS target, so this whole
+    // feature is compiled out there.
+    @Published var healthToolEnabled: Bool = false {
+        didSet {
+            guard healthToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(healthToolEnabled, forKey: "healthToolEnabled")
+            Task {
+                if healthToolEnabled {
+                    await enableHealthTool()
+                } else {
+                    await RunAnywhere.unregisterTool(HealthKitTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var healthAuthorizationError: String?
+    #endif
+
+    // Calendar is opt-in separately for the same reason as Apple Health — it
+    // needs its own OS permission prompt (EventKit). Unlike HealthKit,
+    // EventKit is available on both iOS and macOS, so this one is not
+    // platform-gated.
+    @Published var calendarToolEnabled: Bool = false {
+        didSet {
+            guard calendarToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(calendarToolEnabled, forKey: "calendarToolEnabled")
+            Task {
+                if calendarToolEnabled {
+                    await enableCalendarTool()
+                } else {
+                    await RunAnywhere.unregisterTool(CalendarTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var calendarAuthorizationError: String?
+
     // App-local tools with real implementations.
     private var builtInTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
@@ -38,7 +84,7 @@ class ToolSettingsViewModel: ObservableObject {
                     name: "get_weather",
                     description: "Gets the current weather for a given location using Open-Meteo API",
                     parameters: [
-                        RAToolParameter(
+                        ToolParameter(
                             name: "location",
                             type: .string,
                             description: "City name (e.g., 'San Francisco', 'London', 'Tokyo')"
@@ -50,11 +96,23 @@ class ToolSettingsViewModel: ObservableObject {
                     try await WeatherService.fetchWeather(for: args["location"]?.string ?? "San Francisco")
                 }
             ),
-            // Time Tool - Real system time with timezone
+            // Time Tool - Real system time with timezone.
             (
                 definition: RAToolDefinition(
                     name: "get_current_time",
-                    description: "Gets the current date, time, and timezone information",
+                    // Directive, not just descriptive (same reasoning as the
+                    // search_web tool): small models tend to "helpfully"
+                    // re-convert an already-local timestamp against its own
+                    // timezone label (e.g. subtracting the GMT offset from a
+                    // value that is already local), producing a wrong time
+                    // that's off by exactly that offset. Stating the
+                    // no-location, already-local contract up front heads
+                    // that off at the source, not just in the result note.
+                    description: """
+                        Gets the device's current date, time, and timezone. Returns \
+                        only the device's own local time — it has no location parameter and \
+                        cannot look up another city's time.
+                        """,
                     parameters: [],
                     category: "Utility"
                 ),
@@ -73,7 +131,18 @@ class ToolSettingsViewModel: ObservableObject {
                         "time": RAToolValue(timeFormatter.string(from: now)),
                         "timestamp": RAToolValue(ISO8601DateFormatter().string(from: now)),
                         "timezone": RAToolValue(timeZone.identifier),
-                        "utc_offset": RAToolValue(timeZone.abbreviation() ?? "UTC")
+                        "utc_offset": RAToolValue(timeZone.abbreviation() ?? "UTC"),
+                        // Explicit anti-reconversion guard: "time" above is
+                        // already local. Restating that next to the offset
+                        // (the field a model is most tempted to "apply")
+                        // stops the double-conversion at the point of use.
+                        "note": RAToolValue(
+                            """
+                            "time" is already this device's local wall-clock time in the \
+                            "timezone"/"utc_offset" below — do NOT apply utc_offset to \
+                            it again.
+                            """
+                        )
                     ]
                 }
             ),
@@ -83,7 +152,7 @@ class ToolSettingsViewModel: ObservableObject {
                     name: "calculate",
                     description: "Performs math calculations. Supports +, -, *, /, and parentheses",
                     parameters: [
-                        RAToolParameter(
+                        ToolParameter(
                             name: "expression",
                             type: .string,
                             description: "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')"
@@ -136,19 +205,66 @@ class ToolSettingsViewModel: ObservableObject {
                         "expression": RAToolValue(expression)
                     ]
                 }
+            ),
+            // Device Info Tool - manufacturer, model and OS version.
+            (
+                definition: RAToolDefinition(
+                    name: "get_device_info",
+                    description: "Returns details about the device: manufacturer, model and OS version.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    let model = UIDevice.current.model
+                    #elseif os(macOS)
+                    let model = "Mac"
+                    #endif
+                    return [
+                        "manufacturer": RAToolValue("Apple"),
+                        "model": RAToolValue(model),
+                        "os": RAToolValue(ProcessInfo.processInfo.operatingSystemVersionString)
+                    ]
+                }
+            ),
+            // Battery Level Tool - current charge as a percentage.
+            (
+                definition: RAToolDefinition(
+                    name: "get_battery_level",
+                    description: "Returns the current battery charge level as a percentage.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+                    let level = UIDevice.current.batteryLevel
+                    return [
+                        "battery_percent": RAToolValue(
+                            level >= 0 ? "\(Int((level * 100).rounded()))%" : "unknown"
+                        )
+                    ]
+                    #else
+                    return ["battery_percent": RAToolValue("unknown")]
+                    #endif
+                }
             )
         ]
     }
 
     init() {
         toolCallingEnabled = UserDefaults.standard.bool(forKey: "toolCallingEnabled")
+        #if os(iOS)
+        healthToolEnabled = UserDefaults.standard.bool(forKey: "healthToolEnabled")
+        #endif
+        calendarToolEnabled = UserDefaults.standard.bool(forKey: "calendarToolEnabled")
         Task {
             await refreshRegisteredTools()
         }
     }
 
     func refreshRegisteredTools() async {
-        registeredTools = await RunAnywhere.getRegisteredTools()
+        registeredTools = await RunAnywhere.llm.tools.list()
     }
 
     func registerBuiltInTools() async {
@@ -156,15 +272,56 @@ class ToolSettingsViewModel: ObservableObject {
         logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
 
         for tool in builtInTools {
-            await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
+            await RunAnywhere.llm.tools.register(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
+        }
+        #if os(iOS)
+        if healthToolEnabled {
+            await enableHealthTool()
+        }
+        #endif
+        if calendarToolEnabled {
+            await enableCalendarTool()
         }
         await refreshRegisteredTools()
     }
 
     func clearAllTools() async {
-        await RunAnywhere.clearTools()
+        await RunAnywhere.llm.tools.clear()
         await refreshRegisteredTools()
+    }
+
+    #if os(iOS)
+    func enableHealthTool() async {
+        guard HealthKitManager.isAvailable else {
+            healthAuthorizationError = "Health data is not available on this device."
+            healthToolEnabled = false
+            return
+        }
+        do {
+            try await HealthKitManager.shared.requestAuthorization()
+            healthAuthorizationError = nil
+            await RunAnywhere.registerTool(HealthKitTool.definition, executor: HealthKitTool.executor)
+            logger.info("Registered tool \(HealthKitTool.definition.name)")
+            await refreshRegisteredTools()
+        } catch {
+            healthAuthorizationError = error.localizedDescription
+            healthToolEnabled = false
+        }
+    }
+    #endif
+
+    func enableCalendarTool() async {
+        do {
+            try await CalendarManager.shared.requestAuthorization()
+            calendarAuthorizationError = nil
+            await RunAnywhere.registerTool(CalendarTool.definition, executor: CalendarTool.executor)
+            logger.info("Registered tool \(CalendarTool.definition.name)")
+            await refreshRegisteredTools()
+        } catch {
+            calendarAuthorizationError = error.localizedDescription
+            calendarToolEnabled = false
+        }
     }
 }
 
@@ -178,6 +335,26 @@ struct ToolSettingsSection: View {
             Toggle("Enable Tool Calling", isOn: $viewModel.toolCallingEnabled)
 
             if viewModel.toolCallingEnabled {
+                #if os(iOS)
+                Toggle(isOn: $viewModel.healthToolEnabled) {
+                    Label("Apple Health", systemImage: "heart.fill")
+                }
+                if let error = viewModel.healthAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+                #endif
+
+                Toggle(isOn: $viewModel.calendarToolEnabled) {
+                    Label("Calendar", systemImage: "calendar")
+                }
+                if let error = viewModel.calendarAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+
                 HStack {
                     Text("Registered Tools")
                     Spacer()
@@ -215,79 +392,11 @@ struct ToolSettingsSection: View {
         } footer: {
             Text(
                 "Allow the LLM to use registered tools to perform actions like "
-                + "web lookup, weather, time, or calculations."
+                + "web lookup, weather, time, calculations, your Apple Health data, or your "
+                + "Calendar. iOS does not reveal which Health categories were granted, so if "
+                + "answers seem empty, check Settings > Privacy & Security > Health."
             )
             .font(AppTypography.caption)
-        }
-    }
-}
-
-// MARK: - Tool Settings Card (macOS)
-
-struct ToolSettingsCard: View {
-    @ObservedObject var viewModel: ToolSettingsViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
-            Text("Tool Calling")
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textSecondary)
-
-            VStack(alignment: .leading, spacing: AppSpacing.large) {
-                HStack {
-                    Text("Enable Tool Calling")
-                        .frame(width: 150, alignment: .leading)
-                    Toggle("", isOn: $viewModel.toolCallingEnabled)
-                    Spacer()
-                    Text(viewModel.toolCallingEnabled ? "Enabled" : "Disabled")
-                        .font(AppTypography.caption)
-                        .foregroundColor(viewModel.toolCallingEnabled ? AppColors.statusGreen : AppColors.textSecondary)
-                }
-
-                if viewModel.toolCallingEnabled {
-                    Divider()
-
-                    HStack {
-                        Text("Registered Tools")
-                        Spacer()
-                        Text("\(viewModel.registeredTools.count)")
-                            .font(AppTypography.monospaced)
-                            .foregroundColor(AppColors.primaryAccent)
-                    }
-
-                    if viewModel.registeredTools.isEmpty {
-                        Button("Add Built-in Tools") {
-                            Task {
-                                await viewModel.registerBuiltInTools()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryAccent)
-                    } else {
-                        ForEach(viewModel.registeredTools, id: \.name) { tool in
-                            ToolRow(tool: tool)
-                        }
-
-                        Button("Clear All Tools") {
-                            Task {
-                                await viewModel.clearAllTools()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryRed)
-                    }
-                }
-
-                Text(
-                    "Allow the LLM to use registered tools to perform actions like "
-                    + "web lookup, weather, time, or calculations."
-                )
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.textSecondary)
-            }
-            .padding(AppSpacing.large)
-            .background(AppColors.backgroundSecondary)
-            .cornerRadius(AppSpacing.cornerRadiusLarge)
         }
     }
 }
@@ -311,13 +420,14 @@ struct ToolRow: View {
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(2)
 
-            if !tool.parameters.isEmpty {
+            let parameterNames = tool.parameterNames
+            if !parameterNames.isEmpty {
                 HStack(spacing: 4) {
                     Text("Params:")
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
-                    ForEach(tool.parameters, id: \.name) { param in
-                        Text(param.name)
+                    ForEach(parameterNames, id: \.self) { name in
+                        Text(name)
                             .font(AppTypography.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -328,6 +438,22 @@ struct ToolRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension RAToolDefinition {
+    /// `ToolDefinition.parameters` is now a single raw JSON-Schema object
+    /// string (idl/tool_calling.proto) rather than a typed parameter list --
+    /// read the `properties` object's keys for display, same as the JSON
+    /// Schema every OpenAI/Anthropic/MCP tool definition already publishes.
+    var parameterNames: [String] {
+        guard !parameters.isEmpty,
+              let data = parameters.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let properties = root["properties"] as? [String: Any] else {
+            return []
+        }
+        return properties.keys.sorted()
     }
 }
 

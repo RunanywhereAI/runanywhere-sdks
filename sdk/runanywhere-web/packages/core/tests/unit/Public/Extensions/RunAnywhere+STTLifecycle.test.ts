@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { AudioEncoding, AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
-  STTAudioEncoding,
   STTOutput,
   STTPartialResult,
   STTStreamEvent,
@@ -10,7 +9,7 @@ import {
   type STTTranscriptionRequest as ProtoSTTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
 import type { ModalityProtoModule } from '../../../../src/Adapters/ProtoAdapterTypes';
-import { RunAnywhere } from '../../../../src/Public/RunAnywhere';
+import { transcribe, transcribeStream } from '../../../../src/Public/Extensions/RunAnywhere+STT';
 import {
   clearRunanywhereModule,
   registerWasmModule,
@@ -57,7 +56,7 @@ describe('lifecycle-owned Web STT', () => {
     const harness = fakeSTTModule();
     install(harness.module);
 
-    const result = await RunAnywhere.transcribe(new Float32Array([0, 0.5, -0.5]));
+    const result = await transcribe(new Float32Array([0, 0.5, -0.5]));
 
     expect(result.text).toBe('lifecycle transcript');
     expect(harness.currentLifecycleModelId()).toBe('sherpa-lifecycle-stt');
@@ -69,12 +68,13 @@ describe('lifecycle-owned Web STT', () => {
       componentDestroys: 0,
     });
     expect(harness.requests).toHaveLength(1);
+    // STTAudioSource.bits_per_sample was deleted outright (idl/stt_options.proto):
+    // sample width is determined by `encoding`.
     expect(harness.requests[0]?.audio).toMatchObject({
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate: 16_000,
       channels: 1,
-      bitsPerSample: 16,
     });
     expect(Array.from(harness.requests[0]?.audio?.audioData ?? [])).toEqual([
       0, 0, 0, 64, 1, 192,
@@ -86,7 +86,7 @@ describe('lifecycle-owned Web STT', () => {
     install(harness.module);
 
     const partials: STTPartialResult[] = [];
-    for await (const partial of RunAnywhere.transcribeStream(new Uint8Array([1, 2, 3, 4]))) {
+    for await (const partial of transcribeStream(new Uint8Array([1, 2, 3, 4]))) {
       partials.push(partial);
     }
 
@@ -182,8 +182,6 @@ function fakeSTTModule(): FakeSTTHarness {
       heap32[pointer >>> 2] = value;
     },
     _rac_voice_agent_set_proto_callback: () => 0,
-    _rac_llm_set_stream_proto_callback: () => 0,
-    _rac_llm_unset_stream_proto_callback: () => 0,
     _rac_backend_onnx_register: () => 0,
     _rac_backend_sherpa_register: () => 0,
     _rac_wasm_sizeof_proto_buffer: () => 16,

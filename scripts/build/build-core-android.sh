@@ -438,12 +438,11 @@ for ABI in "${ABIS[@]}"; do
         CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT")
     fi
     cmake "${CMAKE_CONFIGURE_ARGS[@]}"
-    # Use CMake's generator-agnostic --parallel, CAPPED (repo resource
-    # discipline: a bare --parallel spawns one heavy compiler per core and
-    # has OOM-crashed dev laptops). Override with RAC_BUILD_JOBS if needed.
-    # (Ninja rejects a bare `-j`,
-    # while Make accepts it). Lets CMake pick a sensible default job count.
-    cmake --build --preset "${PRESET}" --parallel "${RAC_BUILD_JOBS:-2}"
+    # Full host parallelism by default (repo resource discipline: builds use
+    # full local capacity; scale down with RAC_BUILD_JOBS only under real
+    # memory/thermal pressure).
+    DEFAULT_JOBS="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+    cmake --build --preset "${PRESET}" --parallel "${RAC_BUILD_JOBS:-${DEFAULT_JOBS}}"
 
     BUILD_DIR="${REPO_ROOT}/build/${PRESET}"
     KOTLIN_DEST="${KOTLIN_JNI_DEST}/${ABI}"
@@ -542,9 +541,12 @@ for ABI in "${ABIS[@]}"; do
     LIB_RUNANYWHERE_LLAMACPP="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_llamacpp.so"  -print -quit || true)"
     LIB_RUNANYWHERE_ONNX="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_onnx.so"          -print -quit || true)"
     LIB_RUNANYWHERE_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_sherpa.so"      -print -quit || true)"
-    copy_if_exists "${LIB_RUNANYWHERE_LLAMACPP}" "${KOTLIN_LLAMA_DEST}"
-    copy_if_exists "${LIB_RUNANYWHERE_ONNX}"     "${KOTLIN_ONNX_DEST}"
-    copy_if_exists "${LIB_RUNANYWHERE_SHERPA}"   "${KOTLIN_ONNX_DEST}"
+    # Entry-point libs travel with each backend package on every SDK (Kotlin,
+    # RN, Flutter). RN/Flutter ONNX inventories require librunanywhere_onnx.so
+    # and librunanywhere_sherpa.so alongside the plugin .so files.
+    copy_if_exists "${LIB_RUNANYWHERE_LLAMACPP}" "${KOTLIN_LLAMA_DEST}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_ONNX}"     "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_SHERPA}"   "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
 
     # Per-engine backend + JNI libs. Staged to both RN and Flutter plugin
     # packages so the same jniLibs layout is shipped from every SDK.

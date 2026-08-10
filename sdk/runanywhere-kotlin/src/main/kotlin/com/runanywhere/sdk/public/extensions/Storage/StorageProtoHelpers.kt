@@ -22,28 +22,23 @@ import com.runanywhere.sdk.public.types.RAStorageInfo
 // MARK: - DeviceStorageInfo
 
 /**
- * Build a [DeviceStorageInfo] computing `used_percent` from the supplied
- * counters (matching Swift's behavior of materializing the percentage on
- * the producer side so every binding reports the same value).
+ * Build a [DeviceStorageInfo] from the three canonical byte counters.
+ *
+ * `used_percent` is deleted outright (idl/storage_types.proto): it was a
+ * pure derivation of `total_bytes`/`used_bytes` with no independent wire
+ * value, so [usagePercentage] below is the sole surviving computed
+ * accessor. Matches Swift's `RADeviceStorageInfo.init(totalBytes:freeBytes:usedBytes:)`.
  */
 fun DeviceStorageInfo.Companion.create(
     totalBytes: Long,
     freeBytes: Long,
     usedBytes: Long,
-): DeviceStorageInfo {
-    val usedPercent =
-        if (totalBytes > 0L) {
-            (usedBytes.toDouble() / totalBytes.toDouble() * 100.0).toFloat()
-        } else {
-            0f
-        }
-    return DeviceStorageInfo(
+): DeviceStorageInfo =
+    DeviceStorageInfo(
         total_bytes = totalBytes,
         free_bytes = freeBytes,
         used_bytes = usedBytes,
-        used_percent = usedPercent,
     )
-}
 
 /**
  * Recomputed usage percentage as a Double (0.0–100.0). Equivalent to
@@ -86,13 +81,14 @@ fun AppStorageInfo.Companion.create(
  * An empty [StorageInfo] with default device/app sub-records and no
  * per-model rows. Matches Swift's `RAStorageInfo.empty` static.
  */
+// `total_models` is deleted outright (idl/storage_types.proto): `modelCount`
+// below (models.size) is the sole count now.
 val StorageInfo.Companion.empty: RAStorageInfo
     get() =
         RAStorageInfo(
             app = AppStorageInfo(),
             device = DeviceStorageInfo(),
             models = emptyList(),
-            total_models = 0,
             total_models_bytes = 0L,
         )
 
@@ -114,18 +110,18 @@ val RAStorageInfo.modelCount: Int
 // MARK: - ModelStorageMetrics
 
 /**
- * Build a [ModelStorageMetrics] entry, optionally stamped with the Unix
- * epoch milliseconds of the last load.
+ * Build a [ModelStorageMetrics] entry.
+ *
+ * `last_used_ms` is deleted outright (idl/storage_types.proto): this
+ * metrics record now carries only `model_id` + `size_on_disk_bytes`.
  */
 fun ModelStorageMetrics.Companion.create(
     modelId: String,
     sizeOnDiskBytes: Long,
-    lastUsedMs: Long? = null,
 ): ModelStorageMetrics =
     ModelStorageMetrics(
         model_id = modelId,
         size_on_disk_bytes = sizeOnDiskBytes,
-        last_used_ms = lastUsedMs,
     )
 
 // MARK: - StorageAvailability

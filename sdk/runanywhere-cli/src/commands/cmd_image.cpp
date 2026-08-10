@@ -24,7 +24,7 @@
 
 #include "io/output.h"
 
-#if defined(RCLI_HAS_COREML)
+#if defined(RCLI_HAS_NEURT)
 #include <fstream>
 #include <ios>
 #include <sys/stat.h>
@@ -61,7 +61,7 @@ struct ImageParams {
     int64_t seed = -1;      // -1 = random
 };
 
-#if defined(RCLI_HAS_COREML)
+#if defined(RCLI_HAS_NEURT)
 
 namespace v1 = runanywhere::v1;
 
@@ -116,10 +116,10 @@ bool load_diffusion_model(const GlobalOptions& options, const std::string& model
         out::error_line("diffusion model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
+    if (result.has_error()) {
         out::error_line("diffusion model load failed: " +
-                        (result.error_message().empty() ? "unknown error"
-                                                         : result.error_message()));
+                        (result.error().message().empty() ? "unknown error"
+                                                          : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -128,25 +128,30 @@ bool load_diffusion_model(const GlobalOptions& options, const std::string& model
     return true;
 }
 
-bool write_image(const v1::DiffusionResult& result, const std::string& out_path,
+// image_data/image_media_type/width/height/seed_used/error moved off
+// DiffusionResult onto DiffusionResult.images[0] (a DiffusionImage) --
+// commons emits exactly one entry until the C ABI grows a list. Errors now
+// travel out-of-band via the rac_proto_buffer_t status envelope (checked by
+// proto::parse_proto_buffer before this function is ever called).
+bool write_image(const v1::DiffusionImage& image_result, const std::string& out_path,
                  std::string* error) {
-    const std::string& image = result.image_data();
+    const std::string& image = image_result.data();
     if (image.empty()) {
         if (error) {
             *error = "engine returned no image data";
         }
         return false;
     }
-    // Every shipped C-ABI diffusion engine emits raw RGBA (image_media_type
+    // Every shipped C-ABI diffusion engine emits raw RGBA (media_type
     // "image/raw-rgba"); encode it to PNG. A future backend returning an
     // encoded container writes through verbatim.
     const bool is_raw_rgba =
-        result.image_media_type() == "image/raw-rgba" ||
-        (result.width() > 0 && result.height() > 0 &&
-         image.size() == static_cast<size_t>(result.width()) * result.height() * 4);
+        image_result.media_type() == "image/raw-rgba" ||
+        (image_result.width() > 0 && image_result.height() > 0 &&
+         image.size() == static_cast<size_t>(image_result.width()) * image_result.height() * 4);
     if (is_raw_rgba) {
         return image::write_png(out_path, reinterpret_cast<const uint8_t*>(image.data()),
-                                result.width(), result.height(), error);
+                                image_result.width(), image_result.height(), error);
     }
     std::ofstream file(out_path, std::ios::binary);
     file.write(image.data(), static_cast<std::streamsize>(image.size()));
@@ -159,7 +164,7 @@ bool write_image(const v1::DiffusionResult& result, const std::string& out_path,
     return true;
 }
 
-#endif  // RCLI_HAS_COREML
+#endif  // RCLI_HAS_NEURT
 
 int run_image_generate(const GlobalOptions& options, const ImageParams& params) {
     Bootstrapped env;
@@ -167,7 +172,7 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         return 1;
     }
 
-#if !defined(RCLI_HAS_COREML)
+#if !defined(RCLI_HAS_NEURT)
     (void)params;
     out::error_line("image generation (diffusion) is only supported on Apple/CoreML platforms");
     return 1;
@@ -218,7 +223,7 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         gen->set_negative_prompt(params.negative_prompt);
     }
     if (params.steps > 0) {
-        gen->set_num_inference_steps(params.steps);
+        gen->set_steps(params.steps);
     }
     if (params.guidance > 0.0f) {
         gen->set_guidance_scale(params.guidance);
@@ -235,14 +240,16 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         out::error_line("image generation failed: " + error);
         return 1;
     }
-    if (result.error_code() != 0 || !result.error_message().empty()) {
-        out::error_line("image generation failed: " +
-                        (result.error_message().empty() ? std::to_string(result.error_code())
-                                                         : result.error_message()));
+    // DiffusionResult carries no error field of its own any more -- failures
+    // travel out-of-band on the rac_proto_buffer_t status envelope, already
+    // checked above by parse_proto_buffer. commons emits exactly one image.
+    if (result.images_size() == 0) {
+        out::error_line("image generation failed: engine returned no image");
         return 1;
     }
+    const v1::DiffusionImage& image_result = result.images(0);
 
-    if (!write_image(result, params.out_path, &error)) {
+    if (!write_image(image_result, params.out_path, &error)) {
         out::error_line("failed to write image: " + error);
         return 1;
     }
@@ -252,18 +259,18 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         json.begin_object()
             .field("model", model_id)
             .field("output", params.out_path)
-            .field("width", static_cast<int64_t>(result.width()))
-            .field("height", static_cast<int64_t>(result.height()))
-            .field("seed", static_cast<int64_t>(result.seed_used()))
+            .field("width", static_cast<int64_t>(image_result.width()))
+            .field("height", static_cast<int64_t>(image_result.height()))
+            .field("seed", static_cast<int64_t>(image_result.seed_used()))
             .field("total_ms", static_cast<int64_t>(result.total_time_ms()))
             .end_object();
         out::result_line(json.str());
     } else {
         out::result_line(params.out_path);
         if (options.verbose) {
-            out::status_line("(" + std::to_string(result.width()) + "x" +
-                             std::to_string(result.height()) + ", seed " +
-                             std::to_string(result.seed_used()) + ", " +
+            out::status_line("(" + std::to_string(image_result.width()) + "x" +
+                             std::to_string(image_result.height()) + ", seed " +
+                             std::to_string(image_result.seed_used()) + ", " +
                              std::to_string(result.total_time_ms()) + " ms)");
         }
     }
@@ -274,10 +281,11 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
 }  // namespace
 
 void register_image(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("image", "Generate images (CoreML diffusion, Apple only)");
+    CLI::App* cmd =
+        app.add_subcommand("image", "Make images from text (CoreML diffusion, Apple only)");
     cmd->require_subcommand(1);
 
-    CLI::App* generate = cmd->add_subcommand("generate", "Text-to-image generation");
+    CLI::App* generate = cmd->add_subcommand("generate", "Render an image from a prompt");
     auto params = std::make_shared<ImageParams>();
     generate
         ->add_option("--model,-m", params->model,
@@ -285,13 +293,15 @@ void register_image(CLI::App& app, GlobalOptions& options) {
                      "(default: " +
                          std::string(kDefaultDiffusionModel) + ")")
         ->default_val(kDefaultDiffusionModel);
-    generate->add_option("--prompt,-p", params->prompt, "Text prompt")->required();
-    generate->add_option("--negative", params->negative_prompt, "Negative prompt");
-    generate->add_option("--steps", params->steps, "Number of denoising steps (0 = model default)");
-    generate->add_option("--guidance", params->guidance,
-                         "Classifier-free guidance scale (0 = model default)");
-    generate->add_option("--seed", params->seed, "RNG seed (-1 = random)");
-    generate->add_option("--out,-o", params->out_path, "Output image path (.png)")->required();
+    generate->add_option("--prompt,-p", params->prompt, "What to draw")->required();
+    generate->add_option("--negative-prompt,--negative", params->negative_prompt,
+                         "What to keep out of the image");
+    generate->add_option("--steps", params->steps, "Denoising steps to run (0 = model default)");
+    generate->add_option("--guidance-scale,--guidance", params->guidance,
+                         "How closely to follow the prompt (0 = model default)");
+    generate->add_option("--seed", params->seed,
+                         "Fix the RNG for a repeatable image (-1 = random)");
+    generate->add_option("--output,-o,--out", params->out_path, "PNG file to write")->required();
     generate->callback([&options, params]() {
         const int exit_code = run_image_generate(options, *params);
         if (exit_code != 0) {

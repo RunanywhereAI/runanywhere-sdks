@@ -109,13 +109,19 @@ rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRe
     if (request.has_description()) {
         multi_file.set_description(request.description());
     }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
+    }
 
     bool first = true;
     for (const hf::ResolvedFile& resolved_file : resolved.files) {
         runanywhere::v1::ModelFileDescriptor* file = multi_file.add_files();
         file->set_url(resolved_file.url);
         file->set_filename(resolved_file.filename);
-        file->set_is_required(true);
+        file->set_is_optional(false);
         if (resolved_file.size_bytes > 0) {
             file->set_size_bytes(resolved_file.size_bytes);
         }
@@ -241,7 +247,19 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     }
     if (request.has_category()) {
         multi_file.set_category(request.category());
-    } else if (framework == RAC_FRAMEWORK_MLX) {
+    } else if (framework == RAC_FRAMEWORK_MLX || framework == RAC_FRAMEWORK_COREML) {
+        // A caller that supplies no category leaves it UNSPECIFIED, and
+        // component_for_category maps ONLY unspecified to no component — so the
+        // model registers and downloads fine and then fails at load with
+        // "model category is not supported by lifecycle routing". Measured on a
+        // published ANE bundle pulled by URL.
+        //
+        // Both of these frameworks reach here as folder bundles whose LLM form is
+        // the overwhelmingly common case, and every in-tree caller that registers
+        // a non-LLM modality (diffusion, TTS) passes an explicit category, so this
+        // default only applies where there is nothing better to infer. It is a
+        // default, not an assertion: an ANE ASR bundle pulled by bare URL would
+        // still need its category passed.
         multi_file.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     }
     if (request.has_source()) {
@@ -275,13 +293,19 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     if (request.has_description()) {
         multi_file.set_description(request.description());
     }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
+    }
 
     bool first = true;
     for (const hf::ResolvedFile& resolved_file : resolved.files) {
         runanywhere::v1::ModelFileDescriptor* file = multi_file.add_files();
         file->set_url(resolved_file.url);
         file->set_filename(resolved_file.filename);
-        file->set_is_required(true);
+        file->set_is_optional(false);
         if (resolved_file.size_bytes > 0) {
             file->set_size_bytes(resolved_file.size_bytes);
         }
@@ -456,8 +480,42 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     if (request.has_supports_lora()) {
         made_model.set_supports_lora(request.supports_lora());
     }
+    // RegisterModelFromUrlRequest.artifact_type is a caller-supplied override
+    // classification (its own message, not the deleted ModelInfo top-level
+    // field). ModelInfo.artifact_type was reserved: the artifact oneof is
+    // the only way to express bundle shape now, so an explicit override maps
+    // onto the corresponding oneof arm instead of a parallel scalar field.
     if (request.has_artifact_type()) {
-        made_model.set_artifact_type(request.artifact_type());
+        switch (request.artifact_type()) {
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+                made_model.mutable_archive()->set_type(runanywhere::v1::ARCHIVE_TYPE_ZIP);
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+                made_model.mutable_archive()->set_type(runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE:
+                made_model.mutable_archive()->set_type(runanywhere::v1::ARCHIVE_TYPE_TAR_BZ2);
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE:
+                made_model.mutable_archive()->set_type(runanywhere::v1::ARCHIVE_TYPE_TAR_XZ);
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_ARCHIVE:
+                made_model.mutable_archive();
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_DIRECTORY:
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE:
+                made_model.mutable_multi_file();
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN:
+                made_model.set_built_in(true);
+                break;
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE:
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_CUSTOM:  // no remaining wire representation
+            case runanywhere::v1::MODEL_ARTIFACT_TYPE_UNSPECIFIED:
+            default:
+                made_model.mutable_single_file();
+                break;
+        }
     }
     if (request.has_context_length()) {
         made_model.set_context_length(request.context_length());
@@ -467,6 +525,9 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     }
     if (request.has_download_size_bytes()) {
         made_model.set_download_size_bytes(request.download_size_bytes());
+    }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        made_model.set_cua_profile(request.cua_profile());
     }
 
     // -------------------------------------------------------------------------
@@ -501,9 +562,6 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             if (existing.ParseFromArray(existing_bytes, static_cast<int>(existing_size))) {
                 if (!existing.local_path().empty()) {
                     made_model.set_local_path(existing.local_path());
-                }
-                if (existing.has_is_downloaded()) {
-                    made_model.set_is_downloaded(existing.is_downloaded());
                 }
                 if (existing.has_is_available()) {
                     made_model.set_is_available(existing.is_available());
@@ -619,8 +677,12 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
     if (request.has_description()) {
         model.mutable_metadata()->set_description(request.description());
     }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        model.set_cua_profile(request.cua_profile());
+    }
     *model.mutable_multi_file()->mutable_files() = request.files();
-    model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
+    // artifact_type (top-level) was reserved -- setting the multi_file oneof
+    // arm above is now the only declaration of bundle shape.
 
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
@@ -640,9 +702,6 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
             if (existing.ParseFromArray(existing_bytes, static_cast<int>(existing_size))) {
                 if (!existing.local_path().empty()) {
                     model.set_local_path(existing.local_path());
-                }
-                if (existing.has_is_downloaded()) {
-                    model.set_is_downloaded(existing.is_downloaded());
                 }
                 if (existing.has_is_available()) {
                     model.set_is_available(existing.is_available());

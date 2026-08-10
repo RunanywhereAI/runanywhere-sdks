@@ -55,10 +55,12 @@ generic name like `stt`.
   per-`create()` from `config_json["provider"]`, not baked into the name.
   (`engines/cloud/rac_plugin_entry_cloud.cpp`,
   `engines/cloud/rac_stt_cloud.cpp:5-17`.)
-- **`coreml`** serves DIFFUSION today (our Stable-Diffusion pipeline on Apple
-  CoreML) but is named for the *framework* it runs on, not for diffusion. It was
-  renamed from `diffusion-coreml` precisely to be modality-agnostic.
-  (`engines/coreml/rac_plugin_entry_coreml.cpp:5-12`.)
+- **`neurt`** serves DIFFUSION *and* GENERATE_TEXT but is named for the
+  *runtime that implements it* (NeuRT, the Apple half of the sibling `neurun`
+  repo), not for either modality and not for Apple's framework. It was named
+  `diffusion-coreml`, then `coreml`, and became `neurt` when NeuRT took over the
+  implementation — each rename moving it further from a modality and closer to a
+  stable identity. (`engines/neurt/rac_plugin_entry_neurt.cpp:1-28`.)
 
 Both carry an explicit "to add a modality, fill another op-table slot" comment in
 their vtable — they are deliberately built to grow.
@@ -77,7 +79,7 @@ engine exists in this tree.
 | **sherpa** | STT + TTS + VAD (`stt_ops`/`tts_ops`/`vad_ops`) | Sherpa-ONNX C API (prebuilt, bundles its own ORT) | **3** (bundled-lib sub-case) | **ON** | priority 90. Declares `RAC_RUNTIME_CPU`. Offline recognizer; VAD is Silero-style. Routable only when `SHERPA_ONNX_AVAILABLE` + `RAC_SHERPA_SPEECH_OPS_AVAILABLE`. |
 | **onnx** | SEGMENT (`segmentation_ops`) + optional EMBED (`embedding_ops`) | ONNX Runtime via `runtimes/onnxrt` `Session` | **2** — uses a separate runtime as a library | **ON** | priority 50. Declares `RAC_RUNTIME_ONNXRT`. Segmentation is always advertised; embeddings remain gated on `RAC_BACKEND_RAG`. STT/TTS/VAD are sherpa's, not onnx's. |
 | **cloud** | STT (`stt_ops`) | none — HTTP to a provider (Sarvam today) | **3** (no runtime — HTTP) | **ON** | priority 50, modality-agnostic name. `runtimes=NULL` → always eligible, never runtime-rejected. Provider via `config_json["provider"]`. Multi-modality-ready. |
-| **coreml** | DIFFUSION (`diffusion_ops`) | **our** Stable-Diffusion pipeline on Apple CoreML `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), modality-agnostic name. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(coreml)`. The engine `coreml` uses the runtime `coreml` (same framework name, separate registry/dir). CMake pins `RAC_COREML_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. Multi-modality-ready. |
+| **neurt** | LLM (`llm_ops`) + DIFFUSION (`diffusion_ops`) | **NeuRT** (sibling `neurun` repo): prebuilt Core ML graphs on the Apple Neural Engine, plus our Stable-Diffusion pipeline on `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), identity-named. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(neurt)`. The engine `neurt` uses the runtime `coreml` (different names now — the collision is gone). CMake pins `RAC_NEURT_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. **Needs the neurun checkout** (`NEURT_ROOT`) to be ROUTABLE: both modalities are implemented there. Without it the engine builds as a **non-routable shell** — an all-NULL vtable whose capability check returns `RAC_ERROR_BACKEND_UNAVAILABLE`, so registration is REFUSED rather than accepted-and-useless (the same two-mode pattern as `qhexrt`). This is what lets CI build the Apple targets at all, since neurun is a separate PRIVATE repo. Packaging is still guarded: `build-core-xcframework.sh` refuses to ship a stub unless `RAC_ALLOW_NEURT_STUB=1`. Priority stays BELOW mlx's 110 on purpose — ANE models arrive by name pin, not by priority. |
 | **mlx** | LLM (`llm_ops`) + STT (`stt_ops`) + TTS (`tts_ops`) + EMBED (`embedding_ops`) + VLM (`vlm_ops`) | **our** Swift `mlx-swift-lm` callback bridge (Apple MLX) | **1** — bundles its own runtime (mlx-swift) | **ON (Apple)** | priority 110. PUBLIC availability but Apple-gated: `mlx_capability_check` silent-rejects non-Apple, and `RAC_BACKEND_MLX` is forced OFF off-Apple. Declares `RAC_RUNTIME_CPU` + `RAC_RUNTIME_METAL` (hints); formats SAFETENSORS + FOLDER. `SHARED_ONLY`. Multi-modality (5 filled slots). |
 | **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android builds link the prebuilt under `QHEXRT_ROOT`. |
 
@@ -149,14 +151,14 @@ cleanest references). Names are by convention; CMake lists them explicitly.
 | File | Role |
 |---|---|
 | `rac_plugin_entry_<name>.cpp` | The **manifest + vtable + `RAC_PLUGIN_ENTRY_DEF(<name>)`**. Declares `primitives[]`/`runtimes[]`/`formats[]`, wires the ops-table pointers, owns `capability_check`. The single source of truth the router reads. |
-| `rac_backend_<name>_register.cpp` | The idempotent `rac_backend_<name>_register()` / `_unregister()` entry point: `rac_plugin_register(rac_plugin_entry_<name>())` plus any engine-specific bring-up. Called directly by SDK bridges on dynamic-link hosts (Android/desktop). *(Engines with no extra bring-up — e.g. `coreml` — skip this file and let the static shim call the entry directly.)* |
+| `rac_backend_<name>_register.cpp` | The idempotent `rac_backend_<name>_register()` / `_unregister()` entry point: `rac_plugin_register(rac_plugin_entry_<name>())` plus any engine-specific bring-up. Called directly by SDK bridges on dynamic-link hosts (Android/desktop). *(Engines with no extra bring-up — e.g. `neurt` — skip this file and let the static shim call the entry directly. Hosts that cannot rely on a static ctor call `rac_plugin_register(rac_plugin_entry_<name>())` themselves; rcli, the Electron addon and the Python module all do.)* |
 | `rac_static_register_<name>.cpp` | One-line static-init shim, gated on `RAC_PLUGIN_MODE_STATIC`. Schedules a pre-`main()` ctor: `RAC_STATIC_REGISTER_BACKEND(<name>)` (routes through the register fn) or `RAC_STATIC_PLUGIN_REGISTER(<name>)` (calls the entry directly). Used by iOS/WASM static hosts. |
 | the impl (`<name>_backend.cpp`, `rac_<primitive>_<name>.cpp`, `.mm`, …) | The actual op-table implementations + native-lib glue. |
 
 The boilerplate `create` adapter (a 7-line forward onto the engine's native
 `rac_<primitive>_<name>_create`) can be generated with
 `RAC_DEFINE_CREATE_ADAPTER(primitive, name)` — sherpa uses it for STT/TTS/VAD;
-engines with richer create flows (llamacpp, onnx, coreml, qhexrt) hand-write it.
+engines with richer create flows (llamacpp, onnx, neurt, qhexrt) hand-write it.
 
 ### `engines/common/` shared helpers
 
@@ -206,11 +208,13 @@ own section. (See `runtimes/` for the L1 device-runtime adapters.)
 
 3. **Engine IS our own inference code on a device-runtime.** The engine is our
    pipeline; a device runtime executes the sub-models.
-   - *Example:* **`coreml`** — our Stable-Diffusion pipeline; CoreML's `MLModel`
-     runs each sub-model via the `rac_coreml_*` loader helpers. The **engine
-     `coreml` uses the runtime `coreml`** — same framework name, **separate
-     registries / directories / symbols** (`engines/coreml` vs `runtimes/coreml`)
-     — the cleanest illustration of this pattern. It links `rac_runtime_coreml`.
+   - *Example:* **`neurt`** — our Stable-Diffusion pipeline plus NeuRT's ANE
+     decode loop; CoreML's `MLModel` runs each sub-model via the `rac_coreml_*`
+     loader helpers. The **engine `neurt` uses the runtime `coreml`** — separate
+     registries / directories / symbols (`engines/neurt` vs `runtimes/coreml`) —
+     the cleanest illustration of this pattern. It links `rac_runtime_coreml`.
+     (Until the engine was renamed the two shared the name `coreml`, which is
+     what made this pattern so easy to misread.)
    - *Sub-case (bundled-lib):* **`sherpa`** bundles its own ORT inside
      sherpa-onnx and calls the prebuilt library directly; it declares
      `RAC_RUNTIME_CPU`.
@@ -290,7 +294,7 @@ engine change.
 ## How to ADD A MODALITY to an existing engine
 
 Multi-modality is the whole point of an identity-named engine. `cloud` and
-`coreml` are explicitly built for this and carry the recipe inline:
+`neurt` are explicitly built for this and carry the recipe inline:
 
 1. Implement the new modality's op-table (e.g. a cloud TTS `g_cloud_tts_ops`,
    backed by a per-modality provider adapter under `providers/`).
@@ -304,9 +308,9 @@ The future-modality contract is written into the code itself:
 - `engines/cloud/rac_plugin_entry_cloud.cpp:80-83` —
   *"To add a cloud TTS/LLM/embeddings modality: fill `tts_ops`/`llm_ops`/
   `embedding_ops` here … and add its primitive to k_cloud_manifest.primitives."*
-- `engines/coreml/rac_plugin_entry_coreml.cpp:210-213` —
+- `engines/neurt/rac_plugin_entry_neurt.cpp` (the engine vtable) —
   *"To add a CoreML LLM/VLM/embeddings modality: fill `llm_ops`/`vlm_ops`/
-  `embedding_ops` here … and add its primitive to k_coreml_manifest.primitives."*
+  `embedding_ops` here … and add its primitive to k_neurt_manifest.primitives."*
 
 No new plugin, no rename, no ABI bump — the engine already owns one
 `rac_engine_vtable_t` with all the slots.

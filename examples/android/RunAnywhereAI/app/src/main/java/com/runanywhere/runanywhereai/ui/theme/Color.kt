@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // Primary tonal — RunAnywhere brand orange (#FF6900 hue); see examples/DESIGN_GUIDELINE.md
@@ -13,6 +14,35 @@ val Primary90 = Color(0xFFFFE1CC)
 // Canonical brand accent — the RunAnywhere logo orange (#FF6900), shared with every example app.
 // Used as the dark-scheme primary so brand moments match across platforms.
 val BrandOrange = Color(0xFFFF6900)
+
+// The logo gradient's red stop. Only ever painted as a gradient with [BrandOrange].
+val BrandRed = Color(0xFFFB2C36)
+
+/**
+ * The logo gradient — top-left to bottom-right, matching the web
+ * `linear-gradient(135deg, #FF6900, #FB2C36)` and iOS `AppColors.brandGradient`.
+ *
+ * It marks the reader's *own* words: every user turn in the app (chat, RAG, voice) paints it,
+ * and nothing else does. Carrying [Neutral100] on it is the one white-on-orange deviation
+ * DESIGN_GUIDELINE §5 keeps for large/bold brand moments, so this is the only place the app is
+ * allowed to put white over the brand — a solid `primary` fill must use [OnBrandInk] instead.
+ * One `val` rather than a brush per call site so a bubble cannot drift from the mark;
+ * `Brush.linearGradient` resolves its end offset against the draw size, so a single instance is
+ * correct at every bubble width.
+ */
+val BrandGradient: Brush = Brush.linearGradient(listOf(BrandOrange, BrandRed))
+
+/**
+ * Text and control glyphs sitting ON a solid brand fill.
+ *
+ * White on #FF6900 measures 2.89:1 and on the light scheme's #E65E00 primary 3.52:1 — both
+ * under AA's 4.5:1 for small text and under even the 3:1 floor a control glyph asks
+ * (DESIGN_GUIDELINE §5, which also rules out darkening the hue: it is locked identity). This
+ * ink is 6.12:1 on #FF6900 and 5.02:1 on #E65E00, so `onPrimary` clears AA in both schemes.
+ * Deliberately the same hex as iOS `AppColors.onBrand` and the web `--text-on-primary`, so a
+ * filled primary button reads identically on all four surfaces.
+ */
+val OnBrandInk = Color(0xFF10182B)
 
 // Secondary tonal — Warm Neutral
 val Secondary10 = Color(0xFF1F1A17)

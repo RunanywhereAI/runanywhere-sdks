@@ -21,11 +21,15 @@ public enum RADefaults {
         public static let retryBackoffBaseMs: Int = 100
     }
 
+    public enum Connect {
+        public static let connectTimeoutMs: Int = 5000
+        public static let generationReadTimeoutMs: Int = 120000
+    }
+
     public enum AudioCapture {
         public static let micSampleRateHz: Int = 16000
         public static let micChannels: Int = 1
         public static let micChannelCapacity: Int = 128
-        public static let micTapBufferFrames: Int = 4096
         public static let ttsSampleRateHz: Int = 22050
     }
 

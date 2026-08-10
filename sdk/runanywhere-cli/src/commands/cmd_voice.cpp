@@ -6,6 +6,7 @@
 
 #include "commands/commands.h"
 
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -37,6 +38,10 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
+    }
+    if (input.empty()) {
+        out::error_line("an audio file is required (positional or --input)");
+        return 2;
     }
 
     ResolvedModelPaths stt;
@@ -101,19 +106,19 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
         exit_code = 1;
     } else {
         std::string reply_path;
+        // synthesized_audio_sample_rate_hz/channels/encoding were deleted from
+        // VoiceAgentResult outright: commons (voice_agent_proto_abi.cpp) already
+        // wraps the TTS float32 PCM into a complete WAV container via
+        // rac_audio_float32_to_wav before setting synthesized_audio, so this is
+        // a ready-to-write WAV file, not raw PCM -- no reinterpret/resample here.
         if (!output.empty() && !result.synthesized_audio().empty()) {
-            // Voice agent synthesized audio is float PCM from the TTS stage.
-            const auto* float_samples =
-                reinterpret_cast<const float*>(result.synthesized_audio().data());
-            const size_t sample_count = result.synthesized_audio().size() / sizeof(float);
-            const std::vector<int16_t> reply = wav::to_int16(float_samples, sample_count);
-            const int sample_rate = result.synthesized_audio_sample_rate_hz() > 0
-                                        ? result.synthesized_audio_sample_rate_hz()
-                                        : 22050;
-            if (wav::write_wav(output, reply.data(), reply.size(), sample_rate, &error)) {
+            std::ofstream file(output, std::ios::binary);
+            file.write(result.synthesized_audio().data(),
+                      static_cast<std::streamsize>(result.synthesized_audio().size()));
+            if (file.good()) {
                 reply_path = output;
             } else {
-                out::status_line("warning: " + error);
+                out::status_line("warning: cannot write " + output);
             }
         }
 
@@ -123,7 +128,6 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
                 .field("transcription", result.transcription())
                 .field("response", result.assistant_response())
                 .field("reply_audio", reply_path)
-                .field("total_ms", static_cast<int64_t>(result.total_time_ms()))
                 .end_object();
             out::result_line(json.str());
         } else {
@@ -131,9 +135,6 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
             out::result_line("agent " + result.assistant_response());
             if (!reply_path.empty()) {
                 out::result_line("audio " + reply_path);
-            }
-            if (options.verbose) {
-                out::status_line("(" + std::to_string(result.total_time_ms()) + " ms)");
             }
         }
     }
@@ -145,20 +146,22 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
 }  // namespace
 
 void register_voice(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd =
-        app.add_subcommand("voice", "Run a full voice turn (STT → LLM → TTS) on a WAV file");
+    CLI::App* cmd = app.add_subcommand("voice", "Hold one spoken turn: listen, answer, speak");
     auto input = std::make_shared<std::string>();
     auto stt = std::make_shared<std::string>();
     auto llm = std::make_shared<std::string>();
     auto tts = std::make_shared<std::string>();
     auto output = std::make_shared<std::string>();
-    cmd->add_option("--input,-i", *input, "16-bit PCM WAV file with the user's speech")
-        ->required()
+    cmd->add_option("audio", *input, "16-bit PCM WAV file with the user's speech")
         ->check(CLI::ExistingFile);
-    cmd->add_option("--stt", *stt, "STT model (default: " + std::string(kDefaultStt) + ")");
-    cmd->add_option("--llm", *llm, "LLM model (default: " + std::string(kDefaultLlm) + ")");
-    cmd->add_option("--tts", *tts, "TTS voice (default: " + std::string(kDefaultTts) + ")");
-    cmd->add_option("--output,-o", *output, "Write the agent's spoken reply to this WAV path");
+    cmd->add_option("--input,-i", *input, "16-bit PCM WAV file with the user's speech")
+        ->check(CLI::ExistingFile);
+    cmd->add_option("--stt", *stt,
+                    "Transcription model (default: " + std::string(kDefaultStt) + ")");
+    cmd->add_option("--llm", *llm, "Answering model (default: " + std::string(kDefaultLlm) + ")");
+    cmd->add_option("--tts", *tts, "Voice that speaks the reply (default: " +
+                                       std::string(kDefaultTts) + ")");
+    cmd->add_option("--output,-o", *output, "WAV file for the spoken reply");
     cmd->callback([&options, input, stt, llm, tts, output]() {
         const int exit_code = run_voice(options, *input, *stt, *llm, *tts, *output);
         if (exit_code != 0) {

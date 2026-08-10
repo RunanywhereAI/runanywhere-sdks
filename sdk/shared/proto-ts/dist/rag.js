@@ -5,21 +5,21 @@
 //   protoc               v7.35.1
 // source: rag.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RAGServiceState = exports.RAGStreamEvent = exports.RAGIngestResult = exports.RAGStatistics = exports.RAGResult = exports.RAGSearchResult_MetadataEntry = exports.RAGSearchResult = exports.RAGQueryRequest_MetadataEntry = exports.RAGQueryRequest = exports.RAGQueryOptions = exports.RAGIngestRequest_MetadataEntry = exports.RAGIngestRequest = exports.RAGDocument_MetadataEntry = exports.RAGDocument = exports.RAGConfiguration = exports.RAGStreamEventKind = exports.protobufPackage = void 0;
+exports.RAGStreamEvent = exports.RAGStatistics = exports.RAGResult = exports.RAGSearchResponse = exports.RAGSearchResult_MetadataEntry = exports.RAGSearchResult = exports.RAGSearchRequest = exports.RAGQueryOptions = exports.RAGRetrievalOptions = exports.RAGDeleteResponse = exports.RAGDeleteRequest = exports.RAGDocument_MetadataEntry = exports.RAGDocument = exports.RAGConfiguration = exports.RAGStreamEventKind = exports.protobufPackage = void 0;
 exports.rAGStreamEventKindFromJSON = rAGStreamEventKindFromJSON;
 exports.rAGStreamEventKindToJSON = rAGStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
+const llm_options_1 = require("./llm_options");
+const token_usage_1 = require("./token_usage");
 exports.protobufPackage = "runanywhere.v1";
 var RAGStreamEventKind;
 (function (RAGStreamEventKind) {
     RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "RAG_STREAM_EVENT_KIND_UNSPECIFIED";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED"] = 1] = "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED"] = 2] = "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_CONTEXT_READY"] = 3] = "RAG_STREAM_EVENT_KIND_CONTEXT_READY";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_TOKEN"] = 4] = "RAG_STREAM_EVENT_KIND_TOKEN";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_COMPLETED"] = 5] = "RAG_STREAM_EVENT_KIND_COMPLETED";
-    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_ERROR"] = 6] = "RAG_STREAM_EVENT_KIND_ERROR";
+    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_TOKEN"] = 1] = "RAG_STREAM_EVENT_KIND_TOKEN";
+    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_COMPLETED"] = 2] = "RAG_STREAM_EVENT_KIND_COMPLETED";
+    RAGStreamEventKind[RAGStreamEventKind["RAG_STREAM_EVENT_KIND_ERROR"] = 3] = "RAG_STREAM_EVENT_KIND_ERROR";
     RAGStreamEventKind[RAGStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(RAGStreamEventKind || (exports.RAGStreamEventKind = RAGStreamEventKind = {}));
 function rAGStreamEventKindFromJSON(object) {
@@ -28,21 +28,12 @@ function rAGStreamEventKindFromJSON(object) {
         case "RAG_STREAM_EVENT_KIND_UNSPECIFIED":
             return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED;
         case 1:
-        case "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED":
-            return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED;
-        case 2:
-        case "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED":
-            return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED;
-        case 3:
-        case "RAG_STREAM_EVENT_KIND_CONTEXT_READY":
-            return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY;
-        case 4:
         case "RAG_STREAM_EVENT_KIND_TOKEN":
             return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN;
-        case 5:
+        case 2:
         case "RAG_STREAM_EVENT_KIND_COMPLETED":
             return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED;
-        case 6:
+        case 3:
         case "RAG_STREAM_EVENT_KIND_ERROR":
             return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR;
         case -1:
@@ -55,12 +46,6 @@ function rAGStreamEventKindToJSON(object) {
     switch (object) {
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED:
             return "RAG_STREAM_EVENT_KIND_UNSPECIFIED";
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED:
-            return "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED";
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
-            return "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED";
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
-            return "RAG_STREAM_EVENT_KIND_CONTEXT_READY";
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
             return "RAG_STREAM_EVENT_KIND_TOKEN";
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED:
@@ -78,17 +63,13 @@ function createBaseRAGConfiguration() {
         llmModelId: "",
         embeddingDimension: undefined,
         topK: undefined,
-        similarityThreshold: undefined,
+        scoreThreshold: undefined,
         chunkSize: undefined,
         chunkOverlap: undefined,
         maxContextTokens: undefined,
         promptTemplate: undefined,
         embeddingConfigJson: undefined,
-        llmConfigJson: undefined,
-        indexPath: undefined,
-        persistIndex: false,
         rerankResults: false,
-        rerankerModelId: undefined,
     };
 }
 exports.RAGConfiguration = {
@@ -105,8 +86,8 @@ exports.RAGConfiguration = {
         if (message.topK !== undefined) {
             writer.uint32(32).int32(message.topK);
         }
-        if (message.similarityThreshold !== undefined) {
-            writer.uint32(45).float(message.similarityThreshold);
+        if (message.scoreThreshold !== undefined) {
+            writer.uint32(45).float(message.scoreThreshold);
         }
         if (message.chunkSize !== undefined) {
             writer.uint32(48).int32(message.chunkSize);
@@ -123,20 +104,8 @@ exports.RAGConfiguration = {
         if (message.embeddingConfigJson !== undefined) {
             writer.uint32(82).string(message.embeddingConfigJson);
         }
-        if (message.llmConfigJson !== undefined) {
-            writer.uint32(90).string(message.llmConfigJson);
-        }
-        if (message.indexPath !== undefined) {
-            writer.uint32(98).string(message.indexPath);
-        }
-        if (message.persistIndex !== false) {
-            writer.uint32(104).bool(message.persistIndex);
-        }
         if (message.rerankResults !== false) {
-            writer.uint32(112).bool(message.rerankResults);
-        }
-        if (message.rerankerModelId !== undefined) {
-            writer.uint32(122).string(message.rerankerModelId);
+            writer.uint32(88).bool(message.rerankResults);
         }
         return writer;
     },
@@ -179,7 +148,7 @@ exports.RAGConfiguration = {
                     if (tag !== 45) {
                         break;
                     }
-                    message.similarityThreshold = reader.float();
+                    message.scoreThreshold = reader.float();
                     continue;
                 }
                 case 6: {
@@ -218,38 +187,10 @@ exports.RAGConfiguration = {
                     continue;
                 }
                 case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.llmConfigJson = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.indexPath = reader.string();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.persistIndex = reader.bool();
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 112) {
+                    if (tag !== 88) {
                         break;
                     }
                     message.rerankResults = reader.bool();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 122) {
-                        break;
-                    }
-                    message.rerankerModelId = reader.string();
                     continue;
                 }
             }
@@ -282,10 +223,10 @@ exports.RAGConfiguration = {
                 : isSet(object.top_k)
                     ? globalThis.Number(object.top_k)
                     : undefined,
-            similarityThreshold: isSet(object.similarityThreshold)
-                ? globalThis.Number(object.similarityThreshold)
-                : isSet(object.similarity_threshold)
-                    ? globalThis.Number(object.similarity_threshold)
+            scoreThreshold: isSet(object.scoreThreshold)
+                ? globalThis.Number(object.scoreThreshold)
+                : isSet(object.score_threshold)
+                    ? globalThis.Number(object.score_threshold)
                     : undefined,
             chunkSize: isSet(object.chunkSize)
                 ? globalThis.Number(object.chunkSize)
@@ -312,31 +253,11 @@ exports.RAGConfiguration = {
                 : isSet(object.embedding_config_json)
                     ? globalThis.String(object.embedding_config_json)
                     : undefined,
-            llmConfigJson: isSet(object.llmConfigJson)
-                ? globalThis.String(object.llmConfigJson)
-                : isSet(object.llm_config_json)
-                    ? globalThis.String(object.llm_config_json)
-                    : undefined,
-            indexPath: isSet(object.indexPath)
-                ? globalThis.String(object.indexPath)
-                : isSet(object.index_path)
-                    ? globalThis.String(object.index_path)
-                    : undefined,
-            persistIndex: isSet(object.persistIndex)
-                ? globalThis.Boolean(object.persistIndex)
-                : isSet(object.persist_index)
-                    ? globalThis.Boolean(object.persist_index)
-                    : false,
             rerankResults: isSet(object.rerankResults)
                 ? globalThis.Boolean(object.rerankResults)
                 : isSet(object.rerank_results)
                     ? globalThis.Boolean(object.rerank_results)
                     : false,
-            rerankerModelId: isSet(object.rerankerModelId)
-                ? globalThis.String(object.rerankerModelId)
-                : isSet(object.reranker_model_id)
-                    ? globalThis.String(object.reranker_model_id)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -353,8 +274,8 @@ exports.RAGConfiguration = {
         if (message.topK !== undefined) {
             obj.topK = Math.round(message.topK);
         }
-        if (message.similarityThreshold !== undefined) {
-            obj.similarityThreshold = message.similarityThreshold;
+        if (message.scoreThreshold !== undefined) {
+            obj.scoreThreshold = message.scoreThreshold;
         }
         if (message.chunkSize !== undefined) {
             obj.chunkSize = Math.round(message.chunkSize);
@@ -371,20 +292,8 @@ exports.RAGConfiguration = {
         if (message.embeddingConfigJson !== undefined) {
             obj.embeddingConfigJson = message.embeddingConfigJson;
         }
-        if (message.llmConfigJson !== undefined) {
-            obj.llmConfigJson = message.llmConfigJson;
-        }
-        if (message.indexPath !== undefined) {
-            obj.indexPath = message.indexPath;
-        }
-        if (message.persistIndex !== false) {
-            obj.persistIndex = message.persistIndex;
-        }
         if (message.rerankResults !== false) {
             obj.rerankResults = message.rerankResults;
-        }
-        if (message.rerankerModelId !== undefined) {
-            obj.rerankerModelId = message.rerankerModelId;
         }
         return obj;
     },
@@ -397,30 +306,18 @@ exports.RAGConfiguration = {
         message.llmModelId = object.llmModelId ?? "";
         message.embeddingDimension = object.embeddingDimension ?? undefined;
         message.topK = object.topK ?? undefined;
-        message.similarityThreshold = object.similarityThreshold ?? undefined;
+        message.scoreThreshold = object.scoreThreshold ?? undefined;
         message.chunkSize = object.chunkSize ?? undefined;
         message.chunkOverlap = object.chunkOverlap ?? undefined;
         message.maxContextTokens = object.maxContextTokens ?? undefined;
         message.promptTemplate = object.promptTemplate ?? undefined;
         message.embeddingConfigJson = object.embeddingConfigJson ?? undefined;
-        message.llmConfigJson = object.llmConfigJson ?? undefined;
-        message.indexPath = object.indexPath ?? undefined;
-        message.persistIndex = object.persistIndex ?? false;
         message.rerankResults = object.rerankResults ?? false;
-        message.rerankerModelId = object.rerankerModelId ?? undefined;
         return message;
     },
 };
 function createBaseRAGDocument() {
-    return {
-        id: "",
-        text: "",
-        metadata: {},
-        sourceUri: undefined,
-        adapterHandle: undefined,
-        mediaType: undefined,
-        sizeBytes: 0,
-    };
+    return { id: "", text: "", metadata: {}, sourceUri: undefined };
 }
 exports.RAGDocument = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -431,19 +328,10 @@ exports.RAGDocument = {
             writer.uint32(18).string(message.text);
         }
         globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.RAGDocument_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).join();
+            exports.RAGDocument_MetadataEntry.encode({ key: key, value }, writer.uint32(26).fork()).join();
         });
         if (message.sourceUri !== undefined) {
-            writer.uint32(42).string(message.sourceUri);
-        }
-        if (message.adapterHandle !== undefined) {
-            writer.uint32(50).string(message.adapterHandle);
-        }
-        if (message.mediaType !== undefined) {
-            writer.uint32(58).string(message.mediaType);
-        }
-        if (message.sizeBytes !== 0) {
-            writer.uint32(64).int64(message.sizeBytes);
+            writer.uint32(34).string(message.sourceUri);
         }
         return writer;
     },
@@ -468,42 +356,21 @@ exports.RAGDocument = {
                     message.text = reader.string();
                     continue;
                 }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    const entry3 = exports.RAGDocument_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry3.value !== undefined) {
+                        message.metadata[entry3.key] = entry3.value;
+                    }
+                    continue;
+                }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
-                    const entry4 = exports.RAGDocument_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry4.value !== undefined) {
-                        message.metadata[entry4.key] = entry4.value;
-                    }
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
                     message.sourceUri = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.adapterHandle = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.mediaType = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.sizeBytes = longToNumber(reader.int64());
                     continue;
                 }
             }
@@ -529,21 +396,6 @@ exports.RAGDocument = {
                 : isSet(object.source_uri)
                     ? globalThis.String(object.source_uri)
                     : undefined,
-            adapterHandle: isSet(object.adapterHandle)
-                ? globalThis.String(object.adapterHandle)
-                : isSet(object.adapter_handle)
-                    ? globalThis.String(object.adapter_handle)
-                    : undefined,
-            mediaType: isSet(object.mediaType)
-                ? globalThis.String(object.mediaType)
-                : isSet(object.media_type)
-                    ? globalThis.String(object.media_type)
-                    : undefined,
-            sizeBytes: isSet(object.sizeBytes)
-                ? globalThis.Number(object.sizeBytes)
-                : isSet(object.size_bytes)
-                    ? globalThis.Number(object.size_bytes)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -566,15 +418,6 @@ exports.RAGDocument = {
         if (message.sourceUri !== undefined) {
             obj.sourceUri = message.sourceUri;
         }
-        if (message.adapterHandle !== undefined) {
-            obj.adapterHandle = message.adapterHandle;
-        }
-        if (message.mediaType !== undefined) {
-            obj.mediaType = message.mediaType;
-        }
-        if (message.sizeBytes !== 0) {
-            obj.sizeBytes = Math.round(message.sizeBytes);
-        }
         return obj;
     },
     create(base) {
@@ -591,9 +434,6 @@ exports.RAGDocument = {
             return acc;
         }, {});
         message.sourceUri = object.sourceUri ?? undefined;
-        message.adapterHandle = object.adapterHandle ?? undefined;
-        message.mediaType = object.mediaType ?? undefined;
-        message.sizeBytes = object.sizeBytes ?? 0;
         return message;
     },
 };
@@ -665,29 +505,20 @@ exports.RAGDocument_MetadataEntry = {
         return message;
     },
 };
-function createBaseRAGIngestRequest() {
-    return { requestId: "", documents: [], replaceExisting: false, metadata: {} };
+function createBaseRAGDeleteRequest() {
+    return { documentIds: [] };
 }
-exports.RAGIngestRequest = {
+exports.RAGDeleteRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
+        for (const v of message.documentIds) {
+            writer.uint32(10).string(v);
         }
-        for (const v of message.documents) {
-            exports.RAGDocument.encode(v, writer.uint32(18).fork()).join();
-        }
-        if (message.replaceExisting !== false) {
-            writer.uint32(24).bool(message.replaceExisting);
-        }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.RAGIngestRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).join();
-        });
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGIngestRequest();
+        const message = createBaseRAGDeleteRequest();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -695,31 +526,84 @@ exports.RAGIngestRequest = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.requestId = reader.string();
+                    message.documentIds.push(reader.string());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            documentIds: globalThis.Array.isArray(object?.documentIds)
+                ? object.documentIds.map((e) => globalThis.String(e))
+                : globalThis.Array.isArray(object?.document_ids)
+                    ? object.document_ids.map((e) => globalThis.String(e))
+                    : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.documentIds?.length) {
+            obj.documentIds = message.documentIds;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.RAGDeleteRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRAGDeleteRequest();
+        message.documentIds = object.documentIds?.map((e) => e) || [];
+        return message;
+    },
+};
+function createBaseRAGDeleteResponse() {
+    return { deletedChunks: 0, missingIds: [], error: undefined };
+}
+exports.RAGDeleteResponse = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.deletedChunks !== 0) {
+            writer.uint32(8).int64(message.deletedChunks);
+        }
+        for (const v of message.missingIds) {
+            writer.uint32(18).string(v);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRAGDeleteResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.deletedChunks = longToNumber(reader.int64());
                     continue;
                 }
                 case 2: {
                     if (tag !== 18) {
                         break;
                     }
-                    message.documents.push(exports.RAGDocument.decode(reader, reader.uint32()));
+                    message.missingIds.push(reader.string());
                     continue;
                 }
                 case 3: {
-                    if (tag !== 24) {
+                    if (tag !== 26) {
                         break;
                     }
-                    message.replaceExisting = reader.bool();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    const entry4 = exports.RAGIngestRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry4.value !== undefined) {
-                        message.metadata[entry4.key] = entry4.value;
-                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -732,287 +616,110 @@ exports.RAGIngestRequest = {
     },
     fromJSON(object) {
         return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            documents: globalThis.Array.isArray(object?.documents)
-                ? object.documents.map((e) => exports.RAGDocument.fromJSON(e))
-                : [],
-            replaceExisting: isSet(object.replaceExisting)
-                ? globalThis.Boolean(object.replaceExisting)
-                : isSet(object.replace_existing)
-                    ? globalThis.Boolean(object.replace_existing)
-                    : false,
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
+            deletedChunks: isSet(object.deletedChunks)
+                ? globalThis.Number(object.deletedChunks)
+                : isSet(object.deleted_chunks)
+                    ? globalThis.Number(object.deleted_chunks)
+                    : 0,
+            missingIds: globalThis.Array.isArray(object?.missingIds)
+                ? object.missingIds.map((e) => globalThis.String(e))
+                : globalThis.Array.isArray(object?.missing_ids)
+                    ? object.missing_ids.map((e) => globalThis.String(e))
+                    : [],
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
+        if (message.deletedChunks !== 0) {
+            obj.deletedChunks = Math.round(message.deletedChunks);
         }
-        if (message.documents?.length) {
-            obj.documents = message.documents.map((e) => exports.RAGDocument.toJSON(e));
+        if (message.missingIds?.length) {
+            obj.missingIds = message.missingIds;
         }
-        if (message.replaceExisting !== false) {
-            obj.replaceExisting = message.replaceExisting;
-        }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
     create(base) {
-        return exports.RAGIngestRequest.fromPartial(base ?? {});
+        return exports.RAGDeleteResponse.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseRAGIngestRequest();
-        message.requestId = object.requestId ?? "";
-        message.documents = object.documents?.map((e) => exports.RAGDocument.fromPartial(e)) || [];
-        message.replaceExisting = object.replaceExisting ?? false;
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
+        const message = createBaseRAGDeleteResponse();
+        message.deletedChunks = object.deletedChunks ?? 0;
+        message.missingIds = object.missingIds?.map((e) => e) || [];
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
-function createBaseRAGIngestRequest_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.RAGIngestRequest_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGIngestRequest_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.RAGIngestRequest_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseRAGIngestRequest_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
-        return message;
-    },
-};
-function createBaseRAGQueryOptions() {
+function createBaseRAGRetrievalOptions() {
     return {
-        question: "",
-        systemPrompt: undefined,
-        maxTokens: 0,
-        temperature: 0,
-        topP: 0,
-        topK: 0,
-        retrievalTopK: 0,
-        similarityThreshold: undefined,
-        stream: false,
-        disableThinking: false,
+        topK: undefined,
+        scoreThreshold: undefined,
         enableMultiQuery: false,
         multiQueryCount: undefined,
         scopePrefix: undefined,
     };
 }
-exports.RAGQueryOptions = {
+exports.RAGRetrievalOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.question !== "") {
-            writer.uint32(10).string(message.question);
+        if (message.topK !== undefined) {
+            writer.uint32(8).int32(message.topK);
         }
-        if (message.systemPrompt !== undefined) {
-            writer.uint32(18).string(message.systemPrompt);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(24).int32(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            writer.uint32(37).float(message.temperature);
-        }
-        if (message.topP !== 0) {
-            writer.uint32(45).float(message.topP);
-        }
-        if (message.topK !== 0) {
-            writer.uint32(48).int32(message.topK);
-        }
-        if (message.retrievalTopK !== 0) {
-            writer.uint32(56).int32(message.retrievalTopK);
-        }
-        if (message.similarityThreshold !== undefined) {
-            writer.uint32(69).float(message.similarityThreshold);
-        }
-        if (message.stream !== false) {
-            writer.uint32(72).bool(message.stream);
-        }
-        if (message.disableThinking !== false) {
-            writer.uint32(80).bool(message.disableThinking);
+        if (message.scoreThreshold !== undefined) {
+            writer.uint32(21).float(message.scoreThreshold);
         }
         if (message.enableMultiQuery !== false) {
-            writer.uint32(88).bool(message.enableMultiQuery);
+            writer.uint32(24).bool(message.enableMultiQuery);
         }
         if (message.multiQueryCount !== undefined) {
-            writer.uint32(96).int32(message.multiQueryCount);
+            writer.uint32(32).int32(message.multiQueryCount);
         }
         if (message.scopePrefix !== undefined) {
-            writer.uint32(106).string(message.scopePrefix);
+            writer.uint32(42).string(message.scopePrefix);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGQueryOptions();
+        const message = createBaseRAGRetrievalOptions();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
                 case 1: {
-                    if (tag !== 10) {
+                    if (tag !== 8) {
                         break;
                     }
-                    message.question = reader.string();
+                    message.topK = reader.int32();
                     continue;
                 }
                 case 2: {
-                    if (tag !== 18) {
+                    if (tag !== 21) {
                         break;
                     }
-                    message.systemPrompt = reader.string();
+                    message.scoreThreshold = reader.float();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.temperature = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 45) {
-                        break;
-                    }
-                    message.topP = reader.float();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.topK = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.retrievalTopK = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 69) {
-                        break;
-                    }
-                    message.similarityThreshold = reader.float();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.stream = reader.bool();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.disableThinking = reader.bool();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
                     message.enableMultiQuery = reader.bool();
                     continue;
                 }
-                case 12: {
-                    if (tag !== 96) {
+                case 4: {
+                    if (tag !== 32) {
                         break;
                     }
                     message.multiQueryCount = reader.int32();
                     continue;
                 }
-                case 13: {
-                    if (tag !== 106) {
+                case 5: {
+                    if (tag !== 42) {
                         break;
                     }
                     message.scopePrefix = reader.string();
@@ -1028,44 +735,16 @@ exports.RAGQueryOptions = {
     },
     fromJSON(object) {
         return {
-            question: isSet(object.question) ? globalThis.String(object.question) : "",
-            systemPrompt: isSet(object.systemPrompt)
-                ? globalThis.String(object.systemPrompt)
-                : isSet(object.system_prompt)
-                    ? globalThis.String(object.system_prompt)
-                    : undefined,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-            topP: isSet(object.topP)
-                ? globalThis.Number(object.topP)
-                : isSet(object.top_p)
-                    ? globalThis.Number(object.top_p)
-                    : 0,
             topK: isSet(object.topK)
                 ? globalThis.Number(object.topK)
                 : isSet(object.top_k)
                     ? globalThis.Number(object.top_k)
-                    : 0,
-            retrievalTopK: isSet(object.retrievalTopK)
-                ? globalThis.Number(object.retrievalTopK)
-                : isSet(object.retrieval_top_k)
-                    ? globalThis.Number(object.retrieval_top_k)
-                    : 0,
-            similarityThreshold: isSet(object.similarityThreshold)
-                ? globalThis.Number(object.similarityThreshold)
-                : isSet(object.similarity_threshold)
-                    ? globalThis.Number(object.similarity_threshold)
                     : undefined,
-            stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
-            disableThinking: isSet(object.disableThinking)
-                ? globalThis.Boolean(object.disableThinking)
-                : isSet(object.disable_thinking)
-                    ? globalThis.Boolean(object.disable_thinking)
-                    : false,
+            scoreThreshold: isSet(object.scoreThreshold)
+                ? globalThis.Number(object.scoreThreshold)
+                : isSet(object.score_threshold)
+                    ? globalThis.Number(object.score_threshold)
+                    : undefined,
             enableMultiQuery: isSet(object.enableMultiQuery)
                 ? globalThis.Boolean(object.enableMultiQuery)
                 : isSet(object.enable_multi_query)
@@ -1085,35 +764,11 @@ exports.RAGQueryOptions = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.question !== "") {
-            obj.question = message.question;
-        }
-        if (message.systemPrompt !== undefined) {
-            obj.systemPrompt = message.systemPrompt;
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            obj.temperature = message.temperature;
-        }
-        if (message.topP !== 0) {
-            obj.topP = message.topP;
-        }
-        if (message.topK !== 0) {
+        if (message.topK !== undefined) {
             obj.topK = Math.round(message.topK);
         }
-        if (message.retrievalTopK !== 0) {
-            obj.retrievalTopK = Math.round(message.retrievalTopK);
-        }
-        if (message.similarityThreshold !== undefined) {
-            obj.similarityThreshold = message.similarityThreshold;
-        }
-        if (message.stream !== false) {
-            obj.stream = message.stream;
-        }
-        if (message.disableThinking !== false) {
-            obj.disableThinking = message.disableThinking;
+        if (message.scoreThreshold !== undefined) {
+            obj.scoreThreshold = message.scoreThreshold;
         }
         if (message.enableMultiQuery !== false) {
             obj.enableMultiQuery = message.enableMultiQuery;
@@ -1127,46 +782,38 @@ exports.RAGQueryOptions = {
         return obj;
     },
     create(base) {
-        return exports.RAGQueryOptions.fromPartial(base ?? {});
+        return exports.RAGRetrievalOptions.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseRAGQueryOptions();
-        message.question = object.question ?? "";
-        message.systemPrompt = object.systemPrompt ?? undefined;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.topP = object.topP ?? 0;
-        message.topK = object.topK ?? 0;
-        message.retrievalTopK = object.retrievalTopK ?? 0;
-        message.similarityThreshold = object.similarityThreshold ?? undefined;
-        message.stream = object.stream ?? false;
-        message.disableThinking = object.disableThinking ?? false;
+        const message = createBaseRAGRetrievalOptions();
+        message.topK = object.topK ?? undefined;
+        message.scoreThreshold = object.scoreThreshold ?? undefined;
         message.enableMultiQuery = object.enableMultiQuery ?? false;
         message.multiQueryCount = object.multiQueryCount ?? undefined;
         message.scopePrefix = object.scopePrefix ?? undefined;
         return message;
     },
 };
-function createBaseRAGQueryRequest() {
-    return { requestId: "", options: undefined, metadata: {} };
+function createBaseRAGQueryOptions() {
+    return { query: "", retrieval: undefined, generation: undefined };
 }
-exports.RAGQueryRequest = {
+exports.RAGQueryOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
+        if (message.query !== "") {
+            writer.uint32(10).string(message.query);
         }
-        if (message.options !== undefined) {
-            exports.RAGQueryOptions.encode(message.options, writer.uint32(18).fork()).join();
+        if (message.retrieval !== undefined) {
+            exports.RAGRetrievalOptions.encode(message.retrieval, writer.uint32(18).fork()).join();
         }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.RAGQueryRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(26).fork()).join();
-        });
+        if (message.generation !== undefined) {
+            llm_options_1.LLMGenerationOptions.encode(message.generation, writer.uint32(26).fork()).join();
+        }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGQueryRequest();
+        const message = createBaseRAGQueryOptions();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -1174,24 +821,21 @@ exports.RAGQueryRequest = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.requestId = reader.string();
+                    message.query = reader.string();
                     continue;
                 }
                 case 2: {
                     if (tag !== 18) {
                         break;
                     }
-                    message.options = exports.RAGQueryOptions.decode(reader, reader.uint32());
+                    message.retrieval = exports.RAGRetrievalOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 3: {
                     if (tag !== 26) {
                         break;
                     }
-                    const entry3 = exports.RAGQueryRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry3.value !== undefined) {
-                        message.metadata[entry3.key] = entry3.value;
-                    }
+                    message.generation = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1204,74 +848,56 @@ exports.RAGQueryRequest = {
     },
     fromJSON(object) {
         return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            options: isSet(object.options) ? exports.RAGQueryOptions.fromJSON(object.options) : undefined,
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
+            query: isSet(object.query) ? globalThis.String(object.query) : "",
+            retrieval: isSet(object.retrieval) ? exports.RAGRetrievalOptions.fromJSON(object.retrieval) : undefined,
+            generation: isSet(object.generation) ? llm_options_1.LLMGenerationOptions.fromJSON(object.generation) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
+        if (message.query !== "") {
+            obj.query = message.query;
         }
-        if (message.options !== undefined) {
-            obj.options = exports.RAGQueryOptions.toJSON(message.options);
+        if (message.retrieval !== undefined) {
+            obj.retrieval = exports.RAGRetrievalOptions.toJSON(message.retrieval);
         }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
+        if (message.generation !== undefined) {
+            obj.generation = llm_options_1.LLMGenerationOptions.toJSON(message.generation);
         }
         return obj;
     },
     create(base) {
-        return exports.RAGQueryRequest.fromPartial(base ?? {});
+        return exports.RAGQueryOptions.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseRAGQueryRequest();
-        message.requestId = object.requestId ?? "";
-        message.options = (object.options !== undefined && object.options !== null)
-            ? exports.RAGQueryOptions.fromPartial(object.options)
+        const message = createBaseRAGQueryOptions();
+        message.query = object.query ?? "";
+        message.retrieval = (object.retrieval !== undefined && object.retrieval !== null)
+            ? exports.RAGRetrievalOptions.fromPartial(object.retrieval)
             : undefined;
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
+        message.generation = (object.generation !== undefined && object.generation !== null)
+            ? llm_options_1.LLMGenerationOptions.fromPartial(object.generation)
+            : undefined;
         return message;
     },
 };
-function createBaseRAGQueryRequest_MetadataEntry() {
-    return { key: "", value: "" };
+function createBaseRAGSearchRequest() {
+    return { query: "", retrieval: undefined };
 }
-exports.RAGQueryRequest_MetadataEntry = {
+exports.RAGSearchRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
+        if (message.query !== "") {
+            writer.uint32(10).string(message.query);
         }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
+        if (message.retrieval !== undefined) {
+            exports.RAGRetrievalOptions.encode(message.retrieval, writer.uint32(18).fork()).join();
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGQueryRequest_MetadataEntry();
+        const message = createBaseRAGSearchRequest();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -1279,14 +905,14 @@ exports.RAGQueryRequest_MetadataEntry = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.key = reader.string();
+                    message.query = reader.string();
                     continue;
                 }
                 case 2: {
                     if (tag !== 18) {
                         break;
                     }
-                    message.value = reader.string();
+                    message.retrieval = exports.RAGRetrievalOptions.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1299,27 +925,29 @@ exports.RAGQueryRequest_MetadataEntry = {
     },
     fromJSON(object) {
         return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
+            query: isSet(object.query) ? globalThis.String(object.query) : "",
+            retrieval: isSet(object.retrieval) ? exports.RAGRetrievalOptions.fromJSON(object.retrieval) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
+        if (message.query !== "") {
+            obj.query = message.query;
         }
-        if (message.value !== "") {
-            obj.value = message.value;
+        if (message.retrieval !== undefined) {
+            obj.retrieval = exports.RAGRetrievalOptions.toJSON(message.retrieval);
         }
         return obj;
     },
     create(base) {
-        return exports.RAGQueryRequest_MetadataEntry.fromPartial(base ?? {});
+        return exports.RAGSearchRequest.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseRAGQueryRequest_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
+        const message = createBaseRAGSearchRequest();
+        message.query = object.query ?? "";
+        message.retrieval = (object.retrieval !== undefined && object.retrieval !== null)
+            ? exports.RAGRetrievalOptions.fromPartial(object.retrieval)
+            : undefined;
         return message;
     },
 };
@@ -1327,10 +955,9 @@ function createBaseRAGSearchResult() {
     return {
         chunkId: "",
         text: "",
-        similarityScore: 0,
+        score: 0,
         sourceDocument: undefined,
         metadata: {},
-        rank: 0,
         startOffset: 0,
         endOffset: 0,
         tokenCount: 0,
@@ -1344,8 +971,8 @@ exports.RAGSearchResult = {
         if (message.text !== "") {
             writer.uint32(18).string(message.text);
         }
-        if (message.similarityScore !== 0) {
-            writer.uint32(29).float(message.similarityScore);
+        if (message.score !== 0) {
+            writer.uint32(29).float(message.score);
         }
         if (message.sourceDocument !== undefined) {
             writer.uint32(34).string(message.sourceDocument);
@@ -1353,17 +980,14 @@ exports.RAGSearchResult = {
         globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
             exports.RAGSearchResult_MetadataEntry.encode({ key: key, value }, writer.uint32(42).fork()).join();
         });
-        if (message.rank !== 0) {
-            writer.uint32(56).int32(message.rank);
-        }
         if (message.startOffset !== 0) {
-            writer.uint32(64).int32(message.startOffset);
+            writer.uint32(48).int32(message.startOffset);
         }
         if (message.endOffset !== 0) {
-            writer.uint32(72).int32(message.endOffset);
+            writer.uint32(56).int32(message.endOffset);
         }
         if (message.tokenCount !== 0) {
-            writer.uint32(80).int32(message.tokenCount);
+            writer.uint32(64).int32(message.tokenCount);
         }
         return writer;
     },
@@ -1392,7 +1016,7 @@ exports.RAGSearchResult = {
                     if (tag !== 29) {
                         break;
                     }
-                    message.similarityScore = reader.float();
+                    message.score = reader.float();
                     continue;
                 }
                 case 4: {
@@ -1412,29 +1036,22 @@ exports.RAGSearchResult = {
                     }
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.rank = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
+                case 6: {
+                    if (tag !== 48) {
                         break;
                     }
                     message.startOffset = reader.int32();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 72) {
+                case 7: {
+                    if (tag !== 56) {
                         break;
                     }
                     message.endOffset = reader.int32();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 80) {
+                case 8: {
+                    if (tag !== 64) {
                         break;
                     }
                     message.tokenCount = reader.int32();
@@ -1456,11 +1073,7 @@ exports.RAGSearchResult = {
                     ? globalThis.String(object.chunk_id)
                     : "",
             text: isSet(object.text) ? globalThis.String(object.text) : "",
-            similarityScore: isSet(object.similarityScore)
-                ? globalThis.Number(object.similarityScore)
-                : isSet(object.similarity_score)
-                    ? globalThis.Number(object.similarity_score)
-                    : 0,
+            score: isSet(object.score) ? globalThis.Number(object.score) : 0,
             sourceDocument: isSet(object.sourceDocument)
                 ? globalThis.String(object.sourceDocument)
                 : isSet(object.source_document)
@@ -1472,7 +1085,6 @@ exports.RAGSearchResult = {
                     return acc;
                 }, {})
                 : {},
-            rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
             startOffset: isSet(object.startOffset)
                 ? globalThis.Number(object.startOffset)
                 : isSet(object.start_offset)
@@ -1498,8 +1110,8 @@ exports.RAGSearchResult = {
         if (message.text !== "") {
             obj.text = message.text;
         }
-        if (message.similarityScore !== 0) {
-            obj.similarityScore = message.similarityScore;
+        if (message.score !== 0) {
+            obj.score = message.score;
         }
         if (message.sourceDocument !== undefined) {
             obj.sourceDocument = message.sourceDocument;
@@ -1512,9 +1124,6 @@ exports.RAGSearchResult = {
                     obj.metadata[k] = v;
                 });
             }
-        }
-        if (message.rank !== 0) {
-            obj.rank = Math.round(message.rank);
         }
         if (message.startOffset !== 0) {
             obj.startOffset = Math.round(message.startOffset);
@@ -1534,7 +1143,7 @@ exports.RAGSearchResult = {
         const message = createBaseRAGSearchResult();
         message.chunkId = object.chunkId ?? "";
         message.text = object.text ?? "";
-        message.similarityScore = object.similarityScore ?? 0;
+        message.score = object.score ?? 0;
         message.sourceDocument = object.sourceDocument ?? undefined;
         message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
             if (value !== undefined) {
@@ -1542,7 +1151,6 @@ exports.RAGSearchResult = {
             }
             return acc;
         }, {});
-        message.rank = object.rank ?? 0;
         message.startOffset = object.startOffset ?? 0;
         message.endOffset = object.endOffset ?? 0;
         message.tokenCount = object.tokenCount ?? 0;
@@ -1617,6 +1225,116 @@ exports.RAGSearchResult_MetadataEntry = {
         return message;
     },
 };
+function createBaseRAGSearchResponse() {
+    return { chunks: [], retrievalTimeMs: 0, requestId: "", error: undefined };
+}
+exports.RAGSearchResponse = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        for (const v of message.chunks) {
+            exports.RAGSearchResult.encode(v, writer.uint32(10).fork()).join();
+        }
+        if (message.retrievalTimeMs !== 0) {
+            writer.uint32(16).int64(message.retrievalTimeMs);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(26).string(message.requestId);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(34).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRAGSearchResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.chunks.push(exports.RAGSearchResult.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.retrievalTimeMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            chunks: globalThis.Array.isArray(object?.chunks)
+                ? object.chunks.map((e) => exports.RAGSearchResult.fromJSON(e))
+                : [],
+            retrievalTimeMs: isSet(object.retrievalTimeMs)
+                ? globalThis.Number(object.retrievalTimeMs)
+                : isSet(object.retrieval_time_ms)
+                    ? globalThis.Number(object.retrieval_time_ms)
+                    : 0,
+            requestId: isSet(object.requestId)
+                ? globalThis.String(object.requestId)
+                : isSet(object.request_id)
+                    ? globalThis.String(object.request_id)
+                    : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.chunks?.length) {
+            obj.chunks = message.chunks.map((e) => exports.RAGSearchResult.toJSON(e));
+        }
+        if (message.retrievalTimeMs !== 0) {
+            obj.retrievalTimeMs = Math.round(message.retrievalTimeMs);
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.RAGSearchResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRAGSearchResponse();
+        message.chunks = object.chunks?.map((e) => exports.RAGSearchResult.fromPartial(e)) || [];
+        message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
+        message.requestId = object.requestId ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
+        return message;
+    },
+};
 function createBaseRAGResult() {
     return {
         answer: "",
@@ -1624,14 +1342,10 @@ function createBaseRAGResult() {
         contextUsed: "",
         retrievalTimeMs: 0,
         generationTimeMs: 0,
-        totalTimeMs: 0,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        errorMessage: undefined,
-        errorCode: 0,
         requestId: "",
         thinkingContent: undefined,
+        usage: undefined,
+        error: undefined,
     };
 }
 exports.RAGResult = {
@@ -1651,29 +1365,17 @@ exports.RAGResult = {
         if (message.generationTimeMs !== 0) {
             writer.uint32(40).int64(message.generationTimeMs);
         }
-        if (message.totalTimeMs !== 0) {
-            writer.uint32(48).int64(message.totalTimeMs);
-        }
-        if (message.promptTokens !== 0) {
-            writer.uint32(56).int32(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            writer.uint32(64).int32(message.completionTokens);
-        }
-        if (message.totalTokens !== 0) {
-            writer.uint32(72).int32(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(82).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(88).int32(message.errorCode);
-        }
         if (message.requestId !== "") {
-            writer.uint32(98).string(message.requestId);
+            writer.uint32(50).string(message.requestId);
         }
         if (message.thinkingContent !== undefined) {
-            writer.uint32(106).string(message.thinkingContent);
+            writer.uint32(58).string(message.thinkingContent);
+        }
+        if (message.usage !== undefined) {
+            token_usage_1.TokenUsage.encode(message.usage, writer.uint32(66).fork()).join();
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
@@ -1720,59 +1422,31 @@ exports.RAGResult = {
                     continue;
                 }
                 case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.totalTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.promptTokens = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.completionTokens = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.totalTokens = reader.int32();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
+                    if (tag !== 50) {
                         break;
                     }
                     message.requestId = reader.string();
                     continue;
                 }
-                case 13: {
-                    if (tag !== 106) {
+                case 7: {
+                    if (tag !== 58) {
                         break;
                     }
                     message.thinkingContent = reader.string();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1806,36 +1480,6 @@ exports.RAGResult = {
                 : isSet(object.generation_time_ms)
                     ? globalThis.Number(object.generation_time_ms)
                     : 0,
-            totalTimeMs: isSet(object.totalTimeMs)
-                ? globalThis.Number(object.totalTimeMs)
-                : isSet(object.total_time_ms)
-                    ? globalThis.Number(object.total_time_ms)
-                    : 0,
-            promptTokens: isSet(object.promptTokens)
-                ? globalThis.Number(object.promptTokens)
-                : isSet(object.prompt_tokens)
-                    ? globalThis.Number(object.prompt_tokens)
-                    : 0,
-            completionTokens: isSet(object.completionTokens)
-                ? globalThis.Number(object.completionTokens)
-                : isSet(object.completion_tokens)
-                    ? globalThis.Number(object.completion_tokens)
-                    : 0,
-            totalTokens: isSet(object.totalTokens)
-                ? globalThis.Number(object.totalTokens)
-                : isSet(object.total_tokens)
-                    ? globalThis.Number(object.total_tokens)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             requestId: isSet(object.requestId)
                 ? globalThis.String(object.requestId)
                 : isSet(object.request_id)
@@ -1846,6 +1490,8 @@ exports.RAGResult = {
                 : isSet(object.thinking_content)
                     ? globalThis.String(object.thinking_content)
                     : undefined,
+            usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1865,29 +1511,17 @@ exports.RAGResult = {
         if (message.generationTimeMs !== 0) {
             obj.generationTimeMs = Math.round(message.generationTimeMs);
         }
-        if (message.totalTimeMs !== 0) {
-            obj.totalTimeMs = Math.round(message.totalTimeMs);
-        }
-        if (message.promptTokens !== 0) {
-            obj.promptTokens = Math.round(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            obj.completionTokens = Math.round(message.completionTokens);
-        }
-        if (message.totalTokens !== 0) {
-            obj.totalTokens = Math.round(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.requestId !== "") {
             obj.requestId = message.requestId;
         }
         if (message.thinkingContent !== undefined) {
             obj.thinkingContent = message.thinkingContent;
+        }
+        if (message.usage !== undefined) {
+            obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1901,14 +1535,14 @@ exports.RAGResult = {
         message.contextUsed = object.contextUsed ?? "";
         message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
         message.generationTimeMs = object.generationTimeMs ?? 0;
-        message.totalTimeMs = object.totalTimeMs ?? 0;
-        message.promptTokens = object.promptTokens ?? 0;
-        message.completionTokens = object.completionTokens ?? 0;
-        message.totalTokens = object.totalTokens ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.requestId = object.requestId ?? "";
         message.thinkingContent = object.thinkingContent ?? undefined;
+        message.usage = (object.usage !== undefined && object.usage !== null)
+            ? token_usage_1.TokenUsage.fromPartial(object.usage)
+            : undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1918,13 +1552,8 @@ function createBaseRAGStatistics() {
         indexedChunks: 0,
         totalTokensIndexed: 0,
         lastUpdatedMs: 0,
-        indexPath: undefined,
-        statsJson: undefined,
         vectorStoreSizeBytes: 0,
-        isPersistent: false,
-        lastQueryMs: 0,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.RAGStatistics = {
@@ -1941,26 +1570,11 @@ exports.RAGStatistics = {
         if (message.lastUpdatedMs !== 0) {
             writer.uint32(32).int64(message.lastUpdatedMs);
         }
-        if (message.indexPath !== undefined) {
-            writer.uint32(42).string(message.indexPath);
-        }
-        if (message.statsJson !== undefined) {
-            writer.uint32(50).string(message.statsJson);
-        }
         if (message.vectorStoreSizeBytes !== 0) {
-            writer.uint32(56).int64(message.vectorStoreSizeBytes);
+            writer.uint32(40).int64(message.vectorStoreSizeBytes);
         }
-        if (message.isPersistent !== false) {
-            writer.uint32(64).bool(message.isPersistent);
-        }
-        if (message.lastQueryMs !== 0) {
-            writer.uint32(72).int64(message.lastQueryMs);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(82).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(88).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -2000,52 +1614,17 @@ exports.RAGStatistics = {
                     continue;
                 }
                 case 5: {
-                    if (tag !== 42) {
+                    if (tag !== 40) {
                         break;
                     }
-                    message.indexPath = reader.string();
+                    message.vectorStoreSizeBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 6: {
                     if (tag !== 50) {
                         break;
                     }
-                    message.statsJson = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.vectorStoreSizeBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.isPersistent = reader.bool();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.lastQueryMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2078,41 +1657,12 @@ exports.RAGStatistics = {
                 : isSet(object.last_updated_ms)
                     ? globalThis.Number(object.last_updated_ms)
                     : 0,
-            indexPath: isSet(object.indexPath)
-                ? globalThis.String(object.indexPath)
-                : isSet(object.index_path)
-                    ? globalThis.String(object.index_path)
-                    : undefined,
-            statsJson: isSet(object.statsJson)
-                ? globalThis.String(object.statsJson)
-                : isSet(object.stats_json)
-                    ? globalThis.String(object.stats_json)
-                    : undefined,
             vectorStoreSizeBytes: isSet(object.vectorStoreSizeBytes)
                 ? globalThis.Number(object.vectorStoreSizeBytes)
                 : isSet(object.vector_store_size_bytes)
                     ? globalThis.Number(object.vector_store_size_bytes)
                     : 0,
-            isPersistent: isSet(object.isPersistent)
-                ? globalThis.Boolean(object.isPersistent)
-                : isSet(object.is_persistent)
-                    ? globalThis.Boolean(object.is_persistent)
-                    : false,
-            lastQueryMs: isSet(object.lastQueryMs)
-                ? globalThis.Number(object.lastQueryMs)
-                : isSet(object.last_query_ms)
-                    ? globalThis.Number(object.last_query_ms)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2129,26 +1679,11 @@ exports.RAGStatistics = {
         if (message.lastUpdatedMs !== 0) {
             obj.lastUpdatedMs = Math.round(message.lastUpdatedMs);
         }
-        if (message.indexPath !== undefined) {
-            obj.indexPath = message.indexPath;
-        }
-        if (message.statsJson !== undefined) {
-            obj.statsJson = message.statsJson;
-        }
         if (message.vectorStoreSizeBytes !== 0) {
             obj.vectorStoreSizeBytes = Math.round(message.vectorStoreSizeBytes);
         }
-        if (message.isPersistent !== false) {
-            obj.isPersistent = message.isPersistent;
-        }
-        if (message.lastQueryMs !== 0) {
-            obj.lastQueryMs = Math.round(message.lastQueryMs);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2161,214 +1696,35 @@ exports.RAGStatistics = {
         message.indexedChunks = object.indexedChunks ?? 0;
         message.totalTokensIndexed = object.totalTokensIndexed ?? 0;
         message.lastUpdatedMs = object.lastUpdatedMs ?? 0;
-        message.indexPath = object.indexPath ?? undefined;
-        message.statsJson = object.statsJson ?? undefined;
         message.vectorStoreSizeBytes = object.vectorStoreSizeBytes ?? 0;
-        message.isPersistent = object.isPersistent ?? false;
-        message.lastQueryMs = object.lastQueryMs ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
-        return message;
-    },
-};
-function createBaseRAGIngestResult() {
-    return {
-        requestId: "",
-        documentsIngested: 0,
-        chunksIngested: 0,
-        statistics: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
-}
-exports.RAGIngestResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
-        }
-        if (message.documentsIngested !== 0) {
-            writer.uint32(16).int64(message.documentsIngested);
-        }
-        if (message.chunksIngested !== 0) {
-            writer.uint32(24).int64(message.chunksIngested);
-        }
-        if (message.statistics !== undefined) {
-            exports.RAGStatistics.encode(message.statistics, writer.uint32(34).fork()).join();
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(42).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(48).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGIngestResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.documentsIngested = longToNumber(reader.int64());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.chunksIngested = longToNumber(reader.int64());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.statistics = exports.RAGStatistics.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            documentsIngested: isSet(object.documentsIngested)
-                ? globalThis.Number(object.documentsIngested)
-                : isSet(object.documents_ingested)
-                    ? globalThis.Number(object.documents_ingested)
-                    : 0,
-            chunksIngested: isSet(object.chunksIngested)
-                ? globalThis.Number(object.chunksIngested)
-                : isSet(object.chunks_ingested)
-                    ? globalThis.Number(object.chunks_ingested)
-                    : 0,
-            statistics: isSet(object.statistics) ? exports.RAGStatistics.fromJSON(object.statistics) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
-        if (message.documentsIngested !== 0) {
-            obj.documentsIngested = Math.round(message.documentsIngested);
-        }
-        if (message.chunksIngested !== 0) {
-            obj.chunksIngested = Math.round(message.chunksIngested);
-        }
-        if (message.statistics !== undefined) {
-            obj.statistics = exports.RAGStatistics.toJSON(message.statistics);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.RAGIngestResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseRAGIngestResult();
-        message.requestId = object.requestId ?? "";
-        message.documentsIngested = object.documentsIngested ?? 0;
-        message.chunksIngested = object.chunksIngested ?? 0;
-        message.statistics = (object.statistics !== undefined && object.statistics !== null)
-            ? exports.RAGStatistics.fromPartial(object.statistics)
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };
 function createBaseRAGStreamEvent() {
-    return {
-        seq: 0,
-        timestampUs: 0,
-        requestId: "",
-        kind: 0,
-        chunk: undefined,
-        token: "",
-        result: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
+    return { timestampUs: 0, requestId: "", kind: 0, token: "", result: undefined, error: undefined };
 }
 exports.RAGStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.seq !== 0) {
-            writer.uint32(8).uint64(message.seq);
-        }
         if (message.timestampUs !== 0) {
-            writer.uint32(16).int64(message.timestampUs);
+            writer.uint32(8).int64(message.timestampUs);
         }
         if (message.requestId !== "") {
-            writer.uint32(26).string(message.requestId);
+            writer.uint32(18).string(message.requestId);
         }
         if (message.kind !== 0) {
-            writer.uint32(32).int32(message.kind);
-        }
-        if (message.chunk !== undefined) {
-            exports.RAGSearchResult.encode(message.chunk, writer.uint32(42).fork()).join();
+            writer.uint32(24).int32(message.kind);
         }
         if (message.token !== "") {
-            writer.uint32(50).string(message.token);
+            writer.uint32(34).string(message.token);
         }
         if (message.result !== undefined) {
-            exports.RAGResult.encode(message.result, writer.uint32(58).fork()).join();
+            exports.RAGResult.encode(message.result, writer.uint32(42).fork()).join();
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(66).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(72).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -2383,63 +1739,42 @@ exports.RAGStreamEvent = {
                     if (tag !== 8) {
                         break;
                     }
-                    message.seq = longToNumber(reader.uint64());
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
                     message.timestampUs = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
+                case 2: {
+                    if (tag !== 18) {
                         break;
                     }
                     message.requestId = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
+                case 3: {
+                    if (tag !== 24) {
                         break;
                     }
                     message.kind = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.token = reader.string();
                     continue;
                 }
                 case 5: {
                     if (tag !== 42) {
                         break;
                     }
-                    message.chunk = exports.RAGSearchResult.decode(reader, reader.uint32());
+                    message.result = exports.RAGResult.decode(reader, reader.uint32());
                     continue;
                 }
                 case 6: {
                     if (tag !== 50) {
                         break;
                     }
-                    message.token = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.result = exports.RAGResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2452,7 +1787,6 @@ exports.RAGStreamEvent = {
     },
     fromJSON(object) {
         return {
-            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -2464,26 +1798,13 @@ exports.RAGStreamEvent = {
                     ? globalThis.String(object.request_id)
                     : "",
             kind: isSet(object.kind) ? rAGStreamEventKindFromJSON(object.kind) : 0,
-            chunk: isSet(object.chunk) ? exports.RAGSearchResult.fromJSON(object.chunk) : undefined,
             token: isSet(object.token) ? globalThis.String(object.token) : "",
             result: isSet(object.result) ? exports.RAGResult.fromJSON(object.result) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.seq !== 0) {
-            obj.seq = Math.round(message.seq);
-        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -2493,20 +1814,14 @@ exports.RAGStreamEvent = {
         if (message.kind !== 0) {
             obj.kind = rAGStreamEventKindToJSON(message.kind);
         }
-        if (message.chunk !== undefined) {
-            obj.chunk = exports.RAGSearchResult.toJSON(message.chunk);
-        }
         if (message.token !== "") {
             obj.token = message.token;
         }
         if (message.result !== undefined) {
             obj.result = exports.RAGResult.toJSON(message.result);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2515,196 +1830,16 @@ exports.RAGStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseRAGStreamEvent();
-        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.requestId = object.requestId ?? "";
         message.kind = object.kind ?? 0;
-        message.chunk = (object.chunk !== undefined && object.chunk !== null)
-            ? exports.RAGSearchResult.fromPartial(object.chunk)
-            : undefined;
         message.token = object.token ?? "";
         message.result = (object.result !== undefined && object.result !== null)
             ? exports.RAGResult.fromPartial(object.result)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
-        return message;
-    },
-};
-function createBaseRAGServiceState() {
-    return {
-        isReady: false,
-        statistics: undefined,
-        isIndexing: false,
-        isQuerying: false,
-        activeRequestId: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
-}
-exports.RAGServiceState = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.isReady !== false) {
-            writer.uint32(8).bool(message.isReady);
-        }
-        if (message.statistics !== undefined) {
-            exports.RAGStatistics.encode(message.statistics, writer.uint32(18).fork()).join();
-        }
-        if (message.isIndexing !== false) {
-            writer.uint32(24).bool(message.isIndexing);
-        }
-        if (message.isQuerying !== false) {
-            writer.uint32(32).bool(message.isQuerying);
-        }
-        if (message.activeRequestId !== undefined) {
-            writer.uint32(42).string(message.activeRequestId);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(50).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(56).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRAGServiceState();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.isReady = reader.bool();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.statistics = exports.RAGStatistics.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.isIndexing = reader.bool();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.isQuerying = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.activeRequestId = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            isReady: isSet(object.isReady)
-                ? globalThis.Boolean(object.isReady)
-                : isSet(object.is_ready)
-                    ? globalThis.Boolean(object.is_ready)
-                    : false,
-            statistics: isSet(object.statistics) ? exports.RAGStatistics.fromJSON(object.statistics) : undefined,
-            isIndexing: isSet(object.isIndexing)
-                ? globalThis.Boolean(object.isIndexing)
-                : isSet(object.is_indexing)
-                    ? globalThis.Boolean(object.is_indexing)
-                    : false,
-            isQuerying: isSet(object.isQuerying)
-                ? globalThis.Boolean(object.isQuerying)
-                : isSet(object.is_querying)
-                    ? globalThis.Boolean(object.is_querying)
-                    : false,
-            activeRequestId: isSet(object.activeRequestId)
-                ? globalThis.String(object.activeRequestId)
-                : isSet(object.active_request_id)
-                    ? globalThis.String(object.active_request_id)
-                    : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.isReady !== false) {
-            obj.isReady = message.isReady;
-        }
-        if (message.statistics !== undefined) {
-            obj.statistics = exports.RAGStatistics.toJSON(message.statistics);
-        }
-        if (message.isIndexing !== false) {
-            obj.isIndexing = message.isIndexing;
-        }
-        if (message.isQuerying !== false) {
-            obj.isQuerying = message.isQuerying;
-        }
-        if (message.activeRequestId !== undefined) {
-            obj.activeRequestId = message.activeRequestId;
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.RAGServiceState.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseRAGServiceState();
-        message.isReady = object.isReady ?? false;
-        message.statistics = (object.statistics !== undefined && object.statistics !== null)
-            ? exports.RAGStatistics.fromPartial(object.statistics)
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
-        message.isIndexing = object.isIndexing ?? false;
-        message.isQuerying = object.isQuerying ?? false;
-        message.activeRequestId = object.activeRequestId ?? undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };

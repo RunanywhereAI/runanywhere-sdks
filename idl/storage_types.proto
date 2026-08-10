@@ -1,55 +1,14 @@
-// RunAnywhere IDL — storage / device-capacity / model-on-disk types.
+// RunAnywhere IDL — storage metadata, availability checks, and delete planning.
 //
-// Every SDK consumes these canonical generated types. Storage metrics keep
-// model metadata and on-disk accounting together across platforms.
-//
-// Pre-IDL drift table (canonicalized by this file):
-//
-//   ── DeviceStorageInfo ──────────────────────────────────────────────────────
-//   Swift   StorageTypes.swift:14        (totalSpace, freeSpace, usedSpace,
-//                                          computed usagePercentage:Double)
-//   Kotlin  StorageTypes.kt:25            (totalSpace, freeSpace, usedSpace,
-//                                          computed usagePercentage)
-//   Dart    storage_types.dart:13         (totalSpace, freeSpace, usedSpace,
-//                                          computed usagePercentage)
-//   RN      RunAnywhere+Storage.ts:21     (totalSpace, freeSpace, usedSpace)
-//   Web     types/models.ts:156           (totalSpace, freeSpace, modelsPath)
-//                                          ← drift: flat StorageInfo, no breakdown
-//   C ABI   (no public type — only error codes -180..-219)
-//
-//   ── AppStorageInfo ─────────────────────────────────────────────────────────
-//   Swift   StorageTypes.swift:40         (documentsSize, cacheSize,
-//                                          appSupportSize, totalSize)
-//   Kotlin  StorageTypes.kt:45            (matches Swift)
-//   Dart    storage_types.dart:53         (matches Swift)
-//   RN      RunAnywhere+Storage.ts:31     (matches Swift)
-//   Web     (no equivalent — flat StorageInfo)
-//
-//   ── ModelStorageMetrics ────────────────────────────────────────────────────
-//   Swift   StorageTypes.swift:66         (model:ModelInfo + sizeOnDisk:Int64)
-//   Kotlin  StorageTypes.kt:66            (model:ModelInfo + sizeOnDisk:Long)
-//   Dart    storage_types.dart:95         (model:ModelInfo + sizeOnDisk:int)
-//   RN      RunAnywhere+Storage.ts        (no per-model breakdown — only modelCount)
-//
-//   ── StorageAvailability ────────────────────────────────────────────────────
-//   Swift   StorageTypes.swift:175        (isAvailable, requiredSpace,
-//                                          availableSpace, hasWarning,
-//                                          recommendation:String?)
-//   Kotlin  StorageTypes.kt:178           (matches Swift)
-//   Dart    storage_types.dart:262        (matches Swift)
-//   RN / Web (no equivalent type pre-IDL)
-//
-//   ── NPUChip ───────────────────────────────────────────────────────────────
-//   Dart    npu_chip.dart:14              (snapdragon8Elite, snapdragon8EliteGen5)
-//                                          ← only Dart defines this pre-IDL.
-//   Other SDKs: no equivalent enum. Canonical superset folds NPU detection
-//   across vendors (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU,
-//   Google TPU, Intel NPU, plus NONE for "no NPU detected" and OTHER for
-//   unknown vendors).
+// Platform adapters own directory resolution, sandbox handles, OS free-space
+// facts, and any destructive file operation that needs platform participation.
+// Commons handles aggregation, availability, planning, and scoped execution.
 
 syntax = "proto3";
 
 package runanywhere.v1;
+
+import "errors.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -60,47 +19,27 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// NPU chipset detected on the host device. Used to drive vendor-NPU
-// model-download URL selection and runtime backend wiring.
-// ---------------------------------------------------------------------------
 enum NPUChip {
     NPU_CHIP_UNSPECIFIED         = 0;
-    NPU_CHIP_NONE                = 1;   // No NPU detected on this device
-    NPU_CHIP_APPLE_NEURAL_ENGINE = 2;   // Apple Neural Engine (A-series / M-series)
-    NPU_CHIP_QUALCOMM_HEXAGON    = 3;   // Snapdragon 8 Elite, 8 Elite Gen 5, etc.
-    NPU_CHIP_MEDIATEK_APU        = 4;   // MediaTek Dimensity APU
-    NPU_CHIP_GOOGLE_TPU          = 5;   // Pixel Tensor / TPU
-    NPU_CHIP_INTEL_NPU           = 6;   // Intel Core Ultra NPU
-    NPU_CHIP_OTHER               = 99;  // Detected NPU but vendor unmapped
+    NPU_CHIP_NONE                = 1;
+    NPU_CHIP_APPLE_NEURAL_ENGINE = 2;   // A-series and M-series
+    NPU_CHIP_QUALCOMM_HEXAGON    = 3;
+    NPU_CHIP_MEDIATEK_APU        = 4;   // Dimensity APU
+    NPU_CHIP_GOOGLE_TPU          = 5;   // Pixel Tensor
+    NPU_CHIP_INTEL_NPU           = 6;   // Core Ultra
+    NPU_CHIP_OTHER               = 99;  // Detected but vendor unmapped
 }
 
-// ---------------------------------------------------------------------------
-// Whole-device storage capacity. Reported by the platform OS (e.g. iOS
-// `URLResourceKey.volumeAvailableCapacity*`, Android `StatFs`, browser
-// `navigator.storage.estimate()`).
-//
-// `used_percent` is materialized rather than computed at the receiver so
-// every binding (Swift, Kotlin, Dart, RN, Web) reports the same number even
-// when total_bytes == 0 (in which case used_percent MUST be 0.0).
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
 message DeviceStorageInfo {
     int64 total_bytes  = 1;
     int64 free_bytes   = 2;
+
+    // Distinct from total-minus-free: this is the adapter's own reading of
+    // occupied space, not a derivation. Kept live.
     int64 used_bytes   = 3;
-    float used_percent = 4;   // 0.0 — 100.0; 0.0 if total_bytes == 0
+    reserved 4;  // used_percent: derivable from used_bytes/total_bytes
 }
 
-// ---------------------------------------------------------------------------
-// Per-app storage breakdown by directory type. Mirrors the iOS notion of
-// Documents / Caches / Application Support; on Android these map to
-// filesDir / cacheDir / a stable app-support sub-directory; on Web they map
-// to OPFS / FSAccess buckets (collapsed to documents_bytes by default).
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
 message AppStorageInfo {
     int64 documents_bytes   = 1;
     int64 cache_bytes       = 2;
@@ -108,68 +47,30 @@ message AppStorageInfo {
     int64 total_bytes       = 4;
 }
 
-// ---------------------------------------------------------------------------
-// On-disk metrics for a single downloaded model. The full ModelInfo is *not*
-// embedded here — callers cross-reference `model_id` against ModelInfo from
-// model_types.proto. This avoids circular embeds and keeps the wire payload
-// for storage queries small.
-//
-// `last_used_ms` supports LRU presentation and eviction without another type
-// round-trip.
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
 message ModelStorageMetrics {
     string         model_id            = 1;
     int64          size_on_disk_bytes  = 2;
-    optional int64 last_used_ms        = 3;   // Unix epoch ms of last load
+    reserved 3;  // last_used_ms -> ModelInfo.last_used_at_unix_ms
 }
 
-// ---------------------------------------------------------------------------
-// Aggregate storage view: device capacity + app footprint + per-model rows.
-// `total_models` and `total_models_bytes` are denormalized for receivers that
-// would otherwise re-iterate `models` to compute them (Web binding, RN host).
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
 message StorageInfo {
     AppStorageInfo               app                 = 1;
     DeviceStorageInfo            device              = 2;
     repeated ModelStorageMetrics models              = 3;
-    int32                        total_models        = 4;
+    reserved 4;  // total_models: count over `models`
+    // total_models_bytes (5) is NOT a pure derivation -- kept live; see
+    // storage_event_publisher.cpp and two facade readers.
     int64                        total_models_bytes  = 5;
 }
 
-// ---------------------------------------------------------------------------
-// Result of a "do I have room to download X bytes?" probe. SDKs use this to
-// pre-flight `downloadModel(...)` and surface user-facing warnings (e.g.
-// "you only have 1.2 GB free; this model needs 4 GB").
-//
-// `warning_message` and `recommendation` are independently optional —
-// `warning_message` describes the current shortfall, `recommendation`
-// suggests an action (delete cache, free models, etc.).
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
 message StorageAvailability {
     bool            is_available     = 1;
     int64           required_bytes   = 2;
     int64           available_bytes  = 3;
     optional string warning_message  = 4;
     optional string recommendation   = 5;
-    int64           shortfall_bytes  = 6;
-    float           required_to_available_ratio = 7;
+    reserved 6, 7;  // shortfall = required - available; ratio from the same two
 }
-
-// ---------------------------------------------------------------------------
-// Storage operation contracts.
-//
-// Platform callbacks own filesystem permissions, OS quota APIs, and any
-// sandbox-specific file handles. These messages carry normalized byte counts,
-// paths, model identifiers, and C++ workflow decisions/results so Swift,
-// Kotlin, Dart/Flutter, React Native, and Web can expose one generated API
-// surface for availability checks and deletion planning.
-// ---------------------------------------------------------------------------
 
 message StorageInfoRequest {
     bool include_device = 1;
@@ -179,34 +80,42 @@ message StorageInfoRequest {
 }
 
 message StorageInfoResult {
-    bool        success       = 1;
     StorageInfo info          = 2;
-    string      error_message = 3;
     repeated string warnings  = 4;
+    optional SDKError error    = 5;
 }
 
 message StorageAvailabilityRequest {
     string model_id                  = 1;
     int64  required_bytes            = 2;
-    double safety_margin             = 3;
+    reserved 3;  // was double safety_margin; 0.0 nullified the requirement
+
+    // Absolute headroom the device must still have after the write. Same
+    // unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+    int64  required_free_bytes_after_download = 7;
+
+    // Count bytes already occupied by this model as reclaimable.
     bool   include_existing_model_bytes = 4;
+
     bool   include_delete_plan       = 5;
     bool   allow_cache_reclamation   = 6;
 }
 
 message StorageAvailabilityResult {
-    bool                success       = 1;
     StorageAvailability availability  = 2;
     repeated string     warnings      = 3;
-    string              error_message = 4;
     optional StorageDeletePlan delete_plan = 5;
+    optional SDKError   error         = 6;
 }
 
 message StorageDeletePlanRequest {
     repeated string model_ids       = 1;
     int64           required_bytes  = 2;
     bool            include_cache   = 3;
+
+    // Evict by least-recently-used rather than by size.
     bool            oldest_first    = 4;
+
     bool            allow_loaded_models = 5;
     bool            include_download_partials = 6;
 }
@@ -214,68 +123,53 @@ message StorageDeletePlanRequest {
 message StorageDeleteCandidate {
     string         model_id          = 1;
     int64          reclaimable_bytes = 2;
-    optional int64 last_used_ms      = 3;
+    reserved 3;  // last_used_ms -> ModelInfo.last_used_at_unix_ms
     bool           is_loaded         = 4;
     string         local_path        = 5;
+
+    // Deleting this needs an unload first, or a platform-side delete.
     bool           requires_unload   = 6;
     bool           requires_platform_delete = 7;
+
     string         storage_key       = 8;
 }
 
+// Non-destructive: describes what could be reclaimed without doing it.
 message StorageDeletePlan {
     bool                            can_reclaim_required_bytes = 1;
     int64                           required_bytes             = 2;
     int64                           reclaimable_bytes          = 3;
     repeated StorageDeleteCandidate candidates                 = 4;
     repeated string                 warnings                   = 5;
-    string                          error_message              = 6;
     bool                            requires_unload            = 7;
     bool                            requires_platform_delete   = 8;
-    int32                           candidate_count            = 9;
+    optional SDKError               error                      = 10;
+    reserved 9;  // candidate_count == candidates.size()
 }
 
 message StorageDeleteRequest {
     repeated string model_ids            = 1;
-    bool            delete_files         = 2;
+    // Files are deleted; set this only to opt OUT (catalog-only bookkeeping).
+    bool            keep_files_on_disk   = 2;
     bool            clear_registry_paths = 3;
     bool            unload_if_loaded     = 4;
     bool            dry_run              = 5;
+
+    // Refuse to execute if the plan no longer matches current state.
     optional StorageDeletePlan plan      = 6;
     bool            require_plan_match   = 7;
+
     bool            allow_platform_delete = 8;
 }
 
 message StorageDeleteResult {
-    bool            success           = 1;
     int64           deleted_bytes     = 2;
     repeated string deleted_model_ids = 3;
     repeated string failed_model_ids  = 4;
     repeated string warnings          = 5;
-    string          error_message     = 6;
     repeated string skipped_model_ids = 7;
     bool            dry_run           = 8;
     bool            registry_updated  = 9;
     bool            files_deleted     = 10;
-}
-
-// Logical Storage service contract. Platform adapters remain responsible for
-// directory resolution, sandbox/bookmark/SAF/File System Access handles, OS
-// free-space facts, permissions, and destructive file operations that require
-// platform participation. C++ consumes only serialized request/result messages
-// for metadata aggregation, availability checks, safe delete planning, and
-// scoped delete execution.
-service Storage {
-    // Aggregate normalized storage metadata for device, app, cache, and models.
-    rpc Info(StorageInfoRequest) returns (StorageInfoResult);
-
-    // Check whether required bytes fit under the configured policy and optional
-    // delete-plan inputs.
-    rpc Availability(StorageAvailabilityRequest) returns (StorageAvailabilityResult);
-
-    // Build a non-destructive plan for reclaiming model/cache bytes.
-    rpc DeletePlan(StorageDeletePlanRequest) returns (StorageDeletePlan);
-
-    // Execute or dry-run a scoped delete request using a validated plan when
-    // supplied by the caller.
-    rpc Delete(StorageDeleteRequest) returns (StorageDeleteResult);
+    optional SDKError error           = 11;
 }

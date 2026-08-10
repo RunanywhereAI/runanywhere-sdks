@@ -21,7 +21,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -30,16 +29,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Aggregated performance metrics for a generation (Web SDK
- * PerformanceMetrics in types/models.ts:57). Higher-level summary that
- * rolls up the timing fields scattered across LLMGenerationResult.
- * ---------------------------------------------------------------------------
+ * Referenced only by LLMGenerationResult.performance, which no SDK reads.
  */
 public class PerformanceMetrics(
-  /**
-   * Total latency from request to last token, in milliseconds.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -48,9 +40,6 @@ public class PerformanceMetrics(
     schemaIndex = 0,
   )
   public val latency_ms: Long = 0L,
-  /**
-   * Peak memory used by the inference engine, in bytes.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -59,39 +48,13 @@ public class PerformanceMetrics(
     schemaIndex = 1,
   )
   public val memory_bytes: Long = 0L,
-  /**
-   * Decode throughput in tokens/second.
-   */
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "throughputTokensPerSec",
     schemaIndex = 2,
   )
-  public val throughput_tokens_per_sec: Float = 0f,
-  /**
-   * Prompt (input) token count.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptTokens",
-    schemaIndex = 3,
-  )
-  public val prompt_tokens: Int = 0,
-  /**
-   * Completion (output) token count.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "completionTokens",
-    schemaIndex = 4,
-  )
-  public val completion_tokens: Int = 0,
+  public val usage: TokenUsage? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<PerformanceMetrics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -106,9 +69,7 @@ public class PerformanceMetrics(
     if (unknownFields != other.unknownFields) return false
     if (latency_ms != other.latency_ms) return false
     if (memory_bytes != other.memory_bytes) return false
-    if (throughput_tokens_per_sec != other.throughput_tokens_per_sec) return false
-    if (prompt_tokens != other.prompt_tokens) return false
-    if (completion_tokens != other.completion_tokens) return false
+    if (usage != other.usage) return false
     return true
   }
 
@@ -118,9 +79,7 @@ public class PerformanceMetrics(
       result = unknownFields.hashCode()
       result = result * 37 + latency_ms.hashCode()
       result = result * 37 + memory_bytes.hashCode()
-      result = result * 37 + throughput_tokens_per_sec.hashCode()
-      result = result * 37 + prompt_tokens.hashCode()
-      result = result * 37 + completion_tokens.hashCode()
+      result = result * 37 + (usage?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -130,20 +89,16 @@ public class PerformanceMetrics(
     val result = mutableListOf<String>()
     result += """latency_ms=$latency_ms"""
     result += """memory_bytes=$memory_bytes"""
-    result += """throughput_tokens_per_sec=$throughput_tokens_per_sec"""
-    result += """prompt_tokens=$prompt_tokens"""
-    result += """completion_tokens=$completion_tokens"""
+    if (usage != null) result += """usage=$usage"""
     return result.joinToString(prefix = "PerformanceMetrics{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     latency_ms: Long = this.latency_ms,
     memory_bytes: Long = this.memory_bytes,
-    throughput_tokens_per_sec: Float = this.throughput_tokens_per_sec,
-    prompt_tokens: Int = this.prompt_tokens,
-    completion_tokens: Int = this.completion_tokens,
+    usage: TokenUsage? = this.usage,
     unknownFields: ByteString = this.unknownFields,
-  ): PerformanceMetrics = PerformanceMetrics(latency_ms, memory_bytes, throughput_tokens_per_sec, prompt_tokens, completion_tokens, unknownFields)
+  ): PerformanceMetrics = PerformanceMetrics(latency_ms, memory_bytes, usage, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,14 +119,8 @@ public class PerformanceMetrics(
         if (value.memory_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.memory_bytes)
         }
-        if (!value.throughput_tokens_per_sec.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.throughput_tokens_per_sec)
-        }
-        if (value.prompt_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.prompt_tokens)
-        }
-        if (value.completion_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.completion_tokens)
+        if (value.usage != null) {
+          size += TokenUsage.ADAPTER.encodedSizeWithTag(6, value.usage)
         }
         return size
       }
@@ -183,28 +132,16 @@ public class PerformanceMetrics(
         if (value.memory_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.memory_bytes)
         }
-        if (!value.throughput_tokens_per_sec.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.throughput_tokens_per_sec)
-        }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.prompt_tokens)
-        }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.completion_tokens)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 6, value.usage)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: PerformanceMetrics) {
         writer.writeBytes(value.unknownFields)
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.completion_tokens)
-        }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.prompt_tokens)
-        }
-        if (!value.throughput_tokens_per_sec.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.throughput_tokens_per_sec)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 6, value.usage)
         }
         if (value.memory_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.memory_bytes)
@@ -217,30 +154,25 @@ public class PerformanceMetrics(
       override fun decode(reader: ProtoReader): PerformanceMetrics {
         var latency_ms: Long = 0L
         var memory_bytes: Long = 0L
-        var throughput_tokens_per_sec: Float = 0f
-        var prompt_tokens: Int = 0
-        var completion_tokens: Int = 0
+        var usage: TokenUsage? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> latency_ms = ProtoAdapter.INT64.decode(reader)
             2 -> memory_bytes = ProtoAdapter.INT64.decode(reader)
-            3 -> throughput_tokens_per_sec = ProtoAdapter.FLOAT.decode(reader)
-            4 -> prompt_tokens = ProtoAdapter.INT32.decode(reader)
-            5 -> completion_tokens = ProtoAdapter.INT32.decode(reader)
+            6 -> usage = TokenUsage.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return PerformanceMetrics(
           latency_ms = latency_ms,
           memory_bytes = memory_bytes,
-          throughput_tokens_per_sec = throughput_tokens_per_sec,
-          prompt_tokens = prompt_tokens,
-          completion_tokens = completion_tokens,
+          usage = usage,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: PerformanceMetrics): PerformanceMetrics = value.copy(
+        usage = value.usage?.let(TokenUsage.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

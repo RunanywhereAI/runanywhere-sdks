@@ -59,7 +59,6 @@ class RunAnywhereModels {
         ? await available()
         : await DartBridgeModelRegistry.instance.queryProtoModels(query);
     return ModelListResult(
-      success: true,
       models: ModelInfoList(models: models),
     );
   }
@@ -74,7 +73,10 @@ class RunAnywhereModels {
   /// Mirrors Swift `RunAnywhere.getModel(_:)`.
   Future<ModelGetResult> getModel(ModelGetRequest request) async {
     if (!DartBridge.isInitialized) {
-      return ModelGetResult(found: false, errorMessage: 'SDK not initialized');
+      return ModelGetResult(
+        found: false,
+        error: SDKException.notInitialized().error,
+      );
     }
     final model = await DartBridgeModelRegistry.instance.getProtoModel(
       request.modelId,
@@ -99,7 +101,6 @@ class RunAnywhereModels {
     final models = await DartBridgeModelRegistry.instance
         .listDownloadedProtoModels();
     return ModelListResult(
-      success: true,
       models: ModelInfoList(models: models),
     );
   }
@@ -159,6 +160,7 @@ class RunAnywhereModels {
     String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerModel(
     id: id,
     name: name,
@@ -173,6 +175,7 @@ class RunAnywhereModels {
     description: description,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)
@@ -191,6 +194,7 @@ class RunAnywhereModels {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerArchiveModel(
     archiveUrl: archiveUrl,
     structure: structure,
@@ -202,6 +206,7 @@ class RunAnywhereModels {
     memoryRequirement: memoryRequirement,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register a multi-file model (e.g. embedding model.onnx + vocab.txt).
@@ -220,6 +225,7 @@ class RunAnywhereModels {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerMultiFileModel(
     files: files,
     id: id,
@@ -231,6 +237,7 @@ class RunAnywhereModels {
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,
+    cuaProfile: cuaProfile,
   );
 
   /// Infer the canonical [ModelFileRole] for a single sidecar filename in a

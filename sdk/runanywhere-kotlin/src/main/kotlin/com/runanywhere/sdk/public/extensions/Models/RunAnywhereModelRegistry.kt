@@ -51,9 +51,17 @@ internal fun registerModelInternal(modelInfo: RAModelInfo) {
 
 // MARK: - Swift-Parity Discovery API
 
+@Deprecated("Use RunAnywhere.models.list(filter).")
 suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest()): ModelListResult {
     if (!isInitialized) {
-        return ModelListResult(success = false, error_message = "SDK not initialized")
+        return ModelListResult(
+            error =
+                ai.runanywhere.proto.v1.SDKError(
+                    code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+                    category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    message = "SDK not initialized",
+                ),
+        )
     }
     try {
         ensureServicesReady()
@@ -70,12 +78,22 @@ suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest(
     return modelListResult(infoList)
 }
 
+@Deprecated("Use RunAnywhere.models.list(filter).")
 suspend fun RunAnywhere.queryModels(query: ModelQuery): ModelListResult =
     listModels(ModelListRequest(query = query))
 
+@Deprecated("Use RunAnywhere.models.get(id).")
 suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     if (!isInitialized) {
-        return ModelGetResult(found = false, error_message = "SDK not initialized")
+        return ModelGetResult(
+            found = false,
+            error =
+                ai.runanywhere.proto.v1.SDKError(
+                    code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+                    category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    message = "SDK not initialized",
+                ),
+        )
     }
     try {
         ensureServicesReady()
@@ -84,14 +102,31 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     } catch (_: Exception) {
     }
     if (request.model_id.isEmpty()) {
-        return ModelGetResult(found = false, error_message = "model_id is required")
+        return ModelGetResult(
+            found = false,
+            error =
+                ai.runanywhere.proto.v1.SDKError(
+                    code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+                    category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_VALIDATION,
+                    message = "model_id is required",
+                ),
+        )
     }
     val model =
         CppBridgeModelRegistry.get(request.model_id)
-            ?: return ModelGetResult(found = false, error_message = "Model not found: ${request.model_id}")
+            ?: return ModelGetResult(
+                found = false,
+                error =
+                    ai.runanywhere.proto.v1.SDKError(
+                        code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_MODEL_NOT_FOUND,
+                        category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_MODEL,
+                        message = "Model not found: ${request.model_id}",
+                    ),
+            )
     return ModelGetResult(found = true, model = model)
 }
 
+@Deprecated("Use RunAnywhere.models.list(ModelFilter(downloadedOnly = true)).")
 suspend fun RunAnywhere.downloadedModels(): ModelListResult =
     queryModels(ModelQuery(downloaded_only = true))
 
@@ -125,4 +160,4 @@ suspend fun RunAnywhere.refreshModelRegistry(
 // MARK: - Helpers
 
 private fun modelListResult(list: ModelInfoList): ModelListResult =
-    ModelListResult(success = true, models = list)
+    ModelListResult(models = list)

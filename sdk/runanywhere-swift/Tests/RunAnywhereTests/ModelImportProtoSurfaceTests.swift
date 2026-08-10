@@ -25,7 +25,10 @@ final class ModelImportProtoSurfaceTests: XCTestCase {
         model.localPath = "/models/demo.gguf"
         model.format = .gguf
         model.framework = .llamaCpp
-        model.isDownloaded = true
+        // isDownloaded was deleted outright (idl/model_types.proto: "a bool
+        // cannot express DOWNLOADING"); registryStatus is the sole
+        // downloaded-ness signal now.
+        model.registryStatus = .downloaded
 
         var request = RAModelImportRequest()
         request.model = model

@@ -14,55 +14,59 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class LLMGenerationState extends $pb.ProtobufEnum {
-  static const LLMGenerationState LLM_GENERATION_STATE_UNSPECIFIED =
-      LLMGenerationState._(
-          0, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_UNSPECIFIED');
-  static const LLMGenerationState LLM_GENERATION_STATE_QUEUED =
-      LLMGenerationState._(
-          1, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_QUEUED');
-  static const LLMGenerationState LLM_GENERATION_STATE_PREFILLING =
-      LLMGenerationState._(
-          2, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_PREFILLING');
-  static const LLMGenerationState LLM_GENERATION_STATE_DECODING =
-      LLMGenerationState._(
-          3, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_DECODING');
-  static const LLMGenerationState LLM_GENERATION_STATE_TOOL_CALLING =
-      LLMGenerationState._(
-          4, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_TOOL_CALLING');
-  static const LLMGenerationState LLM_GENERATION_STATE_COMPLETED =
-      LLMGenerationState._(
-          5, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_COMPLETED');
-  static const LLMGenerationState LLM_GENERATION_STATE_CANCELLED =
-      LLMGenerationState._(
-          6, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_CANCELLED');
-  static const LLMGenerationState LLM_GENERATION_STATE_FAILED =
-      LLMGenerationState._(
-          7, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_FAILED');
+/// One declared vocabulary, used in every place a finish reason is reported
+/// on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
+class FinishReason extends $pb.ProtobufEnum {
+  static const FinishReason FINISH_REASON_UNSPECIFIED =
+      FinishReason._(0, _omitEnumNames ? '' : 'FINISH_REASON_UNSPECIFIED');
 
-  static const $core.List<LLMGenerationState> values = <LLMGenerationState>[
-    LLM_GENERATION_STATE_UNSPECIFIED,
-    LLM_GENERATION_STATE_QUEUED,
-    LLM_GENERATION_STATE_PREFILLING,
-    LLM_GENERATION_STATE_DECODING,
-    LLM_GENERATION_STATE_TOOL_CALLING,
-    LLM_GENERATION_STATE_COMPLETED,
-    LLM_GENERATION_STATE_CANCELLED,
-    LLM_GENERATION_STATE_FAILED,
+  /// End-of-turn token. OpenAI "stop" / Anthropic "end_turn".
+  static const FinishReason FINISH_REASON_STOP =
+      FinishReason._(1, _omitEnumNames ? '' : 'FINISH_REASON_STOP');
+
+  /// Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens".
+  static const FinishReason FINISH_REASON_LENGTH =
+      FinishReason._(2, _omitEnumNames ? '' : 'FINISH_REASON_LENGTH');
+
+  /// One of options.stop_sequences fired; see `stop_sequence`.
+  static const FinishReason FINISH_REASON_STOP_SEQUENCE =
+      FinishReason._(3, _omitEnumNames ? '' : 'FINISH_REASON_STOP_SEQUENCE');
+
+  /// Model wants a tool run before it can continue.
+  static const FinishReason FINISH_REASON_TOOL_CALLS =
+      FinishReason._(4, _omitEnumNames ? '' : 'FINISH_REASON_TOOL_CALLS');
+
+  /// Caller cancelled. No cloud analogue.
+  static const FinishReason FINISH_REASON_CANCELLED =
+      FinishReason._(5, _omitEnumNames ? '' : 'FINISH_REASON_CANCELLED');
+
+  /// Conversation exceeded the allocated context window.
+  static const FinishReason FINISH_REASON_CONTEXT_OVERFLOW =
+      FinishReason._(6, _omitEnumNames ? '' : 'FINISH_REASON_CONTEXT_OVERFLOW');
+
+  /// Generation failed; see `error`.
+  static const FinishReason FINISH_REASON_ERROR =
+      FinishReason._(7, _omitEnumNames ? '' : 'FINISH_REASON_ERROR');
+
+  static const $core.List<FinishReason> values = <FinishReason>[
+    FINISH_REASON_UNSPECIFIED,
+    FINISH_REASON_STOP,
+    FINISH_REASON_LENGTH,
+    FINISH_REASON_STOP_SEQUENCE,
+    FINISH_REASON_TOOL_CALLS,
+    FINISH_REASON_CANCELLED,
+    FINISH_REASON_CONTEXT_OVERFLOW,
+    FINISH_REASON_ERROR,
   ];
 
-  static final $core.List<LLMGenerationState?> _byValue =
+  static final $core.List<FinishReason?> _byValue =
       $pb.ProtobufEnum.$_initByValueList(values, 7);
-  static LLMGenerationState? valueOf($core.int value) =>
+  static FinishReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
-  const LLMGenerationState._(super.value, super.name);
+  const FinishReason._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Routing destination for a generation (Web SDK ExecutionTarget in
-/// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
-/// ---------------------------------------------------------------------------
 class ExecutionTarget extends $pb.ProtobufEnum {
   static const ExecutionTarget EXECUTION_TARGET_UNSPECIFIED = ExecutionTarget._(
       0, _omitEnumNames ? '' : 'EXECUTION_TARGET_UNSPECIFIED');
@@ -70,8 +74,6 @@ class ExecutionTarget extends $pb.ProtobufEnum {
       ExecutionTarget._(1, _omitEnumNames ? '' : 'EXECUTION_TARGET_ON_DEVICE');
   static const ExecutionTarget EXECUTION_TARGET_CLOUD =
       ExecutionTarget._(2, _omitEnumNames ? '' : 'EXECUTION_TARGET_CLOUD');
-
-  /// Let the SDK decide based on policy (cost, latency, privacy, etc.).
   static const ExecutionTarget EXECUTION_TARGET_AUTO =
       ExecutionTarget._(3, _omitEnumNames ? '' : 'EXECUTION_TARGET_AUTO');
 

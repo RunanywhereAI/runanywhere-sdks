@@ -105,6 +105,28 @@ message NetworkDefaults {
 }
 
 // ---------------------------------------------------------------------------
+// LAN Connect (macOS host / native mobile clients) socket timings.
+//
+// Distinct from NetworkDefaults.connect_timeout_ms (HTTP TCP connect, 30s).
+// Pre-pool call sites: AndroidConnectTransport.kt companion CONNECT_TIMEOUT_MS
+// / GENERATION_READ_TIMEOUT_MS; ConnectSession.swift generationReadTimeout.
+// ---------------------------------------------------------------------------
+message ConnectDefaults {
+    // TCP connect timeout for joining a LAN Connect host.
+    int32 connect_timeout_ms           = 1 [
+        (runanywhere.v1.rac_default) = "5000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Inter-frame read ceiling while a hosted generation is streaming. Generous
+    // so a stalled host is visible without false positives on slow tokens.
+    int32 generation_read_timeout_ms   = 2 [
+        (runanywhere.v1.rac_default) = "120000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+}
+
+// ---------------------------------------------------------------------------
 // Microphone capture and audio playback rates.
 //
 // Pre-pool call sites: VoiceAgentMicDriver.swift:178-179;
@@ -138,14 +160,8 @@ message AudioCaptureDefaults {
         (runanywhere.v1.rac_min) = 1
     ];
 
-    // Hardware tap buffer size in frames.
-    int32 mic_tap_buffer_frames  = 4 [
-        (runanywhere.v1.rac_default) = "4096",
-        (runanywhere.v1.rac_min) = 256
-    ];
-
     // Playback rate assumed when a TTS backend reports none.
-    int32 tts_sample_rate_hz     = 5 [
+    int32 tts_sample_rate_hz     = 4 [
         (runanywhere.v1.rac_default) = "22050",
         (runanywhere.v1.rac_min) = 8000,
         (runanywhere.v1.rac_max) = 48000
@@ -211,9 +227,23 @@ message VoiceAgentDefaults {
 // HybridRoutingPolicy.ts:114 (RN); HybridTypes.ts:62 (Web). Swift and Kotlin
 // carried the number only inside doc comments
 // (HybridSTTRouter.swift:51, HybridSTTRouter.kt:54).
+//
+// This message is declaration-only (nothing sends a HybridDefaults over the
+// wire): hybrid_router.ConfidenceCascade.threshold carries the same value as
+// its own rac_default annotation, which is what commons' all-protos C
+// generator (generate_cpp_defaults.py) reads. But the other four languages'
+// pool generator (generate_defaults_pool.py) only scans this file by design
+// (see the file header: a full descriptor walk over every .proto to find
+// stray rac_default annotations would defeat the point of having one pool
+// file), so Swift/Kotlin/Dart/TS need their own declaration here to generate
+// a constant from at all. Keep this field's value in sync with
+// ConfidenceCascade.threshold's own rac_default by hand; they are
+// independent annotations describing the same number for two different
+// generators, not a wire-shared field.
 // ---------------------------------------------------------------------------
 message HybridDefaults {
-    // On-device STT confidence below which the router cascades to cloud.
+    // Suggested default confidence threshold for an STT confidence cascade.
+    // Mirrors hybrid_router.proto's ConfidenceCascade.threshold rac_default.
     float stt_confidence_threshold = 1 [
         (runanywhere.v1.rac_default) = "0.5",
         (runanywhere.v1.rac_min_float) = 0.0,

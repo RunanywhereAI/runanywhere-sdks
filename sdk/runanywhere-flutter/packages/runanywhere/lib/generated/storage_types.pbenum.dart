@@ -14,10 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// NPU chipset detected on the host device. Used to drive vendor-NPU
-/// model-download URL selection and runtime backend wiring.
-/// ---------------------------------------------------------------------------
 class NPUChip extends $pb.ProtobufEnum {
   static const NPUChip NPU_CHIP_UNSPECIFIED =
       NPUChip._(0, _omitEnumNames ? '' : 'NPU_CHIP_UNSPECIFIED');

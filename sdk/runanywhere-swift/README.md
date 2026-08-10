@@ -75,25 +75,17 @@ struct MyApp: App {
             // 2. Initialize the SDK
             try RunAnywhere.initialize(
                 apiKey: "<YOUR_API_KEY>",
-                baseURL: "https://api.runanywhere.ai",
+                baseUrl: "https://api.runanywhere.ai",
                 environment: .production
             )
 
-            // 3. Load a model
-            var loadRequest = RAModelLoadRequest()
-            loadRequest.modelID = "llama-3.2-1b-instruct-q4"
-            loadRequest.category = .language
-            let loadResult = await RunAnywhere.loadModel(loadRequest)
-            guard loadResult.success else { return }
-
-            // 4. Generate text
-            var request = RALLMGenerateRequest()
-            request.prompt = "What is the capital of France?"
-            var options = RALLMGenerationOptions.defaults()
-            options.maxTokens = 128
-            request.options = options
-
-            let result = try await RunAnywhere.generate(request)
+            // 3. Generate text. The model auto-loads (and downloads when
+            //    absent); call `RunAnywhere.models.load(id:)` first if you
+            //    want to control when that cost is paid.
+            let result = try await RunAnywhere.llm.generate(
+                prompt: "What is the capital of France?",
+                options: LlmOptions(model: "llama-3.2-1b-instruct-q4", maxOutputTokens: 128)
+            )
             print(result.text)
         }
     }
@@ -104,7 +96,7 @@ struct MyApp: App {
 }
 ```
 
-For development without an API key, call `try RunAnywhere.initialize()` with the default `.development` environment.
+For development without an API key, call `try RunAnywhere.initialize(environment: .development)`.
 
 ---
 
@@ -135,7 +127,24 @@ MLX.register()       // MLX modalities (requires RunAnywhereMLX)
 | ONNX | `.onnx` | ONNX Runtime | STT, TTS, VAD |
 | ORT | `.ort` | ONNX Runtime | Optimized STT/TTS |
 
-Models are discovered through the RunAnywhere catalog, downloaded on-device, and managed via `RunAnywhere.loadModel(_:)`, `RunAnywhere.downloadModel(_:onProgress:)`, and related lifecycle APIs.
+Models are discovered through the RunAnywhere catalog, downloaded on-device, and managed via `RunAnywhere.models.load(id:)`, `RunAnywhere.models.download(id:)`, and the rest of the `models` namespace.
+
+### Connect (trusted LAN)
+
+`ConnectSession` publishes or joins a language-model session on the local network. Commons owns role policy and protocol validation; this SDK owns Bonjour and the framed TCP adapter.
+
+| Role | Platforms |
+|------|-----------|
+| **Host** | macOS only |
+| **Client** | iOS and iPadOS (Android clients use the Kotlin SDK) |
+
+- Service type: `_runanywhere-connect._tcp`
+- Hosting is app-scoped: the macOS app must keep the model loaded and the process alive
+- Clients adopt the **one model the host has selected** — no client-side model download for hosted chat
+- Trust model: **trusted LAN only** (no TLS/pairing in this release). Runtime admission follows commons `platformPolicy()`; compile-time `#if os` guards only gate Apple APIs that do not exist on the other Apple platforms
+- React Native, Flutter, Web, and Electron are **not** Connect participants in this release
+
+See the iOS/macOS example under [`examples/ios/RunAnywhereAI/`](../../examples/ios/RunAnywhereAI/) (`ConnectHostManagementView`, model-selection Connect section).
 
 ---
 

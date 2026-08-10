@@ -1,6 +1,8 @@
 #ifndef RAC_FEATURES_LLM_RAC_LLM_LIFECYCLE_BRIDGE_H
 #define RAC_FEATURES_LLM_RAC_LLM_LIFECYCLE_BRIDGE_H
 
+#include <string>
+
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
 
@@ -27,6 +29,11 @@ void release_lifecycle_llm(LifecycleLlmRef* ref);
 // prompt format): true iff the currently-loaded LLM's framework honors grammar-constrained
 // decoding (QHexRT). Acquires + releases the lifecycle ref internally; false if none loaded.
 bool lifecycle_llm_supports_grammar();
+
+// Model id of the currently-loaded LLM ("" if none). Used to derive the
+// tool-call format when the caller left ToolCallingOptions.format UNSPECIFIED.
+// Acquires + releases the lifecycle ref internally.
+std::string lifecycle_llm_model_id();
 
 void clear_lifecycle_llm_cancel(LifecycleLlmRef* ref);
 void request_lifecycle_llm_cancel(LifecycleLlmRef* ref);

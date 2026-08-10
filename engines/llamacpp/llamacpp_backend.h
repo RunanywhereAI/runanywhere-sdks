@@ -213,6 +213,10 @@ class LlamaCppTextGeneration {
     std::string
     apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
                         const std::string& system_prompt, bool add_assistant_token);
+    // Plain "role: content" prompt used when llama.cpp cannot apply the GGUF's
+    // chat template. Sets prompt_used_fallback_format_ — see the definition.
+    std::string plain_text_fallback_prompt(const std::vector<llama_chat_message>& chat_messages,
+                                           bool add_assistant_token);
 
     // Shared token-decode loop used by both generate_stream() and
     // generate_from_context(). Runs the sample → EOG-check → UTF-8 assembly →
@@ -234,6 +238,12 @@ class LlamaCppTextGeneration {
     llama_model* model_ = nullptr;
     llama_context* context_ = nullptr;
     llama_sampler* sampler_ = nullptr;
+
+    // True when the prompt currently prefilled into the context was built with
+    // plain_text_fallback_prompt rather than the model's chat template. Written
+    // by build_prompt (clear) / plain_text_fallback_prompt (set) and read by
+    // run_decode_loop, all under mutex_ within one generate call.
+    bool prompt_used_fallback_format_ = false;
 
     // Cached sampler parameters — skip rebuild when unchanged
     float cached_temperature_ = -1.0f;

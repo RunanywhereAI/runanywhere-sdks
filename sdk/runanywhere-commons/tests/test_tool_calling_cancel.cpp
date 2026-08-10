@@ -65,6 +65,7 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "model_types.pb.h"
 #include "tool_calling.pb.h"
+#include "llm_service.pb.h"
 #endif
 
 namespace {
@@ -265,7 +266,9 @@ runanywhere::v1::ModelInfo build_llm_model() {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/toolcancel-test.gguf");
-    model.set_is_downloaded(true);
+    // ModelInfo.is_downloaded (tag 32) was deleted outright: registry_status
+    // is now the single downloaded-ness signal (idl/model_types.proto).
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
     return model;
 }
@@ -308,7 +311,7 @@ bool load_mock_llm() {
         rac_model_lifecycle_load_proto(g_registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
     bool ok = rc == RAC_SUCCESS && out.data != nullptr && out.size > 0 &&
-              result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
+              result.ParseFromArray(out.data, static_cast<int>(out.size)) && !result.has_error();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -321,24 +324,33 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("get_weather");
     tool.set_description("Get weather for a city");
-    auto* param = tool.add_parameters();
-    param->set_name("location");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("City name");
-    param->set_required(true);
+    // ToolDefinition.parameters is now ONE JSON Schema object string
+    // (idl/tool_calling.proto, tools-one-json-schema) — the typed
+    // ToolParameter message / ToolParameterType enum were deleted outright.
+    tool.set_parameters(R"({"type":"object","properties":{)"
+                        R"("location":{"type":"string","description":"City name"}},)"
+                        R"("required":["location"]})");
     return tool;
 }
 
 runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
                                                               uint32_t max_tool_calls = 0) {
+    // ToolCallingSessionCreateRequest collapsed to 3 fields — prompt(1),
+    // history(2), ToolCallingOptions options(3)
+    // (tools-collapse-options-and-session-request, idl/tool_calling.proto).
+    // Every knob that used to be re-published directly on the request
+    // (tools, format, max_tool_calls, auto_execute) now lives on `options`
+    // alone; max_tokens/temperature were deleted outright (they duplicated
+    // the enclosing LLMGenerationOptions, which this standalone request has
+    // none of) and have no replacement home.
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.set_max_tokens(64);
-    request.set_temperature(0.5f);
-    *request.add_tools() = make_weather_tool();
-    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    auto* options = request.mutable_options();
+    *options->add_tools() = make_weather_tool();
+    options->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    options->set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.set_max_tool_calls(max_tool_calls);
+        options->set_max_tool_calls(max_tool_calls);
     return request;
 }
 
@@ -365,7 +377,9 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     runanywhere::v1::ToolResult tr;
     tr.set_tool_call_id(received.id());
     tr.set_name(received.name());
-    tr.set_success(true);
+    // ToolResult.success -> is_error is a POLARITY INVERSION, not a rename
+    // (idl/tool_calling.proto). A successful executor result is is_error=false.
+    tr.set_is_error(false);
     tr.set_result_json("{\"ok\":true}");
 
     std::vector<uint8_t> bytes;

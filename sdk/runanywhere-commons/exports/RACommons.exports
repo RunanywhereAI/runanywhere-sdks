@@ -83,6 +83,23 @@ _rac_platform_services_register_availability_callback
 _rac_http_download
 _rac_http_download_cancel
 
+# Connect — protocol/session policy plus the platform transport adapter ABI.
+_rac_connect_client_create_hello_proto
+_rac_connect_client_validate_host_proto
+_rac_connect_get_platform_policy_proto
+_rac_connect_host_accept_client_proto
+_rac_connect_host_close_session_proto
+_rac_connect_host_start_proto
+_rac_connect_host_stop_proto
+_rac_connect_host_validate_cancel_proto
+_rac_connect_host_validate_invocation_proto
+_rac_connect_transport_close
+_rac_connect_transport_is_registered
+_rac_connect_transport_open
+_rac_connect_transport_receive
+_rac_connect_transport_register
+_rac_connect_transport_send
+
 # Events — internal lower-level publisher used by lifecycle manager,
 # storage analyzer, device manager, and engine plugins for telemetry
 # breadcrumbs. Public SDK event stream is rac_sdk_event_* below.
@@ -290,6 +307,7 @@ _rac_llm_generate_stream_proto
 _rac_llm_cancel_proto
 _rac_stt_transcribe_lifecycle_proto
 _rac_stt_transcribe_stream_lifecycle_proto
+_rac_stt_state_lifecycle_proto
 _rac_stt_component_transcribe_proto
 _rac_stt_component_transcribe_stream_proto
 # Canonical STTConfiguration defaults helper.
@@ -298,6 +316,7 @@ _rac_tts_synthesize_lifecycle_proto
 _rac_tts_synthesize_stream_lifecycle_proto
 _rac_tts_stop_lifecycle_proto
 _rac_tts_list_voices_lifecycle_proto
+_rac_tts_state_lifecycle_proto
 _rac_tts_component_list_voices_proto
 _rac_tts_component_synthesize_proto
 _rac_tts_component_synthesize_stream_proto
@@ -328,6 +347,10 @@ _rac_voice_agent_component_destroy_proto
 _rac_vlm_generate_proto
 _rac_vlm_stream_proto
 _rac_vlm_cancel_lifecycle_proto
+# Computer-use-agent (CUA) scaffold — profile prompt + action parse
+_rac_cua_system_prompt
+_rac_cua_parse_action
+_rac_cua_parse_action_proto
 _rac_embeddings_embed_batch_proto
 _rac_embeddings_embed_batch_lifecycle_proto
 _rac_embeddings_create_proto
@@ -383,10 +406,6 @@ _rac_runtime_unload
 
 # Name-pinned plugin selection (hybrid STT router: offline vs cloud).
 _rac_plugin_find_for_engine
-
-# SDKComponent → [InferenceFramework] query (proto ABI).
-_rac_router_frameworks_for_capability_proto
-_rac_router_frameworks_for_capability_proto_free
 
 # STT hybrid router — handle-based offline/online STT dispatch + its proto-byte
 # ABI. Called by the Swift + Flutter-iOS hybrid-router FFI; without these the
@@ -534,19 +553,28 @@ _rac_platform_tts_set_callbacks
 # Kotlin bridges during the proto-byte migration (CPP_PROTO_OWNERSHIP.md §2.1).
 _rac_llm_cancel
 _rac_llm_component_cancel
+_rac_llm_component_append_context
 _rac_llm_component_cleanup
+_rac_llm_component_clear_context
 _rac_llm_component_create
 _rac_llm_component_destroy
 _rac_llm_component_generate
+_rac_llm_component_generate_from_context
 _rac_llm_component_generate_stream
 _rac_llm_component_get_model_id
+_rac_llm_component_inject_system_prompt
 _rac_llm_component_is_loaded
 _rac_llm_component_load_model
 _rac_llm_component_supports_streaming
 _rac_llm_component_unload
+_rac_llm_append_context_lifecycle
+_rac_llm_clear_context_lifecycle
 _rac_llm_create
 _rac_llm_generate
 _rac_llm_generate_stream
+_rac_llm_stream_reset_final_signal
+_rac_llm_stream_report_final_signal
+_rac_llm_stream_final_signal_seen
 
 # STT component lifecycle + non-proto service ABI.
 _rac_stt_component_cleanup
@@ -948,7 +976,9 @@ _rac_llm_component_load_lora
 _rac_llm_component_remove_lora
 _rac_llm_destroy
 _rac_llm_generate_from_context
+_rac_llm_generate_from_context_proto
 _rac_llm_get_info
+_rac_llm_inject_system_prompt_lifecycle
 _rac_llm_initialize
 _rac_llm_inject_system_prompt
 _rac_llm_platform_create

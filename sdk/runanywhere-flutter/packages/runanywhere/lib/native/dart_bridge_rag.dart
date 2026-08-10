@@ -27,6 +27,10 @@ class DartBridgeRAG {
 
   bool get isCreated => _session != null;
 
+  /// True when the loaded commons binary exports `rac_rag_search_proto`.
+  bool get isSearchAvailable =>
+      RacNative.bindings.rac_rag_search_proto != null;
+
   void register() {
     if (_registered) return;
 
@@ -184,6 +188,37 @@ class DartBridgeRAG {
     final resultBytes =
         await Isolate.run(() => _ragQueryWorker(sessionAddr, requestBytes));
     return RAGResult.fromBuffer(resultBytes);
+  }
+
+  /// Retrieval-only search via `rac_rag_search_proto` — embed → retrieve
+  /// without starting LLM generation.
+  RAGSearchResponse search(RAGSearchRequest request) {
+    final session = _requireSession();
+    final fn = RacNative.bindings.rac_rag_search_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_rag_search_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callRequestWithHandle<RAGSearchResponse>(
+      handle: session,
+      request: request,
+      invoke: fn,
+      decode: RAGSearchResponse.fromBuffer,
+      symbol: 'rac_rag_search_proto',
+    );
+  }
+
+  /// Async retrieval-only search; runs the blocking embed→retrieve work in a
+  /// worker isolate so the UI isolate stays responsive.
+  Future<RAGSearchResponse> searchAsync(RAGSearchRequest request) async {
+    final session = _requireSession();
+    if (RacNative.bindings.rac_rag_search_proto == null) {
+      throw UnsupportedError('rac_rag_search_proto is unavailable');
+    }
+    final sessionAddr = session.address;
+    final requestBytes = request.writeToBuffer();
+    final resultBytes =
+        await Isolate.run(() => _ragSearchWorker(sessionAddr, requestBytes));
+    return RAGSearchResponse.fromBuffer(resultBytes);
   }
 
   /// Streaming query. Emits a [RAGStreamEvent] per generated token (kind =
@@ -396,6 +431,30 @@ Uint8List _ragQueryWorker(int sessionAddr, Uint8List requestBytes) {
     bindings.rac_proto_buffer_init(out);
     final code = fn(session, reqPtr, requestBytes.length, out);
     DartBridgeProtoUtils.ensureSuccess(out, code, 'rac_rag_query_proto');
+    if (out.ref.data == ffi.nullptr || out.ref.size == 0) {
+      return Uint8List(0);
+    }
+    return Uint8List.fromList(out.ref.data.asTypedList(out.ref.size));
+  } finally {
+    bindings.rac_proto_buffer_free(out);
+    calloc.free(reqPtr);
+    calloc.free(out);
+  }
+}
+
+Uint8List _ragSearchWorker(int sessionAddr, Uint8List requestBytes) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_rag_search_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_rag_search_proto is unavailable');
+  }
+  final session = ffi.Pointer<ffi.Void>.fromAddress(sessionAddr);
+  final reqPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  final out = calloc<RacProtoBuffer>();
+  try {
+    bindings.rac_proto_buffer_init(out);
+    final code = fn(session, reqPtr, requestBytes.length, out);
+    DartBridgeProtoUtils.ensureSuccess(out, code, 'rac_rag_search_proto');
     if (out.ref.data == ffi.nullptr || out.ref.size == 0) {
       return Uint8List(0);
     }

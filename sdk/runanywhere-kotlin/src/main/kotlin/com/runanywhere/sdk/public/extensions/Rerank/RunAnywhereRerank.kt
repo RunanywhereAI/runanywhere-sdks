@@ -15,7 +15,6 @@ import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRerank
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RARerankCandidate
 import com.runanywhere.sdk.public.types.RARerankOptions
 import com.runanywhere.sdk.public.types.RARerankRequest
 import com.runanywhere.sdk.public.types.RARerankResult
@@ -24,17 +23,23 @@ import com.runanywhere.sdk.public.types.RARerankResult
  * Score every candidate against [query] with the currently-loaded cross-encoder
  * rerank model and return them ordered by descending relevance.
  *
- * Mirrors Swift's `RunAnywhere.rerank(query:candidates:options:)` convenience.
+ * `RerankCandidate` is deleted outright (idl/rerank.proto): every facade
+ * already built it with `id` set to the stringified array index, so the
+ * wrapper carried no information the flat `documents` list below does not.
+ * `RerankRequest.documents` is now a plain `repeated string`, and
+ * `RerankScoredItem.index` points back into it. Mirrors Swift's
+ * `RunAnywhere.rerank(query:documents:options:)` convenience.
  */
+@Deprecated("Use RunAnywhere.rerank.rerank(query, documents, topN).")
 suspend fun RunAnywhere.rerank(
     query: String,
-    candidates: List<RARerankCandidate>,
+    documents: List<String>,
     options: RARerankOptions = RARerankOptions(),
 ): RARerankResult =
     rerank(
         RerankRequest(
             query = query,
-            candidates = candidates,
+            documents = documents,
             options = options,
         ),
     )
@@ -47,6 +52,7 @@ suspend fun RunAnywhere.rerank(
  * ([SDKComponent.SDK_COMPONENT_RERANK]); this call never downloads weights or
  * creates a second model owner.
  */
+@Deprecated("Use RunAnywhere.rerank.rerank(query, documents, topN).")
 suspend fun RunAnywhere.rerank(request: RARerankRequest): RARerankResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK")

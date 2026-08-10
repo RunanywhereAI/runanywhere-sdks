@@ -70,7 +70,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
-**Current version**: `0.20.12` (canonical source: `sdk/runanywhere-commons/VERSION`)
+**Current version**: `0.20.14` (canonical source: `sdk/runanywhere-commons/VERSION`)
 
 ### SDK Implementations
 | SDK | Path | Bridge Mechanism | Platforms |
@@ -85,7 +85,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Directory | Contents |
 |-----------|----------|
 | `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
-| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, cloud, qhexrt, coreml |
+| `engines/` | 7 backend plugins: llamacpp, sherpa, onnx, cloud, mlx, qhexrt, neurt |
 | `runtimes/` | 3 runtime adapters: cpu (always), onnxrt, coreml |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
@@ -134,8 +134,8 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                                     │ rac_engine_vtable_t (v8)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  qhexrt     coreml/cloud       onnx
-     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed,Segment)
+      llamacpp      sherpa-onnx  qhexrt      neurt/cloud       onnx
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (ANE/HTTP)     (Embed,Segment)
 ```
 
 ### Key Architectural Patterns

@@ -12,8 +12,12 @@ import com.runanywhere.runanywhereai.ui.navigation.BenchmarkDetail
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.navigation.Chat
 import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
+import com.runanywhere.runanywhereai.ui.navigation.Diarization
+import com.runanywhere.runanywhereai.ui.navigation.Diffusion
 import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.More
+import com.runanywhere.runanywhereai.ui.navigation.Ocr
+import com.runanywhere.runanywhereai.ui.navigation.Segmentation
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
@@ -25,12 +29,14 @@ import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatTopBar
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectModel
 
 // Pure route dispatcher: picks each screen's own top bar. No UI defined here.
 @Composable
 fun AppTopBar(
     destination: NavDestination?,
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
@@ -49,6 +55,7 @@ fun AppTopBar(
         destination == null -> Unit
         destination.hasRoute<Chat>() -> ChatTopBar(
             model = model,
+            hostedModel = hostedModel,
             conversationModelName = conversationModelName,
             generating = generating,
             loraActive = loraActive,
@@ -70,6 +77,10 @@ fun AppTopBar(
         destination.hasRoute<Vad>() -> StandardTopBar("Voice activity", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Vision>() -> StandardTopBar("Images & live", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Documents>() -> StandardTopBar("Documents", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Ocr>() -> StandardTopBar("Document OCR", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Segmentation>() -> StandardTopBar("Segmentation", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Diffusion>() -> StandardTopBar("Image generation", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Diarization>() -> StandardTopBar("Diarization", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Solutions>() -> StandardTopBar("Solutions", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<CloudProviders>() -> StandardTopBar("Cloud providers", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Benchmarks>() -> StandardTopBar("Benchmarks", showMenu, onMenu, canNavigateBack, onNavigateBack)

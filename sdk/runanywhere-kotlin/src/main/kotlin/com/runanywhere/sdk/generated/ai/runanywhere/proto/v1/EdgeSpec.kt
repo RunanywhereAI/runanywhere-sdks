@@ -30,12 +30,6 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class EdgeSpec(
-  /**
-   * Endpoints are formatted "<operator_name>.<port_name>".
-   * Source port names are operator-specific output channels; sink port
-   * names are operator-specific input channels. Typing is enforced by the
-   * pipeline validator.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -51,11 +45,7 @@ public class EdgeSpec(
   )
   public val to: String = "",
   /**
-   * Channel depth override. Proto3 scalars have no presence bit, so the
-   * sentinel value 0 means "use the per-edge default (16 for PCM, 256 for
-   * tokens, 32 for sentences)". uint32 keeps the wire representation
-   * identical to int32 on the happy path while making negative inputs
-   * statically unrepresentable.
+   * Queue depth, and what happens when it fills.
    */
   @field:WireField(
     tag = 3,

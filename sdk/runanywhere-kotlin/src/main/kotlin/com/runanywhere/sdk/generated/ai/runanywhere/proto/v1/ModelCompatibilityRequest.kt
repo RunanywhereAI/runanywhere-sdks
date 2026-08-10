@@ -52,38 +52,26 @@ public class ModelCompatibilityRequest(
   )
   public val model_id: String = "",
   /**
-   * Optional cached hardware profile from the platform adapter. If
-   * unset, commons will read whatever it has cached internally; the
-   * RAM/storage values below remain authoritative for the verdict.
-   */
-  @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.HardwareProfile#ADAPTER",
-    jsonName = "hardwareProfile",
-    schemaIndex = 1,
-  )
-  public val hardware_profile: HardwareProfile? = null,
-  /**
    * Available RAM in bytes (from device probe). 0 = unknown — commons
    * will treat the requirement as satisfied.
    */
   @field:WireField(
-    tag = 3,
+    tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "availableRamBytes",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val available_ram_bytes: Long = 0L,
   /**
    * Available storage in bytes (from filesystem probe). 0 = unknown.
    */
   @field:WireField(
-    tag = 4,
+    tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "availableStorageBytes",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val available_storage_bytes: Long = 0L,
   /**
@@ -91,17 +79,17 @@ public class ModelCompatibilityRequest(
    * future use; today's verdict is based on memory/storage alone.
    */
   @field:WireField(
-    tag = 5,
+    tag = 4,
     adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     jsonName = "acceleratorPreference",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val accelerator_preference: AccelerationPreference? = null,
   @field:WireField(
-    tag = 6,
+    tag = 5,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     jsonName = "preferredFramework",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val preferred_framework: InferenceFramework? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -117,7 +105,6 @@ public class ModelCompatibilityRequest(
     if (other !is ModelCompatibilityRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (hardware_profile != other.hardware_profile) return false
     if (available_ram_bytes != other.available_ram_bytes) return false
     if (available_storage_bytes != other.available_storage_bytes) return false
     if (accelerator_preference != other.accelerator_preference) return false
@@ -130,7 +117,6 @@ public class ModelCompatibilityRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + (hardware_profile?.hashCode() ?: 0)
       result = result * 37 + available_ram_bytes.hashCode()
       result = result * 37 + available_storage_bytes.hashCode()
       result = result * 37 + (accelerator_preference?.hashCode() ?: 0)
@@ -143,7 +129,6 @@ public class ModelCompatibilityRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    if (hardware_profile != null) result += """hardware_profile=$hardware_profile"""
     result += """available_ram_bytes=$available_ram_bytes"""
     result += """available_storage_bytes=$available_storage_bytes"""
     if (accelerator_preference != null) result += """accelerator_preference=$accelerator_preference"""
@@ -153,13 +138,12 @@ public class ModelCompatibilityRequest(
 
   public fun copy(
     model_id: String = this.model_id,
-    hardware_profile: HardwareProfile? = this.hardware_profile,
     available_ram_bytes: Long = this.available_ram_bytes,
     available_storage_bytes: Long = this.available_storage_bytes,
     accelerator_preference: AccelerationPreference? = this.accelerator_preference,
     preferred_framework: InferenceFramework? = this.preferred_framework,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelCompatibilityRequest = ModelCompatibilityRequest(model_id, hardware_profile, available_ram_bytes, available_storage_bytes, accelerator_preference, preferred_framework, unknownFields)
+  ): ModelCompatibilityRequest = ModelCompatibilityRequest(model_id, available_ram_bytes, available_storage_bytes, accelerator_preference, preferred_framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -177,15 +161,14 @@ public class ModelCompatibilityRequest(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        size += HardwareProfile.ADAPTER.encodedSizeWithTag(2, value.hardware_profile)
         if (value.available_ram_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.available_ram_bytes)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.available_ram_bytes)
         }
         if (value.available_storage_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.available_storage_bytes)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.available_storage_bytes)
         }
-        size += AccelerationPreference.ADAPTER.encodedSizeWithTag(5, value.accelerator_preference)
-        size += InferenceFramework.ADAPTER.encodedSizeWithTag(6, value.preferred_framework)
+        size += AccelerationPreference.ADAPTER.encodedSizeWithTag(4, value.accelerator_preference)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(5, value.preferred_framework)
         return size
       }
 
@@ -193,29 +176,27 @@ public class ModelCompatibilityRequest(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        HardwareProfile.ADAPTER.encodeWithTag(writer, 2, value.hardware_profile)
         if (value.available_ram_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.available_ram_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.available_ram_bytes)
         }
         if (value.available_storage_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.available_storage_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.available_storage_bytes)
         }
-        AccelerationPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
-        InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 4, value.accelerator_preference)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 5, value.preferred_framework)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelCompatibilityRequest) {
         writer.writeBytes(value.unknownFields)
-        InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
-        AccelerationPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 5, value.preferred_framework)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 4, value.accelerator_preference)
         if (value.available_storage_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.available_storage_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.available_storage_bytes)
         }
         if (value.available_ram_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.available_ram_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.available_ram_bytes)
         }
-        HardwareProfile.ADAPTER.encodeWithTag(writer, 2, value.hardware_profile)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
@@ -223,7 +204,6 @@ public class ModelCompatibilityRequest(
 
       override fun decode(reader: ProtoReader): ModelCompatibilityRequest {
         var model_id: String = ""
-        var hardware_profile: HardwareProfile? = null
         var available_ram_bytes: Long = 0L
         var available_storage_bytes: Long = 0L
         var accelerator_preference: AccelerationPreference? = null
@@ -231,15 +211,14 @@ public class ModelCompatibilityRequest(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> hardware_profile = HardwareProfile.ADAPTER.decode(reader)
-            3 -> available_ram_bytes = ProtoAdapter.INT64.decode(reader)
-            4 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
-            5 -> try {
+            2 -> available_ram_bytes = ProtoAdapter.INT64.decode(reader)
+            3 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
+            4 -> try {
               accelerator_preference = AccelerationPreference.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            6 -> try {
+            5 -> try {
               preferred_framework = InferenceFramework.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
@@ -249,7 +228,6 @@ public class ModelCompatibilityRequest(
         }
         return ModelCompatibilityRequest(
           model_id = model_id,
-          hardware_profile = hardware_profile,
           available_ram_bytes = available_ram_bytes,
           available_storage_bytes = available_storage_bytes,
           accelerator_preference = accelerator_preference,
@@ -259,7 +237,6 @@ public class ModelCompatibilityRequest(
       }
 
       override fun redact(`value`: ModelCompatibilityRequest): ModelCompatibilityRequest = value.copy(
-        hardware_profile = value.hardware_profile?.let(HardwareProfile.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

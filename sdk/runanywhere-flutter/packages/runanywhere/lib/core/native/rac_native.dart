@@ -221,8 +221,6 @@ typedef RacSttProtoPartialCallbackNative =
 typedef RacSttTranscribeProtoNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Void>,
-      ffi.Size,
       ffi.Pointer<ffi.Uint8>,
       ffi.Size,
       ffi.Pointer<RacProtoBuffer>,
@@ -230,8 +228,6 @@ typedef RacSttTranscribeProtoNative =
 typedef RacSttTranscribeProtoDart =
     int Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Void>,
-      int,
       ffi.Pointer<ffi.Uint8>,
       int,
       ffi.Pointer<RacProtoBuffer>,
@@ -240,8 +236,6 @@ typedef RacSttTranscribeProtoDart =
 typedef RacSttTranscribeStreamProtoNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Void>,
-      ffi.Size,
       ffi.Pointer<ffi.Uint8>,
       ffi.Size,
       ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
@@ -250,8 +244,6 @@ typedef RacSttTranscribeStreamProtoNative =
 typedef RacSttTranscribeStreamProtoDart =
     int Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Void>,
-      int,
       ffi.Pointer<ffi.Uint8>,
       int,
       ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
@@ -364,8 +356,6 @@ typedef RacVadConfigureProtoDart =
 typedef RacVadProcessProtoNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Float>,
-      ffi.Size,
       ffi.Pointer<ffi.Uint8>,
       ffi.Size,
       ffi.Pointer<RacProtoBuffer>,
@@ -373,8 +363,6 @@ typedef RacVadProcessProtoNative =
 typedef RacVadProcessProtoDart =
     int Function(
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Float>,
-      int,
       ffi.Pointer<ffi.Uint8>,
       int,
       ffi.Pointer<RacProtoBuffer>,
@@ -550,6 +538,14 @@ typedef RacArtifactInferFromUrlProtoDart =
 // PCM frames, then stop (flush final) or cancel (drop). Teardown follows the
 // header contract: unset callback → rac_stt_proto_quiesce() → free user_data.
 // ---------------------------------------------------------------------------
+
+/// `rac_*_component_create(rac_handle_t* out_handle)`.
+typedef RacComponentCreateNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
+
+/// Dart view of [RacComponentCreateNative].
+typedef RacComponentCreateDart =
+    int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
 
 typedef RacSttComponentLoadModelNative =
     ffi.Int32 Function(
@@ -1367,6 +1363,16 @@ class RacBindings {
           'rac_tts_stop_lifecycle_proto',
         ),
       ),
+      rac_stt_state_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_stt_state_lifecycle_proto',
+        ),
+      ),
+      rac_tts_state_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_tts_state_lifecycle_proto',
+        ),
+      ),
       rac_vad_configure_lifecycle_proto =
           _lookupOptional<RacLifecycleRequestProtoDart>(
             () =>
@@ -1479,6 +1485,45 @@ class RacBindings {
                   RacLifecycleRequestProtoDart
                 >('rac_diffusion_generate_lifecycle_proto'),
           ),
+      rac_diarization_diarize_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_diarization_diarize_lifecycle_proto'),
+          ),
+      rac_segmentation_segment_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_segmentation_segment_lifecycle_proto'),
+          ),
+      rac_rerank_component_create = _lookupOptional<RacComponentCreateDart>(
+        () =>
+            lib.lookupFunction<
+              RacComponentCreateNative,
+              RacComponentCreateDart
+            >('rac_rerank_component_create'),
+      ),
+      rac_rerank_component_load_model =
+          _lookupOptional<RacSttComponentLoadModelDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttComponentLoadModelNative,
+                  RacSttComponentLoadModelDart
+                >('rac_rerank_component_load_model'),
+          ),
+      rac_rerank_component_rerank_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_rerank_component_rerank_proto'),
+          ),
       rac_rag_session_create_proto =
           _lookupOptional<RacRagSessionCreateProtoDart>(
             () =>
@@ -1505,6 +1550,13 @@ class RacBindings {
               RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart
             >('rac_rag_query_proto'),
+      ),
+      rac_rag_search_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_rag_search_proto'),
       ),
       rac_rag_clear_proto = _lookupOptional<RacHandleOutProtoDart>(
         () =>
@@ -2142,6 +2194,14 @@ class RacBindings {
 
   final RacOutOnlyProtoDart? rac_tts_stop_lifecycle_proto;
 
+  /// `rac_stt_state_lifecycle_proto(out)` — serialized
+  /// runanywhere.v1.STTServiceState for the lifecycle-owned STT service.
+  final RacOutOnlyProtoDart? rac_stt_state_lifecycle_proto;
+
+  /// `rac_tts_state_lifecycle_proto(out)` — serialized
+  /// runanywhere.v1.TTSServiceState for the lifecycle-owned TTS service.
+  final RacOutOnlyProtoDart? rac_tts_state_lifecycle_proto;
+
   final RacLifecycleRequestProtoDart? rac_vad_configure_lifecycle_proto;
 
   final RacOutOnlyProtoDart? rac_vad_start_lifecycle_proto;
@@ -2180,6 +2240,24 @@ class RacBindings {
 
   final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
 
+  /// `rac_diarization_diarize_lifecycle_proto` — offline speaker diarization
+  /// over the lifecycle-loaded model. Null on older commons binaries.
+  final RacLifecycleRequestProtoDart? rac_diarization_diarize_lifecycle_proto;
+
+  /// `rac_segmentation_segment_lifecycle_proto` — semantic segmentation over
+  /// the lifecycle-loaded model. Null on older commons binaries.
+  final RacLifecycleRequestProtoDart? rac_segmentation_segment_lifecycle_proto;
+
+  /// `rac_rerank_component_create(out_handle)`. The rerank primitive ships
+  /// only handle-scoped verbs, so the bridge owns a component handle.
+  final RacComponentCreateDart? rac_rerank_component_create;
+
+  /// `rac_rerank_component_load_model(handle, path, id, name)`.
+  final RacSttComponentLoadModelDart? rac_rerank_component_load_model;
+
+  /// `rac_rerank_component_rerank_proto(handle, request, size, out)`.
+  final RacHandleBytesToProtoDart? rac_rerank_component_rerank_proto;
+
   final RacRagSessionCreateProtoDart? rac_rag_session_create_proto;
 
   final RacDestroyHandleDart? rac_rag_session_destroy_proto;
@@ -2187,6 +2265,10 @@ class RacBindings {
   final RacHandleBytesToProtoDart? rac_rag_ingest_proto;
 
   final RacHandleBytesToProtoDart? rac_rag_query_proto;
+
+  /// Retrieval-only RAG search. Null on older commons binaries that predate
+  /// `rac_rag_search_proto`.
+  final RacHandleBytesToProtoDart? rac_rag_search_proto;
 
   final RacHandleOutProtoDart? rac_rag_clear_proto;
 

@@ -29,430 +29,23 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace {
 PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
-        // ::runanywhere::v1::DiffusionTokenizerSource
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DiffusionConfiguration
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DiffusionConfig
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DiffusionGenerationOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse
         {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DiffusionGenerationRequest
         {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DiffusionProgress
         {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::DiffusionImage
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DiffusionResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DiffusionCapabilities
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::DiffusionStreamEvent
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::DiffusionServiceState
         {&::_pbi::kDescriptorMethods, &::descriptor_table_diffusion_5foptions_2eproto, /* tracker*/ nullptr,},
 };
 }  // namespace
 #endif
 namespace runanywhere {
 namespace v1 {
-class DiffusionTokenizerSource::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DiffusionTokenizerSource>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_._has_bits_);
-};
-
-constexpr DiffusionTokenizerSource::ParseTableT_ DiffusionTokenizerSource::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_._has_bits_),
-      0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionTokenizerSource>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.DiffusionTokenizerSourceKind kind = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionTokenizerSource, _impl_.kind_), 1>(),
-       {8, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.kind_)}},
-      // optional string custom_path = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.custom_path_)}},
-      // bool auto_download = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionTokenizerSource, _impl_.auto_download_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.auto_download_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.DiffusionTokenizerSourceKind kind = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.kind_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // optional string custom_path = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.custom_path_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool auto_download = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.auto_download_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    // no aux_entries
-    {{
-      "\47\0\13\0\0\0\0\0"
-      "runanywhere.v1.DiffusionTokenizerSource"
-      "custom_path"
-    }},
-  };
-}
-
-
-inline constexpr DiffusionTokenizerSource::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        custom_path_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        kind_{static_cast< ::runanywhere::v1::DiffusionTokenizerSourceKind >(0)},
-        auto_download_{false} {}
-
-template <typename>
-constexpr DiffusionTokenizerSource::DiffusionTokenizerSource(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DiffusionTokenizerSource::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionTokenizerSource(arena);
-}
-constexpr auto DiffusionTokenizerSource::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionTokenizerSource), alignof(DiffusionTokenizerSource));
-}
-constexpr auto DiffusionTokenizerSource::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DiffusionTokenizerSource::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionTokenizerSource>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionTokenizerSource::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionTokenizerSource>(), &DiffusionTokenizerSource::ByteSizeLong,
-              &DiffusionTokenizerSource::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[0],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_diffusion_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DiffusionTokenizerSourceGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionTokenizerSourceGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DiffusionTokenizerSource_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionTokenizerSource::InternalGenerateClassData_(
-            _default, &DiffusionTokenizerSource_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionTokenizerSource>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DiffusionTokenizerSourceGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionTokenizerSource _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionTokenizerSource>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSourceGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionTokenizerSourceGlobalsTypeInternal DiffusionTokenizerSource_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DiffusionTokenizerSource_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionTokenizerSource_globals_.GetClassData();
-#else
-  return DiffusionTokenizerSource_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DiffusionResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._has_bits_);
-};
-
-constexpr DiffusionResult::ParseTableT_ DiffusionResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._has_bits_),
-      0, // no _extensions_
-      12, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294963200,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      12,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // bytes image_data = 1;
-      {::_pbi::TcParser::FastBS1,
-       {10, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.image_data_)}},
-      // int32 width = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionResult, _impl_.width_), 4>(),
-       {16, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.width_)}},
-      // int32 height = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionResult, _impl_.height_), 5>(),
-       {24, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.height_)}},
-      // int64 seed_used = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionResult, _impl_.seed_used_), 6>(),
-       {32, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.seed_used_)}},
-      // int64 total_time_ms = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionResult, _impl_.total_time_ms_), 7>(),
-       {40, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.total_time_ms_)}},
-      // bool safety_flag = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionResult, _impl_.safety_flag_), 8>(),
-       {48, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.safety_flag_)}},
-      // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionResult, _impl_.used_scheduler_), 9>(),
-       {56, 9, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.used_scheduler_)}},
-      // optional string error_message = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.error_message_)}},
-      // int32 error_code = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionResult, _impl_.error_code_), 10>(),
-       {72, 10, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.error_code_)}},
-      // optional string image_media_type = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.image_media_type_)}},
-      // repeated bytes batch_images = 11;
-      {::_pbi::TcParser::FastBR1,
-       {90, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.batch_images_)}},
-      // int32 images_generated = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionResult, _impl_.images_generated_), 11>(),
-       {96, 11, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.images_generated_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bytes image_data = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.image_data_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // int32 width = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.width_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 height = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.height_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int64 seed_used = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.seed_used_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 total_time_ms = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.total_time_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // bool safety_flag = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.safety_flag_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.used_scheduler_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // optional string error_message = 8;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 9;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.error_code_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string image_media_type = 10;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.image_media_type_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // repeated bytes batch_images = 11;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.batch_images_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kBytes | ::_fl::kRepSString)},
-      // int32 images_generated = 12;
-      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.images_generated_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
-      "\36\0\0\0\0\0\0\0\15\0\20\0\0\0\0\0"
-      "runanywhere.v1.DiffusionResult"
-      "error_message"
-      "image_media_type"
-    }},
-  };
-}
-
-
-inline constexpr DiffusionResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        batch_images_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.batch_images_)>()
-         }
-        ,
-        image_data_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        image_media_type_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        width_{0},
-        height_{0},
-        seed_used_{::int64_t{0}},
-        total_time_ms_{::int64_t{0}},
-        safety_flag_{false},
-        used_scheduler_{static_cast< ::runanywhere::v1::DiffusionScheduler >(0)},
-        error_code_{0},
-        images_generated_{0} {}
-
-template <typename>
-constexpr DiffusionResult::DiffusionResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DiffusionResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionResult(arena);
-}
-constexpr auto DiffusionResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionResult), alignof(DiffusionResult));
-}
-constexpr auto DiffusionResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DiffusionResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionResult>(), &DiffusionResult::ByteSizeLong,
-              &DiffusionResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[7],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_diffusion_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DiffusionResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DiffusionResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionResult::InternalGenerateClassData_(
-            _default, &DiffusionResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DiffusionResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionResultGlobalsTypeInternal DiffusionResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DiffusionResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionResult_globals_.GetClassData();
-#else
-  return DiffusionResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class DiffusionProgress::_Internal {
  public:
   using HasBits = decltype(::std::declval<DiffusionProgress>()._impl_._has_bits_);
@@ -465,11 +58,11 @@ constexpr DiffusionProgress::ParseTableT_ DiffusionProgress::InternalGeneratePar
     {
       PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_._has_bits_),
       0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
+      3,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -480,81 +73,30 @@ constexpr DiffusionProgress::ParseTableT_ DiffusionProgress::InternalGeneratePar
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // float progress_percent = 1;
-      {::_pbi::TcParser::FastF32S1,
-       {13, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.progress_percent_)}},
-      // int32 current_step = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.current_step_), 4>(),
-       {16, 4, 0,
+      // int32 current_step = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.current_step_), 1>(),
+       {8, 1, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.current_step_)}},
-      // int32 total_steps = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.total_steps_), 5>(),
-       {24, 5, 0,
+      // int32 total_steps = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.total_steps_), 2>(),
+       {16, 2, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.total_steps_)}},
-      // string stage = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.stage_)}},
-      // optional bytes intermediate_image_data = 5;
+      // optional bytes intermediate_image_data = 3;
       {::_pbi::TcParser::FastBS1,
-       {42, 1, 0,
+       {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_data_)}},
-      // int32 intermediate_image_width = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.intermediate_image_width_), 6>(),
-       {48, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_width_)}},
-      // int32 intermediate_image_height = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionProgress, _impl_.intermediate_image_height_), 9>(),
-       {56, 9, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_height_)}},
-      // int64 timestamp_ms = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionProgress, _impl_.timestamp_ms_), 7>(),
-       {64, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.timestamp_ms_)}},
-      // int64 eta_ms = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionProgress, _impl_.eta_ms_), 8>(),
-       {72, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.eta_ms_)}},
-      // optional string intermediate_image_media_type = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_media_type_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // float progress_percent = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.progress_percent_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 current_step = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.current_step_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 total_steps = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.total_steps_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string stage = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.stage_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional bytes intermediate_image_data = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_data_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // int32 intermediate_image_width = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_width_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 intermediate_image_height = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_height_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int64 timestamp_ms = 8;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 eta_ms = 9;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.eta_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // optional string intermediate_image_media_type = 10;
-      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_media_type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 current_step = 1;
+      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.current_step_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 total_steps = 2;
+      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.total_steps_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional bytes intermediate_image_data = 3;
+      {PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_data_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\40\0\0\0\5\0\0\0\0\0\35\0\0\0\0\0"
-      "runanywhere.v1.DiffusionProgress"
-      "stage"
-      "intermediate_image_media_type"
     }},
   };
 }
@@ -564,22 +106,11 @@ inline constexpr DiffusionProgress::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        stage_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         intermediate_image_data_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        intermediate_image_media_type_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        progress_percent_{0},
         current_step_{0},
-        total_steps_{0},
-        intermediate_image_width_{0},
-        timestamp_ms_{::int64_t{0}},
-        eta_ms_{::int64_t{0}},
-        intermediate_image_height_{0} {}
+        total_steps_{0} {}
 
 template <typename>
 constexpr DiffusionProgress::DiffusionProgress(::_pbi::ConstantInitialized,
@@ -622,7 +153,7 @@ constexpr auto DiffusionProgress::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
+      &file_reflection_data[2],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -673,69 +204,118 @@ const ::_pbi::ClassData* DiffusionProgress_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-constexpr DiffusionGenerationRequest_MetadataEntry_DoNotUse::ParseTableT_ DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+class DiffusionImage::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<DiffusionImage>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_._has_bits_);
+};
+
+constexpr DiffusionImage::ParseTableT_ DiffusionImage::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
-      PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
+      PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_._has_bits_),
       0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
+      6,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
       nullptr,  // post_loop_handler
-      ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
+      ::_pbi::TcParser::GenericFallback,  // fallback
       #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse>(),  // to_prefetch
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionImage>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // string value = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.value_)}},
-      // string key = 1;
-      {::_pbi::TcParser::FastUS1,
+      {::_pbi::TcParser::MiniParse, {}},
+      // bytes data = 1;
+      {::_pbi::TcParser::FastBS1,
        {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.key_)}},
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.data_)}},
+      // int32 width = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionImage, _impl_.width_), 2>(),
+       {16, 2, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.width_)}},
+      // int32 height = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionImage, _impl_.height_), 3>(),
+       {24, 3, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.height_)}},
+      // int64 seed_used = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionImage, _impl_.seed_used_), 4>(),
+       {32, 4, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.seed_used_)}},
+      // bool safety_flag = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionImage, _impl_.safety_flag_), 5>(),
+       {40, 5, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.safety_flag_)}},
+      // string media_type = 6;
+      {::_pbi::TcParser::FastUS1,
+       {50, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.media_type_)}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // string key = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string value = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // bytes data = 1;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.data_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+      // int32 width = 2;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.width_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 height = 3;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.height_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int64 seed_used = 4;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.seed_used_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // bool safety_flag = 5;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.safety_flag_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // string media_type = 6;
+      {PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.media_type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\67\3\5\0\0\0\0\0"
-      "runanywhere.v1.DiffusionGenerationRequest.MetadataEntry"
-      "key"
-      "value"
+      "\35\0\0\0\0\0\12\0"
+      "runanywhere.v1.DiffusionImage"
+      "media_type"
     }},
   };
 }
 
+
+inline constexpr DiffusionImage::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        data_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        media_type_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        width_{0},
+        height_{0},
+        seed_used_{::int64_t{0}},
+        safety_flag_{false} {}
+
 template <typename>
-constexpr DiffusionGenerationRequest_MetadataEntry_DoNotUse::DiffusionGenerationRequest_MetadataEntry_DoNotUse(::_pbi::ConstantInitialized,
+constexpr DiffusionImage::DiffusionImage(::_pbi::ConstantInitialized,
                        const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : DiffusionGenerationRequest_MetadataEntry_DoNotUse::MapEntry(
+    : ::google::protobuf::Message(
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           class_data
 #endif  // PROTOBUF_CUSTOM_VTABLE
-      ) {
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
 }
-inline void* PROTOBUF_NONNULL DiffusionGenerationRequest_MetadataEntry_DoNotUse::PlacementNew_(
+inline void* PROTOBUF_NONNULL DiffusionImage::PlacementNew_(
     const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionGenerationRequest_MetadataEntry_DoNotUse(arena);
+  return ::new (mem) DiffusionImage(arena);
 }
-constexpr auto DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionGenerationRequest_MetadataEntry_DoNotUse), alignof(DiffusionGenerationRequest_MetadataEntry_DoNotUse));
+constexpr auto DiffusionImage::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionImage), alignof(DiffusionImage));
 }
-constexpr auto DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(
+constexpr auto DiffusionImage::InternalGenerateClassData_(
     const MessageLite& prototype,
     const ::google::protobuf::internal::TcParseTableBase* tc_table) {
   return ::google::protobuf::internal::ClassDataFull{
@@ -747,19 +327,18 @@ constexpr auto DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenera
           tc_table,
 #endif
           nullptr,  // IsInitialized
-          &DiffusionGenerationRequest_MetadataEntry_DoNotUse::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionGenerationRequest_MetadataEntry_DoNotUse>(),
+          &DiffusionImage::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DiffusionImage>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionGenerationRequest_MetadataEntry_DoNotUse::SharedDtor,
-          static_cast<void (::google::protobuf::MessageLite::*)()>(&DiffusionGenerationRequest_MetadataEntry_DoNotUse::ClearImpl),
-              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
-              ,
+          &DiffusionImage::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DiffusionImage>(), &DiffusionImage::ByteSizeLong,
+              &DiffusionImage::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_._cached_size_),
+          PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_._cached_size_),
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[4],
+      &file_reflection_data[3],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -767,45 +346,45 @@ constexpr auto DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenera
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   };
 }
-struct DiffusionGenerationRequest_MetadataEntry_DoNotUseGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionGenerationRequest_MetadataEntry_DoNotUseGlobalsTypeInternal()
+struct DiffusionImageGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DiffusionImageGlobalsTypeInternal()
       :
 #ifndef PROTOBUF_MESSAGE_GLOBALS
         _default(::_pbi::ConstantInitialized{},
-                 DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_.base())
+                 DiffusionImage_class_data_.base())
 #else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(
-            _default, &DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_._table.header)),
+        MessageGlobalsBase(DiffusionImage::InternalGenerateClassData_(
+            _default, &DiffusionImage_globals_._table.header)),
         _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionGenerationRequest_MetadataEntry_DoNotUse>(
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionImage>(
             GetClassData()))
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   {
   }
-  ~DiffusionGenerationRequest_MetadataEntry_DoNotUseGlobalsTypeInternal() {}
+  ~DiffusionImageGlobalsTypeInternal() {}
   union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionGenerationRequest_MetadataEntry_DoNotUse _default;
+    alignas(::_pbi::kMaxMessageAlignment) DiffusionImage _default;
   };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionGenerationRequest_MetadataEntry_DoNotUse>(
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionImage>(
       ::std::declval<const ::_pbi::ClassData*>())) _table;
 #endif
 };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest_MetadataEntry_DoNotUseGlobalsTypeInternal, _default) ==
+static_assert(PROTOBUF_FIELD_OFFSET(DiffusionImageGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionGenerationRequest_MetadataEntry_DoNotUseGlobalsTypeInternal DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionImageGlobalsTypeInternal DiffusionImage_globals_
         PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 #if defined(PROTOBUF_CUSTOM_VTABLE)
 namespace {
-const ::_pbi::ClassData* DiffusionGenerationRequest_MetadataEntry_DoNotUse_get_class_data() {
+const ::_pbi::ClassData* DiffusionImage_get_class_data() {
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_.GetClassData();
+  return DiffusionImage_globals_.GetClassData();
 #else
-  return DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_.base();
+  return DiffusionImage_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -822,11 +401,11 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
     {
       PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_._has_bits_),
       0, // no _extensions_
-      20, 248,  // max_field_number, fast_idx_mask
+      15, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4293918720,  // skipmap
+      4294934528,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      20,  // num_field_entries
+      15,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -837,7 +416,7 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // string prompt = 1;
+      // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.prompt_)}},
@@ -845,23 +424,23 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       {::_pbi::TcParser::FastUS1,
        {18, 1, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.negative_prompt_)}},
-      // int32 width = 3;
+      // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.width_), 6>(),
        {24, 6, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.width_)}},
-      // int32 height = 4;
+      // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.height_), 7>(),
        {32, 7, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.height_)}},
-      // int32 num_inference_steps = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.num_inference_steps_), 8>(),
+      // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.steps_), 8>(),
        {40, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.num_inference_steps_)}},
-      // float guidance_scale = 6;
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.steps_)}},
+      // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
       {::_pbi::TcParser::FastF32S1,
        {53, 9, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.guidance_scale_)}},
-      // int64 seed = 7;
+      // optional int64 seed = 7;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionGenerationOptions, _impl_.seed_), 10>(),
        {56, 10, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.seed_)}},
@@ -869,116 +448,75 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.scheduler_), 11>(),
        {64, 11, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.scheduler_)}},
-      // .runanywhere.v1.DiffusionMode mode = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.mode_), 12>(),
-       {72, 12, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mode_)}},
-      // optional bytes input_image = 10;
+      // optional bytes image = 9;
       {::_pbi::TcParser::FastBS1,
-       {82, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_)}},
-      // optional bytes mask_image = 11;
+       {74, 2, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.image_)}},
+      // optional bytes mask_image = 10;
       {::_pbi::TcParser::FastBS1,
-       {90, 3, 0,
+       {82, 3, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_)}},
-      // float denoise_strength = 12;
+      // float strength = 11 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
-       {101, 13, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.denoise_strength_)}},
-      // bool report_intermediate_images = 13;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionGenerationOptions, _impl_.report_intermediate_images_), 17>(),
-       {104, 17, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.report_intermediate_images_)}},
-      // int32 progress_stride = 14;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.progress_stride_), 14>(),
-       {112, 14, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.progress_stride_)}},
-      // int32 input_image_width = 15;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.input_image_width_), 15>(),
-       {120, 15, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_width_)}},
-      // int32 input_image_height = 16;
-      {::_pbi::TcParser::FastV32S2,
-       {384, 16, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_height_)}},
-      // optional string input_image_media_type = 17;
-      {::_pbi::TcParser::FastUS2,
-       {394, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_media_type_)}},
-      // optional string mask_image_media_type = 18;
-      {::_pbi::TcParser::FastUS2,
-       {402, 5, 0,
+       {93, 12, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.strength_)}},
+      // optional string image_media_type = 12;
+      {::_pbi::TcParser::FastUS1,
+       {98, 4, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.image_media_type_)}},
+      // optional string mask_image_media_type = 13;
+      {::_pbi::TcParser::FastUS1,
+       {106, 5, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_media_type_)}},
-      // int32 batch_size = 19;
-      {::_pbi::TcParser::FastV32S2,
-       {408, 19, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.batch_size_)}},
-      // bool return_latents = 20;
-      {::_pbi::TcParser::FastV8S2,
-       {416, 18, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.return_latents_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional int32 n = 14 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.n_), 13>(),
+       {112, 13, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.n_)}},
+      // .runanywhere.v1.DiffusionOutputFormat output_format = 15 [(.runanywhere.v1.rac_default) = "DIFFUSION_OUTPUT_FORMAT_PNG"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.output_format_), 14>(),
+       {120, 14, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.output_format_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // string prompt = 1;
+      // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.prompt_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string negative_prompt = 2;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.negative_prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 width = 3;
+      // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.width_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 height = 4;
+      // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.height_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 num_inference_steps = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.num_inference_steps_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float guidance_scale = 6;
+      // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.steps_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.guidance_scale_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int64 seed = 7;
+      // optional int64 seed = 7;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.seed_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // .runanywhere.v1.DiffusionScheduler scheduler = 8;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.scheduler_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.DiffusionMode mode = 9;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mode_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // optional bytes input_image = 10;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // optional bytes mask_image = 11;
+      // optional bytes image = 9;
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.image_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+      // optional bytes mask_image = 10;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // float denoise_strength = 12;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.denoise_strength_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // bool report_intermediate_images = 13;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.report_intermediate_images_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 progress_stride = 14;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.progress_stride_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 input_image_width = 15;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_width_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 input_image_height = 16;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_height_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string input_image_media_type = 17;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_media_type_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string mask_image_media_type = 18;
+      // float strength = 11 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.strength_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional string image_media_type = 12;
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.image_media_type_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional string mask_image_media_type = 13;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_media_type_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 batch_size = 19;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.batch_size_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool return_latents = 20;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.return_latents_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional int32 n = 14 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.n_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // .runanywhere.v1.DiffusionOutputFormat output_format = 15 [(.runanywhere.v1.rac_default) = "DIFFUSION_OUTPUT_FORMAT_PNG"];
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.output_format_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     // no aux_entries
     {{
-      "\51\6\17\0\0\0\0\0\0\0\0\0\0\0\0\0\0\26\25\0\0\0\0\0"
+      "\51\6\17\0\0\0\0\0\0\0\0\0\20\25\0\0"
       "runanywhere.v1.DiffusionGenerationOptions"
       "prompt"
       "negative_prompt"
-      "input_image_media_type"
+      "image_media_type"
       "mask_image_media_type"
     }},
   };
@@ -995,13 +533,13 @@ inline constexpr DiffusionGenerationOptions::Impl_::Impl_(
         negative_prompt_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        input_image_(
+        image_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         mask_image_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        input_image_media_type_(
+        image_media_type_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         mask_image_media_type_(
@@ -1009,18 +547,13 @@ inline constexpr DiffusionGenerationOptions::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         width_{0},
         height_{0},
-        num_inference_steps_{0},
+        steps_{0},
         guidance_scale_{0},
         seed_{::int64_t{0}},
         scheduler_{static_cast< ::runanywhere::v1::DiffusionScheduler >(0)},
-        mode_{static_cast< ::runanywhere::v1::DiffusionMode >(0)},
-        denoise_strength_{0},
-        progress_stride_{0},
-        input_image_width_{0},
-        input_image_height_{0},
-        report_intermediate_images_{false},
-        return_latents_{false},
-        batch_size_{0} {}
+        strength_{0},
+        n_{0},
+        output_format_{static_cast< ::runanywhere::v1::DiffusionOutputFormat >(0)} {}
 
 template <typename>
 constexpr DiffusionGenerationOptions::DiffusionGenerationOptions(::_pbi::ConstantInitialized,
@@ -1063,7 +596,7 @@ constexpr auto DiffusionGenerationOptions::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[3],
+      &file_reflection_data[0],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -1114,579 +647,74 @@ const ::_pbi::ClassData* DiffusionGenerationOptions_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionCapabilities::_Internal {
+class DiffusionResult::_Internal {
  public:
-  using HasBits = decltype(::std::declval<DiffusionCapabilities>()._impl_._has_bits_);
+  using HasBits = decltype(::std::declval<DiffusionResult>()._impl_._has_bits_);
   static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_._has_bits_);
+      8 * PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._has_bits_);
 };
 
-constexpr DiffusionCapabilities::ParseTableT_ DiffusionCapabilities::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+constexpr DiffusionResult::ParseTableT_ DiffusionResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
-      PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_._has_bits_),
+      PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._has_bits_),
       0, // no _extensions_
-      13, 120,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294959104,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      13,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionCapabilities>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // repeated .runanywhere.v1.DiffusionModelVariant supported_variants = 1;
-      {::_pbi::TcParser::FastV32P1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_variants_)}},
-      // repeated .runanywhere.v1.DiffusionScheduler supported_schedulers = 2;
-      {::_pbi::TcParser::FastV32P1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_schedulers_)}},
-      // int32 max_resolution_px = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionCapabilities, _impl_.max_resolution_px_), 5>(),
-       {24, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_resolution_px_)}},
-      // repeated .runanywhere.v1.DiffusionMode supported_modes = 4;
-      {::_pbi::TcParser::FastV32P1,
-       {34, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_modes_)}},
-      // int32 max_width_px = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionCapabilities, _impl_.max_width_px_), 6>(),
-       {40, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_width_px_)}},
-      // int32 max_height_px = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionCapabilities, _impl_.max_height_px_), 7>(),
-       {48, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_height_px_)}},
-      // bool supports_intermediate_images = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionCapabilities, _impl_.supports_intermediate_images_), 8>(),
-       {56, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_intermediate_images_)}},
-      // bool supports_safety_checker = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionCapabilities, _impl_.supports_safety_checker_), 9>(),
-       {64, 9, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_safety_checker_)}},
-      // bool is_ready = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionCapabilities, _impl_.is_ready_), 10>(),
-       {72, 10, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.is_ready_)}},
-      // optional string current_model = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.current_model_)}},
-      // bool safety_checker_enabled = 11;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionCapabilities, _impl_.safety_checker_enabled_), 11>(),
-       {88, 11, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.safety_checker_enabled_)}},
-      // bool supports_batch_generation = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionCapabilities, _impl_.supports_batch_generation_), 12>(),
-       {96, 12, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_batch_generation_)}},
-      // repeated string supported_output_media_types = 13;
-      {::_pbi::TcParser::FastUR1,
-       {106, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_output_media_types_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // repeated .runanywhere.v1.DiffusionModelVariant supported_variants = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_variants_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // repeated .runanywhere.v1.DiffusionScheduler supported_schedulers = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_schedulers_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // int32 max_resolution_px = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_resolution_px_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // repeated .runanywhere.v1.DiffusionMode supported_modes = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_modes_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // int32 max_width_px = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_width_px_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 max_height_px = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_height_px_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool supports_intermediate_images = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_intermediate_images_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool supports_safety_checker = 8;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_safety_checker_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool is_ready = 9;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.is_ready_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string current_model = 10;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.current_model_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool safety_checker_enabled = 11;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.safety_checker_enabled_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool supports_batch_generation = 12;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_batch_generation_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // repeated string supported_output_media_types = 13;
-      {PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supported_output_media_types_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-    }},
-    // no aux_entries
-    {{
-      "\44\0\0\0\0\0\0\0\0\0\15\0\0\34\0\0"
-      "runanywhere.v1.DiffusionCapabilities"
-      "current_model"
-      "supported_output_media_types"
-    }},
-  };
-}
-
-
-inline constexpr DiffusionCapabilities::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        supported_variants_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_variants_)>()
-         }
-        ,
-        _supported_variants_cached_byte_size_{0},
-        supported_schedulers_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_schedulers_)>()
-         }
-        ,
-        _supported_schedulers_cached_byte_size_{0},
-        supported_modes_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_modes_)>()
-         }
-        ,
-        _supported_modes_cached_byte_size_{0},
-        supported_output_media_types_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_output_media_types_)>()
-         }
-        ,
-        current_model_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        max_resolution_px_{0},
-        max_width_px_{0},
-        max_height_px_{0},
-        supports_intermediate_images_{false},
-        supports_safety_checker_{false},
-        is_ready_{false},
-        safety_checker_enabled_{false},
-        supports_batch_generation_{false} {}
-
-template <typename>
-constexpr DiffusionCapabilities::DiffusionCapabilities(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DiffusionCapabilities::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionCapabilities(arena);
-}
-constexpr auto DiffusionCapabilities::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionCapabilities), alignof(DiffusionCapabilities));
-}
-constexpr auto DiffusionCapabilities::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DiffusionCapabilities::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionCapabilities>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionCapabilities::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionCapabilities>(), &DiffusionCapabilities::ByteSizeLong,
-              &DiffusionCapabilities::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_diffusion_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DiffusionCapabilitiesGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionCapabilitiesGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DiffusionCapabilities_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionCapabilities::InternalGenerateClassData_(
-            _default, &DiffusionCapabilities_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionCapabilities>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DiffusionCapabilitiesGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionCapabilities _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionCapabilities>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionCapabilitiesGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionCapabilitiesGlobalsTypeInternal DiffusionCapabilities_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DiffusionCapabilities_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionCapabilities_globals_.GetClassData();
-#else
-  return DiffusionCapabilities_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionStreamEvent::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DiffusionStreamEvent>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._has_bits_);
-};
-
-constexpr DiffusionStreamEvent::ParseTableT_ DiffusionStreamEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._has_bits_),
-      0, // no _extensions_
-      8, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967040,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      8,  // num_field_entries
-      2,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionStreamEvent>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // int32 error_code = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionStreamEvent, _impl_.error_code_), 7>(),
-       {64, 7, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_code_)}},
-      // uint64 seq = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionStreamEvent, _impl_.seq_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.seq_)}},
-      // int64 timestamp_us = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionStreamEvent, _impl_.timestamp_us_), 5>(),
-       {16, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.timestamp_us_)}},
-      // string request_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.request_id_)}},
-      // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionStreamEvent, _impl_.kind_), 6>(),
-       {32, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.kind_)}},
-      // optional .runanywhere.v1.DiffusionProgress progress = 5;
-      {::_pbi::TcParser::FastMtS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.progress_)}},
-      // optional .runanywhere.v1.DiffusionResult result = 6;
-      {::_pbi::TcParser::FastMtS1,
-       {50, 3, 1,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.result_)}},
-      // optional string error_message = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_message_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // uint64 seq = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
-      // int64 timestamp_us = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string request_id = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // optional .runanywhere.v1.DiffusionProgress progress = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.progress_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional .runanywhere.v1.DiffusionResult result = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string error_message = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 8;
-      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_code_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionProgress>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionProgress_globals_},
-        #endif
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionResult>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionResult_globals_},
-        #endif
-    }},
-    {{
-      "\43\0\0\12\0\0\0\15\0\0\0\0\0\0\0\0"
-      "runanywhere.v1.DiffusionStreamEvent"
-      "request_id"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr DiffusionStreamEvent::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        progress_{nullptr},
-        result_{nullptr},
-        seq_{::uint64_t{0u}},
-        timestamp_us_{::int64_t{0}},
-        kind_{static_cast< ::runanywhere::v1::DiffusionStreamEventKind >(0)},
-        error_code_{0} {}
-
-template <typename>
-constexpr DiffusionStreamEvent::DiffusionStreamEvent(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DiffusionStreamEvent::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionStreamEvent(arena);
-}
-constexpr auto DiffusionStreamEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionStreamEvent), alignof(DiffusionStreamEvent));
-}
-constexpr auto DiffusionStreamEvent::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DiffusionStreamEvent::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionStreamEvent>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionStreamEvent::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionStreamEvent>(), &DiffusionStreamEvent::ByteSizeLong,
-              &DiffusionStreamEvent::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_diffusion_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DiffusionStreamEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionStreamEventGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DiffusionStreamEvent_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionStreamEvent::InternalGenerateClassData_(
-            _default, &DiffusionStreamEvent_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionStreamEvent>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DiffusionStreamEventGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionStreamEvent _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionStreamEvent>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionStreamEventGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionStreamEventGlobalsTypeInternal DiffusionStreamEvent_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DiffusionStreamEvent_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionStreamEvent_globals_.GetClassData();
-#else
-  return DiffusionStreamEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionServiceState::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DiffusionServiceState>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_._has_bits_);
-};
-
-constexpr DiffusionServiceState::ParseTableT_ DiffusionServiceState::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_._has_bits_),
-      0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      2,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::GenericFallback,  // fallback
       #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionServiceState>(),  // to_prefetch
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionResult>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // bool is_ready = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionServiceState, _impl_.is_ready_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.is_ready_)}},
-      // optional string current_model = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.current_model_)}},
-      // optional .runanywhere.v1.DiffusionCapabilities capabilities = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.capabilities_)}},
-      // bool is_generating = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionServiceState, _impl_.is_generating_), 5>(),
-       {32, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.is_generating_)}},
-      // optional string active_request_id = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.active_request_id_)}},
-      // optional string error_message = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.error_message_)}},
-      // int32 error_code = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionServiceState, _impl_.error_code_), 6>(),
-       {56, 6, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.error_code_)}},
+      // int64 total_time_ms = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionResult, _impl_.total_time_ms_), 1>(),
+       {16, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.total_time_ms_)}},
+      // repeated .runanywhere.v1.DiffusionImage images = 1;
+      {::_pbi::TcParser::FastMtR1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.images_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // bool is_ready = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string current_model = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.DiffusionCapabilities capabilities = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.capabilities_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool is_generating = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.is_generating_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string active_request_id = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.active_request_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.error_code_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // repeated .runanywhere.v1.DiffusionImage images = 1;
+      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.images_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+      // int64 total_time_ms = 2;
+      {PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.total_time_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionCapabilities>()},
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionImage>()},
         #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionCapabilities_globals_},
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionImage_globals_},
         #endif
     }},
     {{
-      "\44\0\15\0\0\21\15\0"
-      "runanywhere.v1.DiffusionServiceState"
-      "current_model"
-      "active_request_id"
-      "error_message"
     }},
   };
 }
 
 
-inline constexpr DiffusionServiceState::Impl_::Impl_(
+inline constexpr DiffusionResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        current_model_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        active_request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        capabilities_{nullptr},
-        is_ready_{false},
-        is_generating_{false},
-        error_code_{0} {}
+        images_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::DiffusionResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.images_)>()
+         }
+        ,
+        total_time_ms_{::int64_t{0}} {}
 
 template <typename>
-constexpr DiffusionServiceState::DiffusionServiceState(::_pbi::ConstantInitialized,
+constexpr DiffusionResult::DiffusionResult(::_pbi::ConstantInitialized,
                        const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
     : ::google::protobuf::Message(
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -1695,15 +723,15 @@ constexpr DiffusionServiceState::DiffusionServiceState(::_pbi::ConstantInitializ
           ),
       _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
 }
-inline void* PROTOBUF_NONNULL DiffusionServiceState::PlacementNew_(
+inline void* PROTOBUF_NONNULL DiffusionResult::PlacementNew_(
     const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionServiceState(arena);
+  return ::new (mem) DiffusionResult(arena);
 }
-constexpr auto DiffusionServiceState::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionServiceState), alignof(DiffusionServiceState));
+constexpr auto DiffusionResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionResult), alignof(DiffusionResult));
 }
-constexpr auto DiffusionServiceState::InternalGenerateClassData_(
+constexpr auto DiffusionResult::InternalGenerateClassData_(
     const MessageLite& prototype,
     const ::google::protobuf::internal::TcParseTableBase* tc_table) {
   return ::google::protobuf::internal::ClassDataFull{
@@ -1715,18 +743,18 @@ constexpr auto DiffusionServiceState::InternalGenerateClassData_(
           tc_table,
 #endif
           nullptr,  // IsInitialized
-          &DiffusionServiceState::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionServiceState>(),
+          &DiffusionResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DiffusionResult>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionServiceState::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionServiceState>(), &DiffusionServiceState::ByteSizeLong,
-              &DiffusionServiceState::_InternalSerialize,
+          &DiffusionResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DiffusionResult>(), &DiffusionResult::ByteSizeLong,
+              &DiffusionResult::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_._cached_size_),
+          PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_._cached_size_),
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
+      &file_reflection_data[4],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -1734,45 +762,45 @@ constexpr auto DiffusionServiceState::InternalGenerateClassData_(
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   };
 }
-struct DiffusionServiceStateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionServiceStateGlobalsTypeInternal()
+struct DiffusionResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DiffusionResultGlobalsTypeInternal()
       :
 #ifndef PROTOBUF_MESSAGE_GLOBALS
         _default(::_pbi::ConstantInitialized{},
-                 DiffusionServiceState_class_data_.base())
+                 DiffusionResult_class_data_.base())
 #else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionServiceState::InternalGenerateClassData_(
-            _default, &DiffusionServiceState_globals_._table.header)),
+        MessageGlobalsBase(DiffusionResult::InternalGenerateClassData_(
+            _default, &DiffusionResult_globals_._table.header)),
         _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionServiceState>(
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionResult>(
             GetClassData()))
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   {
   }
-  ~DiffusionServiceStateGlobalsTypeInternal() {}
+  ~DiffusionResultGlobalsTypeInternal() {}
   union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionServiceState _default;
+    alignas(::_pbi::kMaxMessageAlignment) DiffusionResult _default;
   };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionServiceState>(
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionResult>(
       ::std::declval<const ::_pbi::ClassData*>())) _table;
 #endif
 };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionServiceStateGlobalsTypeInternal, _default) ==
+static_assert(PROTOBUF_FIELD_OFFSET(DiffusionResultGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionServiceStateGlobalsTypeInternal DiffusionServiceState_globals_
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionResultGlobalsTypeInternal DiffusionResult_globals_
         PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 #if defined(PROTOBUF_CUSTOM_VTABLE)
 namespace {
-const ::_pbi::ClassData* DiffusionServiceState_get_class_data() {
+const ::_pbi::ClassData* DiffusionResult_get_class_data() {
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionServiceState_globals_.GetClassData();
+  return DiffusionResult_globals_.GetClassData();
 #else
-  return DiffusionServiceState_class_data_.base();
+  return DiffusionResult_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -1789,12 +817,12 @@ constexpr DiffusionGenerationRequest::ParseTableT_ DiffusionGenerationRequest::I
     {
       PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      2,  // num_aux_entries
+      2,  // num_field_entries
+      1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -1803,30 +831,21 @@ constexpr DiffusionGenerationRequest::ParseTableT_ DiffusionGenerationRequest::I
       ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionGenerationRequest>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string request_id = 1;
+      // optional string model_id = 2;
       {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.request_id_)}},
-      // optional .runanywhere.v1.DiffusionGenerationOptions options = 2;
-      {::_pbi::TcParser::FastMtS1,
-       {18, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.options_)}},
-      // optional string model_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
+       {18, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.model_id_)}},
+      // optional .runanywhere.v1.DiffusionGenerationOptions options = 1;
+      {::_pbi::TcParser::FastMtS1,
+       {10, 1, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.options_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // string request_id = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.DiffusionGenerationOptions options = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.options_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // map<string, string> metadata = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.metadata_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+      // optional .runanywhere.v1.DiffusionGenerationOptions options = 1;
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.options_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional string model_id = 2;
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1834,15 +853,11 @@ constexpr DiffusionGenerationRequest::ParseTableT_ DiffusionGenerationRequest::I
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionGenerationOptions_globals_},
         #endif
-        {::_pbi::TcParser::GetMapAuxInfo(
-            1, 0, 9, 9, 0)},
     }},
     {{
-      "\51\12\0\10\10\0\0\0"
+      "\51\0\10\0\0\0\0\0"
       "runanywhere.v1.DiffusionGenerationRequest"
-      "request_id"
       "model_id"
-      "metadata"
     }},
   };
 }
@@ -1852,18 +867,10 @@ inline constexpr DiffusionGenerationRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        options_{nullptr},
-        metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionGenerationRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.metadata_)>()
-         }
-     {}
+        options_{nullptr} {}
 
 template <typename>
 constexpr DiffusionGenerationRequest::DiffusionGenerationRequest(::_pbi::ConstantInitialized,
@@ -1906,7 +913,7 @@ constexpr auto DiffusionGenerationRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[5],
+      &file_reflection_data[1],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -1957,105 +964,104 @@ const ::_pbi::ClassData* DiffusionGenerationRequest_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionConfiguration::_Internal {
+class DiffusionStreamEvent::_Internal {
  public:
-  using HasBits = decltype(::std::declval<DiffusionConfiguration>()._impl_._has_bits_);
+  using HasBits = decltype(::std::declval<DiffusionStreamEvent>()._impl_._has_bits_);
   static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_._has_bits_);
+      8 * PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._has_bits_);
 };
 
-constexpr DiffusionConfiguration::ParseTableT_ DiffusionConfiguration::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+constexpr DiffusionStreamEvent::ParseTableT_ DiffusionStreamEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
-      PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_._has_bits_),
+      PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
-      1,  // num_aux_entries
+      5,  // num_field_entries
+      3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::GenericFallback,  // fallback
       #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionConfiguration>(),  // to_prefetch
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionStreamEvent>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.DiffusionModelVariant model_variant = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.model_variant_), 2>(),
-       {8, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_variant_)}},
-      // .runanywhere.v1.DiffusionTokenizerSource tokenizer_source = 2;
+      // int64 timestamp_us = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionStreamEvent, _impl_.timestamp_us_), 3>(),
+       {8, 3, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.timestamp_us_)}},
+      // .runanywhere.v1.DiffusionStreamEventKind kind = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionStreamEvent, _impl_.kind_), 4>(),
+       {16, 4, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.kind_)}},
+      // optional .runanywhere.v1.DiffusionProgress progress = 3;
       {::_pbi::TcParser::FastMtS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.tokenizer_source_)}},
-      // bool enable_safety_checker = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionConfiguration, _impl_.enable_safety_checker_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.enable_safety_checker_)}},
-      // int32 max_memory_mb = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.max_memory_mb_), 4>(),
-       {32, 4, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.max_memory_mb_)}},
-      // optional string model_id = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_id_)}},
-      // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.preferred_framework_), 5>(),
-       {48, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_)}},
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.progress_)}},
+      // optional .runanywhere.v1.DiffusionResult result = 4;
+      {::_pbi::TcParser::FastMtS1,
+       {34, 1, 1,
+        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.result_)}},
+      // optional .runanywhere.v1.SDKError error = 5;
+      {::_pbi::TcParser::FastMtS1,
+       {42, 2, 2,
+        PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // .runanywhere.v1.DiffusionModelVariant model_variant = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_variant_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.DiffusionTokenizerSource tokenizer_source = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.tokenizer_source_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool enable_safety_checker = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.enable_safety_checker_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 max_memory_mb = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.max_memory_mb_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string model_id = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int64 timestamp_us = 1;
+      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // .runanywhere.v1.DiffusionStreamEventKind kind = 2;
+      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // optional .runanywhere.v1.DiffusionProgress progress = 3;
+      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.progress_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.DiffusionResult result = 4;
+      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 5;
+      {PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_), _Internal::kHasBitsOffset + 2, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionTokenizerSource>()},
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionProgress>()},
         #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionTokenizerSource_globals_},
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionProgress_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionResult>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionResult_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
         #endif
     }},
     {{
-      "\45\0\0\0\0\10\0\0"
-      "runanywhere.v1.DiffusionConfiguration"
-      "model_id"
     }},
   };
 }
 
 
-inline constexpr DiffusionConfiguration::Impl_::Impl_(
+inline constexpr DiffusionStreamEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        tokenizer_source_{nullptr},
-        model_variant_{static_cast< ::runanywhere::v1::DiffusionModelVariant >(0)},
-        enable_safety_checker_{false},
-        max_memory_mb_{0},
-        preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)} {}
+        progress_{nullptr},
+        result_{nullptr},
+        error_{nullptr},
+        timestamp_us_{::int64_t{0}},
+        kind_{static_cast< ::runanywhere::v1::DiffusionStreamEventKind >(0)} {}
 
 template <typename>
-constexpr DiffusionConfiguration::DiffusionConfiguration(::_pbi::ConstantInitialized,
+constexpr DiffusionStreamEvent::DiffusionStreamEvent(::_pbi::ConstantInitialized,
                        const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
     : ::google::protobuf::Message(
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -2064,15 +1070,15 @@ constexpr DiffusionConfiguration::DiffusionConfiguration(::_pbi::ConstantInitial
           ),
       _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
 }
-inline void* PROTOBUF_NONNULL DiffusionConfiguration::PlacementNew_(
+inline void* PROTOBUF_NONNULL DiffusionStreamEvent::PlacementNew_(
     const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionConfiguration(arena);
+  return ::new (mem) DiffusionStreamEvent(arena);
 }
-constexpr auto DiffusionConfiguration::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionConfiguration), alignof(DiffusionConfiguration));
+constexpr auto DiffusionStreamEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(DiffusionStreamEvent), alignof(DiffusionStreamEvent));
 }
-constexpr auto DiffusionConfiguration::InternalGenerateClassData_(
+constexpr auto DiffusionStreamEvent::InternalGenerateClassData_(
     const MessageLite& prototype,
     const ::google::protobuf::internal::TcParseTableBase* tc_table) {
   return ::google::protobuf::internal::ClassDataFull{
@@ -2084,18 +1090,18 @@ constexpr auto DiffusionConfiguration::InternalGenerateClassData_(
           tc_table,
 #endif
           nullptr,  // IsInitialized
-          &DiffusionConfiguration::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionConfiguration>(),
+          &DiffusionStreamEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<DiffusionStreamEvent>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionConfiguration::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionConfiguration>(), &DiffusionConfiguration::ByteSizeLong,
-              &DiffusionConfiguration::_InternalSerialize,
+          &DiffusionStreamEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<DiffusionStreamEvent>(), &DiffusionStreamEvent::ByteSizeLong,
+              &DiffusionStreamEvent::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_._cached_size_),
+          PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_._cached_size_),
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[1],
+      &file_reflection_data[5],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_diffusion_5foptions_2eproto,
@@ -2103,224 +1109,45 @@ constexpr auto DiffusionConfiguration::InternalGenerateClassData_(
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   };
 }
-struct DiffusionConfigurationGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionConfigurationGlobalsTypeInternal()
+struct DiffusionStreamEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr DiffusionStreamEventGlobalsTypeInternal()
       :
 #ifndef PROTOBUF_MESSAGE_GLOBALS
         _default(::_pbi::ConstantInitialized{},
-                 DiffusionConfiguration_class_data_.base())
+                 DiffusionStreamEvent_class_data_.base())
 #else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionConfiguration::InternalGenerateClassData_(
-            _default, &DiffusionConfiguration_globals_._table.header)),
+        MessageGlobalsBase(DiffusionStreamEvent::InternalGenerateClassData_(
+            _default, &DiffusionStreamEvent_globals_._table.header)),
         _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionConfiguration>(
+        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionStreamEvent>(
             GetClassData()))
 #endif  // PROTOBUF_MESSAGE_GLOBALS
   {
   }
-  ~DiffusionConfigurationGlobalsTypeInternal() {}
+  ~DiffusionStreamEventGlobalsTypeInternal() {}
   union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionConfiguration _default;
+    alignas(::_pbi::kMaxMessageAlignment) DiffusionStreamEvent _default;
   };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionConfiguration>(
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionStreamEvent>(
       ::std::declval<const ::_pbi::ClassData*>())) _table;
 #endif
 };
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionConfigurationGlobalsTypeInternal, _default) ==
+static_assert(PROTOBUF_FIELD_OFFSET(DiffusionStreamEventGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionConfigurationGlobalsTypeInternal DiffusionConfiguration_globals_
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionStreamEventGlobalsTypeInternal DiffusionStreamEvent_globals_
         PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 #if defined(PROTOBUF_CUSTOM_VTABLE)
 namespace {
-const ::_pbi::ClassData* DiffusionConfiguration_get_class_data() {
+const ::_pbi::ClassData* DiffusionStreamEvent_get_class_data() {
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionConfiguration_globals_.GetClassData();
+  return DiffusionStreamEvent_globals_.GetClassData();
 #else
-  return DiffusionConfiguration_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class DiffusionConfig::_Internal {
- public:
-  using HasBits = decltype(::std::declval<DiffusionConfig>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_._has_bits_);
-};
-
-constexpr DiffusionConfig::ParseTableT_ DiffusionConfig::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_._has_bits_),
-      0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionConfig>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // optional .runanywhere.v1.DiffusionConfiguration configuration = 4;
-      {::_pbi::TcParser::FastMtS1,
-       {34, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.configuration_)}},
-      // string model_path = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_path_)}},
-      // string model_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_id_)}},
-      // string model_name = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 2, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_name_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string model_path = 1;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_path_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_id = 2;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string model_name = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.model_name_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.DiffusionConfiguration configuration = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_.configuration_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::DiffusionConfiguration>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::DiffusionConfiguration_globals_},
-        #endif
-    }},
-    {{
-      "\36\12\10\12\0\0\0\0"
-      "runanywhere.v1.DiffusionConfig"
-      "model_path"
-      "model_id"
-      "model_name"
-    }},
-  };
-}
-
-
-inline constexpr DiffusionConfig::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        model_path_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_name_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        configuration_{nullptr} {}
-
-template <typename>
-constexpr DiffusionConfig::DiffusionConfig(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL DiffusionConfig::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) DiffusionConfig(arena);
-}
-constexpr auto DiffusionConfig::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(DiffusionConfig), alignof(DiffusionConfig));
-}
-constexpr auto DiffusionConfig::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &DiffusionConfig::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<DiffusionConfig>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &DiffusionConfig::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<DiffusionConfig>(), &DiffusionConfig::ByteSizeLong,
-              &DiffusionConfig::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(DiffusionConfig, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[2],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_diffusion_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct DiffusionConfigGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr DiffusionConfigGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 DiffusionConfig_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(DiffusionConfig::InternalGenerateClassData_(
-            _default, &DiffusionConfig_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<DiffusionConfig>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~DiffusionConfigGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) DiffusionConfig _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<DiffusionConfig>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(DiffusionConfigGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST DiffusionConfigGlobalsTypeInternal DiffusionConfig_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* DiffusionConfig_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return DiffusionConfig_globals_.GetClassData();
-#else
-  return DiffusionConfig_class_data_.base();
+  return DiffusionStreamEvent_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -2328,70 +1155,30 @@ const ::_pbi::ClassData* DiffusionConfig_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_diffusion_5foptions_2eproto[5];
+    file_level_enum_descriptors_diffusion_5foptions_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_diffusion_5foptions_2eproto = nullptr;
 const ::uint32_t
     TableStruct_diffusion_5foptions_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionTokenizerSource, _impl_._has_bits_),
-        6, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionTokenizerSource, _impl_.kind_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionTokenizerSource, _impl_.custom_path_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionTokenizerSource, _impl_.auto_download_),
-        1,
-        0,
-        2,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_._has_bits_),
-        9, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.model_variant_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.tokenizer_source_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.enable_safety_checker_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.max_memory_mb_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.preferred_framework_),
-        2,
-        1,
-        3,
-        4,
-        0,
-        5,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_.model_path_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_.model_name_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_.configuration_),
-        0,
-        1,
-        2,
-        3,
-        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_._has_bits_),
-        23, // hasbit index offset
+        18, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.negative_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.width_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.height_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.num_inference_steps_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.steps_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.guidance_scale_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.seed_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.scheduler_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.mode_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.input_image_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.image_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.mask_image_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.denoise_strength_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.report_intermediate_images_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.progress_stride_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.input_image_width_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.input_image_height_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.input_image_media_type_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.strength_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.image_media_type_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.mask_image_media_type_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.batch_size_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.return_latents_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.n_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.output_format_),
         0,
         1,
         6,
@@ -2400,332 +1187,166 @@ const ::uint32_t
         9,
         10,
         11,
-        12,
         2,
         3,
-        13,
-        17,
-        14,
-        15,
-        16,
+        12,
         4,
         5,
-        19,
-        18,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.key_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse, _impl_.value_),
-        0,
-        1,
+        13,
+        14,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.request_id_),
+        5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.options_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.metadata_),
-        0,
-        2,
         1,
-        3,
+        0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_._has_bits_),
-        13, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.progress_percent_),
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.current_step_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.total_steps_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.stage_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.intermediate_image_data_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.intermediate_image_width_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.intermediate_image_height_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.timestamp_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.eta_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionProgress, _impl_.intermediate_image_media_type_),
+        1,
+        2,
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_._has_bits_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.data_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.width_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.height_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.seed_used_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.safety_flag_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionImage, _impl_.media_type_),
+        0,
+        2,
         3,
         4,
         5,
-        0,
         1,
-        6,
-        9,
-        7,
-        8,
-        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_._has_bits_),
-        15, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.image_data_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.width_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.height_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.seed_used_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.images_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.total_time_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.safety_flag_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.used_scheduler_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.error_code_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.image_media_type_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.batch_images_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.images_generated_),
-        1,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        2,
-        10,
-        3,
-        0,
-        11,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_._has_bits_),
-        16, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_variants_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_schedulers_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.max_resolution_px_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_modes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.max_width_px_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.max_height_px_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supports_intermediate_images_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supports_safety_checker_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.is_ready_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.current_model_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.safety_checker_enabled_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supports_batch_generation_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_output_media_types_),
         0,
         1,
-        5,
-        2,
-        6,
-        7,
-        8,
-        9,
-        10,
-        4,
-        11,
-        12,
-        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_._has_bits_),
-        11, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.seq_),
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.timestamp_us_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.request_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.progress_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.result_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.error_code_),
-        4,
-        5,
-        0,
-        6,
-        2,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionStreamEvent, _impl_.error_),
         3,
-        1,
-        7,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_._has_bits_),
-        10, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.is_ready_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.current_model_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.capabilities_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.is_generating_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.active_request_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionServiceState, _impl_.error_code_),
         4,
         0,
-        3,
-        5,
         1,
         2,
-        6,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, sizeof(::runanywhere::v1::DiffusionTokenizerSource)},
-        {9, sizeof(::runanywhere::v1::DiffusionConfiguration)},
-        {24, sizeof(::runanywhere::v1::DiffusionConfig)},
-        {35, sizeof(::runanywhere::v1::DiffusionGenerationOptions)},
-        {78, sizeof(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse)},
-        {85, sizeof(::runanywhere::v1::DiffusionGenerationRequest)},
-        {96, sizeof(::runanywhere::v1::DiffusionProgress)},
-        {119, sizeof(::runanywhere::v1::DiffusionResult)},
-        {146, sizeof(::runanywhere::v1::DiffusionCapabilities)},
-        {175, sizeof(::runanywhere::v1::DiffusionStreamEvent)},
-        {194, sizeof(::runanywhere::v1::DiffusionServiceState)},
+        {0, sizeof(::runanywhere::v1::DiffusionGenerationOptions)},
+        {33, sizeof(::runanywhere::v1::DiffusionGenerationRequest)},
+        {40, sizeof(::runanywhere::v1::DiffusionProgress)},
+        {49, sizeof(::runanywhere::v1::DiffusionImage)},
+        {64, sizeof(::runanywhere::v1::DiffusionResult)},
+        {71, sizeof(::runanywhere::v1::DiffusionStreamEvent)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
-        &::runanywhere::v1::DiffusionTokenizerSource_globals_,
-        &::runanywhere::v1::DiffusionConfiguration_globals_,
-        &::runanywhere::v1::DiffusionConfig_globals_,
         &::runanywhere::v1::DiffusionGenerationOptions_globals_,
-        &::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_,
         &::runanywhere::v1::DiffusionGenerationRequest_globals_,
         &::runanywhere::v1::DiffusionProgress_globals_,
+        &::runanywhere::v1::DiffusionImage_globals_,
         &::runanywhere::v1::DiffusionResult_globals_,
-        &::runanywhere::v1::DiffusionCapabilities_globals_,
         &::runanywhere::v1::DiffusionStreamEvent_globals_,
-        &::runanywhere::v1::DiffusionServiceState_globals_,
 };
 const char descriptor_table_protodef_diffusion_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\027diffusion_options.proto\022\016runanywhere.v"
-    "1\032\021model_types.proto\"\227\001\n\030DiffusionTokeni"
-    "zerSource\022:\n\004kind\030\001 \001(\0162,.runanywhere.v1"
-    ".DiffusionTokenizerSourceKind\022\030\n\013custom_"
-    "path\030\002 \001(\tH\000\210\001\001\022\025\n\rauto_download\030\003 \001(\010B\016"
-    "\n\014_custom_path\"\330\002\n\026DiffusionConfiguratio"
-    "n\022<\n\rmodel_variant\030\001 \001(\0162%.runanywhere.v"
-    "1.DiffusionModelVariant\022B\n\020tokenizer_sou"
-    "rce\030\002 \001(\0132(.runanywhere.v1.DiffusionToke"
-    "nizerSource\022\035\n\025enable_safety_checker\030\003 \001"
-    "(\010\022\025\n\rmax_memory_mb\030\004 \001(\005\022\025\n\010model_id\030\005 "
-    "\001(\tH\000\210\001\001\022D\n\023preferred_framework\030\006 \001(\0162\"."
-    "runanywhere.v1.InferenceFrameworkH\001\210\001\001B\013"
-    "\n\t_model_idB\026\n\024_preferred_frameworkJ\004\010\007\020"
-    "\010\"\241\001\n\017DiffusionConfig\022\022\n\nmodel_path\030\001 \001("
-    "\t\022\020\n\010model_id\030\002 \001(\t\022\022\n\nmodel_name\030\003 \001(\t\022"
-    "B\n\rconfiguration\030\004 \001(\0132&.runanywhere.v1."
-    "DiffusionConfigurationH\000\210\001\001B\020\n\016_configur"
-    "ation\"\225\005\n\032DiffusionGenerationOptions\022\016\n\006"
-    "prompt\030\001 \001(\t\022\027\n\017negative_prompt\030\002 \001(\t\022\r\n"
-    "\005width\030\003 \001(\005\022\016\n\006height\030\004 \001(\005\022\033\n\023num_infe"
-    "rence_steps\030\005 \001(\005\022\026\n\016guidance_scale\030\006 \001("
-    "\002\022\014\n\004seed\030\007 \001(\003\0225\n\tscheduler\030\010 \001(\0162\".run"
-    "anywhere.v1.DiffusionScheduler\022+\n\004mode\030\t"
-    " \001(\0162\035.runanywhere.v1.DiffusionMode\022\030\n\013i"
-    "nput_image\030\n \001(\014H\000\210\001\001\022\027\n\nmask_image\030\013 \001("
-    "\014H\001\210\001\001\022\030\n\020denoise_strength\030\014 \001(\002\022\"\n\032repo"
-    "rt_intermediate_images\030\r \001(\010\022\027\n\017progress"
-    "_stride\030\016 \001(\005\022\031\n\021input_image_width\030\017 \001(\005"
-    "\022\032\n\022input_image_height\030\020 \001(\005\022#\n\026input_im"
-    "age_media_type\030\021 \001(\tH\002\210\001\001\022\"\n\025mask_image_"
-    "media_type\030\022 \001(\tH\003\210\001\001\022\022\n\nbatch_size\030\023 \001("
-    "\005\022\026\n\016return_latents\030\024 \001(\010B\016\n\014_input_imag"
-    "eB\r\n\013_mask_imageB\031\n\027_input_image_media_t"
-    "ypeB\030\n\026_mask_image_media_type\"\237\002\n\032Diffus"
-    "ionGenerationRequest\022\022\n\nrequest_id\030\001 \001(\t"
-    "\022@\n\007options\030\002 \001(\0132*.runanywhere.v1.Diffu"
-    "sionGenerationOptionsH\000\210\001\001\022\025\n\010model_id\030\003"
-    " \001(\tH\001\210\001\001\022J\n\010metadata\030\004 \003(\01328.runanywher"
-    "e.v1.DiffusionGenerationRequest.Metadata"
-    "Entry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005v"
-    "alue\030\002 \001(\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\""
-    "\342\002\n\021DiffusionProgress\022\030\n\020progress_percen"
-    "t\030\001 \001(\002\022\024\n\014current_step\030\002 \001(\005\022\023\n\013total_s"
-    "teps\030\003 \001(\005\022\r\n\005stage\030\004 \001(\t\022$\n\027intermediat"
-    "e_image_data\030\005 \001(\014H\000\210\001\001\022 \n\030intermediate_"
-    "image_width\030\006 \001(\005\022!\n\031intermediate_image_"
-    "height\030\007 \001(\005\022\024\n\014timestamp_ms\030\010 \001(\003\022\016\n\006et"
-    "a_ms\030\t \001(\003\022*\n\035intermediate_image_media_t"
-    "ype\030\n \001(\tH\001\210\001\001B\032\n\030_intermediate_image_da"
-    "taB \n\036_intermediate_image_media_type\"\345\002\n"
-    "\017DiffusionResult\022\022\n\nimage_data\030\001 \001(\014\022\r\n\005"
-    "width\030\002 \001(\005\022\016\n\006height\030\003 \001(\005\022\021\n\tseed_used"
-    "\030\004 \001(\003\022\025\n\rtotal_time_ms\030\005 \001(\003\022\023\n\013safety_"
-    "flag\030\006 \001(\010\022:\n\016used_scheduler\030\007 \001(\0162\".run"
-    "anywhere.v1.DiffusionScheduler\022\032\n\rerror_"
-    "message\030\010 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\t \001(\005\022\035"
-    "\n\020image_media_type\030\n \001(\tH\001\210\001\001\022\024\n\014batch_i"
-    "mages\030\013 \003(\014\022\030\n\020images_generated\030\014 \001(\005B\020\n"
-    "\016_error_messageB\023\n\021_image_media_type\"\214\004\n"
-    "\025DiffusionCapabilities\022A\n\022supported_vari"
-    "ants\030\001 \003(\0162%.runanywhere.v1.DiffusionMod"
-    "elVariant\022@\n\024supported_schedulers\030\002 \003(\0162"
-    "\".runanywhere.v1.DiffusionScheduler\022\031\n\021m"
-    "ax_resolution_px\030\003 \001(\005\0226\n\017supported_mode"
-    "s\030\004 \003(\0162\035.runanywhere.v1.DiffusionMode\022\024"
-    "\n\014max_width_px\030\005 \001(\005\022\025\n\rmax_height_px\030\006 "
-    "\001(\005\022$\n\034supports_intermediate_images\030\007 \001("
-    "\010\022\037\n\027supports_safety_checker\030\010 \001(\010\022\020\n\010is"
-    "_ready\030\t \001(\010\022\032\n\rcurrent_model\030\n \001(\tH\000\210\001\001"
-    "\022\036\n\026safety_checker_enabled\030\013 \001(\010\022!\n\031supp"
-    "orts_batch_generation\030\014 \001(\010\022$\n\034supported"
-    "_output_media_types\030\r \003(\tB\020\n\016_current_mo"
-    "del\"\317\002\n\024DiffusionStreamEvent\022\013\n\003seq\030\001 \001("
-    "\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 "
-    "\001(\t\0226\n\004kind\030\004 \001(\0162(.runanywhere.v1.Diffu"
-    "sionStreamEventKind\0228\n\010progress\030\005 \001(\0132!."
-    "runanywhere.v1.DiffusionProgressH\000\210\001\001\0224\n"
-    "\006result\030\006 \001(\0132\037.runanywhere.v1.Diffusion"
-    "ResultH\001\210\001\001\022\032\n\rerror_message\030\007 \001(\tH\002\210\001\001\022"
-    "\022\n\nerror_code\030\010 \001(\005B\013\n\t_progressB\t\n\007_res"
-    "ultB\020\n\016_error_message\"\271\002\n\025DiffusionServi"
-    "ceState\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_mod"
-    "el\030\002 \001(\tH\000\210\001\001\022@\n\014capabilities\030\003 \001(\0132%.ru"
-    "nanywhere.v1.DiffusionCapabilitiesH\001\210\001\001\022"
-    "\025\n\ris_generating\030\004 \001(\010\022\036\n\021active_request"
-    "_id\030\005 \001(\tH\002\210\001\001\022\032\n\rerror_message\030\006 \001(\tH\003\210"
-    "\001\001\022\022\n\nerror_code\030\007 \001(\005B\020\n\016_current_model"
-    "B\017\n\r_capabilitiesB\024\n\022_active_request_idB"
-    "\020\n\016_error_message*\223\001\n\rDiffusionMode\022\036\n\032D"
-    "IFFUSION_MODE_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
-    "_MODE_TEXT_TO_IMAGE\020\001\022!\n\035DIFFUSION_MODE_"
-    "IMAGE_TO_IMAGE\020\002\022\035\n\031DIFFUSION_MODE_INPAI"
-    "NTING\020\003*\376\002\n\022DiffusionScheduler\022#\n\037DIFFUS"
-    "ION_SCHEDULER_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
-    "_SCHEDULER_DPMPP_2M\020\001\022\'\n#DIFFUSION_SCHED"
-    "ULER_DPMPP_2M_KARRAS\020\002\022\034\n\030DIFFUSION_SCHE"
-    "DULER_DDIM\020\003\022\034\n\030DIFFUSION_SCHEDULER_DDPM"
-    "\020\004\022\035\n\031DIFFUSION_SCHEDULER_EULER\020\005\022\037\n\033DIF"
-    "FUSION_SCHEDULER_EULER_A\020\006\022\034\n\030DIFFUSION_"
-    "SCHEDULER_PNDM\020\007\022\033\n\027DIFFUSION_SCHEDULER_"
-    "LMS\020\010\022\033\n\027DIFFUSION_SCHEDULER_LCM\020\t\022$\n DI"
-    "FFUSION_SCHEDULER_DPMPP_2M_SDE\020\n*\225\002\n\025Dif"
-    "fusionModelVariant\022\'\n#DIFFUSION_MODEL_VA"
-    "RIANT_UNSPECIFIED\020\000\022\"\n\036DIFFUSION_MODEL_V"
-    "ARIANT_SD_1_5\020\001\022\"\n\036DIFFUSION_MODEL_VARIA"
-    "NT_SD_2_1\020\002\022 \n\034DIFFUSION_MODEL_VARIANT_S"
-    "DXL\020\003\022&\n\"DIFFUSION_MODEL_VARIANT_SDXL_TU"
-    "RBO\020\004\022 \n\034DIFFUSION_MODEL_VARIANT_SDXS\020\005\022"
-    "\037\n\033DIFFUSION_MODEL_VARIANT_LCM\020\006*\220\002\n\034Dif"
-    "fusionTokenizerSourceKind\022/\n+DIFFUSION_T"
-    "OKENIZER_SOURCE_KIND_UNSPECIFIED\020\000\0220\n,DI"
-    "FFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD"
-    "15\020\001\022/\n+DIFFUSION_TOKENIZER_SOURCE_KIND_"
-    "BUNDLED_SD2\020\002\0220\n,DIFFUSION_TOKENIZER_SOU"
-    "RCE_KIND_BUNDLED_SDXL\020\003\022*\n&DIFFUSION_TOK"
-    "ENIZER_SOURCE_KIND_CUSTOM\020\004*\240\002\n\030Diffusio"
-    "nStreamEventKind\022+\n\'DIFFUSION_STREAM_EVE"
-    "NT_KIND_UNSPECIFIED\020\000\022\'\n#DIFFUSION_STREA"
-    "M_EVENT_KIND_STARTED\020\001\022(\n$DIFFUSION_STRE"
-    "AM_EVENT_KIND_PROGRESS\020\002\0222\n.DIFFUSION_ST"
-    "REAM_EVENT_KIND_INTERMEDIATE_IMAGE\020\003\022)\n%"
-    "DIFFUSION_STREAM_EVENT_KIND_COMPLETED\020\004\022"
-    "%\n!DIFFUSION_STREAM_EVENT_KIND_ERROR\020\0052\302"
-    "\001\n\tDiffusion\022W\n\010Generate\022*.runanywhere.v"
-    "1.DiffusionGenerationRequest\032\037.runanywhe"
-    "re.v1.DiffusionResult\022\\\n\006Stream\022*.runany"
-    "where.v1.DiffusionGenerationRequest\032$.ru"
-    "nanywhere.v1.DiffusionStreamEvent0\001B\220\001\n\027"
-    "ai.runanywhere.proto.v1B\025DiffusionOption"
-    "sProtoP\001Z<github.com/runanywhere/runanyw"
-    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
-    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "1\032\014errors.proto\032\021rac_options.proto\"\216\005\n\032D"
+    "iffusionGenerationOptions\022\024\n\006prompt\030\001 \001("
+    "\tB\004\220\265\030\001\022\027\n\017negative_prompt\030\002 \001(\t\022\024\n\005widt"
+    "h\030\003 \001(\005B\005\212\265\030\0010\022\025\n\006height\030\004 \001(\005B\005\212\265\030\0010\022\034\n"
+    "\005steps\030\005 \001(\005B\r\212\265\030\0010\240\265\030\000\250\265\0302\0225\n\016guidance_"
+    "scale\030\006 \001(\002B\035\212\265\030\0030.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000"
+    "4@\022\021\n\004seed\030\007 \001(\003H\000\210\001\001\0225\n\tscheduler\030\010 \001(\016"
+    "2\".runanywhere.v1.DiffusionScheduler\022\022\n\005"
+    "image\030\t \001(\014H\001\210\001\001\022\027\n\nmask_image\030\n \001(\014H\002\210\001"
+    "\001\0220\n\010strength\030\013 \001(\002B\036\212\265\030\0040.75\261\265\030\000\000\000\000\000\000\000\000"
+    "\271\265\030\000\000\000\000\000\000\360\?\022\035\n\020image_media_type\030\014 \001(\tH\003\210"
+    "\001\001\022\"\n\025mask_image_media_type\030\r \001(\tH\004\210\001\001\022\035"
+    "\n\001n\030\016 \001(\005B\r\212\265\030\0011\240\265\030\001\250\265\030\010H\005\210\001\001\022]\n\routput_"
+    "format\030\017 \001(\0162%.runanywhere.v1.DiffusionO"
+    "utputFormatB\037\212\265\030\033DIFFUSION_OUTPUT_FORMAT"
+    "_PNGB\007\n\005_seedB\010\n\006_imageB\r\n\013_mask_imageB\023"
+    "\n\021_image_media_typeB\030\n\026_mask_image_media"
+    "_typeB\004\n\002_n\"\216\001\n\032DiffusionGenerationReque"
+    "st\022@\n\007options\030\001 \001(\0132*.runanywhere.v1.Dif"
+    "fusionGenerationOptionsH\000\210\001\001\022\025\n\010model_id"
+    "\030\002 \001(\tH\001\210\001\001B\n\n\010_optionsB\013\n\t_model_id\"\200\001\n"
+    "\021DiffusionProgress\022\024\n\014current_step\030\001 \001(\005"
+    "\022\023\n\013total_steps\030\002 \001(\005\022$\n\027intermediate_im"
+    "age_data\030\003 \001(\014H\000\210\001\001B\032\n\030_intermediate_ima"
+    "ge_data\"y\n\016DiffusionImage\022\014\n\004data\030\001 \001(\014\022"
+    "\r\n\005width\030\002 \001(\005\022\016\n\006height\030\003 \001(\005\022\021\n\tseed_u"
+    "sed\030\004 \001(\003\022\023\n\013safety_flag\030\005 \001(\010\022\022\n\nmedia_"
+    "type\030\006 \001(\t\"X\n\017DiffusionResult\022.\n\006images\030"
+    "\001 \003(\0132\036.runanywhere.v1.DiffusionImage\022\025\n"
+    "\rtotal_time_ms\030\002 \001(\003\"\244\002\n\024DiffusionStream"
+    "Event\022\024\n\014timestamp_us\030\001 \001(\003\0226\n\004kind\030\002 \001("
+    "\0162(.runanywhere.v1.DiffusionStreamEventK"
+    "ind\0228\n\010progress\030\003 \001(\0132!.runanywhere.v1.D"
+    "iffusionProgressH\000\210\001\001\0224\n\006result\030\004 \001(\0132\037."
+    "runanywhere.v1.DiffusionResultH\001\210\001\001\022,\n\005e"
+    "rror\030\005 \001(\0132\030.runanywhere.v1.SDKErrorH\002\210\001"
+    "\001B\013\n\t_progressB\t\n\007_resultB\010\n\006_error*\303\002\n\022"
+    "DiffusionScheduler\022#\n\037DIFFUSION_SCHEDULE"
+    "R_UNSPECIFIED\020\000\022 \n\034DIFFUSION_SCHEDULER_D"
+    "PMPP_2M\020\001\022\'\n#DIFFUSION_SCHEDULER_DPMPP_2"
+    "M_KARRAS\020\002\022\034\n\030DIFFUSION_SCHEDULER_DDIM\020\003"
+    "\022\035\n\031DIFFUSION_SCHEDULER_EULER\020\004\022\037\n\033DIFFU"
+    "SION_SCHEDULER_EULER_A\020\005\022\034\n\030DIFFUSION_SC"
+    "HEDULER_PNDM\020\006\022\033\n\027DIFFUSION_SCHEDULER_LM"
+    "S\020\007\022$\n DIFFUSION_SCHEDULER_DPMPP_2M_SDE\020"
+    "\010*\313\001\n\025DiffusionOutputFormat\022\'\n#DIFFUSION"
+    "_OUTPUT_FORMAT_UNSPECIFIED\020\000\022\037\n\033DIFFUSIO"
+    "N_OUTPUT_FORMAT_PNG\020\001\022 \n\034DIFFUSION_OUTPU"
+    "T_FORMAT_JPEG\020\002\022 \n\034DIFFUSION_OUTPUT_FORM"
+    "AT_WEBP\020\003\022$\n DIFFUSION_OUTPUT_FORMAT_RAW"
+    "_RGBA\020\004*\240\002\n\030DiffusionStreamEventKind\022+\n\'"
+    "DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED\020"
+    "\000\022\'\n#DIFFUSION_STREAM_EVENT_KIND_STARTED"
+    "\020\001\022(\n$DIFFUSION_STREAM_EVENT_KIND_PROGRE"
+    "SS\020\002\0222\n.DIFFUSION_STREAM_EVENT_KIND_INTE"
+    "RMEDIATE_IMAGE\020\003\022)\n%DIFFUSION_STREAM_EVE"
+    "NT_KIND_COMPLETED\020\004\022%\n!DIFFUSION_STREAM_"
+    "EVENT_KIND_ERROR\020\005B\220\001\n\027ai.runanywhere.pr"
+    "oto.v1B\025DiffusionOptionsProtoP\001Z<github."
+    "com/runanywhere/runanywhere-sdks/idl/v1;"
+    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
+    "\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_diffusion_5foptions_2eproto_deps[1] = {
-        &::descriptor_table_model_5ftypes_2eproto,
+    descriptor_table_diffusion_5foptions_2eproto_deps[2] = {
+        &::descriptor_table_errors_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_diffusion_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diffusion_5foptions_2eproto = {
     false,
     false,
-    5310,
+    2493,
     descriptor_table_protodef_diffusion_5foptions_2eproto,
     "diffusion_options.proto",
     &descriptor_table_diffusion_5foptions_2eproto_once,
     descriptor_table_diffusion_5foptions_2eproto_deps,
-    1,
-    11,
+    2,
+    6,
     schemas,
     file_message_globals,
     TableStruct_diffusion_5foptions_2eproto::offsets,
@@ -2735,969 +1356,26 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diffusion_5fop
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiffusionMode_descriptor() {
+DiffusionScheduler_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_diffusion_5foptions_2eproto);
   return file_level_enum_descriptors_diffusion_5foptions_2eproto[0];
 }
-PROTOBUF_CONSTINIT const uint32_t DiffusionMode_internal_data_[] = {
-    262144u, 0u, };
+PROTOBUF_CONSTINIT const uint32_t DiffusionScheduler_internal_data_[] = {
+    589824u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiffusionScheduler_descriptor() {
+DiffusionOutputFormat_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_diffusion_5foptions_2eproto);
   return file_level_enum_descriptors_diffusion_5foptions_2eproto[1];
 }
-PROTOBUF_CONSTINIT const uint32_t DiffusionScheduler_internal_data_[] = {
-    720896u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiffusionModelVariant_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_diffusion_5foptions_2eproto);
-  return file_level_enum_descriptors_diffusion_5foptions_2eproto[2];
-}
-PROTOBUF_CONSTINIT const uint32_t DiffusionModelVariant_internal_data_[] = {
-    458752u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiffusionTokenizerSourceKind_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_diffusion_5foptions_2eproto);
-  return file_level_enum_descriptors_diffusion_5foptions_2eproto[3];
-}
-PROTOBUF_CONSTINIT const uint32_t DiffusionTokenizerSourceKind_internal_data_[] = {
+PROTOBUF_CONSTINIT const uint32_t DiffusionOutputFormat_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 DiffusionStreamEventKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_diffusion_5foptions_2eproto);
-  return file_level_enum_descriptors_diffusion_5foptions_2eproto[4];
+  return file_level_enum_descriptors_diffusion_5foptions_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t DiffusionStreamEventKind_internal_data_[] = {
     393216u, 0u, };
-// ===================================================================
-
-DiffusionTokenizerSource::DiffusionTokenizerSource(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionTokenizerSource_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionTokenizerSource)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionTokenizerSource::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DiffusionTokenizerSource& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        custom_path_(arena, from.custom_path_) {}
-
-DiffusionTokenizerSource::DiffusionTokenizerSource(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DiffusionTokenizerSource& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionTokenizerSource_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DiffusionTokenizerSource* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, kind_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, kind_),
-           offsetof(Impl_, auto_download_) -
-               offsetof(Impl_, kind_) +
-               sizeof(Impl_::auto_download_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionTokenizerSource)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionTokenizerSource::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        custom_path_(arena) {}
-
-inline void DiffusionTokenizerSource::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, kind_),
-           0,
-           offsetof(Impl_, auto_download_) -
-               offsetof(Impl_, kind_) +
-               sizeof(Impl_::auto_download_));
-}
-DiffusionTokenizerSource::~DiffusionTokenizerSource() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionTokenizerSource)
-  SharedDtor(*this);
-}
-inline void DiffusionTokenizerSource::SharedDtor(MessageLite& self) {
-  DiffusionTokenizerSource& this_ = static_cast<DiffusionTokenizerSource&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.custom_path_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionTokenizerSource_class_data_ =
-        DiffusionTokenizerSource::InternalGenerateClassData_(DiffusionTokenizerSource_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionTokenizerSource::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionTokenizerSource_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionTokenizerSource_class_data_.tc_table);
-  return DiffusionTokenizerSource_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionTokenizerSource::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionTokenizerSource_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionTokenizerSource_globals_));
-  return DiffusionTokenizerSource_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionTokenizerSource::ParseTableT_
-    DiffusionTokenizerSource::_table_ =
-        DiffusionTokenizerSource::InternalGenerateParseTable_(DiffusionTokenizerSource_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DiffusionTokenizerSource::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionTokenizerSource)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.custom_path_.ClearNonDefaultToEmpty();
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
-    ::memset(&_impl_.kind_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.auto_download_) -
-        reinterpret_cast<char*>(&_impl_.kind_)) + sizeof(_impl_.auto_download_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DiffusionTokenizerSource::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DiffusionTokenizerSource& this_ = static_cast<const DiffusionTokenizerSource&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DiffusionTokenizerSource::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DiffusionTokenizerSource& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionTokenizerSource)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.DiffusionTokenizerSourceKind kind = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_kind() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          1, this_._internal_kind(), target);
-    }
-  }
-
-  // optional string custom_path = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    const ::std::string& _s = this_._internal_custom_path();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionTokenizerSource.custom_path");
-    target = stream->WriteStringMaybeAliased(2, _s, target);
-  }
-
-  // bool auto_download = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_auto_download() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_auto_download(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionTokenizerSource)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DiffusionTokenizerSource::ByteSizeLong(const MessageLite& base) {
-  const DiffusionTokenizerSource& this_ = static_cast<const DiffusionTokenizerSource&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DiffusionTokenizerSource::ByteSizeLong() const {
-  const DiffusionTokenizerSource& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionTokenizerSource)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    // optional string custom_path = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_custom_path());
-    }
-    // .runanywhere.v1.DiffusionTokenizerSourceKind kind = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_kind() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
-      }
-    }
-    // bool auto_download = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_auto_download() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DiffusionTokenizerSource::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DiffusionTokenizerSource*>(&to_msg);
-  auto& from = static_cast<const DiffusionTokenizerSource&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionTokenizerSource)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_set_custom_path(from._internal_custom_path());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_kind() != 0) {
-        _this->_impl_.kind_ = from._impl_.kind_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_auto_download() != 0) {
-        _this->_impl_.auto_download_ = from._impl_.auto_download_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DiffusionTokenizerSource::CopyFrom(const DiffusionTokenizerSource& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionTokenizerSource)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DiffusionTokenizerSource::InternalSwap(DiffusionTokenizerSource* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.custom_path_, &other->_impl_.custom_path_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.auto_download_)
-      + sizeof(DiffusionTokenizerSource::_impl_.auto_download_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionTokenizerSource, _impl_.kind_)>(
-          reinterpret_cast<char*>(&_impl_.kind_),
-          reinterpret_cast<char*>(&other->_impl_.kind_));
-}
-
-::google::protobuf::Metadata DiffusionTokenizerSource::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-DiffusionConfiguration::DiffusionConfiguration(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionConfiguration_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionConfiguration)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionConfiguration::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DiffusionConfiguration& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        model_id_(arena, from.model_id_) {}
-
-DiffusionConfiguration::DiffusionConfiguration(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DiffusionConfiguration& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionConfiguration_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DiffusionConfiguration* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.tokenizer_source_ = (CheckHasBit(cached_has_bits, 0x00000002U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.tokenizer_source_)
-                : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, model_variant_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, model_variant_),
-           offsetof(Impl_, preferred_framework_) -
-               offsetof(Impl_, model_variant_) +
-               sizeof(Impl_::preferred_framework_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionConfiguration)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionConfiguration::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        model_id_(arena) {}
-
-inline void DiffusionConfiguration::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, tokenizer_source_),
-           0,
-           offsetof(Impl_, preferred_framework_) -
-               offsetof(Impl_, tokenizer_source_) +
-               sizeof(Impl_::preferred_framework_));
-}
-DiffusionConfiguration::~DiffusionConfiguration() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionConfiguration)
-  SharedDtor(*this);
-}
-inline void DiffusionConfiguration::SharedDtor(MessageLite& self) {
-  DiffusionConfiguration& this_ = static_cast<DiffusionConfiguration&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.model_id_.Destroy();
-  delete this_._impl_.tokenizer_source_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionConfiguration_class_data_ =
-        DiffusionConfiguration::InternalGenerateClassData_(DiffusionConfiguration_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionConfiguration::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionConfiguration_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionConfiguration_class_data_.tc_table);
-  return DiffusionConfiguration_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionConfiguration::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionConfiguration_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionConfiguration_globals_));
-  return DiffusionConfiguration_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionConfiguration::ParseTableT_
-    DiffusionConfiguration::_table_ =
-        DiffusionConfiguration::InternalGenerateParseTable_(DiffusionConfiguration_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionConfiguration)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.model_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(_impl_.tokenizer_source_ != nullptr);
-      _impl_.tokenizer_source_->Clear();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
-    ::memset(&_impl_.model_variant_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.preferred_framework_) -
-        reinterpret_cast<char*>(&_impl_.model_variant_)) + sizeof(_impl_.preferred_framework_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DiffusionConfiguration::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DiffusionConfiguration& this_ = static_cast<const DiffusionConfiguration&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DiffusionConfiguration::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DiffusionConfiguration& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionConfiguration)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.DiffusionModelVariant model_variant = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_model_variant() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          1, this_._internal_model_variant(), target);
-    }
-  }
-
-  // .runanywhere.v1.DiffusionTokenizerSource tokenizer_source = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        2, *this_._impl_.tokenizer_source_, this_._impl_.tokenizer_source_->GetCachedSize(), target,
-        stream);
-  }
-
-  // bool enable_safety_checker = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_enable_safety_checker() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_enable_safety_checker(), target);
-    }
-  }
-
-  // int32 max_memory_mb = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_max_memory_mb() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_max_memory_mb(), target);
-    }
-  }
-
-  // optional string model_id = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    const ::std::string& _s = this_._internal_model_id();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionConfiguration.model_id");
-    target = stream->WriteStringMaybeAliased(5, _s, target);
-  }
-
-  // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteEnumToArray(
-        6, this_._internal_preferred_framework(), target);
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionConfiguration)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DiffusionConfiguration::ByteSizeLong(const MessageLite& base) {
-  const DiffusionConfiguration& this_ = static_cast<const DiffusionConfiguration&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DiffusionConfiguration::ByteSizeLong() const {
-  const DiffusionConfiguration& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionConfiguration)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
-    // optional string model_id = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_model_id());
-    }
-    // .runanywhere.v1.DiffusionTokenizerSource tokenizer_source = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.tokenizer_source_);
-    }
-    // .runanywhere.v1.DiffusionModelVariant model_variant = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_model_variant() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_model_variant());
-      }
-    }
-    // bool enable_safety_checker = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_enable_safety_checker() != 0) {
-        total_size += 2;
-      }
-    }
-    // int32 max_memory_mb = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_max_memory_mb() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_memory_mb());
-      }
-    }
-    // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      total_size += 1 +
-                    ::_pbi::WireFormatLite::EnumSize(this_._internal_preferred_framework());
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DiffusionConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DiffusionConfiguration*>(&to_msg);
-  auto& from = static_cast<const DiffusionConfiguration&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionConfiguration)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_set_model_id(from._internal_model_id());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(from._impl_.tokenizer_source_ != nullptr);
-      if (_this->_impl_.tokenizer_source_ == nullptr) {
-        _this->_impl_.tokenizer_source_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.tokenizer_source_);
-      } else {
-        _this->_impl_.tokenizer_source_->MergeFrom(*from._impl_.tokenizer_source_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_model_variant() != 0) {
-        _this->_impl_.model_variant_ = from._impl_.model_variant_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_enable_safety_checker() != 0) {
-        _this->_impl_.enable_safety_checker_ = from._impl_.enable_safety_checker_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_max_memory_mb() != 0) {
-        _this->_impl_.max_memory_mb_ = from._impl_.max_memory_mb_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      _this->_impl_.preferred_framework_ = from._impl_.preferred_framework_;
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DiffusionConfiguration::CopyFrom(const DiffusionConfiguration& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionConfiguration)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DiffusionConfiguration::InternalSwap(DiffusionConfiguration* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_)
-      + sizeof(DiffusionConfiguration::_impl_.preferred_framework_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.tokenizer_source_)>(
-          reinterpret_cast<char*>(&_impl_.tokenizer_source_),
-          reinterpret_cast<char*>(&other->_impl_.tokenizer_source_));
-}
-
-::google::protobuf::Metadata DiffusionConfiguration::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-DiffusionConfig::DiffusionConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionConfig_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionConfig)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionConfig::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DiffusionConfig& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        model_path_(arena, from.model_path_),
-        model_id_(arena, from.model_id_),
-        model_name_(arena, from.model_name_) {}
-
-DiffusionConfig::DiffusionConfig(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DiffusionConfig& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionConfig_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DiffusionConfig* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.configuration_ = (CheckHasBit(cached_has_bits, 0x00000008U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.configuration_)
-                : nullptr;
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionConfig)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionConfig::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        model_path_(arena),
-        model_id_(arena),
-        model_name_(arena) {}
-
-inline void DiffusionConfig::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.configuration_ = {};
-}
-DiffusionConfig::~DiffusionConfig() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionConfig)
-  SharedDtor(*this);
-}
-inline void DiffusionConfig::SharedDtor(MessageLite& self) {
-  DiffusionConfig& this_ = static_cast<DiffusionConfig&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.model_path_.Destroy();
-  this_._impl_.model_id_.Destroy();
-  this_._impl_.model_name_.Destroy();
-  delete this_._impl_.configuration_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionConfig_class_data_ =
-        DiffusionConfig::InternalGenerateClassData_(DiffusionConfig_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionConfig::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionConfig_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionConfig_class_data_.tc_table);
-  return DiffusionConfig_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionConfig::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionConfig_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionConfig_globals_));
-  return DiffusionConfig_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionConfig::ParseTableT_
-    DiffusionConfig::_table_ =
-        DiffusionConfig::InternalGenerateParseTable_(DiffusionConfig_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DiffusionConfig::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionConfig)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.model_path_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.model_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.model_name_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(_impl_.configuration_ != nullptr);
-      _impl_.configuration_->Clear();
-    }
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DiffusionConfig::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DiffusionConfig& this_ = static_cast<const DiffusionConfig&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DiffusionConfig::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DiffusionConfig& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionConfig)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string model_path = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_model_path().empty()) {
-      const ::std::string& _s = this_._internal_model_path();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionConfig.model_path");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // string model_id = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_model_id().empty()) {
-      const ::std::string& _s = this_._internal_model_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionConfig.model_id");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // string model_name = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_model_name().empty()) {
-      const ::std::string& _s = this_._internal_model_name();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionConfig.model_name");
-      target = stream->WriteStringMaybeAliased(3, _s, target);
-    }
-  }
-
-  // optional .runanywhere.v1.DiffusionConfiguration configuration = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        4, *this_._impl_.configuration_, this_._impl_.configuration_->GetCachedSize(), target,
-        stream);
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionConfig)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DiffusionConfig::ByteSizeLong(const MessageLite& base) {
-  const DiffusionConfig& this_ = static_cast<const DiffusionConfig&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DiffusionConfig::ByteSizeLong() const {
-  const DiffusionConfig& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionConfig)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string model_path = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_model_path().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_path());
-      }
-    }
-    // string model_id = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_model_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_id());
-      }
-    }
-    // string model_name = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_model_name().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_name());
-      }
-    }
-    // optional .runanywhere.v1.DiffusionConfiguration configuration = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.configuration_);
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DiffusionConfig::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DiffusionConfig*>(&to_msg);
-  auto& from = static_cast<const DiffusionConfig&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionConfig)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_model_path().empty()) {
-        _this->_internal_set_model_path(from._internal_model_path());
-      } else {
-        if (_this->_impl_.model_path_.IsDefault()) {
-          _this->_internal_set_model_path("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_model_id().empty()) {
-        _this->_internal_set_model_id(from._internal_model_id());
-      } else {
-        if (_this->_impl_.model_id_.IsDefault()) {
-          _this->_internal_set_model_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_model_name().empty()) {
-        _this->_internal_set_model_name(from._internal_model_name());
-      } else {
-        if (_this->_impl_.model_name_.IsDefault()) {
-          _this->_internal_set_model_name("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(from._impl_.configuration_ != nullptr);
-      if (_this->_impl_.configuration_ == nullptr) {
-        _this->_impl_.configuration_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.configuration_);
-      } else {
-        _this->_impl_.configuration_->MergeFrom(*from._impl_.configuration_);
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DiffusionConfig::CopyFrom(const DiffusionConfig& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionConfig)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DiffusionConfig::InternalSwap(DiffusionConfig* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_path_, &other->_impl_.model_path_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_name_, &other->_impl_.model_name_, arena);
-  swap(_impl_.configuration_, other->_impl_.configuration_);
-}
-
-::google::protobuf::Metadata DiffusionConfig::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
 // ===================================================================
 
 DiffusionGenerationOptions::DiffusionGenerationOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -3717,9 +1395,9 @@ PROTOBUF_NDEBUG_INLINE DiffusionGenerationOptions::Impl_::Impl_(
         _cached_size_{0},
         prompt_(arena, from.prompt_),
         negative_prompt_(arena, from.negative_prompt_),
-        input_image_(arena, from.input_image_),
+        image_(arena, from.image_),
         mask_image_(arena, from.mask_image_),
-        input_image_media_type_(arena, from.input_image_media_type_),
+        image_media_type_(arena, from.image_media_type_),
         mask_image_media_type_(arena, from.mask_image_media_type_) {}
 
 DiffusionGenerationOptions::DiffusionGenerationOptions(
@@ -3740,9 +1418,9 @@ DiffusionGenerationOptions::DiffusionGenerationOptions(
                offsetof(Impl_, width_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, width_),
-           offsetof(Impl_, batch_size_) -
+           offsetof(Impl_, output_format_) -
                offsetof(Impl_, width_) +
-               sizeof(Impl_::batch_size_));
+               sizeof(Impl_::output_format_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionGenerationOptions)
 }
@@ -3752,9 +1430,9 @@ PROTOBUF_NDEBUG_INLINE DiffusionGenerationOptions::Impl_::Impl_(
       : _cached_size_{0},
         prompt_(arena),
         negative_prompt_(arena),
-        input_image_(arena),
+        image_(arena),
         mask_image_(arena),
-        input_image_media_type_(arena),
+        image_media_type_(arena),
         mask_image_media_type_(arena) {}
 
 inline void DiffusionGenerationOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
@@ -3762,9 +1440,9 @@ inline void DiffusionGenerationOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLAB
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, width_),
            0,
-           offsetof(Impl_, batch_size_) -
+           offsetof(Impl_, output_format_) -
                offsetof(Impl_, width_) +
-               sizeof(Impl_::batch_size_));
+               sizeof(Impl_::output_format_));
 }
 DiffusionGenerationOptions::~DiffusionGenerationOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionGenerationOptions)
@@ -3779,9 +1457,9 @@ inline void DiffusionGenerationOptions::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.prompt_.Destroy();
   this_._impl_.negative_prompt_.Destroy();
-  this_._impl_.input_image_.Destroy();
+  this_._impl_.image_.Destroy();
   this_._impl_.mask_image_.Destroy();
-  this_._impl_.input_image_media_type_.Destroy();
+  this_._impl_.image_media_type_.Destroy();
   this_._impl_.mask_image_media_type_.Destroy();
   this_._impl_.~Impl_();
 }
@@ -3828,13 +1506,13 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
       _impl_.negative_prompt_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.input_image_.ClearNonDefaultToEmpty();
+      _impl_.image_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.mask_image_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.input_image_media_type_.ClearNonDefaultToEmpty();
+      _impl_.image_media_type_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.mask_image_media_type_.ClearNonDefaultToEmpty();
@@ -3845,15 +1523,10 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
         reinterpret_cast<char*>(&_impl_.height_) -
         reinterpret_cast<char*>(&_impl_.width_)) + sizeof(_impl_.height_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    ::memset(&_impl_.num_inference_steps_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.input_image_width_) -
-        reinterpret_cast<char*>(&_impl_.num_inference_steps_)) + sizeof(_impl_.input_image_width_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    ::memset(&_impl_.input_image_height_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.batch_size_) -
-        reinterpret_cast<char*>(&_impl_.input_image_height_)) + sizeof(_impl_.batch_size_));
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
+    ::memset(&_impl_.steps_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.output_format_) -
+        reinterpret_cast<char*>(&_impl_.steps_)) + sizeof(_impl_.output_format_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3878,7 +1551,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string prompt = 1;
+  // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_prompt().empty()) {
       const ::std::string& _s = this_._internal_prompt();
@@ -3898,7 +1571,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 width = 3;
+  // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_width() != 0) {
       target =
@@ -3907,7 +1580,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 height = 4;
+  // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_height() != 0) {
       target =
@@ -3916,16 +1589,16 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 num_inference_steps = 5;
+  // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_num_inference_steps() != 0) {
+    if (this_._internal_steps() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_num_inference_steps(), target);
+              stream, this_._internal_steps(), target);
     }
   }
 
-  // float guidance_scale = 6;
+  // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_guidance_scale()) != 0) {
       target = stream->EnsureSpace(target);
@@ -3934,13 +1607,11 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int64 seed = 7;
+  // optional int64 seed = 7;
   if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-    if (this_._internal_seed() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
-              stream, this_._internal_seed(), target);
-    }
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+            stream, this_._internal_seed(), target);
   }
 
   // .runanywhere.v1.DiffusionScheduler scheduler = 8;
@@ -3952,103 +1623,56 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // .runanywhere.v1.DiffusionMode mode = 9;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_mode() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          9, this_._internal_mode(), target);
-    }
+  // optional bytes image = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_image();
+    target = stream->WriteBytesMaybeAliased(9, _s, target);
   }
 
-  // optional bytes input_image = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_input_image();
+  // optional bytes mask_image = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    const ::std::string& _s = this_._internal_mask_image();
     target = stream->WriteBytesMaybeAliased(10, _s, target);
   }
 
-  // optional bytes mask_image = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    const ::std::string& _s = this_._internal_mask_image();
-    target = stream->WriteBytesMaybeAliased(11, _s, target);
-  }
-
-  // float denoise_strength = 12;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_denoise_strength()) != 0) {
+  // float strength = 11 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_strength()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          12, this_._internal_denoise_strength(), target);
+          11, this_._internal_strength(), target);
     }
   }
 
-  // bool report_intermediate_images = 13;
-  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-    if (this_._internal_report_intermediate_images() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          13, this_._internal_report_intermediate_images(), target);
-    }
-  }
-
-  // int32 progress_stride = 14;
-  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
-    if (this_._internal_progress_stride() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<14>(
-              stream, this_._internal_progress_stride(), target);
-    }
-  }
-
-  // int32 input_image_width = 15;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-    if (this_._internal_input_image_width() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<15>(
-              stream, this_._internal_input_image_width(), target);
-    }
-  }
-
-  // int32 input_image_height = 16;
-  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
-    if (this_._internal_input_image_height() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          16, this_._internal_input_image_height(), target);
-    }
-  }
-
-  // optional string input_image_media_type = 17;
+  // optional string image_media_type = 12;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    const ::std::string& _s = this_._internal_input_image_media_type();
+    const ::std::string& _s = this_._internal_image_media_type();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationOptions.input_image_media_type");
-    target = stream->WriteStringMaybeAliased(17, _s, target);
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationOptions.image_media_type");
+    target = stream->WriteStringMaybeAliased(12, _s, target);
   }
 
-  // optional string mask_image_media_type = 18;
+  // optional string mask_image_media_type = 13;
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     const ::std::string& _s = this_._internal_mask_image_media_type();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationOptions.mask_image_media_type");
-    target = stream->WriteStringMaybeAliased(18, _s, target);
+    target = stream->WriteStringMaybeAliased(13, _s, target);
   }
 
-  // int32 batch_size = 19;
-  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-    if (this_._internal_batch_size() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          19, this_._internal_batch_size(), target);
-    }
+  // optional int32 n = 14 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<14>(
+            stream, this_._internal_n(), target);
   }
 
-  // bool return_latents = 20;
-  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-    if (this_._internal_return_latents() != 0) {
+  // .runanywhere.v1.DiffusionOutputFormat output_format = 15 [(.runanywhere.v1.rac_default) = "DIFFUSION_OUTPUT_FORMAT_PNG"];
+  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (this_._internal_output_format() != 0) {
       target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          20, this_._internal_return_latents(), target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          15, this_._internal_output_format(), target);
     }
   }
 
@@ -4078,7 +1702,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // string prompt = 1;
+    // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_prompt().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -4092,34 +1716,34 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
                                         this_._internal_negative_prompt());
       }
     }
-    // optional bytes input_image = 10;
+    // optional bytes image = 9;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                      this_._internal_input_image());
+                                      this_._internal_image());
     }
-    // optional bytes mask_image = 11;
+    // optional bytes mask_image = 10;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
                                       this_._internal_mask_image());
     }
-    // optional string input_image_media_type = 17;
+    // optional string image_media_type = 12;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_input_image_media_type());
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_image_media_type());
     }
-    // optional string mask_image_media_type = 18;
+    // optional string mask_image_media_type = 13;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_mask_image_media_type());
     }
-    // int32 width = 3;
+    // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_width() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_width());
       }
     }
-    // int32 height = 4;
+    // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_height() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
@@ -4127,26 +1751,24 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // int32 num_inference_steps = 5;
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
+    // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_num_inference_steps() != 0) {
+      if (this_._internal_steps() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_num_inference_steps());
+            this_._internal_steps());
       }
     }
-    // float guidance_scale = 6;
+    // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_guidance_scale()) != 0) {
         total_size += 5;
       }
     }
-    // int64 seed = 7;
+    // optional int64 seed = 7;
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (this_._internal_seed() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_seed());
-      }
+      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+          this_._internal_seed());
     }
     // .runanywhere.v1.DiffusionScheduler scheduler = 8;
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
@@ -4155,59 +1777,22 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_scheduler());
       }
     }
-    // .runanywhere.v1.DiffusionMode mode = 9;
+    // float strength = 11 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_mode() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_mode());
-      }
-    }
-    // float denoise_strength = 12;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_denoise_strength()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_strength()) != 0) {
         total_size += 5;
       }
     }
-    // int32 progress_stride = 14;
+    // optional int32 n = 14 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_n());
+    }
+    // .runanywhere.v1.DiffusionOutputFormat output_format = 15 [(.runanywhere.v1.rac_default) = "DIFFUSION_OUTPUT_FORMAT_PNG"];
     if (CheckHasBit(cached_has_bits, 0x00004000U)) {
-      if (this_._internal_progress_stride() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_progress_stride());
-      }
-    }
-    // int32 input_image_width = 15;
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-      if (this_._internal_input_image_width() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_input_image_width());
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    // int32 input_image_height = 16;
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
-      if (this_._internal_input_image_height() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_input_image_height());
-      }
-    }
-    // bool report_intermediate_images = 13;
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-      if (this_._internal_report_intermediate_images() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool return_latents = 20;
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (this_._internal_return_latents() != 0) {
-        total_size += 3;
-      }
-    }
-    // int32 batch_size = 19;
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (this_._internal_batch_size() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_batch_size());
+      if (this_._internal_output_format() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_output_format());
       }
     }
   }
@@ -4248,13 +1833,13 @@ void DiffusionGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_input_image(from._internal_input_image());
+      _this->_internal_set_image(from._internal_image());
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _this->_internal_set_mask_image(from._internal_mask_image());
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_internal_set_input_image_media_type(from._internal_input_image_media_type());
+      _this->_internal_set_image_media_type(from._internal_image_media_type());
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_internal_set_mask_image_media_type(from._internal_mask_image_media_type());
@@ -4270,10 +1855,10 @@ void DiffusionGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_num_inference_steps() != 0) {
-        _this->_impl_.num_inference_steps_ = from._impl_.num_inference_steps_;
+      if (from._internal_steps() != 0) {
+        _this->_impl_.steps_ = from._impl_.steps_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
@@ -4282,9 +1867,7 @@ void DiffusionGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_seed() != 0) {
-        _this->_impl_.seed_ = from._impl_.seed_;
-      }
+      _this->_impl_.seed_ = from._impl_.seed_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_scheduler() != 0) {
@@ -4292,45 +1875,16 @@ void DiffusionGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_mode() != 0) {
-        _this->_impl_.mode_ = from._impl_.mode_;
+      if (::absl::bit_cast<::uint32_t>(from._internal_strength()) != 0) {
+        _this->_impl_.strength_ = from._impl_.strength_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_denoise_strength()) != 0) {
-        _this->_impl_.denoise_strength_ = from._impl_.denoise_strength_;
-      }
+      _this->_impl_.n_ = from._impl_.n_;
     }
     if (CheckHasBit(cached_has_bits, 0x00004000U)) {
-      if (from._internal_progress_stride() != 0) {
-        _this->_impl_.progress_stride_ = from._impl_.progress_stride_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-      if (from._internal_input_image_width() != 0) {
-        _this->_impl_.input_image_width_ = from._impl_.input_image_width_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
-      if (from._internal_input_image_height() != 0) {
-        _this->_impl_.input_image_height_ = from._impl_.input_image_height_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-      if (from._internal_report_intermediate_images() != 0) {
-        _this->_impl_.report_intermediate_images_ = from._impl_.report_intermediate_images_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (from._internal_return_latents() != 0) {
-        _this->_impl_.return_latents_ = from._impl_.return_latents_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (from._internal_batch_size() != 0) {
-        _this->_impl_.batch_size_ = from._impl_.batch_size_;
+      if (from._internal_output_format() != 0) {
+        _this->_impl_.output_format_ = from._impl_.output_format_;
       }
     }
   }
@@ -4355,13 +1909,13 @@ void DiffusionGenerationOptions::InternalSwap(DiffusionGenerationOptions* PROTOB
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.prompt_, &other->_impl_.prompt_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.negative_prompt_, &other->_impl_.negative_prompt_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.input_image_, &other->_impl_.input_image_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.image_, &other->_impl_.image_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.mask_image_, &other->_impl_.mask_image_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.input_image_media_type_, &other->_impl_.input_image_media_type_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.image_media_type_, &other->_impl_.image_media_type_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.mask_image_media_type_, &other->_impl_.mask_image_media_type_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.batch_size_)
-      + sizeof(DiffusionGenerationOptions::_impl_.batch_size_)
+      PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.output_format_)
+      + sizeof(DiffusionGenerationOptions::_impl_.output_format_)
       - PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.width_)>(
           reinterpret_cast<char*>(&_impl_.width_),
           reinterpret_cast<char*>(&other->_impl_.width_));
@@ -4370,44 +1924,6 @@ void DiffusionGenerationOptions::InternalSwap(DiffusionGenerationOptions* PROTOB
 ::google::protobuf::Metadata DiffusionGenerationOptions::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
-// ===================================================================
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::DiffusionGenerationRequest_MetadataEntry_DoNotUse() : SuperType(DiffusionGenerationRequest_MetadataEntry_DoNotUse_get_class_data()) {}
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::DiffusionGenerationRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-    : SuperType(arena, DiffusionGenerationRequest_MetadataEntry_DoNotUse_get_class_data()) {}
-#else   // PROTOBUF_CUSTOM_VTABLE
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::DiffusionGenerationRequest_MetadataEntry_DoNotUse() : SuperType() {}
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::DiffusionGenerationRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
-#endif  // PROTOBUF_CUSTOM_VTABLE
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_ =
-        DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_._default);
-
-// including ~ all the vtables and everything they use become part
-// of the same ~ SCC.
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_.tc_table);
-  return DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionGenerationRequest_MetadataEntry_DoNotUse::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_));
-  return DiffusionGenerationRequest_MetadataEntry_DoNotUse_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionGenerationRequest_MetadataEntry_DoNotUse::ParseTableT_
-    DiffusionGenerationRequest_MetadataEntry_DoNotUse::_table_ =
-        DiffusionGenerationRequest_MetadataEntry_DoNotUse::InternalGenerateParseTable_(DiffusionGenerationRequest_MetadataEntry_DoNotUse_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
 // ===================================================================
 
 DiffusionGenerationRequest::DiffusionGenerationRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -4425,15 +1941,7 @@ PROTOBUF_NDEBUG_INLINE DiffusionGenerationRequest::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::DiffusionGenerationRequest& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        request_id_(arena, from.request_id_),
-        model_id_(arena, from.model_id_),
-        metadata_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::DiffusionGenerationRequest,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.metadata_)>()
-          , from.metadata_
-        }
-     {}
+        model_id_(arena, from.model_id_) {}
 
 DiffusionGenerationRequest::DiffusionGenerationRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4450,7 +1958,7 @@ DiffusionGenerationRequest::DiffusionGenerationRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -4460,13 +1968,7 @@ PROTOBUF_NDEBUG_INLINE DiffusionGenerationRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        request_id_(arena),
-        model_id_(arena),
-        metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionGenerationRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationRequest, _impl_.metadata_)>()
-         }
-     {}
+        model_id_(arena) {}
 
 inline void DiffusionGenerationRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -4483,7 +1985,6 @@ inline void DiffusionGenerationRequest::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.request_id_.Destroy();
   this_._impl_.model_id_.Destroy();
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
@@ -4523,19 +2024,13 @@ PROTOBUF_NOINLINE void DiffusionGenerationRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.request_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.metadata_.Clear();
     }
   }
   _impl_._has_bits_.Clear();
@@ -4561,64 +2056,19 @@ PROTOBUF_NOINLINE void DiffusionGenerationRequest::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string request_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_request_id().empty()) {
-      const ::std::string& _s = this_._internal_request_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.request_id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // optional .runanywhere.v1.DiffusionGenerationOptions options = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  // optional .runanywhere.v1.DiffusionGenerationOptions options = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        2, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
+        1, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
   }
 
-  // optional string model_id = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  // optional string model_id = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     const ::std::string& _s = this_._internal_model_id();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.model_id");
-    target = stream->WriteStringMaybeAliased(3, _s, target);
-  }
-
-  // map<string, string> metadata = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_metadata().empty()) {
-      using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
-      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
-                                     _pbi::WireFormatLite::TYPE_STRING,
-                                     _pbi::WireFormatLite::TYPE_STRING>;
-      const auto& field = this_._internal_metadata();
-
-      if (stream->IsSerializationDeterministic() && field.size() > 1) {
-        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
-          target = WireHelper::InternalSerialize(
-              4, entry.first, entry.second, target, stream);
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.first.data(), static_cast<int>(entry.first.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.metadata");
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.second.data(), static_cast<int>(entry.second.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.metadata");
-        }
-      } else {
-        for (const auto& entry : field) {
-          target = WireHelper::InternalSerialize(
-              4, entry.first, entry.second, target, stream);
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.first.data(), static_cast<int>(entry.first.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.metadata");
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.second.data(), static_cast<int>(entry.second.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionGenerationRequest.metadata");
-        }
-      }
-    }
+    target = stream->WriteStringMaybeAliased(2, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -4646,33 +2096,16 @@ PROTOBUF_NOINLINE void DiffusionGenerationRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string request_id = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // optional string model_id = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_request_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_request_id());
-      }
-    }
-    // optional string model_id = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_model_id());
     }
-    // optional .runanywhere.v1.DiffusionGenerationOptions options = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    // optional .runanywhere.v1.DiffusionGenerationOptions options = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
-    }
-    // map<string, string> metadata = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size +=
-          1 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
-      for (const auto& entry : this_._internal_metadata()) {
-        total_size += _pbi::MapEntryFuncs<::std::string, ::std::string,
-                                       _pbi::WireFormatLite::TYPE_STRING,
-                                       _pbi::WireFormatLite::TYPE_STRING>::ByteSizeLong(entry.first, entry.second);
-      }
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -4693,29 +2126,17 @@ void DiffusionGenerationRequest::MergeImpl(::google::protobuf::MessageLite& to_m
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_request_id().empty()) {
-        _this->_internal_set_request_id(from._internal_request_id());
-      } else {
-        if (_this->_impl_.request_id_.IsDefault()) {
-          _this->_internal_set_request_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _this->_internal_set_model_id(from._internal_model_id());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
       } else {
         _this->_impl_.options_->MergeFrom(*from._impl_.options_);
       }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -4737,10 +2158,8 @@ void DiffusionGenerationRequest::InternalSwap(DiffusionGenerationRequest* PROTOB
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   swap(_impl_.options_, other->_impl_.options_);
-  _impl_.metadata_.InternalSwap(&other->_impl_.metadata_);
 }
 
 ::google::protobuf::Metadata DiffusionGenerationRequest::GetMetadata() const {
@@ -4763,9 +2182,7 @@ PROTOBUF_NDEBUG_INLINE DiffusionProgress::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::DiffusionProgress& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        stage_(arena, from.stage_),
-        intermediate_image_data_(arena, from.intermediate_image_data_),
-        intermediate_image_media_type_(arena, from.intermediate_image_media_type_) {}
+        intermediate_image_data_(arena, from.intermediate_image_data_) {}
 
 DiffusionProgress::DiffusionProgress(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4782,12 +2199,12 @@ DiffusionProgress::DiffusionProgress(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, progress_percent_),
+               offsetof(Impl_, current_step_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, progress_percent_),
-           offsetof(Impl_, intermediate_image_height_) -
-               offsetof(Impl_, progress_percent_) +
-               sizeof(Impl_::intermediate_image_height_));
+               offsetof(Impl_, current_step_),
+           offsetof(Impl_, total_steps_) -
+               offsetof(Impl_, current_step_) +
+               sizeof(Impl_::total_steps_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionProgress)
 }
@@ -4795,18 +2212,16 @@ PROTOBUF_NDEBUG_INLINE DiffusionProgress::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        stage_(arena),
-        intermediate_image_data_(arena),
-        intermediate_image_media_type_(arena) {}
+        intermediate_image_data_(arena) {}
 
 inline void DiffusionProgress::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, progress_percent_),
+               offsetof(Impl_, current_step_),
            0,
-           offsetof(Impl_, intermediate_image_height_) -
-               offsetof(Impl_, progress_percent_) +
-               sizeof(Impl_::intermediate_image_height_));
+           offsetof(Impl_, total_steps_) -
+               offsetof(Impl_, current_step_) +
+               sizeof(Impl_::total_steps_));
 }
 DiffusionProgress::~DiffusionProgress() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionProgress)
@@ -4819,9 +2234,7 @@ inline void DiffusionProgress::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.stage_.Destroy();
   this_._impl_.intermediate_image_data_.Destroy();
-  this_._impl_.intermediate_image_media_type_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -4859,26 +2272,13 @@ PROTOBUF_NOINLINE void DiffusionProgress::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.stage_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.intermediate_image_data_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.intermediate_image_media_type_.ClearNonDefaultToEmpty();
-    }
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.intermediate_image_data_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
-    ::memset(&_impl_.progress_percent_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.timestamp_ms_) -
-        reinterpret_cast<char*>(&_impl_.progress_percent_)) + sizeof(_impl_.timestamp_ms_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.eta_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.intermediate_image_height_) -
-        reinterpret_cast<char*>(&_impl_.eta_ms_)) + sizeof(_impl_.intermediate_image_height_));
+  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+    ::memset(&_impl_.current_step_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.total_steps_) -
+        reinterpret_cast<char*>(&_impl_.current_step_)) + sizeof(_impl_.total_steps_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4903,91 +2303,28 @@ PROTOBUF_NOINLINE void DiffusionProgress::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // float progress_percent = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_progress_percent()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          1, this_._internal_progress_percent(), target);
-    }
-  }
-
-  // int32 current_step = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  // int32 current_step = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_current_step() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<1>(
               stream, this_._internal_current_step(), target);
     }
   }
 
-  // int32 total_steps = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  // int32 total_steps = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_total_steps() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
               stream, this_._internal_total_steps(), target);
     }
   }
 
-  // string stage = 4;
+  // optional bytes intermediate_image_data = 3;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_stage().empty()) {
-      const ::std::string& _s = this_._internal_stage();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionProgress.stage");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
-    }
-  }
-
-  // optional bytes intermediate_image_data = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     const ::std::string& _s = this_._internal_intermediate_image_data();
-    target = stream->WriteBytesMaybeAliased(5, _s, target);
-  }
-
-  // int32 intermediate_image_width = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_intermediate_image_width() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
-              stream, this_._internal_intermediate_image_width(), target);
-    }
-  }
-
-  // int32 intermediate_image_height = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_intermediate_image_height() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
-              stream, this_._internal_intermediate_image_height(), target);
-    }
-  }
-
-  // int64 timestamp_ms = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_timestamp_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
-              stream, this_._internal_timestamp_ms(), target);
-    }
-  }
-
-  // int64 eta_ms = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_eta_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
-              stream, this_._internal_eta_ms(), target);
-    }
-  }
-
-  // optional string intermediate_image_media_type = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_intermediate_image_media_type();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionProgress.intermediate_image_media_type");
-    target = stream->WriteStringMaybeAliased(10, _s, target);
+    target = stream->WriteBytesMaybeAliased(3, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5015,72 +2352,24 @@ PROTOBUF_NOINLINE void DiffusionProgress::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // string stage = 4;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // optional bytes intermediate_image_data = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_stage().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_stage());
-      }
-    }
-    // optional bytes intermediate_image_data = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
                                       this_._internal_intermediate_image_data());
     }
-    // optional string intermediate_image_media_type = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_intermediate_image_media_type());
-    }
-    // float progress_percent = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_progress_percent()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int32 current_step = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    // int32 current_step = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_current_step() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_current_step());
       }
     }
-    // int32 total_steps = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    // int32 total_steps = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_total_steps() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_total_steps());
-      }
-    }
-    // int32 intermediate_image_width = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_intermediate_image_width() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_intermediate_image_width());
-      }
-    }
-    // int64 timestamp_ms = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_timestamp_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_timestamp_ms());
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    // int64 eta_ms = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_eta_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_eta_ms());
-      }
-    }
-    // int32 intermediate_image_height = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_intermediate_image_height() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_intermediate_image_height());
       }
     }
   }
@@ -5101,57 +2390,18 @@ void DiffusionProgress::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_stage().empty()) {
-        _this->_internal_set_stage(from._internal_stage());
-      } else {
-        if (_this->_impl_.stage_.IsDefault()) {
-          _this->_internal_set_stage("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _this->_internal_set_intermediate_image_data(from._internal_intermediate_image_data());
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_intermediate_image_media_type(from._internal_intermediate_image_media_type());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_progress_percent()) != 0) {
-        _this->_impl_.progress_percent_ = from._impl_.progress_percent_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_current_step() != 0) {
         _this->_impl_.current_step_ = from._impl_.current_step_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_total_steps() != 0) {
         _this->_impl_.total_steps_ = from._impl_.total_steps_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_intermediate_image_width() != 0) {
-        _this->_impl_.intermediate_image_width_ = from._impl_.intermediate_image_width_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_timestamp_ms() != 0) {
-        _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_eta_ms() != 0) {
-        _this->_impl_.eta_ms_ = from._impl_.eta_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_intermediate_image_height() != 0) {
-        _this->_impl_.intermediate_image_height_ = from._impl_.intermediate_image_height_;
       }
     }
   }
@@ -5174,18 +2424,373 @@ void DiffusionProgress::InternalSwap(DiffusionProgress* PROTOBUF_RESTRICT PROTOB
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.stage_, &other->_impl_.stage_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.intermediate_image_data_, &other->_impl_.intermediate_image_data_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.intermediate_image_media_type_, &other->_impl_.intermediate_image_media_type_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.intermediate_image_height_)
-      + sizeof(DiffusionProgress::_impl_.intermediate_image_height_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.progress_percent_)>(
-          reinterpret_cast<char*>(&_impl_.progress_percent_),
-          reinterpret_cast<char*>(&other->_impl_.progress_percent_));
+      PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.total_steps_)
+      + sizeof(DiffusionProgress::_impl_.total_steps_)
+      - PROTOBUF_FIELD_OFFSET(DiffusionProgress, _impl_.current_step_)>(
+          reinterpret_cast<char*>(&_impl_.current_step_),
+          reinterpret_cast<char*>(&other->_impl_.current_step_));
 }
 
 ::google::protobuf::Metadata DiffusionProgress::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+DiffusionImage::DiffusionImage(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, DiffusionImage_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionImage)
+}
+PROTOBUF_NDEBUG_INLINE DiffusionImage::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::DiffusionImage& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        data_(arena, from.data_),
+        media_type_(arena, from.media_type_) {}
+
+DiffusionImage::DiffusionImage(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const DiffusionImage& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, DiffusionImage_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  DiffusionImage* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, width_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, width_),
+           offsetof(Impl_, safety_flag_) -
+               offsetof(Impl_, width_) +
+               sizeof(Impl_::safety_flag_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionImage)
+}
+PROTOBUF_NDEBUG_INLINE DiffusionImage::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        data_(arena),
+        media_type_(arena) {}
+
+inline void DiffusionImage::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, width_),
+           0,
+           offsetof(Impl_, safety_flag_) -
+               offsetof(Impl_, width_) +
+               sizeof(Impl_::safety_flag_));
+}
+DiffusionImage::~DiffusionImage() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionImage)
+  SharedDtor(*this);
+}
+inline void DiffusionImage::SharedDtor(MessageLite& self) {
+  DiffusionImage& this_ = static_cast<DiffusionImage&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.data_.Destroy();
+  this_._impl_.media_type_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull DiffusionImage_class_data_ =
+        DiffusionImage::InternalGenerateClassData_(DiffusionImage_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+DiffusionImage::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionImage_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionImage_class_data_.tc_table);
+  return DiffusionImage_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+DiffusionImage::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionImage_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionImage_globals_));
+  return DiffusionImage_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionImage::ParseTableT_
+    DiffusionImage::_table_ =
+        DiffusionImage::InternalGenerateParseTable_(DiffusionImage_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void DiffusionImage::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionImage)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.data_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.media_type_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
+    ::memset(&_impl_.width_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.safety_flag_) -
+        reinterpret_cast<char*>(&_impl_.width_)) + sizeof(_impl_.safety_flag_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL DiffusionImage::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const DiffusionImage& this_ = static_cast<const DiffusionImage&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL DiffusionImage::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const DiffusionImage& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionImage)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bytes data = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_data().empty()) {
+      const ::std::string& _s = this_._internal_data();
+      target = stream->WriteBytesMaybeAliased(1, _s, target);
+    }
+  }
+
+  // int32 width = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_width() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
+              stream, this_._internal_width(), target);
+    }
+  }
+
+  // int32 height = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_height() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
+              stream, this_._internal_height(), target);
+    }
+  }
+
+  // int64 seed_used = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_seed_used() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
+              stream, this_._internal_seed_used(), target);
+    }
+  }
+
+  // bool safety_flag = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_safety_flag() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          5, this_._internal_safety_flag(), target);
+    }
+  }
+
+  // string media_type = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_media_type().empty()) {
+      const ::std::string& _s = this_._internal_media_type();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionImage.media_type");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionImage)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t DiffusionImage::ByteSizeLong(const MessageLite& base) {
+  const DiffusionImage& this_ = static_cast<const DiffusionImage&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t DiffusionImage::ByteSizeLong() const {
+  const DiffusionImage& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionImage)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // bytes data = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_data().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                        this_._internal_data());
+      }
+    }
+    // string media_type = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_media_type().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_media_type());
+      }
+    }
+    // int32 width = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_width() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_width());
+      }
+    }
+    // int32 height = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_height() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_height());
+      }
+    }
+    // int64 seed_used = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_seed_used() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_seed_used());
+      }
+    }
+    // bool safety_flag = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_safety_flag() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void DiffusionImage::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<DiffusionImage*>(&to_msg);
+  auto& from = static_cast<const DiffusionImage&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionImage)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_data().empty()) {
+        _this->_internal_set_data(from._internal_data());
+      } else {
+        if (_this->_impl_.data_.IsDefault()) {
+          _this->_internal_set_data("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_media_type().empty()) {
+        _this->_internal_set_media_type(from._internal_media_type());
+      } else {
+        if (_this->_impl_.media_type_.IsDefault()) {
+          _this->_internal_set_media_type("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_width() != 0) {
+        _this->_impl_.width_ = from._impl_.width_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_height() != 0) {
+        _this->_impl_.height_ = from._impl_.height_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_seed_used() != 0) {
+        _this->_impl_.seed_used_ = from._impl_.seed_used_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_safety_flag() != 0) {
+        _this->_impl_.safety_flag_ = from._impl_.safety_flag_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void DiffusionImage::CopyFrom(const DiffusionImage& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionImage)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void DiffusionImage::InternalSwap(DiffusionImage* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.data_, &other->_impl_.data_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.media_type_, &other->_impl_.media_type_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.safety_flag_)
+      + sizeof(DiffusionImage::_impl_.safety_flag_)
+      - PROTOBUF_FIELD_OFFSET(DiffusionImage, _impl_.width_)>(
+          reinterpret_cast<char*>(&_impl_.width_),
+          reinterpret_cast<char*>(&other->_impl_.width_));
+}
+
+::google::protobuf::Metadata DiffusionImage::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
@@ -5205,16 +2810,13 @@ PROTOBUF_NDEBUG_INLINE DiffusionResult::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::DiffusionResult& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        batch_images_ {
+        images_ {
           visibility, ::_pbi::InternalMetadataOffset::Build<
               ::runanywhere::v1::DiffusionResult,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.batch_images_)>()
-          , from.batch_images_
+              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.images_)>()
+          , from.images_
         }
-        ,
-        image_data_(arena, from.image_data_),
-        error_message_(arena, from.error_message_),
-        image_media_type_(arena, from.image_media_type_) {}
+     {}
 
 DiffusionResult::DiffusionResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5230,13 +2832,7 @@ DiffusionResult::DiffusionResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, width_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, width_),
-           offsetof(Impl_, images_generated_) -
-               offsetof(Impl_, width_) +
-               sizeof(Impl_::images_generated_));
+  _impl_.total_time_ms_ = from._impl_.total_time_ms_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionResult)
 }
@@ -5244,23 +2840,15 @@ PROTOBUF_NDEBUG_INLINE DiffusionResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        batch_images_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+        images_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::DiffusionResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.batch_images_)>()
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionResult, _impl_.images_)>()
          }
-        ,
-        image_data_(arena),
-        error_message_(arena),
-        image_media_type_(arena) {}
+     {}
 
 inline void DiffusionResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, width_),
-           0,
-           offsetof(Impl_, images_generated_) -
-               offsetof(Impl_, width_) +
-               sizeof(Impl_::images_generated_));
+  _impl_.total_time_ms_ = {};
 }
 DiffusionResult::~DiffusionResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionResult)
@@ -5273,9 +2861,6 @@ inline void DiffusionResult::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.image_data_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  this_._impl_.image_media_type_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -5313,30 +2898,10 @@ PROTOBUF_NOINLINE void DiffusionResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.batch_images_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.image_data_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.image_media_type_.ClearNonDefaultToEmpty();
-    }
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.images_.Clear();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
-    ::memset(&_impl_.width_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.total_time_ms_) -
-        reinterpret_cast<char*>(&_impl_.width_)) + sizeof(_impl_.total_time_ms_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
-    ::memset(&_impl_.safety_flag_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.images_generated_) -
-        reinterpret_cast<char*>(&_impl_.safety_flag_)) + sizeof(_impl_.images_generated_));
-  }
+  _impl_.total_time_ms_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -5360,107 +2925,25 @@ PROTOBUF_NOINLINE void DiffusionResult::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // bytes image_data = 1;
+  // repeated .runanywhere.v1.DiffusionImage images = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_images_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_images().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              1, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  // int64 total_time_ms = 2;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_image_data().empty()) {
-      const ::std::string& _s = this_._internal_image_data();
-      target = stream->WriteBytesMaybeAliased(1, _s, target);
-    }
-  }
-
-  // int32 width = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_width() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
-              stream, this_._internal_width(), target);
-    }
-  }
-
-  // int32 height = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_height() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_height(), target);
-    }
-  }
-
-  // int64 seed_used = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_seed_used() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
-              stream, this_._internal_seed_used(), target);
-    }
-  }
-
-  // int64 total_time_ms = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_total_time_ms() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
               stream, this_._internal_total_time_ms(), target);
-    }
-  }
-
-  // bool safety_flag = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_safety_flag() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          6, this_._internal_safety_flag(), target);
-    }
-  }
-
-  // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_used_scheduler() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          7, this_._internal_used_scheduler(), target);
-    }
-  }
-
-  // optional string error_message = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionResult.error_message");
-    target = stream->WriteStringMaybeAliased(8, _s, target);
-  }
-
-  // int32 error_code = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
-              stream, this_._internal_error_code(), target);
-    }
-  }
-
-  // optional string image_media_type = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    const ::std::string& _s = this_._internal_image_media_type();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionResult.image_media_type");
-    target = stream->WriteStringMaybeAliased(10, _s, target);
-  }
-
-  // repeated bytes batch_images = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    for (int i = 0, n = this_._internal_batch_images_size(); i < n; ++i) {
-      const auto& s = this_._internal_batch_images().Get(i);
-      target = stream->WriteBytes(11, s, target);
-    }
-  }
-
-  // int32 images_generated = 12;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_images_generated() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
-              stream, this_._internal_images_generated(), target);
     }
   }
 
@@ -5489,88 +2972,19 @@ PROTOBUF_NOINLINE void DiffusionResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // repeated bytes batch_images = 11;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // repeated .runanywhere.v1.DiffusionImage images = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size +=
-          1 * ::google::protobuf::internal::FromIntSize(this_._internal_batch_images().size());
-      for (int i = 0, n = this_._internal_batch_images().size(); i < n; ++i) {
-        total_size += ::google::protobuf::internal::WireFormatLite::BytesSize(
-            this_._internal_batch_images().Get(i));
+      total_size += 1UL * this_._internal_images_size();
+      for (const auto& msg : this_._internal_images()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
-    // bytes image_data = 1;
+    // int64 total_time_ms = 2;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_image_data().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                        this_._internal_image_data());
-      }
-    }
-    // optional string error_message = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
-    // optional string image_media_type = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_image_media_type());
-    }
-    // int32 width = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_width() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_width());
-      }
-    }
-    // int32 height = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_height() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_height());
-      }
-    }
-    // int64 seed_used = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_seed_used() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_seed_used());
-      }
-    }
-    // int64 total_time_ms = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_total_time_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_total_time_ms());
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
-    // bool safety_flag = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_safety_flag() != 0) {
-        total_size += 2;
-      }
-    }
-    // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_used_scheduler() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_used_scheduler());
-      }
-    }
-    // int32 error_code = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
-      }
-    }
-    // int32 images_generated = 12;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_images_generated() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_images_generated());
       }
     }
   }
@@ -5592,67 +3006,15 @@ void DiffusionResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_mutable_batch_images()->InternalMergeFromWithArena(
+      _this->_internal_mutable_images()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
-          from._internal_batch_images());
+          from._internal_images());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_image_data().empty()) {
-        _this->_internal_set_image_data(from._internal_image_data());
-      } else {
-        if (_this->_impl_.image_data_.IsDefault()) {
-          _this->_internal_set_image_data("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _this->_internal_set_image_media_type(from._internal_image_media_type());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_width() != 0) {
-        _this->_impl_.width_ = from._impl_.width_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_height() != 0) {
-        _this->_impl_.height_ = from._impl_.height_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_seed_used() != 0) {
-        _this->_impl_.seed_used_ = from._impl_.seed_used_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_total_time_ms() != 0) {
         _this->_impl_.total_time_ms_ = from._impl_.total_time_ms_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_safety_flag() != 0) {
-        _this->_impl_.safety_flag_ = from._impl_.safety_flag_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_used_scheduler() != 0) {
-        _this->_impl_.used_scheduler_ = from._impl_.used_scheduler_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_images_generated() != 0) {
-        _this->_impl_.images_generated_ = from._impl_.images_generated_;
       }
     }
   }
@@ -5671,20 +3033,10 @@ void DiffusionResult::CopyFrom(const DiffusionResult& from) {
 
 void DiffusionResult::InternalSwap(DiffusionResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.batch_images_.InternalSwap(&other->_impl_.batch_images_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.image_data_, &other->_impl_.image_data_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.image_media_type_, &other->_impl_.image_media_type_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.images_generated_)
-      + sizeof(DiffusionResult::_impl_.images_generated_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionResult, _impl_.width_)>(
-          reinterpret_cast<char*>(&_impl_.width_),
-          reinterpret_cast<char*>(&other->_impl_.width_));
+  _impl_.images_.InternalSwap(&other->_impl_.images_);
+  swap(_impl_.total_time_ms_, other->_impl_.total_time_ms_);
 }
 
 ::google::protobuf::Metadata DiffusionResult::GetMetadata() const {
@@ -5692,563 +3044,11 @@ void DiffusionResult::InternalSwap(DiffusionResult* PROTOBUF_RESTRICT PROTOBUF_N
 }
 // ===================================================================
 
-DiffusionCapabilities::DiffusionCapabilities(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionCapabilities_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionCapabilities)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionCapabilities::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DiffusionCapabilities& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        supported_variants_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::DiffusionCapabilities,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_variants_)>()
-          , from.supported_variants_
-        }
-        ,
-        _supported_variants_cached_byte_size_{0},
-        supported_schedulers_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::DiffusionCapabilities,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_schedulers_)>()
-          , from.supported_schedulers_
-        }
-        ,
-        _supported_schedulers_cached_byte_size_{0},
-        supported_modes_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::DiffusionCapabilities,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_modes_)>()
-          , from.supported_modes_
-        }
-        ,
-        _supported_modes_cached_byte_size_{0},
-        supported_output_media_types_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::DiffusionCapabilities,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_output_media_types_)>()
-          , from.supported_output_media_types_
-        }
-        ,
-        current_model_(arena, from.current_model_) {}
-
-DiffusionCapabilities::DiffusionCapabilities(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DiffusionCapabilities& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionCapabilities_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DiffusionCapabilities* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, max_resolution_px_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, max_resolution_px_),
-           offsetof(Impl_, supports_batch_generation_) -
-               offsetof(Impl_, max_resolution_px_) +
-               sizeof(Impl_::supports_batch_generation_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionCapabilities)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionCapabilities::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        supported_variants_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_variants_)>()
-         }
-        ,
-        _supported_variants_cached_byte_size_{0},
-        supported_schedulers_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_schedulers_)>()
-         }
-        ,
-        _supported_schedulers_cached_byte_size_{0},
-        supported_modes_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_modes_)>()
-         }
-        ,
-        _supported_modes_cached_byte_size_{0},
-        supported_output_media_types_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::DiffusionCapabilities,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionCapabilities, _impl_.supported_output_media_types_)>()
-         }
-        ,
-        current_model_(arena) {}
-
-inline void DiffusionCapabilities::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, max_resolution_px_),
-           0,
-           offsetof(Impl_, supports_batch_generation_) -
-               offsetof(Impl_, max_resolution_px_) +
-               sizeof(Impl_::supports_batch_generation_));
-}
-DiffusionCapabilities::~DiffusionCapabilities() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionCapabilities)
-  SharedDtor(*this);
-}
-inline void DiffusionCapabilities::SharedDtor(MessageLite& self) {
-  DiffusionCapabilities& this_ = static_cast<DiffusionCapabilities&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.current_model_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionCapabilities_class_data_ =
-        DiffusionCapabilities::InternalGenerateClassData_(DiffusionCapabilities_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionCapabilities::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionCapabilities_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionCapabilities_class_data_.tc_table);
-  return DiffusionCapabilities_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionCapabilities::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionCapabilities_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionCapabilities_globals_));
-  return DiffusionCapabilities_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionCapabilities::ParseTableT_
-    DiffusionCapabilities::_table_ =
-        DiffusionCapabilities::InternalGenerateParseTable_(DiffusionCapabilities_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DiffusionCapabilities::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionCapabilities)
+void DiffusionStreamEvent::clear_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.supported_variants_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.supported_schedulers_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.supported_modes_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.supported_output_media_types_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.current_model_.ClearNonDefaultToEmpty();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
-    ::memset(&_impl_.max_resolution_px_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.max_height_px_) -
-        reinterpret_cast<char*>(&_impl_.max_resolution_px_)) + sizeof(_impl_.max_height_px_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    ::memset(&_impl_.supports_intermediate_images_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.supports_batch_generation_) -
-        reinterpret_cast<char*>(&_impl_.supports_intermediate_images_)) + sizeof(_impl_.supports_batch_generation_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DiffusionCapabilities::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DiffusionCapabilities& this_ = static_cast<const DiffusionCapabilities&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DiffusionCapabilities::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DiffusionCapabilities& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionCapabilities)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // repeated .runanywhere.v1.DiffusionModelVariant supported_variants = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    {
-      ::size_t byte_size = this_._impl_._supported_variants_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            1, this_._internal_supported_variants(), byte_size, target);
-      }
-    }
-  }
-
-  // repeated .runanywhere.v1.DiffusionScheduler supported_schedulers = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    {
-      ::size_t byte_size = this_._impl_._supported_schedulers_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            2, this_._internal_supported_schedulers(), byte_size, target);
-      }
-    }
-  }
-
-  // int32 max_resolution_px = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_max_resolution_px() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_max_resolution_px(), target);
-    }
-  }
-
-  // repeated .runanywhere.v1.DiffusionMode supported_modes = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    {
-      ::size_t byte_size = this_._impl_._supported_modes_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            4, this_._internal_supported_modes(), byte_size, target);
-      }
-    }
-  }
-
-  // int32 max_width_px = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_max_width_px() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_max_width_px(), target);
-    }
-  }
-
-  // int32 max_height_px = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_max_height_px() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
-              stream, this_._internal_max_height_px(), target);
-    }
-  }
-
-  // bool supports_intermediate_images = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_supports_intermediate_images() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          7, this_._internal_supports_intermediate_images(), target);
-    }
-  }
-
-  // bool supports_safety_checker = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_supports_safety_checker() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          8, this_._internal_supports_safety_checker(), target);
-    }
-  }
-
-  // bool is_ready = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-    if (this_._internal_is_ready() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          9, this_._internal_is_ready(), target);
-    }
-  }
-
-  // optional string current_model = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    const ::std::string& _s = this_._internal_current_model();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionCapabilities.current_model");
-    target = stream->WriteStringMaybeAliased(10, _s, target);
-  }
-
-  // bool safety_checker_enabled = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_safety_checker_enabled() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          11, this_._internal_safety_checker_enabled(), target);
-    }
-  }
-
-  // bool supports_batch_generation = 12;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_supports_batch_generation() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          12, this_._internal_supports_batch_generation(), target);
-    }
-  }
-
-  // repeated string supported_output_media_types = 13;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    for (int i = 0, n = this_._internal_supported_output_media_types_size(); i < n; ++i) {
-      const auto& s = this_._internal_supported_output_media_types().Get(i);
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionCapabilities.supported_output_media_types");
-      target = stream->WriteString(13, s, target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionCapabilities)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DiffusionCapabilities::ByteSizeLong(const MessageLite& base) {
-  const DiffusionCapabilities& this_ = static_cast<const DiffusionCapabilities&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DiffusionCapabilities::ByteSizeLong() const {
-  const DiffusionCapabilities& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionCapabilities)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // repeated .runanywhere.v1.DiffusionModelVariant supported_variants = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_supported_variants(), 1, this_._impl_._supported_variants_cached_byte_size_);
-    }
-    // repeated .runanywhere.v1.DiffusionScheduler supported_schedulers = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_supported_schedulers(), 1, this_._impl_._supported_schedulers_cached_byte_size_);
-    }
-    // repeated .runanywhere.v1.DiffusionMode supported_modes = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_supported_modes(), 1, this_._impl_._supported_modes_cached_byte_size_);
-    }
-    // repeated string supported_output_media_types = 13;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size +=
-          1 * ::google::protobuf::internal::FromIntSize(this_._internal_supported_output_media_types().size());
-      for (int i = 0, n = this_._internal_supported_output_media_types().size(); i < n; ++i) {
-        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
-            this_._internal_supported_output_media_types().Get(i));
-      }
-    }
-    // optional string current_model = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_current_model());
-    }
-    // int32 max_resolution_px = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_max_resolution_px() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_resolution_px());
-      }
-    }
-    // int32 max_width_px = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_max_width_px() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_width_px());
-      }
-    }
-    // int32 max_height_px = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_max_height_px() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_height_px());
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    // bool supports_intermediate_images = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_supports_intermediate_images() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool supports_safety_checker = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_supports_safety_checker() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool is_ready = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (this_._internal_is_ready() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool safety_checker_enabled = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_safety_checker_enabled() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool supports_batch_generation = 12;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_supports_batch_generation() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DiffusionCapabilities::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DiffusionCapabilities*>(&to_msg);
-  auto& from = static_cast<const DiffusionCapabilities&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionCapabilities)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_mutable_supported_variants()->MergeFrom(from._internal_supported_variants());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_mutable_supported_schedulers()->MergeFrom(from._internal_supported_schedulers());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_mutable_supported_modes()->MergeFrom(from._internal_supported_modes());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _this->_internal_mutable_supported_output_media_types()->InternalMergeFromWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), arena,
-          from._internal_supported_output_media_types());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_internal_set_current_model(from._internal_current_model());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_max_resolution_px() != 0) {
-        _this->_impl_.max_resolution_px_ = from._impl_.max_resolution_px_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_max_width_px() != 0) {
-        _this->_impl_.max_width_px_ = from._impl_.max_width_px_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_max_height_px() != 0) {
-        _this->_impl_.max_height_px_ = from._impl_.max_height_px_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_supports_intermediate_images() != 0) {
-        _this->_impl_.supports_intermediate_images_ = from._impl_.supports_intermediate_images_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_supports_safety_checker() != 0) {
-        _this->_impl_.supports_safety_checker_ = from._impl_.supports_safety_checker_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_is_ready() != 0) {
-        _this->_impl_.is_ready_ = from._impl_.is_ready_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_safety_checker_enabled() != 0) {
-        _this->_impl_.safety_checker_enabled_ = from._impl_.safety_checker_enabled_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_supports_batch_generation() != 0) {
-        _this->_impl_.supports_batch_generation_ = from._impl_.supports_batch_generation_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DiffusionCapabilities::CopyFrom(const DiffusionCapabilities& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionCapabilities)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DiffusionCapabilities::InternalSwap(DiffusionCapabilities* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.supported_variants_.InternalSwap(&other->_impl_.supported_variants_);
-  _impl_.supported_schedulers_.InternalSwap(&other->_impl_.supported_schedulers_);
-  _impl_.supported_modes_.InternalSwap(&other->_impl_.supported_modes_);
-  _impl_.supported_output_media_types_.InternalSwap(&other->_impl_.supported_output_media_types_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_model_, &other->_impl_.current_model_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.supports_batch_generation_)
-      + sizeof(DiffusionCapabilities::_impl_.supports_batch_generation_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionCapabilities, _impl_.max_resolution_px_)>(
-          reinterpret_cast<char*>(&_impl_.max_resolution_px_),
-          reinterpret_cast<char*>(&other->_impl_.max_resolution_px_));
-}
-
-::google::protobuf::Metadata DiffusionCapabilities::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
 DiffusionStreamEvent::DiffusionStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, DiffusionStreamEvent_get_class_data()) {
@@ -6263,9 +3063,7 @@ PROTOBUF_NDEBUG_INLINE DiffusionStreamEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
     [[maybe_unused]] const ::runanywhere::v1::DiffusionStreamEvent& from_msg)
       : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        request_id_(arena, from.request_id_),
-        error_message_(arena, from.error_message_) {}
+        _cached_size_{0} {}
 
 DiffusionStreamEvent::DiffusionStreamEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -6282,37 +3080,38 @@ DiffusionStreamEvent::DiffusionStreamEvent(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.progress_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.progress_ = (CheckHasBit(cached_has_bits, 0x00000001U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.progress_)
                 : nullptr;
-  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_)
                 : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, seq_),
+               offsetof(Impl_, timestamp_us_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, seq_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, seq_) +
-               sizeof(Impl_::error_code_));
+               offsetof(Impl_, timestamp_us_),
+           offsetof(Impl_, kind_) -
+               offsetof(Impl_, timestamp_us_) +
+               sizeof(Impl_::kind_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionStreamEvent)
 }
 PROTOBUF_NDEBUG_INLINE DiffusionStreamEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        request_id_(arena),
-        error_message_(arena) {}
+      : _cached_size_{0} {}
 
 inline void DiffusionStreamEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, progress_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, kind_) -
                offsetof(Impl_, progress_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::kind_));
 }
 DiffusionStreamEvent::~DiffusionStreamEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionStreamEvent)
@@ -6325,10 +3124,9 @@ inline void DiffusionStreamEvent::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.request_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   delete this_._impl_.progress_;
   delete this_._impl_.result_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -6366,26 +3164,24 @@ PROTOBUF_NOINLINE void DiffusionStreamEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.request_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.progress_ != nullptr);
       _impl_.progress_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(_impl_.result_ != nullptr);
       _impl_.result_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
-    ::memset(&_impl_.seq_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.seq_)) + sizeof(_impl_.error_code_));
+  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
+    ::memset(&_impl_.timestamp_us_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.kind_) -
+        reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.kind_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -6410,72 +3206,43 @@ PROTOBUF_NOINLINE void DiffusionStreamEvent::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // uint64 seq = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_seq() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
-          1, this_._internal_seq(), target);
-    }
-  }
-
-  // int64 timestamp_us = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  // int64 timestamp_us = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<1>(
               stream, this_._internal_timestamp_us(), target);
     }
   }
 
-  // string request_id = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_request_id().empty()) {
-      const ::std::string& _s = this_._internal_request_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionStreamEvent.request_id");
-      target = stream->WriteStringMaybeAliased(3, _s, target);
-    }
-  }
-
-  // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  // .runanywhere.v1.DiffusionStreamEventKind kind = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          4, this_._internal_kind(), target);
+          2, this_._internal_kind(), target);
     }
   }
 
-  // optional .runanywhere.v1.DiffusionProgress progress = 5;
+  // optional .runanywhere.v1.DiffusionProgress progress = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        3, *this_._impl_.progress_, this_._impl_.progress_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.DiffusionResult result = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        4, *this_._impl_.result_, this_._impl_.result_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.SDKError error = 5;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        5, *this_._impl_.progress_, this_._impl_.progress_->GetCachedSize(), target,
+        5, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
         stream);
-  }
-
-  // optional .runanywhere.v1.DiffusionResult result = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        6, *this_._impl_.result_, this_._impl_.result_->GetCachedSize(), target,
-        stream);
-  }
-
-  // optional string error_message = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionStreamEvent.error_message");
-    target = stream->WriteStringMaybeAliased(7, _s, target);
-  }
-
-  // int32 error_code = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
-              stream, this_._internal_error_code(), target);
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -6503,55 +3270,34 @@ PROTOBUF_NOINLINE void DiffusionStreamEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // string request_id = 3;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // optional .runanywhere.v1.DiffusionProgress progress = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_request_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_request_id());
-      }
-    }
-    // optional string error_message = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
-    // optional .runanywhere.v1.DiffusionProgress progress = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.progress_);
     }
-    // optional .runanywhere.v1.DiffusionResult result = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    // optional .runanywhere.v1.DiffusionResult result = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.result_);
     }
-    // uint64 seq = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_seq() != 0) {
-        total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
-            this_._internal_seq());
-      }
+    // optional .runanywhere.v1.SDKError error = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
-    // int64 timestamp_us = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    // int64 timestamp_us = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
-    // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    // .runanywhere.v1.DiffusionStreamEventKind kind = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
-      }
-    }
-    // int32 error_code = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -6573,20 +3319,8 @@ void DiffusionStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_request_id().empty()) {
-        _this->_internal_set_request_id(from._internal_request_id());
-      } else {
-        if (_this->_impl_.request_id_.IsDefault()) {
-          _this->_internal_set_request_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.progress_ != nullptr);
       if (_this->_impl_.progress_ == nullptr) {
         _this->_impl_.progress_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.progress_);
@@ -6594,7 +3328,7 @@ void DiffusionStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.progress_->MergeFrom(*from._impl_.progress_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(from._impl_.result_ != nullptr);
       if (_this->_impl_.result_ == nullptr) {
         _this->_impl_.result_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_);
@@ -6602,24 +3336,22 @@ void DiffusionStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.result_->MergeFrom(*from._impl_.result_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_seq() != 0) {
-        _this->_impl_.seq_ = from._impl_.seq_;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -6638,391 +3370,17 @@ void DiffusionStreamEvent::CopyFrom(const DiffusionStreamEvent& from) {
 
 void DiffusionStreamEvent::InternalSwap(DiffusionStreamEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.error_code_)
-      + sizeof(DiffusionStreamEvent::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.kind_)
+      + sizeof(DiffusionStreamEvent::_impl_.kind_)
       - PROTOBUF_FIELD_OFFSET(DiffusionStreamEvent, _impl_.progress_)>(
           reinterpret_cast<char*>(&_impl_.progress_),
           reinterpret_cast<char*>(&other->_impl_.progress_));
 }
 
 ::google::protobuf::Metadata DiffusionStreamEvent::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-DiffusionServiceState::DiffusionServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionServiceState_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.DiffusionServiceState)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionServiceState::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::DiffusionServiceState& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        current_model_(arena, from.current_model_),
-        active_request_id_(arena, from.active_request_id_),
-        error_message_(arena, from.error_message_) {}
-
-DiffusionServiceState::DiffusionServiceState(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const DiffusionServiceState& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, DiffusionServiceState_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  DiffusionServiceState* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.capabilities_ = (CheckHasBit(cached_has_bits, 0x00000008U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.capabilities_)
-                : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, is_ready_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, is_ready_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, is_ready_) +
-               sizeof(Impl_::error_code_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DiffusionServiceState)
-}
-PROTOBUF_NDEBUG_INLINE DiffusionServiceState::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        current_model_(arena),
-        active_request_id_(arena),
-        error_message_(arena) {}
-
-inline void DiffusionServiceState::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, capabilities_),
-           0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, capabilities_) +
-               sizeof(Impl_::error_code_));
-}
-DiffusionServiceState::~DiffusionServiceState() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.DiffusionServiceState)
-  SharedDtor(*this);
-}
-inline void DiffusionServiceState::SharedDtor(MessageLite& self) {
-  DiffusionServiceState& this_ = static_cast<DiffusionServiceState&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.current_model_.Destroy();
-  this_._impl_.active_request_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  delete this_._impl_.capabilities_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull DiffusionServiceState_class_data_ =
-        DiffusionServiceState::InternalGenerateClassData_(DiffusionServiceState_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionServiceState::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionServiceState_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(DiffusionServiceState_class_data_.tc_table);
-  return DiffusionServiceState_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-DiffusionServiceState::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&DiffusionServiceState_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&DiffusionServiceState_globals_));
-  return DiffusionServiceState_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DiffusionServiceState::ParseTableT_
-    DiffusionServiceState::_table_ =
-        DiffusionServiceState::InternalGenerateParseTable_(DiffusionServiceState_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void DiffusionServiceState::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.DiffusionServiceState)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.current_model_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.active_request_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(_impl_.capabilities_ != nullptr);
-      _impl_.capabilities_->Clear();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000070U)) {
-    ::memset(&_impl_.is_ready_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.is_ready_)) + sizeof(_impl_.error_code_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL DiffusionServiceState::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const DiffusionServiceState& this_ = static_cast<const DiffusionServiceState&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL DiffusionServiceState::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const DiffusionServiceState& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.DiffusionServiceState)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // bool is_ready = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_is_ready() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_is_ready(), target);
-    }
-  }
-
-  // optional string current_model = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    const ::std::string& _s = this_._internal_current_model();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionServiceState.current_model");
-    target = stream->WriteStringMaybeAliased(2, _s, target);
-  }
-
-  // optional .runanywhere.v1.DiffusionCapabilities capabilities = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        3, *this_._impl_.capabilities_, this_._impl_.capabilities_->GetCachedSize(), target,
-        stream);
-  }
-
-  // bool is_generating = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_is_generating() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          4, this_._internal_is_generating(), target);
-    }
-  }
-
-  // optional string active_request_id = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    const ::std::string& _s = this_._internal_active_request_id();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionServiceState.active_request_id");
-    target = stream->WriteStringMaybeAliased(5, _s, target);
-  }
-
-  // optional string error_message = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DiffusionServiceState.error_message");
-    target = stream->WriteStringMaybeAliased(6, _s, target);
-  }
-
-  // int32 error_code = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
-              stream, this_._internal_error_code(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.DiffusionServiceState)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t DiffusionServiceState::ByteSizeLong(const MessageLite& base) {
-  const DiffusionServiceState& this_ = static_cast<const DiffusionServiceState&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t DiffusionServiceState::ByteSizeLong() const {
-  const DiffusionServiceState& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.DiffusionServiceState)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
-    // optional string current_model = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_current_model());
-    }
-    // optional string active_request_id = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_active_request_id());
-    }
-    // optional string error_message = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
-    // optional .runanywhere.v1.DiffusionCapabilities capabilities = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.capabilities_);
-    }
-    // bool is_ready = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_is_ready() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool is_generating = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_is_generating() != 0) {
-        total_size += 2;
-      }
-    }
-    // int32 error_code = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void DiffusionServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<DiffusionServiceState*>(&to_msg);
-  auto& from = static_cast<const DiffusionServiceState&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.DiffusionServiceState)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_set_current_model(from._internal_current_model());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_set_active_request_id(from._internal_active_request_id());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(from._impl_.capabilities_ != nullptr);
-      if (_this->_impl_.capabilities_ == nullptr) {
-        _this->_impl_.capabilities_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.capabilities_);
-      } else {
-        _this->_impl_.capabilities_->MergeFrom(*from._impl_.capabilities_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_is_ready() != 0) {
-        _this->_impl_.is_ready_ = from._impl_.is_ready_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_is_generating() != 0) {
-        _this->_impl_.is_generating_ = from._impl_.is_generating_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void DiffusionServiceState::CopyFrom(const DiffusionServiceState& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.DiffusionServiceState)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void DiffusionServiceState::InternalSwap(DiffusionServiceState* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_model_, &other->_impl_.current_model_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.active_request_id_, &other->_impl_.active_request_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.error_code_)
-      + sizeof(DiffusionServiceState::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(DiffusionServiceState, _impl_.capabilities_)>(
-          reinterpret_cast<char*>(&_impl_.capabilities_),
-          reinterpret_cast<char*>(&other->_impl_.capabilities_));
-}
-
-::google::protobuf::Metadata DiffusionServiceState::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

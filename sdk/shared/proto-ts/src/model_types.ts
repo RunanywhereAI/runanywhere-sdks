@@ -6,27 +6,17 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import {
   AccelerationPreference,
   accelerationPreferenceFromJSON,
   accelerationPreferenceToJSON,
-  HardwareProfile,
 } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * Audio format — union of all cases currently defined across SDKs.
- * Sources pre-IDL:
- *   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
- *   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
- *   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
- *   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
- *   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
- * ---------------------------------------------------------------------------
- */
+/** Container format of an audio payload. */
 export enum AudioFormat {
   AUDIO_FORMAT_UNSPECIFIED = 0,
   AUDIO_FORMAT_PCM = 1,
@@ -111,16 +101,62 @@ export function audioFormatToJSON(object: AudioFormat): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Model file format — union across all SDKs.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
- *   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
- *   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
- *   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
- *                                       SafeTensors, Zip, Folder, Proprietary)
- *   Web    enums.ts:56                (copy of RN)
- * ---------------------------------------------------------------------------
+ * Sample layout of a raw audio payload, as opposed to AudioFormat above, which
+ * names the container. CONTAINER means the bytes carry their own header and the
+ * companion AudioFormat field says which one.
+ *
+ * This is the single encoding enum for STT, VAD, diarization, and the voice
+ * agent. STT previously numbered PCM_S16_LE=1 and PCM_F32_LE=2, the reverse of
+ * everywhere else; it now follows the ordering below.
+ */
+export enum AudioEncoding {
+  AUDIO_ENCODING_UNSPECIFIED = 0,
+  AUDIO_ENCODING_PCM_F32_LE = 1,
+  AUDIO_ENCODING_PCM_S16_LE = 2,
+  AUDIO_ENCODING_CONTAINER = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function audioEncodingFromJSON(object: any): AudioEncoding {
+  switch (object) {
+    case 0:
+    case "AUDIO_ENCODING_UNSPECIFIED":
+      return AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
+    case 1:
+    case "AUDIO_ENCODING_PCM_F32_LE":
+      return AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
+    case 2:
+    case "AUDIO_ENCODING_PCM_S16_LE":
+      return AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
+    case 3:
+    case "AUDIO_ENCODING_CONTAINER":
+      return AudioEncoding.AUDIO_ENCODING_CONTAINER;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AudioEncoding.UNRECOGNIZED;
+  }
+}
+
+export function audioEncodingToJSON(object: AudioEncoding): string {
+  switch (object) {
+    case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
+      return "AUDIO_ENCODING_UNSPECIFIED";
+    case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
+      return "AUDIO_ENCODING_PCM_F32_LE";
+    case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
+      return "AUDIO_ENCODING_PCM_S16_LE";
+    case AudioEncoding.AUDIO_ENCODING_CONTAINER:
+      return "AUDIO_ENCODING_CONTAINER";
+    case AudioEncoding.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+ * ArchiveType (compression).
  */
 export enum ModelFormat {
   MODEL_FORMAT_UNSPECIFIED = 0,
@@ -246,16 +282,8 @@ export function modelFormatToJSON(object: ModelFormat): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Inference framework / runtime. Same name used across all SDKs (RN names it
- * LLMFramework; we canonicalize on InferenceFramework).
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
- *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
- *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
- *   RN     enums.ts:30 (LLMFramework) (16 cases)
- *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
- * ---------------------------------------------------------------------------
+ * Engine that executes a model. Reached from ModelInfo.framework, so the
+ * reserved values below are manifest-critical.
  */
 export enum InferenceFramework {
   INFERENCE_FRAMEWORK_UNSPECIFIED = 0,
@@ -404,16 +432,7 @@ export function inferenceFrameworkToJSON(object: InferenceFramework): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Model category / modality class. Sources pre-IDL:
- *   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
- *   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
- *   Dart  model_types.dart:55         (8 cases, no VAD)
- *   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
- *   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
- * ---------------------------------------------------------------------------
- */
+/** What a model does. */
 export enum ModelCategory {
   MODEL_CATEGORY_UNSPECIFIED = 0,
   MODEL_CATEGORY_LANGUAGE = 1,
@@ -428,6 +447,7 @@ export enum ModelCategory {
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
   MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
   MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
+  MODEL_CATEGORY_RERANK = 12,
   UNRECOGNIZED = -1,
 }
 
@@ -469,6 +489,9 @@ export function modelCategoryFromJSON(object: any): ModelCategory {
     case 11:
     case "MODEL_CATEGORY_SEMANTIC_SEGMENTATION":
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+    case 12:
+    case "MODEL_CATEGORY_RERANK":
+      return ModelCategory.MODEL_CATEGORY_RERANK;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -502,6 +525,8 @@ export function modelCategoryToJSON(object: ModelCategory): string {
       return "MODEL_CATEGORY_SPEAKER_DIARIZATION";
     case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       return "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
+    case ModelCategory.MODEL_CATEGORY_RERANK:
+      return "MODEL_CATEGORY_RERANK";
     case ModelCategory.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -607,14 +632,7 @@ export function modelSourceToJSON(object: ModelSource): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Archive types for multi-file model packages. Sources pre-IDL:
- *   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
- *   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
- *   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
- * ---------------------------------------------------------------------------
- */
+/** Compression flavor of a multi-file model package. */
 export enum ArchiveType {
   ARCHIVE_TYPE_UNSPECIFIED = 0,
   ARCHIVE_TYPE_ZIP = 1,
@@ -717,16 +735,7 @@ export function archiveStructureToJSON(object: ArchiveStructure): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * High-level artifact classification — what KIND of bundle a model ships as.
- * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
- * compression flavor). Sources pre-IDL:
- *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
- *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
- *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
- * ---------------------------------------------------------------------------
- */
+/** What kind of bundle a model ships as. */
 export enum ModelArtifactType {
   MODEL_ARTIFACT_TYPE_UNSPECIFIED = 0,
   MODEL_ARTIFACT_TYPE_SINGLE_FILE = 1,
@@ -815,14 +824,8 @@ export function modelArtifactTypeToJSON(object: ModelArtifactType): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Model registry lifecycle state. This is durable/catalog state, not a live
- * transfer progress stream. Per-download byte counters and transient progress
- * events stay in download_service.proto.
- * Sources pre-IDL:
- *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
- *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
- * ---------------------------------------------------------------------------
+ * Durable catalog state, not a live transfer stream. Byte counters and
+ * progress events live in download_service.proto.
  */
 export enum ModelRegistryStatus {
   MODEL_REGISTRY_STATUS_UNSPECIFIED = 0,
@@ -882,108 +885,6 @@ export function modelRegistryStatusToJSON(object: ModelRegistryStatus): string {
     case ModelRegistryStatus.MODEL_REGISTRY_STATUS_ERROR:
       return "MODEL_REGISTRY_STATUS_ERROR";
     case ModelRegistryStatus.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum ModelQuerySortField {
-  MODEL_QUERY_SORT_FIELD_UNSPECIFIED = 0,
-  MODEL_QUERY_SORT_FIELD_NAME = 1,
-  MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS = 2,
-  MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS = 3,
-  MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4,
-  MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5,
-  MODEL_QUERY_SORT_FIELD_USAGE_COUNT = 6,
-  UNRECOGNIZED = -1,
-}
-
-export function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField {
-  switch (object) {
-    case 0:
-    case "MODEL_QUERY_SORT_FIELD_UNSPECIFIED":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED;
-    case 1:
-    case "MODEL_QUERY_SORT_FIELD_NAME":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME;
-    case 2:
-    case "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS;
-    case 3:
-    case "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS;
-    case 4:
-    case "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES;
-    case 5:
-    case "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS;
-    case 6:
-    case "MODEL_QUERY_SORT_FIELD_USAGE_COUNT":
-      return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return ModelQuerySortField.UNRECOGNIZED;
-  }
-}
-
-export function modelQuerySortFieldToJSON(object: ModelQuerySortField): string {
-  switch (object) {
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED:
-      return "MODEL_QUERY_SORT_FIELD_UNSPECIFIED";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME:
-      return "MODEL_QUERY_SORT_FIELD_NAME";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS:
-      return "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS:
-      return "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES:
-      return "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS:
-      return "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS";
-    case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT:
-      return "MODEL_QUERY_SORT_FIELD_USAGE_COUNT";
-    case ModelQuerySortField.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum ModelQuerySortOrder {
-  MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0,
-  MODEL_QUERY_SORT_ORDER_ASCENDING = 1,
-  MODEL_QUERY_SORT_ORDER_DESCENDING = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function modelQuerySortOrderFromJSON(object: any): ModelQuerySortOrder {
-  switch (object) {
-    case 0:
-    case "MODEL_QUERY_SORT_ORDER_UNSPECIFIED":
-      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED;
-    case 1:
-    case "MODEL_QUERY_SORT_ORDER_ASCENDING":
-      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_ASCENDING;
-    case 2:
-    case "MODEL_QUERY_SORT_ORDER_DESCENDING":
-      return ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_DESCENDING;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return ModelQuerySortOrder.UNRECOGNIZED;
-  }
-}
-
-export function modelQuerySortOrderToJSON(object: ModelQuerySortOrder): string {
-  switch (object) {
-    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED:
-      return "MODEL_QUERY_SORT_ORDER_UNSPECIFIED";
-    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_ASCENDING:
-      return "MODEL_QUERY_SORT_ORDER_ASCENDING";
-    case ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_DESCENDING:
-      return "MODEL_QUERY_SORT_ORDER_DESCENDING";
-    case ModelQuerySortOrder.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -1075,15 +976,8 @@ export function modelFileRoleToJSON(object: ModelFileRole): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
- *   Web    enums.ts (RoutingPolicy)
- *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
- *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
- *   Swift  extensions (RoutingPolicy)
- * Canonical short-form below; specific PreferLocal/PreferCloud cover the
- * "preferred" cases, MANUAL covers explicit user override.
- * ---------------------------------------------------------------------------
+ * On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+ * "preferred" cases; MANUAL is an explicit user override.
  */
 export enum RoutingPolicy {
   ROUTING_POLICY_UNSPECIFIED = 0,
@@ -1142,6 +1036,58 @@ export function routingPolicyToJSON(object: RoutingPolicy): string {
   }
 }
 
+/** Requested execution placement for a load. LiteRT/ExecuTorch-aligned. */
+export enum AcceleratorPolicy {
+  ACCELERATOR_POLICY_UNSPECIFIED = 0,
+  ACCELERATOR_POLICY_AUTO = 1,
+  ACCELERATOR_POLICY_CPU = 2,
+  ACCELERATOR_POLICY_GPU = 3,
+  ACCELERATOR_POLICY_NPU = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function acceleratorPolicyFromJSON(object: any): AcceleratorPolicy {
+  switch (object) {
+    case 0:
+    case "ACCELERATOR_POLICY_UNSPECIFIED":
+      return AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED;
+    case 1:
+    case "ACCELERATOR_POLICY_AUTO":
+      return AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+    case 2:
+    case "ACCELERATOR_POLICY_CPU":
+      return AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+    case 3:
+    case "ACCELERATOR_POLICY_GPU":
+      return AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+    case 4:
+    case "ACCELERATOR_POLICY_NPU":
+      return AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AcceleratorPolicy.UNRECOGNIZED;
+  }
+}
+
+export function acceleratorPolicyToJSON(object: AcceleratorPolicy): string {
+  switch (object) {
+    case AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED:
+      return "ACCELERATOR_POLICY_UNSPECIFIED";
+    case AcceleratorPolicy.ACCELERATOR_POLICY_AUTO:
+      return "ACCELERATOR_POLICY_AUTO";
+    case AcceleratorPolicy.ACCELERATOR_POLICY_CPU:
+      return "ACCELERATOR_POLICY_CPU";
+    case AcceleratorPolicy.ACCELERATOR_POLICY_GPU:
+      return "ACCELERATOR_POLICY_GPU";
+    case AcceleratorPolicy.ACCELERATOR_POLICY_NPU:
+      return "ACCELERATOR_POLICY_NPU";
+    case AcceleratorPolicy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface ModelInfoMetadata {
   description: string;
   author: string;
@@ -1156,14 +1102,8 @@ export interface ModelRuntimeCompatibility {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Core metadata for a model entry.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:393       (16 fields)
- *   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
- *   Dart   model_types.dart:335       (similar shape, nullable divergences)
- *   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
- * ---------------------------------------------------------------------------
+ * Core metadata for a model entry. This message is persisted verbatim to
+ * .rac-manifest.binpb, so field numbers here are permanent.
  */
 export interface ModelInfo {
   id: string;
@@ -1218,21 +1158,8 @@ export interface ModelInfo {
   singleFile?: SingleFileArtifact | undefined;
   archive?: ArchiveArtifact | undefined;
   multiFile?: MultiFileArtifact | undefined;
-  customStrategyId?: string | undefined;
   builtIn?:
     | boolean
-    | undefined;
-  /**
-   * High-level artifact classification, complementary to the `artifact`
-   * oneof above. Allows catalog entries to carry a coarse type tag without
-   * resolving the full strategy variant.
-   */
-  artifactType?:
-    | ModelArtifactType
-    | undefined;
-  /** Manifest of files that are expected on disk after fetch/extraction. */
-  expectedFiles?:
-    | ExpectedModelFiles
     | undefined;
   /** Preferred hardware acceleration backend for this model. */
   accelerationPreference?:
@@ -1251,16 +1178,23 @@ export interface ModelInfo {
     | InferenceFramework
     | undefined;
   /**
-   * Durable registry state. Live byte progress belongs to
-   * download_service.DownloadProgress, not ModelInfo.
+   * The single durable state of this entry, and the only downloaded-ness
+   * signal. A non-empty local_path (7) is location data, NOT state: it
+   * stays populated for an entry whose files were deleted. Live byte
+   * progress belongs to download_service.DownloadProgress, not ModelInfo.
    */
   registryStatus?: ModelRegistryStatus | undefined;
-  isDownloaded?: boolean | undefined;
   isAvailable?: boolean | undefined;
-  lastUsedAtUnixMs?: number | undefined;
-  usageCount?: number | undefined;
-  syncPending?: boolean | undefined;
-  statusMessage?: string | undefined;
+  lastUsedAtUnixMs?:
+    | number
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+   * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+   * models. Lets the catalog mark which models are drivable through
+   * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+   */
+  cuaProfile?: string | undefined;
 }
 
 /**
@@ -1272,21 +1206,12 @@ export interface ModelInfoList {
 }
 
 export interface SingleFileArtifact {
-  requiredPatterns: string[];
-  optionalPatterns: string[];
-  /**
-   * Full manifest form for SDK-local wrappers that attach expected files to
-   * a single-file artifact. The pattern fields above remain for existing
-   * generated consumers.
-   */
   expectedFiles?: ExpectedModelFiles | undefined;
 }
 
 export interface ArchiveArtifact {
   type: ArchiveType;
   structure: ArchiveStructure;
-  requiredPatterns: string[];
-  optionalPatterns: string[];
   /**
    * Full manifest form for archive artifacts after extraction. Archive
    * extraction policy is portable; native filesystem permissions and handles
@@ -1298,14 +1223,8 @@ export interface ArchiveArtifact {
 export interface ModelFileDescriptor {
   url: string;
   filename: string;
-  isRequired: boolean;
-  /**
-   * Extended descriptor fields (Flutter model_types.dart:~350,
-   * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-   * canonical "required" flag — the documented `required` boolean from
-   * newer SDK sources maps onto it (default true, mirrored in Swift).
-   * Exact on-disk artifact size, verified after download.
-   */
+  isOptional: boolean;
+  /** Exact on-disk artifact size, verified after download. */
   sizeBytes?:
     | number
     | undefined;
@@ -1329,13 +1248,8 @@ export interface MultiFileArtifact {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Declarative manifest of files a multi-file / directory model is expected
- * to contain on disk after download/extraction. Used for verification before
- * hand-off to the inference framework. Sources pre-IDL:
- *   Flutter core/types/model_types.dart:420
- *   Swift   ModelTypes.swift:~300
- * ---------------------------------------------------------------------------
+ * What a multi-file model should contain on disk after extraction. Verified
+ * before hand-off to the inference framework.
  */
 export interface ExpectedModelFiles {
   files: ModelFileDescriptor[];
@@ -1349,18 +1263,18 @@ export interface ExpectedModelFiles {
  * Registry/query filters shared by SDK model-management APIs. UI-only
  * presentation state and platform filesystem handles are intentionally not
  * represented here.
+ * Filters only. Ordering is the client's -- a local catalog is tens of rows.
  */
 export interface ModelQuery {
   framework?: InferenceFramework | undefined;
   category?: ModelCategory | undefined;
   format?: ModelFormat | undefined;
   downloadedOnly?: boolean | undefined;
-  availableOnly?: boolean | undefined;
-  maxSizeBytes?: number | undefined;
-  searchQuery: string;
-  source?: ModelSource | undefined;
-  sortField?: ModelQuerySortField | undefined;
-  sortOrder?: ModelQuerySortOrder | undefined;
+  maxSizeBytes?:
+    | number
+    | undefined;
+  /** Optional so "no search" is expressible; empty string is not a filter. */
+  searchQuery?: string | undefined;
   registryStatus?: ModelRegistryStatus | undefined;
 }
 
@@ -1387,37 +1301,20 @@ export interface ModelRegistryRefreshRequest {
 }
 
 export interface ModelRegistryRefreshResult {
-  success: boolean;
   models?: ModelInfoList | undefined;
-  registeredCount: number;
-  updatedCount: number;
-  discoveredCount: number;
-  prunedCount: number;
   refreshedAtUnixMs: number;
   warnings: string[];
-  errorMessage: string;
-  downloadedCount: number;
-  availableCount: number;
-  errorCount: number;
+  error?: SDKError | undefined;
 }
 
 export interface ModelListRequest {
   /** Set query.downloaded_only for downloaded-only lists. */
-  query?:
-    | ModelQuery
-    | undefined;
-  /** Include denormalized counts in ModelListResult. */
-  includeCounts: boolean;
+  query?: ModelQuery | undefined;
 }
 
 export interface ModelListResult {
-  success: boolean;
   models?: ModelInfoList | undefined;
-  errorMessage: string;
-  totalCount: number;
-  downloadedCount: number;
-  availableCount: number;
-  filteredCount: number;
+  error?: SDKError | undefined;
 }
 
 export interface ModelGetRequest {
@@ -1427,7 +1324,7 @@ export interface ModelGetRequest {
 export interface ModelGetResult {
   found: boolean;
   model?: ModelInfo | undefined;
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 export interface ModelImportRequest {
@@ -1452,14 +1349,13 @@ export interface ModelImportRequest {
 }
 
 export interface ModelImportResult {
-  success: boolean;
   model?: ModelInfo | undefined;
   localPath: string;
   importedBytes: number;
   warnings: string[];
-  errorMessage: string;
   registered: boolean;
   copiedIntoManagedStorage: boolean;
+  error?: SDKError | undefined;
 }
 
 export interface ModelDiscoveryRequest {
@@ -1486,32 +1382,44 @@ export interface DiscoveredModel {
 }
 
 export interface ModelDiscoveryResult {
-  success: boolean;
   discoveredModels: DiscoveredModel[];
-  linkedCount: number;
-  purgedCount: number;
   warnings: string[];
-  errorMessage: string;
-  scannedCount: number;
-  importedCount: number;
+  error?: SDKError | undefined;
 }
 
 export interface ModelLoadRequest {
   modelId: string;
-  category?: ModelCategory | undefined;
+  category?:
+    | ModelCategory
+    | undefined;
+  /**
+   * Preferred backend pin. Retained for wire compatibility; new callers
+   * should prefer backend_preferences + accelerator.
+   */
   framework?: InferenceFramework | undefined;
   forceReload: boolean;
   validateAvailability: boolean;
+  /**
+   * The one load knob every on-device runtime exposes. Unset or 0 means
+   * "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+   * hardcoded small default. Carried by the native load ABI.
+   */
+  contextLength?:
+    | number
+    | undefined;
+  /** a hard runtime guarantee */
+  useGpu?: boolean | undefined;
+  backendPreferences: InferenceFramework[];
+  acceleratorPolicy?: AcceleratorPolicy | undefined;
 }
 
 export interface ModelLoadResult {
-  success: boolean;
   modelId: string;
   category: ModelCategory;
+  /** Actual backend that executed the load (not the catalog/request pin). */
   framework: InferenceFramework;
   resolvedPath: string;
   loadedAtUnixMs: number;
-  errorMessage: string;
   warnings: string[];
   alreadyLoaded: boolean;
   /**
@@ -1520,6 +1428,27 @@ export interface ModelLoadResult {
    * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
    */
   resolvedArtifacts: ModelFileDescriptor[];
+  error?:
+    | SDKError
+    | undefined;
+  /** v4 placement truth. */
+  requestedBackend?: InferenceFramework | undefined;
+  actualDeviceId?: string | undefined;
+  actualDeviceName?:
+    | string
+    | undefined;
+  /** cpu | gpu | npu | metal | webgpu | unknown */
+  actualDeviceKind?: string | undefined;
+  runtimeVersion?: string | undefined;
+  abiVersion?: string | undefined;
+  fallbackReason?:
+    | string
+    | undefined;
+  /**
+   * What context length the runtime actually allocated -- a request is
+   * not a promise.
+   */
+  allocatedContextLength?: number | undefined;
 }
 
 export interface ModelUnloadRequest {
@@ -1530,11 +1459,10 @@ export interface ModelUnloadRequest {
 }
 
 export interface ModelUnloadResult {
-  success: boolean;
   unloadedModelIds: string[];
-  errorMessage: string;
   unloadedAtUnixMs: number;
   warnings: string[];
+  error?: SDKError | undefined;
 }
 
 export interface CurrentModelRequest {
@@ -1548,29 +1476,23 @@ export interface CurrentModelResult {
   model?: ModelInfo | undefined;
   loadedAtUnixMs: number;
   found: boolean;
-  errorMessage: string;
   category: ModelCategory;
   framework: InferenceFramework;
   resolvedPath: string;
   resolvedArtifacts: ModelFileDescriptor[];
+  error?: SDKError | undefined;
 }
 
-export interface ModelDeleteRequest {
-  modelId: string;
-  deleteFiles: boolean;
-  unregister: boolean;
-  unloadIfLoaded: boolean;
-}
-
+/**
+ * delete(model_id) frees DISK. It always unloads the model first if it is
+ * resident -- there is no flag, and no failure mode for "still loaded".
+ * Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+ * with an SDKError. Success is the absence of `error`.
+ */
 export interface ModelDeleteResult {
-  success: boolean;
   modelId: string;
   deletedBytes: number;
-  filesDeleted: boolean;
-  registryUpdated: boolean;
-  wasLoaded: boolean;
-  errorMessage: string;
-  warnings: string[];
+  error?: SDKError | undefined;
 }
 
 /**
@@ -1586,14 +1508,6 @@ export interface ModelDeleteResult {
 export interface ModelCompatibilityRequest {
   /** Required. Model identifier to evaluate. */
   modelId: string;
-  /**
-   * Optional cached hardware profile from the platform adapter. If
-   * unset, commons will read whatever it has cached internally; the
-   * RAM/storage values below remain authoritative for the verdict.
-   */
-  hardwareProfile?:
-    | HardwareProfile
-    | undefined;
   /**
    * Available RAM in bytes (from device probe). 0 = unknown — commons
    * will treat the requirement as satisfied.
@@ -1637,12 +1551,7 @@ export interface ModelCompatibilityResult {
    * checks with their request id.
    */
   modelId: string;
-  /**
-   * Negative on failure; mirrors rac_result_t. Empty error_message on
-   * success.
-   */
-  errorCode: number;
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 /**
@@ -1749,12 +1658,10 @@ export interface ModelRegistryFetchAssignmentsRequest {
 }
 
 export interface ModelRegistryFetchAssignmentsResult {
-  success: boolean;
   models?: ModelInfoList | undefined;
   modelCount: number;
   fetchedAtUnixMs: number;
-  errorCode: number;
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 /**
@@ -1850,7 +1757,14 @@ export interface RegisterModelFromUrlRequest {
     | number
     | undefined;
   /** Explicit id override. Empty -> derived from URL/name. */
-  id?: string | undefined;
+  id?:
+    | string
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  cuaProfile?: string | undefined;
 }
 
 /**
@@ -1873,7 +1787,14 @@ export interface RegisterMultiFileModelRequest {
   supportsThinking?: boolean | undefined;
   supportsLora?: boolean | undefined;
   description?: string | undefined;
-  source?: ModelSource | undefined;
+  source?:
+    | ModelSource
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  cuaProfile?: string | undefined;
 }
 
 function createBaseModelInfoMetadata(): ModelInfoMetadata {
@@ -2131,21 +2052,15 @@ function createBaseModelInfo(): ModelInfo {
     singleFile: undefined,
     archive: undefined,
     multiFile: undefined,
-    customStrategyId: undefined,
     builtIn: undefined,
-    artifactType: undefined,
-    expectedFiles: undefined,
     accelerationPreference: undefined,
     routingPolicy: undefined,
     compatibility: undefined,
     preferredFramework: undefined,
     registryStatus: undefined,
-    isDownloaded: undefined,
     isAvailable: undefined,
     lastUsedAtUnixMs: undefined,
-    usageCount: undefined,
-    syncPending: undefined,
-    statusMessage: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -2214,17 +2129,8 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.multiFile !== undefined) {
       MultiFileArtifact.encode(message.multiFile, writer.uint32(178).fork()).join();
     }
-    if (message.customStrategyId !== undefined) {
-      writer.uint32(186).string(message.customStrategyId);
-    }
     if (message.builtIn !== undefined) {
       writer.uint32(192).bool(message.builtIn);
-    }
-    if (message.artifactType !== undefined) {
-      writer.uint32(200).int32(message.artifactType);
-    }
-    if (message.expectedFiles !== undefined) {
-      ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(210).fork()).join();
     }
     if (message.accelerationPreference !== undefined) {
       writer.uint32(216).int32(message.accelerationPreference);
@@ -2241,23 +2147,14 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.registryStatus !== undefined) {
       writer.uint32(248).int32(message.registryStatus);
     }
-    if (message.isDownloaded !== undefined) {
-      writer.uint32(256).bool(message.isDownloaded);
-    }
     if (message.isAvailable !== undefined) {
       writer.uint32(264).bool(message.isAvailable);
     }
     if (message.lastUsedAtUnixMs !== undefined) {
       writer.uint32(272).int64(message.lastUsedAtUnixMs);
     }
-    if (message.usageCount !== undefined) {
-      writer.uint32(280).int32(message.usageCount);
-    }
-    if (message.syncPending !== undefined) {
-      writer.uint32(288).bool(message.syncPending);
-    }
-    if (message.statusMessage !== undefined) {
-      writer.uint32(298).string(message.statusMessage);
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(306).string(message.cuaProfile);
     }
     return writer;
   },
@@ -2437,36 +2334,12 @@ export const ModelInfo: MessageFns<ModelInfo> = {
           message.multiFile = MultiFileArtifact.decode(reader, reader.uint32());
           continue;
         }
-        case 23: {
-          if (tag !== 186) {
-            break;
-          }
-
-          message.customStrategyId = reader.string();
-          continue;
-        }
         case 24: {
           if (tag !== 192) {
             break;
           }
 
           message.builtIn = reader.bool();
-          continue;
-        }
-        case 25: {
-          if (tag !== 200) {
-            break;
-          }
-
-          message.artifactType = reader.int32() as any;
-          continue;
-        }
-        case 26: {
-          if (tag !== 210) {
-            break;
-          }
-
-          message.expectedFiles = ExpectedModelFiles.decode(reader, reader.uint32());
           continue;
         }
         case 27: {
@@ -2509,14 +2382,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
           message.registryStatus = reader.int32() as any;
           continue;
         }
-        case 32: {
-          if (tag !== 256) {
-            break;
-          }
-
-          message.isDownloaded = reader.bool();
-          continue;
-        }
         case 33: {
           if (tag !== 264) {
             break;
@@ -2533,28 +2398,12 @@ export const ModelInfo: MessageFns<ModelInfo> = {
           message.lastUsedAtUnixMs = longToNumber(reader.int64());
           continue;
         }
-        case 35: {
-          if (tag !== 280) {
+        case 38: {
+          if (tag !== 306) {
             break;
           }
 
-          message.usageCount = reader.int32();
-          continue;
-        }
-        case 36: {
-          if (tag !== 288) {
-            break;
-          }
-
-          message.syncPending = reader.bool();
-          continue;
-        }
-        case 37: {
-          if (tag !== 298) {
-            break;
-          }
-
-          message.statusMessage = reader.string();
+          message.cuaProfile = reader.string();
           continue;
         }
       }
@@ -2641,25 +2490,10 @@ export const ModelInfo: MessageFns<ModelInfo> = {
         : isSet(object.multi_file)
         ? MultiFileArtifact.fromJSON(object.multi_file)
         : undefined,
-      customStrategyId: isSet(object.customStrategyId)
-        ? globalThis.String(object.customStrategyId)
-        : isSet(object.custom_strategy_id)
-        ? globalThis.String(object.custom_strategy_id)
-        : undefined,
       builtIn: isSet(object.builtIn)
         ? globalThis.Boolean(object.builtIn)
         : isSet(object.built_in)
         ? globalThis.Boolean(object.built_in)
-        : undefined,
-      artifactType: isSet(object.artifactType)
-        ? modelArtifactTypeFromJSON(object.artifactType)
-        : isSet(object.artifact_type)
-        ? modelArtifactTypeFromJSON(object.artifact_type)
-        : undefined,
-      expectedFiles: isSet(object.expectedFiles)
-        ? ExpectedModelFiles.fromJSON(object.expectedFiles)
-        : isSet(object.expected_files)
-        ? ExpectedModelFiles.fromJSON(object.expected_files)
         : undefined,
       accelerationPreference: isSet(object.accelerationPreference)
         ? accelerationPreferenceFromJSON(object.accelerationPreference)
@@ -2682,11 +2516,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
         : isSet(object.registry_status)
         ? modelRegistryStatusFromJSON(object.registry_status)
         : undefined,
-      isDownloaded: isSet(object.isDownloaded)
-        ? globalThis.Boolean(object.isDownloaded)
-        : isSet(object.is_downloaded)
-        ? globalThis.Boolean(object.is_downloaded)
-        : undefined,
       isAvailable: isSet(object.isAvailable)
         ? globalThis.Boolean(object.isAvailable)
         : isSet(object.is_available)
@@ -2697,20 +2526,10 @@ export const ModelInfo: MessageFns<ModelInfo> = {
         : isSet(object.last_used_at_unix_ms)
         ? globalThis.Number(object.last_used_at_unix_ms)
         : undefined,
-      usageCount: isSet(object.usageCount)
-        ? globalThis.Number(object.usageCount)
-        : isSet(object.usage_count)
-        ? globalThis.Number(object.usage_count)
-        : undefined,
-      syncPending: isSet(object.syncPending)
-        ? globalThis.Boolean(object.syncPending)
-        : isSet(object.sync_pending)
-        ? globalThis.Boolean(object.sync_pending)
-        : undefined,
-      statusMessage: isSet(object.statusMessage)
-        ? globalThis.String(object.statusMessage)
-        : isSet(object.status_message)
-        ? globalThis.String(object.status_message)
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
         : undefined,
     };
   },
@@ -2780,17 +2599,8 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.multiFile !== undefined) {
       obj.multiFile = MultiFileArtifact.toJSON(message.multiFile);
     }
-    if (message.customStrategyId !== undefined) {
-      obj.customStrategyId = message.customStrategyId;
-    }
     if (message.builtIn !== undefined) {
       obj.builtIn = message.builtIn;
-    }
-    if (message.artifactType !== undefined) {
-      obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
-    }
-    if (message.expectedFiles !== undefined) {
-      obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
     }
     if (message.accelerationPreference !== undefined) {
       obj.accelerationPreference = accelerationPreferenceToJSON(message.accelerationPreference);
@@ -2807,23 +2617,14 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.registryStatus !== undefined) {
       obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
     }
-    if (message.isDownloaded !== undefined) {
-      obj.isDownloaded = message.isDownloaded;
-    }
     if (message.isAvailable !== undefined) {
       obj.isAvailable = message.isAvailable;
     }
     if (message.lastUsedAtUnixMs !== undefined) {
       obj.lastUsedAtUnixMs = Math.round(message.lastUsedAtUnixMs);
     }
-    if (message.usageCount !== undefined) {
-      obj.usageCount = Math.round(message.usageCount);
-    }
-    if (message.syncPending !== undefined) {
-      obj.syncPending = message.syncPending;
-    }
-    if (message.statusMessage !== undefined) {
-      obj.statusMessage = message.statusMessage;
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
     }
     return obj;
   },
@@ -2864,12 +2665,7 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     message.multiFile = (object.multiFile !== undefined && object.multiFile !== null)
       ? MultiFileArtifact.fromPartial(object.multiFile)
       : undefined;
-    message.customStrategyId = object.customStrategyId ?? undefined;
     message.builtIn = object.builtIn ?? undefined;
-    message.artifactType = object.artifactType ?? undefined;
-    message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
-      ? ExpectedModelFiles.fromPartial(object.expectedFiles)
-      : undefined;
     message.accelerationPreference = object.accelerationPreference ?? undefined;
     message.routingPolicy = object.routingPolicy ?? undefined;
     message.compatibility = (object.compatibility !== undefined && object.compatibility !== null)
@@ -2877,12 +2673,9 @@ export const ModelInfo: MessageFns<ModelInfo> = {
       : undefined;
     message.preferredFramework = object.preferredFramework ?? undefined;
     message.registryStatus = object.registryStatus ?? undefined;
-    message.isDownloaded = object.isDownloaded ?? undefined;
     message.isAvailable = object.isAvailable ?? undefined;
     message.lastUsedAtUnixMs = object.lastUsedAtUnixMs ?? undefined;
-    message.usageCount = object.usageCount ?? undefined;
-    message.syncPending = object.syncPending ?? undefined;
-    message.statusMessage = object.statusMessage ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };
@@ -2948,17 +2741,11 @@ export const ModelInfoList: MessageFns<ModelInfoList> = {
 };
 
 function createBaseSingleFileArtifact(): SingleFileArtifact {
-  return { requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
+  return { expectedFiles: undefined };
 }
 
 export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
   encode(message: SingleFileArtifact, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.requiredPatterns) {
-      writer.uint32(10).string(v!);
-    }
-    for (const v of message.optionalPatterns) {
-      writer.uint32(18).string(v!);
-    }
     if (message.expectedFiles !== undefined) {
       ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(26).fork()).join();
     }
@@ -2972,22 +2759,6 @@ export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.requiredPatterns.push(reader.string());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.optionalPatterns.push(reader.string());
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -3007,16 +2778,6 @@ export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
 
   fromJSON(object: any): SingleFileArtifact {
     return {
-      requiredPatterns: globalThis.Array.isArray(object?.requiredPatterns)
-        ? object.requiredPatterns.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.required_patterns)
-        ? object.required_patterns.map((e: any) => globalThis.String(e))
-        : [],
-      optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
-        ? object.optionalPatterns.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.optional_patterns)
-        ? object.optional_patterns.map((e: any) => globalThis.String(e))
-        : [],
       expectedFiles: isSet(object.expectedFiles)
         ? ExpectedModelFiles.fromJSON(object.expectedFiles)
         : isSet(object.expected_files)
@@ -3027,12 +2788,6 @@ export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
 
   toJSON(message: SingleFileArtifact): unknown {
     const obj: any = {};
-    if (message.requiredPatterns?.length) {
-      obj.requiredPatterns = message.requiredPatterns;
-    }
-    if (message.optionalPatterns?.length) {
-      obj.optionalPatterns = message.optionalPatterns;
-    }
     if (message.expectedFiles !== undefined) {
       obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
     }
@@ -3044,8 +2799,6 @@ export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
   },
   fromPartial<I extends Exact<DeepPartial<SingleFileArtifact>, I>>(object: I): SingleFileArtifact {
     const message = createBaseSingleFileArtifact();
-    message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
-    message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
     message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
       ? ExpectedModelFiles.fromPartial(object.expectedFiles)
       : undefined;
@@ -3054,7 +2807,7 @@ export const SingleFileArtifact: MessageFns<SingleFileArtifact> = {
 };
 
 function createBaseArchiveArtifact(): ArchiveArtifact {
-  return { type: 0, structure: 0, requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
+  return { type: 0, structure: 0, expectedFiles: undefined };
 }
 
 export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
@@ -3064,12 +2817,6 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
     }
     if (message.structure !== 0) {
       writer.uint32(16).int32(message.structure);
-    }
-    for (const v of message.requiredPatterns) {
-      writer.uint32(26).string(v!);
-    }
-    for (const v of message.optionalPatterns) {
-      writer.uint32(34).string(v!);
     }
     if (message.expectedFiles !== undefined) {
       ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(42).fork()).join();
@@ -3100,22 +2847,6 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
           message.structure = reader.int32() as any;
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.requiredPatterns.push(reader.string());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.optionalPatterns.push(reader.string());
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
@@ -3137,16 +2868,6 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
     return {
       type: isSet(object.type) ? archiveTypeFromJSON(object.type) : 0,
       structure: isSet(object.structure) ? archiveStructureFromJSON(object.structure) : 0,
-      requiredPatterns: globalThis.Array.isArray(object?.requiredPatterns)
-        ? object.requiredPatterns.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.required_patterns)
-        ? object.required_patterns.map((e: any) => globalThis.String(e))
-        : [],
-      optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
-        ? object.optionalPatterns.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.optional_patterns)
-        ? object.optional_patterns.map((e: any) => globalThis.String(e))
-        : [],
       expectedFiles: isSet(object.expectedFiles)
         ? ExpectedModelFiles.fromJSON(object.expectedFiles)
         : isSet(object.expected_files)
@@ -3163,12 +2884,6 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
     if (message.structure !== 0) {
       obj.structure = archiveStructureToJSON(message.structure);
     }
-    if (message.requiredPatterns?.length) {
-      obj.requiredPatterns = message.requiredPatterns;
-    }
-    if (message.optionalPatterns?.length) {
-      obj.optionalPatterns = message.optionalPatterns;
-    }
     if (message.expectedFiles !== undefined) {
       obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
     }
@@ -3182,8 +2897,6 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
     const message = createBaseArchiveArtifact();
     message.type = object.type ?? 0;
     message.structure = object.structure ?? 0;
-    message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
-    message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
     message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
       ? ExpectedModelFiles.fromPartial(object.expectedFiles)
       : undefined;
@@ -3195,7 +2908,7 @@ function createBaseModelFileDescriptor(): ModelFileDescriptor {
   return {
     url: "",
     filename: "",
-    isRequired: false,
+    isOptional: false,
     sizeBytes: undefined,
     relativePath: undefined,
     destinationPath: undefined,
@@ -3213,8 +2926,8 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     if (message.filename !== "") {
       writer.uint32(18).string(message.filename);
     }
-    if (message.isRequired !== false) {
-      writer.uint32(24).bool(message.isRequired);
+    if (message.isOptional !== false) {
+      writer.uint32(96).bool(message.isOptional);
     }
     if (message.sizeBytes !== undefined) {
       writer.uint32(32).int64(message.sizeBytes);
@@ -3260,12 +2973,12 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
           message.filename = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
+        case 12: {
+          if (tag !== 96) {
             break;
           }
 
-          message.isRequired = reader.bool();
+          message.isOptional = reader.bool();
           continue;
         }
         case 4: {
@@ -3329,10 +3042,10 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     return {
       url: isSet(object.url) ? globalThis.String(object.url) : "",
       filename: isSet(object.filename) ? globalThis.String(object.filename) : "",
-      isRequired: isSet(object.isRequired)
-        ? globalThis.Boolean(object.isRequired)
-        : isSet(object.is_required)
-        ? globalThis.Boolean(object.is_required)
+      isOptional: isSet(object.isOptional)
+        ? globalThis.Boolean(object.isOptional)
+        : isSet(object.is_optional)
+        ? globalThis.Boolean(object.is_optional)
         : false,
       sizeBytes: isSet(object.sizeBytes)
         ? globalThis.Number(object.sizeBytes)
@@ -3371,8 +3084,8 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     if (message.filename !== "") {
       obj.filename = message.filename;
     }
-    if (message.isRequired !== false) {
-      obj.isRequired = message.isRequired;
+    if (message.isOptional !== false) {
+      obj.isOptional = message.isOptional;
     }
     if (message.sizeBytes !== undefined) {
       obj.sizeBytes = Math.round(message.sizeBytes);
@@ -3402,7 +3115,7 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     const message = createBaseModelFileDescriptor();
     message.url = object.url ?? "";
     message.filename = object.filename ?? "";
-    message.isRequired = object.isRequired ?? false;
+    message.isOptional = object.isOptional ?? false;
     message.sizeBytes = object.sizeBytes ?? undefined;
     message.relativePath = object.relativePath ?? undefined;
     message.destinationPath = object.destinationPath ?? undefined;
@@ -3619,12 +3332,8 @@ function createBaseModelQuery(): ModelQuery {
     category: undefined,
     format: undefined,
     downloadedOnly: undefined,
-    availableOnly: undefined,
     maxSizeBytes: undefined,
-    searchQuery: "",
-    source: undefined,
-    sortField: undefined,
-    sortOrder: undefined,
+    searchQuery: undefined,
     registryStatus: undefined,
   };
 }
@@ -3643,23 +3352,11 @@ export const ModelQuery: MessageFns<ModelQuery> = {
     if (message.downloadedOnly !== undefined) {
       writer.uint32(32).bool(message.downloadedOnly);
     }
-    if (message.availableOnly !== undefined) {
-      writer.uint32(40).bool(message.availableOnly);
-    }
     if (message.maxSizeBytes !== undefined) {
       writer.uint32(48).int64(message.maxSizeBytes);
     }
-    if (message.searchQuery !== "") {
+    if (message.searchQuery !== undefined) {
       writer.uint32(58).string(message.searchQuery);
-    }
-    if (message.source !== undefined) {
-      writer.uint32(64).int32(message.source);
-    }
-    if (message.sortField !== undefined) {
-      writer.uint32(72).int32(message.sortField);
-    }
-    if (message.sortOrder !== undefined) {
-      writer.uint32(80).int32(message.sortOrder);
     }
     if (message.registryStatus !== undefined) {
       writer.uint32(88).int32(message.registryStatus);
@@ -3706,14 +3403,6 @@ export const ModelQuery: MessageFns<ModelQuery> = {
           message.downloadedOnly = reader.bool();
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.availableOnly = reader.bool();
-          continue;
-        }
         case 6: {
           if (tag !== 48) {
             break;
@@ -3728,30 +3417,6 @@ export const ModelQuery: MessageFns<ModelQuery> = {
           }
 
           message.searchQuery = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.source = reader.int32() as any;
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.sortField = reader.int32() as any;
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.sortOrder = reader.int32() as any;
           continue;
         }
         case 11: {
@@ -3781,11 +3446,6 @@ export const ModelQuery: MessageFns<ModelQuery> = {
         : isSet(object.downloaded_only)
         ? globalThis.Boolean(object.downloaded_only)
         : undefined,
-      availableOnly: isSet(object.availableOnly)
-        ? globalThis.Boolean(object.availableOnly)
-        : isSet(object.available_only)
-        ? globalThis.Boolean(object.available_only)
-        : undefined,
       maxSizeBytes: isSet(object.maxSizeBytes)
         ? globalThis.Number(object.maxSizeBytes)
         : isSet(object.max_size_bytes)
@@ -3795,17 +3455,6 @@ export const ModelQuery: MessageFns<ModelQuery> = {
         ? globalThis.String(object.searchQuery)
         : isSet(object.search_query)
         ? globalThis.String(object.search_query)
-        : "",
-      source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
-      sortField: isSet(object.sortField)
-        ? modelQuerySortFieldFromJSON(object.sortField)
-        : isSet(object.sort_field)
-        ? modelQuerySortFieldFromJSON(object.sort_field)
-        : undefined,
-      sortOrder: isSet(object.sortOrder)
-        ? modelQuerySortOrderFromJSON(object.sortOrder)
-        : isSet(object.sort_order)
-        ? modelQuerySortOrderFromJSON(object.sort_order)
         : undefined,
       registryStatus: isSet(object.registryStatus)
         ? modelRegistryStatusFromJSON(object.registryStatus)
@@ -3829,23 +3478,11 @@ export const ModelQuery: MessageFns<ModelQuery> = {
     if (message.downloadedOnly !== undefined) {
       obj.downloadedOnly = message.downloadedOnly;
     }
-    if (message.availableOnly !== undefined) {
-      obj.availableOnly = message.availableOnly;
-    }
     if (message.maxSizeBytes !== undefined) {
       obj.maxSizeBytes = Math.round(message.maxSizeBytes);
     }
-    if (message.searchQuery !== "") {
+    if (message.searchQuery !== undefined) {
       obj.searchQuery = message.searchQuery;
-    }
-    if (message.source !== undefined) {
-      obj.source = modelSourceToJSON(message.source);
-    }
-    if (message.sortField !== undefined) {
-      obj.sortField = modelQuerySortFieldToJSON(message.sortField);
-    }
-    if (message.sortOrder !== undefined) {
-      obj.sortOrder = modelQuerySortOrderToJSON(message.sortOrder);
     }
     if (message.registryStatus !== undefined) {
       obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
@@ -3862,12 +3499,8 @@ export const ModelQuery: MessageFns<ModelQuery> = {
     message.category = object.category ?? undefined;
     message.format = object.format ?? undefined;
     message.downloadedOnly = object.downloadedOnly ?? undefined;
-    message.availableOnly = object.availableOnly ?? undefined;
     message.maxSizeBytes = object.maxSizeBytes ?? undefined;
-    message.searchQuery = object.searchQuery ?? "";
-    message.source = object.source ?? undefined;
-    message.sortField = object.sortField ?? undefined;
-    message.sortOrder = object.sortOrder ?? undefined;
+    message.searchQuery = object.searchQuery ?? undefined;
     message.registryStatus = object.registryStatus ?? undefined;
     return message;
   },
@@ -4064,41 +3697,13 @@ export const ModelRegistryRefreshRequest: MessageFns<ModelRegistryRefreshRequest
 };
 
 function createBaseModelRegistryRefreshResult(): ModelRegistryRefreshResult {
-  return {
-    success: false,
-    models: undefined,
-    registeredCount: 0,
-    updatedCount: 0,
-    discoveredCount: 0,
-    prunedCount: 0,
-    refreshedAtUnixMs: 0,
-    warnings: [],
-    errorMessage: "",
-    downloadedCount: 0,
-    availableCount: 0,
-    errorCount: 0,
-  };
+  return { models: undefined, refreshedAtUnixMs: 0, warnings: [], error: undefined };
 }
 
 export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> = {
   encode(message: ModelRegistryRefreshResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.models !== undefined) {
       ModelInfoList.encode(message.models, writer.uint32(18).fork()).join();
-    }
-    if (message.registeredCount !== 0) {
-      writer.uint32(24).int32(message.registeredCount);
-    }
-    if (message.updatedCount !== 0) {
-      writer.uint32(32).int32(message.updatedCount);
-    }
-    if (message.discoveredCount !== 0) {
-      writer.uint32(40).int32(message.discoveredCount);
-    }
-    if (message.prunedCount !== 0) {
-      writer.uint32(48).int32(message.prunedCount);
     }
     if (message.refreshedAtUnixMs !== 0) {
       writer.uint32(56).int64(message.refreshedAtUnixMs);
@@ -4106,17 +3711,8 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
     for (const v of message.warnings) {
       writer.uint32(66).string(v!);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(74).string(message.errorMessage);
-    }
-    if (message.downloadedCount !== 0) {
-      writer.uint32(80).int32(message.downloadedCount);
-    }
-    if (message.availableCount !== 0) {
-      writer.uint32(88).int32(message.availableCount);
-    }
-    if (message.errorCount !== 0) {
-      writer.uint32(96).int32(message.errorCount);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -4128,52 +3724,12 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
           }
 
           message.models = ModelInfoList.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.registeredCount = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.updatedCount = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.discoveredCount = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.prunedCount = reader.int32();
           continue;
         }
         case 7: {
@@ -4192,36 +3748,12 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
           message.warnings.push(reader.string());
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
+        case 13: {
+          if (tag !== 106) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.downloadedCount = reader.int32();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.availableCount = reader.int32();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.errorCount = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -4235,78 +3767,21 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
 
   fromJSON(object: any): ModelRegistryRefreshResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
-      registeredCount: isSet(object.registeredCount)
-        ? globalThis.Number(object.registeredCount)
-        : isSet(object.registered_count)
-        ? globalThis.Number(object.registered_count)
-        : 0,
-      updatedCount: isSet(object.updatedCount)
-        ? globalThis.Number(object.updatedCount)
-        : isSet(object.updated_count)
-        ? globalThis.Number(object.updated_count)
-        : 0,
-      discoveredCount: isSet(object.discoveredCount)
-        ? globalThis.Number(object.discoveredCount)
-        : isSet(object.discovered_count)
-        ? globalThis.Number(object.discovered_count)
-        : 0,
-      prunedCount: isSet(object.prunedCount)
-        ? globalThis.Number(object.prunedCount)
-        : isSet(object.pruned_count)
-        ? globalThis.Number(object.pruned_count)
-        : 0,
       refreshedAtUnixMs: isSet(object.refreshedAtUnixMs)
         ? globalThis.Number(object.refreshedAtUnixMs)
         : isSet(object.refreshed_at_unix_ms)
         ? globalThis.Number(object.refreshed_at_unix_ms)
         : 0,
-      warnings: globalThis.Array.isArray(object?.warnings)
-        ? object.warnings.map((e: any) => globalThis.String(e))
-        : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
-      downloadedCount: isSet(object.downloadedCount)
-        ? globalThis.Number(object.downloadedCount)
-        : isSet(object.downloaded_count)
-        ? globalThis.Number(object.downloaded_count)
-        : 0,
-      availableCount: isSet(object.availableCount)
-        ? globalThis.Number(object.availableCount)
-        : isSet(object.available_count)
-        ? globalThis.Number(object.available_count)
-        : 0,
-      errorCount: isSet(object.errorCount)
-        ? globalThis.Number(object.errorCount)
-        : isSet(object.error_count)
-        ? globalThis.Number(object.error_count)
-        : 0,
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelRegistryRefreshResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.models !== undefined) {
       obj.models = ModelInfoList.toJSON(message.models);
-    }
-    if (message.registeredCount !== 0) {
-      obj.registeredCount = Math.round(message.registeredCount);
-    }
-    if (message.updatedCount !== 0) {
-      obj.updatedCount = Math.round(message.updatedCount);
-    }
-    if (message.discoveredCount !== 0) {
-      obj.discoveredCount = Math.round(message.discoveredCount);
-    }
-    if (message.prunedCount !== 0) {
-      obj.prunedCount = Math.round(message.prunedCount);
     }
     if (message.refreshedAtUnixMs !== 0) {
       obj.refreshedAtUnixMs = Math.round(message.refreshedAtUnixMs);
@@ -4314,17 +3789,8 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.downloadedCount !== 0) {
-      obj.downloadedCount = Math.round(message.downloadedCount);
-    }
-    if (message.availableCount !== 0) {
-      obj.availableCount = Math.round(message.availableCount);
-    }
-    if (message.errorCount !== 0) {
-      obj.errorCount = Math.round(message.errorCount);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -4334,35 +3800,26 @@ export const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult> 
   },
   fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(object: I): ModelRegistryRefreshResult {
     const message = createBaseModelRegistryRefreshResult();
-    message.success = object.success ?? false;
     message.models = (object.models !== undefined && object.models !== null)
       ? ModelInfoList.fromPartial(object.models)
       : undefined;
-    message.registeredCount = object.registeredCount ?? 0;
-    message.updatedCount = object.updatedCount ?? 0;
-    message.discoveredCount = object.discoveredCount ?? 0;
-    message.prunedCount = object.prunedCount ?? 0;
     message.refreshedAtUnixMs = object.refreshedAtUnixMs ?? 0;
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
-    message.downloadedCount = object.downloadedCount ?? 0;
-    message.availableCount = object.availableCount ?? 0;
-    message.errorCount = object.errorCount ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseModelListRequest(): ModelListRequest {
-  return { query: undefined, includeCounts: false };
+  return { query: undefined };
 }
 
 export const ModelListRequest: MessageFns<ModelListRequest> = {
   encode(message: ModelListRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.query !== undefined) {
       ModelQuery.encode(message.query, writer.uint32(10).fork()).join();
-    }
-    if (message.includeCounts !== false) {
-      writer.uint32(16).bool(message.includeCounts);
     }
     return writer;
   },
@@ -4382,14 +3839,6 @@ export const ModelListRequest: MessageFns<ModelListRequest> = {
           message.query = ModelQuery.decode(reader, reader.uint32());
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.includeCounts = reader.bool();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4400,23 +3849,13 @@ export const ModelListRequest: MessageFns<ModelListRequest> = {
   },
 
   fromJSON(object: any): ModelListRequest {
-    return {
-      query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
-      includeCounts: isSet(object.includeCounts)
-        ? globalThis.Boolean(object.includeCounts)
-        : isSet(object.include_counts)
-        ? globalThis.Boolean(object.include_counts)
-        : false,
-    };
+    return { query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined };
   },
 
   toJSON(message: ModelListRequest): unknown {
     const obj: any = {};
     if (message.query !== undefined) {
       obj.query = ModelQuery.toJSON(message.query);
-    }
-    if (message.includeCounts !== false) {
-      obj.includeCounts = message.includeCounts;
     }
     return obj;
   },
@@ -4429,45 +3868,21 @@ export const ModelListRequest: MessageFns<ModelListRequest> = {
     message.query = (object.query !== undefined && object.query !== null)
       ? ModelQuery.fromPartial(object.query)
       : undefined;
-    message.includeCounts = object.includeCounts ?? false;
     return message;
   },
 };
 
 function createBaseModelListResult(): ModelListResult {
-  return {
-    success: false,
-    models: undefined,
-    errorMessage: "",
-    totalCount: 0,
-    downloadedCount: 0,
-    availableCount: 0,
-    filteredCount: 0,
-  };
+  return { models: undefined, error: undefined };
 }
 
 export const ModelListResult: MessageFns<ModelListResult> = {
   encode(message: ModelListResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.models !== undefined) {
       ModelInfoList.encode(message.models, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
-    }
-    if (message.totalCount !== 0) {
-      writer.uint32(32).int32(message.totalCount);
-    }
-    if (message.downloadedCount !== 0) {
-      writer.uint32(40).int32(message.downloadedCount);
-    }
-    if (message.availableCount !== 0) {
-      writer.uint32(48).int32(message.availableCount);
-    }
-    if (message.filteredCount !== 0) {
-      writer.uint32(56).int32(message.filteredCount);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -4479,14 +3894,6 @@ export const ModelListResult: MessageFns<ModelListResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -4495,44 +3902,12 @@ export const ModelListResult: MessageFns<ModelListResult> = {
           message.models = ModelInfoList.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 8: {
+          if (tag !== 66) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.totalCount = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.downloadedCount = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.availableCount = reader.int32();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.filteredCount = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -4546,58 +3921,18 @@ export const ModelListResult: MessageFns<ModelListResult> = {
 
   fromJSON(object: any): ModelListResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
-      totalCount: isSet(object.totalCount)
-        ? globalThis.Number(object.totalCount)
-        : isSet(object.total_count)
-        ? globalThis.Number(object.total_count)
-        : 0,
-      downloadedCount: isSet(object.downloadedCount)
-        ? globalThis.Number(object.downloadedCount)
-        : isSet(object.downloaded_count)
-        ? globalThis.Number(object.downloaded_count)
-        : 0,
-      availableCount: isSet(object.availableCount)
-        ? globalThis.Number(object.availableCount)
-        : isSet(object.available_count)
-        ? globalThis.Number(object.available_count)
-        : 0,
-      filteredCount: isSet(object.filteredCount)
-        ? globalThis.Number(object.filteredCount)
-        : isSet(object.filtered_count)
-        ? globalThis.Number(object.filtered_count)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelListResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.models !== undefined) {
       obj.models = ModelInfoList.toJSON(message.models);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.totalCount !== 0) {
-      obj.totalCount = Math.round(message.totalCount);
-    }
-    if (message.downloadedCount !== 0) {
-      obj.downloadedCount = Math.round(message.downloadedCount);
-    }
-    if (message.availableCount !== 0) {
-      obj.availableCount = Math.round(message.availableCount);
-    }
-    if (message.filteredCount !== 0) {
-      obj.filteredCount = Math.round(message.filteredCount);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -4607,15 +3942,12 @@ export const ModelListResult: MessageFns<ModelListResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelListResult>, I>>(object: I): ModelListResult {
     const message = createBaseModelListResult();
-    message.success = object.success ?? false;
     message.models = (object.models !== undefined && object.models !== null)
       ? ModelInfoList.fromPartial(object.models)
       : undefined;
-    message.errorMessage = object.errorMessage ?? "";
-    message.totalCount = object.totalCount ?? 0;
-    message.downloadedCount = object.downloadedCount ?? 0;
-    message.availableCount = object.availableCount ?? 0;
-    message.filteredCount = object.filteredCount ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -4685,7 +4017,7 @@ export const ModelGetRequest: MessageFns<ModelGetRequest> = {
 };
 
 function createBaseModelGetResult(): ModelGetResult {
-  return { found: false, model: undefined, errorMessage: "" };
+  return { found: false, model: undefined, error: undefined };
 }
 
 export const ModelGetResult: MessageFns<ModelGetResult> = {
@@ -4696,8 +4028,8 @@ export const ModelGetResult: MessageFns<ModelGetResult> = {
     if (message.model !== undefined) {
       ModelInfo.encode(message.model, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -4725,12 +4057,12 @@ export const ModelGetResult: MessageFns<ModelGetResult> = {
           message.model = ModelInfo.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -4746,11 +4078,7 @@ export const ModelGetResult: MessageFns<ModelGetResult> = {
     return {
       found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
       model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -4762,8 +4090,8 @@ export const ModelGetResult: MessageFns<ModelGetResult> = {
     if (message.model !== undefined) {
       obj.model = ModelInfo.toJSON(message.model);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -4777,7 +4105,9 @@ export const ModelGetResult: MessageFns<ModelGetResult> = {
     message.model = (object.model !== undefined && object.model !== null)
       ? ModelInfo.fromPartial(object.model)
       : undefined;
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -4951,22 +4281,18 @@ export const ModelImportRequest: MessageFns<ModelImportRequest> = {
 
 function createBaseModelImportResult(): ModelImportResult {
   return {
-    success: false,
     model: undefined,
     localPath: "",
     importedBytes: 0,
     warnings: [],
-    errorMessage: "",
     registered: false,
     copiedIntoManagedStorage: false,
+    error: undefined,
   };
 }
 
 export const ModelImportResult: MessageFns<ModelImportResult> = {
   encode(message: ModelImportResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.model !== undefined) {
       ModelInfo.encode(message.model, writer.uint32(18).fork()).join();
     }
@@ -4979,14 +4305,14 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
     for (const v of message.warnings) {
       writer.uint32(42).string(v!);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
-    }
     if (message.registered !== false) {
       writer.uint32(56).bool(message.registered);
     }
     if (message.copiedIntoManagedStorage !== false) {
       writer.uint32(64).bool(message.copiedIntoManagedStorage);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -4998,14 +4324,6 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -5038,14 +4356,6 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
           message.warnings.push(reader.string());
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
@@ -5062,6 +4372,14 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
           message.copiedIntoManagedStorage = reader.bool();
           continue;
         }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5073,7 +4391,6 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
 
   fromJSON(object: any): ModelImportResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
       localPath: isSet(object.localPath)
         ? globalThis.String(object.localPath)
@@ -5086,25 +4403,18 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
         ? globalThis.Number(object.imported_bytes)
         : 0,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       registered: isSet(object.registered) ? globalThis.Boolean(object.registered) : false,
       copiedIntoManagedStorage: isSet(object.copiedIntoManagedStorage)
         ? globalThis.Boolean(object.copiedIntoManagedStorage)
         : isSet(object.copied_into_managed_storage)
         ? globalThis.Boolean(object.copied_into_managed_storage)
         : false,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelImportResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.model !== undefined) {
       obj.model = ModelInfo.toJSON(message.model);
     }
@@ -5117,14 +4427,14 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.registered !== false) {
       obj.registered = message.registered;
     }
     if (message.copiedIntoManagedStorage !== false) {
       obj.copiedIntoManagedStorage = message.copiedIntoManagedStorage;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -5134,16 +4444,17 @@ export const ModelImportResult: MessageFns<ModelImportResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelImportResult>, I>>(object: I): ModelImportResult {
     const message = createBaseModelImportResult();
-    message.success = object.success ?? false;
     message.model = (object.model !== undefined && object.model !== null)
       ? ModelInfo.fromPartial(object.model)
       : undefined;
     message.localPath = object.localPath ?? "";
     message.importedBytes = object.importedBytes ?? 0;
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.registered = object.registered ?? false;
     message.copiedIntoManagedStorage = object.copiedIntoManagedStorage ?? false;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -5495,43 +4806,19 @@ export const DiscoveredModel: MessageFns<DiscoveredModel> = {
 };
 
 function createBaseModelDiscoveryResult(): ModelDiscoveryResult {
-  return {
-    success: false,
-    discoveredModels: [],
-    linkedCount: 0,
-    purgedCount: 0,
-    warnings: [],
-    errorMessage: "",
-    scannedCount: 0,
-    importedCount: 0,
-  };
+  return { discoveredModels: [], warnings: [], error: undefined };
 }
 
 export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
   encode(message: ModelDiscoveryResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     for (const v of message.discoveredModels) {
       DiscoveredModel.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.linkedCount !== 0) {
-      writer.uint32(24).int32(message.linkedCount);
-    }
-    if (message.purgedCount !== 0) {
-      writer.uint32(32).int32(message.purgedCount);
     }
     for (const v of message.warnings) {
       writer.uint32(42).string(v!);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
-    }
-    if (message.scannedCount !== 0) {
-      writer.uint32(56).int32(message.scannedCount);
-    }
-    if (message.importedCount !== 0) {
-      writer.uint32(64).int32(message.importedCount);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -5543,36 +4830,12 @@ export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
           }
 
           message.discoveredModels.push(DiscoveredModel.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.linkedCount = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.purgedCount = reader.int32();
           continue;
         }
         case 5: {
@@ -5583,28 +4846,12 @@ export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
           message.warnings.push(reader.string());
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.scannedCount = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.importedCount = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -5618,66 +4865,26 @@ export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
 
   fromJSON(object: any): ModelDiscoveryResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       discoveredModels: globalThis.Array.isArray(object?.discoveredModels)
         ? object.discoveredModels.map((e: any) => DiscoveredModel.fromJSON(e))
         : globalThis.Array.isArray(object?.discovered_models)
         ? object.discovered_models.map((e: any) => DiscoveredModel.fromJSON(e))
         : [],
-      linkedCount: isSet(object.linkedCount)
-        ? globalThis.Number(object.linkedCount)
-        : isSet(object.linked_count)
-        ? globalThis.Number(object.linked_count)
-        : 0,
-      purgedCount: isSet(object.purgedCount)
-        ? globalThis.Number(object.purgedCount)
-        : isSet(object.purged_count)
-        ? globalThis.Number(object.purged_count)
-        : 0,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
-      scannedCount: isSet(object.scannedCount)
-        ? globalThis.Number(object.scannedCount)
-        : isSet(object.scanned_count)
-        ? globalThis.Number(object.scanned_count)
-        : 0,
-      importedCount: isSet(object.importedCount)
-        ? globalThis.Number(object.importedCount)
-        : isSet(object.imported_count)
-        ? globalThis.Number(object.imported_count)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelDiscoveryResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.discoveredModels?.length) {
       obj.discoveredModels = message.discoveredModels.map((e) => DiscoveredModel.toJSON(e));
-    }
-    if (message.linkedCount !== 0) {
-      obj.linkedCount = Math.round(message.linkedCount);
-    }
-    if (message.purgedCount !== 0) {
-      obj.purgedCount = Math.round(message.purgedCount);
     }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.scannedCount !== 0) {
-      obj.scannedCount = Math.round(message.scannedCount);
-    }
-    if (message.importedCount !== 0) {
-      obj.importedCount = Math.round(message.importedCount);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -5687,20 +4894,27 @@ export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(object: I): ModelDiscoveryResult {
     const message = createBaseModelDiscoveryResult();
-    message.success = object.success ?? false;
     message.discoveredModels = object.discoveredModels?.map((e) => DiscoveredModel.fromPartial(e)) || [];
-    message.linkedCount = object.linkedCount ?? 0;
-    message.purgedCount = object.purgedCount ?? 0;
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
-    message.scannedCount = object.scannedCount ?? 0;
-    message.importedCount = object.importedCount ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseModelLoadRequest(): ModelLoadRequest {
-  return { modelId: "", category: undefined, framework: undefined, forceReload: false, validateAvailability: false };
+  return {
+    modelId: "",
+    category: undefined,
+    framework: undefined,
+    forceReload: false,
+    validateAvailability: false,
+    contextLength: undefined,
+    useGpu: undefined,
+    backendPreferences: [],
+    acceleratorPolicy: undefined,
+  };
 }
 
 export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
@@ -5719,6 +4933,20 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     }
     if (message.validateAvailability !== false) {
       writer.uint32(40).bool(message.validateAvailability);
+    }
+    if (message.contextLength !== undefined) {
+      writer.uint32(48).int32(message.contextLength);
+    }
+    if (message.useGpu !== undefined) {
+      writer.uint32(64).bool(message.useGpu);
+    }
+    writer.uint32(74).fork();
+    for (const v of message.backendPreferences) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.acceleratorPolicy !== undefined) {
+      writer.uint32(80).int32(message.acceleratorPolicy);
     }
     return writer;
   },
@@ -5770,6 +4998,48 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
           message.validateAvailability = reader.bool();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.contextLength = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.useGpu = reader.bool();
+          continue;
+        }
+        case 9: {
+          if (tag === 72) {
+            message.backendPreferences.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 74) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.backendPreferences.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.acceleratorPolicy = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5798,6 +5068,26 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
         : isSet(object.validate_availability)
         ? globalThis.Boolean(object.validate_availability)
         : false,
+      contextLength: isSet(object.contextLength)
+        ? globalThis.Number(object.contextLength)
+        : isSet(object.context_length)
+        ? globalThis.Number(object.context_length)
+        : undefined,
+      useGpu: isSet(object.useGpu)
+        ? globalThis.Boolean(object.useGpu)
+        : isSet(object.use_gpu)
+        ? globalThis.Boolean(object.use_gpu)
+        : undefined,
+      backendPreferences: globalThis.Array.isArray(object?.backendPreferences)
+        ? object.backendPreferences.map((e: any) => inferenceFrameworkFromJSON(e))
+        : globalThis.Array.isArray(object?.backend_preferences)
+        ? object.backend_preferences.map((e: any) => inferenceFrameworkFromJSON(e))
+        : [],
+      acceleratorPolicy: isSet(object.acceleratorPolicy)
+        ? acceleratorPolicyFromJSON(object.acceleratorPolicy)
+        : isSet(object.accelerator_policy)
+        ? acceleratorPolicyFromJSON(object.accelerator_policy)
+        : undefined,
     };
   },
 
@@ -5818,6 +5108,18 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     if (message.validateAvailability !== false) {
       obj.validateAvailability = message.validateAvailability;
     }
+    if (message.contextLength !== undefined) {
+      obj.contextLength = Math.round(message.contextLength);
+    }
+    if (message.useGpu !== undefined) {
+      obj.useGpu = message.useGpu;
+    }
+    if (message.backendPreferences?.length) {
+      obj.backendPreferences = message.backendPreferences.map((e) => inferenceFrameworkToJSON(e));
+    }
+    if (message.acceleratorPolicy !== undefined) {
+      obj.acceleratorPolicy = acceleratorPolicyToJSON(message.acceleratorPolicy);
+    }
     return obj;
   },
 
@@ -5831,30 +5133,38 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     message.framework = object.framework ?? undefined;
     message.forceReload = object.forceReload ?? false;
     message.validateAvailability = object.validateAvailability ?? false;
+    message.contextLength = object.contextLength ?? undefined;
+    message.useGpu = object.useGpu ?? undefined;
+    message.backendPreferences = object.backendPreferences?.map((e) => e) || [];
+    message.acceleratorPolicy = object.acceleratorPolicy ?? undefined;
     return message;
   },
 };
 
 function createBaseModelLoadResult(): ModelLoadResult {
   return {
-    success: false,
     modelId: "",
     category: 0,
     framework: 0,
     resolvedPath: "",
     loadedAtUnixMs: 0,
-    errorMessage: "",
     warnings: [],
     alreadyLoaded: false,
     resolvedArtifacts: [],
+    error: undefined,
+    requestedBackend: undefined,
+    actualDeviceId: undefined,
+    actualDeviceName: undefined,
+    actualDeviceKind: undefined,
+    runtimeVersion: undefined,
+    abiVersion: undefined,
+    fallbackReason: undefined,
+    allocatedContextLength: undefined,
   };
 }
 
 export const ModelLoadResult: MessageFns<ModelLoadResult> = {
   encode(message: ModelLoadResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.modelId !== "") {
       writer.uint32(18).string(message.modelId);
     }
@@ -5870,9 +5180,6 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     if (message.loadedAtUnixMs !== 0) {
       writer.uint32(48).int64(message.loadedAtUnixMs);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(58).string(message.errorMessage);
-    }
     for (const v of message.warnings) {
       writer.uint32(66).string(v!);
     }
@@ -5881,6 +5188,33 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     }
     for (const v of message.resolvedArtifacts) {
       ModelFileDescriptor.encode(v!, writer.uint32(82).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
+    }
+    if (message.requestedBackend !== undefined) {
+      writer.uint32(96).int32(message.requestedBackend);
+    }
+    if (message.actualDeviceId !== undefined) {
+      writer.uint32(106).string(message.actualDeviceId);
+    }
+    if (message.actualDeviceName !== undefined) {
+      writer.uint32(114).string(message.actualDeviceName);
+    }
+    if (message.actualDeviceKind !== undefined) {
+      writer.uint32(122).string(message.actualDeviceKind);
+    }
+    if (message.runtimeVersion !== undefined) {
+      writer.uint32(130).string(message.runtimeVersion);
+    }
+    if (message.abiVersion !== undefined) {
+      writer.uint32(138).string(message.abiVersion);
+    }
+    if (message.fallbackReason !== undefined) {
+      writer.uint32(146).string(message.fallbackReason);
+    }
+    if (message.allocatedContextLength !== undefined) {
+      writer.uint32(152).int32(message.allocatedContextLength);
     }
     return writer;
   },
@@ -5892,14 +5226,6 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -5940,14 +5266,6 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
           message.loadedAtUnixMs = longToNumber(reader.int64());
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 8: {
           if (tag !== 66) {
             break;
@@ -5972,6 +5290,78 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
           message.resolvedArtifacts.push(ModelFileDescriptor.decode(reader, reader.uint32()));
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.requestedBackend = reader.int32() as any;
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.actualDeviceId = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.actualDeviceName = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.actualDeviceKind = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.runtimeVersion = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.abiVersion = reader.string();
+          continue;
+        }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.fallbackReason = reader.string();
+          continue;
+        }
+        case 19: {
+          if (tag !== 152) {
+            break;
+          }
+
+          message.allocatedContextLength = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5983,7 +5373,6 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
 
   fromJSON(object: any): ModelLoadResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       modelId: isSet(object.modelId)
         ? globalThis.String(object.modelId)
         : isSet(object.model_id)
@@ -6001,14 +5390,7 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
         : isSet(object.loaded_at_unix_ms)
         ? globalThis.Number(object.loaded_at_unix_ms)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
-      warnings: globalThis.Array.isArray(object?.warnings)
-        ? object.warnings.map((e: any) => globalThis.String(e))
-        : [],
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
       alreadyLoaded: isSet(object.alreadyLoaded)
         ? globalThis.Boolean(object.alreadyLoaded)
         : isSet(object.already_loaded)
@@ -6019,14 +5401,52 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
         : globalThis.Array.isArray(object?.resolved_artifacts)
         ? object.resolved_artifacts.map((e: any) => ModelFileDescriptor.fromJSON(e))
         : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      requestedBackend: isSet(object.requestedBackend)
+        ? inferenceFrameworkFromJSON(object.requestedBackend)
+        : isSet(object.requested_backend)
+        ? inferenceFrameworkFromJSON(object.requested_backend)
+        : undefined,
+      actualDeviceId: isSet(object.actualDeviceId)
+        ? globalThis.String(object.actualDeviceId)
+        : isSet(object.actual_device_id)
+        ? globalThis.String(object.actual_device_id)
+        : undefined,
+      actualDeviceName: isSet(object.actualDeviceName)
+        ? globalThis.String(object.actualDeviceName)
+        : isSet(object.actual_device_name)
+        ? globalThis.String(object.actual_device_name)
+        : undefined,
+      actualDeviceKind: isSet(object.actualDeviceKind)
+        ? globalThis.String(object.actualDeviceKind)
+        : isSet(object.actual_device_kind)
+        ? globalThis.String(object.actual_device_kind)
+        : undefined,
+      runtimeVersion: isSet(object.runtimeVersion)
+        ? globalThis.String(object.runtimeVersion)
+        : isSet(object.runtime_version)
+        ? globalThis.String(object.runtime_version)
+        : undefined,
+      abiVersion: isSet(object.abiVersion)
+        ? globalThis.String(object.abiVersion)
+        : isSet(object.abi_version)
+        ? globalThis.String(object.abi_version)
+        : undefined,
+      fallbackReason: isSet(object.fallbackReason)
+        ? globalThis.String(object.fallbackReason)
+        : isSet(object.fallback_reason)
+        ? globalThis.String(object.fallback_reason)
+        : undefined,
+      allocatedContextLength: isSet(object.allocatedContextLength)
+        ? globalThis.Number(object.allocatedContextLength)
+        : isSet(object.allocated_context_length)
+        ? globalThis.Number(object.allocated_context_length)
+        : undefined,
     };
   },
 
   toJSON(message: ModelLoadResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
@@ -6042,9 +5462,6 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     if (message.loadedAtUnixMs !== 0) {
       obj.loadedAtUnixMs = Math.round(message.loadedAtUnixMs);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
@@ -6054,6 +5471,33 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     if (message.resolvedArtifacts?.length) {
       obj.resolvedArtifacts = message.resolvedArtifacts.map((e) => ModelFileDescriptor.toJSON(e));
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
+    if (message.requestedBackend !== undefined) {
+      obj.requestedBackend = inferenceFrameworkToJSON(message.requestedBackend);
+    }
+    if (message.actualDeviceId !== undefined) {
+      obj.actualDeviceId = message.actualDeviceId;
+    }
+    if (message.actualDeviceName !== undefined) {
+      obj.actualDeviceName = message.actualDeviceName;
+    }
+    if (message.actualDeviceKind !== undefined) {
+      obj.actualDeviceKind = message.actualDeviceKind;
+    }
+    if (message.runtimeVersion !== undefined) {
+      obj.runtimeVersion = message.runtimeVersion;
+    }
+    if (message.abiVersion !== undefined) {
+      obj.abiVersion = message.abiVersion;
+    }
+    if (message.fallbackReason !== undefined) {
+      obj.fallbackReason = message.fallbackReason;
+    }
+    if (message.allocatedContextLength !== undefined) {
+      obj.allocatedContextLength = Math.round(message.allocatedContextLength);
+    }
     return obj;
   },
 
@@ -6062,16 +5506,25 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelLoadResult>, I>>(object: I): ModelLoadResult {
     const message = createBaseModelLoadResult();
-    message.success = object.success ?? false;
     message.modelId = object.modelId ?? "";
     message.category = object.category ?? 0;
     message.framework = object.framework ?? 0;
     message.resolvedPath = object.resolvedPath ?? "";
     message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
     message.warnings = object.warnings?.map((e) => e) || [];
     message.alreadyLoaded = object.alreadyLoaded ?? false;
     message.resolvedArtifacts = object.resolvedArtifacts?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
+    message.requestedBackend = object.requestedBackend ?? undefined;
+    message.actualDeviceId = object.actualDeviceId ?? undefined;
+    message.actualDeviceName = object.actualDeviceName ?? undefined;
+    message.actualDeviceKind = object.actualDeviceKind ?? undefined;
+    message.runtimeVersion = object.runtimeVersion ?? undefined;
+    message.abiVersion = object.abiVersion ?? undefined;
+    message.fallbackReason = object.fallbackReason ?? undefined;
+    message.allocatedContextLength = object.allocatedContextLength ?? undefined;
     return message;
   },
 };
@@ -6193,25 +5646,22 @@ export const ModelUnloadRequest: MessageFns<ModelUnloadRequest> = {
 };
 
 function createBaseModelUnloadResult(): ModelUnloadResult {
-  return { success: false, unloadedModelIds: [], errorMessage: "", unloadedAtUnixMs: 0, warnings: [] };
+  return { unloadedModelIds: [], unloadedAtUnixMs: 0, warnings: [], error: undefined };
 }
 
 export const ModelUnloadResult: MessageFns<ModelUnloadResult> = {
   encode(message: ModelUnloadResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     for (const v of message.unloadedModelIds) {
       writer.uint32(18).string(v!);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
     }
     if (message.unloadedAtUnixMs !== 0) {
       writer.uint32(32).int64(message.unloadedAtUnixMs);
     }
     for (const v of message.warnings) {
       writer.uint32(42).string(v!);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -6223,28 +5673,12 @@ export const ModelUnloadResult: MessageFns<ModelUnloadResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
           }
 
           message.unloadedModelIds.push(reader.string());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
           continue;
         }
         case 4: {
@@ -6263,6 +5697,14 @@ export const ModelUnloadResult: MessageFns<ModelUnloadResult> = {
           message.warnings.push(reader.string());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6274,42 +5716,34 @@ export const ModelUnloadResult: MessageFns<ModelUnloadResult> = {
 
   fromJSON(object: any): ModelUnloadResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       unloadedModelIds: globalThis.Array.isArray(object?.unloadedModelIds)
         ? object.unloadedModelIds.map((e: any) => globalThis.String(e))
         : globalThis.Array.isArray(object?.unloaded_model_ids)
         ? object.unloaded_model_ids.map((e: any) => globalThis.String(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       unloadedAtUnixMs: isSet(object.unloadedAtUnixMs)
         ? globalThis.Number(object.unloadedAtUnixMs)
         : isSet(object.unloaded_at_unix_ms)
         ? globalThis.Number(object.unloaded_at_unix_ms)
         : 0,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelUnloadResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.unloadedModelIds?.length) {
       obj.unloadedModelIds = message.unloadedModelIds;
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
     }
     if (message.unloadedAtUnixMs !== 0) {
       obj.unloadedAtUnixMs = Math.round(message.unloadedAtUnixMs);
     }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -6319,11 +5753,12 @@ export const ModelUnloadResult: MessageFns<ModelUnloadResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(object: I): ModelUnloadResult {
     const message = createBaseModelUnloadResult();
-    message.success = object.success ?? false;
     message.unloadedModelIds = object.unloadedModelIds?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.unloadedAtUnixMs = object.unloadedAtUnixMs ?? 0;
     message.warnings = object.warnings?.map((e) => e) || [];
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -6430,11 +5865,11 @@ function createBaseCurrentModelResult(): CurrentModelResult {
     model: undefined,
     loadedAtUnixMs: 0,
     found: false,
-    errorMessage: "",
     category: 0,
     framework: 0,
     resolvedPath: "",
     resolvedArtifacts: [],
+    error: undefined,
   };
 }
 
@@ -6452,9 +5887,6 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
     if (message.found !== false) {
       writer.uint32(40).bool(message.found);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
-    }
     if (message.category !== 0) {
       writer.uint32(56).int32(message.category);
     }
@@ -6466,6 +5898,9 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
     }
     for (const v of message.resolvedArtifacts) {
       ModelFileDescriptor.encode(v!, writer.uint32(82).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -6509,14 +5944,6 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
           message.found = reader.bool();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
@@ -6549,6 +5976,14 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
           message.resolvedArtifacts.push(ModelFileDescriptor.decode(reader, reader.uint32()));
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6572,11 +6007,6 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
         ? globalThis.Number(object.loaded_at_unix_ms)
         : 0,
       found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       category: isSet(object.category) ? modelCategoryFromJSON(object.category) : 0,
       framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
       resolvedPath: isSet(object.resolvedPath)
@@ -6589,6 +6019,7 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
         : globalThis.Array.isArray(object?.resolved_artifacts)
         ? object.resolved_artifacts.map((e: any) => ModelFileDescriptor.fromJSON(e))
         : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -6606,9 +6037,6 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
     if (message.found !== false) {
       obj.found = message.found;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.category !== 0) {
       obj.category = modelCategoryToJSON(message.category);
     }
@@ -6620,6 +6048,9 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
     }
     if (message.resolvedArtifacts?.length) {
       obj.resolvedArtifacts = message.resolvedArtifacts.map((e) => ModelFileDescriptor.toJSON(e));
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -6635,173 +6066,31 @@ export const CurrentModelResult: MessageFns<CurrentModelResult> = {
       : undefined;
     message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
     message.found = object.found ?? false;
-    message.errorMessage = object.errorMessage ?? "";
     message.category = object.category ?? 0;
     message.framework = object.framework ?? 0;
     message.resolvedPath = object.resolvedPath ?? "";
     message.resolvedArtifacts = object.resolvedArtifacts?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseModelDeleteRequest(): ModelDeleteRequest {
-  return { modelId: "", deleteFiles: false, unregister: false, unloadIfLoaded: false };
-}
-
-export const ModelDeleteRequest: MessageFns<ModelDeleteRequest> = {
-  encode(message: ModelDeleteRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.modelId !== "") {
-      writer.uint32(10).string(message.modelId);
-    }
-    if (message.deleteFiles !== false) {
-      writer.uint32(16).bool(message.deleteFiles);
-    }
-    if (message.unregister !== false) {
-      writer.uint32(24).bool(message.unregister);
-    }
-    if (message.unloadIfLoaded !== false) {
-      writer.uint32(32).bool(message.unloadIfLoaded);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ModelDeleteRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModelDeleteRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.deleteFiles = reader.bool();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.unregister = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.unloadIfLoaded = reader.bool();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ModelDeleteRequest {
-    return {
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      deleteFiles: isSet(object.deleteFiles)
-        ? globalThis.Boolean(object.deleteFiles)
-        : isSet(object.delete_files)
-        ? globalThis.Boolean(object.delete_files)
-        : false,
-      unregister: isSet(object.unregister) ? globalThis.Boolean(object.unregister) : false,
-      unloadIfLoaded: isSet(object.unloadIfLoaded)
-        ? globalThis.Boolean(object.unloadIfLoaded)
-        : isSet(object.unload_if_loaded)
-        ? globalThis.Boolean(object.unload_if_loaded)
-        : false,
-    };
-  },
-
-  toJSON(message: ModelDeleteRequest): unknown {
-    const obj: any = {};
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.deleteFiles !== false) {
-      obj.deleteFiles = message.deleteFiles;
-    }
-    if (message.unregister !== false) {
-      obj.unregister = message.unregister;
-    }
-    if (message.unloadIfLoaded !== false) {
-      obj.unloadIfLoaded = message.unloadIfLoaded;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(base?: I): ModelDeleteRequest {
-    return ModelDeleteRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(object: I): ModelDeleteRequest {
-    const message = createBaseModelDeleteRequest();
-    message.modelId = object.modelId ?? "";
-    message.deleteFiles = object.deleteFiles ?? false;
-    message.unregister = object.unregister ?? false;
-    message.unloadIfLoaded = object.unloadIfLoaded ?? false;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseModelDeleteResult(): ModelDeleteResult {
-  return {
-    success: false,
-    modelId: "",
-    deletedBytes: 0,
-    filesDeleted: false,
-    registryUpdated: false,
-    wasLoaded: false,
-    errorMessage: "",
-    warnings: [],
-  };
+  return { modelId: "", deletedBytes: 0, error: undefined };
 }
 
 export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
   encode(message: ModelDeleteResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.modelId !== "") {
       writer.uint32(18).string(message.modelId);
     }
     if (message.deletedBytes !== 0) {
       writer.uint32(24).int64(message.deletedBytes);
     }
-    if (message.filesDeleted !== false) {
-      writer.uint32(32).bool(message.filesDeleted);
-    }
-    if (message.registryUpdated !== false) {
-      writer.uint32(40).bool(message.registryUpdated);
-    }
-    if (message.wasLoaded !== false) {
-      writer.uint32(48).bool(message.wasLoaded);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    for (const v of message.warnings) {
-      writer.uint32(66).string(v!);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -6813,14 +6102,6 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -6837,44 +6118,12 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
           message.deletedBytes = longToNumber(reader.int64());
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.filesDeleted = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.registryUpdated = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.wasLoaded = reader.bool();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.warnings.push(reader.string());
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -6888,7 +6137,6 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
 
   fromJSON(object: any): ModelDeleteResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       modelId: isSet(object.modelId)
         ? globalThis.String(object.modelId)
         : isSet(object.model_id)
@@ -6899,57 +6147,20 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
         : isSet(object.deleted_bytes)
         ? globalThis.Number(object.deleted_bytes)
         : 0,
-      filesDeleted: isSet(object.filesDeleted)
-        ? globalThis.Boolean(object.filesDeleted)
-        : isSet(object.files_deleted)
-        ? globalThis.Boolean(object.files_deleted)
-        : false,
-      registryUpdated: isSet(object.registryUpdated)
-        ? globalThis.Boolean(object.registryUpdated)
-        : isSet(object.registry_updated)
-        ? globalThis.Boolean(object.registry_updated)
-        : false,
-      wasLoaded: isSet(object.wasLoaded)
-        ? globalThis.Boolean(object.wasLoaded)
-        : isSet(object.was_loaded)
-        ? globalThis.Boolean(object.was_loaded)
-        : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
-      warnings: globalThis.Array.isArray(object?.warnings)
-        ? object.warnings.map((e: any) => globalThis.String(e))
-        : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelDeleteResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
     if (message.deletedBytes !== 0) {
       obj.deletedBytes = Math.round(message.deletedBytes);
     }
-    if (message.filesDeleted !== false) {
-      obj.filesDeleted = message.filesDeleted;
-    }
-    if (message.registryUpdated !== false) {
-      obj.registryUpdated = message.registryUpdated;
-    }
-    if (message.wasLoaded !== false) {
-      obj.wasLoaded = message.wasLoaded;
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.warnings?.length) {
-      obj.warnings = message.warnings;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -6959,14 +6170,11 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(object: I): ModelDeleteResult {
     const message = createBaseModelDeleteResult();
-    message.success = object.success ?? false;
     message.modelId = object.modelId ?? "";
     message.deletedBytes = object.deletedBytes ?? 0;
-    message.filesDeleted = object.filesDeleted ?? false;
-    message.registryUpdated = object.registryUpdated ?? false;
-    message.wasLoaded = object.wasLoaded ?? false;
-    message.errorMessage = object.errorMessage ?? "";
-    message.warnings = object.warnings?.map((e) => e) || [];
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -6974,7 +6182,6 @@ export const ModelDeleteResult: MessageFns<ModelDeleteResult> = {
 function createBaseModelCompatibilityRequest(): ModelCompatibilityRequest {
   return {
     modelId: "",
-    hardwareProfile: undefined,
     availableRamBytes: 0,
     availableStorageBytes: 0,
     acceleratorPreference: undefined,
@@ -6987,20 +6194,17 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
     }
-    if (message.hardwareProfile !== undefined) {
-      HardwareProfile.encode(message.hardwareProfile, writer.uint32(18).fork()).join();
-    }
     if (message.availableRamBytes !== 0) {
-      writer.uint32(24).int64(message.availableRamBytes);
+      writer.uint32(16).int64(message.availableRamBytes);
     }
     if (message.availableStorageBytes !== 0) {
-      writer.uint32(32).int64(message.availableStorageBytes);
+      writer.uint32(24).int64(message.availableStorageBytes);
     }
     if (message.acceleratorPreference !== undefined) {
-      writer.uint32(40).int32(message.acceleratorPreference);
+      writer.uint32(32).int32(message.acceleratorPreference);
     }
     if (message.preferredFramework !== undefined) {
-      writer.uint32(48).int32(message.preferredFramework);
+      writer.uint32(40).int32(message.preferredFramework);
     }
     return writer;
   },
@@ -7021,11 +6225,11 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
           continue;
         }
         case 2: {
-          if (tag !== 18) {
+          if (tag !== 16) {
             break;
           }
 
-          message.hardwareProfile = HardwareProfile.decode(reader, reader.uint32());
+          message.availableRamBytes = longToNumber(reader.int64());
           continue;
         }
         case 3: {
@@ -7033,7 +6237,7 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
             break;
           }
 
-          message.availableRamBytes = longToNumber(reader.int64());
+          message.availableStorageBytes = longToNumber(reader.int64());
           continue;
         }
         case 4: {
@@ -7041,19 +6245,11 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
             break;
           }
 
-          message.availableStorageBytes = longToNumber(reader.int64());
+          message.acceleratorPreference = reader.int32() as any;
           continue;
         }
         case 5: {
           if (tag !== 40) {
-            break;
-          }
-
-          message.acceleratorPreference = reader.int32() as any;
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
             break;
           }
 
@@ -7076,11 +6272,6 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      hardwareProfile: isSet(object.hardwareProfile)
-        ? HardwareProfile.fromJSON(object.hardwareProfile)
-        : isSet(object.hardware_profile)
-        ? HardwareProfile.fromJSON(object.hardware_profile)
-        : undefined,
       availableRamBytes: isSet(object.availableRamBytes)
         ? globalThis.Number(object.availableRamBytes)
         : isSet(object.available_ram_bytes)
@@ -7109,9 +6300,6 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.hardwareProfile !== undefined) {
-      obj.hardwareProfile = HardwareProfile.toJSON(message.hardwareProfile);
-    }
     if (message.availableRamBytes !== 0) {
       obj.availableRamBytes = Math.round(message.availableRamBytes);
     }
@@ -7133,9 +6321,6 @@ export const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest> = 
   fromPartial<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(object: I): ModelCompatibilityRequest {
     const message = createBaseModelCompatibilityRequest();
     message.modelId = object.modelId ?? "";
-    message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
-      ? HardwareProfile.fromPartial(object.hardwareProfile)
-      : undefined;
     message.availableRamBytes = object.availableRamBytes ?? 0;
     message.availableStorageBytes = object.availableStorageBytes ?? 0;
     message.acceleratorPreference = object.acceleratorPreference ?? undefined;
@@ -7156,8 +6341,7 @@ function createBaseModelCompatibilityResult(): ModelCompatibilityResult {
     reasons: [],
     suggestedAlternatives: [],
     modelId: "",
-    errorCode: 0,
-    errorMessage: "",
+    error: undefined,
   };
 }
 
@@ -7193,11 +6377,8 @@ export const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult> = {
     if (message.modelId !== "") {
       writer.uint32(82).string(message.modelId);
     }
-    if (message.errorCode !== 0) {
-      writer.uint32(88).int32(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(98).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -7289,20 +6470,12 @@ export const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult> = {
           message.modelId = reader.string();
           continue;
         }
-        case 11: {
-          if (tag !== 88) {
+        case 13: {
+          if (tag !== 106) {
             break;
           }
 
-          message.errorCode = reader.int32();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -7364,16 +6537,7 @@ export const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -7409,11 +6573,8 @@ export const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -7433,8 +6594,9 @@ export const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult> = {
     message.reasons = object.reasons?.map((e) => e) || [];
     message.suggestedAlternatives = object.suggestedAlternatives?.map((e) => e) || [];
     message.modelId = object.modelId ?? "";
-    message.errorCode = object.errorCode ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -7906,14 +7068,11 @@ export const ModelRegistryFetchAssignmentsRequest: MessageFns<ModelRegistryFetch
 };
 
 function createBaseModelRegistryFetchAssignmentsResult(): ModelRegistryFetchAssignmentsResult {
-  return { success: false, models: undefined, modelCount: 0, fetchedAtUnixMs: 0, errorCode: 0, errorMessage: "" };
+  return { models: undefined, modelCount: 0, fetchedAtUnixMs: 0, error: undefined };
 }
 
 export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchAssignmentsResult> = {
   encode(message: ModelRegistryFetchAssignmentsResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.models !== undefined) {
       ModelInfoList.encode(message.models, writer.uint32(18).fork()).join();
     }
@@ -7923,11 +7082,8 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
     if (message.fetchedAtUnixMs !== 0) {
       writer.uint32(32).int64(message.fetchedAtUnixMs);
     }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -7939,14 +7095,6 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -7971,20 +7119,12 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
           message.fetchedAtUnixMs = longToNumber(reader.int64());
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
-          message.errorCode = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -7998,7 +7138,6 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
 
   fromJSON(object: any): ModelRegistryFetchAssignmentsResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
       modelCount: isSet(object.modelCount)
         ? globalThis.Number(object.modelCount)
@@ -8010,24 +7149,12 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
         : isSet(object.fetched_at_unix_ms)
         ? globalThis.Number(object.fetched_at_unix_ms)
         : 0,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ModelRegistryFetchAssignmentsResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.models !== undefined) {
       obj.models = ModelInfoList.toJSON(message.models);
     }
@@ -8037,11 +7164,8 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
     if (message.fetchedAtUnixMs !== 0) {
       obj.fetchedAtUnixMs = Math.round(message.fetchedAtUnixMs);
     }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -8055,14 +7179,14 @@ export const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchA
     object: I,
   ): ModelRegistryFetchAssignmentsResult {
     const message = createBaseModelRegistryFetchAssignmentsResult();
-    message.success = object.success ?? false;
     message.models = (object.models !== undefined && object.models !== null)
       ? ModelInfoList.fromPartial(object.models)
       : undefined;
     message.modelCount = object.modelCount ?? 0;
     message.fetchedAtUnixMs = object.fetchedAtUnixMs ?? 0;
-    message.errorCode = object.errorCode ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -8206,6 +7330,7 @@ function createBaseRegisterModelFromUrlRequest(): RegisterModelFromUrlRequest {
     description: undefined,
     downloadSizeBytes: undefined,
     id: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -8249,6 +7374,9 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     }
     if (message.id !== undefined) {
       writer.uint32(106).string(message.id);
+    }
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(114).string(message.cuaProfile);
     }
     return writer;
   },
@@ -8364,6 +7492,14 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
           message.id = reader.string();
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.cuaProfile = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8412,6 +7548,11 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
         ? globalThis.Number(object.download_size_bytes)
         : undefined,
       id: isSet(object.id) ? globalThis.String(object.id) : undefined,
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
+        : undefined,
     };
   },
 
@@ -8456,6 +7597,9 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     if (message.id !== undefined) {
       obj.id = message.id;
     }
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
+    }
     return obj;
   },
 
@@ -8477,6 +7621,7 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     message.description = object.description ?? undefined;
     message.downloadSizeBytes = object.downloadSizeBytes ?? undefined;
     message.id = object.id ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };
@@ -8496,6 +7641,7 @@ function createBaseRegisterMultiFileModelRequest(): RegisterMultiFileModelReques
     supportsLora: undefined,
     description: undefined,
     source: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -8539,6 +7685,9 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     }
     if (message.source !== undefined) {
       writer.uint32(104).int32(message.source);
+    }
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(114).string(message.cuaProfile);
     }
     return writer;
   },
@@ -8654,6 +7803,14 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
           message.source = reader.int32() as any;
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.cuaProfile = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8700,6 +7857,11 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
         : undefined,
       description: isSet(object.description) ? globalThis.String(object.description) : undefined,
       source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
+        : undefined,
     };
   },
 
@@ -8744,6 +7906,9 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     if (message.source !== undefined) {
       obj.source = modelSourceToJSON(message.source);
     }
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
+    }
     return obj;
   },
 
@@ -8767,6 +7932,7 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     message.supportsLora = object.supportsLora ?? undefined;
     message.description = object.description ?? undefined;
     message.source = object.source ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };

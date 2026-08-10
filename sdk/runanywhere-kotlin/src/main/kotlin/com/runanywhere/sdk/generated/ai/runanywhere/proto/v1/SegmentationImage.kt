@@ -29,6 +29,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class SegmentationImage(
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -37,6 +38,9 @@ public class SegmentationImage(
     schemaIndex = 0,
   )
   public val data_: ByteString = ByteString.EMPTY,
+  @RacRequiredOption(true)
+  @RacMinOption(1)
+  @RacMaxOption(4_096)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -44,6 +48,9 @@ public class SegmentationImage(
     schemaIndex = 1,
   )
   public val width: Int = 0,
+  @RacRequiredOption(true)
+  @RacMinOption(1)
+  @RacMaxOption(4_096)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -51,6 +58,7 @@ public class SegmentationImage(
     schemaIndex = 2,
   )
   public val height: Int = 0,
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.SegmentationPixelFormat#ADAPTER",

@@ -16,6 +16,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.countNonNull
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -169,8 +170,7 @@ public class ModelEvent(
   /**
    * Model-load + download/extraction telemetry metrics so the C++
    * destination router derives the telemetry payload from the proto
-   * SDKEvent alone. `framework` is the InferenceFramework enum stored as
-   * int32 (matches FrameworkEvent.framework).
+   * SDKEvent alone.
    */
   @field:WireField(
     tag = 13,
@@ -199,18 +199,136 @@ public class ModelEvent(
     schemaIndex = 14,
   )
   public val duration_ms: Long = 0L,
-  /**
-   * InferenceFramework enum int
-   */
   @field:WireField(
     tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 15,
   )
-  public val framework: Int = 0,
+  public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+  /**
+   * Absorbed from ModelRegistryEvent: registry-specific identity + results.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "assignmentId",
+    schemaIndex = 16,
+  )
+  public val assignment_id: String = "",
+  @field:WireField(
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "assignedComponent",
+    schemaIndex = 17,
+  )
+  public val assigned_component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED,
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sourcePath",
+    schemaIndex = 18,
+  )
+  public val source_path: String = "",
+  @field:WireField(
+    tag = 20,
+    adapter = "ai.runanywhere.proto.v1.ModelRegistryRefreshResult#ADAPTER",
+    jsonName = "refreshResult",
+    oneofName = "result",
+    schemaIndex = 19,
+  )
+  public val refresh_result: ModelRegistryRefreshResult? = null,
+  @field:WireField(
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.ModelListResult#ADAPTER",
+    jsonName = "listResult",
+    oneofName = "result",
+    schemaIndex = 20,
+  )
+  public val list_result: ModelListResult? = null,
+  @field:WireField(
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.ModelGetResult#ADAPTER",
+    jsonName = "getResult",
+    oneofName = "result",
+    schemaIndex = 21,
+  )
+  public val get_result: ModelGetResult? = null,
+  @field:WireField(
+    tag = 23,
+    adapter = "ai.runanywhere.proto.v1.ModelImportResult#ADAPTER",
+    jsonName = "importResult",
+    oneofName = "result",
+    schemaIndex = 22,
+  )
+  public val import_result: ModelImportResult? = null,
+  @field:WireField(
+    tag = 24,
+    adapter = "ai.runanywhere.proto.v1.ModelDiscoveryResult#ADAPTER",
+    jsonName = "discoveryResult",
+    oneofName = "result",
+    schemaIndex = 23,
+  )
+  public val discovery_result: ModelDiscoveryResult? = null,
+  @field:WireField(
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.ModelCompatibilityResult#ADAPTER",
+    jsonName = "compatibilityResult",
+    oneofName = "result",
+    schemaIndex = 24,
+  )
+  public val compatibility_result: ModelCompatibilityResult? = null,
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.CurrentModelResult#ADAPTER",
+    jsonName = "currentModelResult",
+    oneofName = "result",
+    schemaIndex = 25,
+  )
+  public val current_model_result: CurrentModelResult? = null,
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.DownloadPlanResult#ADAPTER",
+    jsonName = "planResult",
+    oneofName = "result",
+    schemaIndex = 26,
+  )
+  public val plan_result: DownloadPlanResult? = null,
+  @field:WireField(
+    tag = 28,
+    adapter = "ai.runanywhere.proto.v1.DownloadStartResult#ADAPTER",
+    jsonName = "startResult",
+    oneofName = "result",
+    schemaIndex = 27,
+  )
+  public val start_result: DownloadStartResult? = null,
+  @field:WireField(
+    tag = 29,
+    adapter = "ai.runanywhere.proto.v1.DownloadProgress#ADAPTER",
+    jsonName = "downloadProgress",
+    oneofName = "result",
+    schemaIndex = 28,
+  )
+  public val download_progress: DownloadProgress? = null,
+  @field:WireField(
+    tag = 30,
+    adapter = "ai.runanywhere.proto.v1.DownloadCancelResult#ADAPTER",
+    jsonName = "cancelResult",
+    oneofName = "result",
+    schemaIndex = 29,
+  )
+  public val cancel_result: DownloadCancelResult? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelEvent, Nothing>(ADAPTER, unknownFields) {
+  init {
+    require(countNonNull(refresh_result, list_result, get_result, import_result, discovery_result, compatibility_result, current_model_result, plan_result, start_result, download_progress, cancel_result) <= 1) {
+      "At most one of refresh_result, list_result, get_result, import_result, discovery_result, compatibility_result, current_model_result, plan_result, start_result, download_progress, cancel_result may be non-null"
+    }
+  }
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -237,6 +355,20 @@ public class ModelEvent(
     if (model_size_bytes != other.model_size_bytes) return false
     if (duration_ms != other.duration_ms) return false
     if (framework != other.framework) return false
+    if (assignment_id != other.assignment_id) return false
+    if (assigned_component != other.assigned_component) return false
+    if (source_path != other.source_path) return false
+    if (refresh_result != other.refresh_result) return false
+    if (list_result != other.list_result) return false
+    if (get_result != other.get_result) return false
+    if (import_result != other.import_result) return false
+    if (discovery_result != other.discovery_result) return false
+    if (compatibility_result != other.compatibility_result) return false
+    if (current_model_result != other.current_model_result) return false
+    if (plan_result != other.plan_result) return false
+    if (start_result != other.start_result) return false
+    if (download_progress != other.download_progress) return false
+    if (cancel_result != other.cancel_result) return false
     return true
   }
 
@@ -260,6 +392,20 @@ public class ModelEvent(
       result = result * 37 + model_size_bytes.hashCode()
       result = result * 37 + duration_ms.hashCode()
       result = result * 37 + framework.hashCode()
+      result = result * 37 + assignment_id.hashCode()
+      result = result * 37 + assigned_component.hashCode()
+      result = result * 37 + source_path.hashCode()
+      result = result * 37 + (refresh_result?.hashCode() ?: 0)
+      result = result * 37 + (list_result?.hashCode() ?: 0)
+      result = result * 37 + (get_result?.hashCode() ?: 0)
+      result = result * 37 + (import_result?.hashCode() ?: 0)
+      result = result * 37 + (discovery_result?.hashCode() ?: 0)
+      result = result * 37 + (compatibility_result?.hashCode() ?: 0)
+      result = result * 37 + (current_model_result?.hashCode() ?: 0)
+      result = result * 37 + (plan_result?.hashCode() ?: 0)
+      result = result * 37 + (start_result?.hashCode() ?: 0)
+      result = result * 37 + (download_progress?.hashCode() ?: 0)
+      result = result * 37 + (cancel_result?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -283,6 +429,20 @@ public class ModelEvent(
     result += """model_size_bytes=$model_size_bytes"""
     result += """duration_ms=$duration_ms"""
     result += """framework=$framework"""
+    result += """assignment_id=${sanitize(assignment_id)}"""
+    result += """assigned_component=$assigned_component"""
+    result += """source_path=${sanitize(source_path)}"""
+    if (refresh_result != null) result += """refresh_result=$refresh_result"""
+    if (list_result != null) result += """list_result=$list_result"""
+    if (get_result != null) result += """get_result=$get_result"""
+    if (import_result != null) result += """import_result=$import_result"""
+    if (discovery_result != null) result += """discovery_result=$discovery_result"""
+    if (compatibility_result != null) result += """compatibility_result=$compatibility_result"""
+    if (current_model_result != null) result += """current_model_result=$current_model_result"""
+    if (plan_result != null) result += """plan_result=$plan_result"""
+    if (start_result != null) result += """start_result=$start_result"""
+    if (download_progress != null) result += """download_progress=$download_progress"""
+    if (cancel_result != null) result += """cancel_result=$cancel_result"""
     return result.joinToString(prefix = "ModelEvent{", separator = ", ", postfix = "}")
   }
 
@@ -302,9 +462,23 @@ public class ModelEvent(
     model_name: String = this.model_name,
     model_size_bytes: Long = this.model_size_bytes,
     duration_ms: Long = this.duration_ms,
-    framework: Int = this.framework,
+    framework: InferenceFramework = this.framework,
+    assignment_id: String = this.assignment_id,
+    assigned_component: SDKComponent = this.assigned_component,
+    source_path: String = this.source_path,
+    refresh_result: ModelRegistryRefreshResult? = this.refresh_result,
+    list_result: ModelListResult? = this.list_result,
+    get_result: ModelGetResult? = this.get_result,
+    import_result: ModelImportResult? = this.import_result,
+    discovery_result: ModelDiscoveryResult? = this.discovery_result,
+    compatibility_result: ModelCompatibilityResult? = this.compatibility_result,
+    current_model_result: CurrentModelResult? = this.current_model_result,
+    plan_result: DownloadPlanResult? = this.plan_result,
+    start_result: DownloadStartResult? = this.start_result,
+    download_progress: DownloadProgress? = this.download_progress,
+    cancel_result: DownloadCancelResult? = this.cancel_result,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelEvent = ModelEvent(kind, model_id, task_id, progress, bytes_downloaded, total_bytes, download_state, local_path, error, model_count, custom_model_name, custom_model_url, model_name, model_size_bytes, duration_ms, framework, unknownFields)
+  ): ModelEvent = ModelEvent(kind, model_id, task_id, progress, bytes_downloaded, total_bytes, download_state, local_path, error, model_count, custom_model_name, custom_model_url, model_name, model_size_bytes, duration_ms, framework, assignment_id, assigned_component, source_path, refresh_result, list_result, get_result, import_result, discovery_result, compatibility_result, current_model_result, plan_result, start_result, download_progress, cancel_result, unknownFields)
 
   public companion object {
     @JvmField
@@ -363,9 +537,29 @@ public class ModelEvent(
         if (value.duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.duration_ms)
         }
-        if (value.framework != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          size += InferenceFramework.ADAPTER.encodedSizeWithTag(16, value.framework)
         }
+        if (value.assignment_id != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.assignment_id)
+        }
+        if (value.assigned_component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
+          size += SDKComponent.ADAPTER.encodedSizeWithTag(18, value.assigned_component)
+        }
+        if (value.source_path != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.source_path)
+        }
+        size += ModelRegistryRefreshResult.ADAPTER.encodedSizeWithTag(20, value.refresh_result)
+        size += ModelListResult.ADAPTER.encodedSizeWithTag(21, value.list_result)
+        size += ModelGetResult.ADAPTER.encodedSizeWithTag(22, value.get_result)
+        size += ModelImportResult.ADAPTER.encodedSizeWithTag(23, value.import_result)
+        size += ModelDiscoveryResult.ADAPTER.encodedSizeWithTag(24, value.discovery_result)
+        size += ModelCompatibilityResult.ADAPTER.encodedSizeWithTag(25, value.compatibility_result)
+        size += CurrentModelResult.ADAPTER.encodedSizeWithTag(26, value.current_model_result)
+        size += DownloadPlanResult.ADAPTER.encodedSizeWithTag(27, value.plan_result)
+        size += DownloadStartResult.ADAPTER.encodedSizeWithTag(28, value.start_result)
+        size += DownloadProgress.ADAPTER.encodedSizeWithTag(29, value.download_progress)
+        size += DownloadCancelResult.ADAPTER.encodedSizeWithTag(30, value.cancel_result)
         return size
       }
 
@@ -415,16 +609,56 @@ public class ModelEvent(
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 15, value.duration_ms)
         }
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 16, value.framework)
         }
+        if (value.assignment_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.assignment_id)
+        }
+        if (value.assigned_component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
+          SDKComponent.ADAPTER.encodeWithTag(writer, 18, value.assigned_component)
+        }
+        if (value.source_path != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.source_path)
+        }
+        ModelRegistryRefreshResult.ADAPTER.encodeWithTag(writer, 20, value.refresh_result)
+        ModelListResult.ADAPTER.encodeWithTag(writer, 21, value.list_result)
+        ModelGetResult.ADAPTER.encodeWithTag(writer, 22, value.get_result)
+        ModelImportResult.ADAPTER.encodeWithTag(writer, 23, value.import_result)
+        ModelDiscoveryResult.ADAPTER.encodeWithTag(writer, 24, value.discovery_result)
+        ModelCompatibilityResult.ADAPTER.encodeWithTag(writer, 25, value.compatibility_result)
+        CurrentModelResult.ADAPTER.encodeWithTag(writer, 26, value.current_model_result)
+        DownloadPlanResult.ADAPTER.encodeWithTag(writer, 27, value.plan_result)
+        DownloadStartResult.ADAPTER.encodeWithTag(writer, 28, value.start_result)
+        DownloadProgress.ADAPTER.encodeWithTag(writer, 29, value.download_progress)
+        DownloadCancelResult.ADAPTER.encodeWithTag(writer, 30, value.cancel_result)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.framework)
+        DownloadCancelResult.ADAPTER.encodeWithTag(writer, 30, value.cancel_result)
+        DownloadProgress.ADAPTER.encodeWithTag(writer, 29, value.download_progress)
+        DownloadStartResult.ADAPTER.encodeWithTag(writer, 28, value.start_result)
+        DownloadPlanResult.ADAPTER.encodeWithTag(writer, 27, value.plan_result)
+        CurrentModelResult.ADAPTER.encodeWithTag(writer, 26, value.current_model_result)
+        ModelCompatibilityResult.ADAPTER.encodeWithTag(writer, 25, value.compatibility_result)
+        ModelDiscoveryResult.ADAPTER.encodeWithTag(writer, 24, value.discovery_result)
+        ModelImportResult.ADAPTER.encodeWithTag(writer, 23, value.import_result)
+        ModelGetResult.ADAPTER.encodeWithTag(writer, 22, value.get_result)
+        ModelListResult.ADAPTER.encodeWithTag(writer, 21, value.list_result)
+        ModelRegistryRefreshResult.ADAPTER.encodeWithTag(writer, 20, value.refresh_result)
+        if (value.source_path != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.source_path)
+        }
+        if (value.assigned_component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
+          SDKComponent.ADAPTER.encodeWithTag(writer, 18, value.assigned_component)
+        }
+        if (value.assignment_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.assignment_id)
+        }
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 16, value.framework)
         }
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 15, value.duration_ms)
@@ -489,7 +723,21 @@ public class ModelEvent(
         var model_name: String = ""
         var model_size_bytes: Long = 0L
         var duration_ms: Long = 0L
-        var framework: Int = 0
+        var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+        var assignment_id: String = ""
+        var assigned_component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED
+        var source_path: String = ""
+        var refresh_result: ModelRegistryRefreshResult? = null
+        var list_result: ModelListResult? = null
+        var get_result: ModelGetResult? = null
+        var import_result: ModelImportResult? = null
+        var discovery_result: ModelDiscoveryResult? = null
+        var compatibility_result: ModelCompatibilityResult? = null
+        var current_model_result: CurrentModelResult? = null
+        var plan_result: DownloadPlanResult? = null
+        var start_result: DownloadStartResult? = null
+        var download_progress: DownloadProgress? = null
+        var cancel_result: DownloadCancelResult? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -511,7 +759,29 @@ public class ModelEvent(
             13 -> model_name = ProtoAdapter.STRING.decode(reader)
             14 -> model_size_bytes = ProtoAdapter.INT64.decode(reader)
             15 -> duration_ms = ProtoAdapter.INT64.decode(reader)
-            16 -> framework = ProtoAdapter.INT32.decode(reader)
+            16 -> try {
+              framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            17 -> assignment_id = ProtoAdapter.STRING.decode(reader)
+            18 -> try {
+              assigned_component = SDKComponent.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            19 -> source_path = ProtoAdapter.STRING.decode(reader)
+            20 -> refresh_result = ModelRegistryRefreshResult.ADAPTER.decode(reader)
+            21 -> list_result = ModelListResult.ADAPTER.decode(reader)
+            22 -> get_result = ModelGetResult.ADAPTER.decode(reader)
+            23 -> import_result = ModelImportResult.ADAPTER.decode(reader)
+            24 -> discovery_result = ModelDiscoveryResult.ADAPTER.decode(reader)
+            25 -> compatibility_result = ModelCompatibilityResult.ADAPTER.decode(reader)
+            26 -> current_model_result = CurrentModelResult.ADAPTER.decode(reader)
+            27 -> plan_result = DownloadPlanResult.ADAPTER.decode(reader)
+            28 -> start_result = DownloadStartResult.ADAPTER.decode(reader)
+            29 -> download_progress = DownloadProgress.ADAPTER.decode(reader)
+            30 -> cancel_result = DownloadCancelResult.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -532,11 +802,36 @@ public class ModelEvent(
           model_size_bytes = model_size_bytes,
           duration_ms = duration_ms,
           framework = framework,
+          assignment_id = assignment_id,
+          assigned_component = assigned_component,
+          source_path = source_path,
+          refresh_result = refresh_result,
+          list_result = list_result,
+          get_result = get_result,
+          import_result = import_result,
+          discovery_result = discovery_result,
+          compatibility_result = compatibility_result,
+          current_model_result = current_model_result,
+          plan_result = plan_result,
+          start_result = start_result,
+          download_progress = download_progress,
+          cancel_result = cancel_result,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelEvent): ModelEvent = value.copy(
+        refresh_result = value.refresh_result?.let(ModelRegistryRefreshResult.ADAPTER::redact),
+        list_result = value.list_result?.let(ModelListResult.ADAPTER::redact),
+        get_result = value.get_result?.let(ModelGetResult.ADAPTER::redact),
+        import_result = value.import_result?.let(ModelImportResult.ADAPTER::redact),
+        discovery_result = value.discovery_result?.let(ModelDiscoveryResult.ADAPTER::redact),
+        compatibility_result = value.compatibility_result?.let(ModelCompatibilityResult.ADAPTER::redact),
+        current_model_result = value.current_model_result?.let(CurrentModelResult.ADAPTER::redact),
+        plan_result = value.plan_result?.let(DownloadPlanResult.ADAPTER::redact),
+        start_result = value.start_result?.let(DownloadStartResult.ADAPTER::redact),
+        download_progress = value.download_progress?.let(DownloadProgress.ADAPTER::redact),
+        cancel_result = value.cancel_result?.let(DownloadCancelResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

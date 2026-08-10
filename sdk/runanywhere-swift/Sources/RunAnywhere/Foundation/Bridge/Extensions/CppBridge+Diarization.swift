@@ -381,7 +381,7 @@ extension CppBridge {
             request: RAModelUnloadRequest,
             result: RAModelUnloadResult
         ) -> Bool {
-            guard result.success, let loadedModelID, !loadedModelID.isEmpty else {
+            guard !result.hasError, let loadedModelID, !loadedModelID.isEmpty else {
                 return false
             }
             if request.unloadAll {

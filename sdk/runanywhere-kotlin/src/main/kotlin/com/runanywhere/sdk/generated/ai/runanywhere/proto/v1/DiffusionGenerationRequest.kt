@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,43 +27,24 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 public class DiffusionGenerationRequest(
   @field:WireField(
     tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "requestId",
-    schemaIndex = 0,
-  )
-  public val request_id: String = "",
-  @field:WireField(
-    tag = 2,
     adapter = "ai.runanywhere.proto.v1.DiffusionGenerationOptions#ADAPTER",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val options: DiffusionGenerationOptions? = null,
   @field:WireField(
-    tag = 3,
+    tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "modelId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val model_id: String? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionGenerationRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 4,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 3,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -75,10 +55,8 @@ public class DiffusionGenerationRequest(
     if (other === this) return true
     if (other !is DiffusionGenerationRequest) return false
     if (unknownFields != other.unknownFields) return false
-    if (request_id != other.request_id) return false
     if (options != other.options) return false
     if (model_id != other.model_id) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -86,10 +64,8 @@ public class DiffusionGenerationRequest(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + request_id.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
       result = result * 37 + (model_id?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -97,20 +73,16 @@ public class DiffusionGenerationRequest(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """request_id=${sanitize(request_id)}"""
     if (options != null) result += """options=$options"""
     if (model_id != null) result += """model_id=${sanitize(model_id)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "DiffusionGenerationRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    request_id: String = this.request_id,
     options: DiffusionGenerationOptions? = this.options,
     model_id: String? = this.model_id,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionGenerationRequest = DiffusionGenerationRequest(request_id, options, model_id, metadata, unknownFields)
+  ): DiffusionGenerationRequest = DiffusionGenerationRequest(options, model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -123,59 +95,38 @@ public class DiffusionGenerationRequest(
       null, 
       "diffusion_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: DiffusionGenerationRequest): Int {
         var size = value.unknownFields.size
-        if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.request_id)
-        }
-        size += DiffusionGenerationOptions.ADAPTER.encodedSizeWithTag(2, value.options)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.model_id)
-        size += metadataAdapter.encodedSizeWithTag(4, value.metadata)
+        size += DiffusionGenerationOptions.ADAPTER.encodedSizeWithTag(1, value.options)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.model_id)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DiffusionGenerationRequest) {
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
-        }
-        DiffusionGenerationOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.model_id)
-        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
+        DiffusionGenerationOptions.ADAPTER.encodeWithTag(writer, 1, value.options)
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionGenerationRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.model_id)
-        DiffusionGenerationOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
+        DiffusionGenerationOptions.ADAPTER.encodeWithTag(writer, 1, value.options)
       }
 
       override fun decode(reader: ProtoReader): DiffusionGenerationRequest {
-        var request_id: String = ""
         var options: DiffusionGenerationOptions? = null
         var model_id: String? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> request_id = ProtoAdapter.STRING.decode(reader)
-            2 -> options = DiffusionGenerationOptions.ADAPTER.decode(reader)
-            3 -> model_id = ProtoAdapter.STRING.decode(reader)
-            4 -> metadata.putAll(metadataAdapter.decode(reader))
+            1 -> options = DiffusionGenerationOptions.ADAPTER.decode(reader)
+            2 -> model_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DiffusionGenerationRequest(
-          request_id = request_id,
           options = options,
           model_id = model_id,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

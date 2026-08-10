@@ -56,11 +56,11 @@ constexpr SegmentationOptions::ParseTableT_ SegmentationOptions::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_._has_bits_),
       0, // no _extensions_
-      1, 0,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967294,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      1,  // num_field_entries
+      2,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -70,6 +70,10 @@ constexpr SegmentationOptions::ParseTableT_ SegmentationOptions::InternalGenerat
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SegmentationOptions>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
+      // bool include_confidence = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SegmentationOptions, _impl_.include_confidence_), 1>(),
+       {16, 1, 0,
+        PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_.include_confidence_)}},
       // bool include_diagnostic_rgba = 1;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SegmentationOptions, _impl_.include_diagnostic_rgba_), 0>(),
        {8, 0, 0,
@@ -79,6 +83,8 @@ constexpr SegmentationOptions::ParseTableT_ SegmentationOptions::InternalGenerat
     }}, {{
       // bool include_diagnostic_rgba = 1;
       {PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_.include_diagnostic_rgba_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool include_confidence = 2;
+      {PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_.include_confidence_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
@@ -91,7 +97,8 @@ inline constexpr SegmentationOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        include_diagnostic_rgba_{false} {}
+        include_diagnostic_rgba_{false},
+        include_confidence_{false} {}
 
 template <typename>
 constexpr SegmentationOptions::SegmentationOptions(::_pbi::ConstantInitialized,
@@ -211,32 +218,32 @@ constexpr SegmentationImage::ParseTableT_ SegmentationImage::InternalGeneratePar
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SegmentationImage>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+      // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationImage, _impl_.pixel_format_), 3>(),
        {32, 3, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.pixel_format_)}},
-      // bytes data = 1;
+      // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::FastBS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.data_)}},
-      // uint32 width = 2;
+      // uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationImage, _impl_.width_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.width_)}},
-      // uint32 height = 3;
+      // uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationImage, _impl_.height_), 2>(),
        {24, 2, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.height_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // bytes data = 1;
+      // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.data_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // uint32 width = 2;
+      // uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
       {PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.width_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-      // uint32 height = 3;
+      // uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
       {PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.height_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-      // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+      // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(SegmentationImage, _impl_.pixel_format_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     // no aux_entries
@@ -361,11 +368,11 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
     {
       PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      3,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -375,10 +382,7 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SegmentationClassSummary>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // string label = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.label_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // uint32 class_id = 1;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationClassSummary, _impl_.class_id_), 2>(),
        {8, 2, 0,
@@ -387,10 +391,10 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SegmentationClassSummary, _impl_.pixel_count_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.pixel_count_)}},
-      // float fraction = 3;
-      {::_pbi::TcParser::FastF32S1,
-       {29, 3, 0,
-        PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_)}},
+      // string label = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.label_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -398,14 +402,12 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
       {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.class_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
       // uint64 pixel_count = 2;
       {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.pixel_count_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
-      // float fraction = 3;
-      {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // string label = 4;
+      // string label = 3;
       {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.label_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\47\0\0\0\5\0\0\0"
+      "\47\0\0\5\0\0\0\0"
       "runanywhere.v1.SegmentationClassSummary"
       "label"
     }},
@@ -421,8 +423,7 @@ inline constexpr SegmentationClassSummary::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         pixel_count_{::uint64_t{0u}},
-        class_id_{0u},
-        fraction_{0} {}
+        class_id_{0u} {}
 
 template <typename>
 constexpr SegmentationClassSummary::SegmentationClassSummary(::_pbi::ConstantInitialized,
@@ -528,11 +529,11 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
     {
       PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_._has_bits_),
       0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
+      8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
+      4294967040,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      8,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -542,14 +543,17 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SegmentationResult>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional bytes confidence_mask_u8 = 8;
+      {::_pbi::TcParser::FastBS1,
+       {66, 4, 0,
+        PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.confidence_mask_u8_)}},
       // uint32 width = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationResult, _impl_.width_), 4>(),
-       {8, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationResult, _impl_.width_), 5>(),
+       {8, 5, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.width_)}},
       // uint32 height = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationResult, _impl_.height_), 5>(),
-       {16, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SegmentationResult, _impl_.height_), 6>(),
+       {16, 6, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.height_)}},
       // bytes class_mask_u16_le = 3;
       {::_pbi::TcParser::FastBS1,
@@ -564,8 +568,8 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
        {42, 0, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.class_summaries_)}},
       // int64 processing_time_ms = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SegmentationResult, _impl_.processing_time_ms_), 6>(),
-       {48, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SegmentationResult, _impl_.processing_time_ms_), 7>(),
+       {48, 7, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.processing_time_ms_)}},
       // string model_id = 7;
       {::_pbi::TcParser::FastUS1,
@@ -575,9 +579,9 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
       65535, 65535
     }}, {{
       // uint32 width = 1;
-      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.width_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.width_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
       // uint32 height = 2;
-      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.height_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.height_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
       // bytes class_mask_u16_le = 3;
       {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.class_mask_u16_le_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
       // optional bytes diagnostic_rgba = 4;
@@ -585,9 +589,11 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
       // repeated .runanywhere.v1.SegmentationClassSummary class_summaries = 5;
       {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.class_summaries_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // int64 processing_time_ms = 6;
-      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // string model_id = 7;
       {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.model_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional bytes confidence_mask_u8 = 8;
+      {PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.confidence_mask_u8_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -597,7 +603,7 @@ constexpr SegmentationResult::ParseTableT_ SegmentationResult::InternalGenerateP
         #endif
     }},
     {{
-      "\41\0\0\0\0\0\0\10"
+      "\41\0\0\0\0\0\0\10\0\0\0\0\0\0\0\0"
       "runanywhere.v1.SegmentationResult"
       "model_id"
     }},
@@ -621,6 +627,9 @@ inline constexpr SegmentationResult::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        confidence_mask_u8_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         width_{0u},
@@ -731,11 +740,11 @@ constexpr SegmentationRequest::ParseTableT_ SegmentationRequest::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_._has_bits_),
       0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
+      3,  // num_field_entries
       2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -745,21 +754,28 @@ constexpr SegmentationRequest::ParseTableT_ SegmentationRequest::InternalGenerat
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SegmentationRequest>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // optional .runanywhere.v1.SegmentationOptions options = 2;
-      {::_pbi::TcParser::FastMtS1,
-       {18, 1, 1,
-        PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.options_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // .runanywhere.v1.SegmentationImage image = 1;
       {::_pbi::TcParser::FastMtS1,
-       {10, 0, 0,
+       {10, 1, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.image_)}},
+      // optional .runanywhere.v1.SegmentationOptions options = 2;
+      {::_pbi::TcParser::FastMtS1,
+       {18, 2, 1,
+        PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.options_)}},
+      // optional string model_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.model_id_)}},
     }}, {{
       65535, 65535
     }}, {{
       // .runanywhere.v1.SegmentationImage image = 1;
-      {PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.image_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.image_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.SegmentationOptions options = 2;
-      {PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.options_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.options_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional string model_id = 3;
+      {PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -774,6 +790,9 @@ constexpr SegmentationRequest::ParseTableT_ SegmentationRequest::InternalGenerat
         #endif
     }},
     {{
+      "\42\0\0\10\0\0\0\0"
+      "runanywhere.v1.SegmentationRequest"
+      "model_id"
     }},
   };
 }
@@ -783,6 +802,9 @@ inline constexpr SegmentationRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         image_{nullptr},
         options_{nullptr} {}
 
@@ -802,7 +824,7 @@ inline void* PROTOBUF_NONNULL SegmentationRequest::PlacementNew_(
   return ::new (mem) SegmentationRequest(arena);
 }
 constexpr auto SegmentationRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SegmentationRequest), alignof(SegmentationRequest));
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SegmentationRequest), alignof(SegmentationRequest));
 }
 constexpr auto SegmentationRequest::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -900,30 +922,32 @@ const ::uint32_t
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationOptions, _impl_._has_bits_),
-        4, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationOptions, _impl_.include_diagnostic_rgba_),
-        0,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_._has_bits_),
         5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_.image_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_.options_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationOptions, _impl_.include_diagnostic_rgba_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationOptions, _impl_.include_confidence_),
         0,
         1,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_.image_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_.options_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationRequest, _impl_.model_id_),
+        1,
+        2,
+        0,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_._has_bits_),
-        7, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.class_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.pixel_count_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.fraction_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.label_),
         2,
         1,
-        3,
         0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_._has_bits_),
-        10, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.width_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.height_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.class_mask_u16_le_),
@@ -931,22 +955,24 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.class_summaries_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.processing_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.model_id_),
-        4,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_.confidence_mask_u8_),
         5,
+        6,
         1,
         2,
         0,
-        6,
+        7,
         3,
+        4,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::SegmentationImage)},
         {11, sizeof(::runanywhere::v1::SegmentationOptions)},
-        {16, sizeof(::runanywhere::v1::SegmentationRequest)},
-        {23, sizeof(::runanywhere::v1::SegmentationClassSummary)},
-        {34, sizeof(::runanywhere::v1::SegmentationResult)},
+        {18, sizeof(::runanywhere::v1::SegmentationRequest)},
+        {27, sizeof(::runanywhere::v1::SegmentationClassSummary)},
+        {36, sizeof(::runanywhere::v1::SegmentationResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -958,46 +984,52 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_segmentation_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\022segmentation.proto\022\016runanywhere.v1\"\177\n\021"
-    "SegmentationImage\022\014\n\004data\030\001 \001(\014\022\r\n\005width"
-    "\030\002 \001(\r\022\016\n\006height\030\003 \001(\r\022=\n\014pixel_format\030\004"
-    " \001(\0162\'.runanywhere.v1.SegmentationPixelF"
-    "ormat\"6\n\023SegmentationOptions\022\037\n\027include_"
-    "diagnostic_rgba\030\001 \001(\010\"\216\001\n\023SegmentationRe"
-    "quest\0220\n\005image\030\001 \001(\0132!.runanywhere.v1.Se"
-    "gmentationImage\0229\n\007options\030\002 \001(\0132#.runan"
-    "ywhere.v1.SegmentationOptionsH\000\210\001\001B\n\n\010_o"
-    "ptions\"b\n\030SegmentationClassSummary\022\020\n\010cl"
-    "ass_id\030\001 \001(\r\022\023\n\013pixel_count\030\002 \001(\004\022\020\n\010fra"
-    "ction\030\003 \001(\002\022\r\n\005label\030\004 \001(\t\"\361\001\n\022Segmentat"
-    "ionResult\022\r\n\005width\030\001 \001(\r\022\016\n\006height\030\002 \001(\r"
-    "\022\031\n\021class_mask_u16_le\030\003 \001(\014\022\034\n\017diagnosti"
-    "c_rgba\030\004 \001(\014H\000\210\001\001\022A\n\017class_summaries\030\005 \003"
-    "(\0132(.runanywhere.v1.SegmentationClassSum"
-    "mary\022\032\n\022processing_time_ms\030\006 \001(\003\022\020\n\010mode"
-    "l_id\030\007 \001(\tB\022\n\020_diagnostic_rgba*\262\001\n\027Segme"
-    "ntationPixelFormat\022)\n%SEGMENTATION_PIXEL"
-    "_FORMAT_UNSPECIFIED\020\000\022\"\n\036SEGMENTATION_PI"
-    "XEL_FORMAT_RGB8\020\001\022#\n\037SEGMENTATION_PIXEL_"
-    "FORMAT_RGBA8\020\002\022#\n\037SEGMENTATION_PIXEL_FOR"
-    "MAT_BGRA8\020\0032j\n\024SemanticSegmentation\022R\n\007S"
-    "egment\022#.runanywhere.v1.SegmentationRequ"
-    "est\032\".runanywhere.v1.SegmentationResultB"
-    "\214\001\n\027ai.runanywhere.proto.v1B\021Segmentatio"
-    "nProtoP\001Z<github.com/runanywhere/runanyw"
-    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
-    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\n\022segmentation.proto\022\016runanywhere.v1\032\021ra"
+    "c_options.proto\"\251\001\n\021SegmentationImage\022\022\n"
+    "\004data\030\001 \001(\014B\004\220\265\030\001\022\034\n\005width\030\002 \001(\rB\r\220\265\030\001\240\265"
+    "\030\001\250\265\030\200 \022\035\n\006height\030\003 \001(\rB\r\220\265\030\001\240\265\030\001\250\265\030\200 \022C"
+    "\n\014pixel_format\030\004 \001(\0162\'.runanywhere.v1.Se"
+    "gmentationPixelFormatB\004\220\265\030\001\"R\n\023Segmentat"
+    "ionOptions\022\037\n\027include_diagnostic_rgba\030\001 "
+    "\001(\010\022\032\n\022include_confidence\030\002 \001(\010\"\262\001\n\023Segm"
+    "entationRequest\0220\n\005image\030\001 \001(\0132!.runanyw"
+    "here.v1.SegmentationImage\0229\n\007options\030\002 \001"
+    "(\0132#.runanywhere.v1.SegmentationOptionsH"
+    "\000\210\001\001\022\025\n\010model_id\030\003 \001(\tH\001\210\001\001B\n\n\010_optionsB"
+    "\013\n\t_model_id\"P\n\030SegmentationClassSummary"
+    "\022\020\n\010class_id\030\001 \001(\r\022\023\n\013pixel_count\030\002 \001(\004\022"
+    "\r\n\005label\030\003 \001(\t\"\251\002\n\022SegmentationResult\022\r\n"
+    "\005width\030\001 \001(\r\022\016\n\006height\030\002 \001(\r\022\031\n\021class_ma"
+    "sk_u16_le\030\003 \001(\014\022\034\n\017diagnostic_rgba\030\004 \001(\014"
+    "H\000\210\001\001\022A\n\017class_summaries\030\005 \003(\0132(.runanyw"
+    "here.v1.SegmentationClassSummary\022\032\n\022proc"
+    "essing_time_ms\030\006 \001(\003\022\020\n\010model_id\030\007 \001(\t\022\037"
+    "\n\022confidence_mask_u8\030\010 \001(\014H\001\210\001\001B\022\n\020_diag"
+    "nostic_rgbaB\025\n\023_confidence_mask_u8*\262\001\n\027S"
+    "egmentationPixelFormat\022)\n%SEGMENTATION_P"
+    "IXEL_FORMAT_UNSPECIFIED\020\000\022\"\n\036SEGMENTATIO"
+    "N_PIXEL_FORMAT_RGB8\020\001\022#\n\037SEGMENTATION_PI"
+    "XEL_FORMAT_RGBA8\020\002\022#\n\037SEGMENTATION_PIXEL"
+    "_FORMAT_BGRA8\020\003B\214\001\n\027ai.runanywhere.proto"
+    ".v1B\021SegmentationProtoP\001Z<github.com/run"
+    "anywhere/runanywhere-sdks/idl/v1;runanyw"
+    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
+    "proto3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_segmentation_2eproto_deps[1] = {
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_segmentation_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_segmentation_2eproto = {
     false,
     false,
-    1150,
+    1206,
     descriptor_table_protodef_segmentation_2eproto,
     "segmentation.proto",
     &descriptor_table_segmentation_2eproto_once,
-    nullptr,
-    0,
+    descriptor_table_segmentation_2eproto_deps,
+    1,
     5,
     schemas,
     file_message_globals,
@@ -1152,7 +1184,7 @@ PROTOBUF_NOINLINE void SegmentationImage::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // bytes data = 1;
+  // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_data().empty()) {
       const ::std::string& _s = this_._internal_data();
@@ -1160,7 +1192,7 @@ PROTOBUF_NOINLINE void SegmentationImage::Clear() {
     }
   }
 
-  // uint32 width = 2;
+  // uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_width() != 0) {
       target = stream->EnsureSpace(target);
@@ -1169,7 +1201,7 @@ PROTOBUF_NOINLINE void SegmentationImage::Clear() {
     }
   }
 
-  // uint32 height = 3;
+  // uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_height() != 0) {
       target = stream->EnsureSpace(target);
@@ -1178,7 +1210,7 @@ PROTOBUF_NOINLINE void SegmentationImage::Clear() {
     }
   }
 
-  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_pixel_format() != 0) {
       target = stream->EnsureSpace(target);
@@ -1213,28 +1245,28 @@ PROTOBUF_NOINLINE void SegmentationImage::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // bytes data = 1;
+    // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_data().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
                                         this_._internal_data());
       }
     }
-    // uint32 width = 2;
+    // uint32 width = 2 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_width() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_width());
       }
     }
-    // uint32 height = 3;
+    // uint32 height = 3 [(.runanywhere.v1.rac_required) = true, (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 4096];
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_height() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_height());
       }
     }
-    // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+    // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_pixel_format() != 0) {
         total_size += 1 +
@@ -1345,7 +1377,12 @@ PROTOBUF_NDEBUG_INLINE SegmentationOptions::Impl_::Impl_(
 
 inline void SegmentationOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.include_diagnostic_rgba_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, include_diagnostic_rgba_),
+           0,
+           offsetof(Impl_, include_confidence_) -
+               offsetof(Impl_, include_diagnostic_rgba_) +
+               sizeof(Impl_::include_confidence_));
 }
 SegmentationOptions::~SegmentationOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SegmentationOptions)
@@ -1394,7 +1431,9 @@ PROTOBUF_NOINLINE void SegmentationOptions::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.include_diagnostic_rgba_ = false;
+  ::memset(&_impl_.include_diagnostic_rgba_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.include_confidence_) -
+      reinterpret_cast<char*>(&_impl_.include_diagnostic_rgba_)) + sizeof(_impl_.include_confidence_));
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1427,6 +1466,15 @@ PROTOBUF_NOINLINE void SegmentationOptions::Clear() {
     }
   }
 
+  // bool include_confidence = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_include_confidence() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_include_confidence(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1450,11 +1498,18 @@ PROTOBUF_NOINLINE void SegmentationOptions::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void)cached_has_bits;
 
-   {
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     // bool include_diagnostic_rgba = 1;
-    cached_has_bits = this_._impl_._has_bits_[0];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_include_diagnostic_rgba() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool include_confidence = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_include_confidence() != 0) {
         total_size += 2;
       }
     }
@@ -1476,9 +1531,16 @@ void SegmentationOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (from._internal_include_diagnostic_rgba() != 0) {
-      _this->_impl_.include_diagnostic_rgba_ = from._impl_.include_diagnostic_rgba_;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (from._internal_include_diagnostic_rgba() != 0) {
+        _this->_impl_.include_diagnostic_rgba_ = from._impl_.include_diagnostic_rgba_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_include_confidence() != 0) {
+        _this->_impl_.include_confidence_ = from._impl_.include_confidence_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1498,7 +1560,12 @@ void SegmentationOptions::InternalSwap(SegmentationOptions* PROTOBUF_RESTRICT PR
   using ::std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  swap(_impl_.include_diagnostic_rgba_, other->_impl_.include_diagnostic_rgba_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_.include_confidence_)
+      + sizeof(SegmentationOptions::_impl_.include_confidence_)
+      - PROTOBUF_FIELD_OFFSET(SegmentationOptions, _impl_.include_diagnostic_rgba_)>(
+          reinterpret_cast<char*>(&_impl_.include_diagnostic_rgba_),
+          reinterpret_cast<char*>(&other->_impl_.include_diagnostic_rgba_));
 }
 
 ::google::protobuf::Metadata SegmentationOptions::GetMetadata() const {
@@ -1520,7 +1587,8 @@ PROTOBUF_NDEBUG_INLINE SegmentationRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
     [[maybe_unused]] const ::runanywhere::v1::SegmentationRequest& from_msg)
       : _has_bits_{from._has_bits_},
-        _cached_size_{0} {}
+        _cached_size_{0},
+        model_id_(arena, from.model_id_) {}
 
 SegmentationRequest::SegmentationRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -1537,10 +1605,10 @@ SegmentationRequest::SegmentationRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.image_ = (CheckHasBit(cached_has_bits, 0x00000001U))
+  _impl_.image_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.image_)
                 : nullptr;
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -1549,7 +1617,8 @@ SegmentationRequest::SegmentationRequest(
 PROTOBUF_NDEBUG_INLINE SegmentationRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
+      : _cached_size_{0},
+        model_id_(arena) {}
 
 inline void SegmentationRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -1571,6 +1640,7 @@ inline void SegmentationRequest::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.model_id_.Destroy();
   delete this_._impl_.image_;
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
@@ -1610,12 +1680,15 @@ PROTOBUF_NOINLINE void SegmentationRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(_impl_.image_ != nullptr);
       _impl_.image_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
     }
@@ -1644,17 +1717,25 @@ PROTOBUF_NOINLINE void SegmentationRequest::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.SegmentationImage image = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         1, *this_._impl_.image_, this_._impl_.image_->GetCachedSize(), target,
         stream);
   }
 
   // optional .runanywhere.v1.SegmentationOptions options = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         2, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
+  }
+
+  // optional string model_id = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    const ::std::string& _s = this_._internal_model_id();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SegmentationRequest.model_id");
+    target = stream->WriteStringMaybeAliased(3, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1682,14 +1763,19 @@ PROTOBUF_NOINLINE void SegmentationRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // .runanywhere.v1.SegmentationImage image = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // optional string model_id = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_model_id());
+    }
+    // .runanywhere.v1.SegmentationImage image = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.image_);
     }
     // optional .runanywhere.v1.SegmentationOptions options = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
     }
@@ -1712,8 +1798,11 @@ void SegmentationRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _this->_internal_set_model_id(from._internal_model_id());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(from._impl_.image_ != nullptr);
       if (_this->_impl_.image_ == nullptr) {
         _this->_impl_.image_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.image_);
@@ -1721,7 +1810,7 @@ void SegmentationRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.image_->MergeFrom(*from._impl_.image_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
@@ -1745,8 +1834,11 @@ void SegmentationRequest::CopyFrom(const SegmentationRequest& from) {
 
 void SegmentationRequest::InternalSwap(SegmentationRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(SegmentationRequest, _impl_.options_)
       + sizeof(SegmentationRequest::_impl_.options_)
@@ -1795,9 +1887,9 @@ SegmentationClassSummary::SegmentationClassSummary(
                offsetof(Impl_, pixel_count_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, pixel_count_),
-           offsetof(Impl_, fraction_) -
+           offsetof(Impl_, class_id_) -
                offsetof(Impl_, pixel_count_) +
-               sizeof(Impl_::fraction_));
+               sizeof(Impl_::class_id_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SegmentationClassSummary)
 }
@@ -1812,9 +1904,9 @@ inline void SegmentationClassSummary::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, pixel_count_),
            0,
-           offsetof(Impl_, fraction_) -
+           offsetof(Impl_, class_id_) -
                offsetof(Impl_, pixel_count_) +
-               sizeof(Impl_::fraction_));
+               sizeof(Impl_::class_id_));
 }
 SegmentationClassSummary::~SegmentationClassSummary() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SegmentationClassSummary)
@@ -1868,10 +1960,10 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     _impl_.label_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
     ::memset(&_impl_.pixel_count_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.fraction_) -
-        reinterpret_cast<char*>(&_impl_.pixel_count_)) + sizeof(_impl_.fraction_));
+        reinterpret_cast<char*>(&_impl_.class_id_) -
+        reinterpret_cast<char*>(&_impl_.pixel_count_)) + sizeof(_impl_.class_id_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1914,22 +2006,13 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
     }
   }
 
-  // float fraction = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_fraction()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          3, this_._internal_fraction(), target);
-    }
-  }
-
-  // string label = 4;
+  // string label = 3;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_label().empty()) {
       const ::std::string& _s = this_._internal_label();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SegmentationClassSummary.label");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
+      target = stream->WriteStringMaybeAliased(3, _s, target);
     }
   }
 
@@ -1958,8 +2041,8 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string label = 4;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // string label = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_label().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -1980,12 +2063,6 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
             this_._internal_class_id());
       }
     }
-    // float fraction = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_fraction()) != 0) {
-        total_size += 5;
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -2004,7 +2081,7 @@ void SegmentationClassSummary::MergeImpl(::google::protobuf::MessageLite& to_msg
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_label().empty()) {
         _this->_internal_set_label(from._internal_label());
@@ -2022,11 +2099,6 @@ void SegmentationClassSummary::MergeImpl(::google::protobuf::MessageLite& to_msg
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_class_id() != 0) {
         _this->_impl_.class_id_ = from._impl_.class_id_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_fraction()) != 0) {
-        _this->_impl_.fraction_ = from._impl_.fraction_;
       }
     }
   }
@@ -2051,8 +2123,8 @@ void SegmentationClassSummary::InternalSwap(SegmentationClassSummary* PROTOBUF_R
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.label_, &other->_impl_.label_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_)
-      + sizeof(SegmentationClassSummary::_impl_.fraction_)
+      PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.class_id_)
+      + sizeof(SegmentationClassSummary::_impl_.class_id_)
       - PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.pixel_count_)>(
           reinterpret_cast<char*>(&_impl_.pixel_count_),
           reinterpret_cast<char*>(&other->_impl_.pixel_count_));
@@ -2087,7 +2159,8 @@ PROTOBUF_NDEBUG_INLINE SegmentationResult::Impl_::Impl_(
         ,
         class_mask_u16_le_(arena, from.class_mask_u16_le_),
         diagnostic_rgba_(arena, from.diagnostic_rgba_),
-        model_id_(arena, from.model_id_) {}
+        model_id_(arena, from.model_id_),
+        confidence_mask_u8_(arena, from.confidence_mask_u8_) {}
 
 SegmentationResult::SegmentationResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2124,7 +2197,8 @@ PROTOBUF_NDEBUG_INLINE SegmentationResult::Impl_::Impl_(
         ,
         class_mask_u16_le_(arena),
         diagnostic_rgba_(arena),
-        model_id_(arena) {}
+        model_id_(arena),
+        confidence_mask_u8_(arena) {}
 
 inline void SegmentationResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -2149,6 +2223,7 @@ inline void SegmentationResult::SharedDtor(MessageLite& self) {
   this_._impl_.class_mask_u16_le_.Destroy();
   this_._impl_.diagnostic_rgba_.Destroy();
   this_._impl_.model_id_.Destroy();
+  this_._impl_.confidence_mask_u8_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -2186,7 +2261,7 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.class_summaries_.Clear();
     }
@@ -2199,8 +2274,11 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _impl_.confidence_mask_u8_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000070U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
     ::memset(&_impl_.width_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.processing_time_ms_) -
         reinterpret_cast<char*>(&_impl_.width_)) + sizeof(_impl_.processing_time_ms_));
@@ -2229,7 +2307,7 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // uint32 width = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_width() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
@@ -2238,7 +2316,7 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
   }
 
   // uint32 height = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_height() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
@@ -2274,7 +2352,7 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
   }
 
   // int64 processing_time_ms = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_processing_time_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
@@ -2290,6 +2368,12 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SegmentationResult.model_id");
       target = stream->WriteStringMaybeAliased(7, _s, target);
     }
+  }
+
+  // optional bytes confidence_mask_u8 = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    const ::std::string& _s = this_._internal_confidence_mask_u8();
+    target = stream->WriteBytesMaybeAliased(8, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2317,7 +2401,7 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated .runanywhere.v1.SegmentationClassSummary class_summaries = 5;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_class_summaries_size();
@@ -2344,22 +2428,27 @@ PROTOBUF_NOINLINE void SegmentationResult::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // uint32 width = 1;
+    // optional bytes confidence_mask_u8 = 8;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                      this_._internal_confidence_mask_u8());
+    }
+    // uint32 width = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_width() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_width());
       }
     }
     // uint32 height = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_height() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_height());
       }
     }
     // int64 processing_time_ms = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_processing_time_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_processing_time_ms());
@@ -2384,7 +2473,7 @@ void SegmentationResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_class_summaries()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
@@ -2412,16 +2501,19 @@ void SegmentationResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _this->_internal_set_confidence_mask_u8(from._internal_confidence_mask_u8());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_width() != 0) {
         _this->_impl_.width_ = from._impl_.width_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_height() != 0) {
         _this->_impl_.height_ = from._impl_.height_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_processing_time_ms() != 0) {
         _this->_impl_.processing_time_ms_ = from._impl_.processing_time_ms_;
       }
@@ -2450,6 +2542,7 @@ void SegmentationResult::InternalSwap(SegmentationResult* PROTOBUF_RESTRICT PROT
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.class_mask_u16_le_, &other->_impl_.class_mask_u16_le_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.diagnostic_rgba_, &other->_impl_.diagnostic_rgba_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.confidence_mask_u8_, &other->_impl_.confidence_mask_u8_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(SegmentationResult, _impl_.processing_time_ms_)
       + sizeof(SegmentationResult::_impl_.processing_time_ms_)

@@ -7,7 +7,6 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
-import ai.runanywhere.proto.v1.DiffusionMode
 import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusion
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -17,6 +16,7 @@ import com.runanywhere.sdk.public.types.RADiffusionResult
 import okio.ByteString.Companion.toByteString
 
 /** Generate an image with the lifecycle-loaded image-generation model. */
+@Deprecated("Use RunAnywhere.images.generate(prompt, options).")
 suspend fun RunAnywhere.generateImage(
     options: RADiffusionGenerationOptions,
     modelId: String? = null,
@@ -46,6 +46,7 @@ suspend fun RunAnywhere.generateImage(
  * Inpaint an encoded PNG/JPEG using an encoded mask where white pixels mark
  * the region to replace. The result advertises its raw RGBA media type.
  */
+@Deprecated("Use RunAnywhere.images.generate with ImageOptions.mode = ImageMode.Inpaint.")
 suspend fun RunAnywhere.inpaint(
     inputImage: ByteArray,
     maskImage: ByteArray,
@@ -72,16 +73,17 @@ suspend fun RunAnywhere.inpaint(
     val maskMediaType =
         maskImage.encodedImageMediaType()
             ?: throw SDKException.invalidArgument("maskImage must be encoded PNG or JPEG data")
+    // Mode is inferred, never declared (idl/diffusion.proto): no image =
+    // text-to-image, image = image-to-image, image + mask_image = inpainting.
     return generateImage(
         options =
             DiffusionGenerationOptions(
                 prompt = prompt,
                 width = width,
                 height = height,
-                mode = DiffusionMode.DIFFUSION_MODE_INPAINTING,
-                input_image = inputImage.toByteString(),
+                image = inputImage.toByteString(),
                 mask_image = maskImage.toByteString(),
-                input_image_media_type = inputMediaType,
+                image_media_type = inputMediaType,
                 mask_image_media_type = maskMediaType,
             ),
         modelId = modelId,

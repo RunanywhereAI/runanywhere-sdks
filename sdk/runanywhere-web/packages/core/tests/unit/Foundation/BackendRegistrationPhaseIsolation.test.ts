@@ -31,7 +31,7 @@ describe('backend registration Phase 2 isolation', () => {
   });
 
   it('keeps deferred Phase 2 ownership on the core facade export', () => {
-    const source = readSource('packages/core/src/Public/RunAnywhere.ts');
+    const source = readSource('packages/core/src/Public/SDKCore.ts');
     expect(source).toMatch(/export async function completeDeferredServicesInitialization/);
     expect(source).toMatch(/async completeServicesInitialization\(/);
   });

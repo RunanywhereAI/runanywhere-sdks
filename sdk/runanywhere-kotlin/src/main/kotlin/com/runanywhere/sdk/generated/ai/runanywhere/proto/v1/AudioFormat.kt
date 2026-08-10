@@ -17,15 +17,7 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Audio format — union of all cases currently defined across SDKs.
- * Sources pre-IDL:
- *   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
- *   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
- *   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
- *   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
- *   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
- * ---------------------------------------------------------------------------
+ * Container format of an audio payload.
  */
 public enum class AudioFormat(
   override val `value`: Int,

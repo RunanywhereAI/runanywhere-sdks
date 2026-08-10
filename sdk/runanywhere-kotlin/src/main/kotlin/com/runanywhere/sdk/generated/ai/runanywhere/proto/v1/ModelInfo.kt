@@ -31,14 +31,8 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Core metadata for a model entry.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:393       (16 fields)
- *   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
- *   Dart   model_types.dart:335       (similar shape, nullable divergences)
- *   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
- * ---------------------------------------------------------------------------
+ * Core metadata for a model entry. This message is persisted verbatim to
+ * .rac-manifest.binpb, so field numbers here are permanent.
  */
 public class ModelInfo(
   @field:WireField(
@@ -225,51 +219,23 @@ public class ModelInfo(
   )
   public val multi_file: MultiFileArtifact? = null,
   @field:WireField(
-    tag = 23,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "customStrategyId",
-    oneofName = "artifact",
-    schemaIndex = 21,
-  )
-  public val custom_strategy_id: String? = null,
-  @field:WireField(
     tag = 24,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "builtIn",
     oneofName = "artifact",
-    schemaIndex = 22,
+    schemaIndex = 21,
   )
   public val built_in: Boolean? = null,
   /**
-   * High-level artifact classification, complementary to the `artifact`
-   * oneof above. Allows catalog entries to carry a coarse type tag without
-   * resolving the full strategy variant.
-   */
-  @field:WireField(
-    tag = 25,
-    adapter = "ai.runanywhere.proto.v1.ModelArtifactType#ADAPTER",
-    jsonName = "artifactType",
-    schemaIndex = 23,
-  )
-  public val artifact_type: ModelArtifactType? = null,
-  /**
-   * Manifest of files that are expected on disk after fetch/extraction.
-   */
-  @field:WireField(
-    tag = 26,
-    adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
-    jsonName = "expectedFiles",
-    schemaIndex = 24,
-  )
-  public val expected_files: ExpectedModelFiles? = null,
-  /**
+   * artifact_type (restates the oneof),
+   * expected_files (belongs on the variant)
    * Preferred hardware acceleration backend for this model.
    */
   @field:WireField(
     tag = 27,
     adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     jsonName = "accelerationPreference",
-    schemaIndex = 25,
+    schemaIndex = 22,
   )
   public val acceleration_preference: AccelerationPreference? = null,
   /**
@@ -279,7 +245,7 @@ public class ModelInfo(
     tag = 28,
     adapter = "ai.runanywhere.proto.v1.RoutingPolicy#ADAPTER",
     jsonName = "routingPolicy",
-    schemaIndex = 26,
+    schemaIndex = 23,
   )
   public val routing_policy: RoutingPolicy? = null,
   /**
@@ -289,74 +255,63 @@ public class ModelInfo(
   @field:WireField(
     tag = 29,
     adapter = "ai.runanywhere.proto.v1.ModelRuntimeCompatibility#ADAPTER",
-    schemaIndex = 27,
+    schemaIndex = 24,
   )
   public val compatibility: ModelRuntimeCompatibility? = null,
   @field:WireField(
     tag = 30,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     jsonName = "preferredFramework",
-    schemaIndex = 28,
+    schemaIndex = 25,
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
-   * Durable registry state. Live byte progress belongs to
-   * download_service.DownloadProgress, not ModelInfo.
+   * The single durable state of this entry, and the only downloaded-ness
+   * signal. A non-empty local_path (7) is location data, NOT state: it
+   * stays populated for an entry whose files were deleted. Live byte
+   * progress belongs to download_service.DownloadProgress, not ModelInfo.
    */
   @field:WireField(
     tag = 31,
     adapter = "ai.runanywhere.proto.v1.ModelRegistryStatus#ADAPTER",
     jsonName = "registryStatus",
-    schemaIndex = 29,
+    schemaIndex = 26,
   )
   public val registry_status: ModelRegistryStatus? = null,
-  @field:WireField(
-    tag = 32,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "isDownloaded",
-    schemaIndex = 30,
-  )
-  public val is_downloaded: Boolean? = null,
   @field:WireField(
     tag = 33,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "isAvailable",
-    schemaIndex = 31,
+    schemaIndex = 27,
   )
   public val is_available: Boolean? = null,
   @field:WireField(
     tag = 34,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     jsonName = "lastUsedAtUnixMs",
-    schemaIndex = 32,
+    schemaIndex = 28,
   )
   public val last_used_at_unix_ms: Long? = null,
+  /**
+   * sync_pending (no producer), status_message
+   * (SDKError already carries it)
+   * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+   * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+   * models. Lets the catalog mark which models are drivable through
+   * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+   */
   @field:WireField(
-    tag = 35,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "usageCount",
-    schemaIndex = 33,
-  )
-  public val usage_count: Int? = null,
-  @field:WireField(
-    tag = 36,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "syncPending",
-    schemaIndex = 34,
-  )
-  public val sync_pending: Boolean? = null,
-  @field:WireField(
-    tag = 37,
+    tag = 38,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "statusMessage",
-    schemaIndex = 35,
+    jsonName = "cuaProfile",
+    schemaIndex = 29,
   )
-  public val status_message: String? = null,
+  public val cua_profile: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelInfo, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(single_file, archive, multi_file, custom_strategy_id, built_in) <= 1) {
-      "At most one of single_file, archive, multi_file, custom_strategy_id, built_in may be non-null"
+    require(countNonNull(single_file, archive, multi_file, built_in) <= 1) {
+      "At most one of single_file, archive, multi_file, built_in may be non-null"
     }
   }
 
@@ -391,21 +346,15 @@ public class ModelInfo(
     if (single_file != other.single_file) return false
     if (archive != other.archive) return false
     if (multi_file != other.multi_file) return false
-    if (custom_strategy_id != other.custom_strategy_id) return false
     if (built_in != other.built_in) return false
-    if (artifact_type != other.artifact_type) return false
-    if (expected_files != other.expected_files) return false
     if (acceleration_preference != other.acceleration_preference) return false
     if (routing_policy != other.routing_policy) return false
     if (compatibility != other.compatibility) return false
     if (preferred_framework != other.preferred_framework) return false
     if (registry_status != other.registry_status) return false
-    if (is_downloaded != other.is_downloaded) return false
     if (is_available != other.is_available) return false
     if (last_used_at_unix_ms != other.last_used_at_unix_ms) return false
-    if (usage_count != other.usage_count) return false
-    if (sync_pending != other.sync_pending) return false
-    if (status_message != other.status_message) return false
+    if (cua_profile != other.cua_profile) return false
     return true
   }
 
@@ -434,21 +383,15 @@ public class ModelInfo(
       result = result * 37 + (single_file?.hashCode() ?: 0)
       result = result * 37 + (archive?.hashCode() ?: 0)
       result = result * 37 + (multi_file?.hashCode() ?: 0)
-      result = result * 37 + (custom_strategy_id?.hashCode() ?: 0)
       result = result * 37 + (built_in?.hashCode() ?: 0)
-      result = result * 37 + (artifact_type?.hashCode() ?: 0)
-      result = result * 37 + (expected_files?.hashCode() ?: 0)
       result = result * 37 + (acceleration_preference?.hashCode() ?: 0)
       result = result * 37 + (routing_policy?.hashCode() ?: 0)
       result = result * 37 + (compatibility?.hashCode() ?: 0)
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
       result = result * 37 + (registry_status?.hashCode() ?: 0)
-      result = result * 37 + (is_downloaded?.hashCode() ?: 0)
       result = result * 37 + (is_available?.hashCode() ?: 0)
       result = result * 37 + (last_used_at_unix_ms?.hashCode() ?: 0)
-      result = result * 37 + (usage_count?.hashCode() ?: 0)
-      result = result * 37 + (sync_pending?.hashCode() ?: 0)
-      result = result * 37 + (status_message?.hashCode() ?: 0)
+      result = result * 37 + (cua_profile?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -477,21 +420,15 @@ public class ModelInfo(
     if (single_file != null) result += """single_file=$single_file"""
     if (archive != null) result += """archive=$archive"""
     if (multi_file != null) result += """multi_file=$multi_file"""
-    if (custom_strategy_id != null) result += """custom_strategy_id=${sanitize(custom_strategy_id)}"""
     if (built_in != null) result += """built_in=$built_in"""
-    if (artifact_type != null) result += """artifact_type=$artifact_type"""
-    if (expected_files != null) result += """expected_files=$expected_files"""
     if (acceleration_preference != null) result += """acceleration_preference=$acceleration_preference"""
     if (routing_policy != null) result += """routing_policy=$routing_policy"""
     if (compatibility != null) result += """compatibility=$compatibility"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
     if (registry_status != null) result += """registry_status=$registry_status"""
-    if (is_downloaded != null) result += """is_downloaded=$is_downloaded"""
     if (is_available != null) result += """is_available=$is_available"""
     if (last_used_at_unix_ms != null) result += """last_used_at_unix_ms=$last_used_at_unix_ms"""
-    if (usage_count != null) result += """usage_count=$usage_count"""
-    if (sync_pending != null) result += """sync_pending=$sync_pending"""
-    if (status_message != null) result += """status_message=${sanitize(status_message)}"""
+    if (cua_profile != null) result += """cua_profile=${sanitize(cua_profile)}"""
     return result.joinToString(prefix = "ModelInfo{", separator = ", ", postfix = "}")
   }
 
@@ -517,23 +454,17 @@ public class ModelInfo(
     single_file: SingleFileArtifact? = this.single_file,
     archive: ArchiveArtifact? = this.archive,
     multi_file: MultiFileArtifact? = this.multi_file,
-    custom_strategy_id: String? = this.custom_strategy_id,
     built_in: Boolean? = this.built_in,
-    artifact_type: ModelArtifactType? = this.artifact_type,
-    expected_files: ExpectedModelFiles? = this.expected_files,
     acceleration_preference: AccelerationPreference? = this.acceleration_preference,
     routing_policy: RoutingPolicy? = this.routing_policy,
     compatibility: ModelRuntimeCompatibility? = this.compatibility,
     preferred_framework: InferenceFramework? = this.preferred_framework,
     registry_status: ModelRegistryStatus? = this.registry_status,
-    is_downloaded: Boolean? = this.is_downloaded,
     is_available: Boolean? = this.is_available,
     last_used_at_unix_ms: Long? = this.last_used_at_unix_ms,
-    usage_count: Int? = this.usage_count,
-    sync_pending: Boolean? = this.sync_pending,
-    status_message: String? = this.status_message,
+    cua_profile: String? = this.cua_profile,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in, artifact_type, expected_files, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms, usage_count, sync_pending, status_message, unknownFields)
+  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, built_in, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_available, last_used_at_unix_ms, cua_profile, unknownFields)
 
   public companion object {
     @JvmField
@@ -596,21 +527,15 @@ public class ModelInfo(
         size += SingleFileArtifact.ADAPTER.encodedSizeWithTag(20, value.single_file)
         size += ArchiveArtifact.ADAPTER.encodedSizeWithTag(21, value.archive)
         size += MultiFileArtifact.ADAPTER.encodedSizeWithTag(22, value.multi_file)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(23, value.custom_strategy_id)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(24, value.built_in)
-        size += ModelArtifactType.ADAPTER.encodedSizeWithTag(25, value.artifact_type)
-        size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(26, value.expected_files)
         size += AccelerationPreference.ADAPTER.encodedSizeWithTag(27, value.acceleration_preference)
         size += RoutingPolicy.ADAPTER.encodedSizeWithTag(28, value.routing_policy)
         size += ModelRuntimeCompatibility.ADAPTER.encodedSizeWithTag(29, value.compatibility)
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(30, value.preferred_framework)
         size += ModelRegistryStatus.ADAPTER.encodedSizeWithTag(31, value.registry_status)
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(32, value.is_downloaded)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(33, value.is_available)
         size += ProtoAdapter.INT64.encodedSizeWithTag(34, value.last_used_at_unix_ms)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(35, value.usage_count)
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(36, value.sync_pending)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(37, value.status_message)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(38, value.cua_profile)
         return size
       }
 
@@ -661,23 +586,17 @@ public class ModelInfo(
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
         ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
         ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
-        ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
-        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
         AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
         RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
         ModelRuntimeCompatibility.ADAPTER.encodeWithTag(writer, 29, value.compatibility)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.preferred_framework)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 31, value.registry_status)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 32, value.is_downloaded)
         ProtoAdapter.BOOL.encodeWithTag(writer, 33, value.is_available)
         ProtoAdapter.INT64.encodeWithTag(writer, 34, value.last_used_at_unix_ms)
-        ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
-        ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
+        ProtoAdapter.STRING.encodeWithTag(writer, 38, value.cua_profile)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
-        ProtoAdapter.STRING.encodeWithTag(writer, 23, value.custom_strategy_id)
         ProtoAdapter.BOOL.encodeWithTag(writer, 24, value.built_in)
         writer.writeBytes(value.unknownFields)
       }
@@ -685,23 +604,17 @@ public class ModelInfo(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelInfo) {
         writer.writeBytes(value.unknownFields)
         ProtoAdapter.BOOL.encodeWithTag(writer, 24, value.built_in)
-        ProtoAdapter.STRING.encodeWithTag(writer, 23, value.custom_strategy_id)
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
-        ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
-        ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
+        ProtoAdapter.STRING.encodeWithTag(writer, 38, value.cua_profile)
         ProtoAdapter.INT64.encodeWithTag(writer, 34, value.last_used_at_unix_ms)
         ProtoAdapter.BOOL.encodeWithTag(writer, 33, value.is_available)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 32, value.is_downloaded)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 31, value.registry_status)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.preferred_framework)
         ModelRuntimeCompatibility.ADAPTER.encodeWithTag(writer, 29, value.compatibility)
         RoutingPolicy.ADAPTER.encodeWithTag(writer, 28, value.routing_policy)
         AccelerationPreference.ADAPTER.encodeWithTag(writer, 27, value.acceleration_preference)
-        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
-        ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
         ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
         ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
@@ -772,21 +685,15 @@ public class ModelInfo(
         var single_file: SingleFileArtifact? = null
         var archive: ArchiveArtifact? = null
         var multi_file: MultiFileArtifact? = null
-        var custom_strategy_id: String? = null
         var built_in: Boolean? = null
-        var artifact_type: ModelArtifactType? = null
-        var expected_files: ExpectedModelFiles? = null
         var acceleration_preference: AccelerationPreference? = null
         var routing_policy: RoutingPolicy? = null
         var compatibility: ModelRuntimeCompatibility? = null
         var preferred_framework: InferenceFramework? = null
         var registry_status: ModelRegistryStatus? = null
-        var is_downloaded: Boolean? = null
         var is_available: Boolean? = null
         var last_used_at_unix_ms: Long? = null
-        var usage_count: Int? = null
-        var sync_pending: Boolean? = null
-        var status_message: String? = null
+        var cua_profile: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -826,14 +733,7 @@ public class ModelInfo(
             20 -> single_file = SingleFileArtifact.ADAPTER.decode(reader)
             21 -> archive = ArchiveArtifact.ADAPTER.decode(reader)
             22 -> multi_file = MultiFileArtifact.ADAPTER.decode(reader)
-            23 -> custom_strategy_id = ProtoAdapter.STRING.decode(reader)
             24 -> built_in = ProtoAdapter.BOOL.decode(reader)
-            25 -> try {
-              artifact_type = ModelArtifactType.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            26 -> expected_files = ExpectedModelFiles.ADAPTER.decode(reader)
             27 -> try {
               acceleration_preference = AccelerationPreference.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -855,12 +755,9 @@ public class ModelInfo(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            32 -> is_downloaded = ProtoAdapter.BOOL.decode(reader)
             33 -> is_available = ProtoAdapter.BOOL.decode(reader)
             34 -> last_used_at_unix_ms = ProtoAdapter.INT64.decode(reader)
-            35 -> usage_count = ProtoAdapter.INT32.decode(reader)
-            36 -> sync_pending = ProtoAdapter.BOOL.decode(reader)
-            37 -> status_message = ProtoAdapter.STRING.decode(reader)
+            38 -> cua_profile = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -886,21 +783,15 @@ public class ModelInfo(
           single_file = single_file,
           archive = archive,
           multi_file = multi_file,
-          custom_strategy_id = custom_strategy_id,
           built_in = built_in,
-          artifact_type = artifact_type,
-          expected_files = expected_files,
           acceleration_preference = acceleration_preference,
           routing_policy = routing_policy,
           compatibility = compatibility,
           preferred_framework = preferred_framework,
           registry_status = registry_status,
-          is_downloaded = is_downloaded,
           is_available = is_available,
           last_used_at_unix_ms = last_used_at_unix_ms,
-          usage_count = usage_count,
-          sync_pending = sync_pending,
-          status_message = status_message,
+          cua_profile = cua_profile,
           unknownFields = unknownFields
         )
       }
@@ -911,7 +802,6 @@ public class ModelInfo(
         single_file = value.single_file?.let(SingleFileArtifact.ADAPTER::redact),
         archive = value.archive?.let(ArchiveArtifact.ADAPTER::redact),
         multi_file = value.multi_file?.let(MultiFileArtifact.ADAPTER::redact),
-        expected_files = value.expected_files?.let(ExpectedModelFiles.ADAPTER::redact),
         compatibility = value.compatibility?.let(ModelRuntimeCompatibility.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )

@@ -1,24 +1,12 @@
-// RunAnywhere IDL — LLM token streaming service.
-//
-// Server-streaming rpc returning per-token deltas during
-// LLM generation. Replaces the 5 hand-written token-stream implementations
-// (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
-// RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
+// RunAnywhere IDL — LLM request envelopes and streaming events.
 
 syntax = "proto3";
 
 package runanywhere.v1;
 
-import "voice_events.proto";
-// ToolCall / ToolResult provide the structured payload for tool-call stream
-// events.
+import "errors.proto";
 import "tool_calling.proto";
-// Canonical generation settings for LLMGenerateRequest.
 import "llm_options.proto";
-// Prior conversation turns are structured ChatMessages so an engine
-// that owns its chat template (e.g. QHexRT) can render {system, history, user}
-// itself instead of the caller hand-building a marker string. chat.proto
-// imports llm_options.proto (not llm_service.proto), so this adds no cycle.
 import "chat.proto";
 
 option cc_enable_arenas      = true;
@@ -30,56 +18,24 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// Generation settings live exclusively in `options`. Reserved field numbers
-// prevent unsafe wire reuse.
+// The single request envelope for both unary and streaming generation.
 message LLMGenerateRequest {
-    string prompt           = 1;
-    reserved 2 to 6;
-    bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
-    reserved 8 to 13;
+    reserved 1, 25, 27;
+    reserved "prompt", "metadata", "history";
+
+    // Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+    // commons generates one, which is the normal case and matches industry
+    // practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+    // non-empty caller value is honoured verbatim.
     string request_id = 14;
     string model_id = 15;
     string conversation_id = 16;
-    reserved 17 to 24;
-    map<string, string> metadata = 25;
-
-    // Canonical generation settings. When absent, commons applies its SDK
-    // defaults; callers that need explicit controls populate this message.
     optional LLMGenerationOptions options = 26;
 
-    // Prior conversation turns (excludes the current `prompt`, which
-    // stays the live user turn, and `options.system_prompt`, which stays
-    // separate).
-    // Alternating user/assistant ChatMessages in chronological order. An engine
-    // that owns its chat template renders {system_prompt, history, prompt} from
-    // its model's markers; engines that don't simply ignore this field.
-    repeated ChatMessage history = 27;
-}
-
-// Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
-// stream-native token, timing, and error fields distinct from the unary
-// LLMGenerationResult shape.
-message LLMStreamFinalResult {
-    string text = 1;
-    optional string thinking_content = 2;
-    int32 prompt_tokens = 3;
-    int32 completion_tokens = 4;
-    int32 total_tokens = 5;
-    int64 total_time_ms = 6;
-    int64 time_to_first_token_ms = 7;
-    float tokens_per_second = 8;
-    string finish_reason = 9;
-    int32 error_code = 10;
-    string error_message = 11;
-    int64 prompt_eval_time_ms = 12;
-    int64 decode_time_ms = 13;
-
-    // Tool calls actually executed during the streaming session (mirrors
-    // LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
-    // Populated only on terminal events when the backend completed at least
-    // one tool call.
-    repeated ToolCall tool_calls = 14;
-    repeated ToolResult tool_results = 15;
+    // The whole conversation, oldest first, ending with the turn the model
+    // must answer. Never empty. System turns belong in
+    // options.system_prompt, not here.
+    repeated ChatMessage messages = 28;
 }
 
 enum LLMStreamEventKind {
@@ -93,78 +49,43 @@ enum LLMStreamEventKind {
     LLM_STREAM_EVENT_KIND_ERROR = 7;
 }
 
-// Unified per-token streaming event. Replaces
-// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
-// callbackFlow / StreamController / tokenQueue. One serialized event
-// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
-// from voice_events.proto so frontends can reuse gap-detection logic.
+// LLMStreamFinalResult is deleted: the stream terminates with the same
+// LLMGenerationResult type the unary call returns (see `result` below), so
+// one mapper serves both paths instead of two near-identical ones.
+//
+// Exactly one terminal event per stream: event_kind == COMPLETED (with
+// `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+// discriminator.
 message LLMStreamEvent {
-    // Monotonic per-process sequence number. Useful for frontends that
-    // need to detect gaps or out-of-order delivery.
+    reserved 2, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17;
+    reserved "timestamp_us", "is_final", "kind", "token_id", "logprob",
+             "conversation_id", "prompt_tokens_processed",
+             "completion_tokens_generated", "elapsed_ms";
+
+    // Monotonic sequence for tool-calling session streams (#607).
     uint64 seq             = 1;
 
-    // Wall-clock timestamp captured at the C++ edge, in microseconds
-    // since Unix epoch. Frontends may re-timestamp for UI display.
-    int64  timestamp_us    = 2;
-
-    // Generated token text. Empty on terminal events where only
-    // finish_reason or error_message is populated.
+    // The delta. Answer text when event_kind == TOKEN, reasoning text when
+    // event_kind == THINKING.
     string token           = 3;
 
-    // True on the last event of a generation.
-    bool   is_final        = 4;
-
-    // Token semantic category (answer / thought / tool-call).
-    // Canonical TokenKind from voice_events.proto.
-    TokenKind kind         = 5;
-
-    // Backend-provided token id when the engine exposes it; 0 = unset
-    // (proto3 scalar default).
-    uint32 token_id        = 6;
-
-    // Per-token log-probability when supported; 0.0 = unset.
-    float  logprob         = 7;
-
-    // Reason the stream stopped: "stop", "length", "cancelled", "error",
-    // "" = unset (proto3 scalar default). Only populated when is_final.
-    string finish_reason   = 8;
-
-    // Error message on failure events (kind may be unset, is_final true).
-    // Empty on success.
-    string error_message   = 9;
-
-    // Final aggregate result. Only populated on terminal events
-    // (is_final=true) when the backend can report result metrics.
-    optional LLMStreamFinalResult result = 10;
-
-    // Numeric backend status code when the terminal event represents a
-    // failure. 0 = unset/success.
-    int32 error_code = 11;
-
-    // Event classification distinct from token semantic kind.
     LLMStreamEventKind event_kind = 12;
 
-    // Request/session correlation fields.
+    // Correlation id, echoed from the request on every event.
     string request_id = 13;
-    string conversation_id = 14;
 
-    // Running counters for progress UIs.
-    int32 prompt_tokens_processed = 15;
-    int32 completion_tokens_generated = 16;
-    int64 elapsed_ms = 17;
+    FinishReason finish_reason = 21;
 
-    // Structured tool-call payload emitted when event_kind is
-    // LLM_STREAM_EVENT_KIND_TOOL_CALL.
+    // Present exactly when event_kind == COMPLETED.
+    optional LLMGenerationResult result = 22;
+    // Present exactly when event_kind == TOOL_CALL.
     optional ToolCall tool_call = 18;
+    // Present exactly when event_kind == ERROR.
+    optional SDKError error = 19;
+
+    // Largest complete JSON value visible in the output so far, when
+    // LLMGenerationOptions.structured_output is set.
+    optional string partial_json = 20;
 }
 
-service LLM {
-    // Server-streaming: emits one LLMStreamEvent per generated token
-    // until is_final=true. Cancellation aborts the underlying generation
-    // via the existing rac_llm_cancel() C ABI.
-    //
-    // Tool-driven streaming is not supported on this entry point even when
-    // options.tool_calling is populated. Use the non-streaming tool-session
-    // generation path for tool calling.
-    rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
-}
+// ToolCallingSession* messages are canonical in tool_calling.proto (see #607).

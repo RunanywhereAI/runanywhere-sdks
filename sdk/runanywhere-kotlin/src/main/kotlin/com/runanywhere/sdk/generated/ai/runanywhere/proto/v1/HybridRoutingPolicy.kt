@@ -32,10 +32,9 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Full routing policy attached to a model pair. `simple` mode collapses
- * to a single filter; `advanced` mode allows composition.
- * ---------------------------------------------------------------------------
+ * The candidate chain for one routed request: tried first to last, first
+ * success wins, position IS the priority. `mode` still governs whether the
+ * chain may cross the on-device/cloud line.
  */
 public class HybridRoutingPolicy(
   hard_filters: List<HybridFilter> = emptyList(),
@@ -48,11 +47,27 @@ public class HybridRoutingPolicy(
   public val cascade: HybridCascade? = null,
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.HybridRank#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.HybridInferenceMode#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val rank: HybridRank = HybridRank.HYBRID_RANK_UNSPECIFIED,
+  public val mode: HybridInferenceMode = HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED,
+  /**
+   * Per-ATTEMPT deadline, not the overall request deadline. When a candidate
+   * has produced nothing within this many milliseconds it is abandoned and
+   * the next candidate is tried. 0 = no per-attempt deadline.
+   */
+  @RacDefaultOption("0")
+  @RacMinOption(0)
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "attemptTimeoutMs",
+    schemaIndex = 3,
+  )
+  public val attempt_timeout_ms: Int = 0,
+  models: List<HybridModelDescriptor> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridRoutingPolicy, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -63,6 +78,17 @@ public class HybridRoutingPolicy(
     schemaIndex = 0,
   )
   public val hard_filters: List<HybridFilter> = immutableCopyOf("hard_filters", hard_filters)
+
+  /**
+   * Ordered candidates, priority first. Replaces the offline/online pair.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.HybridModelDescriptor#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 4,
+  )
+  public val models: List<HybridModelDescriptor> = immutableCopyOf("models", models)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -76,7 +102,9 @@ public class HybridRoutingPolicy(
     if (unknownFields != other.unknownFields) return false
     if (hard_filters != other.hard_filters) return false
     if (cascade != other.cascade) return false
-    if (rank != other.rank) return false
+    if (mode != other.mode) return false
+    if (attempt_timeout_ms != other.attempt_timeout_ms) return false
+    if (models != other.models) return false
     return true
   }
 
@@ -86,7 +114,9 @@ public class HybridRoutingPolicy(
       result = unknownFields.hashCode()
       result = result * 37 + hard_filters.hashCode()
       result = result * 37 + (cascade?.hashCode() ?: 0)
-      result = result * 37 + rank.hashCode()
+      result = result * 37 + mode.hashCode()
+      result = result * 37 + attempt_timeout_ms.hashCode()
+      result = result * 37 + models.hashCode()
       super.hashCode = result
     }
     return result
@@ -96,16 +126,20 @@ public class HybridRoutingPolicy(
     val result = mutableListOf<String>()
     if (hard_filters.isNotEmpty()) result += """hard_filters=$hard_filters"""
     if (cascade != null) result += """cascade=$cascade"""
-    result += """rank=$rank"""
+    result += """mode=$mode"""
+    result += """attempt_timeout_ms=$attempt_timeout_ms"""
+    if (models.isNotEmpty()) result += """models=$models"""
     return result.joinToString(prefix = "HybridRoutingPolicy{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     hard_filters: List<HybridFilter> = this.hard_filters,
     cascade: HybridCascade? = this.cascade,
-    rank: HybridRank = this.rank,
+    mode: HybridInferenceMode = this.mode,
+    attempt_timeout_ms: Int = this.attempt_timeout_ms,
+    models: List<HybridModelDescriptor> = this.models,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridRoutingPolicy = HybridRoutingPolicy(hard_filters, cascade, rank, unknownFields)
+  ): HybridRoutingPolicy = HybridRoutingPolicy(hard_filters, cascade, mode, attempt_timeout_ms, models, unknownFields)
 
   public companion object {
     @JvmField
@@ -124,9 +158,13 @@ public class HybridRoutingPolicy(
         if (value.cascade != null) {
           size += HybridCascade.ADAPTER.encodedSizeWithTag(2, value.cascade)
         }
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          size += HybridRank.ADAPTER.encodedSizeWithTag(3, value.rank)
+        if (value.mode != ai.runanywhere.proto.v1.HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED) {
+          size += HybridInferenceMode.ADAPTER.encodedSizeWithTag(3, value.mode)
         }
+        if (value.attempt_timeout_ms != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.attempt_timeout_ms)
+        }
+        size += HybridModelDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(5, value.models)
         return size
       }
 
@@ -135,16 +173,24 @@ public class HybridRoutingPolicy(
         if (value.cascade != null) {
           HybridCascade.ADAPTER.encodeWithTag(writer, 2, value.cascade)
         }
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          HybridRank.ADAPTER.encodeWithTag(writer, 3, value.rank)
+        if (value.mode != ai.runanywhere.proto.v1.HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED) {
+          HybridInferenceMode.ADAPTER.encodeWithTag(writer, 3, value.mode)
         }
+        if (value.attempt_timeout_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.attempt_timeout_ms)
+        }
+        HybridModelDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.models)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridRoutingPolicy) {
         writer.writeBytes(value.unknownFields)
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          HybridRank.ADAPTER.encodeWithTag(writer, 3, value.rank)
+        HybridModelDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.models)
+        if (value.attempt_timeout_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.attempt_timeout_ms)
+        }
+        if (value.mode != ai.runanywhere.proto.v1.HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED) {
+          HybridInferenceMode.ADAPTER.encodeWithTag(writer, 3, value.mode)
         }
         if (value.cascade != null) {
           HybridCascade.ADAPTER.encodeWithTag(writer, 2, value.cascade)
@@ -155,23 +201,29 @@ public class HybridRoutingPolicy(
       override fun decode(reader: ProtoReader): HybridRoutingPolicy {
         val hard_filters = mutableListOf<HybridFilter>()
         var cascade: HybridCascade? = null
-        var rank: HybridRank = HybridRank.HYBRID_RANK_UNSPECIFIED
+        var mode: HybridInferenceMode = HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED
+        var attempt_timeout_ms: Int = 0
+        val models = mutableListOf<HybridModelDescriptor>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> hard_filters.add(HybridFilter.ADAPTER.decode(reader))
             2 -> cascade = HybridCascade.ADAPTER.decode(reader)
             3 -> try {
-              rank = HybridRank.ADAPTER.decode(reader)
+              mode = HybridInferenceMode.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            4 -> attempt_timeout_ms = ProtoAdapter.INT32.decode(reader)
+            5 -> models.add(HybridModelDescriptor.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return HybridRoutingPolicy(
           hard_filters = hard_filters,
           cascade = cascade,
-          rank = rank,
+          mode = mode,
+          attempt_timeout_ms = attempt_timeout_ms,
+          models = models,
           unknownFields = unknownFields
         )
       }
@@ -179,6 +231,7 @@ public class HybridRoutingPolicy(
       override fun redact(`value`: HybridRoutingPolicy): HybridRoutingPolicy = value.copy(
         hard_filters = value.hard_filters.redactElements(HybridFilter.ADAPTER),
         cascade = value.cascade?.let(HybridCascade.ADAPTER::redact),
+        models = value.models.redactElements(HybridModelDescriptor.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

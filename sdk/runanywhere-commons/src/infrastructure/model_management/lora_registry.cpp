@@ -109,13 +109,6 @@ static void free_lora_entry(rac_lora_entry_t* entry) {
 #ifdef RAC_HAVE_PROTOBUF
 namespace {
 
-int64_t current_time_ms() {
-    using namespace std::chrono;
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
-
 const void* parse_data(const uint8_t* bytes, size_t size) {
     return rac_proto_bytes_data_or_empty(bytes, size);
 }
@@ -150,31 +143,24 @@ bool contains_case_insensitive(const std::string& haystack, const std::string& n
     return lowercase_ascii(haystack).find(needle_lower) != std::string::npos;
 }
 
+// LoraAdapterCatalogEntry was trimmed to the 6 adapter-specific fields
+// (id/name/compatible_models/default_scale/tags/local_path); every generic
+// artifact fact (description/url/filename/size_bytes/author/checksum_sha256/
+// license/is_downloaded/downloaded_at_unix_ms/is_imported/status_message)
+// now lives on the ModelInfo record for this adapter instead. A non-empty
+// local_path is the single remaining definition of "downloaded".
 bool catalog_entry_is_downloaded(const runanywhere::v1::LoraAdapterCatalogEntry& entry) {
-    return (entry.has_is_downloaded() && entry.is_downloaded()) || !entry.local_path().empty();
+    return !entry.local_path().empty();
 }
 
 void clear_completion_state(runanywhere::v1::LoraAdapterCatalogEntry* entry) {
     entry->clear_local_path();
-    entry->clear_is_downloaded();
-    entry->clear_downloaded_at_unix_ms();
-    entry->clear_is_imported();
-    entry->clear_status_message();
 }
 
 void preserve_completion_state(const runanywhere::v1::LoraAdapterCatalogEntry& from,
                                runanywhere::v1::LoraAdapterCatalogEntry* to) {
     if (from.has_local_path())
         to->set_local_path(from.local_path());
-    if (from.has_is_downloaded())
-        to->set_is_downloaded(from.is_downloaded());
-    if (from.has_downloaded_at_unix_ms()) {
-        to->set_downloaded_at_unix_ms(from.downloaded_at_unix_ms());
-    }
-    if (from.has_is_imported())
-        to->set_is_imported(from.is_imported());
-    if (from.has_status_message())
-        to->set_status_message(from.status_message());
 }
 
 bool parse_snapshot(const std::string& bytes, runanywhere::v1::LoraAdapterCatalogEntry* out) {
@@ -261,17 +247,15 @@ bool contains_all_tags(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
     return true;
 }
 
+// Substring match against name (description/author were trimmed off
+// LoraAdapterCatalogEntry -- see catalog_entry_is_downloaded above).
 bool matches_search_query(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
                           const std::string& query) {
     if (query.empty())
         return true;
     const std::string needle = lowercase_ascii(query);
     if (contains_case_insensitive(entry.id(), needle) ||
-        contains_case_insensitive(entry.name(), needle) ||
-        contains_case_insensitive(entry.description(), needle)) {
-        return true;
-    }
-    if (entry.has_author() && contains_case_insensitive(entry.author(), needle)) {
+        contains_case_insensitive(entry.name(), needle)) {
         return true;
     }
     for (const auto& tag : entry.tags()) {
@@ -325,10 +309,9 @@ rac_result_t list_catalog_with_query(rac_lora_registry_handle_t handle,
         }
     }
 
+    // filtered_count was deleted -- callers that want it read entries.size().
     runanywhere::v1::LoraAdapterCatalogListResult result;
-    result.set_success(true);
     result.set_total_count(static_cast<int32_t>(all_entries.size()));
-    result.set_filtered_count(static_cast<int32_t>(filtered.size()));
     result.set_downloaded_count(downloaded_count(filtered));
     for (const auto& entry : filtered) {
         *result.add_entries() = entry;
@@ -670,7 +653,8 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(rac_lora_registry_han
         auto it = registry->entries.find(request.adapter_id());
         if (it == registry->entries.end()) {
             result.set_found(false);
-            result.set_error_message("LoRA catalog entry not found");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_NOT_FOUND);
+            result.mutable_error()->set_message("LoRA catalog entry not found");
         } else {
             result.set_found(true);
             *result.mutable_entry() =
@@ -681,79 +665,23 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(rac_lora_registry_han
 #endif
 }
 
+// LoraAdapterDownloadCompletedRequest/Result were deleted outright from
+// idl/lora_options.proto (the "lora-delete-download-import-bookkeeping"
+// simplification): adapter files are now acquired through the models
+// domain's download/import verbs, and this LoRA domain carries no download
+// state of its own -- a non-empty LoraAdapterCatalogEntry.local_path is the
+// only "downloaded" signal. This ABI entry point has no request/result proto
+// shape left to parse into, so it is retired to a stub.
 extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
     rac_lora_registry_handle_t registry, const uint8_t* request_proto_bytes,
     size_t request_proto_size, rac_proto_buffer_t* out_result) {
-    if (!out_result)
-        return RAC_ERROR_NULL_POINTER;
-#ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)request_proto_bytes;
     (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-                                      "protobuf support is not available");
-#else
-    if (!registry) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NULL_POINTER,
-                                          "LoRA registry handle is required");
-    }
-
-    runanywhere::v1::LoraAdapterDownloadCompletedRequest request;
-    rac_result_t rc =
-        parse_proto_message(request_proto_bytes, request_proto_size,
-                            "LoraAdapterDownloadCompletedRequest", &request, out_result);
-    if (rc != RAC_SUCCESS)
-        return rc;
-    if (request.adapter_id().empty()) {
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_INVALID_ARGUMENT,
-            "LoraAdapterDownloadCompletedRequest.adapter_id is required");
-    }
-    if (request.local_path().empty()) {
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_INVALID_ARGUMENT,
-            "LoraAdapterDownloadCompletedRequest.local_path is required");
-    }
-
-    runanywhere::v1::LoraAdapterDownloadCompletedResult result;
-    {
-        std::lock_guard<std::mutex> lock(registry->mutex);
-        auto it = registry->entries.find(request.adapter_id());
-        if (it == registry->entries.end()) {
-            result.set_success(false);
-            result.set_persisted(false);
-            result.set_error_message("LoRA catalog entry not found");
-            return copy_proto(result, out_result);
-        }
-
-        runanywhere::v1::LoraAdapterCatalogEntry entry =
-            snapshot_from_struct_locked(registry, request.adapter_id(), it->second);
-        entry.set_local_path(request.local_path());
-        entry.set_is_downloaded(true);
-        entry.set_downloaded_at_unix_ms(request.has_completed_at_unix_ms()
-                                            ? request.completed_at_unix_ms()
-                                            : current_time_ms());
-        entry.set_is_imported(request.imported());
-        entry.set_status_message(
-            request.status_message().empty()
-                ? (request.imported() ? "import completed" : "download completed")
-                : request.status_message());
-        if (request.has_size_bytes() && request.size_bytes() > 0) {
-            entry.set_size_bytes(request.size_bytes());
-            it->second->file_size = request.size_bytes();
-        }
-        if (request.has_checksum_sha256()) {
-            entry.set_checksum_sha256(request.checksum_sha256());
-        }
-
-        rc = store_catalog_snapshot_locked(registry, entry);
-        if (rc != RAC_SUCCESS) {
-            return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-        }
-        result.set_success(true);
-        result.set_persisted(true);
-        *result.mutable_entry() = entry;
-    }
-    return copy_proto(result, out_result);
-#endif
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+    return rac_proto_buffer_set_error(
+        out_result, RAC_ERROR_NOT_IMPLEMENTED,
+        "rac_lora_catalog_mark_download_completed_proto is retired -- LoRA adapter files are "
+        "acquired through the models domain's download/import verbs");
 }

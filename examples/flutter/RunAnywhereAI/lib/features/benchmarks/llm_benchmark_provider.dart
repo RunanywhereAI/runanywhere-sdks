@@ -42,14 +42,16 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
     // Ensure clean state: unload any LLM left over from Chat or a previous
     // run (mirrors iOS pre-unload).
     try {
-      await sdk.RunAnywhere.llm.unload();
+      await sdk.RunAnywhere.models.unloadAll(
+        sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      );
     } catch (_) {
       // Nothing loaded — fine.
     }
 
     // Load
     final loadStopwatch = Stopwatch()..start();
-    await sdk.RunAnywhere.llm.load(model.id);
+    await sdk.RunAnywhere.models.load(model.id);
     metrics.loadTimeMs = loadStopwatch.elapsedMicroseconds / 1000.0;
 
     try {
@@ -57,10 +59,10 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
       final warmupStopwatch = Stopwatch()..start();
       final warmupEvents = sdk.RunAnywhere.llm.generateStream(
         'Hello',
-        sdk.LLMGenerationOptions(maxTokens: 5, temperature: 0.0),
+        options: sdk.LlmOptions(maxOutputTokens: 5, temperature: 0.0),
       );
       await for (final event in warmupEvents) {
-        if (event.isFinal) break;
+        if (event is sdk.GenerationCompleted) break;
       }
       metrics.warmupTimeMs = warmupStopwatch.elapsedMicroseconds / 1000.0;
 
@@ -78,50 +80,41 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
           'training procedures. Be as thorough as possible.';
 
       final benchStopwatch = Stopwatch()..start();
-      final result = await sdk.RunAnywhere.aggregateStream(
-        prompt: prompt,
-        events: sdk.RunAnywhere.llm.generateStream(
-          prompt,
-          sdk.LLMGenerationOptions(
-            maxTokens: maxTokens,
-            temperature: 0.0,
-            systemPrompt: systemPrompt,
-          ),
+      sdk.GenerationResult? result;
+      await for (final event in sdk.RunAnywhere.llm.generateStream(
+        prompt,
+        options: sdk.LlmOptions(
+          maxOutputTokens: maxTokens,
+          temperature: 0.0,
+          systemPrompt: systemPrompt,
         ),
-      );
+      )) {
+        if (event is sdk.GenerationCompleted) result = event.result;
+      }
       final wallMs = benchStopwatch.elapsedMicroseconds / 1000.0;
 
-      if (result.errorMessage.isNotEmpty) {
-        throw Exception(result.errorMessage);
+      if (result == null) {
+        throw Exception('Generation produced no terminal result');
       }
 
-      final generationMs =
-          result.generationTimeMs > 0 ? result.generationTimeMs : wallMs;
-      metrics.endToEndLatencyMs = generationMs;
-      metrics.ttftMs = result.ttftMs > 0 ? result.ttftMs : null;
+      metrics.endToEndLatencyMs = wallMs;
+      metrics.ttftMs = result.timeToFirstTokenMs > 0
+          ? result.timeToFirstTokenMs.toDouble()
+          : null;
       metrics.tokensPerSecond =
           result.tokensPerSecond > 0 ? result.tokensPerSecond : null;
       metrics.inputTokens = result.inputTokens > 0 ? result.inputTokens : null;
       metrics.outputTokens =
-          result.tokensGenerated > 0 ? result.tokensGenerated : null;
-
-      final decodeTimeMs = result.decodeTimeMs.toInt();
-      if (decodeTimeMs > 0 && result.tokensGenerated > 0) {
-        metrics.decodeTokensPerSecond =
-            result.tokensGenerated / (decodeTimeMs / 1000.0);
-      }
-      final promptEvalTimeMs = result.promptEvalTimeMs.toInt();
-      if (promptEvalTimeMs > 0 && result.inputTokens > 0) {
-        metrics.prefillTokensPerSecond =
-            result.inputTokens / (promptEvalTimeMs / 1000.0);
-      }
+          result.outputTokens > 0 ? result.outputTokens : null;
 
       // memoryDeltaBytes stays 0: Dart has no portable available-memory
       // probe (iOS uses os_proc_available_memory).
       return metrics;
     } finally {
       try {
-        await sdk.RunAnywhere.llm.unload();
+        await sdk.RunAnywhere.models.unloadAll(
+          sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        );
       } catch (_) {
         // Best-effort cleanup.
       }

@@ -132,7 +132,7 @@ struct BenchmarkDetailView: View {
                         .shadow(color: AppColors.shadowLight, radius: AppSpacing.shadowSmall)
                         .padding(.bottom, AppSpacing.xxLarge)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.3), value: toast)
+                        .motionAware(Motion.standardFade, value: toast)
                 }
             }
         }
@@ -244,8 +244,8 @@ private struct MetricsGrid: View {
             if let chars = metrics.charactersProcessed { items.append(("Chars", "\(chars)")) }
         case .vlm:
             if let tps = metrics.tokensPerSecond { items.append(("tok/s", String(format: "%.1f", tps))) }
-            if let pt = metrics.promptTokens, pt > 0 { items.append(("Prompt Tok", "\(pt)")) }
-            if let ct = metrics.completionTokens { items.append(("Comp Tok", "\(ct)")) }
+            if let inp = metrics.inputTokens, inp > 0 { items.append(("In Tokens", "\(inp)")) }
+            if let out = metrics.outputTokens { items.append(("Out Tokens", "\(out)")) }
             if metrics.warmupTimeMs > 0 {
                 items.append(("Warmup", String(format: "%.0fms", metrics.warmupTimeMs)))
             }

@@ -291,7 +291,7 @@ if [ -n "$NATIVES_FROM" ]; then
         stage_ios "$FLUTTER_ROOT/packages/runanywhere_mlx" \
             RABackendMLX RunAnywhereMLXRuntime RunAnywhereMLXMetal
         stage_mlx_ios_resources
-        stage_ios "$FLUTTER_ROOT/packages/runanywhere_onnx" RABackendONNX RABackendSherpa RABackendCoreML
+        stage_ios "$FLUTTER_ROOT/packages/runanywhere_onnx" RABackendONNX RABackendSherpa RABackendNeuRT
     fi
 
     HAS_ANDROID=0
@@ -466,7 +466,7 @@ validate_public_remote_binary_contract() {
             runanywhere_onnx)
                 component="onnx"
                 expected_count=3
-                expected_targets="RABackendONNX RABackendSherpa RABackendCoreML"
+                expected_targets="RABackendONNX RABackendSherpa RABackendNeuRT"
                 ;;
         esac
         pkg_dir="$FLUTTER_ROOT/packages/$pkg"

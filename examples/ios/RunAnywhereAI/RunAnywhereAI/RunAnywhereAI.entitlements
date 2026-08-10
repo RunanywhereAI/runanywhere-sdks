@@ -9,6 +9,9 @@
     <!-- macOS Network access for API calls and model downloads -->
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- macOS incoming TCP for Connect hosting (NWListener + Bonjour) -->
+    <key>com.apple.security.network.server</key>
+    <true/>
     <!-- macOS Camera access for VLM vision features -->
     <key>com.apple.security.device.camera</key>
     <true/>
@@ -23,5 +26,16 @@
     <array>
         <string>group.com.runanywhere.runanywhereai</string>
     </array>
+    <!-- iOS HealthKit read access for the get_health_data tool -->
+    <key>com.apple.developer.healthkit</key>
+    <true/>
+    <key>com.apple.developer.healthkit.access</key>
+    <array/>
+    <!-- iOS raised jetsam ceiling. An on-device LLM is resident weights, not
+         transient allocation: the 2.6B ANE bundle measures 3.21 GiB peak RSS
+         (8-bit; the fp16 build is 5.72 GiB and does not fit a phone at all).
+         Without this the app is jetsam-killed mid-load with no catchable error. -->
+    <key>com.apple.developer.kernel.increased-memory-limit</key>
+    <true/>
 </dict>
 </plist>

@@ -5,97 +5,103 @@
 //   protoc               v7.35.1
 // source: llm_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PerformanceMetrics = exports.StreamToken = exports.GenerationHints = exports.LLMConfiguration = exports.LLMGenerationStatus = exports.LLMGenerationRequest_MetadataEntry = exports.LLMGenerationRequest = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.LLMGenerationState = exports.protobufPackage = void 0;
-exports.lLMGenerationStateFromJSON = lLMGenerationStateFromJSON;
-exports.lLMGenerationStateToJSON = lLMGenerationStateToJSON;
+exports.PerformanceMetrics = exports.StreamToken = exports.LLMConfiguration = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.FinishReason = exports.protobufPackage = void 0;
+exports.finishReasonFromJSON = finishReasonFromJSON;
+exports.finishReasonToJSON = finishReasonToJSON;
 exports.executionTargetFromJSON = executionTargetFromJSON;
 exports.executionTargetToJSON = executionTargetToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 const structured_output_1 = require("./structured_output");
 const thinking_tag_pattern_1 = require("./thinking_tag_pattern");
+const token_usage_1 = require("./token_usage");
 const tool_calling_1 = require("./tool_calling");
 exports.protobufPackage = "runanywhere.v1";
-var LLMGenerationState;
-(function (LLMGenerationState) {
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_UNSPECIFIED"] = 0] = "LLM_GENERATION_STATE_UNSPECIFIED";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_QUEUED"] = 1] = "LLM_GENERATION_STATE_QUEUED";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_PREFILLING"] = 2] = "LLM_GENERATION_STATE_PREFILLING";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_DECODING"] = 3] = "LLM_GENERATION_STATE_DECODING";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_TOOL_CALLING"] = 4] = "LLM_GENERATION_STATE_TOOL_CALLING";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_COMPLETED"] = 5] = "LLM_GENERATION_STATE_COMPLETED";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_CANCELLED"] = 6] = "LLM_GENERATION_STATE_CANCELLED";
-    LLMGenerationState[LLMGenerationState["LLM_GENERATION_STATE_FAILED"] = 7] = "LLM_GENERATION_STATE_FAILED";
-    LLMGenerationState[LLMGenerationState["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(LLMGenerationState || (exports.LLMGenerationState = LLMGenerationState = {}));
-function lLMGenerationStateFromJSON(object) {
+/**
+ * One declared vocabulary, used in every place a finish reason is reported
+ * on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
+ */
+var FinishReason;
+(function (FinishReason) {
+    FinishReason[FinishReason["FINISH_REASON_UNSPECIFIED"] = 0] = "FINISH_REASON_UNSPECIFIED";
+    /** FINISH_REASON_STOP - End-of-turn token. OpenAI "stop" / Anthropic "end_turn". */
+    FinishReason[FinishReason["FINISH_REASON_STOP"] = 1] = "FINISH_REASON_STOP";
+    /** FINISH_REASON_LENGTH - Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens". */
+    FinishReason[FinishReason["FINISH_REASON_LENGTH"] = 2] = "FINISH_REASON_LENGTH";
+    /** FINISH_REASON_STOP_SEQUENCE - One of options.stop_sequences fired; see `stop_sequence`. */
+    FinishReason[FinishReason["FINISH_REASON_STOP_SEQUENCE"] = 3] = "FINISH_REASON_STOP_SEQUENCE";
+    /** FINISH_REASON_TOOL_CALLS - Model wants a tool run before it can continue. */
+    FinishReason[FinishReason["FINISH_REASON_TOOL_CALLS"] = 4] = "FINISH_REASON_TOOL_CALLS";
+    /** FINISH_REASON_CANCELLED - Caller cancelled. No cloud analogue. */
+    FinishReason[FinishReason["FINISH_REASON_CANCELLED"] = 5] = "FINISH_REASON_CANCELLED";
+    /** FINISH_REASON_CONTEXT_OVERFLOW - Conversation exceeded the allocated context window. */
+    FinishReason[FinishReason["FINISH_REASON_CONTEXT_OVERFLOW"] = 6] = "FINISH_REASON_CONTEXT_OVERFLOW";
+    /** FINISH_REASON_ERROR - Generation failed; see `error`. */
+    FinishReason[FinishReason["FINISH_REASON_ERROR"] = 7] = "FINISH_REASON_ERROR";
+    FinishReason[FinishReason["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(FinishReason || (exports.FinishReason = FinishReason = {}));
+function finishReasonFromJSON(object) {
     switch (object) {
         case 0:
-        case "LLM_GENERATION_STATE_UNSPECIFIED":
-            return LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED;
+        case "FINISH_REASON_UNSPECIFIED":
+            return FinishReason.FINISH_REASON_UNSPECIFIED;
         case 1:
-        case "LLM_GENERATION_STATE_QUEUED":
-            return LLMGenerationState.LLM_GENERATION_STATE_QUEUED;
+        case "FINISH_REASON_STOP":
+            return FinishReason.FINISH_REASON_STOP;
         case 2:
-        case "LLM_GENERATION_STATE_PREFILLING":
-            return LLMGenerationState.LLM_GENERATION_STATE_PREFILLING;
+        case "FINISH_REASON_LENGTH":
+            return FinishReason.FINISH_REASON_LENGTH;
         case 3:
-        case "LLM_GENERATION_STATE_DECODING":
-            return LLMGenerationState.LLM_GENERATION_STATE_DECODING;
+        case "FINISH_REASON_STOP_SEQUENCE":
+            return FinishReason.FINISH_REASON_STOP_SEQUENCE;
         case 4:
-        case "LLM_GENERATION_STATE_TOOL_CALLING":
-            return LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING;
+        case "FINISH_REASON_TOOL_CALLS":
+            return FinishReason.FINISH_REASON_TOOL_CALLS;
         case 5:
-        case "LLM_GENERATION_STATE_COMPLETED":
-            return LLMGenerationState.LLM_GENERATION_STATE_COMPLETED;
+        case "FINISH_REASON_CANCELLED":
+            return FinishReason.FINISH_REASON_CANCELLED;
         case 6:
-        case "LLM_GENERATION_STATE_CANCELLED":
-            return LLMGenerationState.LLM_GENERATION_STATE_CANCELLED;
+        case "FINISH_REASON_CONTEXT_OVERFLOW":
+            return FinishReason.FINISH_REASON_CONTEXT_OVERFLOW;
         case 7:
-        case "LLM_GENERATION_STATE_FAILED":
-            return LLMGenerationState.LLM_GENERATION_STATE_FAILED;
+        case "FINISH_REASON_ERROR":
+            return FinishReason.FINISH_REASON_ERROR;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return LLMGenerationState.UNRECOGNIZED;
+            return FinishReason.UNRECOGNIZED;
     }
 }
-function lLMGenerationStateToJSON(object) {
+function finishReasonToJSON(object) {
     switch (object) {
-        case LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED:
-            return "LLM_GENERATION_STATE_UNSPECIFIED";
-        case LLMGenerationState.LLM_GENERATION_STATE_QUEUED:
-            return "LLM_GENERATION_STATE_QUEUED";
-        case LLMGenerationState.LLM_GENERATION_STATE_PREFILLING:
-            return "LLM_GENERATION_STATE_PREFILLING";
-        case LLMGenerationState.LLM_GENERATION_STATE_DECODING:
-            return "LLM_GENERATION_STATE_DECODING";
-        case LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING:
-            return "LLM_GENERATION_STATE_TOOL_CALLING";
-        case LLMGenerationState.LLM_GENERATION_STATE_COMPLETED:
-            return "LLM_GENERATION_STATE_COMPLETED";
-        case LLMGenerationState.LLM_GENERATION_STATE_CANCELLED:
-            return "LLM_GENERATION_STATE_CANCELLED";
-        case LLMGenerationState.LLM_GENERATION_STATE_FAILED:
-            return "LLM_GENERATION_STATE_FAILED";
-        case LLMGenerationState.UNRECOGNIZED:
+        case FinishReason.FINISH_REASON_UNSPECIFIED:
+            return "FINISH_REASON_UNSPECIFIED";
+        case FinishReason.FINISH_REASON_STOP:
+            return "FINISH_REASON_STOP";
+        case FinishReason.FINISH_REASON_LENGTH:
+            return "FINISH_REASON_LENGTH";
+        case FinishReason.FINISH_REASON_STOP_SEQUENCE:
+            return "FINISH_REASON_STOP_SEQUENCE";
+        case FinishReason.FINISH_REASON_TOOL_CALLS:
+            return "FINISH_REASON_TOOL_CALLS";
+        case FinishReason.FINISH_REASON_CANCELLED:
+            return "FINISH_REASON_CANCELLED";
+        case FinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+            return "FINISH_REASON_CONTEXT_OVERFLOW";
+        case FinishReason.FINISH_REASON_ERROR:
+            return "FINISH_REASON_ERROR";
+        case FinishReason.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
 }
-/**
- * ---------------------------------------------------------------------------
- * Routing destination for a generation (Web SDK ExecutionTarget in
- * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
- * ---------------------------------------------------------------------------
- */
 var ExecutionTarget;
 (function (ExecutionTarget) {
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_UNSPECIFIED"] = 0] = "EXECUTION_TARGET_UNSPECIFIED";
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_ON_DEVICE"] = 1] = "EXECUTION_TARGET_ON_DEVICE";
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_CLOUD"] = 2] = "EXECUTION_TARGET_CLOUD";
-    /** EXECUTION_TARGET_AUTO - Let the SDK decide based on policy (cost, latency, privacy, etc.). */
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_AUTO"] = 3] = "EXECUTION_TARGET_AUTO";
     ExecutionTarget[ExecutionTarget["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ExecutionTarget || (exports.ExecutionTarget = ExecutionTarget = {}));
@@ -136,55 +142,45 @@ function executionTargetToJSON(object) {
 }
 function createBaseLLMGenerationOptions() {
     return {
-        maxTokens: 0,
-        temperature: 0,
-        topP: 0,
-        topK: 0,
-        repetitionPenalty: 0,
+        maxOutputTokens: undefined,
+        temperature: undefined,
+        topP: undefined,
+        topK: undefined,
+        repeatPenalty: undefined,
         stopSequences: [],
-        streamingEnabled: false,
         preferredFramework: 0,
         systemPrompt: undefined,
-        jsonSchema: undefined,
-        thinkingPattern: undefined,
+        reasoning: undefined,
         executionTarget: undefined,
         structuredOutput: undefined,
-        enableRealTimeTracking: false,
-        seed: 0,
-        frequencyPenalty: 0,
-        presencePenalty: 0,
+        seed: undefined,
+        frequencyPenalty: undefined,
+        presencePenalty: undefined,
         repeatLastN: 0,
-        minP: 0,
-        grammar: undefined,
-        responseFormat: undefined,
+        minP: undefined,
         echoPrompt: false,
-        nThreads: 0,
         toolCalling: undefined,
-        disableThinking: false,
     };
 }
 exports.LLMGenerationOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.maxTokens !== 0) {
-            writer.uint32(8).int32(message.maxTokens);
+        if (message.maxOutputTokens !== undefined) {
+            writer.uint32(8).int32(message.maxOutputTokens);
         }
-        if (message.temperature !== 0) {
+        if (message.temperature !== undefined) {
             writer.uint32(21).float(message.temperature);
         }
-        if (message.topP !== 0) {
+        if (message.topP !== undefined) {
             writer.uint32(29).float(message.topP);
         }
-        if (message.topK !== 0) {
+        if (message.topK !== undefined) {
             writer.uint32(32).int32(message.topK);
         }
-        if (message.repetitionPenalty !== 0) {
-            writer.uint32(45).float(message.repetitionPenalty);
+        if (message.repeatPenalty !== undefined) {
+            writer.uint32(45).float(message.repeatPenalty);
         }
         for (const v of message.stopSequences) {
             writer.uint32(50).string(v);
-        }
-        if (message.streamingEnabled !== false) {
-            writer.uint32(56).bool(message.streamingEnabled);
         }
         if (message.preferredFramework !== 0) {
             writer.uint32(64).int32(message.preferredFramework);
@@ -192,11 +188,8 @@ exports.LLMGenerationOptions = {
         if (message.systemPrompt !== undefined) {
             writer.uint32(74).string(message.systemPrompt);
         }
-        if (message.jsonSchema !== undefined) {
-            writer.uint32(82).string(message.jsonSchema);
-        }
-        if (message.thinkingPattern !== undefined) {
-            thinking_tag_pattern_1.ThinkingTagPattern.encode(message.thinkingPattern, writer.uint32(90).fork()).join();
+        if (message.reasoning !== undefined) {
+            thinking_tag_pattern_1.ReasoningOptions.encode(message.reasoning, writer.uint32(90).fork()).join();
         }
         if (message.executionTarget !== undefined) {
             writer.uint32(96).int32(message.executionTarget);
@@ -204,41 +197,26 @@ exports.LLMGenerationOptions = {
         if (message.structuredOutput !== undefined) {
             structured_output_1.StructuredOutputOptions.encode(message.structuredOutput, writer.uint32(106).fork()).join();
         }
-        if (message.enableRealTimeTracking !== false) {
-            writer.uint32(112).bool(message.enableRealTimeTracking);
-        }
-        if (message.seed !== 0) {
+        if (message.seed !== undefined) {
             writer.uint32(120).int64(message.seed);
         }
-        if (message.frequencyPenalty !== 0) {
+        if (message.frequencyPenalty !== undefined) {
             writer.uint32(133).float(message.frequencyPenalty);
         }
-        if (message.presencePenalty !== 0) {
+        if (message.presencePenalty !== undefined) {
             writer.uint32(141).float(message.presencePenalty);
         }
         if (message.repeatLastN !== 0) {
             writer.uint32(144).int32(message.repeatLastN);
         }
-        if (message.minP !== 0) {
+        if (message.minP !== undefined) {
             writer.uint32(157).float(message.minP);
-        }
-        if (message.grammar !== undefined) {
-            writer.uint32(162).string(message.grammar);
-        }
-        if (message.responseFormat !== undefined) {
-            writer.uint32(170).string(message.responseFormat);
         }
         if (message.echoPrompt !== false) {
             writer.uint32(176).bool(message.echoPrompt);
         }
-        if (message.nThreads !== 0) {
-            writer.uint32(184).int32(message.nThreads);
-        }
         if (message.toolCalling !== undefined) {
             tool_calling_1.ToolCallingOptions.encode(message.toolCalling, writer.uint32(194).fork()).join();
-        }
-        if (message.disableThinking !== false) {
-            writer.uint32(200).bool(message.disableThinking);
         }
         return writer;
     },
@@ -253,7 +231,7 @@ exports.LLMGenerationOptions = {
                     if (tag !== 8) {
                         break;
                     }
-                    message.maxTokens = reader.int32();
+                    message.maxOutputTokens = reader.int32();
                     continue;
                 }
                 case 2: {
@@ -281,7 +259,7 @@ exports.LLMGenerationOptions = {
                     if (tag !== 45) {
                         break;
                     }
-                    message.repetitionPenalty = reader.float();
+                    message.repeatPenalty = reader.float();
                     continue;
                 }
                 case 6: {
@@ -289,13 +267,6 @@ exports.LLMGenerationOptions = {
                         break;
                     }
                     message.stopSequences.push(reader.string());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.streamingEnabled = reader.bool();
                     continue;
                 }
                 case 8: {
@@ -312,18 +283,11 @@ exports.LLMGenerationOptions = {
                     message.systemPrompt = reader.string();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.jsonSchema = reader.string();
-                    continue;
-                }
                 case 11: {
                     if (tag !== 90) {
                         break;
                     }
-                    message.thinkingPattern = thinking_tag_pattern_1.ThinkingTagPattern.decode(reader, reader.uint32());
+                    message.reasoning = thinking_tag_pattern_1.ReasoningOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 12: {
@@ -338,13 +302,6 @@ exports.LLMGenerationOptions = {
                         break;
                     }
                     message.structuredOutput = structured_output_1.StructuredOutputOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 112) {
-                        break;
-                    }
-                    message.enableRealTimeTracking = reader.bool();
                     continue;
                 }
                 case 15: {
@@ -382,20 +339,6 @@ exports.LLMGenerationOptions = {
                     message.minP = reader.float();
                     continue;
                 }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.grammar = reader.string();
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.responseFormat = reader.string();
-                    continue;
-                }
                 case 22: {
                     if (tag !== 176) {
                         break;
@@ -403,25 +346,11 @@ exports.LLMGenerationOptions = {
                     message.echoPrompt = reader.bool();
                     continue;
                 }
-                case 23: {
-                    if (tag !== 184) {
-                        break;
-                    }
-                    message.nThreads = reader.int32();
-                    continue;
-                }
                 case 24: {
                     if (tag !== 194) {
                         break;
                     }
                     message.toolCalling = tool_calling_1.ToolCallingOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 25: {
-                    if (tag !== 200) {
-                        break;
-                    }
-                    message.disableThinking = reader.bool();
                     continue;
                 }
             }
@@ -434,37 +363,32 @@ exports.LLMGenerationOptions = {
     },
     fromJSON(object) {
         return {
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+            maxOutputTokens: isSet(object.maxOutputTokens)
+                ? globalThis.Number(object.maxOutputTokens)
+                : isSet(object.max_output_tokens)
+                    ? globalThis.Number(object.max_output_tokens)
+                    : undefined,
+            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : undefined,
             topP: isSet(object.topP)
                 ? globalThis.Number(object.topP)
                 : isSet(object.top_p)
                     ? globalThis.Number(object.top_p)
-                    : 0,
+                    : undefined,
             topK: isSet(object.topK)
                 ? globalThis.Number(object.topK)
                 : isSet(object.top_k)
                     ? globalThis.Number(object.top_k)
-                    : 0,
-            repetitionPenalty: isSet(object.repetitionPenalty)
-                ? globalThis.Number(object.repetitionPenalty)
-                : isSet(object.repetition_penalty)
-                    ? globalThis.Number(object.repetition_penalty)
-                    : 0,
+                    : undefined,
+            repeatPenalty: isSet(object.repeatPenalty)
+                ? globalThis.Number(object.repeatPenalty)
+                : isSet(object.repeat_penalty)
+                    ? globalThis.Number(object.repeat_penalty)
+                    : undefined,
             stopSequences: globalThis.Array.isArray(object?.stopSequences)
                 ? object.stopSequences.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.stop_sequences)
                     ? object.stop_sequences.map((e) => globalThis.String(e))
                     : [],
-            streamingEnabled: isSet(object.streamingEnabled)
-                ? globalThis.Boolean(object.streamingEnabled)
-                : isSet(object.streaming_enabled)
-                    ? globalThis.Boolean(object.streaming_enabled)
-                    : false,
             preferredFramework: isSet(object.preferredFramework)
                 ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferredFramework)
                 : isSet(object.preferred_framework)
@@ -475,16 +399,7 @@ exports.LLMGenerationOptions = {
                 : isSet(object.system_prompt)
                     ? globalThis.String(object.system_prompt)
                     : undefined,
-            jsonSchema: isSet(object.jsonSchema)
-                ? globalThis.String(object.jsonSchema)
-                : isSet(object.json_schema)
-                    ? globalThis.String(object.json_schema)
-                    : undefined,
-            thinkingPattern: isSet(object.thinkingPattern)
-                ? thinking_tag_pattern_1.ThinkingTagPattern.fromJSON(object.thinkingPattern)
-                : isSet(object.thinking_pattern)
-                    ? thinking_tag_pattern_1.ThinkingTagPattern.fromJSON(object.thinking_pattern)
-                    : undefined,
+            reasoning: isSet(object.reasoning) ? thinking_tag_pattern_1.ReasoningOptions.fromJSON(object.reasoning) : undefined,
             executionTarget: isSet(object.executionTarget)
                 ? executionTargetFromJSON(object.executionTarget)
                 : isSet(object.execution_target)
@@ -495,22 +410,17 @@ exports.LLMGenerationOptions = {
                 : isSet(object.structured_output)
                     ? structured_output_1.StructuredOutputOptions.fromJSON(object.structured_output)
                     : undefined,
-            enableRealTimeTracking: isSet(object.enableRealTimeTracking)
-                ? globalThis.Boolean(object.enableRealTimeTracking)
-                : isSet(object.enable_real_time_tracking)
-                    ? globalThis.Boolean(object.enable_real_time_tracking)
-                    : false,
-            seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
+            seed: isSet(object.seed) ? globalThis.Number(object.seed) : undefined,
             frequencyPenalty: isSet(object.frequencyPenalty)
                 ? globalThis.Number(object.frequencyPenalty)
                 : isSet(object.frequency_penalty)
                     ? globalThis.Number(object.frequency_penalty)
-                    : 0,
+                    : undefined,
             presencePenalty: isSet(object.presencePenalty)
                 ? globalThis.Number(object.presencePenalty)
                 : isSet(object.presence_penalty)
                     ? globalThis.Number(object.presence_penalty)
-                    : 0,
+                    : undefined,
             repeatLastN: isSet(object.repeatLastN)
                 ? globalThis.Number(object.repeatLastN)
                 : isSet(object.repeat_last_n)
@@ -520,57 +430,38 @@ exports.LLMGenerationOptions = {
                 ? globalThis.Number(object.minP)
                 : isSet(object.min_p)
                     ? globalThis.Number(object.min_p)
-                    : 0,
-            grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
-            responseFormat: isSet(object.responseFormat)
-                ? globalThis.String(object.responseFormat)
-                : isSet(object.response_format)
-                    ? globalThis.String(object.response_format)
                     : undefined,
             echoPrompt: isSet(object.echoPrompt)
                 ? globalThis.Boolean(object.echoPrompt)
                 : isSet(object.echo_prompt)
                     ? globalThis.Boolean(object.echo_prompt)
                     : false,
-            nThreads: isSet(object.nThreads)
-                ? globalThis.Number(object.nThreads)
-                : isSet(object.n_threads)
-                    ? globalThis.Number(object.n_threads)
-                    : 0,
             toolCalling: isSet(object.toolCalling)
                 ? tool_calling_1.ToolCallingOptions.fromJSON(object.toolCalling)
                 : isSet(object.tool_calling)
                     ? tool_calling_1.ToolCallingOptions.fromJSON(object.tool_calling)
                     : undefined,
-            disableThinking: isSet(object.disableThinking)
-                ? globalThis.Boolean(object.disableThinking)
-                : isSet(object.disable_thinking)
-                    ? globalThis.Boolean(object.disable_thinking)
-                    : false,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
+        if (message.maxOutputTokens !== undefined) {
+            obj.maxOutputTokens = Math.round(message.maxOutputTokens);
         }
-        if (message.temperature !== 0) {
+        if (message.temperature !== undefined) {
             obj.temperature = message.temperature;
         }
-        if (message.topP !== 0) {
+        if (message.topP !== undefined) {
             obj.topP = message.topP;
         }
-        if (message.topK !== 0) {
+        if (message.topK !== undefined) {
             obj.topK = Math.round(message.topK);
         }
-        if (message.repetitionPenalty !== 0) {
-            obj.repetitionPenalty = message.repetitionPenalty;
+        if (message.repeatPenalty !== undefined) {
+            obj.repeatPenalty = message.repeatPenalty;
         }
         if (message.stopSequences?.length) {
             obj.stopSequences = message.stopSequences;
-        }
-        if (message.streamingEnabled !== false) {
-            obj.streamingEnabled = message.streamingEnabled;
         }
         if (message.preferredFramework !== 0) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
@@ -578,11 +469,8 @@ exports.LLMGenerationOptions = {
         if (message.systemPrompt !== undefined) {
             obj.systemPrompt = message.systemPrompt;
         }
-        if (message.jsonSchema !== undefined) {
-            obj.jsonSchema = message.jsonSchema;
-        }
-        if (message.thinkingPattern !== undefined) {
-            obj.thinkingPattern = thinking_tag_pattern_1.ThinkingTagPattern.toJSON(message.thinkingPattern);
+        if (message.reasoning !== undefined) {
+            obj.reasoning = thinking_tag_pattern_1.ReasoningOptions.toJSON(message.reasoning);
         }
         if (message.executionTarget !== undefined) {
             obj.executionTarget = executionTargetToJSON(message.executionTarget);
@@ -590,41 +478,26 @@ exports.LLMGenerationOptions = {
         if (message.structuredOutput !== undefined) {
             obj.structuredOutput = structured_output_1.StructuredOutputOptions.toJSON(message.structuredOutput);
         }
-        if (message.enableRealTimeTracking !== false) {
-            obj.enableRealTimeTracking = message.enableRealTimeTracking;
-        }
-        if (message.seed !== 0) {
+        if (message.seed !== undefined) {
             obj.seed = Math.round(message.seed);
         }
-        if (message.frequencyPenalty !== 0) {
+        if (message.frequencyPenalty !== undefined) {
             obj.frequencyPenalty = message.frequencyPenalty;
         }
-        if (message.presencePenalty !== 0) {
+        if (message.presencePenalty !== undefined) {
             obj.presencePenalty = message.presencePenalty;
         }
         if (message.repeatLastN !== 0) {
             obj.repeatLastN = Math.round(message.repeatLastN);
         }
-        if (message.minP !== 0) {
+        if (message.minP !== undefined) {
             obj.minP = message.minP;
-        }
-        if (message.grammar !== undefined) {
-            obj.grammar = message.grammar;
-        }
-        if (message.responseFormat !== undefined) {
-            obj.responseFormat = message.responseFormat;
         }
         if (message.echoPrompt !== false) {
             obj.echoPrompt = message.echoPrompt;
         }
-        if (message.nThreads !== 0) {
-            obj.nThreads = Math.round(message.nThreads);
-        }
         if (message.toolCalling !== undefined) {
             obj.toolCalling = tool_calling_1.ToolCallingOptions.toJSON(message.toolCalling);
-        }
-        if (message.disableThinking !== false) {
-            obj.disableThinking = message.disableThinking;
         }
         return obj;
     },
@@ -633,37 +506,30 @@ exports.LLMGenerationOptions = {
     },
     fromPartial(object) {
         const message = createBaseLLMGenerationOptions();
-        message.maxTokens = object.maxTokens ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.topP = object.topP ?? 0;
-        message.topK = object.topK ?? 0;
-        message.repetitionPenalty = object.repetitionPenalty ?? 0;
+        message.maxOutputTokens = object.maxOutputTokens ?? undefined;
+        message.temperature = object.temperature ?? undefined;
+        message.topP = object.topP ?? undefined;
+        message.topK = object.topK ?? undefined;
+        message.repeatPenalty = object.repeatPenalty ?? undefined;
         message.stopSequences = object.stopSequences?.map((e) => e) || [];
-        message.streamingEnabled = object.streamingEnabled ?? false;
         message.preferredFramework = object.preferredFramework ?? 0;
         message.systemPrompt = object.systemPrompt ?? undefined;
-        message.jsonSchema = object.jsonSchema ?? undefined;
-        message.thinkingPattern = (object.thinkingPattern !== undefined && object.thinkingPattern !== null)
-            ? thinking_tag_pattern_1.ThinkingTagPattern.fromPartial(object.thinkingPattern)
+        message.reasoning = (object.reasoning !== undefined && object.reasoning !== null)
+            ? thinking_tag_pattern_1.ReasoningOptions.fromPartial(object.reasoning)
             : undefined;
         message.executionTarget = object.executionTarget ?? undefined;
         message.structuredOutput = (object.structuredOutput !== undefined && object.structuredOutput !== null)
             ? structured_output_1.StructuredOutputOptions.fromPartial(object.structuredOutput)
             : undefined;
-        message.enableRealTimeTracking = object.enableRealTimeTracking ?? false;
-        message.seed = object.seed ?? 0;
-        message.frequencyPenalty = object.frequencyPenalty ?? 0;
-        message.presencePenalty = object.presencePenalty ?? 0;
+        message.seed = object.seed ?? undefined;
+        message.frequencyPenalty = object.frequencyPenalty ?? undefined;
+        message.presencePenalty = object.presencePenalty ?? undefined;
         message.repeatLastN = object.repeatLastN ?? 0;
-        message.minP = object.minP ?? 0;
-        message.grammar = object.grammar ?? undefined;
-        message.responseFormat = object.responseFormat ?? undefined;
+        message.minP = object.minP ?? undefined;
         message.echoPrompt = object.echoPrompt ?? false;
-        message.nThreads = object.nThreads ?? 0;
         message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
             ? tool_calling_1.ToolCallingOptions.fromPartial(object.toolCalling)
             : undefined;
-        message.disableThinking = object.disableThinking ?? false;
         return message;
     },
 };
@@ -671,28 +537,24 @@ function createBaseLLMGenerationResult() {
     return {
         text: "",
         thinkingContent: undefined,
-        inputTokens: 0,
-        tokensGenerated: 0,
         modelUsed: "",
         generationTimeMs: 0,
-        ttftMs: undefined,
-        tokensPerSecond: 0,
         framework: undefined,
-        finishReason: "",
         thinkingTokens: 0,
         responseTokens: 0,
         jsonOutput: undefined,
+        finishReason: 0,
+        stopSequence: undefined,
         performance: undefined,
         executedOn: undefined,
         structuredOutputValidation: undefined,
-        totalTokens: 0,
-        errorMessage: undefined,
-        errorCode: 0,
         cachedPromptTokens: 0,
         promptEvalTimeMs: 0,
         decodeTimeMs: 0,
         toolCalls: [],
         toolResults: [],
+        usage: undefined,
+        error: undefined,
     };
 }
 exports.LLMGenerationResult = {
@@ -703,29 +565,14 @@ exports.LLMGenerationResult = {
         if (message.thinkingContent !== undefined) {
             writer.uint32(18).string(message.thinkingContent);
         }
-        if (message.inputTokens !== 0) {
-            writer.uint32(24).int32(message.inputTokens);
-        }
-        if (message.tokensGenerated !== 0) {
-            writer.uint32(32).int32(message.tokensGenerated);
-        }
         if (message.modelUsed !== "") {
             writer.uint32(42).string(message.modelUsed);
         }
         if (message.generationTimeMs !== 0) {
             writer.uint32(49).double(message.generationTimeMs);
         }
-        if (message.ttftMs !== undefined) {
-            writer.uint32(57).double(message.ttftMs);
-        }
-        if (message.tokensPerSecond !== 0) {
-            writer.uint32(65).double(message.tokensPerSecond);
-        }
         if (message.framework !== undefined) {
             writer.uint32(74).string(message.framework);
-        }
-        if (message.finishReason !== "") {
-            writer.uint32(82).string(message.finishReason);
         }
         if (message.thinkingTokens !== 0) {
             writer.uint32(88).int32(message.thinkingTokens);
@@ -736,6 +583,12 @@ exports.LLMGenerationResult = {
         if (message.jsonOutput !== undefined) {
             writer.uint32(106).string(message.jsonOutput);
         }
+        if (message.finishReason !== 0) {
+            writer.uint32(216).int32(message.finishReason);
+        }
+        if (message.stopSequence !== undefined) {
+            writer.uint32(226).string(message.stopSequence);
+        }
         if (message.performance !== undefined) {
             exports.PerformanceMetrics.encode(message.performance, writer.uint32(114).fork()).join();
         }
@@ -744,15 +597,6 @@ exports.LLMGenerationResult = {
         }
         if (message.structuredOutputValidation !== undefined) {
             structured_output_1.StructuredOutputValidation.encode(message.structuredOutputValidation, writer.uint32(130).fork()).join();
-        }
-        if (message.totalTokens !== 0) {
-            writer.uint32(136).int32(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(146).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(152).int32(message.errorCode);
         }
         if (message.cachedPromptTokens !== 0) {
             writer.uint32(160).int32(message.cachedPromptTokens);
@@ -768,6 +612,12 @@ exports.LLMGenerationResult = {
         }
         for (const v of message.toolResults) {
             tool_calling_1.ToolResult.encode(v, writer.uint32(194).fork()).join();
+        }
+        if (message.usage !== undefined) {
+            token_usage_1.TokenUsage.encode(message.usage, writer.uint32(202).fork()).join();
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(210).fork()).join();
         }
         return writer;
     },
@@ -792,20 +642,6 @@ exports.LLMGenerationResult = {
                     message.thinkingContent = reader.string();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.inputTokens = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.tokensGenerated = reader.int32();
-                    continue;
-                }
                 case 5: {
                     if (tag !== 42) {
                         break;
@@ -820,32 +656,11 @@ exports.LLMGenerationResult = {
                     message.generationTimeMs = reader.double();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 57) {
-                        break;
-                    }
-                    message.ttftMs = reader.double();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 65) {
-                        break;
-                    }
-                    message.tokensPerSecond = reader.double();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 74) {
                         break;
                     }
                     message.framework = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.finishReason = reader.string();
                     continue;
                 }
                 case 11: {
@@ -869,6 +684,20 @@ exports.LLMGenerationResult = {
                     message.jsonOutput = reader.string();
                     continue;
                 }
+                case 27: {
+                    if (tag !== 216) {
+                        break;
+                    }
+                    message.finishReason = reader.int32();
+                    continue;
+                }
+                case 28: {
+                    if (tag !== 226) {
+                        break;
+                    }
+                    message.stopSequence = reader.string();
+                    continue;
+                }
                 case 14: {
                     if (tag !== 114) {
                         break;
@@ -888,27 +717,6 @@ exports.LLMGenerationResult = {
                         break;
                     }
                     message.structuredOutputValidation = structured_output_1.StructuredOutputValidation.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 136) {
-                        break;
-                    }
-                    message.totalTokens = reader.int32();
-                    continue;
-                }
-                case 18: {
-                    if (tag !== 146) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 19: {
-                    if (tag !== 152) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
                     continue;
                 }
                 case 20: {
@@ -946,6 +754,20 @@ exports.LLMGenerationResult = {
                     message.toolResults.push(tool_calling_1.ToolResult.decode(reader, reader.uint32()));
                     continue;
                 }
+                case 25: {
+                    if (tag !== 202) {
+                        break;
+                    }
+                    message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 26: {
+                    if (tag !== 210) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -962,16 +784,6 @@ exports.LLMGenerationResult = {
                 : isSet(object.thinking_content)
                     ? globalThis.String(object.thinking_content)
                     : undefined,
-            inputTokens: isSet(object.inputTokens)
-                ? globalThis.Number(object.inputTokens)
-                : isSet(object.input_tokens)
-                    ? globalThis.Number(object.input_tokens)
-                    : 0,
-            tokensGenerated: isSet(object.tokensGenerated)
-                ? globalThis.Number(object.tokensGenerated)
-                : isSet(object.tokens_generated)
-                    ? globalThis.Number(object.tokens_generated)
-                    : 0,
             modelUsed: isSet(object.modelUsed)
                 ? globalThis.String(object.modelUsed)
                 : isSet(object.model_used)
@@ -982,22 +794,7 @@ exports.LLMGenerationResult = {
                 : isSet(object.generation_time_ms)
                     ? globalThis.Number(object.generation_time_ms)
                     : 0,
-            ttftMs: isSet(object.ttftMs)
-                ? globalThis.Number(object.ttftMs)
-                : isSet(object.ttft_ms)
-                    ? globalThis.Number(object.ttft_ms)
-                    : undefined,
-            tokensPerSecond: isSet(object.tokensPerSecond)
-                ? globalThis.Number(object.tokensPerSecond)
-                : isSet(object.tokens_per_second)
-                    ? globalThis.Number(object.tokens_per_second)
-                    : 0,
             framework: isSet(object.framework) ? globalThis.String(object.framework) : undefined,
-            finishReason: isSet(object.finishReason)
-                ? globalThis.String(object.finishReason)
-                : isSet(object.finish_reason)
-                    ? globalThis.String(object.finish_reason)
-                    : "",
             thinkingTokens: isSet(object.thinkingTokens)
                 ? globalThis.Number(object.thinkingTokens)
                 : isSet(object.thinking_tokens)
@@ -1013,6 +810,16 @@ exports.LLMGenerationResult = {
                 : isSet(object.json_output)
                     ? globalThis.String(object.json_output)
                     : undefined,
+            finishReason: isSet(object.finishReason)
+                ? finishReasonFromJSON(object.finishReason)
+                : isSet(object.finish_reason)
+                    ? finishReasonFromJSON(object.finish_reason)
+                    : 0,
+            stopSequence: isSet(object.stopSequence)
+                ? globalThis.String(object.stopSequence)
+                : isSet(object.stop_sequence)
+                    ? globalThis.String(object.stop_sequence)
+                    : undefined,
             performance: isSet(object.performance) ? exports.PerformanceMetrics.fromJSON(object.performance) : undefined,
             executedOn: isSet(object.executedOn)
                 ? executionTargetFromJSON(object.executedOn)
@@ -1024,21 +831,6 @@ exports.LLMGenerationResult = {
                 : isSet(object.structured_output_validation)
                     ? structured_output_1.StructuredOutputValidation.fromJSON(object.structured_output_validation)
                     : undefined,
-            totalTokens: isSet(object.totalTokens)
-                ? globalThis.Number(object.totalTokens)
-                : isSet(object.total_tokens)
-                    ? globalThis.Number(object.total_tokens)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             cachedPromptTokens: isSet(object.cachedPromptTokens)
                 ? globalThis.Number(object.cachedPromptTokens)
                 : isSet(object.cached_prompt_tokens)
@@ -1064,6 +856,8 @@ exports.LLMGenerationResult = {
                 : globalThis.Array.isArray(object?.tool_results)
                     ? object.tool_results.map((e) => tool_calling_1.ToolResult.fromJSON(e))
                     : [],
+            usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1074,29 +868,14 @@ exports.LLMGenerationResult = {
         if (message.thinkingContent !== undefined) {
             obj.thinkingContent = message.thinkingContent;
         }
-        if (message.inputTokens !== 0) {
-            obj.inputTokens = Math.round(message.inputTokens);
-        }
-        if (message.tokensGenerated !== 0) {
-            obj.tokensGenerated = Math.round(message.tokensGenerated);
-        }
         if (message.modelUsed !== "") {
             obj.modelUsed = message.modelUsed;
         }
         if (message.generationTimeMs !== 0) {
             obj.generationTimeMs = message.generationTimeMs;
         }
-        if (message.ttftMs !== undefined) {
-            obj.ttftMs = message.ttftMs;
-        }
-        if (message.tokensPerSecond !== 0) {
-            obj.tokensPerSecond = message.tokensPerSecond;
-        }
         if (message.framework !== undefined) {
             obj.framework = message.framework;
-        }
-        if (message.finishReason !== "") {
-            obj.finishReason = message.finishReason;
         }
         if (message.thinkingTokens !== 0) {
             obj.thinkingTokens = Math.round(message.thinkingTokens);
@@ -1107,6 +886,12 @@ exports.LLMGenerationResult = {
         if (message.jsonOutput !== undefined) {
             obj.jsonOutput = message.jsonOutput;
         }
+        if (message.finishReason !== 0) {
+            obj.finishReason = finishReasonToJSON(message.finishReason);
+        }
+        if (message.stopSequence !== undefined) {
+            obj.stopSequence = message.stopSequence;
+        }
         if (message.performance !== undefined) {
             obj.performance = exports.PerformanceMetrics.toJSON(message.performance);
         }
@@ -1115,15 +900,6 @@ exports.LLMGenerationResult = {
         }
         if (message.structuredOutputValidation !== undefined) {
             obj.structuredOutputValidation = structured_output_1.StructuredOutputValidation.toJSON(message.structuredOutputValidation);
-        }
-        if (message.totalTokens !== 0) {
-            obj.totalTokens = Math.round(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
         }
         if (message.cachedPromptTokens !== 0) {
             obj.cachedPromptTokens = Math.round(message.cachedPromptTokens);
@@ -1140,6 +916,12 @@ exports.LLMGenerationResult = {
         if (message.toolResults?.length) {
             obj.toolResults = message.toolResults.map((e) => tool_calling_1.ToolResult.toJSON(e));
         }
+        if (message.usage !== undefined) {
+            obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -1149,17 +931,14 @@ exports.LLMGenerationResult = {
         const message = createBaseLLMGenerationResult();
         message.text = object.text ?? "";
         message.thinkingContent = object.thinkingContent ?? undefined;
-        message.inputTokens = object.inputTokens ?? 0;
-        message.tokensGenerated = object.tokensGenerated ?? 0;
         message.modelUsed = object.modelUsed ?? "";
         message.generationTimeMs = object.generationTimeMs ?? 0;
-        message.ttftMs = object.ttftMs ?? undefined;
-        message.tokensPerSecond = object.tokensPerSecond ?? 0;
         message.framework = object.framework ?? undefined;
-        message.finishReason = object.finishReason ?? "";
         message.thinkingTokens = object.thinkingTokens ?? 0;
         message.responseTokens = object.responseTokens ?? 0;
         message.jsonOutput = object.jsonOutput ?? undefined;
+        message.finishReason = object.finishReason ?? 0;
+        message.stopSequence = object.stopSequence ?? undefined;
         message.performance = (object.performance !== undefined && object.performance !== null)
             ? exports.PerformanceMetrics.fromPartial(object.performance)
             : undefined;
@@ -1168,513 +947,36 @@ exports.LLMGenerationResult = {
             (object.structuredOutputValidation !== undefined && object.structuredOutputValidation !== null)
                 ? structured_output_1.StructuredOutputValidation.fromPartial(object.structuredOutputValidation)
                 : undefined;
-        message.totalTokens = object.totalTokens ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.cachedPromptTokens = object.cachedPromptTokens ?? 0;
         message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
         message.decodeTimeMs = object.decodeTimeMs ?? 0;
         message.toolCalls = object.toolCalls?.map((e) => tool_calling_1.ToolCall.fromPartial(e)) || [];
         message.toolResults = object.toolResults?.map((e) => tool_calling_1.ToolResult.fromPartial(e)) || [];
-        return message;
-    },
-};
-function createBaseLLMGenerationRequest() {
-    return {
-        requestId: "",
-        modelId: "",
-        prompt: "",
-        options: undefined,
-        contextChunks: [],
-        metadata: {},
-        conversationId: undefined,
-    };
-}
-exports.LLMGenerationRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.prompt !== "") {
-            writer.uint32(26).string(message.prompt);
-        }
-        if (message.options !== undefined) {
-            exports.LLMGenerationOptions.encode(message.options, writer.uint32(34).fork()).join();
-        }
-        for (const v of message.contextChunks) {
-            writer.uint32(42).string(v);
-        }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.LLMGenerationRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(50).fork()).join();
-        });
-        if (message.conversationId !== undefined) {
-            writer.uint32(58).string(message.conversationId);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLLMGenerationRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.prompt = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.options = exports.LLMGenerationOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.contextChunks.push(reader.string());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    const entry6 = exports.LLMGenerationRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry6.value !== undefined) {
-                        message.metadata[entry6.key] = entry6.value;
-                    }
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.conversationId = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-            options: isSet(object.options) ? exports.LLMGenerationOptions.fromJSON(object.options) : undefined,
-            contextChunks: globalThis.Array.isArray(object?.contextChunks)
-                ? object.contextChunks.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.context_chunks)
-                    ? object.context_chunks.map((e) => globalThis.String(e))
-                    : [],
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
-            conversationId: isSet(object.conversationId)
-                ? globalThis.String(object.conversationId)
-                : isSet(object.conversation_id)
-                    ? globalThis.String(object.conversation_id)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.prompt !== "") {
-            obj.prompt = message.prompt;
-        }
-        if (message.options !== undefined) {
-            obj.options = exports.LLMGenerationOptions.toJSON(message.options);
-        }
-        if (message.contextChunks?.length) {
-            obj.contextChunks = message.contextChunks;
-        }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
-        }
-        if (message.conversationId !== undefined) {
-            obj.conversationId = message.conversationId;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LLMGenerationRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLLMGenerationRequest();
-        message.requestId = object.requestId ?? "";
-        message.modelId = object.modelId ?? "";
-        message.prompt = object.prompt ?? "";
-        message.options = (object.options !== undefined && object.options !== null)
-            ? exports.LLMGenerationOptions.fromPartial(object.options)
+        message.usage = (object.usage !== undefined && object.usage !== null)
+            ? token_usage_1.TokenUsage.fromPartial(object.usage)
             : undefined;
-        message.contextChunks = object.contextChunks?.map((e) => e) || [];
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
-        message.conversationId = object.conversationId ?? undefined;
-        return message;
-    },
-};
-function createBaseLLMGenerationRequest_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.LLMGenerationRequest_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLLMGenerationRequest_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LLMGenerationRequest_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLLMGenerationRequest_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
-        return message;
-    },
-};
-function createBaseLLMGenerationStatus() {
-    return {
-        requestId: "",
-        state: 0,
-        promptTokensProcessed: 0,
-        completionTokensGenerated: 0,
-        progress: 0,
-        elapsedMs: 0,
-        message: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
-}
-exports.LLMGenerationStatus = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
-        }
-        if (message.state !== 0) {
-            writer.uint32(16).int32(message.state);
-        }
-        if (message.promptTokensProcessed !== 0) {
-            writer.uint32(24).int32(message.promptTokensProcessed);
-        }
-        if (message.completionTokensGenerated !== 0) {
-            writer.uint32(32).int32(message.completionTokensGenerated);
-        }
-        if (message.progress !== 0) {
-            writer.uint32(45).float(message.progress);
-        }
-        if (message.elapsedMs !== 0) {
-            writer.uint32(48).int64(message.elapsedMs);
-        }
-        if (message.message !== undefined) {
-            writer.uint32(58).string(message.message);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(66).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(72).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLLMGenerationStatus();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.state = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.promptTokensProcessed = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.completionTokensGenerated = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 45) {
-                        break;
-                    }
-                    message.progress = reader.float();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.elapsedMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.message = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            state: isSet(object.state) ? lLMGenerationStateFromJSON(object.state) : 0,
-            promptTokensProcessed: isSet(object.promptTokensProcessed)
-                ? globalThis.Number(object.promptTokensProcessed)
-                : isSet(object.prompt_tokens_processed)
-                    ? globalThis.Number(object.prompt_tokens_processed)
-                    : 0,
-            completionTokensGenerated: isSet(object.completionTokensGenerated)
-                ? globalThis.Number(object.completionTokensGenerated)
-                : isSet(object.completion_tokens_generated)
-                    ? globalThis.Number(object.completion_tokens_generated)
-                    : 0,
-            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            elapsedMs: isSet(object.elapsedMs)
-                ? globalThis.Number(object.elapsedMs)
-                : isSet(object.elapsed_ms)
-                    ? globalThis.Number(object.elapsed_ms)
-                    : 0,
-            message: isSet(object.message) ? globalThis.String(object.message) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
-        if (message.state !== 0) {
-            obj.state = lLMGenerationStateToJSON(message.state);
-        }
-        if (message.promptTokensProcessed !== 0) {
-            obj.promptTokensProcessed = Math.round(message.promptTokensProcessed);
-        }
-        if (message.completionTokensGenerated !== 0) {
-            obj.completionTokensGenerated = Math.round(message.completionTokensGenerated);
-        }
-        if (message.progress !== 0) {
-            obj.progress = message.progress;
-        }
-        if (message.elapsedMs !== 0) {
-            obj.elapsedMs = Math.round(message.elapsedMs);
-        }
-        if (message.message !== undefined) {
-            obj.message = message.message;
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LLMGenerationStatus.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLLMGenerationStatus();
-        message.requestId = object.requestId ?? "";
-        message.state = object.state ?? 0;
-        message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
-        message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
-        message.progress = object.progress ?? 0;
-        message.elapsedMs = object.elapsedMs ?? 0;
-        message.message = object.message ?? undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseLLMConfiguration() {
-    return {
-        contextLength: 0,
-        temperature: 0,
-        maxTokens: 0,
-        systemPrompt: undefined,
-        streaming: false,
-        modelId: undefined,
-        preferredFramework: undefined,
-    };
+    return { contextLength: 0, modelId: undefined, preferredFramework: undefined, defaultOptions: undefined };
 }
 exports.LLMConfiguration = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.contextLength !== 0) {
             writer.uint32(8).int32(message.contextLength);
         }
-        if (message.temperature !== 0) {
-            writer.uint32(21).float(message.temperature);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(24).int32(message.maxTokens);
-        }
-        if (message.systemPrompt !== undefined) {
-            writer.uint32(34).string(message.systemPrompt);
-        }
-        if (message.streaming !== false) {
-            writer.uint32(40).bool(message.streaming);
-        }
         if (message.modelId !== undefined) {
             writer.uint32(50).string(message.modelId);
         }
         if (message.preferredFramework !== undefined) {
             writer.uint32(56).int32(message.preferredFramework);
+        }
+        if (message.defaultOptions !== undefined) {
+            exports.LLMGenerationOptions.encode(message.defaultOptions, writer.uint32(66).fork()).join();
         }
         return writer;
     },
@@ -1692,34 +994,6 @@ exports.LLMConfiguration = {
                     message.contextLength = reader.int32();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 21) {
-                        break;
-                    }
-                    message.temperature = reader.float();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.systemPrompt = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.streaming = reader.bool();
-                    continue;
-                }
                 case 6: {
                     if (tag !== 50) {
                         break;
@@ -1732,6 +1006,13 @@ exports.LLMConfiguration = {
                         break;
                     }
                     message.preferredFramework = reader.int32();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.defaultOptions = exports.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1749,18 +1030,6 @@ exports.LLMConfiguration = {
                 : isSet(object.context_length)
                     ? globalThis.Number(object.context_length)
                     : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            systemPrompt: isSet(object.systemPrompt)
-                ? globalThis.String(object.systemPrompt)
-                : isSet(object.system_prompt)
-                    ? globalThis.String(object.system_prompt)
-                    : undefined,
-            streaming: isSet(object.streaming) ? globalThis.Boolean(object.streaming) : false,
             modelId: isSet(object.modelId)
                 ? globalThis.String(object.modelId)
                 : isSet(object.model_id)
@@ -1771,6 +1040,11 @@ exports.LLMConfiguration = {
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
                     : undefined,
+            defaultOptions: isSet(object.defaultOptions)
+                ? exports.LLMGenerationOptions.fromJSON(object.defaultOptions)
+                : isSet(object.default_options)
+                    ? exports.LLMGenerationOptions.fromJSON(object.default_options)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1778,23 +1052,14 @@ exports.LLMConfiguration = {
         if (message.contextLength !== 0) {
             obj.contextLength = Math.round(message.contextLength);
         }
-        if (message.temperature !== 0) {
-            obj.temperature = message.temperature;
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.systemPrompt !== undefined) {
-            obj.systemPrompt = message.systemPrompt;
-        }
-        if (message.streaming !== false) {
-            obj.streaming = message.streaming;
-        }
         if (message.modelId !== undefined) {
             obj.modelId = message.modelId;
         }
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
+        }
+        if (message.defaultOptions !== undefined) {
+            obj.defaultOptions = exports.LLMGenerationOptions.toJSON(message.defaultOptions);
         }
         return obj;
     },
@@ -1804,103 +1069,11 @@ exports.LLMConfiguration = {
     fromPartial(object) {
         const message = createBaseLLMConfiguration();
         message.contextLength = object.contextLength ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.systemPrompt = object.systemPrompt ?? undefined;
-        message.streaming = object.streaming ?? false;
         message.modelId = object.modelId ?? undefined;
         message.preferredFramework = object.preferredFramework ?? undefined;
-        return message;
-    },
-};
-function createBaseGenerationHints() {
-    return { temperature: 0, maxTokens: 0, systemRole: undefined };
-}
-exports.GenerationHints = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.temperature !== 0) {
-            writer.uint32(13).float(message.temperature);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(16).int32(message.maxTokens);
-        }
-        if (message.systemRole !== undefined) {
-            writer.uint32(26).string(message.systemRole);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseGenerationHints();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 13) {
-                        break;
-                    }
-                    message.temperature = reader.float();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.systemRole = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            systemRole: isSet(object.systemRole)
-                ? globalThis.String(object.systemRole)
-                : isSet(object.system_role)
-                    ? globalThis.String(object.system_role)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.temperature !== 0) {
-            obj.temperature = message.temperature;
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.systemRole !== undefined) {
-            obj.systemRole = message.systemRole;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.GenerationHints.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseGenerationHints();
-        message.temperature = object.temperature ?? 0;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.systemRole = object.systemRole ?? undefined;
+        message.defaultOptions = (object.defaultOptions !== undefined && object.defaultOptions !== null)
+            ? exports.LLMGenerationOptions.fromPartial(object.defaultOptions)
+            : undefined;
         return message;
     },
 };
@@ -1992,7 +1165,7 @@ exports.StreamToken = {
     },
 };
 function createBasePerformanceMetrics() {
-    return { latencyMs: 0, memoryBytes: 0, throughputTokensPerSec: 0, promptTokens: 0, completionTokens: 0 };
+    return { latencyMs: 0, memoryBytes: 0, usage: undefined };
 }
 exports.PerformanceMetrics = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2002,14 +1175,8 @@ exports.PerformanceMetrics = {
         if (message.memoryBytes !== 0) {
             writer.uint32(16).int64(message.memoryBytes);
         }
-        if (message.throughputTokensPerSec !== 0) {
-            writer.uint32(29).float(message.throughputTokensPerSec);
-        }
-        if (message.promptTokens !== 0) {
-            writer.uint32(32).int32(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            writer.uint32(40).int32(message.completionTokens);
+        if (message.usage !== undefined) {
+            token_usage_1.TokenUsage.encode(message.usage, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -2034,25 +1201,11 @@ exports.PerformanceMetrics = {
                     message.memoryBytes = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 29) {
+                case 6: {
+                    if (tag !== 50) {
                         break;
                     }
-                    message.throughputTokensPerSec = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.promptTokens = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.completionTokens = reader.int32();
+                    message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2075,21 +1228,7 @@ exports.PerformanceMetrics = {
                 : isSet(object.memory_bytes)
                     ? globalThis.Number(object.memory_bytes)
                     : 0,
-            throughputTokensPerSec: isSet(object.throughputTokensPerSec)
-                ? globalThis.Number(object.throughputTokensPerSec)
-                : isSet(object.throughput_tokens_per_sec)
-                    ? globalThis.Number(object.throughput_tokens_per_sec)
-                    : 0,
-            promptTokens: isSet(object.promptTokens)
-                ? globalThis.Number(object.promptTokens)
-                : isSet(object.prompt_tokens)
-                    ? globalThis.Number(object.prompt_tokens)
-                    : 0,
-            completionTokens: isSet(object.completionTokens)
-                ? globalThis.Number(object.completionTokens)
-                : isSet(object.completion_tokens)
-                    ? globalThis.Number(object.completion_tokens)
-                    : 0,
+            usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
         };
     },
     toJSON(message) {
@@ -2100,14 +1239,8 @@ exports.PerformanceMetrics = {
         if (message.memoryBytes !== 0) {
             obj.memoryBytes = Math.round(message.memoryBytes);
         }
-        if (message.throughputTokensPerSec !== 0) {
-            obj.throughputTokensPerSec = message.throughputTokensPerSec;
-        }
-        if (message.promptTokens !== 0) {
-            obj.promptTokens = Math.round(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            obj.completionTokens = Math.round(message.completionTokens);
+        if (message.usage !== undefined) {
+            obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
         }
         return obj;
     },
@@ -2118,9 +1251,9 @@ exports.PerformanceMetrics = {
         const message = createBasePerformanceMetrics();
         message.latencyMs = object.latencyMs ?? 0;
         message.memoryBytes = object.memoryBytes ?? 0;
-        message.throughputTokensPerSec = object.throughputTokensPerSec ?? 0;
-        message.promptTokens = object.promptTokens ?? 0;
-        message.completionTokens = object.completionTokens ?? 0;
+        message.usage = (object.usage !== undefined && object.usage !== null)
+            ? token_usage_1.TokenUsage.fromPartial(object.usage)
+            : undefined;
         return message;
     },
 };
@@ -2133,9 +1266,6 @@ function longToNumber(int64) {
         throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
     }
     return num;
-}
-function isObject(value) {
-    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

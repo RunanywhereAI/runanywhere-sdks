@@ -12,9 +12,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.FinishReason
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private val llmLogger = SDKLogger.llm
 
+@Deprecated("Use RunAnywhere.llm.generate(prompt, options).")
 suspend fun RunAnywhere.generate(
     prompt: String,
     options: RALLMGenerationOptions? = null,
@@ -54,10 +56,11 @@ suspend fun RunAnywhere.generate(
     ensureServicesReady()
 
     val opts = options ?: RALLMGenerationOptions.defaults()
-    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
+    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_output_tokens}")
     return CppBridgeLLM.generate(prompt, options)
 }
 
+@Deprecated("Use RunAnywhere.llm.generate(prompt, options).")
 suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGenerationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -76,12 +79,12 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
     llmLogger.info(
         "[PARAMS] generate: temperature=${requestOptions?.temperature ?: "default"}, " +
             "topP=${requestOptions?.top_p ?: "default"}, " +
-            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
-            "streaming=${requestOptions?.streaming_enabled ?: false}",
+            "maxTokens=${requestOptions?.max_output_tokens ?: "default"}, systemPrompt=$systemPromptDesc",
     )
     return CppBridgeLLM.generate(request)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStream(prompt, options).")
 fun RunAnywhere.generateStream(
     prompt: String,
     options: RALLMGenerationOptions? = null,
@@ -91,7 +94,7 @@ fun RunAnywhere.generateStream(
     }
 
     val opts = options ?: RALLMGenerationOptions.defaults()
-    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
+    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_output_tokens}")
 
     return losslessLLMStreamFlow(
         prepare = { ensureServicesReady() },
@@ -100,6 +103,7 @@ fun RunAnywhere.generateStream(
     )
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStream(prompt, options).")
 fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -116,8 +120,7 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
     llmLogger.info(
         "[PARAMS] generateStream: temperature=${requestOptions?.temperature ?: "default"}, " +
             "topP=${requestOptions?.top_p ?: "default"}, " +
-            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
-            "streaming=${requestOptions?.streaming_enabled ?: false}",
+            "maxTokens=${requestOptions?.max_output_tokens ?: "default"}, systemPrompt=$systemPromptDesc",
     )
 
     return losslessLLMStreamFlow(
@@ -136,6 +139,10 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
  * only mean that the collector closed or cancelled the flow; returning `false`
  * immediately tells native generation to stop instead of silently discarding
  * the remainder of the stream.
+ *
+ * `RALLMStreamEvent.is_final` is deleted outright (idl/llm_service.proto):
+ * `event_kind` (COMPLETED/ERROR) is the sole terminal discriminator now,
+ * matching Swift's `event.eventKind == .completed || event.eventKind == .error`.
  */
 internal fun losslessLLMStreamFlow(
     prepare: suspend () -> Unit,
@@ -150,7 +157,7 @@ internal fun losslessLLMStreamFlow(
                 try {
                     generate { event ->
                         val delivered = trySend(event).isSuccess
-                        delivered && !event.is_final
+                        delivered && !event.isTerminal()
                     }
                     completedNormally.set(true)
                 } finally {
@@ -166,6 +173,11 @@ internal fun losslessLLMStreamFlow(
     }.buffer(Channel.UNLIMITED)
         .flowOn(Dispatchers.IO)
 
+private fun RALLMStreamEvent.isTerminal(): Boolean =
+    event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+        event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR
+
+@Deprecated("Cancel the Flow returned by RunAnywhere.llm.generateStream instead.")
 suspend fun RunAnywhere.cancelGeneration() {
     if (!isInitialized) return
     try {
@@ -194,15 +206,16 @@ internal data class LLMStreamModelIdentity(
  * @param prompt Prompt text used to estimate [RALLMGenerationResult.input_tokens]
  *   when the backend does not surface it directly.
  * @param events Flow of stream events from [generateStream]. Consumed until
- *   [RALLMStreamEvent.is_final] is true or the flow completes.
+ *   [RALLMStreamEvent.event_kind] reaches COMPLETED/ERROR or the flow completes.
  * @param onThinking Optional callback invoked for each typed thought token with
  *   the accumulated model-emitted reasoning text so far.
  * @param onToken Optional callback invoked for each typed answer token with the
  *   accumulated answer transcript so far.
  * @return A populated [RALLMGenerationResult] whose [RALLMGenerationResult.framework]
  *   matches the loaded LLM model's analytics key; on terminal error events the
- *   [RALLMGenerationResult.error_message] is propagated.
+ *   [RALLMGenerationResult.error] submessage is propagated.
  */
+@Deprecated("Collect RunAnywhere.llm.generateStream and read GenerationEvent.Completed.")
 suspend fun RunAnywhere.aggregateStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
@@ -231,7 +244,69 @@ suspend fun RunAnywhere.aggregateStream(
         },
     )
 
-/** Internal, injectable aggregation core used by the public API and unit tests. */
+/**
+ * Internal, injectable aggregation core used by the public API and unit tests.
+ *
+ * `RALLMStreamEvent.is_final`/`.kind` (a per-token `TokenKind`) are deleted
+ * outright (idl/llm_service.proto): `event_kind` (`LLMStreamEventKind`) is
+ * now the sole discriminator, both for terminality (COMPLETED/ERROR) and for
+ * routing a token to the thinking vs. answer transcript
+ * (THINKING/TOOL_CALL/else), matching Swift's
+ * `event.eventKind == .thinking` / `.completed || .error` checks.
+ * `LLMGenerationResult.total_time_ms`/`.time_to_first_token_ms`/top-level
+ * `ttft_ms` are likewise deleted: `generation_time_ms` (already a `Double`)
+ * is the sole wall-clock field left on the result, and TTFT now lives on
+ * the shared `TokenUsage.ttft_ms` (`Int64` milliseconds) instead of a
+ * top-level `Double`. `TokenUsage.tokens_per_second` was renamed
+ * `decode_tokens_per_second`.
+ */
+
+/**
+ * Batch-style backends (Maple/Bonsai) finish generate before dumping stream
+ * chunks. Wall-to-first-token ≈ total, so "decode = total − ttft" is a few ms
+ * and produces impossible five-digit tok/s; TTFT also is not a prefill metric.
+ * Match commons `compute_stream_timing_metrics` and Plane-B's NpuModelE2ETest.
+ */
+internal data class SanitizedStreamMetrics(
+    val decodeTokensPerSecond: Double,
+    val ttftMs: Long,
+)
+
+internal fun sanitizeStreamMetrics(
+    totalMs: Double,
+    outputTokens: Int,
+    reportedTps: Double?,
+    reportedTtftMs: Long?,
+): SanitizedStreamMetrics {
+    val wallTps =
+        if (totalMs > 0.0 && outputTokens > 0) outputTokens / (totalMs / 1000.0) else 0.0
+    val ttft = reportedTtftMs?.takeIf { it > 0L }
+    val decodeWindowMs = if (ttft != null) totalMs - ttft.toDouble() else totalMs
+    val steadyTps =
+        if (ttft != null && decodeWindowMs > 0.0 && outputTokens > 1) {
+            (outputTokens - 1) / (decodeWindowMs / 1000.0)
+        } else {
+            wallTps
+        }
+    // Batch-buffered: first stream token arrives only after the full generate
+    // (Maple/Bonsai), so post-TTFT decode collapses to a few ms. Also catch
+    // absurd reported rates even when TTFT was already cleared/zeroed.
+    val batchBuffered =
+        (ttft != null && decodeWindowMs < maxOf(50.0, totalMs * 0.05)) ||
+            (reportedTps != null && reportedTps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
+            (ttft != null && totalMs > 0.0 && ttft.toDouble() >= totalMs * 0.95)
+    return if (batchBuffered) {
+        // Keep TTFT: for Maple/Bonsai it is time to the first streamed token
+        // (first thinking token when reasoning is on). Only tok/s must use wall.
+        SanitizedStreamMetrics(decodeTokensPerSecond = wallTps, ttftMs = ttft ?: 0L)
+    } else {
+        SanitizedStreamMetrics(
+            decodeTokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: steadyTps,
+            ttftMs = ttft ?: 0L,
+        )
+    }
+}
+
 internal suspend fun aggregateLLMStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
@@ -245,64 +320,94 @@ internal suspend fun aggregateLLMStream(
     var tokenCount = 0
     var firstTokenTimeMs: Long? = null
     val startTimeMs = nowMillis()
-    var finishReason = ""
-    var terminalError = ""
+    var finishReason = FinishReason.FINISH_REASON_UNSPECIFIED
+    var terminalError: ai.runanywhere.proto.v1.SDKError? = null
     var finalEvent: RALLMStreamEvent? = null
 
     events
         .transformWhile { event ->
             emit(event)
-            !event.is_final
+            !event.isTerminal()
         }.collect { event ->
             if (event.token.isNotEmpty()) {
                 if (firstTokenTimeMs == null) firstTokenTimeMs = nowMillis()
                 tokenCount += 1
-                when (event.kind) {
-                    TokenKind.TOKEN_KIND_THOUGHT -> {
+                when (event.event_kind) {
+                    LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING -> {
                         thinkingResponse.append(event.token)
                         onThinking?.invoke(thinkingResponse.toString())
                     }
-                    TokenKind.TOKEN_KIND_TOOL_CALL -> Unit
+                    LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOOL_CALL -> Unit
                     else -> {
                         answerResponse.append(event.token)
                         onToken?.invoke(answerResponse.toString())
                     }
                 }
             }
-            if (event.is_final) {
+            if (event.isTerminal()) {
                 finalEvent = event
                 finishReason = event.finish_reason
-                terminalError = event.error_message
+                terminalError = event.error
             }
         }
 
     val totalLatencyMs = (nowMillis() - startTimeMs).toDouble()
-    val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
+    val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs) }
+    // The decode-only denominator that used to be computed here now lives inside
+    // `sanitizeStreamMetrics`, which needs it anyway to decide whether a backend is
+    // batch-buffered. Computing it twice invited the two copies to drift.
     val modelIdentity = resolveModelIdentity()
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
     // final event carries one, matching the Web SDK; otherwise fall back to the
     // locally concatenated text / wall-clock metrics.
     val final = finalEvent?.result
-    val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
-    val tokensGenerated = final?.completion_tokens ?: tokenCount
+    val inputTokens = final?.usage?.input_tokens ?: maxOf(1, prompt.length / 4)
+    val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
+    val generationTimeMs = final?.generation_time_ms?.takeIf { it > 0.0 } ?: totalLatencyMs
+    // Merge note (origin/main #634 "measure fallback tokens/sec over decode time,
+    // not the whole span"): that fix and this one solve the same problem, and this
+    // path is the stricter of the two, so it is kept rather than replaced.
+    // `sanitizeStreamMetrics` already derives the fallback rate over the decode
+    // window only (`decodeWindowMs = totalMs - ttft`) and divides by
+    // `outputTokens - 1`, because the first token is prefill output and charging it
+    // to decode understates the rate by one token. It additionally guards the
+    // batch-buffered backends (Maple/Bonsai), where the first streamed token only
+    // arrives after the whole generate finishes, so the post-TTFT window collapses
+    // to a few milliseconds and a decode-only denominator would report an absurd
+    // rate — those fall back to wall-clock deliberately.
+    val metrics =
+        sanitizeStreamMetrics(
+            totalMs = generationTimeMs,
+            outputTokens = tokensGenerated,
+            reportedTps = final?.usage?.decode_tokens_per_second,
+            reportedTtftMs = final?.usage?.ttft_ms?.takeIf { it > 0L } ?: ttftMs,
+        )
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
         thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
-        input_tokens = inputTokens,
-        tokens_generated = tokensGenerated,
         response_tokens = tokensGenerated,
-        total_tokens = final?.total_tokens ?: (inputTokens + tokensGenerated),
         model_used = modelIdentity.modelID,
-        generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
+        generation_time_ms = generationTimeMs,
         framework = modelIdentity.framework,
-        prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
-        decode_time_ms = final?.decode_time_ms ?: 0L,
-        tokens_per_second =
-            final?.tokens_per_second?.toDouble()
-                ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
-        ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
+        prompt_eval_time_ms =
+            if (metrics.ttftMs > 0L) (final?.prompt_eval_time_ms?.takeIf { it > 0L } ?: metrics.ttftMs) else 0L,
+        decode_time_ms =
+            final?.decode_time_ms?.takeIf { it > 0L }
+                ?: if (metrics.ttftMs > 0L && generationTimeMs > metrics.ttftMs) {
+                    (generationTimeMs - metrics.ttftMs).toLong()
+                } else {
+                    generationTimeMs.toLong()
+                },
         finish_reason = finishReason,
-        error_message = terminalError.ifEmpty { null },
+        error = terminalError,
+        usage =
+            ai.runanywhere.proto.v1.TokenUsage(
+                input_tokens = inputTokens,
+                output_tokens = tokensGenerated,
+                total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
+                decode_tokens_per_second = metrics.decodeTokensPerSecond,
+                ttft_ms = metrics.ttftMs,
+            ),
     )
 }

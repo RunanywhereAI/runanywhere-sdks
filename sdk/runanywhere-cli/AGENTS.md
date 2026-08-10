@@ -12,6 +12,28 @@ role the Swift/Kotlin/Flutter/RN/Web SDKs play.
 
 Plan / design doc: `thoughts/shared/plans/rcli_desktop_cli.md`.
 
+## Command surface (follow the spec, not your taste)
+
+`thoughts/shared/plans/public_api_spec.md` defines the public surface of all SDKs, and
+the CLI is one of them. Concretely:
+
+- One subcommand per spec namespace, the spec's verb under it: `rcli llm generate`,
+  `rcli models download`, `rcli lora apply`. New capability means a new verb in the
+  right namespace, never a new top-level word.
+- Flags are the spec's option fields in kebab-case: `--max-output-tokens`,
+  `--top-p`, `--system-prompt`, `--reasoning on|off`, `--speed`, `--guidance-scale`,
+  `--top-n`. Do not invent a shorter name for a field the spec already names.
+- Terminal-friendly spellings (`run`, `chat`, `list`, `pull`, `rm`, `show`, and the
+  flat `stt`/`tts`/`vad` forms) are aliases. One `configure_*` function wires the
+  options and callback and is attached at both places; two implementations of the
+  same verb is a bug. See `src/commands/commands.h`.
+- Retired flag spellings ride along as extra names on the same option
+  (`--max-output-tokens,--max-tokens`) for one release, then go.
+- Help strings are one imperative line that says what the command or flag does
+  without restating its name.
+- If the spec asks for something the C ABI cannot do, leave the command out and say
+  so in README "Known limitations". Never wire a flag that the commons call ignores.
+
 ## Layering (the only rule that really matters here)
 
 - Command files (`src/commands/cmd_*.cpp`) are THIN: parse flags → bootstrap() →

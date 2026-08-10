@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: errors.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SDKError = exports.ErrorContext_MetadataEntry = exports.ErrorContext = exports.ErrorCode = exports.ErrorSeverity = exports.ErrorCategory = exports.protobufPackage = void 0;
+exports.SDKError = exports.ErrorCode = exports.ErrorSeverity = exports.ErrorCategory = exports.protobufPackage = void 0;
 exports.errorCategoryFromJSON = errorCategoryFromJSON;
 exports.errorCategoryToJSON = errorCategoryToJSON;
 exports.errorSeverityFromJSON = errorSeverityFromJSON;
@@ -16,33 +16,11 @@ exports.errorCodeToJSON = errorCodeToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * ErrorCategory — coarse-grained logical grouping for filtering / analytics.
+ * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+ * into COMPONENT; use SDKError.component to tell them apart.
  *
- * This is the union of all categories declared across SDKs, condensed to the
- * minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
- * VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
- * covers every category currently in use except for the per-modality ones
- * (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
- * COMPONENT. Per-modality routing is recovered at runtime from the source
- * of the failure (the `c_abi_code` numeric value uniquely identifies the
- * component) and from `ErrorContext.operation` — there is no need to encode
- * modality twice.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
- *                                      stt/tts/llm/vad/vlm/etc.
- *   Swift   ErrorCategory.swift:11     16 cases incl. rag.
- *   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
- *                                      INITIALIZATION, FILE_RESOURCE,
- *                                      OPERATION, PLATFORM (no per-modality).
- *   Dart    error_category.dart:3      27 cases (superset).
- *   RN      ErrorCategory.ts:10        12 cases.
- *   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
- *
- * The drift here is severe — every SDK uses a different category vocabulary.
- * Codegen MUST collapse to the 9 canonical buckets below.
- * ---------------------------------------------------------------------------
+ * The rac_wire_string values are the one form every SDK prints, so a crash
+ * report written by Swift and one written by Web say the same word.
  */
 var ErrorCategory;
 (function (ErrorCategory) {
@@ -181,35 +159,13 @@ function errorSeverityToJSON(object) {
     }
 }
 /**
- * ---------------------------------------------------------------------------
- * ErrorCode — exhaustive enumeration of every distinct numeric error code in
- * the C ABI (`rac_result_t`).
+ * proto3 forbids negative enum values, so each constant is the absolute
+ * magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+ * SDKError.c_abi_code carries the signed original.
  *
- * proto3 forbids negative enum values, so the proto enum holds POSITIVE
- * values that mirror the *absolute* magnitude of each C ABI code. The signed
- * `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
- * platforms can round-trip the original C ABI integer. The naming scheme is:
- *
- *     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
- *
- * (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
- *
- * `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
- * C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
- * SDKError.code (an SDKError implies a failure; success is signalled by the
- * absence of an SDKError). The zero-value enum entry exists only because
- * proto3 mandates it.
- *
- * CRITICAL: Do not change the numeric values without coordinated
- * migrations across every SDK *and* the C ABI. Adding new values is safe;
- * removing or renumbering is a wire-format break.
- *
- * All values below are sourced from
- * `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
- * where the C ABI defines two distinct macro names for the same numeric
- * value) are documented inline; we pick one canonical name per numeric value
- * to keep proto enum values unique.
- * ---------------------------------------------------------------------------
+ * The trailing macro names below are kept because they are the cross-reference
+ * into rac_error.h; where the C ABI defines two names for one value, the alias
+ * is noted.
  */
 var ErrorCode;
 (function (ErrorCode) {
@@ -1143,232 +1099,19 @@ function errorCodeToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-function createBaseErrorContext() {
-    return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined, fieldPath: undefined };
-}
-exports.ErrorContext = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.ErrorContext_MetadataEntry.encode({ key: key, value }, writer.uint32(10).fork()).join();
-        });
-        if (message.sourceFile !== undefined) {
-            writer.uint32(18).string(message.sourceFile);
-        }
-        if (message.sourceLine !== undefined) {
-            writer.uint32(24).int32(message.sourceLine);
-        }
-        if (message.operation !== undefined) {
-            writer.uint32(34).string(message.operation);
-        }
-        if (message.fieldPath !== undefined) {
-            writer.uint32(42).string(message.fieldPath);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseErrorContext();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    const entry1 = exports.ErrorContext_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry1.value !== undefined) {
-                        message.metadata[entry1.key] = entry1.value;
-                    }
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.sourceFile = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.sourceLine = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.operation = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.fieldPath = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
-            sourceFile: isSet(object.sourceFile)
-                ? globalThis.String(object.sourceFile)
-                : isSet(object.source_file)
-                    ? globalThis.String(object.source_file)
-                    : undefined,
-            sourceLine: isSet(object.sourceLine)
-                ? globalThis.Number(object.sourceLine)
-                : isSet(object.source_line)
-                    ? globalThis.Number(object.source_line)
-                    : undefined,
-            operation: isSet(object.operation) ? globalThis.String(object.operation) : undefined,
-            fieldPath: isSet(object.fieldPath)
-                ? globalThis.String(object.fieldPath)
-                : isSet(object.field_path)
-                    ? globalThis.String(object.field_path)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
-        }
-        if (message.sourceFile !== undefined) {
-            obj.sourceFile = message.sourceFile;
-        }
-        if (message.sourceLine !== undefined) {
-            obj.sourceLine = Math.round(message.sourceLine);
-        }
-        if (message.operation !== undefined) {
-            obj.operation = message.operation;
-        }
-        if (message.fieldPath !== undefined) {
-            obj.fieldPath = message.fieldPath;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ErrorContext.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseErrorContext();
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
-        message.sourceFile = object.sourceFile ?? undefined;
-        message.sourceLine = object.sourceLine ?? undefined;
-        message.operation = object.operation ?? undefined;
-        message.fieldPath = object.fieldPath ?? undefined;
-        return message;
-    },
-};
-function createBaseErrorContext_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.ErrorContext_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseErrorContext_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ErrorContext_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseErrorContext_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
-        return message;
-    },
-};
 function createBaseSDKError() {
     return {
         code: 0,
         category: 0,
         message: "",
-        context: undefined,
         cAbiCode: undefined,
         nestedMessage: undefined,
         timestampMs: 0,
         severity: 0,
         component: "",
         retryable: false,
-        remediationHint: "",
-        correlationId: "",
+        requestId: "",
+        param: undefined,
     };
 }
 exports.SDKError = {
@@ -1382,32 +1125,29 @@ exports.SDKError = {
         if (message.message !== "") {
             writer.uint32(26).string(message.message);
         }
-        if (message.context !== undefined) {
-            exports.ErrorContext.encode(message.context, writer.uint32(34).fork()).join();
-        }
         if (message.cAbiCode !== undefined) {
-            writer.uint32(40).int32(message.cAbiCode);
+            writer.uint32(32).int32(message.cAbiCode);
         }
         if (message.nestedMessage !== undefined) {
-            writer.uint32(50).string(message.nestedMessage);
+            writer.uint32(42).string(message.nestedMessage);
         }
         if (message.timestampMs !== 0) {
-            writer.uint32(56).int64(message.timestampMs);
+            writer.uint32(48).int64(message.timestampMs);
         }
         if (message.severity !== 0) {
-            writer.uint32(64).int32(message.severity);
+            writer.uint32(56).int32(message.severity);
         }
         if (message.component !== "") {
-            writer.uint32(74).string(message.component);
+            writer.uint32(66).string(message.component);
         }
         if (message.retryable !== false) {
-            writer.uint32(80).bool(message.retryable);
+            writer.uint32(72).bool(message.retryable);
         }
-        if (message.remediationHint !== "") {
-            writer.uint32(90).string(message.remediationHint);
+        if (message.requestId !== "") {
+            writer.uint32(82).string(message.requestId);
         }
-        if (message.correlationId !== "") {
-            writer.uint32(98).string(message.correlationId);
+        if (message.param !== undefined) {
+            writer.uint32(90).string(message.param);
         }
         return writer;
     },
@@ -1440,66 +1180,59 @@ exports.SDKError = {
                     continue;
                 }
                 case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.context = exports.ErrorContext.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
+                    if (tag !== 32) {
                         break;
                     }
                     message.cAbiCode = reader.int32();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
+                case 5: {
+                    if (tag !== 42) {
                         break;
                     }
                     message.nestedMessage = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.timestampMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 7: {
                     if (tag !== 56) {
                         break;
                     }
-                    message.timestampMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
                     message.severity = reader.int32();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
+                case 8: {
+                    if (tag !== 66) {
                         break;
                     }
                     message.component = reader.string();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 80) {
+                case 9: {
+                    if (tag !== 72) {
                         break;
                     }
                     message.retryable = reader.bool();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.requestId = reader.string();
                     continue;
                 }
                 case 11: {
                     if (tag !== 90) {
                         break;
                     }
-                    message.remediationHint = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.correlationId = reader.string();
+                    message.param = reader.string();
                     continue;
                 }
             }
@@ -1515,7 +1248,6 @@ exports.SDKError = {
             code: isSet(object.code) ? errorCodeFromJSON(object.code) : 0,
             category: isSet(object.category) ? errorCategoryFromJSON(object.category) : 0,
             message: isSet(object.message) ? globalThis.String(object.message) : "",
-            context: isSet(object.context) ? exports.ErrorContext.fromJSON(object.context) : undefined,
             cAbiCode: isSet(object.cAbiCode)
                 ? globalThis.Number(object.cAbiCode)
                 : isSet(object.c_abi_code)
@@ -1534,16 +1266,12 @@ exports.SDKError = {
             severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
             component: isSet(object.component) ? globalThis.String(object.component) : "",
             retryable: isSet(object.retryable) ? globalThis.Boolean(object.retryable) : false,
-            remediationHint: isSet(object.remediationHint)
-                ? globalThis.String(object.remediationHint)
-                : isSet(object.remediation_hint)
-                    ? globalThis.String(object.remediation_hint)
+            requestId: isSet(object.requestId)
+                ? globalThis.String(object.requestId)
+                : isSet(object.request_id)
+                    ? globalThis.String(object.request_id)
                     : "",
-            correlationId: isSet(object.correlationId)
-                ? globalThis.String(object.correlationId)
-                : isSet(object.correlation_id)
-                    ? globalThis.String(object.correlation_id)
-                    : "",
+            param: isSet(object.param) ? globalThis.String(object.param) : undefined,
         };
     },
     toJSON(message) {
@@ -1556,9 +1284,6 @@ exports.SDKError = {
         }
         if (message.message !== "") {
             obj.message = message.message;
-        }
-        if (message.context !== undefined) {
-            obj.context = exports.ErrorContext.toJSON(message.context);
         }
         if (message.cAbiCode !== undefined) {
             obj.cAbiCode = Math.round(message.cAbiCode);
@@ -1578,11 +1303,11 @@ exports.SDKError = {
         if (message.retryable !== false) {
             obj.retryable = message.retryable;
         }
-        if (message.remediationHint !== "") {
-            obj.remediationHint = message.remediationHint;
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
         }
-        if (message.correlationId !== "") {
-            obj.correlationId = message.correlationId;
+        if (message.param !== undefined) {
+            obj.param = message.param;
         }
         return obj;
     },
@@ -1594,17 +1319,14 @@ exports.SDKError = {
         message.code = object.code ?? 0;
         message.category = object.category ?? 0;
         message.message = object.message ?? "";
-        message.context = (object.context !== undefined && object.context !== null)
-            ? exports.ErrorContext.fromPartial(object.context)
-            : undefined;
         message.cAbiCode = object.cAbiCode ?? undefined;
         message.nestedMessage = object.nestedMessage ?? undefined;
         message.timestampMs = object.timestampMs ?? 0;
         message.severity = object.severity ?? 0;
         message.component = object.component ?? "";
         message.retryable = object.retryable ?? false;
-        message.remediationHint = object.remediationHint ?? "";
-        message.correlationId = object.correlationId ?? "";
+        message.requestId = object.requestId ?? "";
+        message.param = object.param ?? undefined;
         return message;
     },
 };
@@ -1617,9 +1339,6 @@ function longToNumber(int64) {
         throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
     }
     return num;
-}
-function isObject(value) {
-    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

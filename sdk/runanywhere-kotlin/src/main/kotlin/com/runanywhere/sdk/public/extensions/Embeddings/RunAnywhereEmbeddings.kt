@@ -120,9 +120,9 @@ object Embeddings {
                     category = ModelCategory.MODEL_CATEGORY_EMBEDDING,
                 ),
             )
-        if (!result.success) {
+        if (result.error != null) {
             val message =
-                result.error_message.ifEmpty { "Embeddings lifecycle unload failed" }
+                result.error!!.message.ifEmpty { "Embeddings lifecycle unload failed" }
             throw SDKException.operation(message)
         }
     }
@@ -147,14 +147,20 @@ object Embeddings {
                     validate_availability = true,
                 ),
             )
-        if (!result.success) {
+        if (result.error != null) {
             val reason =
-                result.error_message.ifEmpty { "Embeddings lifecycle load failed" }
+                result.error!!.message.ifEmpty { "Embeddings lifecycle load failed" }
             throw SDKException.modelLoadFailed(modelId, reason)
         }
     }
 }
 
-/** Capability accessor for Embeddings, mirroring Swift `RunAnywhere.embeddings`. */
-val RunAnywhere.embeddings: Embeddings
+/**
+ * Lifecycle-scoped embeddings surface kept for one release.
+ *
+ * The v3 verb is `RunAnywhere.embeddings.embed(texts, options)`; load the model
+ * with `RunAnywhere.models.load(id)` first.
+ */
+@Deprecated("Use RunAnywhere.embeddings.embed(texts, options) with RunAnywhere.models.load(id).")
+val RunAnywhere.embeddingsLifecycle: Embeddings
     get() = Embeddings

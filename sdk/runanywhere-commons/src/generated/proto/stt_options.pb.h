@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "errors.pb.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
@@ -62,10 +63,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_stt_
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum STTAudioEncoding : int;
-extern const uint32_t STTAudioEncoding_internal_data_[];
-enum STTLanguage : int;
-extern const uint32_t STTLanguage_internal_data_[];
 enum STTStreamEventKind : int;
 extern const uint32_t STTStreamEventKind_internal_data_[];
 class STTAudioSource;
@@ -83,14 +80,6 @@ extern STTConfigurationGlobalsTypeInternal STTConfiguration_globals_;
 extern const ::google::protobuf::internal::ClassDataFull STTConfiguration_class_data_;
 #else
 extern const STTConfigurationGlobalsTypeInternal STTConfiguration_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class STTLanguageDetectionResult;
-struct STTLanguageDetectionResultGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern STTLanguageDetectionResultGlobalsTypeInternal STTLanguageDetectionResult_globals_;
-extern const ::google::protobuf::internal::ClassDataFull STTLanguageDetectionResult_class_data_;
-#else
-extern const STTLanguageDetectionResultGlobalsTypeInternal STTLanguageDetectionResult_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 class STTOptions;
 struct STTOptionsGlobalsTypeInternal;
@@ -177,12 +166,6 @@ extern const WordTimestampGlobalsTypeInternal WordTimestamp_globals_;
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::STTAudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::STTAudioEncoding>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::STTLanguage_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::STTLanguage>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::STTStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::STTStreamEventKind>;
 }  // namespace protobuf
@@ -190,100 +173,6 @@ internal::EnumTraitsT<::runanywhere::v1::STTStreamEventKind_internal_data_>
 
 namespace runanywhere {
 namespace v1 {
-enum STTLanguage : int {
-  STT_LANGUAGE_UNSPECIFIED = 0,
-  STT_LANGUAGE_AUTO = 1,
-  STT_LANGUAGE_EN = 2,
-  STT_LANGUAGE_ES = 3,
-  STT_LANGUAGE_FR = 4,
-  STT_LANGUAGE_DE = 5,
-  STT_LANGUAGE_ZH = 6,
-  STT_LANGUAGE_JA = 7,
-  STT_LANGUAGE_KO = 8,
-  STT_LANGUAGE_IT = 9,
-  STT_LANGUAGE_PT = 10,
-  STT_LANGUAGE_AR = 11,
-  STT_LANGUAGE_RU = 12,
-  STT_LANGUAGE_HI = 13,
-  STTLanguage_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  STTLanguage_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t STTLanguage_internal_data_[];
-inline constexpr STTLanguage STTLanguage_MIN =
-    static_cast<STTLanguage>(0);
-inline constexpr STTLanguage STTLanguage_MAX =
-    static_cast<STTLanguage>(13);
-[[nodiscard]] inline bool STTLanguage_IsValid(int value) {
-  return 0 <= value && value <= 13;
-}
-inline constexpr int STTLanguage_ARRAYSIZE = 13 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-STTLanguage_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(STTLanguage) {
-  return STTLanguage_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& STTLanguage_Name(T value) {
-  static_assert(::std::is_same<T, STTLanguage>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to STTLanguage_Name().");
-  return STTLanguage_Name(static_cast<STTLanguage>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& STTLanguage_Name(STTLanguage value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<STTLanguage_descriptor, 0, 13>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool STTLanguage_Parse(
-    ::absl::string_view name, STTLanguage* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<STTLanguage>(STTLanguage_descriptor(), name,
-                                           value);
-}
-enum STTAudioEncoding : int {
-  STT_AUDIO_ENCODING_UNSPECIFIED = 0,
-  STT_AUDIO_ENCODING_PCM_S16_LE = 1,
-  STT_AUDIO_ENCODING_PCM_F32_LE = 2,
-  STT_AUDIO_ENCODING_CONTAINER = 3,
-  STTAudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  STTAudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t STTAudioEncoding_internal_data_[];
-inline constexpr STTAudioEncoding STTAudioEncoding_MIN =
-    static_cast<STTAudioEncoding>(0);
-inline constexpr STTAudioEncoding STTAudioEncoding_MAX =
-    static_cast<STTAudioEncoding>(3);
-[[nodiscard]] inline bool STTAudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 3;
-}
-inline constexpr int STTAudioEncoding_ARRAYSIZE = 3 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-STTAudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(STTAudioEncoding) {
-  return STTAudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& STTAudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, STTAudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to STTAudioEncoding_Name().");
-  return STTAudioEncoding_Name(static_cast<STTAudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& STTAudioEncoding_Name(STTAudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<STTAudioEncoding_descriptor, 0, 3>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool STTAudioEncoding_Parse(
-    ::absl::string_view name, STTAudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<STTAudioEncoding>(STTAudioEncoding_descriptor(), name,
-                                           value);
-}
 enum STTStreamEventKind : int {
   STT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
   STT_STREAM_EVENT_KIND_STARTED = 1,
@@ -747,8 +636,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
   enum : int {
     kModelIdFieldNumber = 1,
     kProcessingTimeMsFieldNumber = 2,
-    kAudioLengthMsFieldNumber = 3,
-    kRealTimeFactorFieldNumber = 4,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -775,31 +662,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
   void _internal_set_processing_time_ms(::int64_t value);
 
   public:
-  // int64 audio_length_ms = 3;
-  void clear_audio_length_ms() ;
-  [[nodiscard]] ::int64_t audio_length_ms() const;
-  void set_audio_length_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_audio_length_ms() const;
-  void _internal_set_audio_length_ms(::int64_t value);
-
-  public:
-  // float real_time_factor = 4;
-  void clear_real_time_factor() ;
-  [[nodiscard]] float real_time_factor() const;
-  void set_real_time_factor(float value);
-
-  private:
-  float _internal_real_time_factor() const;
-  void _internal_set_real_time_factor(float value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TranscriptionMetadata)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
+      ::google::protobuf::internal::TcParseTable<1, 2,
                           0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -830,8 +697,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::int64_t processing_time_ms_;
-    ::int64_t audio_length_ms_;
-    float real_time_factor_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1038,10 +903,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::go
   enum : int {
     kSupportedLanguageCodesFieldNumber = 4,
     kCurrentModelFieldNumber = 2,
-    kErrorMessageFieldNumber = 5,
     kIsReadyFieldNumber = 1,
     kSupportsStreamingFieldNumber = 3,
-    kErrorCodeFieldNumber = 6,
   };
   // repeated string supported_language_codes = 4;
   [[nodiscard]] int supported_language_codes_size()
@@ -1087,23 +950,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_current_model();
 
   public:
-  // optional string error_message = 5;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
   // bool is_ready = 1;
   void clear_is_ready() ;
   [[nodiscard]] bool is_ready() const;
@@ -1124,22 +970,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::go
   void _internal_set_supports_streaming(bool value);
 
   public:
-  // int32 error_code = 6;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTServiceState)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          0, 89,
+      ::google::protobuf::internal::TcParseTable<2, 4,
+                          0, 76,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1169,10 +1005,245 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::go
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField<::std::string> supported_language_codes_;
     ::google::protobuf::internal::ArenaStringPtr current_model_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     bool is_ready_;
     bool supports_streaming_;
-    ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_stt_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTPartialResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTPartialResult) */ {
+ public:
+  inline STTPartialResult() : STTPartialResult(nullptr) {}
+  ~STTPartialResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(STTPartialResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTPartialResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr STTPartialResult(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline STTPartialResult(const STTPartialResult& from) : STTPartialResult(nullptr, from) {}
+  inline STTPartialResult(STTPartialResult&& from) noexcept : STTPartialResult(nullptr, ::std::move(from)) {}
+  inline STTPartialResult& operator=(const STTPartialResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline STTPartialResult& operator=(STTPartialResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const STTPartialResult& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTPartialResult>(&STTPartialResult_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 9;
+  friend void swap(STTPartialResult& a, STTPartialResult& b) { a.Swap(&b); }
+  inline void Swap(STTPartialResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(STTPartialResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] STTPartialResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<STTPartialResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const STTPartialResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const STTPartialResult& from) { STTPartialResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(STTPartialResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTPartialResult"; }
+
+  explicit STTPartialResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  STTPartialResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTPartialResult& from);
+  STTPartialResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTPartialResult&& from) noexcept
+      : STTPartialResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTextFieldNumber = 1,
+    kLanguageFieldNumber = 14,
+    kIsFinalFieldNumber = 2,
+  };
+  // string text = 1;
+  void clear_text() ;
+  [[nodiscard]] const ::std::string& text() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_text(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_text();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
+  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_text() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
+
+  public:
+  // optional string language = 14;
+  [[nodiscard]] bool has_language()
+      const;
+  void clear_language() ;
+  [[nodiscard]] const ::std::string& language() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_language(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language();
+  void set_allocated_language(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_language() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language();
+
+  public:
+  // bool is_final = 2;
+  void clear_is_final() ;
+  [[nodiscard]] bool is_final() const;
+  void set_is_final(bool value);
+
+  private:
+  bool _internal_is_final() const;
+  void _internal_set_is_final(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTPartialResult)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<1, 3,
+                          0, 52,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const STTPartialResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr text_;
+    ::google::protobuf::internal::ArenaStringPtr language_;
+    bool is_final_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1328,85 +1399,28 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
 
   // accessors -------------------------------------------------------
   enum : int {
-    kVocabularyListFieldNumber = 5,
-    kLanguageCodeFieldNumber = 8,
-    kLanguageFieldNumber = 1,
-    kMaxSpeakersFieldNumber = 4,
+    kLanguageFieldNumber = 17,
     kEnablePunctuationFieldNumber = 2,
-    kEnableDiarizationFieldNumber = 3,
+    kDiarizeFieldNumber = 3,
     kEnableWordTimestampsFieldNumber = 6,
-    kDetectLanguageFieldNumber = 9,
-    kBeamSizeFieldNumber = 7,
-    kAudioFormatFieldNumber = 10,
-    kSampleRateFieldNumber = 11,
-    kMaxAlternativesFieldNumber = 12,
-    kChunkDurationMsFieldNumber = 13,
-    kEndpointSilenceMsFieldNumber = 14,
-    kSuppressBlankFieldNumber = 15,
-    kTranslateToEnglishFieldNumber = 16,
+    kSpeakersExpectedFieldNumber = 4,
+    kSilenceDurationMsFieldNumber = 14,
   };
-  // repeated string vocabulary_list = 5;
-  [[nodiscard]] int vocabulary_list_size()
+  // optional string language = 17;
+  [[nodiscard]] bool has_language()
       const;
-  private:
-  int _internal_vocabulary_list_size() const;
-
-  public:
-  void clear_vocabulary_list() ;
-  [[nodiscard]] const ::std::string& vocabulary_list(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_vocabulary_list(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_vocabulary_list(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_vocabulary_list();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_vocabulary_list(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      vocabulary_list() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_vocabulary_list();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_vocabulary_list() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_vocabulary_list();
-
-  public:
-  // optional string language_code = 8;
-  [[nodiscard]] bool has_language_code()
-      const;
-  void clear_language_code() ;
-  [[nodiscard]] const ::std::string& language_code() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language_code(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language_code();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
-  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_language_code() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
-
-  public:
-  // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   void clear_language() ;
-  [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
-  void set_language(::runanywhere::v1::STTLanguage value);
+  [[nodiscard]] const ::std::string& language() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_language(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language();
+  void set_allocated_language(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  ::runanywhere::v1::STTLanguage _internal_language() const;
-  void _internal_set_language(::runanywhere::v1::STTLanguage value);
-
-  public:
-  // int32 max_speakers = 4;
-  void clear_max_speakers() ;
-  [[nodiscard]] ::int32_t max_speakers() const;
-  void set_max_speakers(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_speakers() const;
-  void _internal_set_max_speakers(::int32_t value);
+  const ::std::string& _internal_language() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language();
 
   public:
   // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
@@ -1419,14 +1433,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
   void _internal_set_enable_punctuation(bool value);
 
   public:
-  // bool enable_diarization = 3;
-  void clear_enable_diarization() ;
-  [[nodiscard]] bool enable_diarization() const;
-  void set_enable_diarization(bool value);
+  // bool diarize = 3;
+  void clear_diarize() ;
+  [[nodiscard]] bool diarize() const;
+  void set_diarize(bool value);
 
   private:
-  bool _internal_enable_diarization() const;
-  void _internal_set_enable_diarization(bool value);
+  bool _internal_diarize() const;
+  void _internal_set_diarize(bool value);
 
   public:
   // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
@@ -1439,102 +1453,34 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
   void _internal_set_enable_word_timestamps(bool value);
 
   public:
-  // bool detect_language = 9;
-  void clear_detect_language() ;
-  [[nodiscard]] bool detect_language() const;
-  void set_detect_language(bool value);
+  // optional int32 speakers_expected = 4;
+  [[nodiscard]] bool has_speakers_expected()
+      const;
+  void clear_speakers_expected() ;
+  [[nodiscard]] ::int32_t speakers_expected() const;
+  void set_speakers_expected(::int32_t value);
 
   private:
-  bool _internal_detect_language() const;
-  void _internal_set_detect_language(bool value);
+  ::int32_t _internal_speakers_expected() const;
+  void _internal_set_speakers_expected(::int32_t value);
 
   public:
-  // int32 beam_size = 7;
-  void clear_beam_size() ;
-  [[nodiscard]] ::int32_t beam_size() const;
-  void set_beam_size(::int32_t value);
+  // int32 silence_duration_ms = 14 [(.runanywhere.v1.rac_default) = "0"];
+  void clear_silence_duration_ms() ;
+  [[nodiscard]] ::int32_t silence_duration_ms() const;
+  void set_silence_duration_ms(::int32_t value);
 
   private:
-  ::int32_t _internal_beam_size() const;
-  void _internal_set_beam_size(::int32_t value);
-
-  public:
-  // .runanywhere.v1.AudioFormat audio_format = 10;
-  void clear_audio_format() ;
-  [[nodiscard]] ::runanywhere::v1::AudioFormat audio_format() const;
-  void set_audio_format(::runanywhere::v1::AudioFormat value);
-
-  private:
-  ::runanywhere::v1::AudioFormat _internal_audio_format() const;
-  void _internal_set_audio_format(::runanywhere::v1::AudioFormat value);
-
-  public:
-  // int32 sample_rate = 11;
-  void clear_sample_rate() ;
-  [[nodiscard]] ::int32_t sample_rate() const;
-  void set_sample_rate(::int32_t value);
-
-  private:
-  ::int32_t _internal_sample_rate() const;
-  void _internal_set_sample_rate(::int32_t value);
-
-  public:
-  // int32 max_alternatives = 12;
-  void clear_max_alternatives() ;
-  [[nodiscard]] ::int32_t max_alternatives() const;
-  void set_max_alternatives(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_alternatives() const;
-  void _internal_set_max_alternatives(::int32_t value);
-
-  public:
-  // int32 chunk_duration_ms = 13;
-  void clear_chunk_duration_ms() ;
-  [[nodiscard]] ::int32_t chunk_duration_ms() const;
-  void set_chunk_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_chunk_duration_ms() const;
-  void _internal_set_chunk_duration_ms(::int32_t value);
-
-  public:
-  // int32 endpoint_silence_ms = 14;
-  void clear_endpoint_silence_ms() ;
-  [[nodiscard]] ::int32_t endpoint_silence_ms() const;
-  void set_endpoint_silence_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_endpoint_silence_ms() const;
-  void _internal_set_endpoint_silence_ms(::int32_t value);
-
-  public:
-  // bool suppress_blank = 15;
-  void clear_suppress_blank() ;
-  [[nodiscard]] bool suppress_blank() const;
-  void set_suppress_blank(bool value);
-
-  private:
-  bool _internal_suppress_blank() const;
-  void _internal_set_suppress_blank(bool value);
-
-  public:
-  // bool translate_to_english = 16;
-  void clear_translate_to_english() ;
-  [[nodiscard]] bool translate_to_english() const;
-  void set_translate_to_english(bool value);
-
-  private:
-  bool _internal_translate_to_english() const;
-  void _internal_set_translate_to_english(bool value);
+  ::int32_t _internal_silence_duration_ms() const;
+  void _internal_set_silence_duration_ms(::int32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 16,
-                          0, 78,
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          0, 42,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1562,283 +1508,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
         const STTOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> vocabulary_list_;
-    ::google::protobuf::internal::ArenaStringPtr language_code_;
-    int language_;
-    ::int32_t max_speakers_;
+    ::google::protobuf::internal::ArenaStringPtr language_;
     bool enable_punctuation_;
-    bool enable_diarization_;
+    bool diarize_;
     bool enable_word_timestamps_;
-    bool detect_language_;
-    ::int32_t beam_size_;
-    int audio_format_;
-    ::int32_t sample_rate_;
-    ::int32_t max_alternatives_;
-    ::int32_t chunk_duration_ms_;
-    ::int32_t endpoint_silence_ms_;
-    bool suppress_blank_;
-    bool translate_to_english_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_stt_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTLanguageDetectionResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTLanguageDetectionResult) */ {
- public:
-  inline STTLanguageDetectionResult() : STTLanguageDetectionResult(nullptr) {}
-  ~STTLanguageDetectionResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(STTLanguageDetectionResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTLanguageDetectionResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr STTLanguageDetectionResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline STTLanguageDetectionResult(const STTLanguageDetectionResult& from) : STTLanguageDetectionResult(nullptr, from) {}
-  inline STTLanguageDetectionResult(STTLanguageDetectionResult&& from) noexcept : STTLanguageDetectionResult(nullptr, ::std::move(from)) {}
-  inline STTLanguageDetectionResult& operator=(const STTLanguageDetectionResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline STTLanguageDetectionResult& operator=(STTLanguageDetectionResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const STTLanguageDetectionResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTLanguageDetectionResult>(&STTLanguageDetectionResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 12;
-  friend void swap(STTLanguageDetectionResult& a, STTLanguageDetectionResult& b) { a.Swap(&b); }
-  inline void Swap(STTLanguageDetectionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(STTLanguageDetectionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] STTLanguageDetectionResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<STTLanguageDetectionResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const STTLanguageDetectionResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const STTLanguageDetectionResult& from) { STTLanguageDetectionResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(STTLanguageDetectionResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTLanguageDetectionResult"; }
-
-  explicit STTLanguageDetectionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  STTLanguageDetectionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTLanguageDetectionResult& from);
-  STTLanguageDetectionResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTLanguageDetectionResult&& from) noexcept
-      : STTLanguageDetectionResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kAlternativesFieldNumber = 4,
-    kLanguageCodeFieldNumber = 2,
-    kLanguageFieldNumber = 1,
-    kConfidenceFieldNumber = 3,
-  };
-  // repeated string alternatives = 4;
-  [[nodiscard]] int alternatives_size()
-      const;
-  private:
-  int _internal_alternatives_size() const;
-
-  public:
-  void clear_alternatives() ;
-  [[nodiscard]] const ::std::string& alternatives(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_alternatives(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_alternatives(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_alternatives();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_alternatives(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      alternatives() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_alternatives();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_alternatives() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_alternatives();
-
-  public:
-  // optional string language_code = 2;
-  [[nodiscard]] bool has_language_code()
-      const;
-  void clear_language_code() ;
-  [[nodiscard]] const ::std::string& language_code() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language_code(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language_code();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
-  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_language_code() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
-
-  public:
-  // .runanywhere.v1.STTLanguage language = 1;
-  void clear_language() ;
-  [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
-  void set_language(::runanywhere::v1::STTLanguage value);
-
-  private:
-  ::runanywhere::v1::STTLanguage _internal_language() const;
-  void _internal_set_language(::runanywhere::v1::STTLanguage value);
-
-  public:
-  // float confidence = 3;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
-
-  private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTLanguageDetectionResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
-                          0, 75,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const STTLanguageDetectionResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> alternatives_;
-    ::google::protobuf::internal::ArenaStringPtr language_code_;
-    int language_;
-    float confidence_;
+    ::int32_t speakers_expected_;
+    ::int32_t silence_duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1994,46 +1669,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
 
   // accessors -------------------------------------------------------
   enum : int {
-    kVocabularyListFieldNumber = 8,
     kModelIdFieldNumber = 1,
-    kLanguageCodeFieldNumber = 12,
-    kLanguageFieldNumber = 2,
+    kLanguageFieldNumber = 13,
     kSampleRateFieldNumber = 3,
     kAudioFormatFieldNumber = 5,
     kEnableVadFieldNumber = 4,
     kEnablePunctuationFieldNumber = 6,
     kEnableDiarizationFieldNumber = 7,
     kEnableWordTimestampsFieldNumber = 10,
-    kMaxAlternativesFieldNumber = 9,
     kPreferredFrameworkFieldNumber = 11,
   };
-  // repeated string vocabulary_list = 8;
-  [[nodiscard]] int vocabulary_list_size()
-      const;
-  private:
-  int _internal_vocabulary_list_size() const;
-
-  public:
-  void clear_vocabulary_list() ;
-  [[nodiscard]] const ::std::string& vocabulary_list(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_vocabulary_list(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_vocabulary_list(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_vocabulary_list();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_vocabulary_list(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      vocabulary_list() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_vocabulary_list();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_vocabulary_list() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_vocabulary_list();
-
-  public:
   // string model_id = 1;
   void clear_model_id() ;
   [[nodiscard]] const ::std::string& model_id() const;
@@ -2049,31 +1694,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
-  // optional string language_code = 12;
-  [[nodiscard]] bool has_language_code()
+  // optional string language = 13;
+  [[nodiscard]] bool has_language()
       const;
-  void clear_language_code() ;
-  [[nodiscard]] const ::std::string& language_code() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language_code(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language_code();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
-  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_language_code() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
-
-  public:
-  // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   void clear_language() ;
-  [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
-  void set_language(::runanywhere::v1::STTLanguage value);
+  [[nodiscard]] const ::std::string& language() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_language(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language();
+  void set_allocated_language(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  ::runanywhere::v1::STTLanguage _internal_language() const;
-  void _internal_set_language(::runanywhere::v1::STTLanguage value);
+  const ::std::string& _internal_language() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language();
 
   public:
   // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
@@ -2136,16 +1771,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   void _internal_set_enable_word_timestamps(bool value);
 
   public:
-  // int32 max_alternatives = 9;
-  void clear_max_alternatives() ;
-  [[nodiscard]] ::int32_t max_alternatives() const;
-  void set_max_alternatives(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_alternatives() const;
-  void _internal_set_max_alternatives(::int32_t value);
-
-  public:
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
   [[nodiscard]] bool has_preferred_framework()
       const;
@@ -2162,8 +1787,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 12,
-                          0, 84,
+      ::google::protobuf::internal::TcParseTable<4, 9,
+                          0, 64,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2191,17 +1816,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
         const STTConfiguration& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> vocabulary_list_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr language_code_;
-    int language_;
+    ::google::protobuf::internal::ArenaStringPtr language_;
     ::int32_t sample_rate_;
     int audio_format_;
     bool enable_vad_;
     bool enable_punctuation_;
     bool enable_diarization_;
     bool enable_word_timestamps_;
-    ::int32_t max_alternatives_;
     int preferred_framework_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -2269,7 +1891,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
   enum SourceCase {
     kAudioData = 1,
     kFileUri = 2,
-    kAdapterHandle = 3,
     SOURCE_NOT_SET = 0,
   };
   static constexpr int kIndexInFileMessages = 2;
@@ -2369,19 +1990,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
     kSampleRateFieldNumber = 6,
     kChannelsFieldNumber = 7,
     kDurationMsFieldNumber = 9,
-    kBitsPerSampleFieldNumber = 8,
     kAudioDataFieldNumber = 1,
     kFileUriFieldNumber = 2,
-    kAdapterHandleFieldNumber = 3,
   };
-  // .runanywhere.v1.STTAudioEncoding encoding = 4;
+  // .runanywhere.v1.AudioEncoding encoding = 4;
   void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::STTAudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::STTAudioEncoding value);
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  ::runanywhere::v1::STTAudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::STTAudioEncoding value);
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
   // .runanywhere.v1.AudioFormat audio_format = 5;
@@ -2424,16 +2043,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
   void _internal_set_duration_ms(::int64_t value);
 
   public:
-  // int32 bits_per_sample = 8;
-  void clear_bits_per_sample() ;
-  [[nodiscard]] ::int32_t bits_per_sample() const;
-  void set_bits_per_sample(::int32_t value);
-
-  private:
-  ::int32_t _internal_bits_per_sample() const;
-  void _internal_set_bits_per_sample(::int32_t value);
-
-  public:
   // bytes audio_data = 1;
   [[nodiscard]] bool has_audio_data()
       const;
@@ -2468,23 +2077,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
   ::std::string* PROTOBUF_NONNULL _internal_mutable_file_uri();
 
   public:
-  // string adapter_handle = 3;
-  [[nodiscard]] bool has_adapter_handle()
-      const;
-  void clear_adapter_handle() ;
-  [[nodiscard]] const ::std::string& adapter_handle() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_adapter_handle(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_adapter_handle();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_adapter_handle();
-  void set_allocated_adapter_handle(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_adapter_handle() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_adapter_handle(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_adapter_handle();
-
-  public:
   void clear_source();
   SourceCase source_case() const;
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTAudioSource)
@@ -2492,12 +2084,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
   class _Internal;
   void set_has_audio_data();
   void set_has_file_uri();
-  void set_has_adapter_handle();
   [[nodiscard]] inline bool has_source() const;
   inline void clear_has_source();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 9,
-                          0, 68,
+      ::google::protobuf::internal::TcParseTable<3, 7,
+                          0, 46,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2530,13 +2121,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
     ::int32_t sample_rate_;
     ::int32_t channels_;
     ::int64_t duration_ms_;
-    ::int32_t bits_per_sample_;
     union SourceUnion {
       constexpr SourceUnion() : _constinit_{} {}
       ::google::protobuf::internal::ConstantInitialized _constinit_;
       ::google::protobuf::internal::ArenaStringPtr audio_data_;
       ::google::protobuf::internal::ArenaStringPtr file_uri_;
-      ::google::protobuf::internal::ArenaStringPtr adapter_handle_;
     } source_;
     ::uint32_t _oneof_case_[1];
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -3197,17 +2786,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   enum : int {
     kWordsFieldNumber = 4,
     kAlternativesFieldNumber = 5,
-    kSpeakerIdsFieldNumber = 10,
     kTextFieldNumber = 1,
-    kLanguageCodeFieldNumber = 7,
-    kErrorMessageFieldNumber = 11,
+    kLanguageFieldNumber = 14,
     kMetadataFieldNumber = 6,
-    kLanguageFieldNumber = 2,
-    kConfidenceFieldNumber = 3,
+    kErrorFieldNumber = 15,
     kTimestampMsFieldNumber = 8,
-    kDurationMsFieldNumber = 9,
-    kErrorCodeFieldNumber = 12,
+    kConfidenceFieldNumber = 3,
     kSegmentIndexFieldNumber = 13,
+    kDurationMsFieldNumber = 9,
   };
   // repeated .runanywhere.v1.WordTimestamp words = 4;
   [[nodiscard]] int words_size()
@@ -3251,33 +2837,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>* PROTOBUF_NONNULL _internal_mutable_alternatives();
 
   public:
-  // repeated string speaker_ids = 10;
-  [[nodiscard]] int speaker_ids_size()
-      const;
-  private:
-  int _internal_speaker_ids_size() const;
-
-  public:
-  void clear_speaker_ids() ;
-  [[nodiscard]] const ::std::string& speaker_ids(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_speaker_ids(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_speaker_ids(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_speaker_ids();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_speaker_ids(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      speaker_ids() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_speaker_ids();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_speaker_ids() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_speaker_ids();
-
-  public:
   // string text = 1;
   void clear_text() ;
   [[nodiscard]] const ::std::string& text() const;
@@ -3293,38 +2852,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
 
   public:
-  // optional string language_code = 7;
-  [[nodiscard]] bool has_language_code()
+  // optional string language = 14;
+  [[nodiscard]] bool has_language()
       const;
-  void clear_language_code() ;
-  [[nodiscard]] const ::std::string& language_code() const;
+  void clear_language() ;
+  [[nodiscard]] const ::std::string& language() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language_code(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language_code();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
-  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
+  void set_language(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language();
+  void set_allocated_language(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_language_code() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
-
-  public:
-  // optional string error_message = 11;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+  const ::std::string& _internal_language() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language();
 
   public:
   // .runanywhere.v1.TranscriptionMetadata metadata = 6;
@@ -3343,24 +2885,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL _internal_mutable_metadata();
 
   public:
-  // .runanywhere.v1.STTLanguage language = 2;
-  void clear_language() ;
-  [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
-  void set_language(::runanywhere::v1::STTLanguage value);
+  // optional .runanywhere.v1.SDKError error = 15;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
 
   private:
-  ::runanywhere::v1::STTLanguage _internal_language() const;
-  void _internal_set_language(::runanywhere::v1::STTLanguage value);
-
-  public:
-  // float confidence = 3;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
-
-  private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
   // int64 timestamp_ms = 8;
@@ -3373,24 +2911,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   void _internal_set_timestamp_ms(::int64_t value);
 
   public:
-  // int64 duration_ms = 9;
-  void clear_duration_ms() ;
-  [[nodiscard]] ::int64_t duration_ms() const;
-  void set_duration_ms(::int64_t value);
+  // float confidence = 3;
+  void clear_confidence() ;
+  [[nodiscard]] float confidence() const;
+  void set_confidence(float value);
 
   private:
-  ::int64_t _internal_duration_ms() const;
-  void _internal_set_duration_ms(::int64_t value);
-
-  public:
-  // int32 error_code = 12;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
+  float _internal_confidence() const;
+  void _internal_set_confidence(float value);
 
   public:
   // int32 segment_index = 13;
@@ -3403,12 +2931,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   void _internal_set_segment_index(::int32_t value);
 
   public:
+  // int64 duration_ms = 9;
+  void clear_duration_ms() ;
+  [[nodiscard]] ::int64_t duration_ms() const;
+  void set_duration_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_duration_ms() const;
+  void _internal_set_duration_ms(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTOutput)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 13,
-                          3, 82,
+      ::google::protobuf::internal::TcParseTable<4, 10,
+                          4, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -3438,396 +2976,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::WordTimestamp > words_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::TranscriptionAlternative > alternatives_;
-    ::google::protobuf::RepeatedPtrField<::std::string> speaker_ids_;
     ::google::protobuf::internal::ArenaStringPtr text_;
-    ::google::protobuf::internal::ArenaStringPtr language_code_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::google::protobuf::internal::ArenaStringPtr language_;
     ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE metadata_;
-    int language_;
-    float confidence_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::int64_t timestamp_ms_;
+    float confidence_;
+    ::int32_t segment_index_;
     ::int64_t duration_ms_;
-    ::int32_t error_code_;
-    ::int32_t segment_index_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_stt_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTPartialResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTPartialResult) */ {
- public:
-  inline STTPartialResult() : STTPartialResult(nullptr) {}
-  ~STTPartialResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(STTPartialResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTPartialResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr STTPartialResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline STTPartialResult(const STTPartialResult& from) : STTPartialResult(nullptr, from) {}
-  inline STTPartialResult(STTPartialResult&& from) noexcept : STTPartialResult(nullptr, ::std::move(from)) {}
-  inline STTPartialResult& operator=(const STTPartialResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline STTPartialResult& operator=(STTPartialResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const STTPartialResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTPartialResult>(&STTPartialResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 9;
-  friend void swap(STTPartialResult& a, STTPartialResult& b) { a.Swap(&b); }
-  inline void Swap(STTPartialResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(STTPartialResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] STTPartialResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<STTPartialResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const STTPartialResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const STTPartialResult& from) { STTPartialResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(STTPartialResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTPartialResult"; }
-
-  explicit STTPartialResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  STTPartialResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTPartialResult& from);
-  STTPartialResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTPartialResult&& from) noexcept
-      : STTPartialResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kAlternativesFieldNumber = 7,
-    kTextFieldNumber = 1,
-    kLanguageCodeFieldNumber = 8,
-    kRequestIdFieldNumber = 9,
-    kFinalOutputFieldNumber = 13,
-    kIsFinalFieldNumber = 2,
-    kStabilityFieldNumber = 3,
-    kConfidenceFieldNumber = 4,
-    kLanguageFieldNumber = 5,
-    kTimestampMsFieldNumber = 6,
-    kAudioStartMsFieldNumber = 11,
-    kAudioEndMsFieldNumber = 12,
-    kSegmentIndexFieldNumber = 10,
-  };
-  // repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
-  [[nodiscard]] int alternatives_size()
-      const;
-  private:
-  int _internal_alternatives_size() const;
-
-  public:
-  void clear_alternatives() ;
-  [[nodiscard]] const ::runanywhere::v1::TranscriptionAlternative& alternatives(int index) const;
-  [[nodiscard]] ::runanywhere::v1::TranscriptionAlternative* PROTOBUF_NONNULL mutable_alternatives(int index);
-  ::runanywhere::v1::TranscriptionAlternative* PROTOBUF_NONNULL add_alternatives();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>&
-  alternatives() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>* PROTOBUF_NONNULL
-  mutable_alternatives();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>& _internal_alternatives() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>* PROTOBUF_NONNULL _internal_mutable_alternatives();
-
-  public:
-  // string text = 1;
-  void clear_text() ;
-  [[nodiscard]] const ::std::string& text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
-  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
-
-  public:
-  // optional string language_code = 8;
-  [[nodiscard]] bool has_language_code()
-      const;
-  void clear_language_code() ;
-  [[nodiscard]] const ::std::string& language_code() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language_code(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language_code();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
-  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_language_code() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
-
-  public:
-  // string request_id = 9;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional .runanywhere.v1.STTOutput final_output = 13;
-  [[nodiscard]] bool has_final_output()
-      const;
-  void clear_final_output() ;
-  [[nodiscard]] const ::runanywhere::v1::STTOutput& final_output() const;
-  [[nodiscard]] ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE release_final_output();
-  ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL mutable_final_output();
-  void set_allocated_final_output(::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_final_output(::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE unsafe_arena_release_final_output();
-
-  private:
-  const ::runanywhere::v1::STTOutput& _internal_final_output() const;
-  ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL _internal_mutable_final_output();
-
-  public:
-  // bool is_final = 2;
-  void clear_is_final() ;
-  [[nodiscard]] bool is_final() const;
-  void set_is_final(bool value);
-
-  private:
-  bool _internal_is_final() const;
-  void _internal_set_is_final(bool value);
-
-  public:
-  // float stability = 3;
-  void clear_stability() ;
-  [[nodiscard]] float stability() const;
-  void set_stability(float value);
-
-  private:
-  float _internal_stability() const;
-  void _internal_set_stability(float value);
-
-  public:
-  // float confidence = 4;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
-
-  private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
-
-  public:
-  // .runanywhere.v1.STTLanguage language = 5;
-  void clear_language() ;
-  [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
-  void set_language(::runanywhere::v1::STTLanguage value);
-
-  private:
-  ::runanywhere::v1::STTLanguage _internal_language() const;
-  void _internal_set_language(::runanywhere::v1::STTLanguage value);
-
-  public:
-  // int64 timestamp_ms = 6;
-  void clear_timestamp_ms() ;
-  [[nodiscard]] ::int64_t timestamp_ms() const;
-  void set_timestamp_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_timestamp_ms() const;
-  void _internal_set_timestamp_ms(::int64_t value);
-
-  public:
-  // int64 audio_start_ms = 11;
-  void clear_audio_start_ms() ;
-  [[nodiscard]] ::int64_t audio_start_ms() const;
-  void set_audio_start_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_audio_start_ms() const;
-  void _internal_set_audio_start_ms(::int64_t value);
-
-  public:
-  // int64 audio_end_ms = 12;
-  void clear_audio_end_ms() ;
-  [[nodiscard]] ::int64_t audio_end_ms() const;
-  void set_audio_end_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_audio_end_ms() const;
-  void _internal_set_audio_end_ms(::int64_t value);
-
-  public:
-  // int32 segment_index = 10;
-  void clear_segment_index() ;
-  [[nodiscard]] ::int32_t segment_index() const;
-  void set_segment_index(::int32_t value);
-
-  private:
-  ::int32_t _internal_segment_index() const;
-  void _internal_set_segment_index(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTPartialResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 13,
-                          2, 75,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const STTPartialResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::TranscriptionAlternative > alternatives_;
-    ::google::protobuf::internal::ArenaStringPtr text_;
-    ::google::protobuf::internal::ArenaStringPtr language_code_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE final_output_;
-    bool is_final_;
-    float stability_;
-    float confidence_;
-    int language_;
-    ::int64_t timestamp_ms_;
-    ::int64_t audio_start_ms_;
-    ::int64_t audio_end_ms_;
-    ::int32_t segment_index_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -3984,13 +3140,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   // accessors -------------------------------------------------------
   enum : int {
     kRequestIdFieldNumber = 3,
-    kErrorMessageFieldNumber = 7,
     kPartialFieldNumber = 5,
     kFinalOutputFieldNumber = 6,
+    kErrorFieldNumber = 9,
     kSeqFieldNumber = 1,
     kTimestampUsFieldNumber = 2,
     kKindFieldNumber = 4,
-    kErrorCodeFieldNumber = 8,
   };
   // string request_id = 3;
   void clear_request_id() ;
@@ -4005,23 +3160,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   const ::std::string& _internal_request_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional string error_message = 7;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
 
   public:
   // optional .runanywhere.v1.STTPartialResult partial = 5;
@@ -4056,6 +3194,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL _internal_mutable_final_output();
 
   public:
+  // optional .runanywhere.v1.SDKError error = 9;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
   // uint64 seq = 1;
   void clear_seq() ;
   [[nodiscard]] ::uint64_t seq() const;
@@ -4086,22 +3240,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   void _internal_set_kind(::runanywhere::v1::STTStreamEventKind value);
 
   public:
-  // int32 error_code = 8;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTStreamEvent)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 8,
-                          2, 69,
+      ::google::protobuf::internal::TcParseTable<3, 7,
+                          3, 48,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -4130,13 +3274,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE partial_;
     ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE final_output_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::uint64_t seq_;
     ::int64_t timestamp_us_;
     int kind_;
-    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4163,7 +3306,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
 inline void STTConfiguration::clear_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline const ::std::string& STTConfiguration::model_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -4173,13 +3316,13 @@ inline const ::std::string& STTConfiguration::model_id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void STTConfiguration::set_model_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.model_id)
 }
 inline ::std::string* PROTOBUF_NONNULL STTConfiguration::mutable_model_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::std::string* _s = _internal_mutable_model_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTConfiguration.model_id)
   return _s;
@@ -4199,10 +3342,10 @@ inline ::std::string* PROTOBUF_NONNULL STTConfiguration::_internal_mutable_model
 inline ::std::string* PROTOBUF_NULLABLE STTConfiguration::release_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTConfiguration.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   auto* released = _impl_.model_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.model_id_.Set("", GetArena());
@@ -4212,9 +3355,9 @@ inline ::std::string* PROTOBUF_NULLABLE STTConfiguration::release_model_id() {
 inline void STTConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
   _impl_.model_id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
@@ -4223,35 +3366,79 @@ inline void STTConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTConfiguration.model_id)
 }
 
-// .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+// optional string language = 13;
+inline bool STTConfiguration::has_language() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
 inline void STTConfiguration::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.language_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline ::runanywhere::v1::STTLanguage STTConfiguration::language() const {
+inline const ::std::string& STTConfiguration::language() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.language)
   return _internal_language();
 }
-inline void STTConfiguration::set_language(::runanywhere::v1::STTLanguage value) {
-  _internal_set_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void STTConfiguration::set_language(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.language)
 }
-inline ::runanywhere::v1::STTLanguage STTConfiguration::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTLanguage>(_impl_.language_);
+inline ::std::string* PROTOBUF_NONNULL STTConfiguration::mutable_language()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_language();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTConfiguration.language)
+  return _s;
 }
-inline void STTConfiguration::_internal_set_language(::runanywhere::v1::STTLanguage value) {
+inline const ::std::string& STTConfiguration::_internal_language() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.language_.Get();
+}
+inline void STTConfiguration::_internal_set_language(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = value;
+  _impl_.language_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL STTConfiguration::_internal_mutable_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.language_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE STTConfiguration::release_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTConfiguration.language)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.language_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  return released;
+}
+inline void STTConfiguration::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.language_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTConfiguration.language)
 }
 
 // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
 inline void STTConfiguration::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::int32_t STTConfiguration::sample_rate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.sample_rate)
@@ -4259,7 +3446,7 @@ inline ::int32_t STTConfiguration::sample_rate() const {
 }
 inline void STTConfiguration::set_sample_rate(::int32_t value) {
   _internal_set_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.sample_rate)
 }
 inline ::int32_t STTConfiguration::_internal_sample_rate() const {
@@ -4275,7 +3462,7 @@ inline void STTConfiguration::_internal_set_sample_rate(::int32_t value) {
 inline void STTConfiguration::clear_enable_vad() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_vad_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline bool STTConfiguration::enable_vad() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.enable_vad)
@@ -4283,7 +3470,7 @@ inline bool STTConfiguration::enable_vad() const {
 }
 inline void STTConfiguration::set_enable_vad(bool value) {
   _internal_set_enable_vad(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.enable_vad)
 }
 inline bool STTConfiguration::_internal_enable_vad() const {
@@ -4299,7 +3486,7 @@ inline void STTConfiguration::_internal_set_enable_vad(bool value) {
 inline void STTConfiguration::clear_audio_format() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_format_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::runanywhere::v1::AudioFormat STTConfiguration::audio_format() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.audio_format)
@@ -4307,7 +3494,7 @@ inline ::runanywhere::v1::AudioFormat STTConfiguration::audio_format() const {
 }
 inline void STTConfiguration::set_audio_format(::runanywhere::v1::AudioFormat value) {
   _internal_set_audio_format(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.audio_format)
 }
 inline ::runanywhere::v1::AudioFormat STTConfiguration::_internal_audio_format() const {
@@ -4323,7 +3510,7 @@ inline void STTConfiguration::_internal_set_audio_format(::runanywhere::v1::Audi
 inline void STTConfiguration::clear_enable_punctuation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_punctuation_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline bool STTConfiguration::enable_punctuation() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.enable_punctuation)
@@ -4331,7 +3518,7 @@ inline bool STTConfiguration::enable_punctuation() const {
 }
 inline void STTConfiguration::set_enable_punctuation(bool value) {
   _internal_set_enable_punctuation(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.enable_punctuation)
 }
 inline bool STTConfiguration::_internal_enable_punctuation() const {
@@ -4347,7 +3534,7 @@ inline void STTConfiguration::_internal_set_enable_punctuation(bool value) {
 inline void STTConfiguration::clear_enable_diarization() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_diarization_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline bool STTConfiguration::enable_diarization() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.enable_diarization)
@@ -4355,7 +3542,7 @@ inline bool STTConfiguration::enable_diarization() const {
 }
 inline void STTConfiguration::set_enable_diarization(bool value) {
   _internal_set_enable_diarization(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.enable_diarization)
 }
 inline bool STTConfiguration::_internal_enable_diarization() const {
@@ -4367,107 +3554,11 @@ inline void STTConfiguration::_internal_set_enable_diarization(bool value) {
   _impl_.enable_diarization_ = value;
 }
 
-// repeated string vocabulary_list = 8;
-inline int STTConfiguration::_internal_vocabulary_list_size() const {
-  return _internal_vocabulary_list().size();
-}
-inline int STTConfiguration::vocabulary_list_size() const {
-  return _internal_vocabulary_list_size();
-}
-inline void STTConfiguration::clear_vocabulary_list() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vocabulary_list_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline ::std::string* PROTOBUF_NONNULL STTConfiguration::add_vocabulary_list()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_vocabulary_list()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.STTConfiguration.vocabulary_list)
-  return _s;
-}
-inline const ::std::string& STTConfiguration::vocabulary_list(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.vocabulary_list)
-  return _internal_vocabulary_list().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL STTConfiguration::mutable_vocabulary_list(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTConfiguration.vocabulary_list)
-  return _internal_mutable_vocabulary_list()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void STTConfiguration::set_vocabulary_list(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(
-      *_internal_mutable_vocabulary_list()->Mutable(index),
-      ::std::forward<Arg_>(value), args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.vocabulary_list)
-}
-template <typename Arg_, typename... Args_>
-inline void STTConfiguration::add_vocabulary_list(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_vocabulary_list(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTConfiguration.vocabulary_list)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& STTConfiguration::vocabulary_list()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTConfiguration.vocabulary_list)
-  return _internal_vocabulary_list();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTConfiguration::mutable_vocabulary_list() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTConfiguration.vocabulary_list)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_vocabulary_list();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-STTConfiguration::_internal_vocabulary_list() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.vocabulary_list_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTConfiguration::_internal_mutable_vocabulary_list() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.vocabulary_list_;
-}
-
-// int32 max_alternatives = 9;
-inline void STTConfiguration::clear_max_alternatives() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_alternatives_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline ::int32_t STTConfiguration::max_alternatives() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.max_alternatives)
-  return _internal_max_alternatives();
-}
-inline void STTConfiguration::set_max_alternatives(::int32_t value) {
-  _internal_set_max_alternatives(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.max_alternatives)
-}
-inline ::int32_t STTConfiguration::_internal_max_alternatives() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_alternatives_;
-}
-inline void STTConfiguration::_internal_set_max_alternatives(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_alternatives_ = value;
-}
-
 // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTConfiguration::clear_enable_word_timestamps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_word_timestamps_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline bool STTConfiguration::enable_word_timestamps() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.enable_word_timestamps)
@@ -4475,7 +3566,7 @@ inline bool STTConfiguration::enable_word_timestamps() const {
 }
 inline void STTConfiguration::set_enable_word_timestamps(bool value) {
   _internal_set_enable_word_timestamps(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.enable_word_timestamps)
 }
 inline bool STTConfiguration::_internal_enable_word_timestamps() const {
@@ -4489,13 +3580,13 @@ inline void STTConfiguration::_internal_set_enable_word_timestamps(bool value) {
 
 // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
 inline bool STTConfiguration::has_preferred_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   return value;
 }
 inline void STTConfiguration::clear_preferred_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preferred_framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::runanywhere::v1::InferenceFramework STTConfiguration::preferred_framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.preferred_framework)
@@ -4503,7 +3594,7 @@ inline ::runanywhere::v1::InferenceFramework STTConfiguration::preferred_framewo
 }
 inline void STTConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_preferred_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.preferred_framework)
 }
 inline ::runanywhere::v1::InferenceFramework STTConfiguration::_internal_preferred_framework() const {
@@ -4515,107 +3606,83 @@ inline void STTConfiguration::_internal_set_preferred_framework(::runanywhere::v
   _impl_.preferred_framework_ = value;
 }
 
-// optional string language_code = 12;
-inline bool STTConfiguration::has_language_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void STTConfiguration::clear_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& STTConfiguration::language_code() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTConfiguration.language_code)
-  return _internal_language_code();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTConfiguration::set_language_code(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTConfiguration.language_code)
-}
-inline ::std::string* PROTOBUF_NONNULL STTConfiguration::mutable_language_code()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_language_code();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTConfiguration.language_code)
-  return _s;
-}
-inline const ::std::string& STTConfiguration::_internal_language_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_code_.Get();
-}
-inline void STTConfiguration::_internal_set_language_code(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTConfiguration::_internal_mutable_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_code_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTConfiguration::release_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTConfiguration.language_code)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.language_code_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTConfiguration::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.language_code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTConfiguration.language_code)
-}
-
 // -------------------------------------------------------------------
 
 // STTOptions
 
-// .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+// optional string language = 17;
+inline bool STTOptions::has_language() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  return value;
+}
 inline void STTOptions::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.language_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::runanywhere::v1::STTLanguage STTOptions::language() const {
+inline const ::std::string& STTOptions::language() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.language)
   return _internal_language();
 }
-inline void STTOptions::set_language(::runanywhere::v1::STTLanguage value) {
-  _internal_set_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void STTOptions::set_language(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.language)
 }
-inline ::runanywhere::v1::STTLanguage STTOptions::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTLanguage>(_impl_.language_);
+inline ::std::string* PROTOBUF_NONNULL STTOptions::mutable_language()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_language();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOptions.language)
+  return _s;
 }
-inline void STTOptions::_internal_set_language(::runanywhere::v1::STTLanguage value) {
+inline const ::std::string& STTOptions::_internal_language() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.language_.Get();
+}
+inline void STTOptions::_internal_set_language(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = value;
+  _impl_.language_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL STTOptions::_internal_mutable_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.language_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE STTOptions::release_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOptions.language)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.language_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  return released;
+}
+inline void STTOptions::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.language_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOptions.language)
 }
 
 // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTOptions::clear_enable_punctuation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_punctuation_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline bool STTOptions::enable_punctuation() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.enable_punctuation)
@@ -4623,7 +3690,7 @@ inline bool STTOptions::enable_punctuation() const {
 }
 inline void STTOptions::set_enable_punctuation(bool value) {
   _internal_set_enable_punctuation(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.enable_punctuation)
 }
 inline bool STTOptions::_internal_enable_punctuation() const {
@@ -4635,131 +3702,63 @@ inline void STTOptions::_internal_set_enable_punctuation(bool value) {
   _impl_.enable_punctuation_ = value;
 }
 
-// bool enable_diarization = 3;
-inline void STTOptions::clear_enable_diarization() {
+// bool diarize = 3;
+inline void STTOptions::clear_diarize() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.enable_diarization_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.diarize_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline bool STTOptions::enable_diarization() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.enable_diarization)
-  return _internal_enable_diarization();
+inline bool STTOptions::diarize() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.diarize)
+  return _internal_diarize();
 }
-inline void STTOptions::set_enable_diarization(bool value) {
-  _internal_set_enable_diarization(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.enable_diarization)
+inline void STTOptions::set_diarize(bool value) {
+  _internal_set_diarize(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.diarize)
 }
-inline bool STTOptions::_internal_enable_diarization() const {
+inline bool STTOptions::_internal_diarize() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.enable_diarization_;
+  return _impl_.diarize_;
 }
-inline void STTOptions::_internal_set_enable_diarization(bool value) {
+inline void STTOptions::_internal_set_diarize(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.enable_diarization_ = value;
+  _impl_.diarize_ = value;
 }
 
-// int32 max_speakers = 4;
-inline void STTOptions::clear_max_speakers() {
+// optional int32 speakers_expected = 4;
+inline bool STTOptions::has_speakers_expected() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
+inline void STTOptions::clear_speakers_expected() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_speakers_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.speakers_expected_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline ::int32_t STTOptions::max_speakers() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.max_speakers)
-  return _internal_max_speakers();
+inline ::int32_t STTOptions::speakers_expected() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.speakers_expected)
+  return _internal_speakers_expected();
 }
-inline void STTOptions::set_max_speakers(::int32_t value) {
-  _internal_set_max_speakers(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.max_speakers)
+inline void STTOptions::set_speakers_expected(::int32_t value) {
+  _internal_set_speakers_expected(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.speakers_expected)
 }
-inline ::int32_t STTOptions::_internal_max_speakers() const {
+inline ::int32_t STTOptions::_internal_speakers_expected() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_speakers_;
+  return _impl_.speakers_expected_;
 }
-inline void STTOptions::_internal_set_max_speakers(::int32_t value) {
+inline void STTOptions::_internal_set_speakers_expected(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_speakers_ = value;
-}
-
-// repeated string vocabulary_list = 5;
-inline int STTOptions::_internal_vocabulary_list_size() const {
-  return _internal_vocabulary_list().size();
-}
-inline int STTOptions::vocabulary_list_size() const {
-  return _internal_vocabulary_list_size();
-}
-inline void STTOptions::clear_vocabulary_list() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vocabulary_list_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline ::std::string* PROTOBUF_NONNULL STTOptions::add_vocabulary_list()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_vocabulary_list()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.STTOptions.vocabulary_list)
-  return _s;
-}
-inline const ::std::string& STTOptions::vocabulary_list(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.vocabulary_list)
-  return _internal_vocabulary_list().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL STTOptions::mutable_vocabulary_list(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOptions.vocabulary_list)
-  return _internal_mutable_vocabulary_list()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void STTOptions::set_vocabulary_list(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(
-      *_internal_mutable_vocabulary_list()->Mutable(index),
-      ::std::forward<Arg_>(value), args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.vocabulary_list)
-}
-template <typename Arg_, typename... Args_>
-inline void STTOptions::add_vocabulary_list(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_vocabulary_list(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTOptions.vocabulary_list)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& STTOptions::vocabulary_list()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTOptions.vocabulary_list)
-  return _internal_vocabulary_list();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTOptions::mutable_vocabulary_list() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTOptions.vocabulary_list)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_vocabulary_list();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-STTOptions::_internal_vocabulary_list() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.vocabulary_list_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTOptions::_internal_mutable_vocabulary_list() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.vocabulary_list_;
+  _impl_.speakers_expected_ = value;
 }
 
 // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTOptions::clear_enable_word_timestamps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_word_timestamps_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool STTOptions::enable_word_timestamps() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.enable_word_timestamps)
@@ -4767,7 +3766,7 @@ inline bool STTOptions::enable_word_timestamps() const {
 }
 inline void STTOptions::set_enable_word_timestamps(bool value) {
   _internal_set_enable_word_timestamps(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.enable_word_timestamps)
 }
 inline bool STTOptions::_internal_enable_word_timestamps() const {
@@ -4779,288 +3778,28 @@ inline void STTOptions::_internal_set_enable_word_timestamps(bool value) {
   _impl_.enable_word_timestamps_ = value;
 }
 
-// int32 beam_size = 7;
-inline void STTOptions::clear_beam_size() {
+// int32 silence_duration_ms = 14 [(.runanywhere.v1.rac_default) = "0"];
+inline void STTOptions::clear_silence_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.beam_size_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  _impl_.silence_duration_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline ::int32_t STTOptions::beam_size() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.beam_size)
-  return _internal_beam_size();
+inline ::int32_t STTOptions::silence_duration_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.silence_duration_ms)
+  return _internal_silence_duration_ms();
 }
-inline void STTOptions::set_beam_size(::int32_t value) {
-  _internal_set_beam_size(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.beam_size)
+inline void STTOptions::set_silence_duration_ms(::int32_t value) {
+  _internal_set_silence_duration_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.silence_duration_ms)
 }
-inline ::int32_t STTOptions::_internal_beam_size() const {
+inline ::int32_t STTOptions::_internal_silence_duration_ms() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.beam_size_;
+  return _impl_.silence_duration_ms_;
 }
-inline void STTOptions::_internal_set_beam_size(::int32_t value) {
+inline void STTOptions::_internal_set_silence_duration_ms(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.beam_size_ = value;
-}
-
-// optional string language_code = 8;
-inline bool STTOptions::has_language_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  return value;
-}
-inline void STTOptions::clear_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& STTOptions::language_code() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.language_code)
-  return _internal_language_code();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTOptions::set_language_code(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.language_code)
-}
-inline ::std::string* PROTOBUF_NONNULL STTOptions::mutable_language_code()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_language_code();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOptions.language_code)
-  return _s;
-}
-inline const ::std::string& STTOptions::_internal_language_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_code_.Get();
-}
-inline void STTOptions::_internal_set_language_code(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTOptions::_internal_mutable_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_code_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTOptions::release_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOptions.language_code)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.language_code_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTOptions::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.language_code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOptions.language_code)
-}
-
-// bool detect_language = 9;
-inline void STTOptions::clear_detect_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.detect_language_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline bool STTOptions::detect_language() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.detect_language)
-  return _internal_detect_language();
-}
-inline void STTOptions::set_detect_language(bool value) {
-  _internal_set_detect_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.detect_language)
-}
-inline bool STTOptions::_internal_detect_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.detect_language_;
-}
-inline void STTOptions::_internal_set_detect_language(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.detect_language_ = value;
-}
-
-// .runanywhere.v1.AudioFormat audio_format = 10;
-inline void STTOptions::clear_audio_format() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_format_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
-}
-inline ::runanywhere::v1::AudioFormat STTOptions::audio_format() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.audio_format)
-  return _internal_audio_format();
-}
-inline void STTOptions::set_audio_format(::runanywhere::v1::AudioFormat value) {
-  _internal_set_audio_format(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.audio_format)
-}
-inline ::runanywhere::v1::AudioFormat STTOptions::_internal_audio_format() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::AudioFormat>(_impl_.audio_format_);
-}
-inline void STTOptions::_internal_set_audio_format(::runanywhere::v1::AudioFormat value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_format_ = value;
-}
-
-// int32 sample_rate = 11;
-inline void STTOptions::clear_sample_rate() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline ::int32_t STTOptions::sample_rate() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.sample_rate)
-  return _internal_sample_rate();
-}
-inline void STTOptions::set_sample_rate(::int32_t value) {
-  _internal_set_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.sample_rate)
-}
-inline ::int32_t STTOptions::_internal_sample_rate() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.sample_rate_;
-}
-inline void STTOptions::_internal_set_sample_rate(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_ = value;
-}
-
-// int32 max_alternatives = 12;
-inline void STTOptions::clear_max_alternatives() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_alternatives_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
-}
-inline ::int32_t STTOptions::max_alternatives() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.max_alternatives)
-  return _internal_max_alternatives();
-}
-inline void STTOptions::set_max_alternatives(::int32_t value) {
-  _internal_set_max_alternatives(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.max_alternatives)
-}
-inline ::int32_t STTOptions::_internal_max_alternatives() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_alternatives_;
-}
-inline void STTOptions::_internal_set_max_alternatives(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_alternatives_ = value;
-}
-
-// int32 chunk_duration_ms = 13;
-inline void STTOptions::clear_chunk_duration_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.chunk_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
-}
-inline ::int32_t STTOptions::chunk_duration_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.chunk_duration_ms)
-  return _internal_chunk_duration_ms();
-}
-inline void STTOptions::set_chunk_duration_ms(::int32_t value) {
-  _internal_set_chunk_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.chunk_duration_ms)
-}
-inline ::int32_t STTOptions::_internal_chunk_duration_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.chunk_duration_ms_;
-}
-inline void STTOptions::_internal_set_chunk_duration_ms(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.chunk_duration_ms_ = value;
-}
-
-// int32 endpoint_silence_ms = 14;
-inline void STTOptions::clear_endpoint_silence_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.endpoint_silence_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
-}
-inline ::int32_t STTOptions::endpoint_silence_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.endpoint_silence_ms)
-  return _internal_endpoint_silence_ms();
-}
-inline void STTOptions::set_endpoint_silence_ms(::int32_t value) {
-  _internal_set_endpoint_silence_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.endpoint_silence_ms)
-}
-inline ::int32_t STTOptions::_internal_endpoint_silence_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.endpoint_silence_ms_;
-}
-inline void STTOptions::_internal_set_endpoint_silence_ms(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.endpoint_silence_ms_ = value;
-}
-
-// bool suppress_blank = 15;
-inline void STTOptions::clear_suppress_blank() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.suppress_blank_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
-}
-inline bool STTOptions::suppress_blank() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.suppress_blank)
-  return _internal_suppress_blank();
-}
-inline void STTOptions::set_suppress_blank(bool value) {
-  _internal_set_suppress_blank(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.suppress_blank)
-}
-inline bool STTOptions::_internal_suppress_blank() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.suppress_blank_;
-}
-inline void STTOptions::_internal_set_suppress_blank(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.suppress_blank_ = value;
-}
-
-// bool translate_to_english = 16;
-inline void STTOptions::clear_translate_to_english() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.translate_to_english_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
-}
-inline bool STTOptions::translate_to_english() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOptions.translate_to_english)
-  return _internal_translate_to_english();
-}
-inline void STTOptions::set_translate_to_english(bool value) {
-  _internal_set_translate_to_english(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOptions.translate_to_english)
-}
-inline bool STTOptions::_internal_translate_to_english() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.translate_to_english_;
-}
-inline void STTOptions::_internal_set_translate_to_english(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.translate_to_english_ = value;
+  _impl_.silence_duration_ms_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -5225,105 +3964,26 @@ inline void STTAudioSource::set_allocated_file_uri(::std::string* PROTOBUF_NULLA
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTAudioSource.file_uri)
 }
 
-// string adapter_handle = 3;
-inline bool STTAudioSource::has_adapter_handle() const {
-  return source_case() == kAdapterHandle;
-}
-inline void STTAudioSource::set_has_adapter_handle() {
-  _impl_._oneof_case_[0] = kAdapterHandle;
-}
-inline void STTAudioSource::clear_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() == kAdapterHandle) {
-    _impl_.source_.adapter_handle_.Destroy();
-    clear_has_source();
-  }
-}
-inline const ::std::string& STTAudioSource::adapter_handle() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTAudioSource.adapter_handle)
-  return _internal_adapter_handle();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTAudioSource::set_adapter_handle(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() != kAdapterHandle) {
-    clear_source();
-
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitDefault();
-  }
-  _impl_.source_.adapter_handle_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTAudioSource.adapter_handle)
-}
-inline ::std::string* PROTOBUF_NONNULL STTAudioSource::mutable_adapter_handle()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  if (source_case() != kAdapterHandle) {
-    clear_source();
-
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitDefault();
-  }
-  ::std::string* _s = _internal_mutable_adapter_handle();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTAudioSource.adapter_handle)
-  return _s;
-}
-inline const ::std::string& STTAudioSource::_internal_adapter_handle() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  if (source_case() != kAdapterHandle) {
-    return ::google::protobuf::internal::GetEmptyStringAlreadyInited();
-  }
-  return _impl_.source_.adapter_handle_.Get();
-}
-inline void STTAudioSource::_internal_set_adapter_handle(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.source_.adapter_handle_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTAudioSource::_internal_mutable_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.source_.adapter_handle_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTAudioSource::release_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTAudioSource.adapter_handle)
-  if (source_case() != kAdapterHandle) {
-    return nullptr;
-  }
-  clear_has_source();
-  return _impl_.source_.adapter_handle_.Release();
-}
-inline void STTAudioSource::set_allocated_adapter_handle(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (has_source()) {
-    clear_source();
-  }
-  if (value != nullptr) {
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitAllocated(value, GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTAudioSource.adapter_handle)
-}
-
-// .runanywhere.v1.STTAudioEncoding encoding = 4;
+// .runanywhere.v1.AudioEncoding encoding = 4;
 inline void STTAudioSource::clear_encoding() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::runanywhere::v1::STTAudioEncoding STTAudioSource::encoding() const {
+inline ::runanywhere::v1::AudioEncoding STTAudioSource::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTAudioSource.encoding)
   return _internal_encoding();
 }
-inline void STTAudioSource::set_encoding(::runanywhere::v1::STTAudioEncoding value) {
+inline void STTAudioSource::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTAudioSource.encoding)
 }
-inline ::runanywhere::v1::STTAudioEncoding STTAudioSource::_internal_encoding() const {
+inline ::runanywhere::v1::AudioEncoding STTAudioSource::_internal_encoding() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTAudioEncoding>(_impl_.encoding_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
 }
-inline void STTAudioSource::_internal_set_encoding(::runanywhere::v1::STTAudioEncoding value) {
+inline void STTAudioSource::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = value;
 }
@@ -5398,30 +4058,6 @@ inline ::int32_t STTAudioSource::_internal_channels() const {
 inline void STTAudioSource::_internal_set_channels(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.channels_ = value;
-}
-
-// int32 bits_per_sample = 8;
-inline void STTAudioSource::clear_bits_per_sample() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.bits_per_sample_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline ::int32_t STTAudioSource::bits_per_sample() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTAudioSource.bits_per_sample)
-  return _internal_bits_per_sample();
-}
-inline void STTAudioSource::set_bits_per_sample(::int32_t value) {
-  _internal_set_bits_per_sample(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTAudioSource.bits_per_sample)
-}
-inline ::int32_t STTAudioSource::_internal_bits_per_sample() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.bits_per_sample_;
-}
-inline void STTAudioSource::_internal_set_bits_per_sample(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.bits_per_sample_ = value;
 }
 
 // int64 duration_ms = 9;
@@ -6201,54 +4837,6 @@ inline void TranscriptionMetadata::_internal_set_processing_time_ms(::int64_t va
   _impl_.processing_time_ms_ = value;
 }
 
-// int64 audio_length_ms = 3;
-inline void TranscriptionMetadata::clear_audio_length_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_length_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::int64_t TranscriptionMetadata::audio_length_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.TranscriptionMetadata.audio_length_ms)
-  return _internal_audio_length_ms();
-}
-inline void TranscriptionMetadata::set_audio_length_ms(::int64_t value) {
-  _internal_set_audio_length_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.TranscriptionMetadata.audio_length_ms)
-}
-inline ::int64_t TranscriptionMetadata::_internal_audio_length_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.audio_length_ms_;
-}
-inline void TranscriptionMetadata::_internal_set_audio_length_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_length_ms_ = value;
-}
-
-// float real_time_factor = 4;
-inline void TranscriptionMetadata::clear_real_time_factor() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.real_time_factor_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline float TranscriptionMetadata::real_time_factor() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.TranscriptionMetadata.real_time_factor)
-  return _internal_real_time_factor();
-}
-inline void TranscriptionMetadata::set_real_time_factor(float value) {
-  _internal_set_real_time_factor(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.TranscriptionMetadata.real_time_factor)
-}
-inline float TranscriptionMetadata::_internal_real_time_factor() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.real_time_factor_;
-}
-inline void TranscriptionMetadata::_internal_set_real_time_factor(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.real_time_factor_ = value;
-}
-
 // -------------------------------------------------------------------
 
 // STTOutput
@@ -6257,7 +4845,7 @@ inline void TranscriptionMetadata::_internal_set_real_time_factor(float value) {
 inline void STTOutput::clear_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.text_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::std::string& STTOutput::text() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -6267,13 +4855,13 @@ inline const ::std::string& STTOutput::text() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void STTOutput::set_text(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.text)
 }
 inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_text()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_text();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.text)
   return _s;
@@ -6293,10 +4881,10 @@ inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_text() {
 inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.text)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.text_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.text_.Set("", GetArena());
@@ -6306,9 +4894,9 @@ inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_text() {
 inline void STTOutput::set_allocated_text(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.text_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
@@ -6317,35 +4905,11 @@ inline void STTOutput::set_allocated_text(::std::string* PROTOBUF_NULLABLE value
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.text)
 }
 
-// .runanywhere.v1.STTLanguage language = 2;
-inline void STTOutput::clear_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline ::runanywhere::v1::STTLanguage STTOutput::language() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.language)
-  return _internal_language();
-}
-inline void STTOutput::set_language(::runanywhere::v1::STTLanguage value) {
-  _internal_set_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.language)
-}
-inline ::runanywhere::v1::STTLanguage STTOutput::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTLanguage>(_impl_.language_);
-}
-inline void STTOutput::_internal_set_language(::runanywhere::v1::STTLanguage value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = value;
-}
-
 // float confidence = 3;
 inline void STTOutput::clear_confidence() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline float STTOutput::confidence() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.confidence)
@@ -6353,7 +4917,7 @@ inline float STTOutput::confidence() const {
 }
 inline void STTOutput::set_confidence(float value) {
   _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.confidence)
 }
 inline float STTOutput::_internal_confidence() const {
@@ -6363,6 +4927,74 @@ inline float STTOutput::_internal_confidence() const {
 inline void STTOutput::_internal_set_confidence(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.confidence_ = value;
+}
+
+// optional string language = 14;
+inline bool STTOutput::has_language() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  return value;
+}
+inline void STTOutput::clear_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline const ::std::string& STTOutput::language() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.language)
+  return _internal_language();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void STTOutput::set_language(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.language)
+}
+inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_language()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_language();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.language)
+  return _s;
+}
+inline const ::std::string& STTOutput::_internal_language() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.language_.Get();
+}
+inline void STTOutput::_internal_set_language(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.language_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_language() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.language)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.language_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  return released;
+}
+inline void STTOutput::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.language_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
+    _impl_.language_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.language)
 }
 
 // repeated .runanywhere.v1.WordTimestamp words = 4;
@@ -6477,14 +5109,14 @@ STTOutput::_internal_mutable_alternatives() {
 
 // .runanywhere.v1.TranscriptionMetadata metadata = 6;
 inline bool STTOutput::has_metadata() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   PROTOBUF_ASSUME(!value || _impl_.metadata_ != nullptr);
   return value;
 }
 inline void STTOutput::clear_metadata() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.metadata_ != nullptr) _impl_.metadata_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline const ::runanywhere::v1::TranscriptionMetadata& STTOutput::_internal_metadata() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -6503,16 +5135,16 @@ inline void STTOutput::unsafe_arena_set_allocated_metadata(
   }
   _impl_.metadata_ = reinterpret_cast<::runanywhere::v1::TranscriptionMetadata*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTOutput.metadata)
 }
 inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE STTOutput::release_metadata() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::runanywhere::v1::TranscriptionMetadata* released = _impl_.metadata_;
   _impl_.metadata_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -6532,7 +5164,7 @@ inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE STTOutput::un
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.metadata)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::runanywhere::v1::TranscriptionMetadata* temp = _impl_.metadata_;
   _impl_.metadata_ = nullptr;
   return temp;
@@ -6547,7 +5179,7 @@ inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL STTOutput::_in
 }
 inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL STTOutput::mutable_metadata()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::runanywhere::v1::TranscriptionMetadata* _msg = _internal_mutable_metadata();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.metadata)
   return _msg;
@@ -6564,88 +5196,20 @@ inline void STTOutput::set_allocated_metadata(::runanywhere::v1::TranscriptionMe
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
 
   _impl_.metadata_ = reinterpret_cast<::runanywhere::v1::TranscriptionMetadata*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.metadata)
 }
 
-// optional string language_code = 7;
-inline bool STTOutput::has_language_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  return value;
-}
-inline void STTOutput::clear_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline const ::std::string& STTOutput::language_code() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.language_code)
-  return _internal_language_code();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTOutput::set_language_code(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.language_code)
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_language_code()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::std::string* _s = _internal_mutable_language_code();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.language_code)
-  return _s;
-}
-inline const ::std::string& STTOutput::_internal_language_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_code_.Get();
-}
-inline void STTOutput::_internal_set_language_code(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_code_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.language_code)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.language_code_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTOutput::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  }
-  _impl_.language_code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.language_code)
-}
-
 // int64 timestamp_ms = 8;
 inline void STTOutput::clear_timestamp_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::int64_t STTOutput::timestamp_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.timestamp_ms)
@@ -6653,7 +5217,7 @@ inline ::int64_t STTOutput::timestamp_ms() const {
 }
 inline void STTOutput::set_timestamp_ms(::int64_t value) {
   _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.timestamp_ms)
 }
 inline ::int64_t STTOutput::_internal_timestamp_ms() const {
@@ -6669,7 +5233,7 @@ inline void STTOutput::_internal_set_timestamp_ms(::int64_t value) {
 inline void STTOutput::clear_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline ::int64_t STTOutput::duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.duration_ms)
@@ -6677,7 +5241,7 @@ inline ::int64_t STTOutput::duration_ms() const {
 }
 inline void STTOutput::set_duration_ms(::int64_t value) {
   _internal_set_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.duration_ms)
 }
 inline ::int64_t STTOutput::_internal_duration_ms() const {
@@ -6689,175 +5253,11 @@ inline void STTOutput::_internal_set_duration_ms(::int64_t value) {
   _impl_.duration_ms_ = value;
 }
 
-// repeated string speaker_ids = 10;
-inline int STTOutput::_internal_speaker_ids_size() const {
-  return _internal_speaker_ids().size();
-}
-inline int STTOutput::speaker_ids_size() const {
-  return _internal_speaker_ids_size();
-}
-inline void STTOutput::clear_speaker_ids() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.speaker_ids_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::add_speaker_ids()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_speaker_ids()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.STTOutput.speaker_ids)
-  return _s;
-}
-inline const ::std::string& STTOutput::speaker_ids(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.speaker_ids)
-  return _internal_speaker_ids().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_speaker_ids(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.speaker_ids)
-  return _internal_mutable_speaker_ids()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void STTOutput::set_speaker_ids(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(
-      *_internal_mutable_speaker_ids()->Mutable(index),
-      ::std::forward<Arg_>(value), args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.speaker_ids)
-}
-template <typename Arg_, typename... Args_>
-inline void STTOutput::add_speaker_ids(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_speaker_ids(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTOutput.speaker_ids)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& STTOutput::speaker_ids()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTOutput.speaker_ids)
-  return _internal_speaker_ids();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTOutput::mutable_speaker_ids() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTOutput.speaker_ids)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_speaker_ids();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-STTOutput::_internal_speaker_ids() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.speaker_ids_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTOutput::_internal_mutable_speaker_ids() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.speaker_ids_;
-}
-
-// optional string error_message = 11;
-inline bool STTOutput::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
-  return value;
-}
-inline void STTOutput::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline const ::std::string& STTOutput::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTOutput::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.error_message)
-  return _s;
-}
-inline const ::std::string& STTOutput::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void STTOutput::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTOutput::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.error_message)
-}
-
-// int32 error_code = 12;
-inline void STTOutput::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
-}
-inline ::int32_t STTOutput::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error_code)
-  return _internal_error_code();
-}
-inline void STTOutput::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.error_code)
-}
-inline ::int32_t STTOutput::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTOutput::_internal_set_error_code(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
 // int32 segment_index = 13;
 inline void STTOutput::clear_segment_index() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.segment_index_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::int32_t STTOutput::segment_index() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.segment_index)
@@ -6865,7 +5265,7 @@ inline ::int32_t STTOutput::segment_index() const {
 }
 inline void STTOutput::set_segment_index(::int32_t value) {
   _internal_set_segment_index(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.segment_index)
 }
 inline ::int32_t STTOutput::_internal_segment_index() const {
@@ -6877,6 +5277,99 @@ inline void STTOutput::_internal_set_segment_index(::int32_t value) {
   _impl_.segment_index_ = value;
 }
 
+// optional .runanywhere.v1.SDKError error = 15;
+inline bool STTOutput::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::SDKError& STTOutput::_internal_error() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
+}
+inline const ::runanywhere::v1::SDKError& STTOutput::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error)
+  return _internal_error();
+}
+inline void STTOutput::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTOutput.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTOutput::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTOutput::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTOutput::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTOutput::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.error)
+  return _msg;
+}
+inline void STTOutput::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.error)
+}
+
 // -------------------------------------------------------------------
 
 // STTPartialResult
@@ -6885,7 +5378,7 @@ inline void STTOutput::_internal_set_segment_index(::int32_t value) {
 inline void STTPartialResult::clear_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.text_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline const ::std::string& STTPartialResult::text() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -6895,13 +5388,13 @@ inline const ::std::string& STTPartialResult::text() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void STTPartialResult::set_text(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.text)
 }
 inline ::std::string* PROTOBUF_NONNULL STTPartialResult::mutable_text()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::std::string* _s = _internal_mutable_text();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.text)
   return _s;
@@ -6921,10 +5414,10 @@ inline ::std::string* PROTOBUF_NONNULL STTPartialResult::_internal_mutable_text(
 inline ::std::string* PROTOBUF_NULLABLE STTPartialResult::release_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTPartialResult.text)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   auto* released = _impl_.text_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.text_.Set("", GetArena());
@@ -6934,9 +5427,9 @@ inline ::std::string* PROTOBUF_NULLABLE STTPartialResult::release_text() {
 inline void STTPartialResult::set_allocated_text(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
   _impl_.text_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
@@ -6949,7 +5442,7 @@ inline void STTPartialResult::set_allocated_text(::std::string* PROTOBUF_NULLABL
 inline void STTPartialResult::clear_is_final() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_final_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline bool STTPartialResult::is_final() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.is_final)
@@ -6957,7 +5450,7 @@ inline bool STTPartialResult::is_final() const {
 }
 inline void STTPartialResult::set_is_final(bool value) {
   _internal_set_is_final(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.is_final)
 }
 inline bool STTPartialResult::_internal_is_final() const {
@@ -6969,457 +5462,72 @@ inline void STTPartialResult::_internal_set_is_final(bool value) {
   _impl_.is_final_ = value;
 }
 
-// float stability = 3;
-inline void STTPartialResult::clear_stability() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.stability_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+// optional string language = 14;
+inline bool STTPartialResult::has_language() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
 }
-inline float STTPartialResult::stability() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.stability)
-  return _internal_stability();
-}
-inline void STTPartialResult::set_stability(float value) {
-  _internal_set_stability(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.stability)
-}
-inline float STTPartialResult::_internal_stability() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.stability_;
-}
-inline void STTPartialResult::_internal_set_stability(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.stability_ = value;
-}
-
-// float confidence = 4;
-inline void STTPartialResult::clear_confidence() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline float STTPartialResult::confidence() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.confidence)
-  return _internal_confidence();
-}
-inline void STTPartialResult::set_confidence(float value) {
-  _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.confidence)
-}
-inline float STTPartialResult::_internal_confidence() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.confidence_;
-}
-inline void STTPartialResult::_internal_set_confidence(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = value;
-}
-
-// .runanywhere.v1.STTLanguage language = 5;
 inline void STTPartialResult::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  _impl_.language_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline ::runanywhere::v1::STTLanguage STTPartialResult::language() const {
+inline const ::std::string& STTPartialResult::language() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.language)
   return _internal_language();
 }
-inline void STTPartialResult::set_language(::runanywhere::v1::STTLanguage value) {
-  _internal_set_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void STTPartialResult::set_language(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.language)
 }
-inline ::runanywhere::v1::STTLanguage STTPartialResult::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTLanguage>(_impl_.language_);
-}
-inline void STTPartialResult::_internal_set_language(::runanywhere::v1::STTLanguage value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = value;
-}
-
-// int64 timestamp_ms = 6;
-inline void STTPartialResult::clear_timestamp_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.timestamp_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
-}
-inline ::int64_t STTPartialResult::timestamp_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.timestamp_ms)
-  return _internal_timestamp_ms();
-}
-inline void STTPartialResult::set_timestamp_ms(::int64_t value) {
-  _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.timestamp_ms)
-}
-inline ::int64_t STTPartialResult::_internal_timestamp_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.timestamp_ms_;
-}
-inline void STTPartialResult::_internal_set_timestamp_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.timestamp_ms_ = value;
-}
-
-// repeated .runanywhere.v1.TranscriptionAlternative alternatives = 7;
-inline int STTPartialResult::_internal_alternatives_size() const {
-  return _internal_alternatives().size();
-}
-inline int STTPartialResult::alternatives_size() const {
-  return _internal_alternatives_size();
-}
-inline void STTPartialResult::clear_alternatives() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.alternatives_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::runanywhere::v1::TranscriptionAlternative& STTPartialResult::alternatives(int index) const
+inline ::std::string* PROTOBUF_NONNULL STTPartialResult::mutable_language()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.alternatives)
-  return _internal_alternatives().Get(index);
-}
-inline ::runanywhere::v1::TranscriptionAlternative* PROTOBUF_NONNULL STTPartialResult::mutable_alternatives(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.alternatives)
-  return _internal_mutable_alternatives()->Mutable(index);
-}
-inline ::runanywhere::v1::TranscriptionAlternative* PROTOBUF_NONNULL STTPartialResult::add_alternatives()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::runanywhere::v1::TranscriptionAlternative* _add =
-      _internal_mutable_alternatives()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTPartialResult.alternatives)
-  return _add;
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>& STTPartialResult::alternatives() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTPartialResult.alternatives)
-  return _internal_alternatives();
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>* PROTOBUF_NONNULL
-STTPartialResult::mutable_alternatives() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTPartialResult.alternatives)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_alternatives();
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>&
-STTPartialResult::_internal_alternatives() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.alternatives_;
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::TranscriptionAlternative>* PROTOBUF_NONNULL
-STTPartialResult::_internal_mutable_alternatives() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.alternatives_;
-}
-
-// optional string language_code = 8;
-inline bool STTPartialResult::has_language_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void STTPartialResult::clear_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& STTPartialResult::language_code() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.language_code)
-  return _internal_language_code();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTPartialResult::set_language_code(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.language_code)
-}
-inline ::std::string* PROTOBUF_NONNULL STTPartialResult::mutable_language_code()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_language_code();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.language_code)
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_language();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.language)
   return _s;
 }
-inline const ::std::string& STTPartialResult::_internal_language_code() const {
+inline const ::std::string& STTPartialResult::_internal_language() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_code_.Get();
+  return _impl_.language_.Get();
 }
-inline void STTPartialResult::_internal_set_language_code(const ::std::string& value) {
+inline void STTPartialResult::_internal_set_language(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.Set(value, GetArena());
+  _impl_.language_.Set(value, GetArena());
 }
-inline ::std::string* PROTOBUF_NONNULL STTPartialResult::_internal_mutable_language_code() {
+inline ::std::string* PROTOBUF_NONNULL STTPartialResult::_internal_mutable_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_code_.Mutable( GetArena());
+  return _impl_.language_.Mutable( GetArena());
 }
-inline ::std::string* PROTOBUF_NULLABLE STTPartialResult::release_language_code() {
+inline ::std::string* PROTOBUF_NULLABLE STTPartialResult::release_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTPartialResult.language_code)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTPartialResult.language)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.language_code_.Release();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.language_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_code_.Set("", GetArena());
+    _impl_.language_.Set("", GetArena());
   }
   return released;
 }
-inline void STTPartialResult::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
+inline void STTPartialResult::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.language_code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
-    _impl_.language_code_.Set("", GetArena());
+  _impl_.language_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
+    _impl_.language_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTPartialResult.language_code)
-}
-
-// string request_id = 9;
-inline void STTPartialResult::clear_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.request_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline const ::std::string& STTPartialResult::request_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.request_id)
-  return _internal_request_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTPartialResult::set_request_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  _impl_.request_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.request_id)
-}
-inline ::std::string* PROTOBUF_NONNULL STTPartialResult::mutable_request_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::std::string* _s = _internal_mutable_request_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.request_id)
-  return _s;
-}
-inline const ::std::string& STTPartialResult::_internal_request_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.request_id_.Get();
-}
-inline void STTPartialResult::_internal_set_request_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.request_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTPartialResult::_internal_mutable_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.request_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTPartialResult::release_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTPartialResult.request_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.request_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.request_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTPartialResult::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-  _impl_.request_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_id_.IsDefault()) {
-    _impl_.request_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTPartialResult.request_id)
-}
-
-// int32 segment_index = 10;
-inline void STTPartialResult::clear_segment_index() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.segment_index_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
-}
-inline ::int32_t STTPartialResult::segment_index() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.segment_index)
-  return _internal_segment_index();
-}
-inline void STTPartialResult::set_segment_index(::int32_t value) {
-  _internal_set_segment_index(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.segment_index)
-}
-inline ::int32_t STTPartialResult::_internal_segment_index() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.segment_index_;
-}
-inline void STTPartialResult::_internal_set_segment_index(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.segment_index_ = value;
-}
-
-// int64 audio_start_ms = 11;
-inline void STTPartialResult::clear_audio_start_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_start_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline ::int64_t STTPartialResult::audio_start_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.audio_start_ms)
-  return _internal_audio_start_ms();
-}
-inline void STTPartialResult::set_audio_start_ms(::int64_t value) {
-  _internal_set_audio_start_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.audio_start_ms)
-}
-inline ::int64_t STTPartialResult::_internal_audio_start_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.audio_start_ms_;
-}
-inline void STTPartialResult::_internal_set_audio_start_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_start_ms_ = value;
-}
-
-// int64 audio_end_ms = 12;
-inline void STTPartialResult::clear_audio_end_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_end_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
-}
-inline ::int64_t STTPartialResult::audio_end_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.audio_end_ms)
-  return _internal_audio_end_ms();
-}
-inline void STTPartialResult::set_audio_end_ms(::int64_t value) {
-  _internal_set_audio_end_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTPartialResult.audio_end_ms)
-}
-inline ::int64_t STTPartialResult::_internal_audio_end_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.audio_end_ms_;
-}
-inline void STTPartialResult::_internal_set_audio_end_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.audio_end_ms_ = value;
-}
-
-// optional .runanywhere.v1.STTOutput final_output = 13;
-inline bool STTPartialResult::has_final_output() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  PROTOBUF_ASSUME(!value || _impl_.final_output_ != nullptr);
-  return value;
-}
-inline void STTPartialResult::clear_final_output() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.final_output_ != nullptr) _impl_.final_output_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline const ::runanywhere::v1::STTOutput& STTPartialResult::_internal_final_output() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::STTOutput* p = _impl_.final_output_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::STTOutput>(&::runanywhere::v1::STTOutput_globals_);
-}
-inline const ::runanywhere::v1::STTOutput& STTPartialResult::final_output() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTPartialResult.final_output)
-  return _internal_final_output();
-}
-inline void STTPartialResult::unsafe_arena_set_allocated_final_output(
-    ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.final_output_);
-  }
-  _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTPartialResult.final_output)
-}
-inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTPartialResult::release_final_output() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::runanywhere::v1::STTOutput* released = _impl_.final_output_;
-  _impl_.final_output_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTPartialResult::unsafe_arena_release_final_output() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTPartialResult.final_output)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::runanywhere::v1::STTOutput* temp = _impl_.final_output_;
-  _impl_.final_output_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTPartialResult::_internal_mutable_final_output() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.final_output_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::STTOutput>(GetArena());
-    _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(p);
-  }
-  return _impl_.final_output_;
-}
-inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTPartialResult::mutable_final_output()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::runanywhere::v1::STTOutput* _msg = _internal_mutable_final_output();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTPartialResult.final_output)
-  return _msg;
-}
-inline void STTPartialResult::set_allocated_final_output(::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.final_output_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  }
-
-  _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTPartialResult.final_output)
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTPartialResult.language)
 }
 
 // -------------------------------------------------------------------
@@ -7564,14 +5672,14 @@ inline void STTStreamEvent::_internal_set_kind(::runanywhere::v1::STTStreamEvent
 
 // optional .runanywhere.v1.STTPartialResult partial = 5;
 inline bool STTStreamEvent::has_partial() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.partial_ != nullptr);
   return value;
 }
 inline void STTStreamEvent::clear_partial() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.partial_ != nullptr) _impl_.partial_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::STTPartialResult& STTStreamEvent::_internal_partial() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -7590,16 +5698,16 @@ inline void STTStreamEvent::unsafe_arena_set_allocated_partial(
   }
   _impl_.partial_ = reinterpret_cast<::runanywhere::v1::STTPartialResult*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.partial)
 }
 inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE STTStreamEvent::release_partial() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* released = _impl_.partial_;
   _impl_.partial_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -7619,7 +5727,7 @@ inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE STTStreamEvent::un
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.partial)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* temp = _impl_.partial_;
   _impl_.partial_ = nullptr;
   return temp;
@@ -7634,7 +5742,7 @@ inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NONNULL STTStreamEvent::_in
 }
 inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NONNULL STTStreamEvent::mutable_partial()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* _msg = _internal_mutable_partial();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.partial)
   return _msg;
@@ -7651,9 +5759,9 @@ inline void STTStreamEvent::set_allocated_partial(::runanywhere::v1::STTPartialR
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.partial_ = reinterpret_cast<::runanywhere::v1::STTPartialResult*>(value);
@@ -7662,14 +5770,14 @@ inline void STTStreamEvent::set_allocated_partial(::runanywhere::v1::STTPartialR
 
 // optional .runanywhere.v1.STTOutput final_output = 6;
 inline bool STTStreamEvent::has_final_output() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.final_output_ != nullptr);
   return value;
 }
 inline void STTStreamEvent::clear_final_output() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.final_output_ != nullptr) _impl_.final_output_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::STTOutput& STTStreamEvent::_internal_final_output() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -7688,16 +5796,16 @@ inline void STTStreamEvent::unsafe_arena_set_allocated_final_output(
   }
   _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.final_output)
 }
 inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTStreamEvent::release_final_output() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* released = _impl_.final_output_;
   _impl_.final_output_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -7717,7 +5825,7 @@ inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTStreamEvent::unsafe_ar
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.final_output)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* temp = _impl_.final_output_;
   _impl_.final_output_ = nullptr;
   return temp;
@@ -7732,7 +5840,7 @@ inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTStreamEvent::_internal_
 }
 inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTStreamEvent::mutable_final_output()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* _msg = _internal_mutable_final_output();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.final_output)
   return _msg;
@@ -7749,105 +5857,106 @@ inline void STTStreamEvent::set_allocated_final_output(::runanywhere::v1::STTOut
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
 
   _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.final_output)
 }
 
-// optional string error_message = 7;
-inline bool STTStreamEvent::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+// optional .runanywhere.v1.SDKError error = 9;
+inline bool STTStreamEvent::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void STTStreamEvent::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& STTStreamEvent::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTStreamEvent::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTStreamEvent::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.error_message)
-  return _s;
-}
-inline const ::std::string& STTStreamEvent::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& STTStreamEvent::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void STTStreamEvent::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& STTStreamEvent::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL STTStreamEvent::_internal_mutable_error_message() {
+inline void STTStreamEvent::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTStreamEvent::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTStreamEvent::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
   return released;
 }
-inline void STTStreamEvent::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTStreamEvent::unsafe_arena_release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.error_message)
-}
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.error)
 
-// int32 error_code = 8;
-inline void STTStreamEvent::clear_error_code() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTStreamEvent::_internal_mutable_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
 }
-inline ::int32_t STTStreamEvent::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error_code)
-  return _internal_error_code();
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTStreamEvent::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.error)
+  return _msg;
 }
-inline void STTStreamEvent::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.error_code)
-}
-inline ::int32_t STTStreamEvent::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTStreamEvent::_internal_set_error_code(::int32_t value) {
+inline void STTStreamEvent::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.error)
 }
 
 // -------------------------------------------------------------------
@@ -7858,7 +5967,7 @@ inline void STTStreamEvent::_internal_set_error_code(::int32_t value) {
 inline void STTServiceState::clear_is_ready() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_ready_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline bool STTServiceState::is_ready() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.is_ready)
@@ -7866,7 +5975,7 @@ inline bool STTServiceState::is_ready() const {
 }
 inline void STTServiceState::set_is_ready(bool value) {
   _internal_set_is_ready(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.is_ready)
 }
 inline bool STTServiceState::_internal_is_ready() const {
@@ -7950,7 +6059,7 @@ inline void STTServiceState::set_allocated_current_model(::std::string* PROTOBUF
 inline void STTServiceState::clear_supports_streaming() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.supports_streaming_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool STTServiceState::supports_streaming() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.supports_streaming)
@@ -7958,7 +6067,7 @@ inline bool STTServiceState::supports_streaming() const {
 }
 inline void STTServiceState::set_supports_streaming(bool value) {
   _internal_set_supports_streaming(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.supports_streaming)
 }
 inline bool STTServiceState::_internal_supports_streaming() const {
@@ -8042,290 +6151,6 @@ STTServiceState::_internal_mutable_supported_language_codes() {
   return &_impl_.supported_language_codes_;
 }
 
-// optional string error_message = 5;
-inline bool STTServiceState::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void STTServiceState::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& STTServiceState::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTServiceState::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTServiceState::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTServiceState.error_message)
-  return _s;
-}
-inline const ::std::string& STTServiceState::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void STTServiceState::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTServiceState::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTServiceState::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTServiceState.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTServiceState::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTServiceState.error_message)
-}
-
-// int32 error_code = 6;
-inline void STTServiceState::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline ::int32_t STTServiceState::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.error_code)
-  return _internal_error_code();
-}
-inline void STTServiceState::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.error_code)
-}
-inline ::int32_t STTServiceState::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTServiceState::_internal_set_error_code(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
-// -------------------------------------------------------------------
-
-// STTLanguageDetectionResult
-
-// .runanywhere.v1.STTLanguage language = 1;
-inline void STTLanguageDetectionResult::clear_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::runanywhere::v1::STTLanguage STTLanguageDetectionResult::language() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.language)
-  return _internal_language();
-}
-inline void STTLanguageDetectionResult::set_language(::runanywhere::v1::STTLanguage value) {
-  _internal_set_language(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.language)
-}
-inline ::runanywhere::v1::STTLanguage STTLanguageDetectionResult::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTLanguage>(_impl_.language_);
-}
-inline void STTLanguageDetectionResult::_internal_set_language(::runanywhere::v1::STTLanguage value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_ = value;
-}
-
-// optional string language_code = 2;
-inline bool STTLanguageDetectionResult::has_language_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  return value;
-}
-inline void STTLanguageDetectionResult::clear_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& STTLanguageDetectionResult::language_code() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.language_code)
-  return _internal_language_code();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTLanguageDetectionResult::set_language_code(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.language_code)
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::mutable_language_code()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_language_code();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTLanguageDetectionResult.language_code)
-  return _s;
-}
-inline const ::std::string& STTLanguageDetectionResult::_internal_language_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_code_.Get();
-}
-inline void STTLanguageDetectionResult::_internal_set_language_code(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_code_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::_internal_mutable_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_code_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTLanguageDetectionResult::release_language_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTLanguageDetectionResult.language_code)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.language_code_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTLanguageDetectionResult::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.language_code_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
-    _impl_.language_code_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTLanguageDetectionResult.language_code)
-}
-
-// float confidence = 3;
-inline void STTLanguageDetectionResult::clear_confidence() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline float STTLanguageDetectionResult::confidence() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.confidence)
-  return _internal_confidence();
-}
-inline void STTLanguageDetectionResult::set_confidence(float value) {
-  _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.confidence)
-}
-inline float STTLanguageDetectionResult::_internal_confidence() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.confidence_;
-}
-inline void STTLanguageDetectionResult::_internal_set_confidence(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = value;
-}
-
-// repeated string alternatives = 4;
-inline int STTLanguageDetectionResult::_internal_alternatives_size() const {
-  return _internal_alternatives().size();
-}
-inline int STTLanguageDetectionResult::alternatives_size() const {
-  return _internal_alternatives_size();
-}
-inline void STTLanguageDetectionResult::clear_alternatives() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.alternatives_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::add_alternatives()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_alternatives()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _s;
-}
-inline const ::std::string& STTLanguageDetectionResult::alternatives(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_alternatives().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::mutable_alternatives(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_mutable_alternatives()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void STTLanguageDetectionResult::set_alternatives(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(
-      *_internal_mutable_alternatives()->Mutable(index),
-      ::std::forward<Arg_>(value), args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-}
-template <typename Arg_, typename... Args_>
-inline void STTLanguageDetectionResult::add_alternatives(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_alternatives(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& STTLanguageDetectionResult::alternatives()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_alternatives();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTLanguageDetectionResult::mutable_alternatives() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_alternatives();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-STTLanguageDetectionResult::_internal_alternatives() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.alternatives_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTLanguageDetectionResult::_internal_mutable_alternatives() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.alternatives_;
-}
-
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -8338,18 +6163,6 @@ STTLanguageDetectionResult::_internal_mutable_alternatives() {
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::STTLanguage> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::STTLanguage>() {
-  return ::runanywhere::v1::STTLanguage_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::STTAudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::STTAudioEncoding>() {
-  return ::runanywhere::v1::STTAudioEncoding_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::STTStreamEventKind> : std::true_type {};
 template <>

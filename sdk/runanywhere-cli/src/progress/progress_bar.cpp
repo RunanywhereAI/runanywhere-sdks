@@ -12,15 +12,15 @@ namespace rcli::progress {
 
 namespace {
 
-const char* stage_label(runanywhere::v1::DownloadStage stage) {
-    switch (stage) {
-        case runanywhere::v1::DOWNLOAD_STAGE_DOWNLOADING:
+const char* stage_label(runanywhere::v1::DownloadState state) {
+    switch (state) {
+        case runanywhere::v1::DOWNLOAD_STATE_DOWNLOADING:
             return "pulling";
-        case runanywhere::v1::DOWNLOAD_STAGE_EXTRACTING:
+        case runanywhere::v1::DOWNLOAD_STATE_EXTRACTING:
             return "extracting";
-        case runanywhere::v1::DOWNLOAD_STAGE_VALIDATING:
+        case runanywhere::v1::DOWNLOAD_STATE_VALIDATING:
             return "verifying";
-        case runanywhere::v1::DOWNLOAD_STAGE_COMPLETED:
+        case runanywhere::v1::DOWNLOAD_STATE_COMPLETED:
             return "done";
         default:
             return "preparing";
@@ -80,7 +80,7 @@ std::string ProgressRenderer::render_bar(float fraction, int width) const {
 void ProgressRenderer::update(const runanywhere::v1::DownloadProgress& progress) {
     const float fraction = fraction_of(progress);
     const int percent = static_cast<int>(fraction * 100.0f);
-    const std::string stage = stage_label(progress.stage());
+    const std::string stage = stage_label(progress.state());
 
     if (!interactive_) {
         // Plain mode: line per stage change or 10%-step.
@@ -114,7 +114,7 @@ void ProgressRenderer::update(const runanywhere::v1::DownloadProgress& progress)
         line += "  " + out::human_bytes(progress.bytes_downloaded()) + "/" +
                 out::human_bytes(progress.total_bytes());
     }
-    const std::string speed = speed_text(progress.overall_speed_bps());
+    const std::string speed = speed_text(progress.bytes_per_second());
     if (!speed.empty()) {
         line += "  " + speed;
     }

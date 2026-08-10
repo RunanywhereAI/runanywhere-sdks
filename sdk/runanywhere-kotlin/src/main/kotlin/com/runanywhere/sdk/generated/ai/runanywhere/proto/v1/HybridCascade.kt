@@ -28,18 +28,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Cascade — triggers fallback from the primary candidate to the next
- * candidate mid-request. Matches the file.txt Confidence policy.
- * ---------------------------------------------------------------------------
- */
 public class HybridCascade(
-  /**
-   * Cascade when the primary's confidence/logprob signal falls below
-   * `threshold`, or when the primary returns an error (treated as
-   * "no confidence").
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.ConfidenceCascade#ADAPTER",

@@ -78,7 +78,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isAssistant = message.role === MessageRole.Assistant;
   const hasThinking = !!message.thinkingContent;
   const hasContent = !!message.content?.trim();
-  const tps = message.analytics?.performance.throughputTokensPerSec ?? 0;
+  const tps = message.analytics?.performance.usage?.decodeTokensPerSecond ?? 0;
 
   const toggleThinking = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

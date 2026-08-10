@@ -74,7 +74,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
         await RunAnywhere.initialize(
           apiKey: customApiKey,
-          baseURL: normalizedURL,
+          baseUrl: normalizedURL,
           // Production + explicit creds — same proven path as the Android
           // example (custom URL honored, full bearer auth + registration).
           environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
@@ -97,21 +97,15 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('🔑 Applied persisted HuggingFace token');
       }
 
-      // Model paths + registry must be ready before catalog registration.
-      await RunAnywhere.completeServicesInitialization();
       await ModelCatalogBootstrap.registerAll(mlxRegistered: _mlxRegistered);
-      await _registerRagBackend();
-      await RunAnywhere.refreshModelRegistry();
+      await RunAnywhere.models.list();
 
       stopwatch.stop();
       debugPrint(
         '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms',
       );
       debugPrint(
-        '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}',
-      );
-      debugPrint(
-        '🔧 Environment: ${RunAnywhere.environment?.description ?? "Unknown"}',
+        '🎯 SDK Status: ${RunAnywhere.isReady ? "Ready" : "Not ready"}',
       );
 
       debugPrint(
@@ -199,18 +193,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
 
     _backendsRegistered = true;
-  }
-
-  /// RAG backend registration stays in the app next to `_registerBackends`
-  /// (it is backend wiring, not catalog seeding — mirrors iOS keeping
-  /// backends out of `ModelCatalogBootstrap`).
-  Future<void> _registerRagBackend() async {
-    try {
-      await RAGModule.register();
-      debugPrint('✅ RAG backend registered');
-    } catch (e) {
-      debugPrint('⚠️ RAG backend not available (RAG features disabled): $e');
-    }
   }
 
   @override

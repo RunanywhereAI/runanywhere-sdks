@@ -16,13 +16,11 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -30,115 +28,33 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Streamed progress event. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:511    (DiffusionProgress)
- *   Kotlin DiffusionTypes.kt:337       (DiffusionProgress)
- *   RN     DiffusionTypes.ts:163       (DiffusionProgress)
- *   Web    DiffusionTypes.ts:69        (callback signature, not a struct)
- *   C ABI  rac_diffusion_types.h:279   (rac_diffusion_progress_t)
- * ---------------------------------------------------------------------------
- */
 public class DiffusionProgress(
-  /**
-   * Fraction of denoising completed in \[0.0, 1.0\].
-   */
   @field:WireField(
     tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "progressPercent",
+    jsonName = "currentStep",
     schemaIndex = 0,
   )
-  public val progress_percent: Float = 0f,
+  public val current_step: Int = 0,
   /**
-   * 1-based current step number.
+   * as resolved by the backend
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "currentStep",
+    jsonName = "totalSteps",
     schemaIndex = 1,
   )
-  public val current_step: Int = 0,
-  /**
-   * Total number of steps the engine plans to execute.
-   */
+  public val total_steps: Int = 0,
   @field:WireField(
     tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalSteps",
-    schemaIndex = 2,
-  )
-  public val total_steps: Int = 0,
-  /**
-   * Free-form stage name ("Encoding", "Denoising", "Decoding", …).
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val stage: String = "",
-  /**
-   * Optional intermediate image bytes (PNG when surfaced by
-   * Swift/Kotlin/RN; raw RGBA when surfaced by the C ABI). Present only
-   * when the caller requested intermediate-image reporting and the
-   * engine has produced one for this step.
-   */
-  @field:WireField(
-    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
     jsonName = "intermediateImageData",
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val intermediate_image_data: ByteString? = null,
-  /**
-   * Dimensions for intermediate_image_data when it is raw pixel data.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "intermediateImageWidth",
-    schemaIndex = 5,
-  )
-  public val intermediate_image_width: Int = 0,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "intermediateImageHeight",
-    schemaIndex = 6,
-  )
-  public val intermediate_image_height: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "timestampMs",
-    schemaIndex = 7,
-  )
-  public val timestamp_ms: Long = 0L,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "etaMs",
-    schemaIndex = 8,
-  )
-  public val eta_ms: Long = 0L,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "intermediateImageMediaType",
-    schemaIndex = 9,
-  )
-  public val intermediate_image_media_type: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionProgress, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -151,16 +67,9 @@ public class DiffusionProgress(
     if (other === this) return true
     if (other !is DiffusionProgress) return false
     if (unknownFields != other.unknownFields) return false
-    if (progress_percent != other.progress_percent) return false
     if (current_step != other.current_step) return false
     if (total_steps != other.total_steps) return false
-    if (stage != other.stage) return false
     if (intermediate_image_data != other.intermediate_image_data) return false
-    if (intermediate_image_width != other.intermediate_image_width) return false
-    if (intermediate_image_height != other.intermediate_image_height) return false
-    if (timestamp_ms != other.timestamp_ms) return false
-    if (eta_ms != other.eta_ms) return false
-    if (intermediate_image_media_type != other.intermediate_image_media_type) return false
     return true
   }
 
@@ -168,16 +77,9 @@ public class DiffusionProgress(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + progress_percent.hashCode()
       result = result * 37 + current_step.hashCode()
       result = result * 37 + total_steps.hashCode()
-      result = result * 37 + stage.hashCode()
       result = result * 37 + (intermediate_image_data?.hashCode() ?: 0)
-      result = result * 37 + intermediate_image_width.hashCode()
-      result = result * 37 + intermediate_image_height.hashCode()
-      result = result * 37 + timestamp_ms.hashCode()
-      result = result * 37 + eta_ms.hashCode()
-      result = result * 37 + (intermediate_image_media_type?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -185,32 +87,18 @@ public class DiffusionProgress(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """progress_percent=$progress_percent"""
     result += """current_step=$current_step"""
     result += """total_steps=$total_steps"""
-    result += """stage=${sanitize(stage)}"""
     if (intermediate_image_data != null) result += """intermediate_image_data=$intermediate_image_data"""
-    result += """intermediate_image_width=$intermediate_image_width"""
-    result += """intermediate_image_height=$intermediate_image_height"""
-    result += """timestamp_ms=$timestamp_ms"""
-    result += """eta_ms=$eta_ms"""
-    if (intermediate_image_media_type != null) result += """intermediate_image_media_type=${sanitize(intermediate_image_media_type)}"""
     return result.joinToString(prefix = "DiffusionProgress{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    progress_percent: Float = this.progress_percent,
     current_step: Int = this.current_step,
     total_steps: Int = this.total_steps,
-    stage: String = this.stage,
     intermediate_image_data: ByteString? = this.intermediate_image_data,
-    intermediate_image_width: Int = this.intermediate_image_width,
-    intermediate_image_height: Int = this.intermediate_image_height,
-    timestamp_ms: Long = this.timestamp_ms,
-    eta_ms: Long = this.eta_ms,
-    intermediate_image_media_type: String? = this.intermediate_image_media_type,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionProgress = DiffusionProgress(progress_percent, current_step, total_steps, stage, intermediate_image_data, intermediate_image_width, intermediate_image_height, timestamp_ms, eta_ms, intermediate_image_media_type, unknownFields)
+  ): DiffusionProgress = DiffusionProgress(current_step, total_steps, intermediate_image_data, unknownFields)
 
   public companion object {
     @JvmField
@@ -224,132 +112,54 @@ public class DiffusionProgress(
     ) {
       override fun encodedSize(`value`: DiffusionProgress): Int {
         var size = value.unknownFields.size
-        if (!value.progress_percent.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(1, value.progress_percent)
-        }
         if (value.current_step != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.current_step)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.current_step)
         }
         if (value.total_steps != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.total_steps)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.total_steps)
         }
-        if (value.stage != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.stage)
-        }
-        size += ProtoAdapter.BYTES.encodedSizeWithTag(5, value.intermediate_image_data)
-        if (value.intermediate_image_width != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.intermediate_image_width)
-        }
-        if (value.intermediate_image_height != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.intermediate_image_height)
-        }
-        if (value.timestamp_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.timestamp_ms)
-        }
-        if (value.eta_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.eta_ms)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.intermediate_image_media_type)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(3, value.intermediate_image_data)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DiffusionProgress) {
-        if (!value.progress_percent.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.progress_percent)
-        }
         if (value.current_step != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.current_step)
+          ProtoAdapter.INT32.encodeWithTag(writer, 1, value.current_step)
         }
         if (value.total_steps != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_steps)
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.total_steps)
         }
-        if (value.stage != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.stage)
-        }
-        ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.intermediate_image_data)
-        if (value.intermediate_image_width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.intermediate_image_width)
-        }
-        if (value.intermediate_image_height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.intermediate_image_height)
-        }
-        if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.timestamp_ms)
-        }
-        if (value.eta_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.eta_ms)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.intermediate_image_media_type)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.intermediate_image_data)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionProgress) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.intermediate_image_media_type)
-        if (value.eta_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.eta_ms)
-        }
-        if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.timestamp_ms)
-        }
-        if (value.intermediate_image_height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.intermediate_image_height)
-        }
-        if (value.intermediate_image_width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.intermediate_image_width)
-        }
-        ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.intermediate_image_data)
-        if (value.stage != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.stage)
-        }
+        ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.intermediate_image_data)
         if (value.total_steps != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_steps)
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.total_steps)
         }
         if (value.current_step != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.current_step)
-        }
-        if (!value.progress_percent.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.progress_percent)
+          ProtoAdapter.INT32.encodeWithTag(writer, 1, value.current_step)
         }
       }
 
       override fun decode(reader: ProtoReader): DiffusionProgress {
-        var progress_percent: Float = 0f
         var current_step: Int = 0
         var total_steps: Int = 0
-        var stage: String = ""
         var intermediate_image_data: ByteString? = null
-        var intermediate_image_width: Int = 0
-        var intermediate_image_height: Int = 0
-        var timestamp_ms: Long = 0L
-        var eta_ms: Long = 0L
-        var intermediate_image_media_type: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> progress_percent = ProtoAdapter.FLOAT.decode(reader)
-            2 -> current_step = ProtoAdapter.INT32.decode(reader)
-            3 -> total_steps = ProtoAdapter.INT32.decode(reader)
-            4 -> stage = ProtoAdapter.STRING.decode(reader)
-            5 -> intermediate_image_data = ProtoAdapter.BYTES.decode(reader)
-            6 -> intermediate_image_width = ProtoAdapter.INT32.decode(reader)
-            7 -> intermediate_image_height = ProtoAdapter.INT32.decode(reader)
-            8 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
-            9 -> eta_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> intermediate_image_media_type = ProtoAdapter.STRING.decode(reader)
+            1 -> current_step = ProtoAdapter.INT32.decode(reader)
+            2 -> total_steps = ProtoAdapter.INT32.decode(reader)
+            3 -> intermediate_image_data = ProtoAdapter.BYTES.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DiffusionProgress(
-          progress_percent = progress_percent,
           current_step = current_step,
           total_steps = total_steps,
-          stage = stage,
           intermediate_image_data = intermediate_image_data,
-          intermediate_image_width = intermediate_image_width,
-          intermediate_image_height = intermediate_image_height,
-          timestamp_ms = timestamp_ms,
-          eta_ms = eta_ms,
-          intermediate_image_media_type = intermediate_image_media_type,
           unknownFields = unknownFields
         )
       }

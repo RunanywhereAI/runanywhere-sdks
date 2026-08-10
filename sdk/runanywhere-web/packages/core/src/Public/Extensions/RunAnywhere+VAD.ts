@@ -3,7 +3,7 @@
  *
  * Voice activity detection namespace — mirrors Swift's `RunAnywhere+VAD.swift`.
  * Provides `RunAnywhere.vad.*` capability surface for owning VAD component
- * handles plus a `RunAnywhere.vad.detectVoiceAuto(audio, options)` shortcut.
+ * handles plus a `RunAnywhere.vad.detectVoice(audio, options)` shortcut.
  *
  * The proto-byte adapters (`VADProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_vad_component_create()` followed by
@@ -22,7 +22,10 @@ import {
   type VADStatistics,
   type SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
-import { vADConfigurationDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
+import {
+  vADConfigurationDefaults,
+  vADOptionsDefaults,
+} from '@runanywhere/proto-ts/convenience/vad_options_convenience';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
@@ -86,11 +89,7 @@ function defaultVADConfig(overrides?: Partial<VADConfiguration>): VADConfigurati
 
 function defaultVADOptions(overrides?: Partial<VADOptions>): VADOptions {
   return {
-    threshold: 0,
-    minSpeechDurationMs: 100,
-    minSilenceDurationMs: 300,
-    maxSpeechDurationMs: 0,
-    includeStatistics: false,
+    ...vADOptionsDefaults(),
     ...(overrides ?? {}),
   };
 }
@@ -196,20 +195,28 @@ function lifecycleVADAdapter(feature: string): VADProtoAdapter {
   return adapter;
 }
 
-function callOptions(options?: DetectVoiceOptions, threshold = options?.threshold ?? 0): VADOptions {
-  return defaultVADOptions({
-    threshold,
-    minSpeechDurationMs: options?.minSpeechDurationMs ?? 100,
-    minSilenceDurationMs: options?.minSilenceDurationMs ?? 300,
-    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? 0,
-    includeStatistics: options?.includeStatistics ?? false,
-  });
+function callOptions(
+  options?: DetectVoiceOptions,
+  activationThreshold = options?.activationThreshold ?? 0,
+): VADOptions {
+  const defaults = vADOptionsDefaults();
+  return {
+    ...defaults,
+    activationThreshold,
+    minSpeechDurationMs: options?.minSpeechDurationMs ?? defaults.minSpeechDurationMs,
+    minSilenceDurationMs: options?.minSilenceDurationMs ?? defaults.minSilenceDurationMs,
+    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? defaults.maxSpeechDurationMs,
+    prefixPaddingMs: options?.prefixPaddingMs ?? defaults.prefixPaddingMs,
+  };
 }
 
 function lifecycleConfiguration(options?: DetectVoiceOptions): VADConfiguration {
   const config = defaultVADConfig(options?.config);
-  if (options?.config?.threshold === undefined && options?.threshold !== undefined) {
-    return { ...config, threshold: options.threshold };
+  if (
+    options?.config?.activationThreshold === undefined
+    && options?.activationThreshold !== undefined
+  ) {
+    return { ...config, activationThreshold: options.activationThreshold };
   }
   return config;
 }
@@ -226,20 +233,19 @@ function assertRequestedModelMatches(
 }
 
 export const VAD = {
-  detectVoiceAuto: detectVoice,
-  streamVoiceAuto: streamVoiceActivity,
+  detectVoice,
+  streamVoiceActivity,
 
   /**
    * Reset the lifecycle-loaded VAD service (clears speech-segment buffers).
    * Handle-less form backing Swift's parameterless `RunAnywhere.resetVAD()`.
    * No-op returning false when no VAD model is loaded through lifecycle.
    */
-  resetVoiceAuto(): boolean {
+  async resetLoaded(): Promise<boolean> {
     if (!currentLifecycleVADModel()) return false;
     return (
-      lifecycleVADAdapter('RunAnywhere.vad.resetVoiceAuto').resetLifecycle() !=
-      null
-    );
+      await lifecycleVADAdapter('RunAnywhere.vad.resetLoaded').resetLifecycle()
+    ) != null;
   },
 
   /**
@@ -425,9 +431,9 @@ export async function detectVoice(
     );
   }
   assertRequestedModelMatches(current, options);
-  const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoiceAuto');
+  const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoice');
   const config = lifecycleConfiguration(options);
-  if (!adapter.configureLifecycle(config)) {
+  if (!await adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
   // The threshold was applied by configureLifecycle. Keeping the per-frame
@@ -471,15 +477,15 @@ export async function* streamVoiceActivity(
     );
   }
   assertRequestedModelMatches(current, options);
-  const adapter = lifecycleVADAdapter('VAD.streamVoiceAuto');
+  const adapter = lifecycleVADAdapter('VAD.streamVoiceActivity');
   const config = lifecycleConfiguration(options);
-  if (!adapter.configureLifecycle(config)) {
+  if (!await adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
 
   let started = false;
   try {
-    if (!adapter.startLifecycle()) {
+    if (!await adapter.startLifecycle()) {
       throw SDKException.processingFailed('Failed to start the lifecycle VAD service');
     }
     started = true;
@@ -495,11 +501,26 @@ export async function* streamVoiceActivity(
       yield result;
     }
   } finally {
-    if (started && !adapter.stopLifecycle()) {
-      logger.warning('Failed to stop the lifecycle VAD service during stream cleanup');
+    // Teardown routes to whichever heap owns the detector, so it can now fail
+    // for transport reasons (a torn-down BackendWorker). Report it, never let
+    // it replace the error that ended the stream.
+    if (started) await warnOnCleanupFailure('stop', () => adapter.stopLifecycle());
+    await warnOnCleanupFailure('reset', () => adapter.resetLifecycle());
+  }
+}
+
+async function warnOnCleanupFailure(
+  verb: 'stop' | 'reset',
+  call: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    if (await call() == null) {
+      logger.warning(`Failed to ${verb} the lifecycle VAD service during stream cleanup`);
     }
-    if (!adapter.resetLifecycle()) {
-      logger.warning('Failed to reset the lifecycle VAD service during stream cleanup');
-    }
+  } catch (error) {
+    logger.warning(
+      `Failed to ${verb} the lifecycle VAD service during stream cleanup: `
+      + `${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

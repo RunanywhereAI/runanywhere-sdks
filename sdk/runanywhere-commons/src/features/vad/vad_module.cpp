@@ -291,22 +291,17 @@ std::string make_vad_request_id(rac_handle_t handle) {
 }
 
 bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
-    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+    if (event.timestamp_us() <= 0 || event.request_id().empty()) {
         return false;
     }
 
     switch (event.kind()) {
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STARTED:
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STOPPED:
-            return true;
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME:
             return event.has_result();
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
             return event.has_activity();
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STATISTICS:
-            return event.has_statistics();
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR:
-            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+            return event.has_error();
         default:
             return false;
     }
@@ -328,7 +323,9 @@ void emit_vad_stream_event(const runanywhere::v1::VADStreamEvent& event,
 void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, int32_t duration_ms,
                                 rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::VoiceEvent voice_event;
-    voice_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    // VoiceEvent.timestamp_us was renamed to timestamp_ms (the producer clock
+    // is millisecond-granular; no *1000 conversion needed anymore).
+    voice_event.set_timestamp_ms(rac_get_current_time_ms());
     voice_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
                                                        : runanywhere::v1::EVENT_CATEGORY_ERROR);
     voice_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
@@ -339,17 +336,22 @@ void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, 
         // VADEvent.type uses VADStreamEventKind; the speech/silence
         // direction is carried in the companion is_speech field below.
         vad->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
-        vad->set_confidence(confidence);
+        vad->set_probability(confidence);
         vad->set_is_speech(is_speech);
         vad->set_speech_duration_ms(is_speech ? duration_ms : 0);
         vad->set_silence_duration_ms(is_speech ? 0 : duration_ms);
         vad->set_noise_floor_db(energy > 0.0f ? 20.0 * std::log10(energy) : -120.0);
     } else {
-        auto* error = voice_event.mutable_error();
-        error->set_code(static_cast<int32_t>(error_code));
+        // VoiceEvent.error was deleted; the one error payload in this domain
+        // is now the session_error oneof arm (VoiceSessionError).
+        auto* error = voice_event.mutable_session_error();
+        const int32_t signed_code = static_cast<int32_t>(error_code);
+        const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
+        error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
         error->set_message(rac_error_message(error_code));
-        error->set_component("vad");
-        error->set_is_recoverable(true);
+        error->set_failed_component("vad");
+        error->set_c_abi_code(signed_code);
+        error->set_recoverable(true);
     }
 
     runanywhere::v1::SDKEvent sdk_event;
@@ -1208,44 +1210,61 @@ extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
                               ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
                               : RAC_VAD_DEFAULT_FRAME_LENGTH;
     config.energy_threshold =
-        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     config.enable_auto_calibration = proto.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
     return rac_vad_component_configure(handle, &config);
 #endif
 }
 
-extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
-                                                        size_t num_samples,
-                                                        const uint8_t* options_proto_bytes,
-                                                        size_t options_proto_size,
+#if defined(RAC_HAVE_PROTOBUF)
+namespace {
+rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
+                                std::vector<float>* out, rac_proto_buffer_t* out_error);
+}
+#endif
+
+extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
+                                                        const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
                                                         rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
-    (void)samples;
-    (void)num_samples;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
-    if (!handle || !samples || num_samples == 0) {
+    if (!handle) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "VAD process proto requires handle and samples");
+                                          "VAD process proto requires a handle");
     }
-    if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
+    if (!proto_bytes_valid(request_proto_bytes, request_proto_size)) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "VADOptions bytes are invalid");
+                                          "VADProcessRequest bytes are invalid");
     }
 
-    runanywhere::v1::VADOptions options;
-    if (!options.ParseFromArray(proto_parse_data(options_proto_bytes, options_proto_size),
-                                static_cast<int>(options_proto_size))) {
+    runanywhere::v1::VADProcessRequest request;
+    if (!request.ParseFromArray(proto_parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse VADOptions");
+                                          "failed to parse VADProcessRequest");
     }
+    const runanywhere::v1::VADOptions& options = request.options();
+
+    std::vector<float> decoded;
+    rac_result_t decode_rc = decode_vad_samples(request.audio(), &decoded, out_result);
+    if (decode_rc != RAC_SUCCESS) {
+        return decode_rc;
+    }
+    if (decoded.empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest decoded no samples");
+    }
+    const float* samples = decoded.data();
+    const size_t num_samples = decoded.size();
 
     int32_t sample_rate = RAC_VAD_DEFAULT_SAMPLE_RATE;
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
@@ -1261,7 +1280,7 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
                                : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
     }
 
-    const bool has_override = options.threshold() > 0.0f;
+    const bool has_override = options.activation_threshold() > 0.0f;
 
     // Serialize the get→set(override)→process→
     // restore window on the same per-handle mutex used by the streaming
@@ -1276,9 +1295,9 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
         auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(handle);
-        rc = rac_vad_component_set_energy_threshold(handle, options.threshold());
+        rc = rac_vad_component_set_energy_threshold(handle, options.activation_threshold());
         if (rc == RAC_SUCCESS) {
-            threshold = options.threshold();
+            threshold = options.activation_threshold();
             rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
             const rac_result_t restore_rc =
                 rac_vad_component_set_energy_threshold(handle, original_threshold);
@@ -1306,7 +1325,7 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
 
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
-    result.set_confidence(confidence);
+    result.set_probability(confidence);
     result.set_energy(energy);
     result.set_duration_ms(duration_ms);
     publish_vad_pipeline_event(is_speech == RAC_TRUE, confidence, energy, duration_ms);
@@ -1419,11 +1438,6 @@ rac_result_t parse_vad_request(const uint8_t* request_proto_bytes, size_t reques
                                      static_cast<int>(request_proto_size))) {
         return parse_error(out_error, "failed to parse VADProcessRequest");
     }
-    if (out_request->has_audio() && !out_request->audio().adapter_handle().empty()) {
-        return rac_proto_buffer_set_error(
-            out_error, RAC_ERROR_NOT_SUPPORTED,
-            "VADProcessRequest audio adapter_handle requires a platform adapter");
-    }
     if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                           "VADProcessRequest.audio.audio_data is required");
@@ -1441,7 +1455,7 @@ rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
     const std::string& bytes = audio.audio_data();
     out->clear();
     switch (audio.encoding()) {
-        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE: {
+        case runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE: {
             if (bytes.size() % sizeof(int16_t) != 0) {
                 return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                                   "VAD PCM_S16_LE audio byte length is invalid");
@@ -1457,8 +1471,8 @@ rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
             }
             return RAC_SUCCESS;
         }
-        case runanywhere::v1::VAD_AUDIO_ENCODING_UNSPECIFIED:
-        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE: {
+        case runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED:
+        case runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE: {
             if (bytes.size() % sizeof(float) != 0) {
                 return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                                   "VAD PCM_F32_LE audio byte length is invalid");
@@ -1484,15 +1498,14 @@ rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, 
     const bool active = (ref.ops != nullptr && ref.ops->is_speech_active != nullptr &&
                          ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
     state.set_is_speech_active(active);
-    state.set_energy_threshold(threshold);
+    state.set_activation_threshold(threshold);
     state.set_sample_rate(sample_rate);
     state.set_frame_length_ms(frame_length_ms);
     if (ref.model_id) {
         state.set_current_model(ref.model_id);
     }
     if (op_rc != RAC_SUCCESS) {
-        state.set_error_code(op_rc);
-        state.set_error_message(rac_error_message(op_rc));
+        rac::foundation::populate_sdk_error(state.mutable_error(), op_rc);
     }
     return copy_proto(state, out_result);
 }
@@ -1540,8 +1553,8 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
 
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
-    if (request.has_options() && request.options().threshold() > 0.0f) {
-        threshold = request.options().threshold();
+    if (request.has_options() && request.options().activation_threshold() > 0.0f) {
+        threshold = request.options().activation_threshold();
         if (ref.ops->set_threshold) {
             (void)ref.ops->set_threshold(ref.impl, threshold);
         }
@@ -1569,8 +1582,8 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
     result.set_energy(energy);
-    result.set_confidence(threshold > 0.0f ? std::min(1.0f, energy / threshold)
-                                           : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
+    result.set_probability(threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                            : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
     int32_t duration_ms = static_cast<int32_t>(
         (static_cast<double>(samples.size()) / static_cast<double>(sample_rate)) * 1000.0);
     if (!samples.empty() && duration_ms == 0) {
@@ -1583,7 +1596,7 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     // event for the in-app event stream + edge-detected speech-activity rows
     // (started/ended with speech/silence duration + segment count). Without
     // this, standalone VAD via processLifecycle never reached telemetry.
-    emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.confidence(), energy,
+    emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.probability(), energy,
                                  duration_ms, ref.model_id);
 
     rc = copy_proto(result, out_result);
@@ -1627,7 +1640,7 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
         proto.frame_length_ms() > 0 ? proto.frame_length_ms()
                                     : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
     const float threshold =
-        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
 
     rac_result_t op_rc = RAC_SUCCESS;
     if (ref.ops && ref.ops->set_threshold) {

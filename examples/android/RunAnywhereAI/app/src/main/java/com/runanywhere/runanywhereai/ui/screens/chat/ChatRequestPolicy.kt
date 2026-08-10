@@ -32,6 +32,9 @@ internal object ChatRequestPolicy {
      * ESTIMATED and deliberately over-counted (≈3 chars/token + per-message role markers) plus a context
      * margin — better to trim a turn early than to overflow and crash. Large-context models (Qwen3.5 =
      * 1024) keep their full history for normal conversations; only long chats on tiny models get trimmed.
+     *
+     * Kept turns are a CONTIGUOUS chronological block. Trailing turns that cannot fit are skipped rather
+     * than aborting the scan, so one oversized reply costs you that reply, not the entire conversation.
      */
     fun windowHistory(
         turn: ChatTurnSnapshot,
@@ -51,7 +54,17 @@ internal object ChatRequestPolicy {
         val kept = ArrayDeque<ProtoChatMessage>()
         for (message in turn.history.asReversed()) { // keep the most RECENT turns that fit
             val cost = est(message.content)
-            if (cost > available) break
+            if (cost > available) {
+                // A single oversized message must not erase the whole history. A plain `break` here made
+                // trimming ALL-OR-NOTHING: one long assistant reply (a reasoning model easily emits 150-250
+                // tokens) exceeds the entire history budget on a 512-token model, so every older turn was
+                // discarded too — including the SHORT user turn that carried the facts, which would have fit
+                // with room to spare. The model then answers "I don't have information about your name"
+                // immediately after being told it. Skip trailing messages that cannot fit; once something
+                // HAS been kept, stop, so the result stays a contiguous chronological block.
+                if (kept.isEmpty()) continue
+                break
+            }
             available -= cost
             kept.addFirst(message)
         }
@@ -63,13 +76,17 @@ internal object ChatRequestPolicy {
         options: RALLMGenerationOptions,
         conversationId: String,
         streaming: Boolean,
-    ): RALLMGenerateRequest =
-        options.copy(
-            streaming_enabled = streaming,
-        ).toRALLMGenerateRequest(turn.prompt).copy(
+    ): RALLMGenerateRequest {
+        // `LLMGenerateRequest.history` was deleted outright: the request now
+        // carries only `messages` (oldest first, ending with the turn the
+        // model must answer). Prepend the prior turns to the single-message
+        // list `toRALLMGenerateRequest` built for the current prompt.
+        val request = options.toRALLMGenerateRequest(turn.prompt)
+        return request.copy(
             conversation_id = conversationId,
-            history = turn.history,
+            messages = turn.history + request.messages,
         )
+    }
 
     /**
      * Flatten prior turns into the commons tool-calling history contract: a flat
@@ -109,6 +126,13 @@ internal object ChatRequestPolicy {
     }
 
     private fun toProtoMessage(message: ChatMessage): ProtoChatMessage? {
+        // A failed turn is the APP's report, not something the model said, so it must never
+        // come back as a prior assistant message — otherwise the next request tells the model
+        // it previously answered "Error: Backend not available for: llm" and it starts
+        // apologising for a failure it had no part in. iOS skips the same turns when it builds
+        // history (LLMViewModel+Generation), and the web `conversationHistoryForGeneration`
+        // now filters on the same flag.
+        if (message.isError) return null
         val content = message.text.takeIf(String::isNotBlank) ?: return null
         return ProtoChatMessage(
             role = if (message.isUser) {

@@ -27,6 +27,39 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "errors.pb.h"
+
+namespace rac::foundation {
+
+void populate_sdk_error(::runanywhere::v1::SDKError* out, rac_result_t code) {
+    if (out == nullptr) {
+        return;
+    }
+
+    const int32_t signed_code = static_cast<int32_t>(code);
+    const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
+    out->set_code(static_cast<::runanywhere::v1::ErrorCode>(abs_code));
+    out->set_category(rac::foundation::rac_result_to_proto_category(code));
+
+    const char* message = rac_error_message(code);
+    out->set_message(message ? message : "");
+
+    // Surface the thread-local "caused by" detail (set via
+    // rac_error_set_details, e.g. the underlying backend/MLX load error) so
+    // callers see the real reason instead of only the generic per-code message.
+    // Runs on the same thread that produced the failure and set the detail, so
+    // the thread-local is still visible here.
+    const char* details = rac_error_get_details();
+    if (details != nullptr && details[0] != '\0') {
+        out->set_nested_message(details);
+    }
+
+    if (signed_code != 0) {
+        out->set_c_abi_code(signed_code);
+    }
+    out->set_severity(::runanywhere::v1::ERROR_SEVERITY_ERROR);
+}
+
+}  // namespace rac::foundation
 #endif
 
 extern "C" {
@@ -38,29 +71,7 @@ rac_result_t rac_result_to_proto_error(rac_result_t code, rac_proto_buffer_t* ou
 
 #ifdef RAC_HAVE_PROTOBUF
     ::runanywhere::v1::SDKError error;
-
-    const int32_t signed_code = static_cast<int32_t>(code);
-    const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
-    error.set_code(static_cast<::runanywhere::v1::ErrorCode>(abs_code));
-    error.set_category(rac::foundation::rac_result_to_proto_category(code));
-
-    const char* message = rac_error_message(code);
-    error.set_message(message ? message : "");
-
-    // Surface the thread-local "caused by" detail (set via
-    // rac_error_set_details, e.g. the underlying backend/MLX load error) so
-    // callers see the real reason instead of only the generic per-code message.
-    // Runs on the same thread that produced the failure and set the detail, so
-    // the thread-local is still visible here.
-    const char* details = rac_error_get_details();
-    if (details != nullptr && details[0] != '\0') {
-        error.set_nested_message(details);
-    }
-
-    if (signed_code != 0) {
-        error.set_c_abi_code(signed_code);
-    }
-    error.set_severity(::runanywhere::v1::ERROR_SEVERITY_ERROR);
+    rac::foundation::populate_sdk_error(&error, code);
 
     const size_t size = error.ByteSizeLong();
     std::vector<uint8_t> bytes(size);

@@ -29,22 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * SolutionHandle — opaque, serialisable descriptor for a started solution.
- *
- * The native side owns a `rac_solution_handle_t`; this message is the
- * language-agnostic shape that frontends (Swift `SolutionHandle` class,
- * Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
- * the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
- * are issued against the C handle keyed by `handle_id`.
- * ---------------------------------------------------------------------------
- */
 public class SolutionHandle(
-  /**
-   * Stable, opaque identifier minted by the core for this solution
-   * instance. Used as the lookup key for lifecycle calls.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -53,12 +38,6 @@ public class SolutionHandle(
     schemaIndex = 0,
   )
   public val handle_id: String = "",
-  /**
-   * String discriminator for the solution kind, e.g. "voice_agent",
-   * "rag", "time_series", "agent_loop". Free-form for
-   * forward-compat with future solutions; canonical values match the
-   * `SolutionType` enum names lower-cased.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -67,9 +46,6 @@ public class SolutionHandle(
     schemaIndex = 1,
   )
   public val solution_type: String = "",
-  /**
-   * Wall-clock creation timestamp (ms since Unix epoch).
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -79,8 +55,7 @@ public class SolutionHandle(
   )
   public val created_at_ms: Long = 0L,
   /**
-   * Optional engine-specific state string (e.g. "created", "running",
-   * "stopped"). Empty when the host hasn't surfaced state.
+   * Engine-specific, e.g. "running" or "stopped".
    */
   @field:WireField(
     tag = 4,

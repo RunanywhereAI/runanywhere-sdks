@@ -17,6 +17,8 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
+ * enum DownloadStage: deleted. It duplicated DownloadState (both had
+ * DOWNLOADING/EXTRACTING/COMPLETED) with no defined FAILED moment.
  * Structured reason for a download plan/start/resume rejection. Lets every SDK
  * branch on a stable enum instead of substring-matching the human-readable
  * error_message (the prior approach, which silently broke on any reword).

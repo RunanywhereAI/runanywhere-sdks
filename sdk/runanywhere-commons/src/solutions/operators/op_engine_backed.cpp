@@ -57,11 +57,13 @@
 #include "pipeline.pb.h"
 #include "rag.pb.h"
 #include "stt_options.pb.h"
+#include "tool_calling.pb.h"
 #include "tts_options.pb.h"
 #include "vad_options.pb.h"
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_tool_calling.h"
 #if defined(RAC_HAVE_RAG)
 #include "rac/features/rag/rac_rag.h"
 #endif
@@ -205,17 +207,20 @@ class GenerateTextNode final : public OperatorNode {
             return;
         }
 
+        // LLMGenerateRequest.prompt was deleted: the whole conversation now
+        // rides on `messages` (never empty), single-turn here.
         runanywhere::v1::LLMGenerateRequest request;
-        request.set_prompt(item.text());
+        auto* message = request.add_messages();
+        message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+        message->set_content(item.text());
         auto* options = request.mutable_options();
         options->set_temperature(temperature_ > 0.0f ? temperature_ : 0.8f);
         options->set_top_p(1.0f);
-        options->set_repetition_penalty(1.0f);
         if (!system_prompt_.empty()) {
             options->set_system_prompt(system_prompt_);
         }
         if (max_tokens_ > 0) {
-            options->set_max_tokens(max_tokens_);
+            options->set_max_output_tokens(max_tokens_);
         }
         if (!model_id_.empty()) {
             request.set_model_id(model_id_);
@@ -245,8 +250,8 @@ class GenerateTextNode final : public OperatorNode {
             return;
         }
 
-        if (!result.error_message().empty() || result.error_code() != 0) {
-            set_error_detail(name(), "LLM generation failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "LLM generation failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -259,6 +264,145 @@ class GenerateTextNode final : public OperatorNode {
     int max_tokens_;
     float temperature_;
     std::string system_prompt_;
+};
+
+// ---------------------------------------------------------------------------
+// agent_loop — text in (text.utf8) → text out (text.utf8) on port "token".
+//
+// AG-2: routes a tools-bearing AgentLoopConfig through the REAL tool-calling
+// run loop (rac_tool_calling_run_loop_proto) instead of the plain
+// generate_text path that silently ignored `tools`. Tool definitions arrive
+// from solution_converter as indexed spec params ("tool.<i>.name" /
+// ".description" / ".json_schema", count in "tool.count") because
+// OperatorSpec.params is the only converter→operator channel today.
+//
+// Solutions pipelines have no host tool-executor callback yet, so the loop
+// runs with auto_execute=false: the model sees the advertised tools, and a
+// requested call surfaces as an explicit structured error naming the tool —
+// replacing the old silent no-tools behavior with an honest contract.
+// ---------------------------------------------------------------------------
+class AgentLoopNode final : public OperatorNode {
+   public:
+    AgentLoopNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
+        : PipelineNode(std::move(name), /*input*/ 8, /*output*/ 8, OverflowPolicy::BlockProducer),
+          max_iterations_(param_int_or(spec, "max_iterations", 0)) {
+        if (const std::string* p = find_param(spec, "system_prompt"); p) {
+            system_prompt_ = *p;
+        }
+        const int tool_count = param_int_or(spec, "tool.count", 0);
+        tools_.reserve(static_cast<size_t>(tool_count));
+        for (int i = 0; i < tool_count; ++i) {
+            const std::string prefix = "tool." + std::to_string(i) + ".";
+            ToolSpecParams tool;
+            if (const std::string* v = find_param(spec, prefix + "name"); v) {
+                tool.name = *v;
+            }
+            if (const std::string* v = find_param(spec, prefix + "description"); v) {
+                tool.description = *v;
+            }
+            if (const std::string* v = find_param(spec, prefix + "json_schema"); v) {
+                tool.json_schema = *v;
+            }
+            if (!tool.name.empty()) {
+                tools_.push_back(std::move(tool));
+            }
+        }
+    }
+
+   protected:
+    void process(Item item, OutputEdge& out) override {
+        if (!item.is_text()) {
+            set_error_detail(name(), "agent_loop expected text.utf8 input but received '" +
+                                         std::string(item.body_type_id()) + "'");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        // ToolCallingSessionCreateRequest.prompt is now the current turn's
+        // user prompt (still a plain string, unchanged), and every tool
+        // policy knob (tools/auto_execute/system_prompt/max_tool_calls) moved
+        // onto the single ToolCallingOptions home instead of being re-published
+        // directly on the request.
+        runanywhere::v1::ToolCallingSessionCreateRequest request;
+        request.set_prompt(item.text());
+        auto* options = request.mutable_options();
+        if (!system_prompt_.empty()) {
+            options->set_system_prompt(system_prompt_);
+        }
+        if (max_iterations_ > 0) {
+            options->set_max_tool_calls(max_iterations_);
+        }
+        // No host executor exists in the Solutions DAG context; parse and
+        // validate the call, then hand it back instead of invoking anything.
+        options->set_auto_execute(false);
+        for (const ToolSpecParams& tool : tools_) {
+            auto* def = options->add_tools();
+            def->set_name(tool.name);
+            def->set_description(tool.description);
+            if (!tool.json_schema.empty()) {
+                def->set_parameters(tool.json_schema);
+            }
+        }
+
+        std::vector<uint8_t> bytes(request.ByteSizeLong());
+        if (!bytes.empty() &&
+            !request.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+            set_error_detail(name(), "failed to serialize ToolCallingSessionCreateRequest");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        ProtoBufferGuard buffer;
+        const rac_result_t rc = rac_tool_calling_run_loop_proto(
+            bytes.empty() ? nullptr : bytes.data(), bytes.size(),
+            // Required non-null; unreachable because auto_execute=false.
+            [](const uint8_t*, size_t, rac_proto_buffer_t* exec_out, void*) -> rac_result_t {
+                return rac_proto_buffer_set_error(exec_out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                                  "Solutions pipelines have no host tool executor");
+            },
+            nullptr, [](uint64_t, void*) {}, nullptr, buffer.raw());
+        if (rc != RAC_SUCCESS) {
+            set_error_detail(name(), std::string("rac_tool_calling_run_loop_proto failed: ") +
+                                         rac_error_message(rc));
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        runanywhere::v1::ToolCallingResult result;
+        if (!result.ParseFromArray(buffer.data(), static_cast<int>(buffer.size()))) {
+            set_error_detail(name(), "failed to decode ToolCallingResult");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        if (result.tool_calls_size() > 0) {
+            set_error_detail(name(), "agent_loop: model requested tool '" +
+                                         result.tool_calls(0).name() +
+                                         "' but Solutions pipelines cannot execute host tools yet; "
+                                         "run tool-enabled generation through the SDK facade "
+                                         "(generateWithTools) instead");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+        if (!result.error_message().empty() || result.error_code() != 0) {
+            set_error_detail(name(), "agent_loop generation failed: " + result.error_message());
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        out.push(Item::text(result.text()), this->cancel_token());
+    }
+
+   private:
+    struct ToolSpecParams {
+        std::string name;
+        std::string description;
+        std::string json_schema;
+    };
+
+    int max_iterations_;
+    std::string system_prompt_;
+    std::vector<ToolSpecParams> tools_;
 };
 
 // ---------------------------------------------------------------------------
@@ -283,10 +427,11 @@ class TranscribeNode final : public OperatorNode {
         runanywhere::v1::STTTranscriptionRequest request;
         auto* audio = request.mutable_audio();
         audio->set_audio_data(item.bytes);
-        audio->set_encoding(runanywhere::v1::STT_AUDIO_ENCODING_PCM_S16_LE);
+        audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
-        audio->set_bits_per_sample(16);
+        // STTAudioSource.bits_per_sample was deleted: sample width is
+        // determined by `encoding` (PCM_S16_LE already implies 16-bit).
         if (!model_id_.empty()) {
             (*request.mutable_metadata())["model_id"] = model_id_;
         }
@@ -316,8 +461,8 @@ class TranscribeNode final : public OperatorNode {
             return;
         }
 
-        if (output.error_code() != 0) {
-            set_error_detail(name(), "STT transcription failed: " + output.error_message());
+        if (output.has_error()) {
+            set_error_detail(name(), "STT transcription failed: " + output.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -355,9 +500,12 @@ class SynthesizeNode final : public OperatorNode {
             return;
         }
 
+        // TTSSynthesisRequest.metadata was deleted outright (no code ever
+        // read it). TTSOptions.model is the intended channel for a voice/model
+        // id, so model_id rides there instead.
         runanywhere::v1::TTSSynthesisRequest request;
         request.set_text(item.text());
-        if (!voice_.empty() || !language_.empty()) {
+        if (!voice_.empty() || !language_.empty() || !model_id_.empty()) {
             auto* options = request.mutable_options();
             if (!voice_.empty()) {
                 options->set_voice(voice_);
@@ -365,9 +513,9 @@ class SynthesizeNode final : public OperatorNode {
             if (!language_.empty()) {
                 options->set_language_code(language_);
             }
-        }
-        if (!model_id_.empty()) {
-            (*request.mutable_metadata())["model_id"] = model_id_;
+            if (!model_id_.empty()) {
+                options->set_model(model_id_);
+            }
         }
 
         std::vector<uint8_t> bytes(request.ByteSizeLong());
@@ -395,8 +543,8 @@ class SynthesizeNode final : public OperatorNode {
             return;
         }
 
-        if (output.error_code() != 0) {
-            set_error_detail(name(), "TTS synthesis failed: " + output.error_message());
+        if (output.has_error()) {
+            set_error_detail(name(), "TTS synthesis failed: " + output.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -441,11 +589,11 @@ class DetectVoiceNode final : public OperatorNode {
         runanywhere::v1::VADProcessRequest request;
         auto* audio = request.mutable_audio();
         audio->set_audio_data(item.bytes);
-        audio->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE);
+        audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
         if (threshold_ > 0.0f) {
-            request.mutable_options()->set_threshold(threshold_);
+            request.mutable_options()->set_activation_threshold(threshold_);
         }
 
         std::vector<uint8_t> bytes(request.ByteSizeLong());
@@ -472,8 +620,8 @@ class DetectVoiceNode final : public OperatorNode {
             return;
         }
 
-        if (result.error_code() != 0) {
-            set_error_detail(name(), "VAD detect failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "VAD detect failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -541,12 +689,8 @@ class EmbedNode final : public OperatorNode {
             cancel_graph(this->cancel_token());
             return;
         }
-
-        if (result.error_code() != 0) {
-            set_error_detail(name(), "embeddings call failed: " + result.error_message());
-            cancel_graph(this->cancel_token());
-            return;
-        }
+        // EmbeddingsResult.error was deleted (never populated); the rc check
+        // above is the only failure signal for this call.
 
         if (result.vectors_size() == 0) {
             set_error_detail(name(), "embeddings result has no vectors");
@@ -621,16 +765,21 @@ class RetrieveNode final : public OperatorNode {
             return;
         }
 
+        // RAGQueryOptions was collapsed onto the shared RAGRetrievalOptions
+        // message: query=1, retrieval=2, generation=3. `question` is now
+        // `query`; the flat retrieval_top_k/similarity_threshold fields moved
+        // onto `retrieval` (and similarity_threshold was renamed
+        // score_threshold).
         runanywhere::v1::RAGQueryOptions request;
-        request.set_question(item.text());
+        request.set_query(item.text());
         if (!system_prompt_.empty()) {
-            request.set_system_prompt(system_prompt_);
+            request.mutable_generation()->set_system_prompt(system_prompt_);
         }
         if (retrieval_top_k_ > 0) {
-            request.set_retrieval_top_k(retrieval_top_k_);
+            request.mutable_retrieval()->set_top_k(retrieval_top_k_);
         }
         if (similarity_threshold_ > 0.0f) {
-            request.set_similarity_threshold(similarity_threshold_);
+            request.mutable_retrieval()->set_score_threshold(similarity_threshold_);
         }
         // Per the RAG service contract, retrieve does not generate. Setting
         // max_tokens to 0 still produces a RAGResult with retrieved_chunks
@@ -675,8 +824,8 @@ class RetrieveNode final : public OperatorNode {
             return;
         }
 
-        if (result.error_code() != 0 || !result.error_message().empty()) {
-            set_error_detail(name(), "RAG query failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "RAG query failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -748,6 +897,17 @@ std::size_t register_engine_backed_operators(OperatorRegistry& registry) {
         "generate_text",
         [](const runanywhere::v1::OperatorSpec& spec) {
             return std::make_shared<GenerateTextNode>(spec.name(), spec);
+        },
+        schema({"in"}, {"token"}, kPayloadTextUtf8, kPayloadTextUtf8));
+    ++count;
+
+    // agent_loop — tool-enabled LLM loop. text.utf8 in → text.utf8 out on
+    // port "token" (same edge layout as generate_text, so
+    // solution_converter can swap the op type without new wiring).
+    registry.register_factory(
+        "agent_loop",
+        [](const runanywhere::v1::OperatorSpec& spec) {
+            return std::make_shared<AgentLoopNode>(spec.name(), spec);
         },
         schema({"in"}, {"token"}, kPayloadTextUtf8, kPayloadTextUtf8));
     ++count;

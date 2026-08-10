@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SolutionConfig,
-  SolutionType,
   VoiceAgentConfig,
 } from '@runanywhere/proto-ts/solutions';
 import {
@@ -21,6 +20,8 @@ import {
  */
 describe('Solutions generated surface', () => {
   it('SolutionConfig carries voice agent oneof fields', () => {
+    // `VoiceAgentConfig.typeKind` was deleted outright -- presence of the
+    // `SolutionConfig.voiceAgent` oneof arm is the sole discriminant now.
     const config = SolutionConfig.create({
       voiceAgent: {
         llmModelId: 'qwen3-4b-q4_k_m',
@@ -30,7 +31,6 @@ describe('Solutions generated surface', () => {
         sampleRateHz: 16000,
         chunkMs: 20,
         maxContextTokens: 4096,
-        typeKind: SolutionType.SOLUTION_TYPE_VOICE_AGENT,
       },
     });
 
@@ -42,7 +42,6 @@ describe('Solutions generated surface', () => {
       sampleRateHz: 16000,
       chunkMs: 20,
       maxContextTokens: 4096,
-      typeKind: SolutionType.SOLUTION_TYPE_VOICE_AGENT,
     });
   });
 

@@ -9,7 +9,7 @@
  *
  * Canonical defaults (mirrored from Swift):
  *   model_id      = ""
- *   language      = STT_LANGUAGE_EN
+ *   language      = "en"
  *   sample_rate   = 16000
  *   enable_vad    = false
  *
@@ -55,7 +55,7 @@ rac_stt_configuration_defaults_proto(rac_proto_buffer_t* out_RASTTConfiguration)
 #else
     runanywhere::v1::STTConfiguration cfg;
     // model_id defaults to empty string (proto zero value).
-    cfg.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    cfg.set_language("en");
     cfg.set_sample_rate(16000);
     cfg.set_enable_vad(false);
     return copy_proto(cfg, out_RASTTConfiguration);

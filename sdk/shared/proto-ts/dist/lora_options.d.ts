@@ -1,124 +1,90 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Configuration for loading a LoRA adapter.
- *
- * `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
- * adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
- * quantized bases). `adapter_id` is optional and, when present, links the
- * runtime config back to a registered `LoraAdapterCatalogEntry.id`. Catalog
- * helper APIs should preserve it; raw path-only adapters may omit it.
- * ---------------------------------------------------------------------------
- */
-export interface LoRAAdapterConfig {
-    /** path on disk to the GGUF file */
-    adapterPath: string;
-    /** default 1.0 (set by codegen layer) */
-    scale: number;
-    /** optional link to catalog entry id */
-    adapterId?: string | undefined;
-    metadata: {
-        [key: string]: string;
-    };
-    targetModules: string[];
-}
-export interface LoRAAdapterConfig_MetadataEntry {
-    key: string;
-    value: string;
-}
-/**
- * ---------------------------------------------------------------------------
- * Info about a currently-loaded LoRA adapter (read-only snapshot).
- *
- * `adapter_id` and `error_message` are not present in any current SDK shape;
- * they are encoded as `proto3 optional` so the existing fields (path, scale,
- * applied) round-trip exactly while reserving room for richer status reports.
- * ---------------------------------------------------------------------------
- */
-export interface LoRAAdapterInfo {
-    /** catalog id if known, else empty */
+export interface LoraAdapterConfig {
+    /**
+     * The handle. apply, remove, list and per-request selection all key on
+     * this. Matches PEFT adapter_name / vLLM lora_name / Genie
+     * loraAdapterName.
+     */
     adapterId: string;
-    /** path used when loading */
+    /**
+     * Escape hatch for a loose GGUF that was never registered. Commons still
+     * loads strictly from this path: there is no catalog id -> path resolver
+     * on the apply path yet.
+     */
+    adapterPath?: string | undefined;
+    /**
+     * 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
+     * subtract. Unbounded and signed. Unset falls back to the catalog entry's
+     * default_scale, then to 1.0.
+     */
+    scale?: number | undefined;
+}
+export interface LoraAdapterInfo {
+    /** Catalog id when known, else empty. */
+    adapterId: string;
     adapterPath: string;
-    /** active scale factor */
     scale: number;
-    /** currently applied to the context */
+    /** Whether it is currently applied to the context. */
     applied: boolean;
-    /** populated when applied = false */
-    errorMessage?: string | undefined;
-    errorCode: number;
+    /**
+     * Read from the adapter artifact at load time. Never settable.
+     * rank is PEFT's `r`, alpha is lora_alpha; effective strength is
+     * scale * (alpha / rank), which is why 1.0 is not portable between
+     * adapters trained with different alpha/rank.
+     */
+    rank?: number | undefined;
+    alpha?: number | undefined;
+    /**
+     * Measured resident size of this adapter's weights. Absent when the
+     * backend does not report it.
+     */
+    sizeBytes?: number | undefined;
     loadedAtMs: number;
+    /** Populated when applied is false. */
+    error?: SDKError | undefined;
 }
 /**
- * ---------------------------------------------------------------------------
- * Catalog entry for a LoRA adapter registered with the SDK.
- * Apps register entries at startup; SDKs query "which adapters work with this
- * model" without reinventing detection logic per platform.
- *
- * `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
- * Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
- * nullable / has-bit-tracked field.
- * ---------------------------------------------------------------------------
+ * The adapter-specific facts only. Everything generic about the artifact —
+ * where it is fetched from, how large it is, how to verify it, who published
+ * it, and whether it has been fetched — lives on the ModelInfo record for
+ * this adapter.
  */
 export interface LoraAdapterCatalogEntry {
-    /** unique adapter identifier */
     id: string;
-    /** human-readable display name */
     name: string;
-    /** short description */
-    description: string;
-    /** direct download URL (.gguf) */
-    url: string;
-    /** filename to save as on disk */
-    filename: string;
-    /** explicit base model IDs */
+    /** Explicit base model ids this adapter works with. */
     compatibleModels: string[];
-    /** file size, 0 if unknown */
-    sizeBytes: number;
-    /** optional adapter author */
-    author?: string | undefined;
-    /** recommended adapter scale */
-    defaultScale: number;
-    /** lowercase hex SHA-256 */
-    checksumSha256?: string | undefined;
-    license?: string | undefined;
+    /** Publisher-recommended strength. Unset means 1.0. */
+    defaultScale?: number | undefined;
     tags: string[];
-    metadata: {
-        [key: string]: string;
-    };
     /**
-     * Stable platform-normalized local artifact path after native/Web has
-     * completed download/import and reported the result back to commons.
+     * Non-empty means the adapter file is on disk. This is the single
+     * definition of "downloaded".
      */
     localPath?: string | undefined;
-    isDownloaded?: boolean | undefined;
-    downloadedAtUnixMs?: number | undefined;
-    isImported?: boolean | undefined;
-    statusMessage?: string | undefined;
-}
-export interface LoraAdapterCatalogEntry_MetadataEntry {
-    key: string;
-    value: string;
 }
 export interface LoraAdapterCatalogQuery {
     adapterId?: string | undefined;
     modelId?: string | undefined;
     downloadedOnly?: boolean | undefined;
+    /** Substring match against name. */
     searchQuery?: string | undefined;
     tags: string[];
 }
 export interface LoraAdapterCatalogListRequest {
     query?: LoraAdapterCatalogQuery | undefined;
-    includeCounts: boolean;
 }
 export interface LoraAdapterCatalogListResult {
-    success: boolean;
     entries: LoraAdapterCatalogEntry[];
-    errorMessage: string;
+    /**
+     * total_count is unfiltered. Callers that want a filtered count read
+     * entries.size(); a downloaded count is entries with a local_path.
+     */
     totalCount: number;
-    filteredCount: number;
     downloadedCount: number;
+    error?: SDKError | undefined;
 }
 export interface LoraAdapterCatalogGetRequest {
     adapterId: string;
@@ -126,112 +92,57 @@ export interface LoraAdapterCatalogGetRequest {
 export interface LoraAdapterCatalogGetResult {
     found: boolean;
     entry?: LoraAdapterCatalogEntry | undefined;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
-export interface LoraAdapterDownloadCompletedRequest {
-    adapterId: string;
-    localPath: string;
-    sizeBytes?: number | undefined;
-    checksumSha256?: string | undefined;
-    completedAtUnixMs?: number | undefined;
-    imported: boolean;
-    statusMessage: string;
-}
-export interface LoraAdapterDownloadCompletedResult {
-    success: boolean;
-    entry?: LoraAdapterCatalogEntry | undefined;
-    errorMessage: string;
-    persisted: boolean;
-}
-/**
- * ---------------------------------------------------------------------------
- * Import of a user-picked local adapter file. Commons owns everything past
- * the platform-readable source path: deterministic catalog matching (exact
- * local-path match, else an unambiguous filename match), canonical placement
- * under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
- * manifest persistence, and catalog completion for matched entries.
- * Platforms only resolve OS-specific access (security-scoped URLs, content
- * URIs, Blob-to-FS staging) before calling.
- * ---------------------------------------------------------------------------
- */
-export interface LoraAdapterImportRequest {
-    /** platform-readable path of the picked file */
-    sourcePath: string;
-    /** destination filename; default basename(source_path) */
-    filename?: string | undefined;
-}
-export interface LoraAdapterImportResult {
-    success: boolean;
-    errorMessage: string;
-    /** stable SDK-owned path of the imported file */
-    localPath: string;
-    /** a catalog entry matched and was completed */
-    matched: boolean;
-    /** updated catalog entry when matched */
-    entry?: LoraAdapterCatalogEntry | undefined;
-}
-/**
- * ---------------------------------------------------------------------------
- * Result of a LoRA compatibility pre-check.
- *
- * `base_model_required` is not present in any current SDK shape — it is
- * encoded as `proto3 optional` so a future implementation can surface "this
- * adapter requires base model X" without breaking wire compatibility.
- * ---------------------------------------------------------------------------
- */
 export interface LoraCompatibilityResult {
     isCompatible: boolean;
-    /** populated when is_compatible = false */
-    errorMessage?: string | undefined;
-    /** base model id this adapter expects */
     baseModelRequired?: string | undefined;
-    warnings: string[];
-    errorCode: number;
+    /** Populated when is_compatible is false. */
+    error?: SDKError | undefined;
 }
-export interface LoRAApplyRequest {
+export interface LoraApplyRequest {
     requestId: string;
-    adapters: LoRAAdapterConfig[];
-    replaceExisting: boolean;
+    /**
+     * SET semantics, matching Diffusers set_adapters and
+     * llama_set_adapters_lora: `adapters` becomes the complete active set and
+     * anything not listed is detached.
+     */
+    adapters: LoraAdapterConfig[];
+    /** Stack on top of the currently-applied set instead of replacing it. */
+    keepExisting: boolean;
 }
-export interface LoRAApplyResult {
+export interface LoraApplyResult {
     requestId: string;
-    adapters: LoRAAdapterInfo[];
-    success: boolean;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    adapters: LoraAdapterInfo[];
+    error?: SDKError | undefined;
 }
-export interface LoRARemoveRequest {
-    requestId: string;
+export interface LoraRemoveRequest {
+    /** Remove the named adapters; clear_all ignores the list. */
     adapterIds: string[];
-    adapterPaths: string[];
     clearAll: boolean;
 }
-export interface LoRAState {
-    loadedAdapters: LoRAAdapterInfo[];
-    hasActiveAdapters: boolean;
+/**
+ * Response only. The state read takes no arguments; base_model_id is
+ * reported, never a filter.
+ */
+export interface LoraState {
+    loadedAdapters: LoraAdapterInfo[];
     baseModelId?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
-export declare const LoRAAdapterConfig: MessageFns<LoRAAdapterConfig>;
-export declare const LoRAAdapterConfig_MetadataEntry: MessageFns<LoRAAdapterConfig_MetadataEntry>;
-export declare const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo>;
+export declare const LoraAdapterConfig: MessageFns<LoraAdapterConfig>;
+export declare const LoraAdapterInfo: MessageFns<LoraAdapterInfo>;
 export declare const LoraAdapterCatalogEntry: MessageFns<LoraAdapterCatalogEntry>;
-export declare const LoraAdapterCatalogEntry_MetadataEntry: MessageFns<LoraAdapterCatalogEntry_MetadataEntry>;
 export declare const LoraAdapterCatalogQuery: MessageFns<LoraAdapterCatalogQuery>;
 export declare const LoraAdapterCatalogListRequest: MessageFns<LoraAdapterCatalogListRequest>;
 export declare const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResult>;
 export declare const LoraAdapterCatalogGetRequest: MessageFns<LoraAdapterCatalogGetRequest>;
 export declare const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult>;
-export declare const LoraAdapterDownloadCompletedRequest: MessageFns<LoraAdapterDownloadCompletedRequest>;
-export declare const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadCompletedResult>;
-export declare const LoraAdapterImportRequest: MessageFns<LoraAdapterImportRequest>;
-export declare const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult>;
 export declare const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult>;
-export declare const LoRAApplyRequest: MessageFns<LoRAApplyRequest>;
-export declare const LoRAApplyResult: MessageFns<LoRAApplyResult>;
-export declare const LoRARemoveRequest: MessageFns<LoRARemoveRequest>;
-export declare const LoRAState: MessageFns<LoRAState>;
+export declare const LoraApplyRequest: MessageFns<LoraApplyRequest>;
+export declare const LoraApplyResult: MessageFns<LoraApplyResult>;
+export declare const LoraRemoveRequest: MessageFns<LoraRemoveRequest>;
+export declare const LoraState: MessageFns<LoraState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

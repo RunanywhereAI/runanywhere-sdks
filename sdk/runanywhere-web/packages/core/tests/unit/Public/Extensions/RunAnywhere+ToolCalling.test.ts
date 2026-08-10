@@ -38,7 +38,6 @@ import {
   ToolCallingSessionStepWithResultRequest,
   ToolChoiceMode,
   ToolDefinition,
-  ToolParameterType,
   ToolValue,
   ToolValueJSON,
   type ToolCall as ProtoToolCall,
@@ -360,14 +359,14 @@ function toolCallEvent(name: string, args: Record<string, unknown>): ToolCalling
 function finalResultEvent(text: string): ToolCallingSessionEvent {
   return ToolCallingSessionEvent.fromPartial({
     seq: 2,
+    // `ToolCallingResult.rawText` doesn't exist -- `text` is the sole
+    // final-answer field.
     finalResult: ToolCallingResult.fromPartial({
       text,
       toolCalls: [],
       toolResults: [],
       isComplete: true,
       iterationsUsed: 1,
-      errorCode: 0,
-      rawText: text,
     }),
   });
 }
@@ -381,20 +380,18 @@ function errorEvent(): ToolCallingSessionEvent {
   });
 }
 
+// `ToolDefinition.parameters` is now ONE JSON-Schema string (not a structured
+// array); `ToolParameterType` and `.examples` were deleted outright
+// (idl/tool_calling.proto).
 function sampleToolDefinition(name = 'get_weather'): ProtoToolDefinition {
   return ToolDefinition.fromPartial({
     name,
     description: 'Get the weather for a location',
-    parameters: [
-      {
-        name: 'location',
-        type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-        description: 'City name',
-        required: true,
-        enumValues: [],
-      },
-    ],
-    examples: [],
+    parameters: JSON.stringify({
+      type: 'object',
+      properties: { location: { type: 'string', description: 'City name' } },
+      required: ['location'],
+    }),
   });
 }
 
@@ -413,11 +410,16 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
     const module = makeFakeModule({ onCreate: [finalResultEvent('hi')] });
     registerWasmModule(['tool-calling'], module);
 
+    // `ToolCallingSessionCreateRequest` was collapsed to 3 fields
+    // (prompt/history/options) -- every knob that used to be re-published on
+    // the session-create request now lives solely on the embedded
+    // `ToolCallingOptions` (idl/tool_calling.proto). `temperature`/
+    // `maxTokens` were deleted outright with NO replacement anywhere in this
+    // session ABI (commons runs the tool loop's generations with its own
+    // model defaults), so this test no longer passes or asserts them.
     const tool = sampleToolDefinition();
     await ToolCalling.generateWithTools('What is the weather?', {
       tools: [tool],
-      temperature: 0.42,
-      maxTokens: 256,
       systemPrompt: 'You are helpful.',
       maxToolCalls: 5,
       keepToolsAvailable: true,
@@ -431,27 +433,25 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
 
     expect(module.capturedCreateRequest).toBeDefined();
     expect(module.capturedCreateRequest!.prompt).toBe('What is the weather?');
-    expect(module.capturedCreateRequest!.maxTokens).toBe(256);
-    expect(module.capturedCreateRequest!.temperature).toBeCloseTo(0.42, 5);
-    expect(module.capturedCreateRequest!.systemPrompt).toBe('You are helpful.');
-    expect(module.capturedCreateRequest!.tools).toHaveLength(1);
-    expect(module.capturedCreateRequest!.tools[0]!.name).toBe('get_weather');
-    expect(module.capturedCreateRequest!.format).toBe(
+    expect(module.capturedCreateRequest!.options?.systemPrompt).toBe('You are helpful.');
+    expect(module.capturedCreateRequest!.options?.tools).toHaveLength(1);
+    expect(module.capturedCreateRequest!.options?.tools[0]!.name).toBe('get_weather');
+    expect(module.capturedCreateRequest!.options?.format).toBe(
       ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2,
     );
-    expect(module.capturedCreateRequest!.maxToolCalls).toBe(5);
-    expect(module.capturedCreateRequest!.keepToolsAvailable).toBe(true);
+    expect(module.capturedCreateRequest!.options?.maxToolCalls).toBe(5);
+    expect(module.capturedCreateRequest!.options?.keepToolsAvailable).toBe(true);
     // Swift makeRunLoopRequest parity (RunAnywhere+ToolCalling.swift:528-536):
     // validate_calls stays UNSET unless the caller specifies it, so commons
     // applies its documented default (true).
-    expect(module.capturedCreateRequest!.validateCalls).toBeUndefined();
-    expect(module.capturedCreateRequest!.toolChoice).toBe(
+    expect(module.capturedCreateRequest!.options?.validateCalls).toBeUndefined();
+    expect(module.capturedCreateRequest!.options?.toolChoice).toBe(
       ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     );
-    expect(module.capturedCreateRequest!.forcedToolName).toBe('get_weather');
-    expect(module.capturedCreateRequest!.autoExecute).toBe(false);
-    expect(module.capturedCreateRequest!.replaceSystemPrompt).toBe(true);
-    expect(module.capturedCreateRequest!.requireJsonArguments).toBe(false);
+    expect(module.capturedCreateRequest!.options?.forcedToolName).toBe('get_weather');
+    expect(module.capturedCreateRequest!.options?.autoExecute).toBe(false);
+    expect(module.capturedCreateRequest!.options?.replaceSystemPrompt).toBe(true);
+    expect(module.capturedCreateRequest!.options?.requireJsonArguments).toBe(false);
   });
 
   it('serializes maxToolCalls', async () => {
@@ -463,7 +463,7 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
       maxToolCalls: 7,
     });
 
-    expect(module.capturedCreateRequest!.maxToolCalls).toBe(7);
+    expect(module.capturedCreateRequest!.options?.maxToolCalls).toBe(7);
   });
 });
 
@@ -524,7 +524,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
     registerWasmModule(['tool-calling'], module);
 
     ToolCalling.registerTool(
-      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
+      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: '' }),
       // Swift-parity executor contract: parsed args in, result object out;
       // the SDK serializes the object into resultJson.
       async (args) => ({ echoed: args['value']! }),
@@ -638,7 +638,7 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
     registerWasmModule(['tool-calling'], module);
 
     ToolCalling.registerTool(
-      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
+      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: '' }),
       async (args) => ({ echoed: args['value']! }),
     );
 
@@ -833,7 +833,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
       }),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.isError).toBe(true);
     expect(result.error).toBe('boom');
     expect(result.toolCallId).toBe('tc-1');
     expect(result.name).toBe('will_fail');
@@ -856,7 +856,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
       }),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.isError).toBe(true);
     expect(result.error).toMatch(/Failed to parse tool arguments/);
   });
 
@@ -869,7 +869,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
       }),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.isError).toBe(true);
     expect(result.error).toMatch(/Unknown tool: not_registered/);
   });
 
@@ -888,7 +888,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
       }),
     );
 
-    expect(result.success).toBe(true);
+    expect(result.isError).toBe(false);
     // makeToolResult backfills toolCallId from the originating call.
     expect(result.toolCallId).toBe('tc-3');
     expect(result.name).toBe('echo');

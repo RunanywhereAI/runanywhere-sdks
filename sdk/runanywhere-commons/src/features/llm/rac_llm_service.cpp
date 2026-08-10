@@ -34,6 +34,10 @@ const rac_llm_service_ops_t* llm_ops(const rac_engine_vtable_t* vt) {
     return vt ? vt->llm_ops : nullptr;
 }
 
+// See rac_llm_stream_reset_final_signal() in rac_llm_service.h: thread-local
+// because generate_stream() is synchronous/blocking on the calling thread.
+thread_local bool g_llm_stream_final_signal_seen = false;
+
 }  // namespace
 
 // =============================================================================
@@ -152,8 +156,21 @@ rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
 
     const std::string effective_prompt =
         rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
+    rac_llm_stream_reset_final_signal();
     return service->ops->generate_stream(service->impl, effective_prompt.c_str(), options, callback,
                                          user_data);
+}
+
+void rac_llm_stream_reset_final_signal(void) {
+    g_llm_stream_final_signal_seen = false;
+}
+
+void rac_llm_stream_report_final_signal(void) {
+    g_llm_stream_final_signal_seen = true;
+}
+
+rac_bool_t rac_llm_stream_final_signal_seen(void) {
+    return g_llm_stream_final_signal_seen ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info) {

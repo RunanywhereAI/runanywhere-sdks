@@ -4,8 +4,6 @@ import type {
   DownloadPlanRequest,
   DownloadPlanResult,
   DownloadProgress,
-  DownloadResumeRequest,
-  DownloadResumeResult,
   DownloadStartRequest,
   DownloadStartResult,
   DownloadSubscribeRequest,
@@ -24,7 +22,7 @@ function requireAdapter(): DownloadAdapter {
 }
 
 export const Downloads = {
-  plan(request: DownloadPlanRequest): DownloadPlanResult | null {
+  plan(request: DownloadPlanRequest): Promise<DownloadPlanResult | null> {
     return requireAdapter().plan(request);
   },
 
@@ -34,10 +32,6 @@ export const Downloads = {
 
   cancel(request: DownloadCancelRequest): DownloadCancelResult | null {
     return requireAdapter().cancel(request);
-  },
-
-  resume(request: DownloadResumeRequest): DownloadResumeResult | null {
-    return requireAdapter().resume(request);
   },
 
   poll(request: DownloadSubscribeRequest): DownloadProgress | null {

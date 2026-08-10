@@ -51,17 +51,17 @@ public class VoiceEvent(
   )
   public val seq: Long = 0L,
   /**
-   * Wall-clock timestamp captured at the C++ edge, in microseconds since
+   * Wall-clock timestamp captured at the C++ edge, in milliseconds since
    * Unix epoch. Frontends may re-timestamp for UI display.
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "timestampUs",
+    jsonName = "timestampMs",
     schemaIndex = 1,
   )
-  public val timestamp_us: Long = 0L,
+  public val timestamp_ms: Long = 0L,
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.EventCategory#ADAPTER",
@@ -130,155 +130,84 @@ public class VoiceEvent(
   public val state: StateChangeEvent? = null,
   @field:WireField(
     tag = 16,
-    adapter = "ai.runanywhere.proto.v1.ErrorEvent#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.MetricsEvent#ADAPTER",
     oneofName = "payload",
     schemaIndex = 11,
   )
-  public val error: ErrorEvent? = null,
+  public val metrics: MetricsEvent? = null,
   @field:WireField(
     tag = 17,
-    adapter = "ai.runanywhere.proto.v1.MetricsEvent#ADAPTER",
-    oneofName = "payload",
-    schemaIndex = 12,
-  )
-  public val metrics: MetricsEvent? = null,
-  /**
-   * Voice agent lifecycle events. Mirror Swift VoiceSessionError /
-   * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
-   * signals consumed by the cross-platform VoiceAgent extensions
-   * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
-   * VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
-   * voice_agent_types.dart).
-   */
-  @field:WireField(
-    tag = 18,
     adapter = "ai.runanywhere.proto.v1.VoiceAgentComponentStates#ADAPTER",
     jsonName = "componentStateChanged",
     oneofName = "payload",
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
   public val component_state_changed: VoiceAgentComponentStates? = null,
+  /**
+   * The one error payload in this domain.
+   */
   @field:WireField(
-    tag = 19,
+    tag = 18,
     adapter = "ai.runanywhere.proto.v1.VoiceSessionError#ADAPTER",
     jsonName = "sessionError",
     oneofName = "payload",
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val session_error: VoiceSessionError? = null,
+  /**
+   * Agent-response start/complete and user-speech start/end are
+   * TurnLifecycleEventKind values, not separate arms. Session start and
+   * stop are PipelineState transitions on StateChangeEvent.
+   */
   @field:WireField(
-    tag = 20,
-    adapter = "ai.runanywhere.proto.v1.SessionStartedEvent#ADAPTER",
-    jsonName = "sessionStarted",
-    oneofName = "payload",
-    schemaIndex = 15,
-  )
-  public val session_started: SessionStartedEvent? = null,
-  @field:WireField(
-    tag = 21,
-    adapter = "ai.runanywhere.proto.v1.SessionStoppedEvent#ADAPTER",
-    jsonName = "sessionStopped",
-    oneofName = "payload",
-    schemaIndex = 16,
-  )
-  public val session_stopped: SessionStoppedEvent? = null,
-  @field:WireField(
-    tag = 22,
-    adapter = "ai.runanywhere.proto.v1.AgentResponseStartedEvent#ADAPTER",
-    jsonName = "agentResponseStarted",
-    oneofName = "payload",
-    schemaIndex = 17,
-  )
-  public val agent_response_started: AgentResponseStartedEvent? = null,
-  @field:WireField(
-    tag = 23,
-    adapter = "ai.runanywhere.proto.v1.AgentResponseCompletedEvent#ADAPTER",
-    jsonName = "agentResponseCompleted",
-    oneofName = "payload",
-    schemaIndex = 18,
-  )
-  public val agent_response_completed: AgentResponseCompletedEvent? = null,
-  @field:WireField(
-    tag = 24,
-    adapter = "ai.runanywhere.proto.v1.SpeechTurnDetectionEvent#ADAPTER",
-    jsonName = "speechTurnDetection",
-    oneofName = "payload",
-    schemaIndex = 19,
-  )
-  public val speech_turn_detection: SpeechTurnDetectionEvent? = null,
-  @field:WireField(
-    tag = 25,
+    tag = 19,
     adapter = "ai.runanywhere.proto.v1.TurnLifecycleEvent#ADAPTER",
     jsonName = "turnLifecycle",
     oneofName = "payload",
-    schemaIndex = 20,
+    schemaIndex = 14,
   )
   public val turn_lifecycle: TurnLifecycleEvent? = null,
-  @field:WireField(
-    tag = 26,
-    adapter = "ai.runanywhere.proto.v1.WakeWordDetectedEvent#ADAPTER",
-    jsonName = "wakewordDetected",
-    oneofName = "payload",
-    schemaIndex = 21,
-  )
-  public val wakeword_detected: WakeWordDetectedEvent? = null,
-  @field:WireField(
-    tag = 27,
-    adapter = "ai.runanywhere.proto.v1.AudioLevelEvent#ADAPTER",
-    jsonName = "audioLevel",
-    oneofName = "payload",
-    schemaIndex = 22,
-  )
-  public val audio_level: AudioLevelEvent? = null,
-  @field:WireField(
-    tag = 28,
-    adapter = "ai.runanywhere.proto.v1.ComponentProgressEvent#ADAPTER",
-    jsonName = "componentProgress",
-    oneofName = "payload",
-    schemaIndex = 23,
-  )
-  public val component_progress: ComponentProgressEvent? = null,
   /**
    * Correlation fields shared by streaming and one-shot voice turns.
    */
   @field:WireField(
-    tag = 30,
+    tag = 20,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sessionId",
-    schemaIndex = 24,
+    schemaIndex = 15,
   )
   public val session_id: String = "",
   @field:WireField(
-    tag = 31,
+    tag = 21,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "turnId",
-    schemaIndex = 25,
+    schemaIndex = 16,
   )
   public val turn_id: String = "",
   @field:WireField(
-    tag = 32,
+    tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 26,
+    schemaIndex = 17,
   )
   public val request_id: String = "",
   metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceEvent, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
-    tag = 33,
+    tag = 23,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 27,
+    schemaIndex = 18,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   init {
-    require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected, audio_level, component_progress) <= 1) {
-      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected, audio_level, component_progress may be non-null"
+    require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, metrics, component_state_changed, session_error, turn_lifecycle) <= 1) {
+      "At most one of user_said, assistant_token, audio, vad, interrupted, state, metrics, component_state_changed, session_error, turn_lifecycle may be non-null"
     }
   }
 
@@ -293,7 +222,7 @@ public class VoiceEvent(
     if (other !is VoiceEvent) return false
     if (unknownFields != other.unknownFields) return false
     if (seq != other.seq) return false
-    if (timestamp_us != other.timestamp_us) return false
+    if (timestamp_ms != other.timestamp_ms) return false
     if (category != other.category) return false
     if (severity != other.severity) return false
     if (component != other.component) return false
@@ -303,19 +232,10 @@ public class VoiceEvent(
     if (vad != other.vad) return false
     if (interrupted != other.interrupted) return false
     if (state != other.state) return false
-    if (error != other.error) return false
     if (metrics != other.metrics) return false
     if (component_state_changed != other.component_state_changed) return false
     if (session_error != other.session_error) return false
-    if (session_started != other.session_started) return false
-    if (session_stopped != other.session_stopped) return false
-    if (agent_response_started != other.agent_response_started) return false
-    if (agent_response_completed != other.agent_response_completed) return false
-    if (speech_turn_detection != other.speech_turn_detection) return false
     if (turn_lifecycle != other.turn_lifecycle) return false
-    if (wakeword_detected != other.wakeword_detected) return false
-    if (audio_level != other.audio_level) return false
-    if (component_progress != other.component_progress) return false
     if (session_id != other.session_id) return false
     if (turn_id != other.turn_id) return false
     if (request_id != other.request_id) return false
@@ -328,7 +248,7 @@ public class VoiceEvent(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + seq.hashCode()
-      result = result * 37 + timestamp_us.hashCode()
+      result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + category.hashCode()
       result = result * 37 + severity.hashCode()
       result = result * 37 + component.hashCode()
@@ -338,19 +258,10 @@ public class VoiceEvent(
       result = result * 37 + (vad?.hashCode() ?: 0)
       result = result * 37 + (interrupted?.hashCode() ?: 0)
       result = result * 37 + (state?.hashCode() ?: 0)
-      result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + (metrics?.hashCode() ?: 0)
       result = result * 37 + (component_state_changed?.hashCode() ?: 0)
       result = result * 37 + (session_error?.hashCode() ?: 0)
-      result = result * 37 + (session_started?.hashCode() ?: 0)
-      result = result * 37 + (session_stopped?.hashCode() ?: 0)
-      result = result * 37 + (agent_response_started?.hashCode() ?: 0)
-      result = result * 37 + (agent_response_completed?.hashCode() ?: 0)
-      result = result * 37 + (speech_turn_detection?.hashCode() ?: 0)
       result = result * 37 + (turn_lifecycle?.hashCode() ?: 0)
-      result = result * 37 + (wakeword_detected?.hashCode() ?: 0)
-      result = result * 37 + (audio_level?.hashCode() ?: 0)
-      result = result * 37 + (component_progress?.hashCode() ?: 0)
       result = result * 37 + session_id.hashCode()
       result = result * 37 + turn_id.hashCode()
       result = result * 37 + request_id.hashCode()
@@ -363,7 +274,7 @@ public class VoiceEvent(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """seq=$seq"""
-    result += """timestamp_us=$timestamp_us"""
+    result += """timestamp_ms=$timestamp_ms"""
     result += """category=$category"""
     result += """severity=$severity"""
     result += """component=$component"""
@@ -373,19 +284,10 @@ public class VoiceEvent(
     if (vad != null) result += """vad=$vad"""
     if (interrupted != null) result += """interrupted=$interrupted"""
     if (state != null) result += """state=$state"""
-    if (error != null) result += """error=$error"""
     if (metrics != null) result += """metrics=$metrics"""
     if (component_state_changed != null) result += """component_state_changed=$component_state_changed"""
     if (session_error != null) result += """session_error=$session_error"""
-    if (session_started != null) result += """session_started=$session_started"""
-    if (session_stopped != null) result += """session_stopped=$session_stopped"""
-    if (agent_response_started != null) result += """agent_response_started=$agent_response_started"""
-    if (agent_response_completed != null) result += """agent_response_completed=$agent_response_completed"""
-    if (speech_turn_detection != null) result += """speech_turn_detection=$speech_turn_detection"""
     if (turn_lifecycle != null) result += """turn_lifecycle=$turn_lifecycle"""
-    if (wakeword_detected != null) result += """wakeword_detected=$wakeword_detected"""
-    if (audio_level != null) result += """audio_level=$audio_level"""
-    if (component_progress != null) result += """component_progress=$component_progress"""
     result += """session_id=${sanitize(session_id)}"""
     result += """turn_id=${sanitize(turn_id)}"""
     result += """request_id=${sanitize(request_id)}"""
@@ -395,7 +297,7 @@ public class VoiceEvent(
 
   public fun copy(
     seq: Long = this.seq,
-    timestamp_us: Long = this.timestamp_us,
+    timestamp_ms: Long = this.timestamp_ms,
     category: EventCategory = this.category,
     severity: ErrorSeverity = this.severity,
     component: VoicePipelineComponent = this.component,
@@ -405,25 +307,16 @@ public class VoiceEvent(
     vad: VADEvent? = this.vad,
     interrupted: InterruptedEvent? = this.interrupted,
     state: StateChangeEvent? = this.state,
-    error: ErrorEvent? = this.error,
     metrics: MetricsEvent? = this.metrics,
     component_state_changed: VoiceAgentComponentStates? = this.component_state_changed,
     session_error: VoiceSessionError? = this.session_error,
-    session_started: SessionStartedEvent? = this.session_started,
-    session_stopped: SessionStoppedEvent? = this.session_stopped,
-    agent_response_started: AgentResponseStartedEvent? = this.agent_response_started,
-    agent_response_completed: AgentResponseCompletedEvent? = this.agent_response_completed,
-    speech_turn_detection: SpeechTurnDetectionEvent? = this.speech_turn_detection,
     turn_lifecycle: TurnLifecycleEvent? = this.turn_lifecycle,
-    wakeword_detected: WakeWordDetectedEvent? = this.wakeword_detected,
-    audio_level: AudioLevelEvent? = this.audio_level,
-    component_progress: ComponentProgressEvent? = this.component_progress,
     session_id: String = this.session_id,
     turn_id: String = this.turn_id,
     request_id: String = this.request_id,
     metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceEvent = VoiceEvent(seq, timestamp_us, category, severity, component, user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected, audio_level, component_progress, session_id, turn_id, request_id, metadata, unknownFields)
+  ): VoiceEvent = VoiceEvent(seq, timestamp_ms, category, severity, component, user_said, assistant_token, audio, vad, interrupted, state, metrics, component_state_changed, session_error, turn_lifecycle, session_id, turn_id, request_id, metadata, unknownFields)
 
   public companion object {
     @JvmField
@@ -443,8 +336,8 @@ public class VoiceEvent(
         if (value.seq != 0L) {
           size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
         }
-        if (value.timestamp_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
+        if (value.timestamp_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_ms)
         }
         if (value.category != ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_UNSPECIFIED) {
           size += EventCategory.ADAPTER.encodedSizeWithTag(3, value.category)
@@ -461,29 +354,20 @@ public class VoiceEvent(
         size += VADEvent.ADAPTER.encodedSizeWithTag(13, value.vad)
         size += InterruptedEvent.ADAPTER.encodedSizeWithTag(14, value.interrupted)
         size += StateChangeEvent.ADAPTER.encodedSizeWithTag(15, value.state)
-        size += ErrorEvent.ADAPTER.encodedSizeWithTag(16, value.error)
-        size += MetricsEvent.ADAPTER.encodedSizeWithTag(17, value.metrics)
-        size += VoiceAgentComponentStates.ADAPTER.encodedSizeWithTag(18, value.component_state_changed)
-        size += VoiceSessionError.ADAPTER.encodedSizeWithTag(19, value.session_error)
-        size += SessionStartedEvent.ADAPTER.encodedSizeWithTag(20, value.session_started)
-        size += SessionStoppedEvent.ADAPTER.encodedSizeWithTag(21, value.session_stopped)
-        size += AgentResponseStartedEvent.ADAPTER.encodedSizeWithTag(22, value.agent_response_started)
-        size += AgentResponseCompletedEvent.ADAPTER.encodedSizeWithTag(23, value.agent_response_completed)
-        size += SpeechTurnDetectionEvent.ADAPTER.encodedSizeWithTag(24, value.speech_turn_detection)
-        size += TurnLifecycleEvent.ADAPTER.encodedSizeWithTag(25, value.turn_lifecycle)
-        size += WakeWordDetectedEvent.ADAPTER.encodedSizeWithTag(26, value.wakeword_detected)
-        size += AudioLevelEvent.ADAPTER.encodedSizeWithTag(27, value.audio_level)
-        size += ComponentProgressEvent.ADAPTER.encodedSizeWithTag(28, value.component_progress)
+        size += MetricsEvent.ADAPTER.encodedSizeWithTag(16, value.metrics)
+        size += VoiceAgentComponentStates.ADAPTER.encodedSizeWithTag(17, value.component_state_changed)
+        size += VoiceSessionError.ADAPTER.encodedSizeWithTag(18, value.session_error)
+        size += TurnLifecycleEvent.ADAPTER.encodedSizeWithTag(19, value.turn_lifecycle)
         if (value.session_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(30, value.session_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.session_id)
         }
         if (value.turn_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(31, value.turn_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(21, value.turn_id)
         }
         if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(32, value.request_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.request_id)
         }
-        size += metadataAdapter.encodedSizeWithTag(33, value.metadata)
+        size += metadataAdapter.encodedSizeWithTag(23, value.metadata)
         return size
       }
 
@@ -491,8 +375,8 @@ public class VoiceEvent(
         if (value.seq != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
         }
-        if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
+        if (value.timestamp_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_ms)
         }
         if (value.category != ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_UNSPECIFIED) {
           EventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
@@ -504,67 +388,49 @@ public class VoiceEvent(
           VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
         }
         if (value.session_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.session_id)
         }
         if (value.turn_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.turn_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.turn_id)
         }
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 32, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.request_id)
         }
-        metadataAdapter.encodeWithTag(writer, 33, value.metadata)
+        metadataAdapter.encodeWithTag(writer, 23, value.metadata)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
         VADEvent.ADAPTER.encodeWithTag(writer, 13, value.vad)
         InterruptedEvent.ADAPTER.encodeWithTag(writer, 14, value.interrupted)
         StateChangeEvent.ADAPTER.encodeWithTag(writer, 15, value.state)
-        ErrorEvent.ADAPTER.encodeWithTag(writer, 16, value.error)
-        MetricsEvent.ADAPTER.encodeWithTag(writer, 17, value.metrics)
-        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 18, value.component_state_changed)
-        VoiceSessionError.ADAPTER.encodeWithTag(writer, 19, value.session_error)
-        SessionStartedEvent.ADAPTER.encodeWithTag(writer, 20, value.session_started)
-        SessionStoppedEvent.ADAPTER.encodeWithTag(writer, 21, value.session_stopped)
-        AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
-        AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23, value.agent_response_completed)
-        SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
-        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
-        WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
-        AudioLevelEvent.ADAPTER.encodeWithTag(writer, 27, value.audio_level)
-        ComponentProgressEvent.ADAPTER.encodeWithTag(writer, 28, value.component_progress)
+        MetricsEvent.ADAPTER.encodeWithTag(writer, 16, value.metrics)
+        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 17, value.component_state_changed)
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 18, value.session_error)
+        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 19, value.turn_lifecycle)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceEvent) {
         writer.writeBytes(value.unknownFields)
-        ComponentProgressEvent.ADAPTER.encodeWithTag(writer, 28, value.component_progress)
-        AudioLevelEvent.ADAPTER.encodeWithTag(writer, 27, value.audio_level)
-        WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
-        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
-        SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
-        AgentResponseCompletedEvent.ADAPTER.encodeWithTag(writer, 23, value.agent_response_completed)
-        AgentResponseStartedEvent.ADAPTER.encodeWithTag(writer, 22, value.agent_response_started)
-        SessionStoppedEvent.ADAPTER.encodeWithTag(writer, 21, value.session_stopped)
-        SessionStartedEvent.ADAPTER.encodeWithTag(writer, 20, value.session_started)
-        VoiceSessionError.ADAPTER.encodeWithTag(writer, 19, value.session_error)
-        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 18, value.component_state_changed)
-        MetricsEvent.ADAPTER.encodeWithTag(writer, 17, value.metrics)
-        ErrorEvent.ADAPTER.encodeWithTag(writer, 16, value.error)
+        TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 19, value.turn_lifecycle)
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 18, value.session_error)
+        VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 17, value.component_state_changed)
+        MetricsEvent.ADAPTER.encodeWithTag(writer, 16, value.metrics)
         StateChangeEvent.ADAPTER.encodeWithTag(writer, 15, value.state)
         InterruptedEvent.ADAPTER.encodeWithTag(writer, 14, value.interrupted)
         VADEvent.ADAPTER.encodeWithTag(writer, 13, value.vad)
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
-        metadataAdapter.encodeWithTag(writer, 33, value.metadata)
+        metadataAdapter.encodeWithTag(writer, 23, value.metadata)
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 32, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.request_id)
         }
         if (value.turn_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.turn_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.turn_id)
         }
         if (value.session_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.session_id)
         }
         if (value.component != ai.runanywhere.proto.v1.VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED) {
           VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
@@ -575,8 +441,8 @@ public class VoiceEvent(
         if (value.category != ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_UNSPECIFIED) {
           EventCategory.ADAPTER.encodeWithTag(writer, 3, value.category)
         }
-        if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
+        if (value.timestamp_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_ms)
         }
         if (value.seq != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
@@ -585,7 +451,7 @@ public class VoiceEvent(
 
       override fun decode(reader: ProtoReader): VoiceEvent {
         var seq: Long = 0L
-        var timestamp_us: Long = 0L
+        var timestamp_ms: Long = 0L
         var category: EventCategory = EventCategory.EVENT_CATEGORY_UNSPECIFIED
         var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var component: VoicePipelineComponent = VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED
@@ -595,19 +461,10 @@ public class VoiceEvent(
         var vad: VADEvent? = null
         var interrupted: InterruptedEvent? = null
         var state: StateChangeEvent? = null
-        var error: ErrorEvent? = null
         var metrics: MetricsEvent? = null
         var component_state_changed: VoiceAgentComponentStates? = null
         var session_error: VoiceSessionError? = null
-        var session_started: SessionStartedEvent? = null
-        var session_stopped: SessionStoppedEvent? = null
-        var agent_response_started: AgentResponseStartedEvent? = null
-        var agent_response_completed: AgentResponseCompletedEvent? = null
-        var speech_turn_detection: SpeechTurnDetectionEvent? = null
         var turn_lifecycle: TurnLifecycleEvent? = null
-        var wakeword_detected: WakeWordDetectedEvent? = null
-        var audio_level: AudioLevelEvent? = null
-        var component_progress: ComponentProgressEvent? = null
         var session_id: String = ""
         var turn_id: String = ""
         var request_id: String = ""
@@ -615,7 +472,7 @@ public class VoiceEvent(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
-            2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
+            2 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             3 -> try {
               category = EventCategory.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -637,29 +494,20 @@ public class VoiceEvent(
             13 -> vad = VADEvent.ADAPTER.decode(reader)
             14 -> interrupted = InterruptedEvent.ADAPTER.decode(reader)
             15 -> state = StateChangeEvent.ADAPTER.decode(reader)
-            16 -> error = ErrorEvent.ADAPTER.decode(reader)
-            17 -> metrics = MetricsEvent.ADAPTER.decode(reader)
-            18 -> component_state_changed = VoiceAgentComponentStates.ADAPTER.decode(reader)
-            19 -> session_error = VoiceSessionError.ADAPTER.decode(reader)
-            20 -> session_started = SessionStartedEvent.ADAPTER.decode(reader)
-            21 -> session_stopped = SessionStoppedEvent.ADAPTER.decode(reader)
-            22 -> agent_response_started = AgentResponseStartedEvent.ADAPTER.decode(reader)
-            23 -> agent_response_completed = AgentResponseCompletedEvent.ADAPTER.decode(reader)
-            24 -> speech_turn_detection = SpeechTurnDetectionEvent.ADAPTER.decode(reader)
-            25 -> turn_lifecycle = TurnLifecycleEvent.ADAPTER.decode(reader)
-            26 -> wakeword_detected = WakeWordDetectedEvent.ADAPTER.decode(reader)
-            27 -> audio_level = AudioLevelEvent.ADAPTER.decode(reader)
-            28 -> component_progress = ComponentProgressEvent.ADAPTER.decode(reader)
-            30 -> session_id = ProtoAdapter.STRING.decode(reader)
-            31 -> turn_id = ProtoAdapter.STRING.decode(reader)
-            32 -> request_id = ProtoAdapter.STRING.decode(reader)
-            33 -> metadata.putAll(metadataAdapter.decode(reader))
+            16 -> metrics = MetricsEvent.ADAPTER.decode(reader)
+            17 -> component_state_changed = VoiceAgentComponentStates.ADAPTER.decode(reader)
+            18 -> session_error = VoiceSessionError.ADAPTER.decode(reader)
+            19 -> turn_lifecycle = TurnLifecycleEvent.ADAPTER.decode(reader)
+            20 -> session_id = ProtoAdapter.STRING.decode(reader)
+            21 -> turn_id = ProtoAdapter.STRING.decode(reader)
+            22 -> request_id = ProtoAdapter.STRING.decode(reader)
+            23 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return VoiceEvent(
           seq = seq,
-          timestamp_us = timestamp_us,
+          timestamp_ms = timestamp_ms,
           category = category,
           severity = severity,
           component = component,
@@ -669,19 +517,10 @@ public class VoiceEvent(
           vad = vad,
           interrupted = interrupted,
           state = state,
-          error = error,
           metrics = metrics,
           component_state_changed = component_state_changed,
           session_error = session_error,
-          session_started = session_started,
-          session_stopped = session_stopped,
-          agent_response_started = agent_response_started,
-          agent_response_completed = agent_response_completed,
-          speech_turn_detection = speech_turn_detection,
           turn_lifecycle = turn_lifecycle,
-          wakeword_detected = wakeword_detected,
-          audio_level = audio_level,
-          component_progress = component_progress,
           session_id = session_id,
           turn_id = turn_id,
           request_id = request_id,
@@ -697,19 +536,10 @@ public class VoiceEvent(
         vad = value.vad?.let(VADEvent.ADAPTER::redact),
         interrupted = value.interrupted?.let(InterruptedEvent.ADAPTER::redact),
         state = value.state?.let(StateChangeEvent.ADAPTER::redact),
-        error = value.error?.let(ErrorEvent.ADAPTER::redact),
         metrics = value.metrics?.let(MetricsEvent.ADAPTER::redact),
         component_state_changed = value.component_state_changed?.let(VoiceAgentComponentStates.ADAPTER::redact),
         session_error = value.session_error?.let(VoiceSessionError.ADAPTER::redact),
-        session_started = value.session_started?.let(SessionStartedEvent.ADAPTER::redact),
-        session_stopped = value.session_stopped?.let(SessionStoppedEvent.ADAPTER::redact),
-        agent_response_started = value.agent_response_started?.let(AgentResponseStartedEvent.ADAPTER::redact),
-        agent_response_completed = value.agent_response_completed?.let(AgentResponseCompletedEvent.ADAPTER::redact),
-        speech_turn_detection = value.speech_turn_detection?.let(SpeechTurnDetectionEvent.ADAPTER::redact),
         turn_lifecycle = value.turn_lifecycle?.let(TurnLifecycleEvent.ADAPTER::redact),
-        wakeword_detected = value.wakeword_detected?.let(WakeWordDetectedEvent.ADAPTER::redact),
-        audio_level = value.audio_level?.let(AudioLevelEvent.ADAPTER::redact),
-        component_progress = value.component_progress?.let(ComponentProgressEvent.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

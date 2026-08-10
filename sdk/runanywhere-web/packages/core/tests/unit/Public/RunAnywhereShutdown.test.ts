@@ -5,7 +5,7 @@ import {
   setVoiceAgentProvider,
   type VoiceAgentProvider,
 } from '../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
-import { RunAnywhere } from '../../../src/Public/RunAnywhere';
+import { SDKCore as RunAnywhere } from '../../../src/Public/SDKCore';
 
 describe('RunAnywhere.shutdown provider cleanup', () => {
   it('cleans up and forgets a voice-agent provider before module teardown', async () => {

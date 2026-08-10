@@ -16,6 +16,16 @@ import Foundation
 import os
 import SwiftProtobuf
 
+private enum STTStateProtoABI {
+    typealias State = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let stateName = "rac_stt_state_lifecycle_proto"
+
+    static let state = NativeProtoABI.load(stateName, as: State.self)
+}
+
 private enum STTStreamSessionABI {
     typealias Callback = @convention(c) (
         UnsafePointer<UInt8>?,
@@ -87,10 +97,10 @@ private final class STTStreamSessionContext: @unchecked Sendable {
     }
 
     private let state = OSAllocatedUnfairLock<State>(initialState: State())
-    private let continuation: AsyncStream<RASTTPartialResult>.Continuation
+    private let continuation: AsyncThrowingStream<RASTTPartialResult, Error>.Continuation
     private let logger = SDKLogger(category: "CppBridge.STT.SessionStream")
 
-    init(_ continuation: AsyncStream<RASTTPartialResult>.Continuation) {
+    init(_ continuation: AsyncThrowingStream<RASTTPartialResult, Error>.Continuation) {
         self.continuation = continuation
     }
 
@@ -119,14 +129,25 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         }
     }
 
+    /// End the stream with the failure, instead of dressing the message up as
+    /// speech.
+    ///
+    /// This used to yield `RASTTPartialResult(isFinal: true, text: message)`,
+    /// because the stream could only carry partials. Nothing downstream could
+    /// tell that apart from a recognized utterance, so "STT stream feed failed"
+    /// arrived as the user's own words — and, because it was marked final, was
+    /// followed by a successful `completed`. A failure reported as a transcript
+    /// is worse than a failure reported as nothing.
+    ///
+    /// The stream throws now, so the error travels as an error. The code is
+    /// mapped through `rac_result_to_proto_error`, keeping one error vocabulary
+    /// across the ABI rather than inventing a Swift-side category here.
     func yieldFailure(_ message: String, code: rac_result_t = RAC_ERROR_STREAM_CANCELLED) {
         guard !isCancelled else { return }
-        var partial = RASTTPartialResult()
-        partial.isFinal = true
-        partial.text = message
-        partial.finalOutput.errorMessage = message
-        partial.finalOutput.errorCode = Int32(code)
-        continuation.yield(partial)
+        let failure = SDKException.from(rcResult: code)
+            ?? SDKException(code: .processingFailed, message: message, category: .component)
+        logger.warning("STT session stream failed: \(message)")
+        continuation.finish(throwing: failure)
     }
 
     private func yield(_ event: RASTTStreamEvent) {
@@ -138,16 +159,14 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         case .final:
             var partial = event.hasPartial ? event.partial : RASTTPartialResult()
             partial.isFinal = true
-            if event.hasFinalOutput {
-                partial.finalOutput = event.finalOutput
-                if partial.text.isEmpty {
-                    partial.text = event.finalOutput.text
-                }
+            if event.hasFinalOutput, partial.text.isEmpty {
+                partial.text = event.finalOutput.text
             }
             continuation.yield(partial)
         case .error:
-            let message = event.hasErrorMessage ? event.errorMessage : "STT stream failed"
-            yieldFailure(message, code: rac_result_t(event.errorCode))
+            let message = event.hasError ? event.error.message : "STT stream failed"
+            let code = event.hasError ? rac_result_t(event.error.cAbiCode) : RAC_ERROR_STREAM_CANCELLED
+            yieldFailure(message, code: code)
         case .started, .unspecified, .UNRECOGNIZED:
             break
         }
@@ -231,6 +250,24 @@ extension CppBridge {
         /// Get the currently loaded model ID
         public var currentModelId: String? { loadedModelId }
 
+        /// Lifecycle STT service state (readiness, current model, streaming
+        /// support, supported language codes).
+        public func stateProto() throws -> RASTTServiceState {
+            let symbol = try NativeProtoABI.require(
+                STTStateProtoABI.state,
+                named: STTStateProtoABI.stateName
+            )
+            var outBuffer = rac_proto_buffer_t()
+            defer { NativeProtoABI.free(&outBuffer) }
+            let status = symbol(&outBuffer)
+            guard status == RAC_SUCCESS else {
+                let message = outBuffer.error_message.map { String(cString: $0) }
+                    ?? "Native proto request failed: \(STTStateProtoABI.stateName) rc=\(status)"
+                throw SDKException(code: .processingFailed, message: message, category: .internal)
+            }
+            return try NativeProtoABI.decode(RASTTServiceState.self, from: outBuffer)
+        }
+
         /// Check if streaming is supported
         public var supportsStreaming: Bool {
             get async {
@@ -276,7 +313,7 @@ extension CppBridge {
             audio: AsyncStream<Data>,
             options: RASTTOptions,
             loadedModel: RACurrentModelResult
-        ) async throws -> AsyncStream<RASTTPartialResult> {
+        ) async throws -> AsyncThrowingStream<RASTTPartialResult, Error> {
             let handle = try await prepareStreamingHandle(from: loadedModel)
             guard STTStreamSessionABI.resolve() != nil else {
                 throw SDKException(
@@ -287,7 +324,7 @@ extension CppBridge {
             }
 
             let optionsData = try options.serializedData()
-            return AsyncStream { continuation in
+            return AsyncThrowingStream { continuation in
                 let context = STTStreamSessionContext(continuation)
                 let contextPtr = STTStreamingContextPointer(
                     rawValue: Unmanaged.passRetained(context).toOpaque()

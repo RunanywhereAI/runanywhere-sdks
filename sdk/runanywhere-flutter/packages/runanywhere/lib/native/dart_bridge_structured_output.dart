@@ -3,23 +3,33 @@
 // DartBridge+StructuredOutput
 //
 // Structured-output bridge. Mirrors Swift's `CppBridge+StructuredOutput.swift`.
-// All orchestration (prompt preparation, generation, thinking-tag stripping,
-// JSON extraction, schema validation) lives in commons C++. This file only
-// packs the request proto bytes and unpacks the result proto bytes.
+// All orchestration (prompt preparation, thinking-tag stripping, JSON
+// extraction, schema validation) lives in commons C++. This file only packs
+// the request proto bytes and unpacks the result proto bytes.
+//
+// `rac_structured_output_generate_proto` is a permanently-retired stub
+// (idl/structured_output.proto, API-realignment so-p2 —
+// `StructuredOutputRequest` was deleted outright): commons now reports
+// `RAC_ERROR_FEATURE_NOT_AVAILABLE` unconditionally and directs callers to
+// `rac_llm_generate_proto` with `LLMGenerationOptions.structuredOutput` set
+// instead. There is therefore no `generate()`/`makeGenerateRequest()` here
+// anymore — structured GENERATION routes through the normal LLM path (see
+// `RunAnywhereStructuredOutput.generateWithStructuredOutput` /
+// `namespaces/llm.dart`'s `generateStructured`), and this bridge keeps only
+// the surviving extract/validate/prepare-prompt surface over
+// `StructuredOutputParseRequest`.
 library;
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
-        JSONSchema,
         StructuredOutputOptions,
         StructuredOutputParseRequest,
         StructuredOutputPromptResult,
-        StructuredOutputRequest,
         StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
-/// Thin C ABI bridge for structured-output parse / generate / prepare-prompt.
+/// Thin C ABI bridge for structured-output parse / prepare-prompt.
 class DartBridgeStructuredOutput {
   DartBridgeStructuredOutput._();
 
@@ -37,19 +47,6 @@ class DartBridgeStructuredOutput {
     );
   }
 
-  /// Run full structured-output generation against the lifecycle-owned LLM via
-  /// commons. Commons handles prompt preparation, LLM generation, thinking-tag
-  /// stripping, JSON extraction, and schema validation.
-  StructuredOutputResult generate(StructuredOutputRequest request) {
-    final fn = RacNative.bindings.rac_structured_output_generate_proto;
-    return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
-      request: request,
-      invoke: fn,
-      decode: StructuredOutputResult.fromBuffer,
-      symbol: 'rac_structured_output_generate_proto',
-    );
-  }
-
   /// Build the schema-instrumented prompt for structured output via commons.
   StructuredOutputPromptResult preparePrompt({
     required String prompt,
@@ -57,11 +54,10 @@ class DartBridgeStructuredOutput {
     String requestId = '',
   }) {
     final fn = RacNative.bindings.rac_structured_output_prepare_prompt_proto;
-    final request = makeGenerateRequest(
-      prompt: prompt,
-      options: options,
-      requestId: requestId,
-    );
+    final request = StructuredOutputParseRequest(text: prompt, options: options);
+    if (requestId.isNotEmpty) {
+      request.requestId = requestId;
+    }
     return DartBridgeProtoUtils.callRequest<StructuredOutputPromptResult>(
       request: request,
       invoke: fn,
@@ -71,29 +67,19 @@ class DartBridgeStructuredOutput {
   }
 
   /// Build a `StructuredOutputParseRequest` for the given text + schema.
+  ///
+  /// `StructuredOutputParseRequest` (request_id, text, options, metadata) is
+  /// now the sole request envelope shared by parse/validate/prepare-prompt
+  /// (idl/structured_output.proto) — `text` plays the role the old `prompt`
+  /// field did on the deleted `StructuredOutputRequest`.
   StructuredOutputParseRequest makeParseRequest({
     required String text,
-    required JSONSchema schema,
+    required String schema,
     String requestId = '',
   }) {
     final request = StructuredOutputParseRequest()
       ..text = text
       ..options = StructuredOutputOptions(schema: schema);
-    if (requestId.isNotEmpty) {
-      request.requestId = requestId;
-    }
-    return request;
-  }
-
-  /// Build a `StructuredOutputRequest` for the given prompt + options.
-  StructuredOutputRequest makeGenerateRequest({
-    required String prompt,
-    required StructuredOutputOptions options,
-    String requestId = '',
-  }) {
-    final request = StructuredOutputRequest()
-      ..prompt = prompt
-      ..options = options;
     if (requestId.isNotEmpty) {
       request.requestId = requestId;
     }

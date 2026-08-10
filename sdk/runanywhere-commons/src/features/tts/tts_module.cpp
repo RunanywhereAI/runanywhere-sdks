@@ -151,8 +151,8 @@ rac_tts_options_t options_from_proto(const runanywhere::v1::TTSOptions& proto,
     if (!proto.language_code().empty()) {
         options.language = proto.language_code().c_str();
     }
-    if (proto.speaking_rate() > 0.0f) {
-        options.rate = proto.speaking_rate();
+    if (proto.speed() > 0.0f) {
+        options.rate = proto.speed();
     }
     if (proto.pitch() > 0.0f) {
         options.pitch = proto.pitch();
@@ -160,7 +160,8 @@ rac_tts_options_t options_from_proto(const runanywhere::v1::TTSOptions& proto,
     if (proto.volume() > 0.0f) {
         options.volume = proto.volume();
     }
-    options.use_ssml = proto.enable_ssml() ? RAC_TRUE : RAC_FALSE;
+    // SSML was deleted from the proto surface entirely (no backend parses it);
+    // use_ssml keeps whatever the C defaults carry.
     options.audio_format = c_audio_format(proto.audio_format());
     return options;
 }
@@ -192,8 +193,7 @@ void fill_tts_output(const rac_tts_result_t& result, const char* text, const cha
         metadata->set_language_code(options.language);
     }
     metadata->set_processing_time_ms(result.processing_time_ms);
-    metadata->set_character_count(text ? static_cast<int32_t>(std::strlen(text)) : 0);
-    metadata->set_audio_duration_ms(result.duration_ms);
+    metadata->set_input_bytes(text ? static_cast<int32_t>(std::strlen(text)) : 0);
 }
 
 void publish_tts_voice_event(
@@ -242,17 +242,13 @@ void publish_tts_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
         voice.set_character_count(char_count);
     }
     if (audio_duration_ms > 0) {
-        voice.set_audio_duration_ms(audio_duration_ms);
+        voice.set_output_audio_duration_ms(audio_duration_ms);
     }
     if (audio_size_bytes > 0) {
-        voice.set_audio_size_bytes_tts(audio_size_bytes);
+        voice.set_output_audio_bytes(audio_size_bytes);
     }
     if (processing_ms > 0) {
         voice.set_processing_duration_ms(processing_ms);
-        if (char_count > 0) {
-            voice.set_characters_per_second(static_cast<double>(char_count) * 1000.0 /
-                                            static_cast<double>(processing_ms));
-        }
     }
     if (sample_rate > 0) {
         voice.set_sample_rate(sample_rate);
@@ -266,7 +262,8 @@ void publish_tts_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
     if (framework_name != nullptr && framework_name[0] != '\0') {
         rac_inference_framework_t fw = RAC_FRAMEWORK_UNKNOWN;
         (void)rac_inference_framework_from_string(framework_name, &fw);
-        voice.set_framework(rac::events::framework_to_proto_int(fw));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(fw)));
     }
     rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                       runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
@@ -442,7 +439,8 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
             m.set_model_id(voice_id);
         if (voice_name)
             m.set_model_name(voice_name);
-        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        m.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         rac::events::publish(runanywhere::v1::SDK_COMPONENT_TTS,
                              runanywhere::v1::EVENT_CATEGORY_MODEL, std::move(m));
     }
@@ -466,7 +464,8 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
             m.set_model_id(voice_id);
         if (voice_name)
             m.set_model_name(voice_name);
-        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        m.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         m.set_duration_ms(static_cast<int64_t>(load_duration_ms));
         if (result != RAC_SUCCESS) {
             m.set_kind(runanywhere::v1::MODEL_EVENT_KIND_LOAD_FAILED);
@@ -565,7 +564,8 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
                     voice.set_model_id(voice_id);
                 if (voice_name)
                     voice.set_model_name(voice_name);
-                voice.set_framework(rac::events::framework_to_proto_int(framework));
+                voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+                    rac::events::framework_to_proto_int(framework)));
                 voice.set_error("No voice loaded");
                 rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                                   runanywhere::v1::EVENT_CATEGORY_TTS,
@@ -587,7 +587,8 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         if (voice_name)
             voice.set_model_name(voice_name);
         voice.set_character_count(static_cast<int32_t>(std::strlen(text)));
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                           runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
                                           synthesis_id.c_str());
@@ -616,7 +617,8 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
             if (voice_name)
                 voice.set_model_name(voice_name);
             voice.set_processing_duration_ms(static_cast<int64_t>(duration.count()));
-            voice.set_framework(rac::events::framework_to_proto_int(framework));
+            voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+                rac::events::framework_to_proto_int(framework)));
             voice.set_error("Synthesis failed");
             rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                               runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
@@ -634,7 +636,6 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
     {
         int32_t char_count = static_cast<int32_t>(std::strlen(text));
         double processing_ms = static_cast<double>(out_result->processing_time_ms);
-        double chars_per_sec = processing_ms > 0 ? (char_count * 1000.0 / processing_ms) : 0.0;
 
 #if defined(RAC_HAVE_PROTOBUF)
         runanywhere::v1::VoiceLifecycleEvent voice;
@@ -644,12 +645,12 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         if (voice_name)
             voice.set_model_name(voice_name);
         voice.set_character_count(char_count);
-        voice.set_audio_duration_ms(static_cast<int64_t>(out_result->duration_ms));
-        voice.set_audio_size_bytes_tts(static_cast<int32_t>(out_result->audio_size));
+        voice.set_output_audio_duration_ms(static_cast<int64_t>(out_result->duration_ms));
+        voice.set_output_audio_bytes(static_cast<int32_t>(out_result->audio_size));
         voice.set_processing_duration_ms(static_cast<int64_t>(processing_ms));
-        voice.set_characters_per_second(chars_per_sec);
         voice.set_sample_rate(static_cast<int32_t>(out_result->sample_rate));
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                           runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
                                           synthesis_id.c_str());
@@ -703,7 +704,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
                     voice.set_model_id(voice_id);
                 if (voice_name)
                     voice.set_model_name(voice_name);
-                voice.set_framework(rac::events::framework_to_proto_int(framework));
+                voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+                    rac::events::framework_to_proto_int(framework)));
                 voice.set_error("No voice loaded");
                 rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                                   runanywhere::v1::EVENT_CATEGORY_TTS,
@@ -725,7 +727,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         if (voice_name)
             voice.set_model_name(voice_name);
         voice.set_character_count(char_count);
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                           runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
                                           synthesis_id.c_str());
@@ -755,7 +758,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
             if (voice_name)
                 voice.set_model_name(voice_name);
             voice.set_processing_duration_ms(static_cast<int64_t>(duration.count()));
-            voice.set_framework(rac::events::framework_to_proto_int(framework));
+            voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+                rac::events::framework_to_proto_int(framework)));
             voice.set_error("Streaming synthesis failed");
             rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                               runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
@@ -765,7 +769,6 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
     } else {
         // Emit SYNTHESIS_COMPLETED event (streaming complete)
         double processing_ms = static_cast<double>(duration.count());
-        double chars_per_sec = processing_ms > 0 ? (char_count * 1000.0 / processing_ms) : 0.0;
 
 #if defined(RAC_HAVE_PROTOBUF)
         runanywhere::v1::VoiceLifecycleEvent voice;
@@ -776,8 +779,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
             voice.set_model_name(voice_name);
         voice.set_character_count(char_count);
         voice.set_processing_duration_ms(static_cast<int64_t>(processing_ms));
-        voice.set_characters_per_second(chars_per_sec);
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                           runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
                                           synthesis_id.c_str());
@@ -1039,8 +1042,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
         if (ctx->options.language) {
             metadata->set_language_code(ctx->options.language);
         }
-        metadata->set_character_count(ctx->text ? static_cast<int32_t>(std::strlen(ctx->text)) : 0);
-        metadata->set_audio_duration_ms(output.duration_ms());
+        metadata->set_input_bytes(ctx->text ? static_cast<int32_t>(std::strlen(ctx->text)) : 0);
         const size_t size = output.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
         if (size == 0 || output.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
@@ -1113,9 +1115,9 @@ rac_result_t parse_tts_request(const uint8_t* request_proto_bytes, size_t reques
                                      static_cast<int>(request_proto_size))) {
         return parse_error(out_error, "failed to parse TTSSynthesisRequest");
     }
-    if (out_request->text().empty() && !out_request->has_ssml()) {
+    if (out_request->text().empty()) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
-                                          "TTSSynthesisRequest.text or ssml is required");
+                                          "TTSSynthesisRequest.text is required");
     }
     return RAC_SUCCESS;
 }
@@ -1165,11 +1167,7 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
         options.sample_rate = request.options().sample_rate();
     }
 
-    const bool use_ssml = request.has_ssml() && !request.ssml().empty();
-    if (use_ssml) {
-        options.use_ssml = RAC_TRUE;
-    }
-    const std::string& text = use_ssml ? request.ssml() : request.text();
+    const std::string& text = request.text();
     rac_tts_service_t service{ref.ops, ref.impl, ref.model_id};
     rac_tts_result_t raw = {};
 
@@ -1208,14 +1206,12 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
     }
     output.set_timestamp_ms(rac_get_current_time_ms());
     output.set_is_final(true);
-    output.set_error_code(RAC_SUCCESS);
-    output.set_audio_size_bytes(static_cast<int64_t>(raw.audio_size));
     auto* metadata = output.mutable_metadata();
     metadata->set_voice_id(options.voice ? options.voice : (ref.model_id ? ref.model_id : ""));
     if (options.language) {
         metadata->set_language_code(options.language);
     }
-    metadata->set_character_count(static_cast<int32_t>(text.size()));
+    metadata->set_input_bytes(static_cast<int32_t>(text.size()));
 
     rc = copy_proto(output, out_result);
     rac_tts_result_free(&raw);
@@ -1276,11 +1272,7 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
         options.sample_rate = request.options().sample_rate();
     }
 
-    const bool use_ssml = request.has_ssml() && !request.ssml().empty();
-    if (use_ssml) {
-        options.use_ssml = RAC_TRUE;
-    }
-    const std::string& text = use_ssml ? request.ssml() : request.text();
+    const std::string& text = request.text();
 
     const std::string request_id =
         request.request_id().empty()
@@ -1291,7 +1283,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
         rac_tts_lifecycle_stream_event_callback_fn fn;
         void* user_data;
         std::string request_id;
-        uint64_t next_seq;
         std::string voice_id;
         std::string language_code;
         int32_t sample_rate;
@@ -1301,7 +1292,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     StreamCtx ctx{.fn = callback,
                   .user_data = user_data,
                   .request_id = request_id,
-                  .next_seq = 1,
                   .voice_id = options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
                   .language_code = options.language ? options.language : "",
                   .sample_rate =
@@ -1322,7 +1312,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     // STARTED envelope.
     {
         runanywhere::v1::TTSStreamEvent started;
-        started.set_seq(ctx.next_seq++);
         started.set_timestamp_us(rac_get_current_time_ms() * 1000);
         started.set_request_id(ctx.request_id);
         started.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED);
@@ -1332,7 +1321,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     auto chunk_bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
         auto* c = static_cast<StreamCtx*>(opaque);
         runanywhere::v1::TTSStreamEvent event;
-        event.set_seq(c->next_seq++);
         event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         event.set_request_id(c->request_id);
         event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK);
@@ -1360,11 +1348,10 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
         output->set_audio_format(audio_format_proto);
         output->set_sample_rate(c->sample_rate);
         output->set_timestamp_ms(rac_get_current_time_ms());
-        output->set_audio_size_bytes(static_cast<int64_t>(audio_size));
         auto* metadata = output->mutable_metadata();
         metadata->set_voice_id(c->voice_id);
         metadata->set_language_code(c->language_code);
-        metadata->set_character_count(c->character_count);
+        metadata->set_input_bytes(c->character_count);
         const size_t size = event.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
         if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
@@ -1377,16 +1364,13 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
 
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::TTSStreamEvent error_event;
-        error_event.set_seq(ctx.next_seq++);
         error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         error_event.set_request_id(ctx.request_id);
         error_event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR);
-        error_event.set_error_code(rc);
-        error_event.set_error_message(rac_error_message(rc));
+        rac::foundation::populate_sdk_error(error_event.mutable_error(), rc);
         emit_event(error_event, ctx.fn, ctx.user_data);
     } else {
         runanywhere::v1::TTSStreamEvent completed;
-        completed.set_seq(ctx.next_seq++);
         completed.set_timestamp_us(rac_get_current_time_ms() * 1000);
         completed.set_request_id(ctx.request_id);
         completed.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED);
@@ -1424,8 +1408,7 @@ rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
         state.set_current_voice(ref.model_id);
     }
     if (stop_rc != RAC_SUCCESS) {
-        state.set_error_code(stop_rc);
-        state.set_error_message(rac_error_message(stop_rc));
+        rac::foundation::populate_sdk_error(state.mutable_error(), stop_rc);
     }
     rc = copy_proto(state, out_result);
     rac::lifecycle::release_lifecycle_tts(&ref);
@@ -1470,6 +1453,52 @@ rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out) {
     rc = copy_proto(list, out);
     rac::lifecycle::release_lifecycle_tts(&ref);
     return rc;
+#endif
+}
+
+rac_result_t rac_tts_state_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    runanywhere::v1::TTSServiceState state;
+
+    rac::lifecycle::LifecycleTtsRef ref;
+    if (rac::lifecycle::acquire_lifecycle_tts(&ref) != RAC_SUCCESS) {
+        state.set_is_ready(false);
+        return copy_proto(state, out_result);
+    }
+
+    state.set_is_ready(true);
+    if (ref.model_id) {
+        state.set_current_voice(ref.model_id);
+    }
+
+    // TTSServiceState.voices was deleted -- callers use the list-voices verb
+    // (rac_tts_list_voices_lifecycle_proto) instead of this snapshot.
+
+    if (ref.ops && ref.ops->get_languages) {
+        char* json = nullptr;
+        if (ref.ops->get_languages(ref.impl, &json) == RAC_SUCCESS && json) {
+            // Engines emit a flat JSON string array (["en-US",...]); pull out
+            // the quoted values without a JSON dependency.
+            const char* p = json;
+            while ((p = std::strchr(p, '"')) != nullptr) {
+                const char* end = std::strchr(p + 1, '"');
+                if (!end)
+                    break;
+                if (end > p + 1) {
+                    state.add_supported_language_codes(std::string(p + 1, end));
+                }
+                p = end + 1;
+            }
+            std::free(json);
+        }
+    }
+
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return copy_proto(state, out_result);
 #endif
 }
 

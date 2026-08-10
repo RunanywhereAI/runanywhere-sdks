@@ -1,237 +1,267 @@
 //
-
 //  InlineMarkdownRenderer.swift
-
 //  RunAnywhereAI
-
 //
-
-//  Renders inline markdown: **bold**, *italic*, `code`, headings, lists
-
-//  Uses AttributedString for native iOS markdown parsing
-
-//  Pre-processes to fix markdown conflicts (list bullets + bold text)
-
+//  Inline runs *within* one block: bold, italic, inline code, links, and
+//  strikethrough, via `AttributedString`'s CommonMark parser.
 //
-
+//  Block structure — headings, lists, quotes, rules, fences — is not this file's
+//  job. `MarkdownBlockParser` has already split the reply and handed each block
+//  down separately, which is why the heading- and bullet-rewriting that used to
+//  live here is gone: it existed only because there was no block layer, and it
+//  was actively harmful (it wrapped heading text in `**…**`, and a heading ending
+//  in a markdown hard break became `**Foo  **`, whose closing delimiter is not
+//  right-flanking, so it rendered as literal asterisks — this renderer's own
+//  doing).
+//
+//  ## Why there is still a normalization pass
+//
+//  CommonMark requires a closing `**` to be *right-flanking* — no whitespace
+//  between the last content character and the delimiter. Small local models
+//  routinely emit `**Heading  **`, and the parser correctly refuses it, so the
+//  reader sees literal asterisks mid-reply. Verified: for
+//  `"**The Industrial Revolution and Modernization  **"` the parser reports no
+//  `.stronglyEmphasized` run and returns the source text unchanged.
+//
+//  That is a presentation repair: nothing here changes what the model said, it
+//  only makes emphasis the model clearly intended actually render as emphasis.
+//
+//  ## What is deliberately not repaired
+//
+//  An unterminated delimiter stays literal. `**start` renders as `**start` until
+//  its closer arrives, which is precisely what stops a streaming reply from
+//  flickering between plain and bold as tokens land.
+//
 
 import SwiftUI
 
-
-/// Inline markdown renderer for text with basic formatting
-
-/// Handles: bold, italic, inline code, headings (as bold), hierarchical lists
-
+/// Inline markdown for one block of text: emphasis, code spans, links,
+/// strikethrough.
 struct MarkdownText: View {
     let content: String
-
     let baseFont: Font
-
     let textColor: Color
-
 
     init(_ content: String, font: Font = .body, color: Color = .primary) {
         self.content = content
-
         self.baseFont = font
-
         self.textColor = color
     }
 
-
     var body: some View {
         Text(attributedString)
-
-            .textSelection(.enabled) // Allow text selection
-
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-
-    /// Convert markdown string to AttributedString with custom styling
+    // MARK: - Parsing
 
     private var attributedString: AttributedString {
-        do {
-            // Pre-process to fix list markers conflicting with bold syntax
-
-            // Replace "* **text**" with "• **text**" to avoid markdown conflicts
-
-            let processedContent = preprocessListMarkers(content)
-
-
-            // Parse with inlineOnly to preserve text structure
-
-            // This prevents numbers and periods from being interpreted as lists
-
-            var attributedString = try AttributedString(
-                markdown: processedContent, options: AttributedString.MarkdownParsingOptions(
-                    interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible
-                )
+        guard var parsed = try? AttributedString(
+            markdown: Self.normalizeEmphasis(content),
+            options: AttributedString.MarkdownParsingOptions(
+                // `inlineOnlyPreservingWhitespace` keeps the block's own line
+                // structure. Full-document parsing would re-flow it into
+                // Foundation's layout and drop the single newlines a model uses
+                // for a wrapped sentence or an address.
+                interpretedSyntax: .inlineOnlyPreservingWhitespace,
+                failurePolicy: .returnPartiallyParsedIfPossible
             )
-
-
-            // Apply custom styling to the entire string
-
-            attributedString.foregroundColor = textColor
-
-
-            // Enhanced styling for specific markdown elements
-
-            for run in attributedString.runs {
-                var container = AttributeContainer()
-
-
-                // Inline presentation intent (bold, italic, code)
-
-                if let inlineIntent = run.inlinePresentationIntent {
-                    // Bold text (**text**) - make it semibold
-
-                    if inlineIntent.contains(.stronglyEmphasized) {
-                        container.font = fontToUIFont(baseFont.weight(.semibold))
-                    }
-
-
-                    // Italic text (*text*) - make it italic
-
-                    if inlineIntent.contains(.emphasized) {
-                        container.font = fontToUIFont(baseFont.italic())
-                    }
-
-
-                    // Code (`code`) - monospaced font with background
-
-                    if inlineIntent.contains(.code) {
-                        container.font = .system(.body, design: .monospaced)
-
-                        container.foregroundColor = .purple
-
-                        container.backgroundColor = Color.purple.opacity(0.1)
-                    }
-                }
-
-
-                // Apply base font if no specific styling was set
-
-                if container.font == nil {
-                    container.font = fontToUIFont(baseFont)
-                }
-
-
-                // Apply custom styling
-
-                // Note: AttributedString's markdown parser already handles bold+italic merging correctly
-
-                attributedString[run.range].mergeAttributes(container)
-            }
-
-
-            return attributedString
-        } catch {
-            // Fallback to plain text if markdown parsing fails
-
-            var fallback = AttributedString(content)
-
-            fallback.foregroundColor = textColor
-
-            fallback.font = fontToUIFont(baseFont)
-
-            return fallback
-        }
-    }
-
-
-    /// Preprocess list markers and headings to avoid conflicts with bold syntax
-
-    private func preprocessListMarkers(_ text: String) -> String {
-        let lines = text.components(separatedBy: .newlines)
-
-        let processedLines = lines.map { line -> String in
-            // 1. Remove heading symbols (###) and make text bold
-
-            if let range = line.range(of: "^\\s*#{1,6}\\s+", options: .regularExpression) {
-                let leadingSpaces = line.prefix { $0 == " " }
-
-                let headingText = line[range.upperBound...]
-
-
-                // Make heading text bold
-
-                return String(leadingSpaces) + "**\(headingText)**"
-            }
-
-
-            // 2. Replace markdown list markers (* or -) with hierarchical bullet points
-
-            // This prevents conflicts when list items contain bold text: "* **Bold**"
-
-            if let range = line.range(of: "^\\s*[*-]\\s+", options: .regularExpression) {
-                let leadingSpaces = String(line.prefix { $0 == " " })
-
-                let restOfLine = line[range.upperBound...]
-
-
-                // Determine bullet style based on indentation level
-
-                // Support both 2-space and 4-space indents (common markdown standards)
-
-                let spaceCount = leadingSpaces.count
-
-                let indentLevel: Int
-
-                if spaceCount == 0 {
-                    indentLevel = 0
-                } else if spaceCount <= 3 {
-                    indentLevel = 1  // 1-3 spaces = level 1
-
-                } else if spaceCount <= 6 {
-                    indentLevel = 2  // 4-6 spaces = level 2
-
-                } else {
-                    indentLevel = 3  // 7+ spaces = level 3+
-
-                }
-
-
-                let bullet: String
-
-                switch indentLevel {
-                case 0:
-
-                    bullet = "•"   // Main level: filled bullet (U+2022)
-
-                case 1:
-
-                    bullet = "◦"   // Second level: hollow bullet (U+25E6)
-
-                case 2:
-
-                    bullet = "‣"   // Third level: triangular bullet (U+2023) - cleaner than squares
-
-                default:
-
-                    bullet = "·"   // Deeper levels: middle dot (U+00B7) - subtle
-
-                }
-
-
-                // Replace with appropriate bullet point
-
-                return leadingSpaces + bullet + " " + restOfLine
-            }
-
-
-            return line
+        ) else {
+            return plainFallback
         }
 
+        parsed.foregroundColor = textColor
 
-        return processedLines.joined(separator: "\n")
+        for run in parsed.runs {
+            parsed[run.range].mergeAttributes(container(for: run))
+        }
+
+        return parsed
     }
 
+    /// Style for one parsed run.
+    ///
+    /// Intents compose: `***both***` carries strong *and* emphasized and must end
+    /// up semibold *and* italic, and `~~*x*~~` carries strikethrough as well —
+    /// which is why this accumulates into one font and one container rather than
+    /// returning early per intent.
+    private func container(for run: AttributedString.Runs.Run) -> AttributeContainer {
+        var container = AttributeContainer()
+        let intent = run.inlinePresentationIntent
 
-    /// Convert SwiftUI Font to UIKit/AppKit font
+        if intent?.contains(.code) == true {
+            // A code span is different *content*, not emphasized prose, so it is
+            // the one run that changes color. Its own delimiters win over any
+            // emphasis markers inside it: `` `**not bold**` `` renders literally,
+            // which the parser already guarantees.
+            container.font = AppType.font(.mono)
+            container.foregroundColor = AppColors.brandInk
+            container.backgroundColor = AppColors.brand.opacity(0.10)
+            return container
+        }
 
-    private func fontToUIFont(_ font: Font) -> Font {
-        // SwiftUI Font is already the right type for AttributedString
+        var font = baseFont
+        if intent?.contains(.stronglyEmphasized) == true {
+            // Semibold, not bold: at body size in a chat bubble, `.bold` against
+            // `.regular` is a heavier jump than emphasis needs.
+            font = font.weight(.semibold)
+        }
+        if intent?.contains(.emphasized) == true {
+            font = font.italic()
+        }
+        container.font = font
 
-        font
+        if intent?.contains(.strikethrough) == true {
+            container.strikethroughStyle = .single
+        }
+
+        if run.link != nil {
+            // Links get the brand color and an underline. Both, not one: color
+            // alone fails a reader who cannot distinguish it, and this is the
+            // only run type that is actionable.
+            container.foregroundColor = AppColors.brand
+            container.underlineStyle = .single
+        }
+
+        return container
     }
+
+    private var plainFallback: AttributedString {
+        var fallback = AttributedString(content)
+        fallback.foregroundColor = textColor
+        fallback.font = baseFont
+        return fallback
+    }
+
+    // MARK: - Emphasis normalization
+
+    /// Delimiter runs this repairs. Ordered longest-first so `**` is consumed
+    /// before the `*` pass can bite into it.
+    private static let emphasisDelimiters = ["***", "___", "**", "__", "*", "_"]
+
+    /// Repairs a *closing* delimiter that whitespace has pushed out of
+    /// right-flanking position, so `**text  **` becomes `**text**  ` and renders
+    /// as the emphasis the model meant. Whitespace is preserved — moved outside
+    /// the delimiters, not dropped — so word spacing is unchanged.
+    ///
+    /// ## Why only the closing side
+    ///
+    /// An earlier version also pulled whitespace off the *opening* side, turning
+    /// `** text **` into `**text**`. That looked more thorough and was wrong: a
+    /// delimiter followed by a space is, per CommonMark's left-flanking rule,
+    /// deliberately *not* an opener, and that rule is the only thing protecting
+    /// arithmetic and globs. Verified failure: `5 * 3 * 2` was rewritten to
+    /// `5  *3*  2` and rendered with an italic 3. Requiring the opener to be
+    /// left-flanking already is what makes `rm *.txt`, `a * b`, `2*3`,
+    /// `2 * 3 = 6 and 4 * 5 = 20` and `get_user_name` all stay literal.
+    ///
+    /// So the contract is narrow on purpose: the model must have written a valid
+    /// opener. Only its closer gets un-slacked.
+    ///
+    /// Operates per line: an emphasis run cannot span a blank line, and scoping
+    /// to a line keeps a stray delimiter from pairing with one paragraphs away.
+    static func normalizeEmphasis(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { normalizeLine(String($0)) }
+            .joined(separator: "\n")
+    }
+
+    /// Normalizes the prose on a line while leaving code spans untouched.
+    ///
+    /// Code spans have to be carved out first, because a `*` inside one is
+    /// literal but is still just a character to `components(separatedBy:)`.
+    /// Verified failure: on
+    /// `` "Literal: 5 * 3 * 2, `rm *.txt`, a * b" `` the `*` in `` `rm *.txt` ``
+    /// paired with the `*` in `a * b`, and the line was rewritten to `a*  b` —
+    /// a code span silently reached out and corrupted prose two clauses away.
+    ///
+    /// This is the same precedence the web renderer applies (code spans win over
+    /// the emphasis markers they contain) and the same the parser applies to
+    /// `` `**not bold**` ``.
+    private static func normalizeLine(_ line: String) -> String {
+        var result = ""
+        var rest = Substring(line)
+
+        while let open = rest.firstIndex(of: "`") {
+            let afterOpen = rest.index(after: open)
+            guard let close = rest[afterOpen...].firstIndex(of: "`") else { break }
+            // Prose before the span gets normalized; the span itself is copied
+            // through verbatim, delimiters included.
+            result += normalizeProse(String(rest[rest.startIndex..<open]))
+            result += rest[open...close]
+            rest = rest[rest.index(after: close)...]
+        }
+
+        return result + normalizeProse(String(rest))
+    }
+
+    private static func normalizeProse(_ fragment: String) -> String {
+        var result = fragment
+        for delimiter in emphasisDelimiters {
+            result = normalize(delimiter: delimiter, in: result)
+        }
+        return result
+    }
+
+    /// Rewrites balanced pairs of `delimiter` on one line, moving any inner
+    /// trailing padding to the outside.
+    ///
+    /// Only *pairs* are touched: an odd trailing delimiter is left exactly as
+    /// written, because a lone `*` is far more likely to be a literal asterisk
+    /// (a footnote marker, a glob, a multiplication sign) than a broken emphasis
+    /// run — and because during streaming it is simply an opener whose closer has
+    /// not arrived yet.
+    private static func normalize(delimiter: String, in line: String) -> String {
+        let segments = line.components(separatedBy: delimiter)
+        // n segments = n-1 delimiters. Fewer than 3 segments means no pair.
+        guard segments.count >= 3 else { return line }
+
+        var output = segments[0]
+        var index = 1
+
+        while index < segments.count {
+            // The closing delimiter for this run, if there is one.
+            guard index + 1 < segments.count else {
+                // Unpaired tail: re-emit verbatim.
+                output += delimiter + segments[index]
+                break
+            }
+
+            let inner = segments[index]
+            let opensWithSpace = inner.first == " " || inner.first == "\t"
+
+            if inner.trimmingCharacters(in: .whitespaces).isEmpty || opensWithSpace {
+                // Either no content to emphasize (`****`, `**  **`), or the
+                // opening delimiter is not left-flanking so it was never an
+                // opener at all (`5 * 3 * 2`). Both re-emit verbatim.
+                output += delimiter + inner + delimiter
+            } else {
+                let content = String(inner.reversed().drop { $0 == " " || $0 == "\t" }.reversed())
+                let trailing = String(inner.dropFirst(content.count))
+                output += delimiter + content + delimiter + trailing
+            }
+
+            output += segments[index + 1]
+            index += 2
+        }
+
+        return output
+    }
+}
+
+// MARK: - Preview
+
+#Preview("Inline runs") {
+    VStack(alignment: .leading, spacing: Space.lg) {
+        // The exact string captured from a live Qwen3 reply.
+        MarkdownText("**The Industrial Revolution and Modernization  **", font: AppType.font(.body))
+        MarkdownText("Well-formed **bold**, *italic*, ***both***, and `code`.", font: AppType.font(.body))
+        MarkdownText("A ~~struck~~ run and a [link](https://runanywhere.ai).", font: AppType.font(.body))
+        MarkdownText("Literal: 5 * 3 * 2, `rm *.txt`, a * b, get_user_name.", font: AppType.font(.body))
+        MarkdownText("Mid-stream: **start", font: AppType.font(.body))
+    }
+    .padding(Space.xl)
+    .frame(width: 420)
+    .background(AppColors.background)
 }

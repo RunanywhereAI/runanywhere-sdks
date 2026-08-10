@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.ocr
 
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -13,11 +12,9 @@ import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.ui.screens.models.isDocumentOcrModel
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
-import com.runanywhere.sdk.public.types.RAVLMImage
-import kotlinx.coroutines.CoroutineScope
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.vlm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -79,18 +76,13 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 file = withContext(Dispatchers.IO) { writeJpegToCache(bitmap) }
                 val options = OcrGenerationPolicy.options(active.model.id)
-                val result = withContext(Dispatchers.Default) {
-                    RunAnywhere.processImage(
-                        RAVLMImage(
-                            file_path = file.absolutePath,
-                            format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
-                        ),
-                        options,
-                    )
-                }
+                val result = RunAnywhere.vlm.generate(
+                    ImageInput.file(file.absolutePath),
+                    OcrGenerationPolicy.PROMPT,
+                    options,
+                )
                 extractedText = result.text.trim()
-                latencyMs = result.processing_time_ms.takeIf { it > 0 }
-                    ?: (System.currentTimeMillis() - start)
+                latencyMs = System.currentTimeMillis() - start
                 status = if (extractedText.isBlank()) {
                     "No text detected in this image."
                 } else {
@@ -111,7 +103,6 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stop() {
         job?.cancel()
-        viewModelScope.launch { runCatching { RunAnywhere.cancelVLMGeneration() } }
     }
 
     fun reportError(message: String) {
@@ -119,17 +110,8 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        // Only fire the process-wide native cancel when this screen actually owns
-        // an in-flight extraction; another screen's VLM generation may be running.
-        val extracting = job?.isActive == true
+        // Cancelling the job reaches the native VLM cancel through the SDK.
         job?.cancel()
-        if (extracting) {
-            // viewModelScope is already cancelling; use an independent scope so the
-            // one-shot native cancel actually runs during teardown.
-            CoroutineScope(Dispatchers.Default).launch {
-                runCatching { RunAnywhere.cancelVLMGeneration() }
-            }
-        }
     }
 
     private fun writeJpegToCache(bitmap: Bitmap): File {
@@ -145,19 +127,22 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
 
 /** Suite-aligned generation options for Nemotron OCR / Parse. */
 internal object OcrGenerationPolicy {
-    fun options(modelId: String): RAVLMGenerationOptions {
+    /**
+     * Suites use an empty prompt, but an empty string is omitted on the wire and
+     * commons then rejects the request as missing a prompt. A single space is a
+     * no-op for the OCR detector+recognizer path.
+     */
+    const val PROMPT: String = " "
+
+    fun options(modelId: String): LlmOptions {
         val parse = modelId.contains("parse", ignoreCase = true)
-        return RAVLMGenerationOptions(
-            // Suites use an empty prompt, but Wire omits "" so commons never sees
-            // has_prompt and returns -259 INVALID_ARGUMENT ("prompt is required").
-            // A single space is a no-op for the OCR detector+recognizer path.
-            prompt = " ",
+        return LlmOptions(
             // OCR returns the full document in one shot (suite max_new=1).
             // Parse is a longer structured decode — give it room for multi-page text.
-            max_tokens = if (parse) 512 else 1,
+            maxOutputTokens = if (parse) 512 else 1,
             temperature = 0f,
-            top_p = 0f,
-            top_k = 0,
+            topP = 0f,
+            topK = 0,
         )
     }
 }

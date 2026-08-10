@@ -32,8 +32,12 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Check if a VLM model is loaded.
   Future<void> checkModelStatus() async {
-    _isModelLoaded = sdk.RunAnywhere.vlm.isLoaded;
-    _loadedModelName = _isModelLoaded ? sdk.RunAnywhere.vlm.currentModelId : null;
+    final state = await sdk.RunAnywhere.models.state();
+    final model =
+        state.loaded[sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL] ??
+        state.loaded[sdk.ModelCategory.MODEL_CATEGORY_VISION];
+    _isModelLoaded = model != null;
+    _loadedModelName = model?.name;
     notifyListeners();
   }
 
@@ -42,7 +46,7 @@ class VLMViewModel extends ChangeNotifier {
       String modelId, String modelName, BuildContext context) async {
     try {
       debugPrint('Loading VLM model: $modelId');
-      await sdk.RunAnywhere.vlm.load(modelId);
+      await sdk.RunAnywhere.models.load(modelId);
       _isModelLoaded = true;
       _loadedModelName = modelName;
       notifyListeners();
@@ -94,18 +98,19 @@ class VLMViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final image = sdk.VLMImage(filePath: path);
-
-      final events = sdk.RunAnywhere.vlm.processImageStream(
-        image,
-        prompt: promptText,
-        options: sdk.VLMGenerationOptions(maxTokens: 300),
+      final events = sdk.RunAnywhere.vlm.generateStream(
+        sdk.ImageInput.file(path),
+        promptText,
+        options: sdk.LlmOptions(maxOutputTokens: 300),
       );
 
       final buffer = StringBuffer();
       await for (final event in events) {
-        if (event.token.isEmpty) continue;
-        buffer.write(event.token);
+        if (event case sdk.GenerationFailed(:final error)) {
+          throw error;
+        }
+        if (event is! sdk.GenerationTextDelta || event.text.isEmpty) continue;
+        buffer.write(event.text);
         _currentDescription = buffer.toString();
         notifyListeners();
       }
@@ -125,7 +130,7 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Cancel an ongoing VLM generation.
   Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhere.vlm.cancelVLMGeneration());
+    sdk.RunAnywhere.vlm.cancel();
     debugPrint('VLM generation cancelled');
   }
 }

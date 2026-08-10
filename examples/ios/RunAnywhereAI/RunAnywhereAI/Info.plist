@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -18,6 +22,12 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RunAnywhere looks for a Mac on your local network when you choose to use a hosted language model.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_runanywhere-connect._tcp</string>
 	</array>
 	<!-- Live Activities (Dynamic Island recording indicator) -->
 	<key>NSSupportsLiveActivities</key>

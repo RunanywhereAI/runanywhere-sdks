@@ -6,23 +6,24 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { LLMGenerationOptions } from "./llm_options";
 
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * SolutionType — discriminator for the kind of solution backing a
- * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
- * oneof arms so frontends can switch on a single enum value rather than
- * inspecting the oneof shape.
- * ---------------------------------------------------------------------------
+ * Frontends switch on the SolutionConfig oneof case. This enum exists only
+ * for logs and handles, and its numbers now match the oneof tags.
  */
 export enum SolutionType {
   SOLUTION_TYPE_UNSPECIFIED = 0,
+  /** SOLUTION_TYPE_VOICE_AGENT - SolutionConfig.voice_agent = 1 */
   SOLUTION_TYPE_VOICE_AGENT = 1,
+  /** SOLUTION_TYPE_RAG - SolutionConfig.rag         = 2 */
   SOLUTION_TYPE_RAG = 2,
-  SOLUTION_TYPE_TIME_SERIES = 4,
-  SOLUTION_TYPE_AGENT_LOOP = 5,
+  /** SOLUTION_TYPE_AGENT_LOOP - SolutionConfig.agent_loop  = 4 */
+  SOLUTION_TYPE_AGENT_LOOP = 4,
+  /** SOLUTION_TYPE_TIME_SERIES - SolutionConfig.time_series = 5 */
+  SOLUTION_TYPE_TIME_SERIES = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -38,11 +39,11 @@ export function solutionTypeFromJSON(object: any): SolutionType {
     case "SOLUTION_TYPE_RAG":
       return SolutionType.SOLUTION_TYPE_RAG;
     case 4:
-    case "SOLUTION_TYPE_TIME_SERIES":
-      return SolutionType.SOLUTION_TYPE_TIME_SERIES;
-    case 5:
     case "SOLUTION_TYPE_AGENT_LOOP":
       return SolutionType.SOLUTION_TYPE_AGENT_LOOP;
+    case 5:
+    case "SOLUTION_TYPE_TIME_SERIES":
+      return SolutionType.SOLUTION_TYPE_TIME_SERIES;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -58,10 +59,10 @@ export function solutionTypeToJSON(object: SolutionType): string {
       return "SOLUTION_TYPE_VOICE_AGENT";
     case SolutionType.SOLUTION_TYPE_RAG:
       return "SOLUTION_TYPE_RAG";
-    case SolutionType.SOLUTION_TYPE_TIME_SERIES:
-      return "SOLUTION_TYPE_TIME_SERIES";
     case SolutionType.SOLUTION_TYPE_AGENT_LOOP:
       return "SOLUTION_TYPE_AGENT_LOOP";
+    case SolutionType.SOLUTION_TYPE_TIME_SERIES:
+      return "SOLUTION_TYPE_TIME_SERIES";
     case SolutionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -70,11 +71,9 @@ export function solutionTypeToJSON(object: SolutionType): string {
 
 export enum AudioSource {
   AUDIO_SOURCE_UNSPECIFIED = 0,
-  /** AUDIO_SOURCE_MICROPHONE - Platform mic (default) */
   AUDIO_SOURCE_MICROPHONE = 1,
-  /** AUDIO_SOURCE_FILE - Path supplied in audio_file_path */
   AUDIO_SOURCE_FILE = 2,
-  /** AUDIO_SOURCE_CALLBACK - Frontend feeds frames via C ABI */
+  /** AUDIO_SOURCE_CALLBACK - Frontend feeds frames through the C ABI */
   AUDIO_SOURCE_CALLBACK = 3,
   UNRECOGNIZED = -1,
 }
@@ -118,9 +117,9 @@ export function audioSourceToJSON(object: AudioSource): string {
 
 export enum VectorStore {
   VECTOR_STORE_UNSPECIFIED = 0,
-  /** VECTOR_STORE_USEARCH - default, in-process HNSW */
+  /** VECTOR_STORE_USEARCH - in-process HNSW */
   VECTOR_STORE_USEARCH = 1,
-  /** VECTOR_STORE_PGVECTOR - remote, server deployments only */
+  /** VECTOR_STORE_PGVECTOR - server deployments only, no on-device path */
   VECTOR_STORE_PGVECTOR = 2,
   UNRECOGNIZED = -1,
 }
@@ -157,7 +156,6 @@ export function vectorStoreToJSON(object: VectorStore): string {
   }
 }
 
-/** Top-level union dispatched to the matching solution loader. */
 export interface SolutionConfig {
   voiceAgent?: VoiceAgentConfig | undefined;
   rag?: RAGConfig | undefined;
@@ -165,162 +163,73 @@ export interface SolutionConfig {
   timeSeries?: TimeSeriesConfig | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * SolutionHandle — opaque, serialisable descriptor for a started solution.
- *
- * The native side owns a `rac_solution_handle_t`; this message is the
- * language-agnostic shape that frontends (Swift `SolutionHandle` class,
- * Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
- * the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
- * are issued against the C handle keyed by `handle_id`.
- * ---------------------------------------------------------------------------
- */
 export interface SolutionHandle {
-  /**
-   * Stable, opaque identifier minted by the core for this solution
-   * instance. Used as the lookup key for lifecycle calls.
-   */
   handleId: string;
-  /**
-   * String discriminator for the solution kind, e.g. "voice_agent",
-   * "rag", "time_series", "agent_loop". Free-form for
-   * forward-compat with future solutions; canonical values match the
-   * `SolutionType` enum names lower-cased.
-   */
   solutionType: string;
-  /** Wall-clock creation timestamp (ms since Unix epoch). */
   createdAtMs: number;
-  /**
-   * Optional engine-specific state string (e.g. "created", "running",
-   * "stopped"). Empty when the host hasn't surfaced state.
-   */
+  /** Engine-specific, e.g. "running" or "stopped". */
   state?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * VoiceAgent — the canonical streaming voice AI loop.
- * ---------------------------------------------------------------------------
- */
 export interface VoiceAgentConfig {
-  /** Model identifiers — resolved against the model registry. */
   llmModelId: string;
-  /** e.g. "whisper-base" */
   sttModelId: string;
-  /** e.g. "kokoro" */
   ttsModelId: string;
-  /** e.g. "silero-v5" */
   vadModelId: string;
-  /**
-   * pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-   * (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-   * fall back to using tts_model_id as the voice id — correct for
-   * single-voice engines, wrong for multi-voice. Aligns the caller-facing
-   * VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-   * (voice_agent_service.proto:214) which already exposes tts_voice_id.
-   */
   ttsVoiceId: string;
-  /** Audio configuration. */
   sampleRateHz: number;
-  /** default 20 */
   chunkMs: number;
+  /** audio_file_path applies when audio_source is FILE. */
   audioSource: AudioSource;
-  /**
-   * Absolute path to an audio file. Required when `audio_source` is
-   * `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
-   */
   audioFilePath: string;
-  /** Barge-in behavior. */
-  enableBargeIn?:
-    | boolean
-    | undefined;
-  /** default 200 */
+  /** Unset means enabled. */
+  enableBargeIn?: boolean | undefined;
   bargeInThresholdMs: number;
-  /** LLM behavior. */
-  systemPrompt: string;
+  generation?: LLMGenerationOptions | undefined;
   maxContextTokens: number;
-  temperature: number;
-  /** Emit partial transcripts as UserSaidEvent{is_final=false}. */
+  /** Emit partial transcripts as non-final user-said events. */
   emitPartials: boolean;
-  /** Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens. */
-  emitThoughts: boolean;
-  /**
-   * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-   * oneof arm; provided so callers that pass this message standalone (or
-   * log it) can read a single discriminator. Defaults to UNSPECIFIED.
-   */
-  typeKind?: SolutionType | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAG — retrieve → rerank → prompt → LLM.
- * ---------------------------------------------------------------------------
- */
 export interface RAGConfig {
-  /** e.g. "bge-small-en-v1.5" */
   embedModelId: string;
-  /** e.g. "bge-reranker-v2-m3" */
   rerankModelId: string;
   llmModelId: string;
-  /** Vector store — USearch (in-process HNSW, default) or remote pgvector. */
   vectorStore: VectorStore;
-  /** Local path for USearch index */
   vectorStorePath: string;
-  /** default 24 */
+  /** Retrieve this many candidates, then keep this many after reranking. */
   retrieveK: number;
-  /** default 6 */
   rerankTop: number;
-  /** BM25 parameters. */
+  /** BM25 term-saturation and length-normalization parameters. */
   bm25K1: number;
-  /** default 0.75 */
   bm25B: number;
-  /** RRF fusion parameter. */
+  /** Reciprocal-rank-fusion smoothing constant. */
   rrfK: number;
-  /** Prompt template. Supports {{context}} and {{query}} placeholders. */
   promptTemplate: string;
-  /** Optional explicit solution-kind tag. See `SolutionType`. */
-  typeKind?: SolutionType | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Agent loop — multi-turn LLM with tool calling.
- * ---------------------------------------------------------------------------
- */
 export interface AgentLoopConfig {
   llmModelId: string;
   systemPrompt: string;
   tools: ToolSpec[];
-  /** default 10 */
   maxIterations: number;
   maxContextTokens: number;
-  /** Optional explicit solution-kind tag. See `SolutionType`. */
-  typeKind?: SolutionType | undefined;
 }
 
 export interface ToolSpec {
   name: string;
   description: string;
-  /** Parameters schema, OpenAI-compatible */
+  /** OpenAI-compatible parameters schema. */
   jsonSchema: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Time series — window + anomaly_detect + generate_text.
- * ---------------------------------------------------------------------------
- */
 export interface TimeSeriesConfig {
   anomalyModelId: string;
   llmModelId: string;
-  /** Samples per window */
+  /** Samples per window, and how far the window advances each step. */
   windowSize: number;
   stride: number;
   anomalyThreshold: number;
-  /** Optional explicit solution-kind tag. See `SolutionType`. */
-  typeKind?: SolutionType | undefined;
 }
 
 function createBaseSolutionConfig(): SolutionConfig {
@@ -582,12 +491,9 @@ function createBaseVoiceAgentConfig(): VoiceAgentConfig {
     audioFilePath: "",
     enableBargeIn: undefined,
     bargeInThresholdMs: 0,
-    systemPrompt: "",
+    generation: undefined,
     maxContextTokens: 0,
-    temperature: 0,
     emitPartials: false,
-    emitThoughts: false,
-    typeKind: undefined,
   };
 }
 
@@ -606,43 +512,34 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
       writer.uint32(34).string(message.vadModelId);
     }
     if (message.ttsVoiceId !== "") {
-      writer.uint32(138).string(message.ttsVoiceId);
+      writer.uint32(42).string(message.ttsVoiceId);
     }
     if (message.sampleRateHz !== 0) {
-      writer.uint32(40).int32(message.sampleRateHz);
+      writer.uint32(48).int32(message.sampleRateHz);
     }
     if (message.chunkMs !== 0) {
-      writer.uint32(48).int32(message.chunkMs);
+      writer.uint32(56).int32(message.chunkMs);
     }
     if (message.audioSource !== 0) {
-      writer.uint32(56).int32(message.audioSource);
+      writer.uint32(64).int32(message.audioSource);
     }
     if (message.audioFilePath !== "") {
-      writer.uint32(122).string(message.audioFilePath);
+      writer.uint32(74).string(message.audioFilePath);
     }
     if (message.enableBargeIn !== undefined) {
-      writer.uint32(64).bool(message.enableBargeIn);
+      writer.uint32(80).bool(message.enableBargeIn);
     }
     if (message.bargeInThresholdMs !== 0) {
-      writer.uint32(72).int32(message.bargeInThresholdMs);
+      writer.uint32(88).int32(message.bargeInThresholdMs);
     }
-    if (message.systemPrompt !== "") {
-      writer.uint32(82).string(message.systemPrompt);
+    if (message.generation !== undefined) {
+      LLMGenerationOptions.encode(message.generation, writer.uint32(98).fork()).join();
     }
     if (message.maxContextTokens !== 0) {
-      writer.uint32(88).int32(message.maxContextTokens);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(101).float(message.temperature);
+      writer.uint32(104).int32(message.maxContextTokens);
     }
     if (message.emitPartials !== false) {
-      writer.uint32(104).bool(message.emitPartials);
-    }
-    if (message.emitThoughts !== false) {
-      writer.uint32(112).bool(message.emitThoughts);
-    }
-    if (message.typeKind !== undefined) {
-      writer.uint32(128).int32(message.typeKind);
+      writer.uint32(112).bool(message.emitPartials);
     }
     return writer;
   },
@@ -686,20 +583,12 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
           message.vadModelId = reader.string();
           continue;
         }
-        case 17: {
-          if (tag !== 138) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
           message.ttsVoiceId = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.sampleRateHz = reader.int32();
           continue;
         }
         case 6: {
@@ -707,7 +596,7 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.chunkMs = reader.int32();
+          message.sampleRateHz = reader.int32();
           continue;
         }
         case 7: {
@@ -715,15 +604,7 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.audioSource = reader.int32() as any;
-          continue;
-        }
-        case 15: {
-          if (tag !== 122) {
-            break;
-          }
-
-          message.audioFilePath = reader.string();
+          message.chunkMs = reader.int32();
           continue;
         }
         case 8: {
@@ -731,23 +612,23 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.enableBargeIn = reader.bool();
+          message.audioSource = reader.int32() as any;
           continue;
         }
         case 9: {
-          if (tag !== 72) {
+          if (tag !== 74) {
             break;
           }
 
-          message.bargeInThresholdMs = reader.int32();
+          message.audioFilePath = reader.string();
           continue;
         }
         case 10: {
-          if (tag !== 82) {
+          if (tag !== 80) {
             break;
           }
 
-          message.systemPrompt = reader.string();
+          message.enableBargeIn = reader.bool();
           continue;
         }
         case 11: {
@@ -755,15 +636,15 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.maxContextTokens = reader.int32();
+          message.bargeInThresholdMs = reader.int32();
           continue;
         }
         case 12: {
-          if (tag !== 101) {
+          if (tag !== 98) {
             break;
           }
 
-          message.temperature = reader.float();
+          message.generation = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
         case 13: {
@@ -771,7 +652,7 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.emitPartials = reader.bool();
+          message.maxContextTokens = reader.int32();
           continue;
         }
         case 14: {
@@ -779,15 +660,7 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
             break;
           }
 
-          message.emitThoughts = reader.bool();
-          continue;
-        }
-        case 16: {
-          if (tag !== 128) {
-            break;
-          }
-
-          message.typeKind = reader.int32() as any;
+          message.emitPartials = reader.bool();
           continue;
         }
       }
@@ -856,32 +729,17 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
         : isSet(object.barge_in_threshold_ms)
         ? globalThis.Number(object.barge_in_threshold_ms)
         : 0,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : "",
+      generation: isSet(object.generation) ? LLMGenerationOptions.fromJSON(object.generation) : undefined,
       maxContextTokens: isSet(object.maxContextTokens)
         ? globalThis.Number(object.maxContextTokens)
         : isSet(object.max_context_tokens)
         ? globalThis.Number(object.max_context_tokens)
         : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
       emitPartials: isSet(object.emitPartials)
         ? globalThis.Boolean(object.emitPartials)
         : isSet(object.emit_partials)
         ? globalThis.Boolean(object.emit_partials)
         : false,
-      emitThoughts: isSet(object.emitThoughts)
-        ? globalThis.Boolean(object.emitThoughts)
-        : isSet(object.emit_thoughts)
-        ? globalThis.Boolean(object.emit_thoughts)
-        : false,
-      typeKind: isSet(object.typeKind)
-        ? solutionTypeFromJSON(object.typeKind)
-        : isSet(object.type_kind)
-        ? solutionTypeFromJSON(object.type_kind)
-        : undefined,
     };
   },
 
@@ -920,23 +778,14 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
     if (message.bargeInThresholdMs !== 0) {
       obj.bargeInThresholdMs = Math.round(message.bargeInThresholdMs);
     }
-    if (message.systemPrompt !== "") {
-      obj.systemPrompt = message.systemPrompt;
+    if (message.generation !== undefined) {
+      obj.generation = LLMGenerationOptions.toJSON(message.generation);
     }
     if (message.maxContextTokens !== 0) {
       obj.maxContextTokens = Math.round(message.maxContextTokens);
     }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
     if (message.emitPartials !== false) {
       obj.emitPartials = message.emitPartials;
-    }
-    if (message.emitThoughts !== false) {
-      obj.emitThoughts = message.emitThoughts;
-    }
-    if (message.typeKind !== undefined) {
-      obj.typeKind = solutionTypeToJSON(message.typeKind);
     }
     return obj;
   },
@@ -957,12 +806,11 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
     message.audioFilePath = object.audioFilePath ?? "";
     message.enableBargeIn = object.enableBargeIn ?? undefined;
     message.bargeInThresholdMs = object.bargeInThresholdMs ?? 0;
-    message.systemPrompt = object.systemPrompt ?? "";
+    message.generation = (object.generation !== undefined && object.generation !== null)
+      ? LLMGenerationOptions.fromPartial(object.generation)
+      : undefined;
     message.maxContextTokens = object.maxContextTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
     message.emitPartials = object.emitPartials ?? false;
-    message.emitThoughts = object.emitThoughts ?? false;
-    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
@@ -980,7 +828,6 @@ function createBaseRAGConfig(): RAGConfig {
     bm25B: 0,
     rrfK: 0,
     promptTemplate: "",
-    typeKind: undefined,
   };
 }
 
@@ -1018,9 +865,6 @@ export const RAGConfig: MessageFns<RAGConfig> = {
     }
     if (message.promptTemplate !== "") {
       writer.uint32(90).string(message.promptTemplate);
-    }
-    if (message.typeKind !== undefined) {
-      writer.uint32(96).int32(message.typeKind);
     }
     return writer;
   },
@@ -1120,14 +964,6 @@ export const RAGConfig: MessageFns<RAGConfig> = {
           message.promptTemplate = reader.string();
           continue;
         }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.typeKind = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1194,11 +1030,6 @@ export const RAGConfig: MessageFns<RAGConfig> = {
         : isSet(object.prompt_template)
         ? globalThis.String(object.prompt_template)
         : "",
-      typeKind: isSet(object.typeKind)
-        ? solutionTypeFromJSON(object.typeKind)
-        : isSet(object.type_kind)
-        ? solutionTypeFromJSON(object.type_kind)
-        : undefined,
     };
   },
 
@@ -1237,9 +1068,6 @@ export const RAGConfig: MessageFns<RAGConfig> = {
     if (message.promptTemplate !== "") {
       obj.promptTemplate = message.promptTemplate;
     }
-    if (message.typeKind !== undefined) {
-      obj.typeKind = solutionTypeToJSON(message.typeKind);
-    }
     return obj;
   },
 
@@ -1259,13 +1087,12 @@ export const RAGConfig: MessageFns<RAGConfig> = {
     message.bm25B = object.bm25B ?? 0;
     message.rrfK = object.rrfK ?? 0;
     message.promptTemplate = object.promptTemplate ?? "";
-    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
 
 function createBaseAgentLoopConfig(): AgentLoopConfig {
-  return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0, typeKind: undefined };
+  return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0 };
 }
 
 export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
@@ -1284,9 +1111,6 @@ export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
     }
     if (message.maxContextTokens !== 0) {
       writer.uint32(40).int32(message.maxContextTokens);
-    }
-    if (message.typeKind !== undefined) {
-      writer.uint32(48).int32(message.typeKind);
     }
     return writer;
   },
@@ -1338,14 +1162,6 @@ export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
           message.maxContextTokens = reader.int32();
           continue;
         }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.typeKind = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1378,11 +1194,6 @@ export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
         : isSet(object.max_context_tokens)
         ? globalThis.Number(object.max_context_tokens)
         : 0,
-      typeKind: isSet(object.typeKind)
-        ? solutionTypeFromJSON(object.typeKind)
-        : isSet(object.type_kind)
-        ? solutionTypeFromJSON(object.type_kind)
-        : undefined,
     };
   },
 
@@ -1403,9 +1214,6 @@ export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
     if (message.maxContextTokens !== 0) {
       obj.maxContextTokens = Math.round(message.maxContextTokens);
     }
-    if (message.typeKind !== undefined) {
-      obj.typeKind = solutionTypeToJSON(message.typeKind);
-    }
     return obj;
   },
 
@@ -1419,7 +1227,6 @@ export const AgentLoopConfig: MessageFns<AgentLoopConfig> = {
     message.tools = object.tools?.map((e) => ToolSpec.fromPartial(e)) || [];
     message.maxIterations = object.maxIterations ?? 0;
     message.maxContextTokens = object.maxContextTokens ?? 0;
-    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };
@@ -1521,7 +1328,7 @@ export const ToolSpec: MessageFns<ToolSpec> = {
 };
 
 function createBaseTimeSeriesConfig(): TimeSeriesConfig {
-  return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0, typeKind: undefined };
+  return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0 };
 }
 
 export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
@@ -1540,9 +1347,6 @@ export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
     }
     if (message.anomalyThreshold !== 0) {
       writer.uint32(45).float(message.anomalyThreshold);
-    }
-    if (message.typeKind !== undefined) {
-      writer.uint32(48).int32(message.typeKind);
     }
     return writer;
   },
@@ -1594,14 +1398,6 @@ export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
           message.anomalyThreshold = reader.float();
           continue;
         }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.typeKind = reader.int32() as any;
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1634,11 +1430,6 @@ export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
         : isSet(object.anomaly_threshold)
         ? globalThis.Number(object.anomaly_threshold)
         : 0,
-      typeKind: isSet(object.typeKind)
-        ? solutionTypeFromJSON(object.typeKind)
-        : isSet(object.type_kind)
-        ? solutionTypeFromJSON(object.type_kind)
-        : undefined,
     };
   },
 
@@ -1659,9 +1450,6 @@ export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
     if (message.anomalyThreshold !== 0) {
       obj.anomalyThreshold = message.anomalyThreshold;
     }
-    if (message.typeKind !== undefined) {
-      obj.typeKind = solutionTypeToJSON(message.typeKind);
-    }
     return obj;
   },
 
@@ -1675,7 +1463,6 @@ export const TimeSeriesConfig: MessageFns<TimeSeriesConfig> = {
     message.windowSize = object.windowSize ?? 0;
     message.stride = object.stride ?? 0;
     message.anomalyThreshold = object.anomalyThreshold ?? 0;
-    message.typeKind = object.typeKind ?? undefined;
     return message;
   },
 };

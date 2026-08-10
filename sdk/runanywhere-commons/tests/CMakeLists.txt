@@ -63,6 +63,31 @@ function(rac_test_define_have_solutions target)
     endif()
 endfunction()
 
+# --- Connect role policy + transport-independent handshake -----------------
+# Covers the shared contract used by Swift, Kotlin, Flutter, and React Native:
+# role admission, protocol negotiation, model adoption, and reconnect
+# deduplication. Platform discovery/socket adapters are tested in their SDKs.
+add_executable(test_connect_proto_abi test_connect_proto_abi.cpp)
+target_include_directories(test_connect_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_proto_abi)
+target_compile_features(test_connect_proto_abi PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_connect_proto_abi)
+add_test(NAME connect_proto_abi_tests COMMAND test_connect_proto_abi)
+
+add_executable(test_connect_transport_registry test_connect_transport_registry.cpp)
+target_include_directories(test_connect_transport_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_transport_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_transport_registry)
+target_compile_features(test_connect_transport_registry PRIVATE cxx_std_20)
+add_test(NAME connect_transport_registry_tests COMMAND test_connect_transport_registry)
+
 set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 # Tests may need access to commons private headers (e.g. the internal
@@ -108,6 +133,19 @@ target_link_libraries(test_log_redact PRIVATE rac_commons)
 rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
+
+# CUA (computer-use-agent) scaffold: profile prompt + tool_call parse + coord
+# scale. Pure-C++ helper, no backend dependency.
+add_executable(test_cua test_cua.cpp)
+target_include_directories(test_cua PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_cua PRIVATE rac_commons)
+rac_link_archive_deps(test_cua)
+rac_test_define_have_protobuf(test_cua)  # decode CuaAction in the proto round-trip test
+target_compile_features(test_cua PRIVATE cxx_std_17)
+add_test(NAME cua_tests COMMAND test_cua --run-all)
 
 # --- Desktop platform adapter tests ---------------------------------
 # POSIX adapter slots + 0600 secure store + curl transport registration +
@@ -357,6 +395,37 @@ target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
 
+# --- TC-1: tool-call grammar derivation --------------------------------
+# Pure-function test over build_tool_call_grammar() (no mock LLM plugin
+# needed): verifies the GBNF/qhexrt dialect content per tool_choice policy.
+add_executable(test_tool_calling_grammar test_tool_calling_grammar.cpp)
+target_include_directories(test_tool_calling_grammar PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_tool_calling_grammar PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_grammar)
+target_compile_features(test_tool_calling_grammar PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_grammar)
+add_test(NAME tool_calling_grammar_tests COMMAND test_tool_calling_grammar)
+
+# --- AG-2: declarative AgentLoop -> real tool run-loop wiring ----------
+# Verifies expand_agent_loop emits the agent_loop operator (tool params
+# consumed) for tools-bearing configs and generate_text otherwise.
+add_executable(test_agent_loop_converter test_agent_loop_converter.cpp)
+target_include_directories(test_agent_loop_converter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_agent_loop_converter PRIVATE rac_commons)
+rac_link_archive_deps(test_agent_loop_converter)
+target_compile_features(test_agent_loop_converter PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_agent_loop_converter)
+add_test(NAME agent_loop_converter_tests COMMAND test_agent_loop_converter)
+
 # --- tool-calling cancel ABI concurrency regression -----------
 # Covers the run_loop_with_handle / run_loop_cancel / session_cancel C
 # ABIs. Exercises:
@@ -558,18 +627,6 @@ target_compile_features(test_sdk_init PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_sdk_init)
 add_test(NAME sdk_init_tests COMMAND test_sdk_init)
 
-# --- SDKEvents generated service descriptor test ----------------------------
-add_executable(test_sdk_events_service_proto_abi test_sdk_events_service_proto_abi.cpp)
-target_include_directories(test_sdk_events_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_sdk_events_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_sdk_events_service_proto_abi)
-target_compile_features(test_sdk_events_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_sdk_events_service_proto_abi)
-add_test(NAME sdk_events_service_proto_abi_tests COMMAND test_sdk_events_service_proto_abi)
-
 # Telemetry extraction → routing → JSON pipeline (regression guards for the
 # per-modality telemetry field bugs). Needs protobuf for the SDKEvent builders.
 add_executable(test_telemetry_extraction test_telemetry_extraction.cpp)
@@ -582,30 +639,6 @@ rac_link_archive_deps(test_telemetry_extraction)
 target_compile_features(test_telemetry_extraction PRIVATE cxx_std_20)
 rac_test_define_have_protobuf(test_telemetry_extraction)
 add_test(NAME telemetry_extraction_tests COMMAND test_telemetry_extraction)
-
-# --- ToolCalling generated service descriptor test --------------------------
-add_executable(test_tool_calling_service_proto_abi test_tool_calling_service_proto_abi.cpp)
-target_include_directories(test_tool_calling_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_tool_calling_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_tool_calling_service_proto_abi)
-target_compile_features(test_tool_calling_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_tool_calling_service_proto_abi)
-add_test(NAME tool_calling_service_proto_abi_tests COMMAND test_tool_calling_service_proto_abi)
-
-# --- StructuredOutput generated service descriptor test ---------------------
-add_executable(test_structured_output_service_proto_abi test_structured_output_service_proto_abi.cpp)
-target_include_directories(test_structured_output_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_structured_output_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_structured_output_service_proto_abi)
-target_compile_features(test_structured_output_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_structured_output_service_proto_abi)
-add_test(NAME structured_output_service_proto_abi_tests COMMAND test_structured_output_service_proto_abi)
 
 # --- Model registry proto-byte ABI tests -------------------------------------
 # Exercises register/update/get/list/remove using serialized ModelInfo and
@@ -620,18 +653,6 @@ rac_link_archive_deps(test_model_registry_proto)
 target_compile_features(test_model_registry_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_registry_proto)
 add_test(NAME model_registry_proto_tests COMMAND test_model_registry_proto)
-
-# --- ModelRegistry generated service descriptor test -------------------------
-add_executable(test_model_registry_service_proto_abi test_model_registry_service_proto_abi.cpp)
-target_include_directories(test_model_registry_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_model_registry_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_model_registry_service_proto_abi)
-target_compile_features(test_model_registry_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_model_registry_service_proto_abi)
-add_test(NAME model_registry_service_proto_abi_tests COMMAND test_model_registry_service_proto_abi)
 
 # --- Model assignment proto-byte refresh/cache tests -------------------------
 # Exercises ModelRegistryRefreshRequest/Result over the assignment transport
@@ -930,66 +951,6 @@ if(TARGET rac_backend_rag)
     add_test(NAME advanced_modality_proto_abi_tests COMMAND test_advanced_modality_proto_abi)
 endif()
 
-# --- Diffusion generated service descriptor test ----------------------------
-add_executable(test_diffusion_service_proto_abi test_diffusion_service_proto_abi.cpp)
-target_include_directories(test_diffusion_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_diffusion_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_diffusion_service_proto_abi)
-target_compile_features(test_diffusion_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_diffusion_service_proto_abi)
-add_test(NAME diffusion_service_proto_abi_tests COMMAND test_diffusion_service_proto_abi)
-
-# --- Embeddings generated service descriptor test ---------------------------
-add_executable(test_embeddings_service_proto_abi test_embeddings_service_proto_abi.cpp)
-target_include_directories(test_embeddings_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_embeddings_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_embeddings_service_proto_abi)
-target_compile_features(test_embeddings_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_embeddings_service_proto_abi)
-add_test(NAME embeddings_service_proto_abi_tests COMMAND test_embeddings_service_proto_abi)
-
-# --- VLM generated service descriptor test ----------------------------------
-add_executable(test_vlm_service_proto_abi test_vlm_service_proto_abi.cpp)
-target_include_directories(test_vlm_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_vlm_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_vlm_service_proto_abi)
-target_compile_features(test_vlm_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_vlm_service_proto_abi)
-add_test(NAME vlm_service_proto_abi_tests COMMAND test_vlm_service_proto_abi)
-
-# --- RAG generated service descriptor test ----------------------------------
-add_executable(test_rag_service_proto_abi test_rag_service_proto_abi.cpp)
-target_include_directories(test_rag_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_rag_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_rag_service_proto_abi)
-target_compile_features(test_rag_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_rag_service_proto_abi)
-add_test(NAME rag_service_proto_abi_tests COMMAND test_rag_service_proto_abi)
-
-# --- LoRA generated service descriptor test ---------------------------------
-add_executable(test_lora_service_proto_abi test_lora_service_proto_abi.cpp)
-target_include_directories(test_lora_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_lora_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_lora_service_proto_abi)
-target_compile_features(test_lora_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_lora_service_proto_abi)
-add_test(NAME lora_service_proto_abi_tests COMMAND test_lora_service_proto_abi)
-
 # --- Lifecycle-aware LoRA proto ABI tests -----------------------------
 # Pins the v2 contract: each rac_lora_*_proto resolves its backend through
 # the model-lifecycle service (no rac_handle_t llm_component arg). Covers the
@@ -1006,18 +967,6 @@ rac_link_archive_deps(test_lora_proto_abi)
 target_compile_features(test_lora_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_lora_proto_abi)
 add_test(NAME lora_proto_abi_tests COMMAND test_lora_proto_abi)
-
-# --- Storage generated service descriptor test ------------------------------
-add_executable(test_storage_service_proto_abi test_storage_service_proto_abi.cpp)
-target_include_directories(test_storage_service_proto_abi PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_storage_service_proto_abi PRIVATE rac_commons)
-rac_link_archive_deps(test_storage_service_proto_abi)
-target_compile_features(test_storage_service_proto_abi PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_storage_service_proto_abi)
-add_test(NAME storage_service_proto_abi_tests COMMAND test_storage_service_proto_abi)
 
 # --- Speech/VAD/voice-agent proto-byte ABI tests -----------------------------
 # Exercises STT transcribe/partials, TTS voices/synthesize/stream, VAD
@@ -1235,16 +1184,21 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
+# RAC_NEURT_ENGINE_AVAILABLE, not just the target: with RAC_BACKEND_NEURT=ON but no neurun
+# checkout the engine still builds — as a non-routable shell — so `TARGET rac_backend_neurt` is
+# true while the neurun include dirs are absent. This test includes rac_diffusion_coreml.h and
+# would fail to compile. That is exactly what broke every Apple CI job's Build step.
+if(APPLE AND RAC_BACKEND_NEURT AND TARGET rac_backend_neurt AND RAC_NEURT_ENGINE_AVAILABLE)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
+    # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/); it arrives
+    # transitively through rac_backend_neurt's PUBLIC include dirs.
     target_include_directories(test_diffusion_coreml_generate PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/coreml
     )
     target_link_libraries(test_diffusion_coreml_generate PRIVATE
         rac_commons
-        rac_backend_coreml
+        rac_backend_neurt
     )
     rac_link_archive_deps(test_diffusion_coreml_generate)
     target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)
@@ -1514,6 +1468,8 @@ add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 # generic folder resolver without any private runtime headers or binaries.
 get_filename_component(QHEXRT_ENGINE_DIR
     "${CMAKE_CURRENT_LIST_DIR}/../../../engines/qhexrt" ABSOLUTE)
+get_filename_component(NEURT_ENGINE_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../../engines/neurt" ABSOLUTE)
 add_executable(test_bundle_policy
     test_bundle_policy.cpp
     ${QHEXRT_ENGINE_DIR}/qhexrt_device_capability.cpp
@@ -1523,6 +1479,10 @@ target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${QHEXRT_ENGINE_DIR}
     ${QHEXRT_ENGINE_DIR}/include
+    # The NeuRT policy is header-only for the same reason QHexRT's is: it can be
+    # included here with no engine target and no Apple SDK, so the predicate is
+    # gated on every runner rather than only on a Mac.
+    ${NEURT_ENGINE_DIR}
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)

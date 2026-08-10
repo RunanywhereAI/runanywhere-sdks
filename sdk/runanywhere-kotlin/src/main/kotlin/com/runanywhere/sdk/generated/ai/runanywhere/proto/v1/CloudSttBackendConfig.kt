@@ -29,22 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Cloud STT backend registration config. Replaces the hand-built
- * `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
- * HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
- * (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
- * across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
- * these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
- * the same keys out of the JSON blob (`config_json\["provider"\]` etc., see
- * HybridModelDescriptor.provider).
- * ---------------------------------------------------------------------------
- */
 public class CloudSttBackendConfig(
-  /**
-   * HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -52,9 +37,6 @@ public class CloudSttBackendConfig(
     schemaIndex = 0,
   )
   public val provider: String = "",
-  /**
-   * Provider-side model id (e.g. "saarika:v2").
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -63,7 +45,8 @@ public class CloudSttBackendConfig(
   )
   public val model: String = "",
   /**
-   * Provider API key / credential.
+   * SECRET. Held in memory only; never logged, never persisted, never
+   * included in a toString()/toJSON() dump.
    */
   @field:WireField(
     tag = 3,
@@ -73,9 +56,6 @@ public class CloudSttBackendConfig(
     schemaIndex = 2,
   )
   public val api_key: String = "",
-  /**
-   * BCP-47 language hint forwarded to the provider (empty = auto-detect).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -84,9 +64,6 @@ public class CloudSttBackendConfig(
     schemaIndex = 3,
   )
   public val language_code: String = "",
-  /**
-   * Override the provider base URL (empty = provider default).
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -95,9 +72,6 @@ public class CloudSttBackendConfig(
     schemaIndex = 4,
   )
   public val base_url: String = "",
-  /**
-   * Request timeout in milliseconds (0 = engine default).
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

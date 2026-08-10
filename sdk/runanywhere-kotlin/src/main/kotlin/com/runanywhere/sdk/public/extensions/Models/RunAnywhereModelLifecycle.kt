@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 
 private val logger = SDKLogger("ModelLifecycle")
 
+@Deprecated("Use RunAnywhere.models.load(id, options).")
 suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) {
@@ -79,13 +80,14 @@ private suspend fun RunAnywhere.performModelLoad(request: RAModelLoadRequest): R
                 request,
                 "Native model lifecycle load proto API unavailable",
             )
-    if (result.success) {
+    if (result.error == null) {
         val modelID = result.model_id.ifEmpty { request.model_id }
         logger.info("Model load succeeded for $modelID")
     }
     return result
 }
 
+@Deprecated("Use RunAnywhere.models.load(id, options).")
 suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
     loadModel(
         RAModelLoadRequest(
@@ -95,17 +97,26 @@ suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
         ),
     )
 
+@Deprecated("Use RunAnywhere.models.unload(category).")
 suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
     if (!isInitialized) {
         return ModelUnloadResult(
-            success = false,
-            error_message = "SDK not initialized",
+            error =
+                ai.runanywhere.proto.v1.SDKError(
+                    code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+                    category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    message = "SDK not initialized",
+                ),
         )
     }
     return CppBridgeModelLifecycle.unload(request)
         ?: ModelUnloadResult(
-            success = false,
-            error_message = "Native model lifecycle unload proto API unavailable",
+            error =
+                ai.runanywhere.proto.v1.SDKError(
+                    code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
+                    category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    message = "Native model lifecycle unload proto API unavailable",
+                ),
         )
 }
 
@@ -216,9 +227,13 @@ private fun modelLoadFailure(
     message: String,
 ): RAModelLoadResult =
     RAModelLoadResult(
-        success = false,
         model_id = request.model_id,
         category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
         framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-        error_message = message,
+        error =
+            ai.runanywhere.proto.v1.SDKError(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                message = message,
+            ),
     )

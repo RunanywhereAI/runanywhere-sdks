@@ -33,10 +33,6 @@ import kotlin.lazy
 import okio.ByteString
 
 public class OperatorSpec(
-  /**
-   * Unique within the spec, used as the prefix in edge endpoints like
-   * "stt.final" or "llm.token".
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -44,12 +40,6 @@ public class OperatorSpec(
     schemaIndex = 0,
   )
   public val name: String = "",
-  /**
-   * The primitive the operator implements: "generate_text", "transcribe",
-   * "synthesize", "detect_voice", "embed", "rerank", "tokenize", "window",
-   * or a solution-declared custom operator ("AudioSource", "AudioSink",
-   * "SentenceDetector", "VectorSearch", "ContextBuild").
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -59,8 +49,7 @@ public class OperatorSpec(
   public val type: String = "",
   params: Map<String, String> = emptyMap(),
   /**
-   * Optional override of the engine that will serve this operator. When
-   * empty, the L3 router picks based on capability + model format.
+   * Bypasses priority-based engine selection.
    */
   @field:WireField(
     tag = 4,
@@ -70,9 +59,6 @@ public class OperatorSpec(
     schemaIndex = 3,
   )
   public val pinned_engine: String = "",
-  /**
-   * Optional model identifier (resolved against the model registry).
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -81,10 +67,6 @@ public class OperatorSpec(
     schemaIndex = 4,
   )
   public val model_id: String = "",
-  /**
-   * Affinity hint: run this operator on CPU, GPU, or Neural Engine. The
-   * scheduler may override if the requested device is unavailable.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.DeviceAffinity#ADAPTER",
@@ -94,10 +76,6 @@ public class OperatorSpec(
   public val device: DeviceAffinity = DeviceAffinity.DEVICE_AFFINITY_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<OperatorSpec, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Free-form parameters interpreted by the operator. The C++ loader
-   * validates required keys per type before instantiating.
-   */
   @field:WireField(
     tag = 3,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -46,7 +46,7 @@ describe('ONNX worker routing policy', () => {
   it('routes embeddings.embed through the onnx BackendWorker', async () => {
     const resultBytes = EmbeddingsResult.encode(
       EmbeddingsResult.fromPartial({
-        vectors: [{ values: [0.1, 0.2], dimension: 2 }],
+        vectors: [{ values: [0.1, 0.2], inputIndex: 0 }],
         dimension: 2,
       }),
     ).finish();
@@ -70,7 +70,7 @@ describe('ONNX worker routing policy', () => {
   it('routes GGUF embeddings through the llamacpp BackendWorker', async () => {
     const resultBytes = EmbeddingsResult.encode(
       EmbeddingsResult.fromPartial({
-        vectors: [{ values: [0.3, 0.4], dimension: 2 }],
+        vectors: [{ values: [0.3, 0.4], inputIndex: 0 }],
         dimension: 2,
       }),
     ).finish();

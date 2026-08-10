@@ -9,44 +9,278 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "runanywhere.v1";
 
+/**
+ * Host OS family. Closed set — a producer that cannot classify itself sends
+ * PLATFORM_UNSPECIFIED rather than inventing a spelling.
+ */
+export enum Platform {
+  PLATFORM_UNSPECIFIED = 0,
+  PLATFORM_IOS = 1,
+  PLATFORM_ANDROID = 2,
+  PLATFORM_MACOS = 3,
+  PLATFORM_WEB = 4,
+  PLATFORM_LINUX = 5,
+  PLATFORM_WINDOWS = 6,
+  PLATFORM_TVOS = 7,
+  PLATFORM_WATCHOS = 8,
+  PLATFORM_VISIONOS = 9,
+  UNRECOGNIZED = -1,
+}
+
+export function platformFromJSON(object: any): Platform {
+  switch (object) {
+    case 0:
+    case "PLATFORM_UNSPECIFIED":
+      return Platform.PLATFORM_UNSPECIFIED;
+    case 1:
+    case "PLATFORM_IOS":
+      return Platform.PLATFORM_IOS;
+    case 2:
+    case "PLATFORM_ANDROID":
+      return Platform.PLATFORM_ANDROID;
+    case 3:
+    case "PLATFORM_MACOS":
+      return Platform.PLATFORM_MACOS;
+    case 4:
+    case "PLATFORM_WEB":
+      return Platform.PLATFORM_WEB;
+    case 5:
+    case "PLATFORM_LINUX":
+      return Platform.PLATFORM_LINUX;
+    case 6:
+    case "PLATFORM_WINDOWS":
+      return Platform.PLATFORM_WINDOWS;
+    case 7:
+    case "PLATFORM_TVOS":
+      return Platform.PLATFORM_TVOS;
+    case 8:
+    case "PLATFORM_WATCHOS":
+      return Platform.PLATFORM_WATCHOS;
+    case 9:
+    case "PLATFORM_VISIONOS":
+      return Platform.PLATFORM_VISIONOS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return Platform.UNRECOGNIZED;
+  }
+}
+
+export function platformToJSON(object: Platform): string {
+  switch (object) {
+    case Platform.PLATFORM_UNSPECIFIED:
+      return "PLATFORM_UNSPECIFIED";
+    case Platform.PLATFORM_IOS:
+      return "PLATFORM_IOS";
+    case Platform.PLATFORM_ANDROID:
+      return "PLATFORM_ANDROID";
+    case Platform.PLATFORM_MACOS:
+      return "PLATFORM_MACOS";
+    case Platform.PLATFORM_WEB:
+      return "PLATFORM_WEB";
+    case Platform.PLATFORM_LINUX:
+      return "PLATFORM_LINUX";
+    case Platform.PLATFORM_WINDOWS:
+      return "PLATFORM_WINDOWS";
+    case Platform.PLATFORM_TVOS:
+      return "PLATFORM_TVOS";
+    case Platform.PLATFORM_WATCHOS:
+      return "PLATFORM_WATCHOS";
+    case Platform.PLATFORM_VISIONOS:
+      return "PLATFORM_VISIONOS";
+    case Platform.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Physical device class. */
+export enum FormFactor {
+  /** FORM_FACTOR_UNSPECIFIED - replaces the hand-written "unknown" token */
+  FORM_FACTOR_UNSPECIFIED = 0,
+  FORM_FACTOR_PHONE = 1,
+  FORM_FACTOR_TABLET = 2,
+  FORM_FACTOR_DESKTOP = 3,
+  FORM_FACTOR_LAPTOP = 4,
+  FORM_FACTOR_TV = 5,
+  FORM_FACTOR_WATCH = 6,
+  FORM_FACTOR_HEADSET = 7,
+  UNRECOGNIZED = -1,
+}
+
+export function formFactorFromJSON(object: any): FormFactor {
+  switch (object) {
+    case 0:
+    case "FORM_FACTOR_UNSPECIFIED":
+      return FormFactor.FORM_FACTOR_UNSPECIFIED;
+    case 1:
+    case "FORM_FACTOR_PHONE":
+      return FormFactor.FORM_FACTOR_PHONE;
+    case 2:
+    case "FORM_FACTOR_TABLET":
+      return FormFactor.FORM_FACTOR_TABLET;
+    case 3:
+    case "FORM_FACTOR_DESKTOP":
+      return FormFactor.FORM_FACTOR_DESKTOP;
+    case 4:
+    case "FORM_FACTOR_LAPTOP":
+      return FormFactor.FORM_FACTOR_LAPTOP;
+    case 5:
+    case "FORM_FACTOR_TV":
+      return FormFactor.FORM_FACTOR_TV;
+    case 6:
+    case "FORM_FACTOR_WATCH":
+      return FormFactor.FORM_FACTOR_WATCH;
+    case 7:
+    case "FORM_FACTOR_HEADSET":
+      return FormFactor.FORM_FACTOR_HEADSET;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FormFactor.UNRECOGNIZED;
+  }
+}
+
+export function formFactorToJSON(object: FormFactor): string {
+  switch (object) {
+    case FormFactor.FORM_FACTOR_UNSPECIFIED:
+      return "FORM_FACTOR_UNSPECIFIED";
+    case FormFactor.FORM_FACTOR_PHONE:
+      return "FORM_FACTOR_PHONE";
+    case FormFactor.FORM_FACTOR_TABLET:
+      return "FORM_FACTOR_TABLET";
+    case FormFactor.FORM_FACTOR_DESKTOP:
+      return "FORM_FACTOR_DESKTOP";
+    case FormFactor.FORM_FACTOR_LAPTOP:
+      return "FORM_FACTOR_LAPTOP";
+    case FormFactor.FORM_FACTOR_TV:
+      return "FORM_FACTOR_TV";
+    case FormFactor.FORM_FACTOR_WATCH:
+      return "FORM_FACTOR_WATCH";
+    case FormFactor.FORM_FACTOR_HEADSET:
+      return "FORM_FACTOR_HEADSET";
+    case FormFactor.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Charging state of the main battery. */
+export enum BatteryState {
+  /** BATTERY_STATE_UNSPECIFIED - unreadable (desktop, tvOS, browser) */
+  BATTERY_STATE_UNSPECIFIED = 0,
+  BATTERY_STATE_CHARGING = 1,
+  BATTERY_STATE_UNPLUGGED = 2,
+  BATTERY_STATE_FULL = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function batteryStateFromJSON(object: any): BatteryState {
+  switch (object) {
+    case 0:
+    case "BATTERY_STATE_UNSPECIFIED":
+      return BatteryState.BATTERY_STATE_UNSPECIFIED;
+    case 1:
+    case "BATTERY_STATE_CHARGING":
+      return BatteryState.BATTERY_STATE_CHARGING;
+    case 2:
+    case "BATTERY_STATE_UNPLUGGED":
+      return BatteryState.BATTERY_STATE_UNPLUGGED;
+    case 3:
+    case "BATTERY_STATE_FULL":
+      return BatteryState.BATTERY_STATE_FULL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return BatteryState.UNRECOGNIZED;
+  }
+}
+
+export function batteryStateToJSON(object: BatteryState): string {
+  switch (object) {
+    case BatteryState.BATTERY_STATE_UNSPECIFIED:
+      return "BATTERY_STATE_UNSPECIFIED";
+    case BatteryState.BATTERY_STATE_CHARGING:
+      return "BATTERY_STATE_CHARGING";
+    case BatteryState.BATTERY_STATE_UNPLUGGED:
+      return "BATTERY_STATE_UNPLUGGED";
+    case BatteryState.BATTERY_STATE_FULL:
+      return "BATTERY_STATE_FULL";
+    case BatteryState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface DeviceInfo {
   /** e.g. "iPhone16,2", "Pixel 8 Pro". */
   deviceModel: string;
-  /** User-facing device name. */
-  deviceName: string;
-  /** "ios" | "android" | "macos" | "web" | ... */
-  platform: string;
+  platform: Platform;
   osVersion: string;
-  /** "phone" | "tablet" | "desktop" | ... */
-  formFactor: string;
-  /** "arm64" | "x86_64" | "wasm32" | ... */
+  formFactor: FormFactor;
+  /**
+   * ABI name as the OS reports it: Android sends Build.SUPPORTED_ABIS[0]
+   * ("arm64-v8a"), Apple "arm64", Web "wasm32". Kept a string because no
+   * industry API enumerates ABIs — but the spelling is the OS's, not ours.
+   */
   architecture: string;
   /** e.g. "Apple A17 Pro". */
   chipName: string;
-  /** Bytes. */
-  totalMemory: number;
-  /** Bytes. */
-  availableMemory: number;
-  hasNeuralEngine: boolean;
-  neuralEngineCores: number;
+  /**
+   * Physical RAM installed, in BYTES. Never the JVM heap cap — Android must
+   * read ActivityManager.MemoryInfo.totalMem, not Runtime.maxMemory().
+   */
+  totalMemoryBytes: number;
+  /**
+   * Free + reclaimable system RAM at snapshot time, in BYTES.
+   * 0 = UNKNOWN (the Web producer cannot read it). A consumer MUST NOT read
+   * 0 as "no memory left" and refuse to load.
+   */
+  availableMemoryBytes: number;
+  /** Dedicated neural accelerator present (ANE, Hexagon, APU, ...). */
+  hasNpu: boolean;
+  /** 0 = none OR present-but-unreported. */
+  npuCores: number;
   gpuFamily: string;
-  /** 0.0–1.0; unset when unavailable. */
+  /**
+   * Remaining charge as a fraction of full. ABSENT is the ONLY encoding of
+   * "unknown" — 0.0 means a flat battery, not an unreadable one. Producers
+   * bridging through rac_device_registration_info_t (which uses a negative
+   * sentinel) MUST map negative -> absent, never negative -> 0.
+   */
   batteryLevel?:
     | number
     | undefined;
-  /** "charging" | "unplugged" | "full" | ... */
-  batteryState?: string | undefined;
+  /**
+   * ABSENT when the platform reports no battery at all; UNSPECIFIED when a
+   * battery exists but its state could not be read. The C ABI member is
+   * documented NULL-if-unavailable, which is why this stays `optional`.
+   */
+  batteryState?: BatteryState | undefined;
   isLowPowerMode: boolean;
   coreCount: number;
   performanceCores: number;
-  efficiencyCores: number;
   deviceFingerprint?:
     | string
     | undefined;
   /**
-   * Platform-specific fields that are not part of the cross-SDK core
-   * (e.g. web: "has_webgpu", "has_shared_array_buffer"; android: "manufacturer",
-   * "android_api_level", "os_build_id", ...).
+   * Vendor escape hatch, CLOSED key set:
+   *   android: "manufacturer", "device_id", "os_build_id", "sdk_version",
+   *            "android_api_level", "locale", "timezone"
+   *   web:     "has_webgpu", "has_shared_array_buffer"
+   *
+   * "manufacturer" and "device_id" are the only two the native parser reads
+   * ("device_id" arrives as a promoted top-level JSON key). Keys not listed
+   * here are NOT dropped: the Kotlin serializer flattens them into the
+   * outbound registration body verbatim, where no client code reads them.
+   *
+   * A key that restates a typed field above MUST NOT be sent — "device_type",
+   * "os_name", "processor_count" and "is_simulator" were removed for exactly
+   * that reason, and "device_id" duplicates device_fingerprint and should
+   * follow once the native parser reads the typed field instead.
+   *
+   * Values are always strings. This map does not cross the C ABI on Apple
+   * platforms, so nothing load-bearing may live here.
    */
   platformExtras: { [key: string]: string };
 }
@@ -59,23 +293,21 @@ export interface DeviceInfo_PlatformExtrasEntry {
 function createBaseDeviceInfo(): DeviceInfo {
   return {
     deviceModel: "",
-    deviceName: "",
-    platform: "",
+    platform: 0,
     osVersion: "",
-    formFactor: "",
+    formFactor: 0,
     architecture: "",
     chipName: "",
-    totalMemory: 0,
-    availableMemory: 0,
-    hasNeuralEngine: false,
-    neuralEngineCores: 0,
+    totalMemoryBytes: 0,
+    availableMemoryBytes: 0,
+    hasNpu: false,
+    npuCores: 0,
     gpuFamily: "",
     batteryLevel: undefined,
     batteryState: undefined,
     isLowPowerMode: false,
     coreCount: 0,
     performanceCores: 0,
-    efficiencyCores: 0,
     deviceFingerprint: undefined,
     platformExtras: {},
   };
@@ -86,62 +318,56 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
     if (message.deviceModel !== "") {
       writer.uint32(10).string(message.deviceModel);
     }
-    if (message.deviceName !== "") {
-      writer.uint32(18).string(message.deviceName);
-    }
-    if (message.platform !== "") {
-      writer.uint32(26).string(message.platform);
+    if (message.platform !== 0) {
+      writer.uint32(16).int32(message.platform);
     }
     if (message.osVersion !== "") {
-      writer.uint32(34).string(message.osVersion);
+      writer.uint32(26).string(message.osVersion);
     }
-    if (message.formFactor !== "") {
-      writer.uint32(42).string(message.formFactor);
+    if (message.formFactor !== 0) {
+      writer.uint32(32).int32(message.formFactor);
     }
     if (message.architecture !== "") {
-      writer.uint32(50).string(message.architecture);
+      writer.uint32(42).string(message.architecture);
     }
     if (message.chipName !== "") {
-      writer.uint32(58).string(message.chipName);
+      writer.uint32(50).string(message.chipName);
     }
-    if (message.totalMemory !== 0) {
-      writer.uint32(64).int64(message.totalMemory);
+    if (message.totalMemoryBytes !== 0) {
+      writer.uint32(56).int64(message.totalMemoryBytes);
     }
-    if (message.availableMemory !== 0) {
-      writer.uint32(72).int64(message.availableMemory);
+    if (message.availableMemoryBytes !== 0) {
+      writer.uint32(64).int64(message.availableMemoryBytes);
     }
-    if (message.hasNeuralEngine !== false) {
-      writer.uint32(80).bool(message.hasNeuralEngine);
+    if (message.hasNpu !== false) {
+      writer.uint32(72).bool(message.hasNpu);
     }
-    if (message.neuralEngineCores !== 0) {
-      writer.uint32(88).int32(message.neuralEngineCores);
+    if (message.npuCores !== 0) {
+      writer.uint32(80).int32(message.npuCores);
     }
     if (message.gpuFamily !== "") {
-      writer.uint32(98).string(message.gpuFamily);
+      writer.uint32(90).string(message.gpuFamily);
     }
     if (message.batteryLevel !== undefined) {
-      writer.uint32(109).float(message.batteryLevel);
+      writer.uint32(101).float(message.batteryLevel);
     }
     if (message.batteryState !== undefined) {
-      writer.uint32(114).string(message.batteryState);
+      writer.uint32(104).int32(message.batteryState);
     }
     if (message.isLowPowerMode !== false) {
-      writer.uint32(120).bool(message.isLowPowerMode);
+      writer.uint32(112).bool(message.isLowPowerMode);
     }
     if (message.coreCount !== 0) {
-      writer.uint32(128).int32(message.coreCount);
+      writer.uint32(120).int32(message.coreCount);
     }
     if (message.performanceCores !== 0) {
-      writer.uint32(136).int32(message.performanceCores);
-    }
-    if (message.efficiencyCores !== 0) {
-      writer.uint32(144).int32(message.efficiencyCores);
+      writer.uint32(128).int32(message.performanceCores);
     }
     if (message.deviceFingerprint !== undefined) {
-      writer.uint32(154).string(message.deviceFingerprint);
+      writer.uint32(138).string(message.deviceFingerprint);
     }
     globalThis.Object.entries(message.platformExtras).forEach(([key, value]: [string, string]) => {
-      DeviceInfo_PlatformExtrasEntry.encode({ key: key as any, value }, writer.uint32(162).fork()).join();
+      DeviceInfo_PlatformExtrasEntry.encode({ key: key as any, value }, writer.uint32(146).fork()).join();
     });
     return writer;
   },
@@ -162,11 +388,11 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
           continue;
         }
         case 2: {
-          if (tag !== 18) {
+          if (tag !== 16) {
             break;
           }
 
-          message.deviceName = reader.string();
+          message.platform = reader.int32() as any;
           continue;
         }
         case 3: {
@@ -174,15 +400,15 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.platform = reader.string();
+          message.osVersion = reader.string();
           continue;
         }
         case 4: {
-          if (tag !== 34) {
+          if (tag !== 32) {
             break;
           }
 
-          message.osVersion = reader.string();
+          message.formFactor = reader.int32() as any;
           continue;
         }
         case 5: {
@@ -190,7 +416,7 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.formFactor = reader.string();
+          message.architecture = reader.string();
           continue;
         }
         case 6: {
@@ -198,15 +424,15 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.architecture = reader.string();
+          message.chipName = reader.string();
           continue;
         }
         case 7: {
-          if (tag !== 58) {
+          if (tag !== 56) {
             break;
           }
 
-          message.chipName = reader.string();
+          message.totalMemoryBytes = longToNumber(reader.int64());
           continue;
         }
         case 8: {
@@ -214,7 +440,7 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.totalMemory = longToNumber(reader.int64());
+          message.availableMemoryBytes = longToNumber(reader.int64());
           continue;
         }
         case 9: {
@@ -222,7 +448,7 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.availableMemory = longToNumber(reader.int64());
+          message.hasNpu = reader.bool();
           continue;
         }
         case 10: {
@@ -230,39 +456,39 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.hasNeuralEngine = reader.bool();
+          message.npuCores = reader.int32();
           continue;
         }
         case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.neuralEngineCores = reader.int32();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
+          if (tag !== 90) {
             break;
           }
 
           message.gpuFamily = reader.string();
           continue;
         }
-        case 13: {
-          if (tag !== 109) {
+        case 12: {
+          if (tag !== 101) {
             break;
           }
 
           message.batteryLevel = reader.float();
           continue;
         }
-        case 14: {
-          if (tag !== 114) {
+        case 13: {
+          if (tag !== 104) {
             break;
           }
 
-          message.batteryState = reader.string();
+          message.batteryState = reader.int32() as any;
+          continue;
+        }
+        case 14: {
+          if (tag !== 112) {
+            break;
+          }
+
+          message.isLowPowerMode = reader.bool();
           continue;
         }
         case 15: {
@@ -270,7 +496,7 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.isLowPowerMode = reader.bool();
+          message.coreCount = reader.int32();
           continue;
         }
         case 16: {
@@ -278,41 +504,25 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
             break;
           }
 
-          message.coreCount = reader.int32();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
           message.performanceCores = reader.int32();
           continue;
         }
-        case 18: {
-          if (tag !== 144) {
-            break;
-          }
-
-          message.efficiencyCores = reader.int32();
-          continue;
-        }
-        case 19: {
-          if (tag !== 154) {
+        case 17: {
+          if (tag !== 138) {
             break;
           }
 
           message.deviceFingerprint = reader.string();
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
+        case 18: {
+          if (tag !== 146) {
             break;
           }
 
-          const entry20 = DeviceInfo_PlatformExtrasEntry.decode(reader, reader.uint32());
-          if (entry20.value !== undefined) {
-            message.platformExtras[entry20.key] = entry20.value;
+          const entry18 = DeviceInfo_PlatformExtrasEntry.decode(reader, reader.uint32());
+          if (entry18.value !== undefined) {
+            message.platformExtras[entry18.key] = entry18.value;
           }
           continue;
         }
@@ -332,47 +542,42 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
         : isSet(object.device_model)
         ? globalThis.String(object.device_model)
         : "",
-      deviceName: isSet(object.deviceName)
-        ? globalThis.String(object.deviceName)
-        : isSet(object.device_name)
-        ? globalThis.String(object.device_name)
-        : "",
-      platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+      platform: isSet(object.platform) ? platformFromJSON(object.platform) : 0,
       osVersion: isSet(object.osVersion)
         ? globalThis.String(object.osVersion)
         : isSet(object.os_version)
         ? globalThis.String(object.os_version)
         : "",
       formFactor: isSet(object.formFactor)
-        ? globalThis.String(object.formFactor)
+        ? formFactorFromJSON(object.formFactor)
         : isSet(object.form_factor)
-        ? globalThis.String(object.form_factor)
-        : "",
+        ? formFactorFromJSON(object.form_factor)
+        : 0,
       architecture: isSet(object.architecture) ? globalThis.String(object.architecture) : "",
       chipName: isSet(object.chipName)
         ? globalThis.String(object.chipName)
         : isSet(object.chip_name)
         ? globalThis.String(object.chip_name)
         : "",
-      totalMemory: isSet(object.totalMemory)
-        ? globalThis.Number(object.totalMemory)
-        : isSet(object.total_memory)
-        ? globalThis.Number(object.total_memory)
+      totalMemoryBytes: isSet(object.totalMemoryBytes)
+        ? globalThis.Number(object.totalMemoryBytes)
+        : isSet(object.total_memory_bytes)
+        ? globalThis.Number(object.total_memory_bytes)
         : 0,
-      availableMemory: isSet(object.availableMemory)
-        ? globalThis.Number(object.availableMemory)
-        : isSet(object.available_memory)
-        ? globalThis.Number(object.available_memory)
+      availableMemoryBytes: isSet(object.availableMemoryBytes)
+        ? globalThis.Number(object.availableMemoryBytes)
+        : isSet(object.available_memory_bytes)
+        ? globalThis.Number(object.available_memory_bytes)
         : 0,
-      hasNeuralEngine: isSet(object.hasNeuralEngine)
-        ? globalThis.Boolean(object.hasNeuralEngine)
-        : isSet(object.has_neural_engine)
-        ? globalThis.Boolean(object.has_neural_engine)
+      hasNpu: isSet(object.hasNpu)
+        ? globalThis.Boolean(object.hasNpu)
+        : isSet(object.has_npu)
+        ? globalThis.Boolean(object.has_npu)
         : false,
-      neuralEngineCores: isSet(object.neuralEngineCores)
-        ? globalThis.Number(object.neuralEngineCores)
-        : isSet(object.neural_engine_cores)
-        ? globalThis.Number(object.neural_engine_cores)
+      npuCores: isSet(object.npuCores)
+        ? globalThis.Number(object.npuCores)
+        : isSet(object.npu_cores)
+        ? globalThis.Number(object.npu_cores)
         : 0,
       gpuFamily: isSet(object.gpuFamily)
         ? globalThis.String(object.gpuFamily)
@@ -385,9 +590,9 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
         ? globalThis.Number(object.battery_level)
         : undefined,
       batteryState: isSet(object.batteryState)
-        ? globalThis.String(object.batteryState)
+        ? batteryStateFromJSON(object.batteryState)
         : isSet(object.battery_state)
-        ? globalThis.String(object.battery_state)
+        ? batteryStateFromJSON(object.battery_state)
         : undefined,
       isLowPowerMode: isSet(object.isLowPowerMode)
         ? globalThis.Boolean(object.isLowPowerMode)
@@ -403,11 +608,6 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
         ? globalThis.Number(object.performanceCores)
         : isSet(object.performance_cores)
         ? globalThis.Number(object.performance_cores)
-        : 0,
-      efficiencyCores: isSet(object.efficiencyCores)
-        ? globalThis.Number(object.efficiencyCores)
-        : isSet(object.efficiency_cores)
-        ? globalThis.Number(object.efficiency_cores)
         : 0,
       deviceFingerprint: isSet(object.deviceFingerprint)
         ? globalThis.String(object.deviceFingerprint)
@@ -439,17 +639,14 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
     if (message.deviceModel !== "") {
       obj.deviceModel = message.deviceModel;
     }
-    if (message.deviceName !== "") {
-      obj.deviceName = message.deviceName;
-    }
-    if (message.platform !== "") {
-      obj.platform = message.platform;
+    if (message.platform !== 0) {
+      obj.platform = platformToJSON(message.platform);
     }
     if (message.osVersion !== "") {
       obj.osVersion = message.osVersion;
     }
-    if (message.formFactor !== "") {
-      obj.formFactor = message.formFactor;
+    if (message.formFactor !== 0) {
+      obj.formFactor = formFactorToJSON(message.formFactor);
     }
     if (message.architecture !== "") {
       obj.architecture = message.architecture;
@@ -457,17 +654,17 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
     if (message.chipName !== "") {
       obj.chipName = message.chipName;
     }
-    if (message.totalMemory !== 0) {
-      obj.totalMemory = Math.round(message.totalMemory);
+    if (message.totalMemoryBytes !== 0) {
+      obj.totalMemoryBytes = Math.round(message.totalMemoryBytes);
     }
-    if (message.availableMemory !== 0) {
-      obj.availableMemory = Math.round(message.availableMemory);
+    if (message.availableMemoryBytes !== 0) {
+      obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
     }
-    if (message.hasNeuralEngine !== false) {
-      obj.hasNeuralEngine = message.hasNeuralEngine;
+    if (message.hasNpu !== false) {
+      obj.hasNpu = message.hasNpu;
     }
-    if (message.neuralEngineCores !== 0) {
-      obj.neuralEngineCores = Math.round(message.neuralEngineCores);
+    if (message.npuCores !== 0) {
+      obj.npuCores = Math.round(message.npuCores);
     }
     if (message.gpuFamily !== "") {
       obj.gpuFamily = message.gpuFamily;
@@ -476,7 +673,7 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
       obj.batteryLevel = message.batteryLevel;
     }
     if (message.batteryState !== undefined) {
-      obj.batteryState = message.batteryState;
+      obj.batteryState = batteryStateToJSON(message.batteryState);
     }
     if (message.isLowPowerMode !== false) {
       obj.isLowPowerMode = message.isLowPowerMode;
@@ -486,9 +683,6 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
     }
     if (message.performanceCores !== 0) {
       obj.performanceCores = Math.round(message.performanceCores);
-    }
-    if (message.efficiencyCores !== 0) {
-      obj.efficiencyCores = Math.round(message.efficiencyCores);
     }
     if (message.deviceFingerprint !== undefined) {
       obj.deviceFingerprint = message.deviceFingerprint;
@@ -511,23 +705,21 @@ export const DeviceInfo: MessageFns<DeviceInfo> = {
   fromPartial<I extends Exact<DeepPartial<DeviceInfo>, I>>(object: I): DeviceInfo {
     const message = createBaseDeviceInfo();
     message.deviceModel = object.deviceModel ?? "";
-    message.deviceName = object.deviceName ?? "";
-    message.platform = object.platform ?? "";
+    message.platform = object.platform ?? 0;
     message.osVersion = object.osVersion ?? "";
-    message.formFactor = object.formFactor ?? "";
+    message.formFactor = object.formFactor ?? 0;
     message.architecture = object.architecture ?? "";
     message.chipName = object.chipName ?? "";
-    message.totalMemory = object.totalMemory ?? 0;
-    message.availableMemory = object.availableMemory ?? 0;
-    message.hasNeuralEngine = object.hasNeuralEngine ?? false;
-    message.neuralEngineCores = object.neuralEngineCores ?? 0;
+    message.totalMemoryBytes = object.totalMemoryBytes ?? 0;
+    message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
+    message.hasNpu = object.hasNpu ?? false;
+    message.npuCores = object.npuCores ?? 0;
     message.gpuFamily = object.gpuFamily ?? "";
     message.batteryLevel = object.batteryLevel ?? undefined;
     message.batteryState = object.batteryState ?? undefined;
     message.isLowPowerMode = object.isLowPowerMode ?? false;
     message.coreCount = object.coreCount ?? 0;
     message.performanceCores = object.performanceCores ?? 0;
-    message.efficiencyCores = object.efficiencyCores ?? 0;
     message.deviceFingerprint = object.deviceFingerprint ?? undefined;
     message.platformExtras = (globalThis.Object.entries(object.platformExtras ?? {}) as [string, string][]).reduce(
       (acc: { [key: string]: string }, [key, value]: [string, string]) => {

@@ -10,29 +10,22 @@ exports.nPUChipFromJSON = nPUChipFromJSON;
 exports.nPUChipToJSON = nPUChipToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * NPU chipset detected on the host device. Used to drive vendor-NPU
- * model-download URL selection and runtime backend wiring.
- * ---------------------------------------------------------------------------
- */
 var NPUChip;
 (function (NPUChip) {
     NPUChip[NPUChip["NPU_CHIP_UNSPECIFIED"] = 0] = "NPU_CHIP_UNSPECIFIED";
-    /** NPU_CHIP_NONE - No NPU detected on this device */
     NPUChip[NPUChip["NPU_CHIP_NONE"] = 1] = "NPU_CHIP_NONE";
-    /** NPU_CHIP_APPLE_NEURAL_ENGINE - Apple Neural Engine (A-series / M-series) */
+    /** NPU_CHIP_APPLE_NEURAL_ENGINE - A-series and M-series */
     NPUChip[NPUChip["NPU_CHIP_APPLE_NEURAL_ENGINE"] = 2] = "NPU_CHIP_APPLE_NEURAL_ENGINE";
-    /** NPU_CHIP_QUALCOMM_HEXAGON - Snapdragon 8 Elite, 8 Elite Gen 5, etc. */
     NPUChip[NPUChip["NPU_CHIP_QUALCOMM_HEXAGON"] = 3] = "NPU_CHIP_QUALCOMM_HEXAGON";
-    /** NPU_CHIP_MEDIATEK_APU - MediaTek Dimensity APU */
+    /** NPU_CHIP_MEDIATEK_APU - Dimensity APU */
     NPUChip[NPUChip["NPU_CHIP_MEDIATEK_APU"] = 4] = "NPU_CHIP_MEDIATEK_APU";
-    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor / TPU */
+    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor */
     NPUChip[NPUChip["NPU_CHIP_GOOGLE_TPU"] = 5] = "NPU_CHIP_GOOGLE_TPU";
-    /** NPU_CHIP_INTEL_NPU - Intel Core Ultra NPU */
+    /** NPU_CHIP_INTEL_NPU - Core Ultra */
     NPUChip[NPUChip["NPU_CHIP_INTEL_NPU"] = 6] = "NPU_CHIP_INTEL_NPU";
-    /** NPU_CHIP_OTHER - Detected NPU but vendor unmapped */
+    /** NPU_CHIP_OTHER - Detected but vendor unmapped */
     NPUChip[NPUChip["NPU_CHIP_OTHER"] = 99] = "NPU_CHIP_OTHER";
     NPUChip[NPUChip["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(NPUChip || (exports.NPUChip = NPUChip = {}));
@@ -92,7 +85,7 @@ function nPUChipToJSON(object) {
     }
 }
 function createBaseDeviceStorageInfo() {
-    return { totalBytes: 0, freeBytes: 0, usedBytes: 0, usedPercent: 0 };
+    return { totalBytes: 0, freeBytes: 0, usedBytes: 0 };
 }
 exports.DeviceStorageInfo = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -104,9 +97,6 @@ exports.DeviceStorageInfo = {
         }
         if (message.usedBytes !== 0) {
             writer.uint32(24).int64(message.usedBytes);
-        }
-        if (message.usedPercent !== 0) {
-            writer.uint32(37).float(message.usedPercent);
         }
         return writer;
     },
@@ -138,13 +128,6 @@ exports.DeviceStorageInfo = {
                     message.usedBytes = longToNumber(reader.int64());
                     continue;
                 }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.usedPercent = reader.float();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -170,11 +153,6 @@ exports.DeviceStorageInfo = {
                 : isSet(object.used_bytes)
                     ? globalThis.Number(object.used_bytes)
                     : 0,
-            usedPercent: isSet(object.usedPercent)
-                ? globalThis.Number(object.usedPercent)
-                : isSet(object.used_percent)
-                    ? globalThis.Number(object.used_percent)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -188,9 +166,6 @@ exports.DeviceStorageInfo = {
         if (message.usedBytes !== 0) {
             obj.usedBytes = Math.round(message.usedBytes);
         }
-        if (message.usedPercent !== 0) {
-            obj.usedPercent = message.usedPercent;
-        }
         return obj;
     },
     create(base) {
@@ -201,7 +176,6 @@ exports.DeviceStorageInfo = {
         message.totalBytes = object.totalBytes ?? 0;
         message.freeBytes = object.freeBytes ?? 0;
         message.usedBytes = object.usedBytes ?? 0;
-        message.usedPercent = object.usedPercent ?? 0;
         return message;
     },
 };
@@ -320,7 +294,7 @@ exports.AppStorageInfo = {
     },
 };
 function createBaseModelStorageMetrics() {
-    return { modelId: "", sizeOnDiskBytes: 0, lastUsedMs: undefined };
+    return { modelId: "", sizeOnDiskBytes: 0 };
 }
 exports.ModelStorageMetrics = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -329,9 +303,6 @@ exports.ModelStorageMetrics = {
         }
         if (message.sizeOnDiskBytes !== 0) {
             writer.uint32(16).int64(message.sizeOnDiskBytes);
-        }
-        if (message.lastUsedMs !== undefined) {
-            writer.uint32(24).int64(message.lastUsedMs);
         }
         return writer;
     },
@@ -356,13 +327,6 @@ exports.ModelStorageMetrics = {
                     message.sizeOnDiskBytes = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.lastUsedMs = longToNumber(reader.int64());
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -383,11 +347,6 @@ exports.ModelStorageMetrics = {
                 : isSet(object.size_on_disk_bytes)
                     ? globalThis.Number(object.size_on_disk_bytes)
                     : 0,
-            lastUsedMs: isSet(object.lastUsedMs)
-                ? globalThis.Number(object.lastUsedMs)
-                : isSet(object.last_used_ms)
-                    ? globalThis.Number(object.last_used_ms)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -398,9 +357,6 @@ exports.ModelStorageMetrics = {
         if (message.sizeOnDiskBytes !== 0) {
             obj.sizeOnDiskBytes = Math.round(message.sizeOnDiskBytes);
         }
-        if (message.lastUsedMs !== undefined) {
-            obj.lastUsedMs = Math.round(message.lastUsedMs);
-        }
         return obj;
     },
     create(base) {
@@ -410,12 +366,11 @@ exports.ModelStorageMetrics = {
         const message = createBaseModelStorageMetrics();
         message.modelId = object.modelId ?? "";
         message.sizeOnDiskBytes = object.sizeOnDiskBytes ?? 0;
-        message.lastUsedMs = object.lastUsedMs ?? undefined;
         return message;
     },
 };
 function createBaseStorageInfo() {
-    return { app: undefined, device: undefined, models: [], totalModels: 0, totalModelsBytes: 0 };
+    return { app: undefined, device: undefined, models: [], totalModelsBytes: 0 };
 }
 exports.StorageInfo = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -427,9 +382,6 @@ exports.StorageInfo = {
         }
         for (const v of message.models) {
             exports.ModelStorageMetrics.encode(v, writer.uint32(26).fork()).join();
-        }
-        if (message.totalModels !== 0) {
-            writer.uint32(32).int32(message.totalModels);
         }
         if (message.totalModelsBytes !== 0) {
             writer.uint32(40).int64(message.totalModelsBytes);
@@ -464,13 +416,6 @@ exports.StorageInfo = {
                     message.models.push(exports.ModelStorageMetrics.decode(reader, reader.uint32()));
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.totalModels = reader.int32();
-                    continue;
-                }
                 case 5: {
                     if (tag !== 40) {
                         break;
@@ -493,11 +438,6 @@ exports.StorageInfo = {
             models: globalThis.Array.isArray(object?.models)
                 ? object.models.map((e) => exports.ModelStorageMetrics.fromJSON(e))
                 : [],
-            totalModels: isSet(object.totalModels)
-                ? globalThis.Number(object.totalModels)
-                : isSet(object.total_models)
-                    ? globalThis.Number(object.total_models)
-                    : 0,
             totalModelsBytes: isSet(object.totalModelsBytes)
                 ? globalThis.Number(object.totalModelsBytes)
                 : isSet(object.total_models_bytes)
@@ -516,9 +456,6 @@ exports.StorageInfo = {
         if (message.models?.length) {
             obj.models = message.models.map((e) => exports.ModelStorageMetrics.toJSON(e));
         }
-        if (message.totalModels !== 0) {
-            obj.totalModels = Math.round(message.totalModels);
-        }
         if (message.totalModelsBytes !== 0) {
             obj.totalModelsBytes = Math.round(message.totalModelsBytes);
         }
@@ -536,7 +473,6 @@ exports.StorageInfo = {
             ? exports.DeviceStorageInfo.fromPartial(object.device)
             : undefined;
         message.models = object.models?.map((e) => exports.ModelStorageMetrics.fromPartial(e)) || [];
-        message.totalModels = object.totalModels ?? 0;
         message.totalModelsBytes = object.totalModelsBytes ?? 0;
         return message;
     },
@@ -548,8 +484,6 @@ function createBaseStorageAvailability() {
         availableBytes: 0,
         warningMessage: undefined,
         recommendation: undefined,
-        shortfallBytes: 0,
-        requiredToAvailableRatio: 0,
     };
 }
 exports.StorageAvailability = {
@@ -568,12 +502,6 @@ exports.StorageAvailability = {
         }
         if (message.recommendation !== undefined) {
             writer.uint32(42).string(message.recommendation);
-        }
-        if (message.shortfallBytes !== 0) {
-            writer.uint32(48).int64(message.shortfallBytes);
-        }
-        if (message.requiredToAvailableRatio !== 0) {
-            writer.uint32(61).float(message.requiredToAvailableRatio);
         }
         return writer;
     },
@@ -619,20 +547,6 @@ exports.StorageAvailability = {
                     message.recommendation = reader.string();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.shortfallBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 61) {
-                        break;
-                    }
-                    message.requiredToAvailableRatio = reader.float();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -664,16 +578,6 @@ exports.StorageAvailability = {
                     ? globalThis.String(object.warning_message)
                     : undefined,
             recommendation: isSet(object.recommendation) ? globalThis.String(object.recommendation) : undefined,
-            shortfallBytes: isSet(object.shortfallBytes)
-                ? globalThis.Number(object.shortfallBytes)
-                : isSet(object.shortfall_bytes)
-                    ? globalThis.Number(object.shortfall_bytes)
-                    : 0,
-            requiredToAvailableRatio: isSet(object.requiredToAvailableRatio)
-                ? globalThis.Number(object.requiredToAvailableRatio)
-                : isSet(object.required_to_available_ratio)
-                    ? globalThis.Number(object.required_to_available_ratio)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -693,12 +597,6 @@ exports.StorageAvailability = {
         if (message.recommendation !== undefined) {
             obj.recommendation = message.recommendation;
         }
-        if (message.shortfallBytes !== 0) {
-            obj.shortfallBytes = Math.round(message.shortfallBytes);
-        }
-        if (message.requiredToAvailableRatio !== 0) {
-            obj.requiredToAvailableRatio = message.requiredToAvailableRatio;
-        }
         return obj;
     },
     create(base) {
@@ -711,8 +609,6 @@ exports.StorageAvailability = {
         message.availableBytes = object.availableBytes ?? 0;
         message.warningMessage = object.warningMessage ?? undefined;
         message.recommendation = object.recommendation ?? undefined;
-        message.shortfallBytes = object.shortfallBytes ?? 0;
-        message.requiredToAvailableRatio = object.requiredToAvailableRatio ?? 0;
         return message;
     },
 };
@@ -831,21 +727,18 @@ exports.StorageInfoRequest = {
     },
 };
 function createBaseStorageInfoResult() {
-    return { success: false, info: undefined, errorMessage: "", warnings: [] };
+    return { info: undefined, warnings: [], error: undefined };
 }
 exports.StorageInfoResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.success !== false) {
-            writer.uint32(8).bool(message.success);
-        }
         if (message.info !== undefined) {
             exports.StorageInfo.encode(message.info, writer.uint32(18).fork()).join();
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(26).string(message.errorMessage);
-        }
         for (const v of message.warnings) {
             writer.uint32(34).string(v);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(42).fork()).join();
         }
         return writer;
     },
@@ -856,13 +749,6 @@ exports.StorageInfoResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 18) {
                         break;
@@ -870,18 +756,18 @@ exports.StorageInfoResult = {
                     message.info = exports.StorageInfo.decode(reader, reader.uint32());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
                     message.warnings.push(reader.string());
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -894,29 +780,21 @@ exports.StorageInfoResult = {
     },
     fromJSON(object) {
         return {
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             info: isSet(object.info) ? exports.StorageInfo.fromJSON(object.info) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.info !== undefined) {
             obj.info = exports.StorageInfo.toJSON(message.info);
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -925,12 +803,13 @@ exports.StorageInfoResult = {
     },
     fromPartial(object) {
         const message = createBaseStorageInfoResult();
-        message.success = object.success ?? false;
         message.info = (object.info !== undefined && object.info !== null)
             ? exports.StorageInfo.fromPartial(object.info)
             : undefined;
-        message.errorMessage = object.errorMessage ?? "";
         message.warnings = object.warnings?.map((e) => e) || [];
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -938,7 +817,7 @@ function createBaseStorageAvailabilityRequest() {
     return {
         modelId: "",
         requiredBytes: 0,
-        safetyMargin: 0,
+        requiredFreeBytesAfterDownload: 0,
         includeExistingModelBytes: false,
         includeDeletePlan: false,
         allowCacheReclamation: false,
@@ -952,8 +831,8 @@ exports.StorageAvailabilityRequest = {
         if (message.requiredBytes !== 0) {
             writer.uint32(16).int64(message.requiredBytes);
         }
-        if (message.safetyMargin !== 0) {
-            writer.uint32(25).double(message.safetyMargin);
+        if (message.requiredFreeBytesAfterDownload !== 0) {
+            writer.uint32(56).int64(message.requiredFreeBytesAfterDownload);
         }
         if (message.includeExistingModelBytes !== false) {
             writer.uint32(32).bool(message.includeExistingModelBytes);
@@ -987,11 +866,11 @@ exports.StorageAvailabilityRequest = {
                     message.requiredBytes = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 25) {
+                case 7: {
+                    if (tag !== 56) {
                         break;
                     }
-                    message.safetyMargin = reader.double();
+                    message.requiredFreeBytesAfterDownload = longToNumber(reader.int64());
                     continue;
                 }
                 case 4: {
@@ -1035,10 +914,10 @@ exports.StorageAvailabilityRequest = {
                 : isSet(object.required_bytes)
                     ? globalThis.Number(object.required_bytes)
                     : 0,
-            safetyMargin: isSet(object.safetyMargin)
-                ? globalThis.Number(object.safetyMargin)
-                : isSet(object.safety_margin)
-                    ? globalThis.Number(object.safety_margin)
+            requiredFreeBytesAfterDownload: isSet(object.requiredFreeBytesAfterDownload)
+                ? globalThis.Number(object.requiredFreeBytesAfterDownload)
+                : isSet(object.required_free_bytes_after_download)
+                    ? globalThis.Number(object.required_free_bytes_after_download)
                     : 0,
             includeExistingModelBytes: isSet(object.includeExistingModelBytes)
                 ? globalThis.Boolean(object.includeExistingModelBytes)
@@ -1065,8 +944,8 @@ exports.StorageAvailabilityRequest = {
         if (message.requiredBytes !== 0) {
             obj.requiredBytes = Math.round(message.requiredBytes);
         }
-        if (message.safetyMargin !== 0) {
-            obj.safetyMargin = message.safetyMargin;
+        if (message.requiredFreeBytesAfterDownload !== 0) {
+            obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
         }
         if (message.includeExistingModelBytes !== false) {
             obj.includeExistingModelBytes = message.includeExistingModelBytes;
@@ -1086,7 +965,7 @@ exports.StorageAvailabilityRequest = {
         const message = createBaseStorageAvailabilityRequest();
         message.modelId = object.modelId ?? "";
         message.requiredBytes = object.requiredBytes ?? 0;
-        message.safetyMargin = object.safetyMargin ?? 0;
+        message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
         message.includeExistingModelBytes = object.includeExistingModelBytes ?? false;
         message.includeDeletePlan = object.includeDeletePlan ?? false;
         message.allowCacheReclamation = object.allowCacheReclamation ?? false;
@@ -1094,24 +973,21 @@ exports.StorageAvailabilityRequest = {
     },
 };
 function createBaseStorageAvailabilityResult() {
-    return { success: false, availability: undefined, warnings: [], errorMessage: "", deletePlan: undefined };
+    return { availability: undefined, warnings: [], deletePlan: undefined, error: undefined };
 }
 exports.StorageAvailabilityResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.success !== false) {
-            writer.uint32(8).bool(message.success);
-        }
         if (message.availability !== undefined) {
             exports.StorageAvailability.encode(message.availability, writer.uint32(18).fork()).join();
         }
         for (const v of message.warnings) {
             writer.uint32(26).string(v);
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(34).string(message.errorMessage);
-        }
         if (message.deletePlan !== undefined) {
             exports.StorageDeletePlan.encode(message.deletePlan, writer.uint32(42).fork()).join();
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -1122,13 +998,6 @@ exports.StorageAvailabilityResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 18) {
                         break;
@@ -1143,18 +1012,18 @@ exports.StorageAvailabilityResult = {
                     message.warnings.push(reader.string());
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 5: {
                     if (tag !== 42) {
                         break;
                     }
                     message.deletePlan = exports.StorageDeletePlan.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1167,37 +1036,29 @@ exports.StorageAvailabilityResult = {
     },
     fromJSON(object) {
         return {
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             availability: isSet(object.availability) ? exports.StorageAvailability.fromJSON(object.availability) : undefined,
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             deletePlan: isSet(object.deletePlan)
                 ? exports.StorageDeletePlan.fromJSON(object.deletePlan)
                 : isSet(object.delete_plan)
                     ? exports.StorageDeletePlan.fromJSON(object.delete_plan)
                     : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.availability !== undefined) {
             obj.availability = exports.StorageAvailability.toJSON(message.availability);
         }
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.deletePlan !== undefined) {
             obj.deletePlan = exports.StorageDeletePlan.toJSON(message.deletePlan);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1206,14 +1067,15 @@ exports.StorageAvailabilityResult = {
     },
     fromPartial(object) {
         const message = createBaseStorageAvailabilityResult();
-        message.success = object.success ?? false;
         message.availability = (object.availability !== undefined && object.availability !== null)
             ? exports.StorageAvailability.fromPartial(object.availability)
             : undefined;
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? "";
         message.deletePlan = (object.deletePlan !== undefined && object.deletePlan !== null)
             ? exports.StorageDeletePlan.fromPartial(object.deletePlan)
+            : undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
         return message;
     },
@@ -1381,7 +1243,6 @@ function createBaseStorageDeleteCandidate() {
     return {
         modelId: "",
         reclaimableBytes: 0,
-        lastUsedMs: undefined,
         isLoaded: false,
         localPath: "",
         requiresUnload: false,
@@ -1396,9 +1257,6 @@ exports.StorageDeleteCandidate = {
         }
         if (message.reclaimableBytes !== 0) {
             writer.uint32(16).int64(message.reclaimableBytes);
-        }
-        if (message.lastUsedMs !== undefined) {
-            writer.uint32(24).int64(message.lastUsedMs);
         }
         if (message.isLoaded !== false) {
             writer.uint32(32).bool(message.isLoaded);
@@ -1436,13 +1294,6 @@ exports.StorageDeleteCandidate = {
                         break;
                     }
                     message.reclaimableBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.lastUsedMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 4: {
@@ -1500,11 +1351,6 @@ exports.StorageDeleteCandidate = {
                 : isSet(object.reclaimable_bytes)
                     ? globalThis.Number(object.reclaimable_bytes)
                     : 0,
-            lastUsedMs: isSet(object.lastUsedMs)
-                ? globalThis.Number(object.lastUsedMs)
-                : isSet(object.last_used_ms)
-                    ? globalThis.Number(object.last_used_ms)
-                    : undefined,
             isLoaded: isSet(object.isLoaded)
                 ? globalThis.Boolean(object.isLoaded)
                 : isSet(object.is_loaded)
@@ -1540,9 +1386,6 @@ exports.StorageDeleteCandidate = {
         if (message.reclaimableBytes !== 0) {
             obj.reclaimableBytes = Math.round(message.reclaimableBytes);
         }
-        if (message.lastUsedMs !== undefined) {
-            obj.lastUsedMs = Math.round(message.lastUsedMs);
-        }
         if (message.isLoaded !== false) {
             obj.isLoaded = message.isLoaded;
         }
@@ -1567,7 +1410,6 @@ exports.StorageDeleteCandidate = {
         const message = createBaseStorageDeleteCandidate();
         message.modelId = object.modelId ?? "";
         message.reclaimableBytes = object.reclaimableBytes ?? 0;
-        message.lastUsedMs = object.lastUsedMs ?? undefined;
         message.isLoaded = object.isLoaded ?? false;
         message.localPath = object.localPath ?? "";
         message.requiresUnload = object.requiresUnload ?? false;
@@ -1583,10 +1425,9 @@ function createBaseStorageDeletePlan() {
         reclaimableBytes: 0,
         candidates: [],
         warnings: [],
-        errorMessage: "",
         requiresUnload: false,
         requiresPlatformDelete: false,
-        candidateCount: 0,
+        error: undefined,
     };
 }
 exports.StorageDeletePlan = {
@@ -1606,17 +1447,14 @@ exports.StorageDeletePlan = {
         for (const v of message.warnings) {
             writer.uint32(42).string(v);
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(50).string(message.errorMessage);
-        }
         if (message.requiresUnload !== false) {
             writer.uint32(56).bool(message.requiresUnload);
         }
         if (message.requiresPlatformDelete !== false) {
             writer.uint32(64).bool(message.requiresPlatformDelete);
         }
-        if (message.candidateCount !== 0) {
-            writer.uint32(72).int32(message.candidateCount);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(82).fork()).join();
         }
         return writer;
     },
@@ -1662,13 +1500,6 @@ exports.StorageDeletePlan = {
                     message.warnings.push(reader.string());
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 7: {
                     if (tag !== 56) {
                         break;
@@ -1683,11 +1514,11 @@ exports.StorageDeletePlan = {
                     message.requiresPlatformDelete = reader.bool();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 72) {
+                case 10: {
+                    if (tag !== 82) {
                         break;
                     }
-                    message.candidateCount = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1721,11 +1552,6 @@ exports.StorageDeletePlan = {
             warnings: globalThis.Array.isArray(object?.warnings)
                 ? object.warnings.map((e) => globalThis.String(e))
                 : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             requiresUnload: isSet(object.requiresUnload)
                 ? globalThis.Boolean(object.requiresUnload)
                 : isSet(object.requires_unload)
@@ -1736,11 +1562,7 @@ exports.StorageDeletePlan = {
                 : isSet(object.requires_platform_delete)
                     ? globalThis.Boolean(object.requires_platform_delete)
                     : false,
-            candidateCount: isSet(object.candidateCount)
-                ? globalThis.Number(object.candidateCount)
-                : isSet(object.candidate_count)
-                    ? globalThis.Number(object.candidate_count)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1760,17 +1582,14 @@ exports.StorageDeletePlan = {
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.requiresUnload !== false) {
             obj.requiresUnload = message.requiresUnload;
         }
         if (message.requiresPlatformDelete !== false) {
             obj.requiresPlatformDelete = message.requiresPlatformDelete;
         }
-        if (message.candidateCount !== 0) {
-            obj.candidateCount = Math.round(message.candidateCount);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1784,17 +1603,18 @@ exports.StorageDeletePlan = {
         message.reclaimableBytes = object.reclaimableBytes ?? 0;
         message.candidates = object.candidates?.map((e) => exports.StorageDeleteCandidate.fromPartial(e)) || [];
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? "";
         message.requiresUnload = object.requiresUnload ?? false;
         message.requiresPlatformDelete = object.requiresPlatformDelete ?? false;
-        message.candidateCount = object.candidateCount ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseStorageDeleteRequest() {
     return {
         modelIds: [],
-        deleteFiles: false,
+        keepFilesOnDisk: false,
         clearRegistryPaths: false,
         unloadIfLoaded: false,
         dryRun: false,
@@ -1808,8 +1628,8 @@ exports.StorageDeleteRequest = {
         for (const v of message.modelIds) {
             writer.uint32(10).string(v);
         }
-        if (message.deleteFiles !== false) {
-            writer.uint32(16).bool(message.deleteFiles);
+        if (message.keepFilesOnDisk !== false) {
+            writer.uint32(16).bool(message.keepFilesOnDisk);
         }
         if (message.clearRegistryPaths !== false) {
             writer.uint32(24).bool(message.clearRegistryPaths);
@@ -1849,7 +1669,7 @@ exports.StorageDeleteRequest = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.deleteFiles = reader.bool();
+                    message.keepFilesOnDisk = reader.bool();
                     continue;
                 }
                 case 3: {
@@ -1909,10 +1729,10 @@ exports.StorageDeleteRequest = {
                 : globalThis.Array.isArray(object?.model_ids)
                     ? object.model_ids.map((e) => globalThis.String(e))
                     : [],
-            deleteFiles: isSet(object.deleteFiles)
-                ? globalThis.Boolean(object.deleteFiles)
-                : isSet(object.delete_files)
-                    ? globalThis.Boolean(object.delete_files)
+            keepFilesOnDisk: isSet(object.keepFilesOnDisk)
+                ? globalThis.Boolean(object.keepFilesOnDisk)
+                : isSet(object.keep_files_on_disk)
+                    ? globalThis.Boolean(object.keep_files_on_disk)
                     : false,
             clearRegistryPaths: isSet(object.clearRegistryPaths)
                 ? globalThis.Boolean(object.clearRegistryPaths)
@@ -1947,8 +1767,8 @@ exports.StorageDeleteRequest = {
         if (message.modelIds?.length) {
             obj.modelIds = message.modelIds;
         }
-        if (message.deleteFiles !== false) {
-            obj.deleteFiles = message.deleteFiles;
+        if (message.keepFilesOnDisk !== false) {
+            obj.keepFilesOnDisk = message.keepFilesOnDisk;
         }
         if (message.clearRegistryPaths !== false) {
             obj.clearRegistryPaths = message.clearRegistryPaths;
@@ -1976,7 +1796,7 @@ exports.StorageDeleteRequest = {
     fromPartial(object) {
         const message = createBaseStorageDeleteRequest();
         message.modelIds = object.modelIds?.map((e) => e) || [];
-        message.deleteFiles = object.deleteFiles ?? false;
+        message.keepFilesOnDisk = object.keepFilesOnDisk ?? false;
         message.clearRegistryPaths = object.clearRegistryPaths ?? false;
         message.unloadIfLoaded = object.unloadIfLoaded ?? false;
         message.dryRun = object.dryRun ?? false;
@@ -1990,23 +1810,19 @@ exports.StorageDeleteRequest = {
 };
 function createBaseStorageDeleteResult() {
     return {
-        success: false,
         deletedBytes: 0,
         deletedModelIds: [],
         failedModelIds: [],
         warnings: [],
-        errorMessage: "",
         skippedModelIds: [],
         dryRun: false,
         registryUpdated: false,
         filesDeleted: false,
+        error: undefined,
     };
 }
 exports.StorageDeleteResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.success !== false) {
-            writer.uint32(8).bool(message.success);
-        }
         if (message.deletedBytes !== 0) {
             writer.uint32(16).int64(message.deletedBytes);
         }
@@ -2018,9 +1834,6 @@ exports.StorageDeleteResult = {
         }
         for (const v of message.warnings) {
             writer.uint32(42).string(v);
-        }
-        if (message.errorMessage !== "") {
-            writer.uint32(50).string(message.errorMessage);
         }
         for (const v of message.skippedModelIds) {
             writer.uint32(58).string(v);
@@ -2034,6 +1847,9 @@ exports.StorageDeleteResult = {
         if (message.filesDeleted !== false) {
             writer.uint32(80).bool(message.filesDeleted);
         }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(90).fork()).join();
+        }
         return writer;
     },
     decode(input, length) {
@@ -2043,13 +1859,6 @@ exports.StorageDeleteResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -2076,13 +1885,6 @@ exports.StorageDeleteResult = {
                         break;
                     }
                     message.warnings.push(reader.string());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
                     continue;
                 }
                 case 7: {
@@ -2113,6 +1915,13 @@ exports.StorageDeleteResult = {
                     message.filesDeleted = reader.bool();
                     continue;
                 }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2123,7 +1932,6 @@ exports.StorageDeleteResult = {
     },
     fromJSON(object) {
         return {
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             deletedBytes: isSet(object.deletedBytes)
                 ? globalThis.Number(object.deletedBytes)
                 : isSet(object.deleted_bytes)
@@ -2140,11 +1948,6 @@ exports.StorageDeleteResult = {
                     ? object.failed_model_ids.map((e) => globalThis.String(e))
                     : [],
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             skippedModelIds: globalThis.Array.isArray(object?.skippedModelIds)
                 ? object.skippedModelIds.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.skipped_model_ids)
@@ -2165,13 +1968,11 @@ exports.StorageDeleteResult = {
                 : isSet(object.files_deleted)
                     ? globalThis.Boolean(object.files_deleted)
                     : false,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.deletedBytes !== 0) {
             obj.deletedBytes = Math.round(message.deletedBytes);
         }
@@ -2183,9 +1984,6 @@ exports.StorageDeleteResult = {
         }
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
-        }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
         }
         if (message.skippedModelIds?.length) {
             obj.skippedModelIds = message.skippedModelIds;
@@ -2199,6 +1997,9 @@ exports.StorageDeleteResult = {
         if (message.filesDeleted !== false) {
             obj.filesDeleted = message.filesDeleted;
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -2206,16 +2007,17 @@ exports.StorageDeleteResult = {
     },
     fromPartial(object) {
         const message = createBaseStorageDeleteResult();
-        message.success = object.success ?? false;
         message.deletedBytes = object.deletedBytes ?? 0;
         message.deletedModelIds = object.deletedModelIds?.map((e) => e) || [];
         message.failedModelIds = object.failedModelIds?.map((e) => e) || [];
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? "";
         message.skippedModelIds = object.skippedModelIds?.map((e) => e) || [];
         message.dryRun = object.dryRun ?? false;
         message.registryUpdated = object.registryUpdated ?? false;
         message.filesDeleted = object.filesDeleted ?? false;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

@@ -121,6 +121,17 @@ rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
   | perl -ne 'while (/"((?:rac|ra_mlx)_[A-Za-z0-9_]+)"/g) { print "$1\n" }' \
   | sort -u > /tmp/runanywhere_expected_swift_native_symbols.from_strings
 
+# Declared only inside a build-configuration guard this archive does not compile.
+# The rg pass above is a plain text scan and does not evaluate `#if`, so without
+# this filter the gate fails on every good archive over a symbol that is
+# CORRECTLY absent. `ra_mlx_metal_resource_anchor` lives in MLXRuntime/MLX.swift
+# under `#if RUNANYWHERE_MLX_DISTRIBUTION`, set only for the CocoaPods
+# distribution build; a SwiftPM archive never compiles it.
+# Extend this list ONLY for a symbol confirmed guarded out of this configuration.
+PACKAGING_ONLY_SYMBOLS=(
+  ra_mlx_metal_resource_anchor
+)
+
 {
   cat /tmp/runanywhere_expected_swift_native_symbols.from_strings
   printf '%s\n' \
@@ -139,7 +150,9 @@ rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
     ra_mlx_runtime_is_available \
     ra_mlx_runtime_is_registered \
     ra_mlx_unregister_runtime
-} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.txt
+} | sort -u \
+  | grep -vxF "$(printf '%s\n' "${PACKAGING_ONLY_SYMBOLS[@]}")" \
+  > /tmp/runanywhere_expected_swift_native_symbols.txt
 
 comm -23 \
   /tmp/runanywhere_expected_swift_native_symbols.txt \
@@ -269,11 +282,11 @@ Three layers:
 ### SDK Initialization Gate
 The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. The boot sequence:
 1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, Boolean-returning `MLX.register(priority:100)`, `ONNX.register(priority:100)`
-2. `RunAnywhere.initialize()` — core C++ bridge init
+2. `RunAnywhere.initialize(apiKey:baseUrl:environment:)` brings the SDK up; network work continues in the background
 3. `ModelCatalogBootstrap.registerAll(mlxRegistered:)` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, and LoRA while omitting every MLX row when registration failed
-4. `RunAnywhere.discoverDownloadedModels()` then `RunAnywhere.listModels()` (refresh registry)
+4. `RunAnywhere.models.refresh()` then `RunAnywhere.models.list()` (reconcile the registry with disk)
 
-Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
+Backends MUST be registered before any `await` to prevent a race where a model load fires against an empty provider registry.
 MLX execution requires a physical iOS device (or native macOS). The arm64 iOS
 Simulator build is for package, compile, link, and startup validation only;
 `MLX.register()` returns `false`, and the example does not seed MLX rows there.
@@ -354,11 +367,11 @@ The primary feature. `LLMViewModel` is split across 7 files via extensions:
 | File | Responsibility |
 |------|---------------|
 | `LLMViewModel.swift` | Core state, `sendMessage()`, ChatML prompt builder, LoRA management |
-| `LLMViewModel+Generation.swift` | Streaming (`RunAnywhere.generateStream`) and non-streaming (`RunAnywhere.generate`) paths |
-| `LLMViewModel+ToolCalling.swift` | `RunAnywhere.generateWithTools`, format detection (default vs LFM2) |
-| `LLMViewModel+ModelManagement.swift` | `RunAnywhere.loadModel`, model status checks |
+| `LLMViewModel+Generation.swift` | Streaming (`RunAnywhere.llm.generateStream(messages:)`) and non-streaming (`RunAnywhere.llm.generate(messages:)`) paths |
+| `LLMViewModel+ToolCalling.swift` | `RunAnywhere.llm.generate` with the tool registry active; the SDK runs the call/execute loop |
+| `LLMViewModel+ModelManagement.swift` | `RunAnywhere.models.load(id:)`, model status checks |
 | `LLMViewModel+Analytics.swift` | `MessageAnalytics` creation, `ConversationAnalytics` aggregation |
-| `LLMViewModel+Events.swift` | Combine subscription to `RunAnywhere.events.events` for model lifecycle |
+| `LLMViewModel+Events.swift` | Combine subscription to `RunAnywhere.eventBus` for model lifecycle |
 | `LLMViewModelTypes.swift` | `LLMError`, `GenerationMetricsFromSDK`, `DownloadProgressDelegate` |
 
 **Data flow**: User input → `sendMessage()` → `prepareMessagesForSending()` (creates user + empty assistant messages) → `executeGeneration()` → `performGeneration()` → routes to streaming/non-streaming/tool-calling path → SDK call → token-by-token message update → `finalizeGeneration()` → persist to `ConversationStore`
@@ -379,7 +392,7 @@ Full STT → LLM → TTS pipeline orchestrated by the SDK.
 
 **Setup**: User loads 3 models independently (STT, LLM, TTS) via `ModelSelectionSheet`.
 
-**Pipeline**: `startConversation()` → `RunAnywhere.initializeVoiceAgentWithLoadedModels()` → `RunAnywhere.streamVoiceAgent()` returns `AsyncStream<RAVoiceEvent>`. Events include `.state`, `.vad`, `.userSaid`, `.assistantToken`, `.audio`, `.error`. The SDK owns the full audio pipeline internally.
+**Pipeline**: `startConversation()` → `RunAnywhere.voice.createSession(stt:llm:tts:)` → `session.start()` opens the microphone → `session.events` yields `VoiceEvent`s (`userTranscribed`, `agentStateChanged`, `agentResponse`, `speechStarted`, `speechEnded`, `error`). The SDK owns the full audio pipeline internally, including the VAD it ensures for itself.
 
 **Particle animation**: Metal-rendered 2000-particle system (`VoiceAssistantParticleView.swift`). Fibonacci-lattice sphere morphs to ring during listening/speaking. Amplitude driven by real microphone level (listening) or simulated sine wave (speaking). Touch scatter with 0.92 decay.
 
@@ -388,18 +401,19 @@ Full STT → LLM → TTS pipeline orchestrated by the SDK.
 ### 3. Speech-to-Text (`Features/Voice/STTViewModel.swift`)
 
 Two modes:
-- **Batch**: Record audio → `RunAnywhere.transcribe(audioBuffer)` → full transcription
-- **Live**: VAD-based polling at 50ms intervals; silence threshold 0.02 for 1.5s triggers `RunAnywhere.transcribe()` on accumulated buffer, then clears and continues
+- **Batch**: Record audio → `RunAnywhere.stt.transcribe(.pcm16(buffer, sampleRate: 16_000))` → full transcript
+- **Live**: Mic chunks are yielded into `RunAnywhere.stt.transcribeStream(_:)`, which owns segmentation and emits `.partial` / `.final` events. No app-side silence detection.
+- **Hybrid**: On-device first with cloud fallback through `HybridSTTRouter`.
 
 Audio captured via `AudioCaptureManager`. SDK events monitored for model load/unload state.
 
 ### 4. Text-to-Speech (`Features/Voice/TTSViewModel.swift`)
 
-`RunAnywhere.speak(text, options: TTSOptions(rate:pitch:))` — SDK handles both synthesis and playback internally. Returns `TTSSpeakResult` with duration, format, audio size. `RunAnywhere.stopSpeaking()` for interruption.
+`RunAnywhere.tts.speak(text, options: TtsOptions(speed:pitch:))` handles synthesis and playback inside the SDK and returns nothing. `RunAnywhere.tts.stop()` interrupts it. Use `tts.synthesize(_:)` when you want the `Audio` buffer instead of playback.
 
 ### 5. Voice Activity Detection (`Features/Voice/VADViewModel.swift`)
 
-Detection loop runs every 30ms. Buffers 1024 bytes (512 Int16 samples = 32ms at 16kHz), converts to `[Float]`, calls `RunAnywhere.detectSpeech(in: samples)` → `Bool`. Activity log limited to 50 entries.
+Mic chunks go straight into `RunAnywhere.vad.detectStream(_:)`, which emits `.speechStarted`, `.speechEnded`, and per-chunk `.frame(VadResult)`. Framing is the SDK's job, not the app's. Activity log limited to 50 entries.
 
 ### 6. Voice Keyboard (`Features/VoiceKeyboard/`)
 
@@ -409,7 +423,7 @@ Cross-process dictation system using a WisprFlow-style architecture:
 - **App Group UserDefaults** (`group.com.runanywhere.runanywhereai`): shared state (sessionState, transcribedText, audioLevel, heartbeat)
 - **Darwin CFNotificationCenter**: zero-latency cross-process signals (6 notification names in `SharedConstants.DarwinNotifications`)
 
-**Flow**: Keyboard taps "Run" → opens `runanywhere://startFlow` deep link → main app activates session → loads STT model → starts audio capture → posts `sessionReady` → user returns to host app → keyboard sends `startListening` → main app buffers audio → keyboard sends `stopListening` → main app calls `RunAnywhere.transcribe()` → writes result to shared UserDefaults → posts `transcriptionReady` → keyboard reads and inserts via `textDocumentProxy.insertText()`
+**Flow**: Keyboard taps "Run" → opens `runanywhere://startFlow` deep link → main app activates session → loads STT model → starts audio capture → posts `sessionReady` → user returns to host app → keyboard sends `startListening` → main app buffers audio → keyboard sends `stopListening` → main app calls `RunAnywhere.stt.transcribe(_:)` → writes result to shared UserDefaults → posts `transcriptionReady` → keyboard reads and inserts via `textDocumentProxy.insertText()`
 
 **Live Activity**: `DictationActivityAttributes` with `ContentState` (phase, elapsedSeconds, transcript, wordCount). Updates Dynamic Island compact/expanded + Lock Screen views.
 
@@ -418,7 +432,7 @@ Cross-process dictation system using a WisprFlow-style architecture:
 ### 7. Vision / VLM (`Features/Vision/`)
 
 Real-time camera-based image description. `AVCaptureSession` with BGRA pixel format. Three modes:
-- **Single capture**: `RunAnywhere.processImageStream(VLMImage(pixelBuffer:), prompt:, maxTokens: 200)` → token stream
+- **Single capture**: `RunAnywhere.vlm.generateStream(image: .pixelBuffer(frame), prompt:, options:)` → token stream
 - **Photo library**: Same pipeline from selected image
 - **Auto-streaming**: Captures frame every 2.5s, shorter prompt (maxTokens: 100)
 
@@ -426,7 +440,7 @@ Real-time camera-based image description. `AVCaptureSession` with BGRA pixel for
 
 PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
-**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → construct `RARAGDocument` with its typed `metadata` map → `RunAnywhere.ragCreatePipeline(config:)` → `RunAnywhere.ragIngest(_:)` → user asks question → `RunAnywhere.ragQuery(question:)` → thinking content parsed via `ThinkingContentParser`
+**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → `RunAnywhere.rag.open(embeddingModel:llmModel:)` → `session.ingest(document: RagDocument(text:metadata:))` → user asks question → `session.query(question:options:)` → thinking content parsed via `ThinkingContentParser`. The session stays open across turns for the same document and model pair.
 
 Path resolution handles multi-file embedding models (e.g., `all-minilm-l6-v2` with `model.onnx` + `vocab.txt`).
 
@@ -440,22 +454,23 @@ Deterministic performance testing across 4 modalities (LLM, STT, TTS, VLM). Each
 
 ### 10. Models Management (`Features/Models/`)
 
-`ModelListViewModel` (singleton) is the canonical model registry. Subscribes to `RunAnywhere.events.events` for real-time load/unload state. `ModelSelectionSheet` is the universal model picker parameterized by `ModelSelectionContext` enum (`.llm`, `.stt`, `.tts`, `.vad`, `.vlm`, `.ragEmbedding`, `.ragLLM`). Custom model registration via URL in `AddModelFromURLView`.
+`ModelListViewModel` (singleton) is the canonical model registry. Subscribes to `RunAnywhere.eventBus.modelLifecycle` for real-time load/unload state. `ModelSelectionSheet` is the universal model picker parameterized by `ModelSelectionContext` enum (`.llm`, `.stt`, `.tts`, `.vad`, `.vlm`, `.ragEmbedding`, `.ragLLM`). Custom model registration via URL in `AddModelFromURLView`.
 
 ### 11. Storage (`Features/Storage/`)
 
-`RunAnywhere.getStorageInfo()` → disk usage display using
-`RAStorageInfo.models` / `RAModelStorageMetrics` directly. Rows cross-reference
-`ModelListViewModel` for display name and local path, and treat `lastUsedMs`
-only as last-used time. Per-model deletion uses `RunAnywhere.deleteModel()`.
-Cache/temp clearing uses `RunAnywhere.clearCache()` /
+`RunAnywhere.models.state()` supplies the used and free byte counts, and
+`RunAnywhere.models.list(filter: ModelFilter(downloadedOnly: true))` supplies the
+rows, filtered to entries with a real on-disk size so Apple system pseudo-models
+drop out. Each row reads its own `ModelInfo` for name, local path, framework, and
+`lastUsedAtUnixMs`. Per-model deletion is `RunAnywhere.models.delete(id:)`;
+cache and temp clearing are `RunAnywhere.clearCache()` and
 `RunAnywhere.cleanTempFiles()`.
 
 ### 12. Settings (`Features/Settings/`)
 
 `SettingsViewModel` (singleton): temperature, maxTokens, systemPrompt (UserDefaults), API key/baseURL (Keychain), thinking mode toggle. Auto-saves via Combine `debounce(0.5s)`.
 
-`ToolSettingsViewModel`: registers/clears demo tools via `RunAnywhere.registerTool(definition:executor:)`. Includes `SafeMathEvaluator` (recursive-descent parser) for the `calculate` tool.
+`ToolSettingsViewModel`: registers and clears demo tools via `RunAnywhere.llm.tools`. Includes `SafeMathEvaluator` (recursive-descent parser) for the `calculate` tool.
 
 ---
 
@@ -473,74 +488,73 @@ Three-layer delegation chain for AI response text:
 
 ## SDK API Surface (as consumed by this app)
 
-All calls go through the `RunAnywhere` enum namespace (no instances). The app
-uses a mix of canonical proto-backed SDK APIs and **app-local convenience
-shims** defined in `Extensions/RunAnywhere+ExampleShims.swift`. The shims
-compose canonical proto requests (`RAModelLoadRequest`, `RALLMGenerateRequest`,
-etc.) into ergonomic helpers; they are NOT part of the SDK public surface.
-
-### Canonical SDK API (`sdk/runanywhere-swift`)
+Every call goes through the `RunAnywhere` enum (never instantiated) and follows
+the cross-SDK v3 contract in `thoughts/shared/plans/public_api_spec.md`. One
+namespace per modality; the SDK owns model resolution, loading, downloading, and
+orchestration behind each verb.
 
 ```swift
-// Initialization
-RunAnywhere.initialize(apiKey:baseURL:environment:)  // throws
-RunAnywhere.discoverDownloadedModels()
+// Core
+try RunAnywhere.initialize(apiKey:baseUrl:environment:)   // one call, both phases
+RunAnywhere.isReady / .version / .deviceId
+RunAnywhere.events            // AsyncStream<SdkEvent>
+RunAnywhere.eventBus          // Combine publisher over raw RASDKEvent protos
 
-// Model lifecycle (canonical proto-request entry points)
-RunAnywhere.loadModel(_ request: RAModelLoadRequest) -> RAModelLoadResult
-RunAnywhere.unloadModel(_ request: RAModelUnloadRequest) -> RAModelUnloadResult
-RunAnywhere.currentModel(_ request: RACurrentModelRequest) -> RACurrentModelSnapshot
-RunAnywhere.listModels() -> RAListModelsResult
-RunAnywhere.queryModels(_:) / getModel(_:) / downloadedModels()
-RunAnywhere.importModel(_ request: RAModelImportRequest)
-RunAnywhere.downloadModel(_ model: RAModelInfo, onProgress:) async throws
+// Models
+RunAnywhere.models.list(filter:) / .get(id:) / .register(_:) / .download(id:)
+RunAnywhere.models.load(id:options:) / .unload(category:) / .delete(id:) / .state()
 
-// LLM
-RunAnywhere.generate(_ request: RALLMGenerateRequest) -> RALLMGenerationResult
-RunAnywhere.generateStream(_:) -> AsyncStream<RALLMStreamEvent>
-RunAnywhere.generateWithTools(prompt:options:toolOptions:) -> RAToolCallingResult
-RunAnywhere.cancelGeneration()
-RunAnywhere.registerTool(_:executor:) / unregisterTool(_:) / getRegisteredTools() / clearTools()
+// Generation
+RunAnywhere.llm.generate(prompt:options:) / .generate(messages:options:)
+RunAnywhere.llm.generateStream(...) / .generateStructured(prompt:schema:options:)
+RunAnywhere.llm.tools.register(_:executor:) / .unregister(name:) / .list() / .clear()
+RunAnywhere.vlm.generate(image:prompt:options:) / .generateStream(...)
 
-// STT / TTS / VAD / VLM
-RunAnywhere.transcribe(audio:options:) -> RATranscriptionResult
-RunAnywhere.speak(text:options:) -> RATTSSpeakResult
-RunAnywhere.detectVoiceActivity(_ audioData: Data) -> RAVADResult
-RunAnywhere.processImage(_ image: RAVLMImage, options:) -> RAVLMResult
-RunAnywhere.processImageStream(_ image: RAVLMImage, options:) -> AsyncStream<RAVLMStreamEvent>
+// Audio and vision
+RunAnywhere.stt.transcribe(_:options:) / .transcribeStream(_:options:) / .state()
+RunAnywhere.tts.synthesize(_:options:) / .speak(_:options:) / .stop() / .voices()
+RunAnywhere.vad.detect(_:options:) / .detectStream(_:options:)
+RunAnywhere.diarization.diarize(_:options:)
+RunAnywhere.segmentation.segment(_:options:)
 
-// Voice agent
-RunAnywhere.initializeVoiceAgent(_ config: RAVoiceAgentComposeConfig)
-RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>
-RunAnywhere.processVoiceTurn / cleanupVoiceAgent
+// Sessions
+let voice = try await RunAnywhere.voice.createSession(stt:llm:tts:)
+try voice.start()             // the only thing that opens the microphone
+let rag = try await RunAnywhere.rag.open(embeddingModel:llmModel:config:)
 
-// RAG / Storage / LoRA / Solutions
-RunAnywhere.ragCreatePipeline(config:) / ragIngest(_:) / ragQuery(_:)
-RunAnywhere.getStorageInfo() / clearCache() / cleanTempFiles() / planStorageDelete / deleteStorage
-RunAnywhere.lora.{apply,remove,list,state,register,listCatalog,allRegistered,...}
-RunAnywhere.solutions.run(yaml:) -> handle
-
-// Events (canonical typed payloads)
-RunAnywhere.events.events  // Combine Publisher<any SDKEvent, Never>
-// Read typed payloads on RASDKEvent: event.model.kind/.modelID, event.generation.kind/.tokensUsed/...,
-// event.capability, event.componentLifecycle, event.operationID. Do NOT read event.properties[String].
+// LoRA, embeddings, rerank, storage
+RunAnywhere.lora.apply(adapterId:scale:) / .remove(adapterId:) / .list()
+RunAnywhere.embeddings.embed(_:options:)
+RunAnywhere.rerank.rerank(query:documents:topN:)
+RunAnywhere.clearCache() / .cleanTempFiles() / .deleteStorage(_:)
 ```
+
+Inputs are `AudioInput` (`.pcm16`, `.float32`, `.wav`, `.file`) and `ImageInput`
+(`.file`, `.bytes`, `.rawRgb`, `.uiImage`, `.cgImage`, `.pixelBuffer`). Pixel
+conversion, including camera frames, belongs to the SDK: hand `ImageInput` a
+`CVPixelBuffer` and do not bridge through `CIContext` in the app.
+
+Options are `LlmOptions`, `SttOptions`, `TtsOptions`, `VadOptions`,
+`EmbedOptions`, `ImageOptions`, `DiarizationOptions`, `SegmentationOptions`,
+`LoadOptions`, and `RagConfig`. Every field is optional and every default comes
+from the IDL.
+
+One-shot verbs throw `SDKException`. Stream factories are
+`async throws -> AsyncThrowingStream`, so they throw on preflight failure and
+throw into the consumer mid-flight. No result carries a `success` flag, and no
+error text hides in a payload field. Cancel a request by cancelling the Task
+consuming it; there are no cancel verbs.
+
+The older flat verbs (`loadModel`, `transcribe`, `ragQuery`, and friends) still
+exist as deprecated forwarders in the SDK for one release. Do not use them here.
 
 ### App-Local Convenience Shims (`RunAnywhere+ExampleShims.swift`)
 
-All previous shim wrappers (modality-specific load/unload helpers, current-model
-accessors, prompt-form generation overloads, VAD ergonomics, VLM token-stream
-flattening, voice-agent compose helpers, URL-form `registerModel`, etc.) have
-been promoted into the canonical SDK public surface. The example app calls
-those directly via `RunAnywhere.*`.
-
-What remains in this file is strictly example-specific UI plumbing with no
-cross-SDK parity story:
+One helper remains, and it is UI plumbing with no cross-SDK parity story:
 
 ```swift
-// Framework discovery via listModels() — composes the canonical
-// RunAnywhere.listModels() proto API into the shape the Models tab and
-// Add-from-URL flow want. Sorted by descending model count.
+// Framework filter list for the Models tab and Add-from-URL flow, composed
+// from RunAnywhere.models.list() and sorted by descending model count.
 RunAnywhere.getRegisteredFrameworks() -> [RAInferenceFramework]
 ```
 

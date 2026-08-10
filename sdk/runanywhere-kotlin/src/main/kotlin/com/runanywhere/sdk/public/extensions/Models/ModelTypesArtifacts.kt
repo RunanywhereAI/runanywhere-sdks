@@ -9,9 +9,14 @@
  * The `RA*` typealiases are pending; for now these helpers operate
  * on the Wire-generated proto types directly.
  *
- * NOTE: filesystem-aware checks (`isDownloadedOnDisk`) defer to the proto's
- * `is_downloaded` flag because commonMain does not have access to platform
- * file APIs. The platform actuals (jvmAndroidMain) populate that flag.
+ * NOTE: `ModelInfo.is_downloaded` was deleted outright (idl/model_types.proto,
+ * reserved 32: "a bool cannot express DOWNLOADING"). `registry_status`
+ * (`ModelRegistryStatus`) is now the single durable state signal;
+ * `isDownloadedOnDisk` below checks `registry_status ==
+ * MODEL_REGISTRY_STATUS_DOWNLOADED` first, falling back to a non-empty
+ * `local_path` for entries commons has not round-tripped through the
+ * registry status machine yet (mirrors Swift, which still probes the
+ * filesystem directly since it has platform file APIs commonMain lacks).
  */
 
 package com.runanywhere.sdk.public.extensions.Models
@@ -30,6 +35,7 @@ import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoMakeRequest
 import ai.runanywhere.proto.v1.ModelInfoMetadata
+import ai.runanywhere.proto.v1.ModelRegistryStatus
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
@@ -75,7 +81,10 @@ fun ModelFileDescriptor.Companion.create(
     ModelFileDescriptor(
         url = url,
         filename = filename,
-        is_required = isRequired,
+        // Wire polarity was inverted (ModelFileDescriptor.is_required ->
+        // is_optional): the public isRequired parameter name/default are
+        // unchanged, only the proto-building code inverts.
+        is_optional = !isRequired,
         relative_path = url.substringAfterLast('/').takeIf { it.isNotEmpty() } ?: filename,
         destination_path = filename,
     )
@@ -228,15 +237,22 @@ val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
 
 /**
  * Resolve the [ExpectedModelFiles] manifest the SDK should hand to the
- * downloader. Mirrors Swift's `expectedArtifactFiles`: a top-level manifest
- * short-circuits; otherwise the canonical fall-through (artifact-attached
- * manifest → pattern shorthand → multi-file descriptor seed) is computed by
- * commons via `rac_artifact_expected_files_proto` so the Kotlin,
- * Swift, and download-planner views can never drift.
+ * downloader. `ModelInfo.expected_files` (the top-level field) was deleted
+ * outright (idl/model_types.proto: "belongs on the variant") — the
+ * manifest now lives exclusively on the active artifact-oneof arm
+ * (`single_file.expected_files` / `archive.expected_files` /
+ * `multi_file.files`), so this reads that arm directly instead of a
+ * top-level short-circuit. Falls through to commons via
+ * `rac_artifact_expected_files_proto` so the Kotlin, Swift, and
+ * download-planner views can never drift.
  */
 val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles
     get() {
-        expected_files?.let { if (!it.isEmptyManifest) return it }
+        single_file?.expected_files?.let { if (!it.isEmptyManifest) return it }
+        archive?.expected_files?.let { if (!it.isEmptyManifest) return it }
+        multi_file?.files?.takeIf { it.isNotEmpty() }?.let {
+            return ExpectedModelFiles(files = it)
+        }
         val decoded =
             RunAnywhereBridge
                 .racArtifactExpectedFilesProto(ModelInfo.ADAPTER.encode(this))
@@ -246,28 +262,34 @@ val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles
 
 /**
  * Built-in detection — covers the explicit `built_in` oneof flag, the
- * `built_in` artifact type, the `builtin:` localpath prefix, and the two
- * platform-built-in frameworks (Foundation Models, System TTS).
+ * `builtin:` localpath prefix, and the two platform-built-in frameworks
+ * (Foundation Models, System TTS). `ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN`
+ * is still a valid enum value on the wire, but `ModelInfo.artifact_type`
+ * itself was deleted outright, so the `built_in` oneof arm is the sole
+ * classification signal now.
  */
 val RAModelInfo.isBuiltIn: Boolean
     get() {
         if (built_in == true) return true
-        if (artifact_type == ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN) return true
         if (local_path.startsWith("builtin:")) return true
         return framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
             framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
     }
 
 /**
- * Whether the model is downloaded on disk. CommonMain has no filesystem
- * access, so this falls back to the proto's `is_downloaded` flag (which
- * the platform actuals populate via `FileOperationsUtilities` /
- * `existsWithType` on the JVM/Android side).
+ * Whether the model is downloaded on disk. `ModelInfo.is_downloaded` was
+ * deleted outright (idl/model_types.proto, reserved 32: "a bool cannot
+ * express DOWNLOADING") — `registry_status` is now the durable-state
+ * signal; a non-empty `local_path` is a location hint (per the proto's own
+ * comment it "stays populated for an entry whose files were deleted"), so
+ * it is checked only as a fallback when commons has not yet stamped a
+ * registry status.
  */
 val RAModelInfo.isDownloadedOnDisk: Boolean
     get() {
         if (isBuiltIn) return true
-        return is_downloaded == true || local_path.isNotEmpty()
+        if (registry_status == ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED) return true
+        return registry_status == null && local_path.isNotEmpty()
     }
 
 /** Whether the model is ready to load (built-in OR on-disk OR proto-marked). */
@@ -290,8 +312,20 @@ val RAModelInfo.localPathURL: String?
 val RAModelInfo.downloadSizeHint: Long
     get() = download_size_bytes
 
+/**
+ * The artifact-oneof arm's classification, computed from the oneof itself
+ * since `ModelInfo.artifact_type` was deleted outright (it "restated the
+ * oneof"). Mirrors Swift `RAModelInfo.OneOf_Artifact.artifactType`.
+ */
 private val RAModelInfo.artifactTypeOrUnspecified: ModelArtifactType
-    get() = artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
+    get() =
+        when {
+            single_file != null -> ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
+            archive != null -> archive.type.toModelArtifactType()
+            multi_file != null -> ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE
+            built_in == true -> ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN
+            else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
+        }
 
 // MARK: - Fluent helpers (return a new copy with the requested mutation)
 
@@ -301,96 +335,65 @@ fun RAModelInfo.setDownloadURL(url: String?): RAModelInfo =
 
 /**
  * Returns a copy of [ModelInfo] with `local_path` updated and the derived
- * `is_downloaded` / `is_available` flags re-stamped to match.
+ * `is_available` flag re-stamped to match. `is_downloaded` was deleted
+ * outright — `registry_status` (not re-derived here; commons owns writes to
+ * it) is the durable-state signal now.
  */
 fun RAModelInfo.setLocalPath(path: String?): RAModelInfo {
     val updated = copy(local_path = path.orEmpty())
-    return updated.copy(
-        is_downloaded = updated.isDownloadedOnDisk,
-        is_available = updated.isAvailableForUse,
-    )
+    return updated.copy(is_available = updated.isAvailableForUse)
 }
 
 /**
  * Returns a copy of [ModelInfo] with the artifact oneof set to a single-
- * file artifact. Also updates the canonical `artifact_type` and stamps
- * the artifact's `expected_files` onto the entry when non-empty.
+ * file artifact. `artifact_type` was deleted outright (restated the
+ * oneof) — setting the oneof arm alone now fully classifies the entry.
  */
-fun RAModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): RAModelInfo {
-    val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
-    return copy(
+fun RAModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): RAModelInfo =
+    copy(
         single_file = artifact,
         archive = null,
         multi_file = null,
-        custom_strategy_id = null,
         built_in = null,
-        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-        expected_files = derived ?: expected_files,
     )
-}
 
 /**
  * Returns a copy of [ModelInfo] with the artifact oneof set to an archive.
- * Also updates `artifact_type` and stamps the manifest when present.
  */
-fun RAModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): RAModelInfo {
-    val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
-    return copy(
+fun RAModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): RAModelInfo =
+    copy(
         single_file = null,
         archive = artifact,
         multi_file = null,
-        custom_strategy_id = null,
         built_in = null,
-        artifact_type = artifact.type.toModelArtifactType(),
-        expected_files = derived ?: expected_files,
     )
-}
 
 /**
  * Returns a copy of [ModelInfo] with the artifact oneof set to a multi-
- * file artifact. Also updates `artifact_type`.
+ * file artifact.
  */
 fun RAModelInfo.setMultiFileArtifact(artifact: MultiFileArtifact): RAModelInfo =
     copy(
         single_file = null,
         archive = null,
         multi_file = artifact,
-        custom_strategy_id = null,
         built_in = null,
-        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
     )
 
-/**
- * Returns a copy of [ModelInfo] with the artifact oneof set to a custom
- * strategy id. Also updates `artifact_type`.
- */
-fun RAModelInfo.setCustomStrategyArtifact(strategyId: String): RAModelInfo =
-    copy(
-        single_file = null,
-        archive = null,
-        multi_file = null,
-        custom_strategy_id = strategyId,
-        built_in = null,
-        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM,
-    )
+// setCustomStrategyArtifact is deleted: `custom_strategy_id` was removed
+// outright from idl/model_types.proto ("undocumented registry", reserved
+// 23) with no replacement -- there is no longer a custom-strategy artifact
+// variant to set.
 
 /**
- * Returns a copy of [ModelInfo] flagged as built-in. Also updates
- * `artifact_type`.
+ * Returns a copy of [ModelInfo] flagged as built-in.
  */
 fun RAModelInfo.setBuiltInArtifact(enabled: Boolean = true): RAModelInfo =
     copy(
         single_file = null,
         archive = null,
         multi_file = null,
-        custom_strategy_id = null,
         built_in = enabled,
-        artifact_type =
-            if (enabled) {
-                ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN
-            } else {
-                ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
-            },
     )
 
 // MARK: - Factory
@@ -515,7 +518,7 @@ fun RAModelInfo.resolvedModelFilePath(role: ModelFileRole): String? {
     val descriptor =
         descriptors.firstOrNull { it.role == role }
             ?: if (role == ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL) {
-                descriptors.firstOrNull { it.is_required } ?: descriptors.firstOrNull()
+                descriptors.firstOrNull { !it.is_optional } ?: descriptors.firstOrNull()
             } else {
                 null
             }
@@ -529,8 +532,7 @@ fun RAModelInfo.resolvedModelFilePath(role: ModelFileRole): String? {
 
 private val RAModelInfo.declaredModelFileDescriptors: List<ModelFileDescriptor>
     get() =
-        expected_files?.files?.takeIf { it.isNotEmpty() }
-            ?: multi_file?.files?.takeIf { it.isNotEmpty() }
+        multi_file?.files?.takeIf { it.isNotEmpty() }
             ?: archive?.expected_files?.files?.takeIf { it.isNotEmpty() }
             ?: single_file?.expected_files?.files?.takeIf { it.isNotEmpty() }
             ?: emptyList()

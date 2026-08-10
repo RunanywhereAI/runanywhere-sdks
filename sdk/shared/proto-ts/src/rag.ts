@@ -6,17 +6,17 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
+import { LLMGenerationOptions } from "./llm_options";
+import { TokenUsage } from "./token_usage";
 
 export const protobufPackage = "runanywhere.v1";
 
 export enum RAGStreamEventKind {
   RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0,
-  RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED = 1,
-  RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED = 2,
-  RAG_STREAM_EVENT_KIND_CONTEXT_READY = 3,
-  RAG_STREAM_EVENT_KIND_TOKEN = 4,
-  RAG_STREAM_EVENT_KIND_COMPLETED = 5,
-  RAG_STREAM_EVENT_KIND_ERROR = 6,
+  RAG_STREAM_EVENT_KIND_TOKEN = 1,
+  RAG_STREAM_EVENT_KIND_COMPLETED = 2,
+  RAG_STREAM_EVENT_KIND_ERROR = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -26,21 +26,12 @@ export function rAGStreamEventKindFromJSON(object: any): RAGStreamEventKind {
     case "RAG_STREAM_EVENT_KIND_UNSPECIFIED":
       return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED;
     case 1:
-    case "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED":
-      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED;
-    case 2:
-    case "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED":
-      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED;
-    case 3:
-    case "RAG_STREAM_EVENT_KIND_CONTEXT_READY":
-      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY;
-    case 4:
     case "RAG_STREAM_EVENT_KIND_TOKEN":
       return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN;
-    case 5:
+    case 2:
     case "RAG_STREAM_EVENT_KIND_COMPLETED":
       return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED;
-    case 6:
+    case 3:
     case "RAG_STREAM_EVENT_KIND_ERROR":
       return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR;
     case -1:
@@ -54,12 +45,6 @@ export function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string {
   switch (object) {
     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED:
       return "RAG_STREAM_EVENT_KIND_UNSPECIFIED";
-    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED:
-      return "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED";
-    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
-      return "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED";
-    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
-      return "RAG_STREAM_EVENT_KIND_CONTEXT_READY";
     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
       return "RAG_STREAM_EVENT_KIND_TOKEN";
     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED:
@@ -72,123 +57,42 @@ export function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config.
- *
- * This message carries *model ids*, not filesystem paths.
- * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
- * for resolving those ids to on-disk paths through the canonical model
- * registry. SDK callers MUST register the embedding / LLM / reranker models
- * first and pass only their ids here.
- * ---------------------------------------------------------------------------
- */
 export interface RAGConfiguration {
-  /**
-   * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
-   * Commons resolves this to the primary artifact path via the model registry.
-   */
   embeddingModelId: string;
-  /**
-   * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
-   * leave empty to create an embed-only / retrieval-only pipeline.
-   */
   llmModelId: string;
-  /**
-   * Embedding vector dimension — must match the embedding model.
-   * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-   * Leave UNSET: commons derives the dimension from the loaded embedding
-   * model at session create (rac_embeddings_get_info). Set only to
-   * override. No rac_default on purpose — a generated defaults() that
-   * stamped 384 would mark the field present and defeat the derivation.
-   */
   embeddingDimension?:
     | number
     | undefined;
-  /**
-   * Number of top chunks to retrieve per query.
-   * Optional so callers can distinguish "unset" from an explicit value.
-   */
+  /** Retrieval depth, not sampling top_k. */
   topK?:
     | number
     | undefined;
-  /**
-   * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
-   * score are discarded before being passed to the LLM as context.
-   * Optional so callers can distinguish "unset" from explicit 0.0
-   * (accept-everything) without losing the canonical default.
-   * Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
-   * produce cosine similarities that rarely exceed ~0.5 even for relevant
-   * chunks, and chunking a document lowers each chunk's similarity further, so
-   * any positive floor filters out real matches — a multi-chunk document then
-   * retrieves nothing and the answer model reports "no information". top_k
-   * bounds the result count instead of a similarity floor.
-   */
-  similarityThreshold?:
+  /** Drop hits scoring below this. 0.0 = no filtering. */
+  scoreThreshold?:
     | number
     | undefined;
-  /**
-   * Tokens per chunk when splitting documents during ingestion.
-   * Optional so callers can distinguish "unset" from an explicit value.
-   */
-  chunkSize?:
-    | number
-    | undefined;
-  /**
-   * Overlap tokens between consecutive chunks. Must be < chunk_size.
-   * Optional so callers can explicitly request zero overlap (no overlap)
-   * without it being silently replaced by the canonical default of 64.
-   */
-  chunkOverlap?:
-    | number
-    | undefined;
-  /**
-   * Maximum tokens of retrieved context passed to the LLM.
-   * Optional so callers can distinguish "unset" from an explicit value.
-   */
-  maxContextTokens?:
-    | number
-    | undefined;
-  /** Prompt template with `{context}` and `{query}` placeholders. */
-  promptTemplate?:
-    | string
-    | undefined;
-  /** Backend-specific config JSON passed to the embedding model/provider. */
+  /** Tokens per chunk, and the overlap carried between adjacent chunks. */
+  chunkSize?: number | undefined;
+  chunkOverlap?: number | undefined;
+  maxContextTokens?: number | undefined;
+  promptTemplate?: string | undefined;
   embeddingConfigJson?:
     | string
     | undefined;
-  /** Backend-specific config JSON passed to the LLM provider. */
-  llmConfigJson?:
-    | string
-    | undefined;
-  /** Index persistence and retrieval behavior. Empty path = in-memory index. */
-  indexPath?: string | undefined;
-  persistIndex: boolean;
+  /** Pointwise rerank of the retrieved chunks using the session LLM. */
   rerankResults: boolean;
-  /** Registered id of the reranker model (optional). */
-  rerankerModelId?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAGDocument — batch-ingest input item.
- * ---------------------------------------------------------------------------
- */
 export interface RAGDocument {
-  /** Optional caller-supplied document id. */
+  /** Caller-owned stable id. Re-ingesting an existing id REPLACES its chunks. */
   id: string;
-  /** Plain text content to chunk/embed. */
   text: string;
-  /** Typed metadata map for generated-proto callers. */
   metadata: { [key: string]: string };
   /**
-   * Adapter-normalized document source. Pickers, sandbox bookmarks, and
-   * platform file access remain SDK-owned.
+   * Where this document came from. Copied into every chunk's metadata as
+   * "source" and returned as RAGSearchResult.source_document.
    */
   sourceUri?: string | undefined;
-  adapterHandle?: string | undefined;
-  mediaType?: string | undefined;
-  sizeBytes: number;
 }
 
 export interface RAGDocument_MetadataEntry {
@@ -196,107 +100,68 @@ export interface RAGDocument_MetadataEntry {
   value: string;
 }
 
-export interface RAGIngestRequest {
-  requestId: string;
-  documents: RAGDocument[];
-  replaceExisting: boolean;
-  metadata: { [key: string]: string };
+/** Remove whole documents from the index for `rac_rag_delete_proto`. */
+export interface RAGDeleteRequest {
+  /** RAGDocument.id values given at ingest. Empty is an error — use clear(). */
+  documentIds: string[];
 }
 
-export interface RAGIngestRequest_MetadataEntry {
-  key: string;
-  value: string;
+export interface RAGDeleteResponse {
+  deletedChunks: number;
+  /** Ids that were not in the index. Not an error. */
+  missingIds: string[];
+  error?: SDKError | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAGQueryOptions — per-query sampling and prompt overrides.
- * ---------------------------------------------------------------------------
- */
-export interface RAGQueryOptions {
-  /** The user question to answer. Required (empty = no-op). */
-  question: string;
-  /** Optional system prompt override. Unset uses the pipeline default. */
-  systemPrompt?:
-    | string
+/** The retrieval knobs, declared once. Every field unset = inherit RAGConfiguration. */
+export interface RAGRetrievalOptions {
+  /** Retrieval depth for this call. Unset inherits RAGConfiguration.top_k. */
+  topK?:
+    | number
     | undefined;
-  /** Maximum tokens to generate in the answer. */
-  maxTokens: number;
-  /** Sampling temperature. 0.0 = greedy, higher = more random. */
-  temperature: number;
-  /** Nucleus (top-p) sampling parameter. 1.0 = disabled. */
-  topP: number;
-  /** Top-k sampling parameter. 0 = disabled. */
-  topK: number;
-  /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
-  retrievalTopK: number;
+  /** Drop hits scoring below this. Unset inherits RAGConfiguration.score_threshold. */
+  scoreThreshold?:
+    | number
+    | undefined;
   /**
-   * Per-query similarity floor. `optional` so an explicit 0.0 (accept
-   * everything) is distinguishable from "unset" and can override a positive
-   * session-level default; unset falls back to RAGConfiguration.
-   */
-  similarityThreshold?: number | undefined;
-  stream: boolean;
-  /**
-   * When true, suppress the answer model's thinking phase (maps to
-   * LLMGenerationOptions.disable_thinking so commons prepends the no-think
-   * directive instead of the app injecting "/no_think"). Default false.
-   */
-  disableThinking: boolean;
-  /**
-   * Multi-query expansion: when true, the answer LLM rewrites the question
-   * into `multi_query_count` variants; retrieval runs for the original plus
-   * each variant and the rankings are RRF-fused before rerank. Falls back to
-   * a single query if expansion yields nothing.
+   * Expand the query into several phrasings and merge the results.
+   * Requires a session LLM.
    */
   enableMultiQuery: boolean;
   multiQueryCount?:
     | number
     | undefined;
-  /**
-   * Scoped retrieval: when set, only chunks whose document id begins with
-   * this prefix are eligible (e.g. a chat/collection namespace). Unset =
-   * search the whole index.
-   */
+  /** Keep only chunks whose document id starts with this prefix. */
   scopePrefix?: string | undefined;
 }
 
-export interface RAGQueryRequest {
-  requestId: string;
-  options?: RAGQueryOptions | undefined;
-  metadata: { [key: string]: string };
-}
-
-export interface RAGQueryRequest_MetadataEntry {
-  key: string;
-  value: string;
+export interface RAGQueryOptions {
+  query: string;
+  retrieval?: RAGRetrievalOptions | undefined;
+  generation?: LLMGenerationOptions | undefined;
 }
 
 /**
- * ---------------------------------------------------------------------------
- * RAGSearchResult — a single retrieved document chunk with similarity score.
- * ---------------------------------------------------------------------------
+ * Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
+ * Intentionally omits generation options — that is `RAGQueryOptions` /
+ * `rac_rag_query_proto` / SDK `rag.query()`.
  */
+export interface RAGSearchRequest {
+  query: string;
+  retrieval?: RAGRetrievalOptions | undefined;
+}
+
 export interface RAGSearchResult {
-  /** Unique identifier of the chunk (assigned at ingestion time). */
   chunkId: string;
-  /** Text content of the chunk (the actual snippet shown to the LLM). */
   text: string;
-  /** Cosine similarity score (0.0–1.0). Higher = more relevant. */
-  similarityScore: number;
   /**
-   * Optional source document identifier (filename, URL, or document ID).
-   * Set when the chunk's origin is tracked at ingestion time.
+   * Relevance, higher-is-better, normalised to 0..1. Fused dense + BM25 (RRF),
+   * not a raw cosine similarity.
    */
-  sourceDocument?:
-    | string
-    | undefined;
-  /**
-   * Free-form metadata associated with the chunk (e.g. page number, section,
-   * ingestion timestamp).
-   */
+  score: number;
+  sourceDocument?: string | undefined;
   metadata: { [key: string]: string };
-  rank: number;
+  /** Character offsets into the source document. */
   startOffset: number;
   endOffset: number;
   tokenCount: number;
@@ -307,113 +172,53 @@ export interface RAGSearchResult_MetadataEntry {
   value: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAGResult — the full result of a RAG query.
- * ---------------------------------------------------------------------------
- */
-export interface RAGResult {
-  /** The LLM-generated answer grounded in the retrieved context. */
-  answer: string;
-  /**
-   * Document chunks retrieved during vector search and used as context.
-   * Order matches retrieval rank (highest similarity first).
-   */
-  retrievedChunks: RAGSearchResult[];
-  /**
-   * Full context string passed to the LLM (chunks joined into a prompt).
-   * May be empty for queries with no matching chunks.
-   */
-  contextUsed: string;
-  /** Time spent in the retrieval phase (vector search), in milliseconds. */
+/** Retrieval-only response for `rac_rag_search_proto`. */
+export interface RAGSearchResponse {
+  chunks: RAGSearchResult[];
   retrievalTimeMs: number;
-  /** Time spent in the LLM generation phase, in milliseconds. */
-  generationTimeMs: number;
-  /**
-   * Total end-to-end query time (retrieval + generation + overhead),
-   * in milliseconds.
-   */
-  totalTimeMs: number;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
   requestId: string;
-  /** Optional thinking/reasoning content extracted from the answer. */
-  thinkingContent?: string | undefined;
+  error?: SDKError | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * RAGStatistics — index-level counters for the RAG pipeline.
- *
- * Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
- * ---------------------------------------------------------------------------
- */
+export interface RAGResult {
+  answer: string;
+  retrievedChunks: RAGSearchResult[];
+  contextUsed: string;
+  /** Measured directly, not by subtraction: embed the query + search + fuse. */
+  retrievalTimeMs: number;
+  generationTimeMs: number;
+  /** MUST be set by rac_rag_proto_abi (event_id()). */
+  requestId: string;
+  thinkingContent?:
+    | string
+    | undefined;
+  /** MUST be copied from the LLM result the pipeline already holds. */
+  usage?: TokenUsage | undefined;
+  error?: SDKError | undefined;
+}
+
 export interface RAGStatistics {
-  /** Total number of documents ever ingested into the index. */
   indexedDocuments: number;
-  /** Total number of chunks across all indexed documents. */
   indexedChunks: number;
-  /** Approximate total token count across all indexed chunks. */
   totalTokensIndexed: number;
-  /**
-   * Wall-clock timestamp of the most recent ingestion, in milliseconds
-   * since Unix epoch. 0 = no ingestion yet.
-   */
+  /** Milliseconds since the Unix epoch when the index last changed. */
   lastUpdatedMs: number;
   /**
-   * Filesystem path to the on-disk index, when applicable. Unset for
-   * in-memory-only indexes.
+   * Bytes the index occupies (industry: VectorStore.usage_bytes).
+   * MUST be populated by make_stats() — it is surfaced as RagStats.indexSizeBytes.
    */
-  indexPath?:
-    | string
-    | undefined;
-  /**
-   * Raw backend statistics JSON for implementations that cannot yet project
-   * every counter into typed fields.
-   */
-  statsJson?:
-    | string
-    | undefined;
-  /** Approximate vector-store footprint in bytes, when known. */
   vectorStoreSizeBytes: number;
-  isPersistent: boolean;
-  lastQueryMs: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-export interface RAGIngestResult {
-  requestId: string;
-  documentsIngested: number;
-  chunksIngested: number;
-  statistics?: RAGStatistics | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface RAGStreamEvent {
-  seq: number;
+  /** Microseconds since the Unix epoch, matching every other modality. */
   timestampUs: number;
   requestId: string;
   kind: RAGStreamEventKind;
-  chunk?: RAGSearchResult | undefined;
   token: string;
   result?: RAGResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-export interface RAGServiceState {
-  isReady: boolean;
-  statistics?: RAGStatistics | undefined;
-  isIndexing: boolean;
-  isQuerying: boolean;
-  activeRequestId?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseRAGConfiguration(): RAGConfiguration {
@@ -422,17 +227,13 @@ function createBaseRAGConfiguration(): RAGConfiguration {
     llmModelId: "",
     embeddingDimension: undefined,
     topK: undefined,
-    similarityThreshold: undefined,
+    scoreThreshold: undefined,
     chunkSize: undefined,
     chunkOverlap: undefined,
     maxContextTokens: undefined,
     promptTemplate: undefined,
     embeddingConfigJson: undefined,
-    llmConfigJson: undefined,
-    indexPath: undefined,
-    persistIndex: false,
     rerankResults: false,
-    rerankerModelId: undefined,
   };
 }
 
@@ -450,8 +251,8 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
     if (message.topK !== undefined) {
       writer.uint32(32).int32(message.topK);
     }
-    if (message.similarityThreshold !== undefined) {
-      writer.uint32(45).float(message.similarityThreshold);
+    if (message.scoreThreshold !== undefined) {
+      writer.uint32(45).float(message.scoreThreshold);
     }
     if (message.chunkSize !== undefined) {
       writer.uint32(48).int32(message.chunkSize);
@@ -468,20 +269,8 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
     if (message.embeddingConfigJson !== undefined) {
       writer.uint32(82).string(message.embeddingConfigJson);
     }
-    if (message.llmConfigJson !== undefined) {
-      writer.uint32(90).string(message.llmConfigJson);
-    }
-    if (message.indexPath !== undefined) {
-      writer.uint32(98).string(message.indexPath);
-    }
-    if (message.persistIndex !== false) {
-      writer.uint32(104).bool(message.persistIndex);
-    }
     if (message.rerankResults !== false) {
-      writer.uint32(112).bool(message.rerankResults);
-    }
-    if (message.rerankerModelId !== undefined) {
-      writer.uint32(122).string(message.rerankerModelId);
+      writer.uint32(88).bool(message.rerankResults);
     }
     return writer;
   },
@@ -530,7 +319,7 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
             break;
           }
 
-          message.similarityThreshold = reader.float();
+          message.scoreThreshold = reader.float();
           continue;
         }
         case 6: {
@@ -574,43 +363,11 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
           continue;
         }
         case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.llmConfigJson = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.indexPath = reader.string();
-          continue;
-        }
-        case 13: {
-          if (tag !== 104) {
-            break;
-          }
-
-          message.persistIndex = reader.bool();
-          continue;
-        }
-        case 14: {
-          if (tag !== 112) {
+          if (tag !== 88) {
             break;
           }
 
           message.rerankResults = reader.bool();
-          continue;
-        }
-        case 15: {
-          if (tag !== 122) {
-            break;
-          }
-
-          message.rerankerModelId = reader.string();
           continue;
         }
       }
@@ -644,10 +401,10 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
         : isSet(object.top_k)
         ? globalThis.Number(object.top_k)
         : undefined,
-      similarityThreshold: isSet(object.similarityThreshold)
-        ? globalThis.Number(object.similarityThreshold)
-        : isSet(object.similarity_threshold)
-        ? globalThis.Number(object.similarity_threshold)
+      scoreThreshold: isSet(object.scoreThreshold)
+        ? globalThis.Number(object.scoreThreshold)
+        : isSet(object.score_threshold)
+        ? globalThis.Number(object.score_threshold)
         : undefined,
       chunkSize: isSet(object.chunkSize)
         ? globalThis.Number(object.chunkSize)
@@ -674,31 +431,11 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
         : isSet(object.embedding_config_json)
         ? globalThis.String(object.embedding_config_json)
         : undefined,
-      llmConfigJson: isSet(object.llmConfigJson)
-        ? globalThis.String(object.llmConfigJson)
-        : isSet(object.llm_config_json)
-        ? globalThis.String(object.llm_config_json)
-        : undefined,
-      indexPath: isSet(object.indexPath)
-        ? globalThis.String(object.indexPath)
-        : isSet(object.index_path)
-        ? globalThis.String(object.index_path)
-        : undefined,
-      persistIndex: isSet(object.persistIndex)
-        ? globalThis.Boolean(object.persistIndex)
-        : isSet(object.persist_index)
-        ? globalThis.Boolean(object.persist_index)
-        : false,
       rerankResults: isSet(object.rerankResults)
         ? globalThis.Boolean(object.rerankResults)
         : isSet(object.rerank_results)
         ? globalThis.Boolean(object.rerank_results)
         : false,
-      rerankerModelId: isSet(object.rerankerModelId)
-        ? globalThis.String(object.rerankerModelId)
-        : isSet(object.reranker_model_id)
-        ? globalThis.String(object.reranker_model_id)
-        : undefined,
     };
   },
 
@@ -716,8 +453,8 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
     if (message.topK !== undefined) {
       obj.topK = Math.round(message.topK);
     }
-    if (message.similarityThreshold !== undefined) {
-      obj.similarityThreshold = message.similarityThreshold;
+    if (message.scoreThreshold !== undefined) {
+      obj.scoreThreshold = message.scoreThreshold;
     }
     if (message.chunkSize !== undefined) {
       obj.chunkSize = Math.round(message.chunkSize);
@@ -734,20 +471,8 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
     if (message.embeddingConfigJson !== undefined) {
       obj.embeddingConfigJson = message.embeddingConfigJson;
     }
-    if (message.llmConfigJson !== undefined) {
-      obj.llmConfigJson = message.llmConfigJson;
-    }
-    if (message.indexPath !== undefined) {
-      obj.indexPath = message.indexPath;
-    }
-    if (message.persistIndex !== false) {
-      obj.persistIndex = message.persistIndex;
-    }
     if (message.rerankResults !== false) {
       obj.rerankResults = message.rerankResults;
-    }
-    if (message.rerankerModelId !== undefined) {
-      obj.rerankerModelId = message.rerankerModelId;
     }
     return obj;
   },
@@ -761,31 +486,19 @@ export const RAGConfiguration: MessageFns<RAGConfiguration> = {
     message.llmModelId = object.llmModelId ?? "";
     message.embeddingDimension = object.embeddingDimension ?? undefined;
     message.topK = object.topK ?? undefined;
-    message.similarityThreshold = object.similarityThreshold ?? undefined;
+    message.scoreThreshold = object.scoreThreshold ?? undefined;
     message.chunkSize = object.chunkSize ?? undefined;
     message.chunkOverlap = object.chunkOverlap ?? undefined;
     message.maxContextTokens = object.maxContextTokens ?? undefined;
     message.promptTemplate = object.promptTemplate ?? undefined;
     message.embeddingConfigJson = object.embeddingConfigJson ?? undefined;
-    message.llmConfigJson = object.llmConfigJson ?? undefined;
-    message.indexPath = object.indexPath ?? undefined;
-    message.persistIndex = object.persistIndex ?? false;
     message.rerankResults = object.rerankResults ?? false;
-    message.rerankerModelId = object.rerankerModelId ?? undefined;
     return message;
   },
 };
 
 function createBaseRAGDocument(): RAGDocument {
-  return {
-    id: "",
-    text: "",
-    metadata: {},
-    sourceUri: undefined,
-    adapterHandle: undefined,
-    mediaType: undefined,
-    sizeBytes: 0,
-  };
+  return { id: "", text: "", metadata: {}, sourceUri: undefined };
 }
 
 export const RAGDocument: MessageFns<RAGDocument> = {
@@ -797,19 +510,10 @@ export const RAGDocument: MessageFns<RAGDocument> = {
       writer.uint32(18).string(message.text);
     }
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      RAGDocument_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
+      RAGDocument_MetadataEntry.encode({ key: key as any, value }, writer.uint32(26).fork()).join();
     });
     if (message.sourceUri !== undefined) {
-      writer.uint32(42).string(message.sourceUri);
-    }
-    if (message.adapterHandle !== undefined) {
-      writer.uint32(50).string(message.adapterHandle);
-    }
-    if (message.mediaType !== undefined) {
-      writer.uint32(58).string(message.mediaType);
-    }
-    if (message.sizeBytes !== 0) {
-      writer.uint32(64).int64(message.sizeBytes);
+      writer.uint32(34).string(message.sourceUri);
     }
     return writer;
   },
@@ -837,47 +541,23 @@ export const RAGDocument: MessageFns<RAGDocument> = {
           message.text = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          const entry3 = RAGDocument_MetadataEntry.decode(reader, reader.uint32());
+          if (entry3.value !== undefined) {
+            message.metadata[entry3.key] = entry3.value;
+          }
+          continue;
+        }
         case 4: {
           if (tag !== 34) {
             break;
           }
 
-          const entry4 = RAGDocument_MetadataEntry.decode(reader, reader.uint32());
-          if (entry4.value !== undefined) {
-            message.metadata[entry4.key] = entry4.value;
-          }
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
           message.sourceUri = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.adapterHandle = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.mediaType = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.sizeBytes = longToNumber(reader.int64());
           continue;
         }
       }
@@ -907,21 +587,6 @@ export const RAGDocument: MessageFns<RAGDocument> = {
         : isSet(object.source_uri)
         ? globalThis.String(object.source_uri)
         : undefined,
-      adapterHandle: isSet(object.adapterHandle)
-        ? globalThis.String(object.adapterHandle)
-        : isSet(object.adapter_handle)
-        ? globalThis.String(object.adapter_handle)
-        : undefined,
-      mediaType: isSet(object.mediaType)
-        ? globalThis.String(object.mediaType)
-        : isSet(object.media_type)
-        ? globalThis.String(object.media_type)
-        : undefined,
-      sizeBytes: isSet(object.sizeBytes)
-        ? globalThis.Number(object.sizeBytes)
-        : isSet(object.size_bytes)
-        ? globalThis.Number(object.size_bytes)
-        : 0,
     };
   },
 
@@ -945,15 +610,6 @@ export const RAGDocument: MessageFns<RAGDocument> = {
     if (message.sourceUri !== undefined) {
       obj.sourceUri = message.sourceUri;
     }
-    if (message.adapterHandle !== undefined) {
-      obj.adapterHandle = message.adapterHandle;
-    }
-    if (message.mediaType !== undefined) {
-      obj.mediaType = message.mediaType;
-    }
-    if (message.sizeBytes !== 0) {
-      obj.sizeBytes = Math.round(message.sizeBytes);
-    }
     return obj;
   },
 
@@ -974,9 +630,6 @@ export const RAGDocument: MessageFns<RAGDocument> = {
       {},
     );
     message.sourceUri = object.sourceUri ?? undefined;
-    message.adapterHandle = object.adapterHandle ?? undefined;
-    message.mediaType = object.mediaType ?? undefined;
-    message.sizeBytes = object.sizeBytes ?? 0;
     return message;
   },
 };
@@ -1057,31 +710,22 @@ export const RAGDocument_MetadataEntry: MessageFns<RAGDocument_MetadataEntry> = 
   },
 };
 
-function createBaseRAGIngestRequest(): RAGIngestRequest {
-  return { requestId: "", documents: [], replaceExisting: false, metadata: {} };
+function createBaseRAGDeleteRequest(): RAGDeleteRequest {
+  return { documentIds: [] };
 }
 
-export const RAGIngestRequest: MessageFns<RAGIngestRequest> = {
-  encode(message: RAGIngestRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
+export const RAGDeleteRequest: MessageFns<RAGDeleteRequest> = {
+  encode(message: RAGDeleteRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.documentIds) {
+      writer.uint32(10).string(v!);
     }
-    for (const v of message.documents) {
-      RAGDocument.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.replaceExisting !== false) {
-      writer.uint32(24).bool(message.replaceExisting);
-    }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      RAGIngestRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
-    });
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGIngestRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGDeleteRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGIngestRequest();
+    const message = createBaseRAGDeleteRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1090,7 +734,77 @@ export const RAGIngestRequest: MessageFns<RAGIngestRequest> = {
             break;
           }
 
-          message.requestId = reader.string();
+          message.documentIds.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGDeleteRequest {
+    return {
+      documentIds: globalThis.Array.isArray(object?.documentIds)
+        ? object.documentIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.document_ids)
+        ? object.document_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: RAGDeleteRequest): unknown {
+    const obj: any = {};
+    if (message.documentIds?.length) {
+      obj.documentIds = message.documentIds;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGDeleteRequest>, I>>(base?: I): RAGDeleteRequest {
+    return RAGDeleteRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGDeleteRequest>, I>>(object: I): RAGDeleteRequest {
+    const message = createBaseRAGDeleteRequest();
+    message.documentIds = object.documentIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseRAGDeleteResponse(): RAGDeleteResponse {
+  return { deletedChunks: 0, missingIds: [], error: undefined };
+}
+
+export const RAGDeleteResponse: MessageFns<RAGDeleteResponse> = {
+  encode(message: RAGDeleteResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.deletedChunks !== 0) {
+      writer.uint32(8).int64(message.deletedChunks);
+    }
+    for (const v of message.missingIds) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGDeleteResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGDeleteResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.deletedChunks = longToNumber(reader.int64());
           continue;
         }
         case 2: {
@@ -1098,26 +812,15 @@ export const RAGIngestRequest: MessageFns<RAGIngestRequest> = {
             break;
           }
 
-          message.documents.push(RAGDocument.decode(reader, reader.uint32()));
+          message.missingIds.push(reader.string());
           continue;
         }
         case 3: {
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.replaceExisting = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          const entry4 = RAGIngestRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry4.value !== undefined) {
-            message.metadata[entry4.key] = entry4.value;
-          }
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1129,238 +832,101 @@ export const RAGIngestRequest: MessageFns<RAGIngestRequest> = {
     return message;
   },
 
-  fromJSON(object: any): RAGIngestRequest {
+  fromJSON(object: any): RAGDeleteResponse {
     return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      documents: globalThis.Array.isArray(object?.documents)
-        ? object.documents.map((e: any) => RAGDocument.fromJSON(e))
+      deletedChunks: isSet(object.deletedChunks)
+        ? globalThis.Number(object.deletedChunks)
+        : isSet(object.deleted_chunks)
+        ? globalThis.Number(object.deleted_chunks)
+        : 0,
+      missingIds: globalThis.Array.isArray(object?.missingIds)
+        ? object.missingIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.missing_ids)
+        ? object.missing_ids.map((e: any) => globalThis.String(e))
         : [],
-      replaceExisting: isSet(object.replaceExisting)
-        ? globalThis.Boolean(object.replaceExisting)
-        : isSet(object.replace_existing)
-        ? globalThis.Boolean(object.replace_existing)
-        : false,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
-  toJSON(message: RAGIngestRequest): unknown {
+  toJSON(message: RAGDeleteResponse): unknown {
     const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
+    if (message.deletedChunks !== 0) {
+      obj.deletedChunks = Math.round(message.deletedChunks);
     }
-    if (message.documents?.length) {
-      obj.documents = message.documents.map((e) => RAGDocument.toJSON(e));
+    if (message.missingIds?.length) {
+      obj.missingIds = message.missingIds;
     }
-    if (message.replaceExisting !== false) {
-      obj.replaceExisting = message.replaceExisting;
-    }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(base?: I): RAGIngestRequest {
-    return RAGIngestRequest.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<RAGDeleteResponse>, I>>(base?: I): RAGDeleteResponse {
+    return RAGDeleteResponse.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(object: I): RAGIngestRequest {
-    const message = createBaseRAGIngestRequest();
-    message.requestId = object.requestId ?? "";
-    message.documents = object.documents?.map((e) => RAGDocument.fromPartial(e)) || [];
-    message.replaceExisting = object.replaceExisting ?? false;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
+  fromPartial<I extends Exact<DeepPartial<RAGDeleteResponse>, I>>(object: I): RAGDeleteResponse {
+    const message = createBaseRAGDeleteResponse();
+    message.deletedChunks = object.deletedChunks ?? 0;
+    message.missingIds = object.missingIds?.map((e) => e) || [];
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
-function createBaseRAGIngestRequest_MetadataEntry(): RAGIngestRequest_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const RAGIngestRequest_MetadataEntry: MessageFns<RAGIngestRequest_MetadataEntry> = {
-  encode(message: RAGIngestRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGIngestRequest_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGIngestRequest_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RAGIngestRequest_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: RAGIngestRequest_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(base?: I): RAGIngestRequest_MetadataEntry {
-    return RAGIngestRequest_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(
-    object: I,
-  ): RAGIngestRequest_MetadataEntry {
-    const message = createBaseRAGIngestRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
-    return message;
-  },
-};
-
-function createBaseRAGQueryOptions(): RAGQueryOptions {
+function createBaseRAGRetrievalOptions(): RAGRetrievalOptions {
   return {
-    question: "",
-    systemPrompt: undefined,
-    maxTokens: 0,
-    temperature: 0,
-    topP: 0,
-    topK: 0,
-    retrievalTopK: 0,
-    similarityThreshold: undefined,
-    stream: false,
-    disableThinking: false,
+    topK: undefined,
+    scoreThreshold: undefined,
     enableMultiQuery: false,
     multiQueryCount: undefined,
     scopePrefix: undefined,
   };
 }
 
-export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
-  encode(message: RAGQueryOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.question !== "") {
-      writer.uint32(10).string(message.question);
+export const RAGRetrievalOptions: MessageFns<RAGRetrievalOptions> = {
+  encode(message: RAGRetrievalOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.topK !== undefined) {
+      writer.uint32(8).int32(message.topK);
     }
-    if (message.systemPrompt !== undefined) {
-      writer.uint32(18).string(message.systemPrompt);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(24).int32(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(37).float(message.temperature);
-    }
-    if (message.topP !== 0) {
-      writer.uint32(45).float(message.topP);
-    }
-    if (message.topK !== 0) {
-      writer.uint32(48).int32(message.topK);
-    }
-    if (message.retrievalTopK !== 0) {
-      writer.uint32(56).int32(message.retrievalTopK);
-    }
-    if (message.similarityThreshold !== undefined) {
-      writer.uint32(69).float(message.similarityThreshold);
-    }
-    if (message.stream !== false) {
-      writer.uint32(72).bool(message.stream);
-    }
-    if (message.disableThinking !== false) {
-      writer.uint32(80).bool(message.disableThinking);
+    if (message.scoreThreshold !== undefined) {
+      writer.uint32(21).float(message.scoreThreshold);
     }
     if (message.enableMultiQuery !== false) {
-      writer.uint32(88).bool(message.enableMultiQuery);
+      writer.uint32(24).bool(message.enableMultiQuery);
     }
     if (message.multiQueryCount !== undefined) {
-      writer.uint32(96).int32(message.multiQueryCount);
+      writer.uint32(32).int32(message.multiQueryCount);
     }
     if (message.scopePrefix !== undefined) {
-      writer.uint32(106).string(message.scopePrefix);
+      writer.uint32(42).string(message.scopePrefix);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGQueryOptions {
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGRetrievalOptions {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGQueryOptions();
+    const message = createBaseRAGRetrievalOptions();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 10) {
+          if (tag !== 8) {
             break;
           }
 
-          message.question = reader.string();
+          message.topK = reader.int32();
           continue;
         }
         case 2: {
-          if (tag !== 18) {
+          if (tag !== 21) {
             break;
           }
 
-          message.systemPrompt = reader.string();
+          message.scoreThreshold = reader.float();
           continue;
         }
         case 3: {
@@ -1368,83 +934,19 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
             break;
           }
 
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.topP = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.topK = reader.int32();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.retrievalTopK = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 69) {
-            break;
-          }
-
-          message.similarityThreshold = reader.float();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.stream = reader.bool();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.disableThinking = reader.bool();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
           message.enableMultiQuery = reader.bool();
           continue;
         }
-        case 12: {
-          if (tag !== 96) {
+        case 4: {
+          if (tag !== 32) {
             break;
           }
 
           message.multiQueryCount = reader.int32();
           continue;
         }
-        case 13: {
-          if (tag !== 106) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
@@ -1460,46 +962,18 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     return message;
   },
 
-  fromJSON(object: any): RAGQueryOptions {
+  fromJSON(object: any): RAGRetrievalOptions {
     return {
-      question: isSet(object.question) ? globalThis.String(object.question) : "",
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : undefined,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-      topP: isSet(object.topP)
-        ? globalThis.Number(object.topP)
-        : isSet(object.top_p)
-        ? globalThis.Number(object.top_p)
-        : 0,
       topK: isSet(object.topK)
         ? globalThis.Number(object.topK)
         : isSet(object.top_k)
         ? globalThis.Number(object.top_k)
-        : 0,
-      retrievalTopK: isSet(object.retrievalTopK)
-        ? globalThis.Number(object.retrievalTopK)
-        : isSet(object.retrieval_top_k)
-        ? globalThis.Number(object.retrieval_top_k)
-        : 0,
-      similarityThreshold: isSet(object.similarityThreshold)
-        ? globalThis.Number(object.similarityThreshold)
-        : isSet(object.similarity_threshold)
-        ? globalThis.Number(object.similarity_threshold)
         : undefined,
-      stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
-      disableThinking: isSet(object.disableThinking)
-        ? globalThis.Boolean(object.disableThinking)
-        : isSet(object.disable_thinking)
-        ? globalThis.Boolean(object.disable_thinking)
-        : false,
+      scoreThreshold: isSet(object.scoreThreshold)
+        ? globalThis.Number(object.scoreThreshold)
+        : isSet(object.score_threshold)
+        ? globalThis.Number(object.score_threshold)
+        : undefined,
       enableMultiQuery: isSet(object.enableMultiQuery)
         ? globalThis.Boolean(object.enableMultiQuery)
         : isSet(object.enable_multi_query)
@@ -1518,37 +992,13 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     };
   },
 
-  toJSON(message: RAGQueryOptions): unknown {
+  toJSON(message: RAGRetrievalOptions): unknown {
     const obj: any = {};
-    if (message.question !== "") {
-      obj.question = message.question;
-    }
-    if (message.systemPrompt !== undefined) {
-      obj.systemPrompt = message.systemPrompt;
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
-    if (message.topP !== 0) {
-      obj.topP = message.topP;
-    }
-    if (message.topK !== 0) {
+    if (message.topK !== undefined) {
       obj.topK = Math.round(message.topK);
     }
-    if (message.retrievalTopK !== 0) {
-      obj.retrievalTopK = Math.round(message.retrievalTopK);
-    }
-    if (message.similarityThreshold !== undefined) {
-      obj.similarityThreshold = message.similarityThreshold;
-    }
-    if (message.stream !== false) {
-      obj.stream = message.stream;
-    }
-    if (message.disableThinking !== false) {
-      obj.disableThinking = message.disableThinking;
+    if (message.scoreThreshold !== undefined) {
+      obj.scoreThreshold = message.scoreThreshold;
     }
     if (message.enableMultiQuery !== false) {
       obj.enableMultiQuery = message.enableMultiQuery;
@@ -1562,21 +1012,13 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(base?: I): RAGQueryOptions {
-    return RAGQueryOptions.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<RAGRetrievalOptions>, I>>(base?: I): RAGRetrievalOptions {
+    return RAGRetrievalOptions.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(object: I): RAGQueryOptions {
-    const message = createBaseRAGQueryOptions();
-    message.question = object.question ?? "";
-    message.systemPrompt = object.systemPrompt ?? undefined;
-    message.maxTokens = object.maxTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
-    message.topP = object.topP ?? 0;
-    message.topK = object.topK ?? 0;
-    message.retrievalTopK = object.retrievalTopK ?? 0;
-    message.similarityThreshold = object.similarityThreshold ?? undefined;
-    message.stream = object.stream ?? false;
-    message.disableThinking = object.disableThinking ?? false;
+  fromPartial<I extends Exact<DeepPartial<RAGRetrievalOptions>, I>>(object: I): RAGRetrievalOptions {
+    const message = createBaseRAGRetrievalOptions();
+    message.topK = object.topK ?? undefined;
+    message.scoreThreshold = object.scoreThreshold ?? undefined;
     message.enableMultiQuery = object.enableMultiQuery ?? false;
     message.multiQueryCount = object.multiQueryCount ?? undefined;
     message.scopePrefix = object.scopePrefix ?? undefined;
@@ -1584,28 +1026,28 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
   },
 };
 
-function createBaseRAGQueryRequest(): RAGQueryRequest {
-  return { requestId: "", options: undefined, metadata: {} };
+function createBaseRAGQueryOptions(): RAGQueryOptions {
+  return { query: "", retrieval: undefined, generation: undefined };
 }
 
-export const RAGQueryRequest: MessageFns<RAGQueryRequest> = {
-  encode(message: RAGQueryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
+export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
+  encode(message: RAGQueryOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.query !== "") {
+      writer.uint32(10).string(message.query);
     }
-    if (message.options !== undefined) {
-      RAGQueryOptions.encode(message.options, writer.uint32(18).fork()).join();
+    if (message.retrieval !== undefined) {
+      RAGRetrievalOptions.encode(message.retrieval, writer.uint32(18).fork()).join();
     }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      RAGQueryRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(26).fork()).join();
-    });
+    if (message.generation !== undefined) {
+      LLMGenerationOptions.encode(message.generation, writer.uint32(26).fork()).join();
+    }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGQueryRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGQueryOptions {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGQueryRequest();
+    const message = createBaseRAGQueryOptions();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1614,7 +1056,7 @@ export const RAGQueryRequest: MessageFns<RAGQueryRequest> = {
             break;
           }
 
-          message.requestId = reader.string();
+          message.query = reader.string();
           continue;
         }
         case 2: {
@@ -1622,7 +1064,7 @@ export const RAGQueryRequest: MessageFns<RAGQueryRequest> = {
             break;
           }
 
-          message.options = RAGQueryOptions.decode(reader, reader.uint32());
+          message.retrieval = RAGRetrievalOptions.decode(reader, reader.uint32());
           continue;
         }
         case 3: {
@@ -1630,10 +1072,7 @@ export const RAGQueryRequest: MessageFns<RAGQueryRequest> = {
             break;
           }
 
-          const entry3 = RAGQueryRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry3.value !== undefined) {
-            message.metadata[entry3.key] = entry3.value;
-          }
+          message.generation = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1645,87 +1084,63 @@ export const RAGQueryRequest: MessageFns<RAGQueryRequest> = {
     return message;
   },
 
-  fromJSON(object: any): RAGQueryRequest {
+  fromJSON(object: any): RAGQueryOptions {
     return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      options: isSet(object.options) ? RAGQueryOptions.fromJSON(object.options) : undefined,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
+      query: isSet(object.query) ? globalThis.String(object.query) : "",
+      retrieval: isSet(object.retrieval) ? RAGRetrievalOptions.fromJSON(object.retrieval) : undefined,
+      generation: isSet(object.generation) ? LLMGenerationOptions.fromJSON(object.generation) : undefined,
     };
   },
 
-  toJSON(message: RAGQueryRequest): unknown {
+  toJSON(message: RAGQueryOptions): unknown {
     const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
+    if (message.query !== "") {
+      obj.query = message.query;
     }
-    if (message.options !== undefined) {
-      obj.options = RAGQueryOptions.toJSON(message.options);
+    if (message.retrieval !== undefined) {
+      obj.retrieval = RAGRetrievalOptions.toJSON(message.retrieval);
     }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
+    if (message.generation !== undefined) {
+      obj.generation = LLMGenerationOptions.toJSON(message.generation);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(base?: I): RAGQueryRequest {
-    return RAGQueryRequest.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(base?: I): RAGQueryOptions {
+    return RAGQueryOptions.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(object: I): RAGQueryRequest {
-    const message = createBaseRAGQueryRequest();
-    message.requestId = object.requestId ?? "";
-    message.options = (object.options !== undefined && object.options !== null)
-      ? RAGQueryOptions.fromPartial(object.options)
+  fromPartial<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(object: I): RAGQueryOptions {
+    const message = createBaseRAGQueryOptions();
+    message.query = object.query ?? "";
+    message.retrieval = (object.retrieval !== undefined && object.retrieval !== null)
+      ? RAGRetrievalOptions.fromPartial(object.retrieval)
       : undefined;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
+    message.generation = (object.generation !== undefined && object.generation !== null)
+      ? LLMGenerationOptions.fromPartial(object.generation)
+      : undefined;
     return message;
   },
 };
 
-function createBaseRAGQueryRequest_MetadataEntry(): RAGQueryRequest_MetadataEntry {
-  return { key: "", value: "" };
+function createBaseRAGSearchRequest(): RAGSearchRequest {
+  return { query: "", retrieval: undefined };
 }
 
-export const RAGQueryRequest_MetadataEntry: MessageFns<RAGQueryRequest_MetadataEntry> = {
-  encode(message: RAGQueryRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
+export const RAGSearchRequest: MessageFns<RAGSearchRequest> = {
+  encode(message: RAGSearchRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.query !== "") {
+      writer.uint32(10).string(message.query);
     }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
+    if (message.retrieval !== undefined) {
+      RAGRetrievalOptions.encode(message.retrieval, writer.uint32(18).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGQueryRequest_MetadataEntry {
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGSearchRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGQueryRequest_MetadataEntry();
+    const message = createBaseRAGSearchRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1734,7 +1149,7 @@ export const RAGQueryRequest_MetadataEntry: MessageFns<RAGQueryRequest_MetadataE
             break;
           }
 
-          message.key = reader.string();
+          message.query = reader.string();
           continue;
         }
         case 2: {
@@ -1742,7 +1157,7 @@ export const RAGQueryRequest_MetadataEntry: MessageFns<RAGQueryRequest_MetadataE
             break;
           }
 
-          message.value = reader.string();
+          message.retrieval = RAGRetrievalOptions.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1754,33 +1169,33 @@ export const RAGQueryRequest_MetadataEntry: MessageFns<RAGQueryRequest_MetadataE
     return message;
   },
 
-  fromJSON(object: any): RAGQueryRequest_MetadataEntry {
+  fromJSON(object: any): RAGSearchRequest {
     return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
+      query: isSet(object.query) ? globalThis.String(object.query) : "",
+      retrieval: isSet(object.retrieval) ? RAGRetrievalOptions.fromJSON(object.retrieval) : undefined,
     };
   },
 
-  toJSON(message: RAGQueryRequest_MetadataEntry): unknown {
+  toJSON(message: RAGSearchRequest): unknown {
     const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
+    if (message.query !== "") {
+      obj.query = message.query;
     }
-    if (message.value !== "") {
-      obj.value = message.value;
+    if (message.retrieval !== undefined) {
+      obj.retrieval = RAGRetrievalOptions.toJSON(message.retrieval);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(base?: I): RAGQueryRequest_MetadataEntry {
-    return RAGQueryRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<RAGSearchRequest>, I>>(base?: I): RAGSearchRequest {
+    return RAGSearchRequest.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(
-    object: I,
-  ): RAGQueryRequest_MetadataEntry {
-    const message = createBaseRAGQueryRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
+  fromPartial<I extends Exact<DeepPartial<RAGSearchRequest>, I>>(object: I): RAGSearchRequest {
+    const message = createBaseRAGSearchRequest();
+    message.query = object.query ?? "";
+    message.retrieval = (object.retrieval !== undefined && object.retrieval !== null)
+      ? RAGRetrievalOptions.fromPartial(object.retrieval)
+      : undefined;
     return message;
   },
 };
@@ -1789,10 +1204,9 @@ function createBaseRAGSearchResult(): RAGSearchResult {
   return {
     chunkId: "",
     text: "",
-    similarityScore: 0,
+    score: 0,
     sourceDocument: undefined,
     metadata: {},
-    rank: 0,
     startOffset: 0,
     endOffset: 0,
     tokenCount: 0,
@@ -1807,8 +1221,8 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
     if (message.text !== "") {
       writer.uint32(18).string(message.text);
     }
-    if (message.similarityScore !== 0) {
-      writer.uint32(29).float(message.similarityScore);
+    if (message.score !== 0) {
+      writer.uint32(29).float(message.score);
     }
     if (message.sourceDocument !== undefined) {
       writer.uint32(34).string(message.sourceDocument);
@@ -1816,17 +1230,14 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
       RAGSearchResult_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
     });
-    if (message.rank !== 0) {
-      writer.uint32(56).int32(message.rank);
-    }
     if (message.startOffset !== 0) {
-      writer.uint32(64).int32(message.startOffset);
+      writer.uint32(48).int32(message.startOffset);
     }
     if (message.endOffset !== 0) {
-      writer.uint32(72).int32(message.endOffset);
+      writer.uint32(56).int32(message.endOffset);
     }
     if (message.tokenCount !== 0) {
-      writer.uint32(80).int32(message.tokenCount);
+      writer.uint32(64).int32(message.tokenCount);
     }
     return writer;
   },
@@ -1859,7 +1270,7 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
             break;
           }
 
-          message.similarityScore = reader.float();
+          message.score = reader.float();
           continue;
         }
         case 4: {
@@ -1881,32 +1292,24 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
           }
           continue;
         }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.rank = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
+        case 6: {
+          if (tag !== 48) {
             break;
           }
 
           message.startOffset = reader.int32();
           continue;
         }
-        case 9: {
-          if (tag !== 72) {
+        case 7: {
+          if (tag !== 56) {
             break;
           }
 
           message.endOffset = reader.int32();
           continue;
         }
-        case 10: {
-          if (tag !== 80) {
+        case 8: {
+          if (tag !== 64) {
             break;
           }
 
@@ -1930,11 +1333,7 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
         ? globalThis.String(object.chunk_id)
         : "",
       text: isSet(object.text) ? globalThis.String(object.text) : "",
-      similarityScore: isSet(object.similarityScore)
-        ? globalThis.Number(object.similarityScore)
-        : isSet(object.similarity_score)
-        ? globalThis.Number(object.similarity_score)
-        : 0,
+      score: isSet(object.score) ? globalThis.Number(object.score) : 0,
       sourceDocument: isSet(object.sourceDocument)
         ? globalThis.String(object.sourceDocument)
         : isSet(object.source_document)
@@ -1949,7 +1348,6 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
           {},
         )
         : {},
-      rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
       startOffset: isSet(object.startOffset)
         ? globalThis.Number(object.startOffset)
         : isSet(object.start_offset)
@@ -1976,8 +1374,8 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
     if (message.text !== "") {
       obj.text = message.text;
     }
-    if (message.similarityScore !== 0) {
-      obj.similarityScore = message.similarityScore;
+    if (message.score !== 0) {
+      obj.score = message.score;
     }
     if (message.sourceDocument !== undefined) {
       obj.sourceDocument = message.sourceDocument;
@@ -1990,9 +1388,6 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
           obj.metadata[k] = v;
         });
       }
-    }
-    if (message.rank !== 0) {
-      obj.rank = Math.round(message.rank);
     }
     if (message.startOffset !== 0) {
       obj.startOffset = Math.round(message.startOffset);
@@ -2013,7 +1408,7 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
     const message = createBaseRAGSearchResult();
     message.chunkId = object.chunkId ?? "";
     message.text = object.text ?? "";
-    message.similarityScore = object.similarityScore ?? 0;
+    message.score = object.score ?? 0;
     message.sourceDocument = object.sourceDocument ?? undefined;
     message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
       (acc: { [key: string]: string }, [key, value]: [string, string]) => {
@@ -2024,7 +1419,6 @@ export const RAGSearchResult: MessageFns<RAGSearchResult> = {
       },
       {},
     );
-    message.rank = object.rank ?? 0;
     message.startOffset = object.startOffset ?? 0;
     message.endOffset = object.endOffset ?? 0;
     message.tokenCount = object.tokenCount ?? 0;
@@ -2110,6 +1504,126 @@ export const RAGSearchResult_MetadataEntry: MessageFns<RAGSearchResult_MetadataE
   },
 };
 
+function createBaseRAGSearchResponse(): RAGSearchResponse {
+  return { chunks: [], retrievalTimeMs: 0, requestId: "", error: undefined };
+}
+
+export const RAGSearchResponse: MessageFns<RAGSearchResponse> = {
+  encode(message: RAGSearchResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.chunks) {
+      RAGSearchResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.retrievalTimeMs !== 0) {
+      writer.uint32(16).int64(message.retrievalTimeMs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGSearchResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGSearchResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.chunks.push(RAGSearchResult.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.retrievalTimeMs = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGSearchResponse {
+    return {
+      chunks: globalThis.Array.isArray(object?.chunks)
+        ? object.chunks.map((e: any) => RAGSearchResult.fromJSON(e))
+        : [],
+      retrievalTimeMs: isSet(object.retrievalTimeMs)
+        ? globalThis.Number(object.retrievalTimeMs)
+        : isSet(object.retrieval_time_ms)
+        ? globalThis.Number(object.retrieval_time_ms)
+        : 0,
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+    };
+  },
+
+  toJSON(message: RAGSearchResponse): unknown {
+    const obj: any = {};
+    if (message.chunks?.length) {
+      obj.chunks = message.chunks.map((e) => RAGSearchResult.toJSON(e));
+    }
+    if (message.retrievalTimeMs !== 0) {
+      obj.retrievalTimeMs = Math.round(message.retrievalTimeMs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGSearchResponse>, I>>(base?: I): RAGSearchResponse {
+    return RAGSearchResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGSearchResponse>, I>>(object: I): RAGSearchResponse {
+    const message = createBaseRAGSearchResponse();
+    message.chunks = object.chunks?.map((e) => RAGSearchResult.fromPartial(e)) || [];
+    message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseRAGResult(): RAGResult {
   return {
     answer: "",
@@ -2117,14 +1631,10 @@ function createBaseRAGResult(): RAGResult {
     contextUsed: "",
     retrievalTimeMs: 0,
     generationTimeMs: 0,
-    totalTimeMs: 0,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    errorMessage: undefined,
-    errorCode: 0,
     requestId: "",
     thinkingContent: undefined,
+    usage: undefined,
+    error: undefined,
   };
 }
 
@@ -2145,29 +1655,17 @@ export const RAGResult: MessageFns<RAGResult> = {
     if (message.generationTimeMs !== 0) {
       writer.uint32(40).int64(message.generationTimeMs);
     }
-    if (message.totalTimeMs !== 0) {
-      writer.uint32(48).int64(message.totalTimeMs);
-    }
-    if (message.promptTokens !== 0) {
-      writer.uint32(56).int32(message.promptTokens);
-    }
-    if (message.completionTokens !== 0) {
-      writer.uint32(64).int32(message.completionTokens);
-    }
-    if (message.totalTokens !== 0) {
-      writer.uint32(72).int32(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(82).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(88).int32(message.errorCode);
-    }
     if (message.requestId !== "") {
-      writer.uint32(98).string(message.requestId);
+      writer.uint32(50).string(message.requestId);
     }
     if (message.thinkingContent !== undefined) {
-      writer.uint32(106).string(message.thinkingContent);
+      writer.uint32(58).string(message.thinkingContent);
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(66).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -2220,67 +1718,35 @@ export const RAGResult: MessageFns<RAGResult> = {
           continue;
         }
         case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.totalTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.promptTokens = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.completionTokens = reader.int32();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.totalTokens = reader.int32();
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
+          if (tag !== 50) {
             break;
           }
 
           message.requestId = reader.string();
           continue;
         }
-        case 13: {
-          if (tag !== 106) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
           message.thinkingContent = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2315,36 +1781,6 @@ export const RAGResult: MessageFns<RAGResult> = {
         : isSet(object.generation_time_ms)
         ? globalThis.Number(object.generation_time_ms)
         : 0,
-      totalTimeMs: isSet(object.totalTimeMs)
-        ? globalThis.Number(object.totalTimeMs)
-        : isSet(object.total_time_ms)
-        ? globalThis.Number(object.total_time_ms)
-        : 0,
-      promptTokens: isSet(object.promptTokens)
-        ? globalThis.Number(object.promptTokens)
-        : isSet(object.prompt_tokens)
-        ? globalThis.Number(object.prompt_tokens)
-        : 0,
-      completionTokens: isSet(object.completionTokens)
-        ? globalThis.Number(object.completionTokens)
-        : isSet(object.completion_tokens)
-        ? globalThis.Number(object.completion_tokens)
-        : 0,
-      totalTokens: isSet(object.totalTokens)
-        ? globalThis.Number(object.totalTokens)
-        : isSet(object.total_tokens)
-        ? globalThis.Number(object.total_tokens)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
@@ -2355,6 +1791,8 @@ export const RAGResult: MessageFns<RAGResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2375,29 +1813,17 @@ export const RAGResult: MessageFns<RAGResult> = {
     if (message.generationTimeMs !== 0) {
       obj.generationTimeMs = Math.round(message.generationTimeMs);
     }
-    if (message.totalTimeMs !== 0) {
-      obj.totalTimeMs = Math.round(message.totalTimeMs);
-    }
-    if (message.promptTokens !== 0) {
-      obj.promptTokens = Math.round(message.promptTokens);
-    }
-    if (message.completionTokens !== 0) {
-      obj.completionTokens = Math.round(message.completionTokens);
-    }
-    if (message.totalTokens !== 0) {
-      obj.totalTokens = Math.round(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
+    }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2412,14 +1838,14 @@ export const RAGResult: MessageFns<RAGResult> = {
     message.contextUsed = object.contextUsed ?? "";
     message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
     message.generationTimeMs = object.generationTimeMs ?? 0;
-    message.totalTimeMs = object.totalTimeMs ?? 0;
-    message.promptTokens = object.promptTokens ?? 0;
-    message.completionTokens = object.completionTokens ?? 0;
-    message.totalTokens = object.totalTokens ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.requestId = object.requestId ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2430,13 +1856,8 @@ function createBaseRAGStatistics(): RAGStatistics {
     indexedChunks: 0,
     totalTokensIndexed: 0,
     lastUpdatedMs: 0,
-    indexPath: undefined,
-    statsJson: undefined,
     vectorStoreSizeBytes: 0,
-    isPersistent: false,
-    lastQueryMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -2454,26 +1875,11 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
     if (message.lastUpdatedMs !== 0) {
       writer.uint32(32).int64(message.lastUpdatedMs);
     }
-    if (message.indexPath !== undefined) {
-      writer.uint32(42).string(message.indexPath);
-    }
-    if (message.statsJson !== undefined) {
-      writer.uint32(50).string(message.statsJson);
-    }
     if (message.vectorStoreSizeBytes !== 0) {
-      writer.uint32(56).int64(message.vectorStoreSizeBytes);
+      writer.uint32(40).int64(message.vectorStoreSizeBytes);
     }
-    if (message.isPersistent !== false) {
-      writer.uint32(64).bool(message.isPersistent);
-    }
-    if (message.lastQueryMs !== 0) {
-      writer.uint32(72).int64(message.lastQueryMs);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(82).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(88).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2518,11 +1924,11 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
           continue;
         }
         case 5: {
-          if (tag !== 42) {
+          if (tag !== 40) {
             break;
           }
 
-          message.indexPath = reader.string();
+          message.vectorStoreSizeBytes = longToNumber(reader.int64());
           continue;
         }
         case 6: {
@@ -2530,47 +1936,7 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
             break;
           }
 
-          message.statsJson = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.vectorStoreSizeBytes = longToNumber(reader.int64());
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.isPersistent = reader.bool();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.lastQueryMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2604,41 +1970,12 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
         : isSet(object.last_updated_ms)
         ? globalThis.Number(object.last_updated_ms)
         : 0,
-      indexPath: isSet(object.indexPath)
-        ? globalThis.String(object.indexPath)
-        : isSet(object.index_path)
-        ? globalThis.String(object.index_path)
-        : undefined,
-      statsJson: isSet(object.statsJson)
-        ? globalThis.String(object.statsJson)
-        : isSet(object.stats_json)
-        ? globalThis.String(object.stats_json)
-        : undefined,
       vectorStoreSizeBytes: isSet(object.vectorStoreSizeBytes)
         ? globalThis.Number(object.vectorStoreSizeBytes)
         : isSet(object.vector_store_size_bytes)
         ? globalThis.Number(object.vector_store_size_bytes)
         : 0,
-      isPersistent: isSet(object.isPersistent)
-        ? globalThis.Boolean(object.isPersistent)
-        : isSet(object.is_persistent)
-        ? globalThis.Boolean(object.is_persistent)
-        : false,
-      lastQueryMs: isSet(object.lastQueryMs)
-        ? globalThis.Number(object.lastQueryMs)
-        : isSet(object.last_query_ms)
-        ? globalThis.Number(object.last_query_ms)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2656,26 +1993,11 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
     if (message.lastUpdatedMs !== 0) {
       obj.lastUpdatedMs = Math.round(message.lastUpdatedMs);
     }
-    if (message.indexPath !== undefined) {
-      obj.indexPath = message.indexPath;
-    }
-    if (message.statsJson !== undefined) {
-      obj.statsJson = message.statsJson;
-    }
     if (message.vectorStoreSizeBytes !== 0) {
       obj.vectorStoreSizeBytes = Math.round(message.vectorStoreSizeBytes);
     }
-    if (message.isPersistent !== false) {
-      obj.isPersistent = message.isPersistent;
-    }
-    if (message.lastQueryMs !== 0) {
-      obj.lastQueryMs = Math.round(message.lastQueryMs);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2689,228 +2011,37 @@ export const RAGStatistics: MessageFns<RAGStatistics> = {
     message.indexedChunks = object.indexedChunks ?? 0;
     message.totalTokensIndexed = object.totalTokensIndexed ?? 0;
     message.lastUpdatedMs = object.lastUpdatedMs ?? 0;
-    message.indexPath = object.indexPath ?? undefined;
-    message.statsJson = object.statsJson ?? undefined;
     message.vectorStoreSizeBytes = object.vectorStoreSizeBytes ?? 0;
-    message.isPersistent = object.isPersistent ?? false;
-    message.lastQueryMs = object.lastQueryMs ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
-    return message;
-  },
-};
-
-function createBaseRAGIngestResult(): RAGIngestResult {
-  return {
-    requestId: "",
-    documentsIngested: 0,
-    chunksIngested: 0,
-    statistics: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
-}
-
-export const RAGIngestResult: MessageFns<RAGIngestResult> = {
-  encode(message: RAGIngestResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
-    }
-    if (message.documentsIngested !== 0) {
-      writer.uint32(16).int64(message.documentsIngested);
-    }
-    if (message.chunksIngested !== 0) {
-      writer.uint32(24).int64(message.chunksIngested);
-    }
-    if (message.statistics !== undefined) {
-      RAGStatistics.encode(message.statistics, writer.uint32(34).fork()).join();
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(42).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(48).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGIngestResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGIngestResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.documentsIngested = longToNumber(reader.int64());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.chunksIngested = longToNumber(reader.int64());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.statistics = RAGStatistics.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RAGIngestResult {
-    return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      documentsIngested: isSet(object.documentsIngested)
-        ? globalThis.Number(object.documentsIngested)
-        : isSet(object.documents_ingested)
-        ? globalThis.Number(object.documents_ingested)
-        : 0,
-      chunksIngested: isSet(object.chunksIngested)
-        ? globalThis.Number(object.chunksIngested)
-        : isSet(object.chunks_ingested)
-        ? globalThis.Number(object.chunks_ingested)
-        : 0,
-      statistics: isSet(object.statistics) ? RAGStatistics.fromJSON(object.statistics) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: RAGIngestResult): unknown {
-    const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
-    }
-    if (message.documentsIngested !== 0) {
-      obj.documentsIngested = Math.round(message.documentsIngested);
-    }
-    if (message.chunksIngested !== 0) {
-      obj.chunksIngested = Math.round(message.chunksIngested);
-    }
-    if (message.statistics !== undefined) {
-      obj.statistics = RAGStatistics.toJSON(message.statistics);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RAGIngestResult>, I>>(base?: I): RAGIngestResult {
-    return RAGIngestResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RAGIngestResult>, I>>(object: I): RAGIngestResult {
-    const message = createBaseRAGIngestResult();
-    message.requestId = object.requestId ?? "";
-    message.documentsIngested = object.documentsIngested ?? 0;
-    message.chunksIngested = object.chunksIngested ?? 0;
-    message.statistics = (object.statistics !== undefined && object.statistics !== null)
-      ? RAGStatistics.fromPartial(object.statistics)
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
 
 function createBaseRAGStreamEvent(): RAGStreamEvent {
-  return {
-    seq: 0,
-    timestampUs: 0,
-    requestId: "",
-    kind: 0,
-    chunk: undefined,
-    token: "",
-    result: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { timestampUs: 0, requestId: "", kind: 0, token: "", result: undefined, error: undefined };
 }
 
 export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
   encode(message: RAGStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
-      writer.uint32(16).int64(message.timestampUs);
+      writer.uint32(8).int64(message.timestampUs);
     }
     if (message.requestId !== "") {
-      writer.uint32(26).string(message.requestId);
+      writer.uint32(18).string(message.requestId);
     }
     if (message.kind !== 0) {
-      writer.uint32(32).int32(message.kind);
-    }
-    if (message.chunk !== undefined) {
-      RAGSearchResult.encode(message.chunk, writer.uint32(42).fork()).join();
+      writer.uint32(24).int32(message.kind);
     }
     if (message.token !== "") {
-      writer.uint32(50).string(message.token);
+      writer.uint32(34).string(message.token);
     }
     if (message.result !== undefined) {
-      RAGResult.encode(message.result, writer.uint32(58).fork()).join();
+      RAGResult.encode(message.result, writer.uint32(42).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2927,31 +2058,31 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
             break;
           }
 
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
           message.timestampUs = longToNumber(reader.int64());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
           message.requestId = reader.string();
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
+        case 3: {
+          if (tag !== 24) {
             break;
           }
 
           message.kind = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.token = reader.string();
           continue;
         }
         case 5: {
@@ -2959,7 +2090,7 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
             break;
           }
 
-          message.chunk = RAGSearchResult.decode(reader, reader.uint32());
+          message.result = RAGResult.decode(reader, reader.uint32());
           continue;
         }
         case 6: {
@@ -2967,31 +2098,7 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
             break;
           }
 
-          message.token = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.result = RAGResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -3005,7 +2112,6 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
 
   fromJSON(object: any): RAGStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -3017,27 +2123,14 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
         ? globalThis.String(object.request_id)
         : "",
       kind: isSet(object.kind) ? rAGStreamEventKindFromJSON(object.kind) : 0,
-      chunk: isSet(object.chunk) ? RAGSearchResult.fromJSON(object.chunk) : undefined,
       token: isSet(object.token) ? globalThis.String(object.token) : "",
       result: isSet(object.result) ? RAGResult.fromJSON(object.result) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: RAGStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -3047,20 +2140,14 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
     if (message.kind !== 0) {
       obj.kind = rAGStreamEventKindToJSON(message.kind);
     }
-    if (message.chunk !== undefined) {
-      obj.chunk = RAGSearchResult.toJSON(message.chunk);
-    }
     if (message.token !== "") {
       obj.token = message.token;
     }
     if (message.result !== undefined) {
       obj.result = RAGResult.toJSON(message.result);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -3070,209 +2157,16 @@ export const RAGStreamEvent: MessageFns<RAGStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<RAGStreamEvent>, I>>(object: I): RAGStreamEvent {
     const message = createBaseRAGStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
-    message.chunk = (object.chunk !== undefined && object.chunk !== null)
-      ? RAGSearchResult.fromPartial(object.chunk)
-      : undefined;
     message.token = object.token ?? "";
     message.result = (object.result !== undefined && object.result !== null)
       ? RAGResult.fromPartial(object.result)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
-    return message;
-  },
-};
-
-function createBaseRAGServiceState(): RAGServiceState {
-  return {
-    isReady: false,
-    statistics: undefined,
-    isIndexing: false,
-    isQuerying: false,
-    activeRequestId: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
-}
-
-export const RAGServiceState: MessageFns<RAGServiceState> = {
-  encode(message: RAGServiceState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.isReady !== false) {
-      writer.uint32(8).bool(message.isReady);
-    }
-    if (message.statistics !== undefined) {
-      RAGStatistics.encode(message.statistics, writer.uint32(18).fork()).join();
-    }
-    if (message.isIndexing !== false) {
-      writer.uint32(24).bool(message.isIndexing);
-    }
-    if (message.isQuerying !== false) {
-      writer.uint32(32).bool(message.isQuerying);
-    }
-    if (message.activeRequestId !== undefined) {
-      writer.uint32(42).string(message.activeRequestId);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(50).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(56).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RAGServiceState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRAGServiceState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.isReady = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.statistics = RAGStatistics.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.isIndexing = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.isQuerying = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.activeRequestId = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RAGServiceState {
-    return {
-      isReady: isSet(object.isReady)
-        ? globalThis.Boolean(object.isReady)
-        : isSet(object.is_ready)
-        ? globalThis.Boolean(object.is_ready)
-        : false,
-      statistics: isSet(object.statistics) ? RAGStatistics.fromJSON(object.statistics) : undefined,
-      isIndexing: isSet(object.isIndexing)
-        ? globalThis.Boolean(object.isIndexing)
-        : isSet(object.is_indexing)
-        ? globalThis.Boolean(object.is_indexing)
-        : false,
-      isQuerying: isSet(object.isQuerying)
-        ? globalThis.Boolean(object.isQuerying)
-        : isSet(object.is_querying)
-        ? globalThis.Boolean(object.is_querying)
-        : false,
-      activeRequestId: isSet(object.activeRequestId)
-        ? globalThis.String(object.activeRequestId)
-        : isSet(object.active_request_id)
-        ? globalThis.String(object.active_request_id)
-        : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: RAGServiceState): unknown {
-    const obj: any = {};
-    if (message.isReady !== false) {
-      obj.isReady = message.isReady;
-    }
-    if (message.statistics !== undefined) {
-      obj.statistics = RAGStatistics.toJSON(message.statistics);
-    }
-    if (message.isIndexing !== false) {
-      obj.isIndexing = message.isIndexing;
-    }
-    if (message.isQuerying !== false) {
-      obj.isQuerying = message.isQuerying;
-    }
-    if (message.activeRequestId !== undefined) {
-      obj.activeRequestId = message.activeRequestId;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RAGServiceState>, I>>(base?: I): RAGServiceState {
-    return RAGServiceState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RAGServiceState>, I>>(object: I): RAGServiceState {
-    const message = createBaseRAGServiceState();
-    message.isReady = object.isReady ?? false;
-    message.statistics = (object.statistics !== undefined && object.statistics !== null)
-      ? RAGStatistics.fromPartial(object.statistics)
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
       : undefined;
-    message.isIndexing = object.isIndexing ?? false;
-    message.isQuerying = object.isQuerying ?? false;
-    message.activeRequestId = object.activeRequestId ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };

@@ -34,7 +34,7 @@ export type { PlatformAdapterModule } from './runtime/PlatformAdapter.js';
 export {
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
-} from './Public/RunAnywhere.js';
+} from './Public/SDKCore.js';
 
 export {
   Runtime,
@@ -127,7 +127,7 @@ export { SDKLogger, LogLevel } from './Foundation/SDKLogger.js';
 // re-exported here); negate to get the signed rac_result_t cAbiCode.
 export { SDKException, isSDKException } from './Foundation/SDKException.js';
 export { ProtoErrorCategory, ProtoErrorCode, ProtoErrorSeverity } from './Foundation/SDKException.js';
-export type { ProtoSDKError, ProtoErrorContext } from './Foundation/SDKException.js';
+export type { ProtoSDKError } from './Foundation/SDKException.js';
 export {
   RAC_ERROR_NETWORK_UNAVAILABLE,
   RAC_ERROR_NETWORK_ERROR,

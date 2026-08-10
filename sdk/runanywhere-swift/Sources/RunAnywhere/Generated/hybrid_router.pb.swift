@@ -8,16 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — Hybrid router schema.
+// RunAnywhere IDL — hybrid on-device / cloud routing.
 //
-// Per-request routing between an on-device (offline) backend and a cloud
-// (online) backend. Wired today for STT: sherpa-onnx offline ↔ cloud STT
-// (provider=sarvam) online. The schema is capability-agnostic; cascade/filter/
-// rank semantics are identical across capabilities.
-//
-// Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
-// the codegen scripts in idl/codegen/. The JNI boundary between the Kotlin
-// SDK and rac_commons exchanges these messages as serialized bytes.
+// Only STT is wired today. Most of these types are consumed by the TypeScript
+// and Dart routing policy rather than by commons.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -36,17 +30,17 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Capability under hybrid routing. Only STT is wired today.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAHybridCapability: SwiftProtobuf.Enum, Swift.CaseIterable {
+/// Firebase AI Logic / developer.android.com InferenceMode, verbatim.
+/// PREFER_* falls back silently across the boundary; ONLY_* fails instead.
+public nonisolated enum RAHybridInferenceMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
+
+  /// Treated as PREFER_ON_DEVICE, so the proto3 zero is the private default.
   case unspecified // = 0
-  case llm // = 1
-  case vlm // = 2
-  case stt // = 3
-  case tts // = 4
-  case vad // = 5
+  case preferOnDevice // = 1
+  case onlyOnDevice // = 2
+  case preferInCloud // = 3
+  case onlyInCloud // = 4
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -56,11 +50,10 @@ public nonisolated enum RAHybridCapability: SwiftProtobuf.Enum, Swift.CaseIterab
   public init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
-    case 1: self = .llm
-    case 2: self = .vlm
-    case 3: self = .stt
-    case 4: self = .tts
-    case 5: self = .vad
+    case 1: self = .preferOnDevice
+    case 2: self = .onlyOnDevice
+    case 3: self = .preferInCloud
+    case 4: self = .onlyInCloud
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -68,171 +61,26 @@ public nonisolated enum RAHybridCapability: SwiftProtobuf.Enum, Swift.CaseIterab
   public var rawValue: Int {
     switch self {
     case .unspecified: return 0
-    case .llm: return 1
-    case .vlm: return 2
-    case .stt: return 3
-    case .tts: return 4
-    case .vad: return 5
+    case .preferOnDevice: return 1
+    case .onlyOnDevice: return 2
+    case .preferInCloud: return 3
+    case .onlyInCloud: return 4
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAHybridCapability] = [
+  public static let allCases: [RAHybridInferenceMode] = [
     .unspecified,
-    .llm,
-    .vlm,
-    .stt,
-    .tts,
-    .vad,
+    .preferOnDevice,
+    .onlyOnDevice,
+    .preferInCloud,
+    .onlyInCloud,
   ]
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Backend identity. Matches the engines/ directory entry that registers
-/// the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
-/// ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
-/// the descriptor's `provider` field, not from a distinct enum kind.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAHybridBackendKind: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case hybridBackendUnspecified // = 0
-  case hybridBackendLlamacpp // = 1
-  case hybridBackendOpenrouter // = 2
-  case hybridBackendSherpa // = 3
-
-  /// Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-  /// the generic "cloud_stt" backend; the provider is carried out-of-band.
-  case hybridBackendCloud // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .hybridBackendUnspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .hybridBackendUnspecified
-    case 1: self = .hybridBackendLlamacpp
-    case 2: self = .hybridBackendOpenrouter
-    case 3: self = .hybridBackendSherpa
-    case 4: self = .hybridBackendCloud
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .hybridBackendUnspecified: return 0
-    case .hybridBackendLlamacpp: return 1
-    case .hybridBackendOpenrouter: return 2
-    case .hybridBackendSherpa: return 3
-    case .hybridBackendCloud: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAHybridBackendKind] = [
-    .hybridBackendUnspecified,
-    .hybridBackendLlamacpp,
-    .hybridBackendOpenrouter,
-    .hybridBackendSherpa,
-    .hybridBackendCloud,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
-/// Whether a model runs on-device or in the cloud. The router decides which
-/// of its two registered candidates to invoke based on policy.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAHybridModelType: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case offline // = 1
-  case online // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .offline
-    case 2: self = .online
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .offline: return 1
-    case .online: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAHybridModelType] = [
-    .unspecified,
-    .offline,
-    .online,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
-/// Rank — comparator used to sort eligible candidates. Exactly one rank
-/// per policy.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAHybridRank: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case preferLocalFirst // = 1
-  case preferOnlineFirst // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .preferLocalFirst
-    case 2: self = .preferOnlineFirst
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .preferLocalFirst: return 1
-    case .preferOnlineFirst: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAHybridRank] = [
-    .unspecified,
-    .preferLocalFirst,
-    .preferOnlineFirst,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
-/// Hard filter — drops a candidate from consideration when the predicate
-/// fails. Filters compose with AND semantics. The wire kinds match
-/// thoughts/file.txt's Routing Conditions list verbatim.
-/// ---------------------------------------------------------------------------
+/// A candidate must pass every hard filter to stay in the running.
 public nonisolated struct RAHybridFilter: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -240,8 +88,6 @@ public nonisolated struct RAHybridFilter: Sendable {
 
   public var kind: RAHybridFilter.OneOf_Kind? = nil
 
-  /// True iff the host has working network. Disqualifies online
-  /// candidates when false; offline candidates are unaffected.
   public var network: Bool {
     get {
       if case .network(let v)? = kind {return v}
@@ -250,18 +96,6 @@ public nonisolated struct RAHybridFilter: Sendable {
     set {kind = .network(newValue)}
   }
 
-  /// Discrete quality tier required from the candidate. Candidates
-  /// declaring a lower tier in their descriptor are filtered out.
-  public var qualityTier: Int32 {
-    get {
-      if case .qualityTier(let v)? = kind {return v}
-      return 0
-    }
-    set {kind = .qualityTier(newValue)}
-  }
-
-  /// Disqualifies cloud candidates when the device is below the
-  /// given battery percent (0–100).
   public var battery: RABatteryFilter {
     get {
       if case .battery(let v)? = kind {return v}
@@ -270,8 +104,6 @@ public nonisolated struct RAHybridFilter: Sendable {
     set {kind = .battery(newValue)}
   }
 
-  /// Caller-supplied predicate, evaluated host-side via the
-  /// registered custom-filter callback table.
   public var custom: RACustomFilter {
     get {
       if case .custom(let v)? = kind {return v}
@@ -283,17 +115,8 @@ public nonisolated struct RAHybridFilter: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Kind: Equatable, Sendable {
-    /// True iff the host has working network. Disqualifies online
-    /// candidates when false; offline candidates are unaffected.
     case network(Bool)
-    /// Discrete quality tier required from the candidate. Candidates
-    /// declaring a lower tier in their descriptor are filtered out.
-    case qualityTier(Int32)
-    /// Disqualifies cloud candidates when the device is below the
-    /// given battery percent (0–100).
     case battery(RABatteryFilter)
-    /// Caller-supplied predicate, evaluated host-side via the
-    /// registered custom-filter callback table.
     case custom(RACustomFilter)
 
   }
@@ -306,6 +129,7 @@ public nonisolated struct RABatteryFilter: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  /// Charge floor, 0-100, below which the on-device candidate is dropped.
   public var minBatteryPercent: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -327,10 +151,6 @@ public nonisolated struct RACustomFilter: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Cascade — triggers fallback from the primary candidate to the next
-/// candidate mid-request. Matches the file.txt Confidence policy.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridCascade: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -338,9 +158,6 @@ public nonisolated struct RAHybridCascade: Sendable {
 
   public var kind: RAHybridCascade.OneOf_Kind? = nil
 
-  /// Cascade when the primary's confidence/logprob signal falls below
-  /// `threshold`, or when the primary returns an error (treated as
-  /// "no confidence").
   public var confidence: RAConfidenceCascade {
     get {
       if case .confidence(let v)? = kind {return v}
@@ -352,9 +169,6 @@ public nonisolated struct RAHybridCascade: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Kind: Equatable, Sendable {
-    /// Cascade when the primary's confidence/logprob signal falls below
-    /// `threshold`, or when the primary returns an error (treated as
-    /// "no confidence").
     case confidence(RAConfidenceCascade)
 
   }
@@ -362,6 +176,7 @@ public nonisolated struct RAHybridCascade: Sendable {
   public init() {}
 }
 
+/// Below this on-device confidence, the router escalates to cloud.
 public nonisolated struct RAConfidenceCascade: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -374,10 +189,9 @@ public nonisolated struct RAConfidenceCascade: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Full routing policy attached to a model pair. `simple` mode collapses
-/// to a single filter; `advanced` mode allows composition.
-/// ---------------------------------------------------------------------------
+/// The candidate chain for one routed request: tried first to last, first
+/// success wins, position IS the priority. `mode` still governs whether the
+/// chain may cross the on-device/cloud line.
 public nonisolated struct RAHybridRoutingPolicy: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -394,7 +208,15 @@ public nonisolated struct RAHybridRoutingPolicy: Sendable {
   /// Clears the value of `cascade`. Subsequent reads from it will return its default value.
   public mutating func clearCascade() {self._cascade = nil}
 
-  public var rank: RAHybridRank = .unspecified
+  public var mode: RAHybridInferenceMode = .unspecified
+
+  /// Per-ATTEMPT deadline, not the overall request deadline. When a candidate
+  /// has produced nothing within this many milliseconds it is abandoned and
+  /// the next candidate is tried. 0 = no per-attempt deadline.
+  public var attemptTimeoutMs: Int32 = 0
+
+  /// Ordered candidates, priority first. Replaces the offline/online pair.
+  public var models: [RAHybridModelDescriptor] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -403,9 +225,6 @@ public nonisolated struct RAHybridRoutingPolicy: Sendable {
   fileprivate var _cascade: RAHybridCascade? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Descriptor for a single registered model on one side of the pair.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridModelDescriptor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -413,24 +232,21 @@ public nonisolated struct RAHybridModelDescriptor: Sendable {
 
   public var modelID: String = String()
 
-  public var modelType: RAHybridModelType = .unspecified
+  /// True = this candidate runs ON DEVICE (and is exempt from the network and
+  /// battery filters). False = it runs IN CLOUD. Firebase/Android vocabulary.
+  public var isOnDevice: Bool = false
 
-  public var backend: RAHybridBackendKind = .hybridBackendUnspecified
-
-  /// Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-  /// "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-  /// empty defaults to "sarvam". Ignored for non-cloud backends.
-  public var provider: String = String()
+  /// The plugin-registry engine name the runtime already pins on: "sherpa",
+  /// "llamacpp", "onnx", "qhexrt", "mlx", "cloud", or any name passed to
+  /// registerCloudProvider(). Empty = let the registry pick by priority.
+  public var engine: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Metadata returned alongside the capability result describing what the
-/// router did. Always populated even on success.
-/// ---------------------------------------------------------------------------
+/// What the router actually did, including the failed primary attempt.
 public nonisolated struct RAHybridRoutedMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -442,73 +258,60 @@ public nonisolated struct RAHybridRoutedMetadata: Sendable {
 
   public var attemptCount: Int32 = 0
 
-  /// Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-  /// the primary served the request or no fallback occurred.
   public var primaryErrorCode: Int32 = 0
 
   public var primaryErrorMessage: String = String()
 
-  /// Final confidence of the result that was actually returned. NaN when
-  /// the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
-  public var confidence: Float = 0
+  /// Absent (not NaN, not 0.0) when the engine reports no quality score.
+  public var confidence: Float {
+    get {_confidence ?? 0}
+    set {_confidence = newValue}
+  }
+  /// Returns true if `confidence` has been explicitly set.
+  public var hasConfidence: Bool {self._confidence != nil}
+  /// Clears the value of `confidence`. Subsequent reads from it will return its default value.
+  public mutating func clearConfidence() {self._confidence = nil}
 
-  /// Primary's confidence captured BEFORE cascading to the secondary.
-  /// Populated only when `was_fallback = true` AND the fallback fired on
-  /// confidence (not on an error). NaN otherwise.
-  public var primaryConfidence: Float = 0
+  /// Absent unless a confidence cascade discarded a primary answer.
+  public var primaryConfidence: Float {
+    get {_primaryConfidence ?? 0}
+    set {_primaryConfidence = newValue}
+  }
+  /// Returns true if `primaryConfidence` has been explicitly set.
+  public var hasPrimaryConfidence: Bool {self._primaryConfidence != nil}
+  /// Clears the value of `primaryConfidence`. Subsequent reads from it will return its default value.
+  public mutating func clearPrimaryConfidence() {self._primaryConfidence = nil}
+
+  /// True when the answer was produced ON DEVICE. This is the field an app
+  /// reads to truthfully claim "processed on your device"; never infer it by
+  /// comparing chosen_model_id.
+  public var servedOnDevice: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _confidence: Float? = nil
+  fileprivate var _primaryConfidence: Float? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-request routing context — caller-supplied hints only.
-///
-/// Device state lives behind the rac_hybrid_device_state C ABI vtable in
-/// commons; callers do not serialize platform state into this message.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAHybridRoutingContext: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// ---------------------------------------------------------------------------
-/// Cloud STT backend registration config. Replaces the hand-built
-/// `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
-/// HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
-/// (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
-/// across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
-/// these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
-/// the same keys out of the JSON blob (`config_json["provider"]` etc., see
-/// HybridModelDescriptor.provider).
-/// ---------------------------------------------------------------------------
 public nonisolated struct RACloudSttBackendConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
   public var provider: String = String()
 
-  /// Provider-side model id (e.g. "saarika:v2").
   public var model: String = String()
 
-  /// Provider API key / credential.
+  /// SECRET. Held in memory only; never logged, never persisted, never
+  /// included in a toString()/toJSON() dump.
   public var apiKey: String = String()
 
-  /// BCP-47 language hint forwarded to the provider (empty = auto-detect).
   public var languageCode: String = String()
 
-  /// Override the provider base URL (empty = provider default).
   public var baseURL: String = String()
 
-  /// Request timeout in milliseconds (0 = engine default).
   public var timeoutMs: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -516,11 +319,6 @@ public nonisolated struct RACloudSttBackendConfig: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// STT transcription options carried through the router. Sample rate and
-/// audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
-/// caller-supplied BCP-47 hint (empty = backend auto-detect).
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridSttTranscribeOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -530,35 +328,21 @@ public nonisolated struct RAHybridSttTranscribeOptions: Sendable {
 
   public var sampleRate: Int32 = 0
 
-  /// Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-  public var audioFormat: Int32 = 0
+  /// Container the bytes are already in. UNSPECIFIED (the proto3 zero) means
+  /// headerless PCM16, which commons wraps in a WAV container.
+  public var audioFormat: RAAudioFormat = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Request handed to the JNI transcribe thunk. Audio bytes are passed
-/// verbatim to the chosen backend; each engine is responsible for parsing
-/// the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
-/// file part; sherpa decodes the WAV/PCM bytes).
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridSttTranscribeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var audioBytes: Data = Data()
-
-  public var context: RAHybridRoutingContext {
-    get {_context ?? RAHybridRoutingContext()}
-    set {_context = newValue}
-  }
-  /// Returns true if `context` has been explicitly set.
-  public var hasContext: Bool {self._context != nil}
-  /// Clears the value of `context`. Subsequent reads from it will return its default value.
-  public mutating func clearContext() {self._context = nil}
 
   public var options: RAHybridSttTranscribeOptions {
     get {_options ?? RAHybridSttTranscribeOptions()}
@@ -573,15 +357,9 @@ public nonisolated struct RAHybridSttTranscribeRequest: Sendable {
 
   public init() {}
 
-  fileprivate var _context: RAHybridRoutingContext? = nil
   fileprivate var _options: RAHybridSttTranscribeOptions? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Response returned by the JNI transcribe thunk. Carries the transcript,
-/// the detected (or hinted) language, the routing decision metadata, the
-/// native rc, and a human-readable error message when rc != 0.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridSttTranscribeResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -602,8 +380,6 @@ public nonisolated struct RAHybridSttTranscribeResponse: Sendable {
   /// Clears the value of `routing`. Subsequent reads from it will return its default value.
   public mutating func clearRouting() {self._routing = nil}
 
-  public var errorMsg: String = String()
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -615,25 +391,13 @@ public nonisolated struct RAHybridSttTranscribeResponse: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RAHybridCapability: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HYBRID_CAPABILITY_UNSPECIFIED\0\u{1}HYBRID_CAPABILITY_LLM\0\u{1}HYBRID_CAPABILITY_VLM\0\u{1}HYBRID_CAPABILITY_STT\0\u{1}HYBRID_CAPABILITY_TTS\0\u{1}HYBRID_CAPABILITY_VAD\0")
-}
-
-nonisolated extension RAHybridBackendKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HYBRID_BACKEND_UNSPECIFIED\0\u{1}HYBRID_BACKEND_LLAMACPP\0\u{1}HYBRID_BACKEND_OPENROUTER\0\u{1}HYBRID_BACKEND_SHERPA\0\u{1}HYBRID_BACKEND_CLOUD\0")
-}
-
-nonisolated extension RAHybridModelType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HYBRID_MODEL_TYPE_UNSPECIFIED\0\u{1}HYBRID_MODEL_TYPE_OFFLINE\0\u{1}HYBRID_MODEL_TYPE_ONLINE\0")
-}
-
-nonisolated extension RAHybridRank: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HYBRID_RANK_UNSPECIFIED\0\u{1}HYBRID_RANK_PREFER_LOCAL_FIRST\0\u{1}HYBRID_RANK_PREFER_ONLINE_FIRST\0")
+nonisolated extension RAHybridInferenceMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HYBRID_INFERENCE_MODE_UNSPECIFIED\0\u{1}HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE\0\u{1}HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE\0\u{1}HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD\0\u{1}HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD\0")
 }
 
 nonisolated extension RAHybridFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridFilter"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}network\0\u{4}\u{2}quality_tier\0\u{1}battery\0\u{1}custom\0\u{c}\u{2}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}network\0\u{1}battery\0\u{1}custom\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -649,15 +413,7 @@ nonisolated extension RAHybridFilter: SwiftProtobuf.Message, SwiftProtobuf._Mess
           self.kind = .network(v)
         }
       }()
-      case 3: try {
-        var v: Int32?
-        try decoder.decodeSingularInt32Field(value: &v)
-        if let v = v {
-          if self.kind != nil {try decoder.handleConflictingOneOf()}
-          self.kind = .qualityTier(v)
-        }
-      }()
-      case 4: try {
+      case 2: try {
         var v: RABatteryFilter?
         var hadOneofValue = false
         if let current = self.kind {
@@ -670,7 +426,7 @@ nonisolated extension RAHybridFilter: SwiftProtobuf.Message, SwiftProtobuf._Mess
           self.kind = .battery(v)
         }
       }()
-      case 5: try {
+      case 3: try {
         var v: RACustomFilter?
         var hadOneofValue = false
         if let current = self.kind {
@@ -698,17 +454,13 @@ nonisolated extension RAHybridFilter: SwiftProtobuf.Message, SwiftProtobuf._Mess
       guard case .network(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularBoolField(value: v, fieldNumber: 1)
     }()
-    case .qualityTier?: try {
-      guard case .qualityTier(let v)? = self.kind else { preconditionFailure() }
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
-    }()
     case .battery?: try {
       guard case .battery(let v)? = self.kind else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     }()
     case .custom?: try {
       guard case .custom(let v)? = self.kind else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }()
     case nil: break
     }
@@ -865,7 +617,7 @@ nonisolated extension RAConfidenceCascade: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAHybridRoutingPolicy: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridRoutingPolicy"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}hard_filters\0\u{1}cascade\0\u{1}rank\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}hard_filters\0\u{1}cascade\0\u{1}mode\0\u{3}attempt_timeout_ms\0\u{1}models\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -875,7 +627,9 @@ nonisolated extension RAHybridRoutingPolicy: SwiftProtobuf.Message, SwiftProtobu
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.hardFilters) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._cascade) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.rank) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.mode) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.attemptTimeoutMs) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.models) }()
       default: break
       }
     }
@@ -892,8 +646,14 @@ nonisolated extension RAHybridRoutingPolicy: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._cascade {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.rank != .unspecified {
-      try visitor.visitSingularEnumField(value: self.rank, fieldNumber: 3)
+    if self.mode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.mode, fieldNumber: 3)
+    }
+    if self.attemptTimeoutMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.attemptTimeoutMs, fieldNumber: 4)
+    }
+    if !self.models.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.models, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -901,7 +661,9 @@ nonisolated extension RAHybridRoutingPolicy: SwiftProtobuf.Message, SwiftProtobu
   public static func ==(lhs: RAHybridRoutingPolicy, rhs: RAHybridRoutingPolicy) -> Bool {
     if lhs.hardFilters != rhs.hardFilters {return false}
     if lhs._cascade != rhs._cascade {return false}
-    if lhs.rank != rhs.rank {return false}
+    if lhs.mode != rhs.mode {return false}
+    if lhs.attemptTimeoutMs != rhs.attemptTimeoutMs {return false}
+    if lhs.models != rhs.models {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -909,7 +671,7 @@ nonisolated extension RAHybridRoutingPolicy: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RAHybridModelDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridModelDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}model_type\0\u{1}backend\0\u{1}provider\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}is_on_device\0\u{1}engine\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -918,9 +680,8 @@ nonisolated extension RAHybridModelDescriptor: SwiftProtobuf.Message, SwiftProto
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.modelType) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.backend) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.provider) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.isOnDevice) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.engine) }()
       default: break
       }
     }
@@ -930,23 +691,19 @@ nonisolated extension RAHybridModelDescriptor: SwiftProtobuf.Message, SwiftProto
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
-    if self.modelType != .unspecified {
-      try visitor.visitSingularEnumField(value: self.modelType, fieldNumber: 2)
+    if self.isOnDevice != false {
+      try visitor.visitSingularBoolField(value: self.isOnDevice, fieldNumber: 2)
     }
-    if self.backend != .hybridBackendUnspecified {
-      try visitor.visitSingularEnumField(value: self.backend, fieldNumber: 3)
-    }
-    if !self.provider.isEmpty {
-      try visitor.visitSingularStringField(value: self.provider, fieldNumber: 4)
+    if !self.engine.isEmpty {
+      try visitor.visitSingularStringField(value: self.engine, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAHybridModelDescriptor, rhs: RAHybridModelDescriptor) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
-    if lhs.modelType != rhs.modelType {return false}
-    if lhs.backend != rhs.backend {return false}
-    if lhs.provider != rhs.provider {return false}
+    if lhs.isOnDevice != rhs.isOnDevice {return false}
+    if lhs.engine != rhs.engine {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -954,7 +711,7 @@ nonisolated extension RAHybridModelDescriptor: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension RAHybridRoutedMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridRoutedMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chosen_model_id\0\u{3}was_fallback\0\u{3}attempt_count\0\u{3}primary_error_code\0\u{3}primary_error_message\0\u{1}confidence\0\u{3}primary_confidence\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chosen_model_id\0\u{3}was_fallback\0\u{3}attempt_count\0\u{3}primary_error_code\0\u{3}primary_error_message\0\u{1}confidence\0\u{3}primary_confidence\0\u{3}served_on_device\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -967,14 +724,19 @@ nonisolated extension RAHybridRoutedMetadata: SwiftProtobuf.Message, SwiftProtob
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.attemptCount) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.primaryErrorCode) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.primaryErrorMessage) }()
-      case 6: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
-      case 7: try { try decoder.decodeSingularFloatField(value: &self.primaryConfidence) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self._confidence) }()
+      case 7: try { try decoder.decodeSingularFloatField(value: &self._primaryConfidence) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.servedOnDevice) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.chosenModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.chosenModelID, fieldNumber: 1)
     }
@@ -990,11 +752,14 @@ nonisolated extension RAHybridRoutedMetadata: SwiftProtobuf.Message, SwiftProtob
     if !self.primaryErrorMessage.isEmpty {
       try visitor.visitSingularStringField(value: self.primaryErrorMessage, fieldNumber: 5)
     }
-    if self.confidence.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 6)
-    }
-    if self.primaryConfidence.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.primaryConfidence, fieldNumber: 7)
+    try { if let v = self._confidence {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._primaryConfidence {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 7)
+    } }()
+    if self.servedOnDevice != false {
+      try visitor.visitSingularBoolField(value: self.servedOnDevice, fieldNumber: 8)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1005,27 +770,9 @@ nonisolated extension RAHybridRoutedMetadata: SwiftProtobuf.Message, SwiftProtob
     if lhs.attemptCount != rhs.attemptCount {return false}
     if lhs.primaryErrorCode != rhs.primaryErrorCode {return false}
     if lhs.primaryErrorMessage != rhs.primaryErrorMessage {return false}
-    if lhs.confidence != rhs.confidence {return false}
-    if lhs.primaryConfidence != rhs.primaryConfidence {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAHybridRoutingContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".HybridRoutingContext"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{c}\u{1}\u{1}\u{c}\u{2}\u{1}\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAHybridRoutingContext, rhs: RAHybridRoutingContext) -> Bool {
+    if lhs._confidence != rhs._confidence {return false}
+    if lhs._primaryConfidence != rhs._primaryConfidence {return false}
+    if lhs.servedOnDevice != rhs.servedOnDevice {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1098,7 +845,7 @@ nonisolated extension RAHybridSttTranscribeOptions: SwiftProtobuf.Message, Swift
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.language) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.audioFormat) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
       default: break
       }
     }
@@ -1111,8 +858,8 @@ nonisolated extension RAHybridSttTranscribeOptions: SwiftProtobuf.Message, Swift
     if self.sampleRate != 0 {
       try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 2)
     }
-    if self.audioFormat != 0 {
-      try visitor.visitSingularInt32Field(value: self.audioFormat, fieldNumber: 3)
+    if self.audioFormat != .unspecified {
+      try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1128,7 +875,7 @@ nonisolated extension RAHybridSttTranscribeOptions: SwiftProtobuf.Message, Swift
 
 nonisolated extension RAHybridSttTranscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridSttTranscribeRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_bytes\0\u{1}context\0\u{1}options\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_bytes\0\u{1}options\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1137,8 +884,7 @@ nonisolated extension RAHybridSttTranscribeRequest: SwiftProtobuf.Message, Swift
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.audioBytes) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._context) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
       default: break
       }
     }
@@ -1152,18 +898,14 @@ nonisolated extension RAHybridSttTranscribeRequest: SwiftProtobuf.Message, Swift
     if !self.audioBytes.isEmpty {
       try visitor.visitSingularBytesField(value: self.audioBytes, fieldNumber: 1)
     }
-    try { if let v = self._context {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
     try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAHybridSttTranscribeRequest, rhs: RAHybridSttTranscribeRequest) -> Bool {
     if lhs.audioBytes != rhs.audioBytes {return false}
-    if lhs._context != rhs._context {return false}
     if lhs._options != rhs._options {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1172,7 +914,7 @@ nonisolated extension RAHybridSttTranscribeRequest: SwiftProtobuf.Message, Swift
 
 nonisolated extension RAHybridSttTranscribeResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridSttTranscribeResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rc\0\u{1}text\0\u{3}detected_language\0\u{1}routing\0\u{3}error_msg\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rc\0\u{1}text\0\u{3}detected_language\0\u{1}routing\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1184,7 +926,6 @@ nonisolated extension RAHybridSttTranscribeResponse: SwiftProtobuf.Message, Swif
       case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.detectedLanguage) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._routing) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.errorMsg) }()
       default: break
       }
     }
@@ -1207,9 +948,6 @@ nonisolated extension RAHybridSttTranscribeResponse: SwiftProtobuf.Message, Swif
     try { if let v = self._routing {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
-    if !self.errorMsg.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMsg, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1218,7 +956,6 @@ nonisolated extension RAHybridSttTranscribeResponse: SwiftProtobuf.Message, Swif
     if lhs.text != rhs.text {return false}
     if lhs.detectedLanguage != rhs.detectedLanguage {return false}
     if lhs._routing != rhs._routing {return false}
-    if lhs.errorMsg != rhs.errorMsg {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

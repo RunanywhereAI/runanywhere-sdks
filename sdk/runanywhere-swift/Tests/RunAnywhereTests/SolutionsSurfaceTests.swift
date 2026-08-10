@@ -37,7 +37,9 @@ final class SolutionsSurfaceTests: XCTestCase {
         XCTAssertEqual(voiceAgent.sampleRateHz, 16000)
         XCTAssertEqual(voiceAgent.chunkMs, 20)
         XCTAssertEqual(voiceAgent.maxContextTokens, 4096)
-        XCTAssertEqual(voiceAgent.typeKind, .voiceAgent)
+        // `VoiceAgentConfig` carries no `typeKind` field of its own -- the
+        // enclosing `SolutionConfig.config` oneof arm (already matched
+        // above) is the sole type discriminator (idl/solutions.proto).
     }
 
     /// A decoded config serialises losslessly — the bytes path is exactly what

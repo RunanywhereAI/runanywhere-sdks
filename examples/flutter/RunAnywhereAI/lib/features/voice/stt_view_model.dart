@@ -62,7 +62,9 @@ class STTViewModel extends VoiceComponentViewModelBase {
   // Live mode: mic chunks are fed straight into the SDK's streaming
   // transcription session (RunAnywhere.transcribeStream), which owns
   // endpointing/segmentation natively. No app-side silence detection.
-  StreamSubscription<sdk.STTPartialResult>? _liveSubscription;
+  StreamSubscription<sdk.TranscriptionEvent>? _liveSubscription;
+  StreamSubscription<Uint8List>? _liveChunkSubscription;
+  sdk.SttStream? _liveStream;
   String _committedTranscription = '';
 
   // Hybrid mode: router cached on the config tuple (mirrors iOS
@@ -71,12 +73,6 @@ class STTViewModel extends VoiceComponentViewModelBase {
   String? _hybridPairKey;
 
   // --- Component identity -----------------------------------------------------
-
-  @override
-  sdk.SDKComponent get component => sdk.SDKComponent.SDK_COMPONENT_STT;
-
-  @override
-  sdk.EventCategory get eventCategory => sdk.EventCategory.EVENT_CATEGORY_STT;
 
   @override
   ModelCategory get modelCategory =>
@@ -178,7 +174,7 @@ class STTViewModel extends VoiceComponentViewModelBase {
 
   @override
   Future<void> performLoad(ModelInfo model) =>
-      sdk.RunAnywhere.stt.load(model.id);
+      sdk.RunAnywhere.models.load(model.id);
 
   /// STT resolves the display name from the model catalog when available,
   /// falling back to the model's own metadata (mirrors iOS).
@@ -287,11 +283,13 @@ class STTViewModel extends VoiceComponentViewModelBase {
     notify();
 
     try {
-      if (!sdk.RunAnywhere.stt.isLoaded) {
+      if (!hasModelSelected) {
         throw StateError(
             'STT component not loaded. Please load an STT model first.');
       }
-      final result = await sdk.RunAnywhere.stt.transcribe(audioData);
+      final result = await sdk.RunAnywhere.stt.transcribe(
+        sdk.AudioInput.pcm16(audioData),
+      );
       transcription = result.text;
       debugPrint('Batch transcription complete: ${result.text.length} chars');
     } catch (e) {
@@ -326,12 +324,13 @@ class STTViewModel extends VoiceComponentViewModelBase {
         onlineModelId: onlineModelId,
       );
       // Buffered recordings are WAV-encoded at 16 kHz (AudioCaptureManager).
-      // audio_format wire values match rac_audio_format_enum_t (1 = WAV).
+      // `audioFormat` is now the typed `AudioFormat` enum, not a raw
+      // rac_audio_format_enum_t int.
       final response = router.transcribe(
         audioBytes,
         options: sdk.HybridSttTranscribeOptions(
           sampleRate: 16000,
-          audioFormat: 1,
+          audioFormat: sdk.AudioFormat.AUDIO_FORMAT_WAV,
         ),
       );
       transcription = response.text;
@@ -445,26 +444,44 @@ class STTViewModel extends VoiceComponentViewModelBase {
 
     _subscribeToAudioLevels();
 
-    _liveSubscription = sdk.RunAnywhere.transcribeStream(chunks).listen(
-      (partial) {
-        final text = partial.text.trim();
-        if (partial.isFinal) {
-          // Stream errors surface as a terminal partial carrying the
-          // failure text (see RunAnywhere.transcribeStream).
-          if (text.startsWith('STT stream failed')) {
-            errorMessage = text;
-            notify();
-            return;
-          }
-          if (text.isNotEmpty) {
-            _committedTranscription = _committedTranscription.isEmpty
-                ? text
-                : '$_committedTranscription\n$text';
-          }
-          transcription = _committedTranscription;
-          partialText = '';
-        } else if (text.isNotEmpty) {
-          partialText = text;
+    // Open the session once with the capture format, then push each mic chunk
+    // as a frame. The format is established at open time, so it is not
+    // re-derived per chunk the way the deprecated adapter had to.
+    final stream = await sdk.RunAnywhere.stt.openStream(
+      const sdk.AudioFormatSpec(
+        encoding: sdk.AudioEncoding.pcm16,
+        sampleRate: 16000,
+      ),
+    );
+    _liveStream = stream;
+    _liveChunkSubscription = chunks.listen(
+      (bytes) => stream.pushFrame(
+        sdk.AudioFrame(samples: bytes, sampleCount: bytes.length),
+      ),
+      onDone: stream.finish,
+    );
+
+    _liveSubscription = stream.events.listen(
+      (event) {
+        switch (event) {
+          case sdk.TranscriptionPartial(:final text):
+            final trimmed = text.trim();
+            if (trimmed.isNotEmpty) partialText = trimmed;
+          case sdk.TranscriptionFinal(:final transcription):
+            final trimmed = transcription.text.trim();
+            if (trimmed.isNotEmpty) {
+              _committedTranscription = _committedTranscription.isEmpty
+                  ? trimmed
+                  : '$_committedTranscription\n$trimmed';
+            }
+            this.transcription = _committedTranscription;
+            partialText = '';
+          case sdk.TranscriptionFailed(:final error):
+            errorMessage = 'Transcription failed: $error';
+          case sdk.TranscriptionStarted():
+          case sdk.TranscriptionCompleted():
+          case sdk.TranscriptionCancelled():
+            break;
         }
         notify();
       },
@@ -493,8 +510,13 @@ class STTViewModel extends VoiceComponentViewModelBase {
 
   /// Stop live transcription resources (called when mode changes).
   void _stopLiveTranscription() {
+    unawaited(_liveChunkSubscription?.cancel());
+    _liveChunkSubscription = null;
     unawaited(_liveSubscription?.cancel());
     _liveSubscription = null;
+    final stream = _liveStream;
+    _liveStream = null;
+    if (stream != null) unawaited(stream.close());
   }
 
   // --- Transcript actions --------------------------------------------------------------

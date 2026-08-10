@@ -68,7 +68,12 @@ static constexpr int kReservedEosTokens = 4;     // Tokens reserved for EOS at e
 static constexpr int kRepeatPenaltyWindow = 64;  // Last-N tokens for repetition penalty
 
 // Buffer sizes
-static constexpr size_t kChatTemplateBufSize = 2048;
+// First-try capacity for the GGUF's `tokenizer.chat_template` metadata string.
+// Modern templates (Qwen3, LFM2, Llama 3.x, anything with tool support) run
+// well past this, so a too-small read is expected and re-queried at the exact
+// length — see apply_chat_template. Truncating instead corrupts the template
+// and silently drops the whole conversation onto the plain-text fallback.
+static constexpr size_t kChatTemplateBufSize = 4096;
 // llama_chat_apply_template takes a signed 32-bit output capacity.
 static constexpr int32_t kFormattedPromptBufSize = 256 * 1024;
 
@@ -149,15 +154,26 @@ const std::vector<std::string> kBuiltinStopSequences = {
     "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>", "\n\nUser:", "\n\nHuman:",
 };
 
-// Longest built-in stop sequence — the rolling stop_window only needs to retain
-// this many trailing bytes to catch any pending match.
-const size_t kMaxBuiltinStopLen = [] {
+// Turn markers of the plain-text fallback prompt format
+// (LlamaCppTextGeneration::plain_text_fallback_prompt). Added to the stop list
+// ONLY for a request whose prompt actually used that format: it has no
+// end-of-turn token, so the model continues into the next turn and the raw
+// "\nuser: ..." continuation reaches the UI and the TTS. A model prompted with
+// a real chat template must NOT get these — it can legitimately write
+// "\nuser:" inside prose or code.
+const std::vector<std::string> kFallbackFormatStopSequences = {
+    "\nuser:", "\nassistant:", "\nsystem:",
+};
+
+// Longest stop sequence in a list — the rolling stop_window only needs to
+// retain this many trailing bytes to catch any pending match.
+size_t max_stop_len(const std::vector<std::string>& stops) {
     size_t m = 0;
-    for (const auto& s : kBuiltinStopSequences) {
+    for (const auto& s : stops) {
         m = std::max(m, s.size());
     }
     return m;
-}();
+}
 
 // Construct a fresh per-request sampler chain. Identical ordering and parameters
 // to what generate_stream() and generate_from_context() each built inline
@@ -686,15 +702,26 @@ bool LlamaCppTextGeneration::unload_model() {
 
 std::string LlamaCppTextGeneration::build_prompt(const TextGenerationRequest& request) {
     std::vector<std::pair<std::string, std::string>> messages;
+    // Cleared here and set only by apply_chat_template's fallback branch, so the
+    // flag always describes the prompt the decode loop is about to run on
+    // (both callers build the prompt immediately before run_decode_loop, under
+    // the same mutex).
+    prompt_used_fallback_format_ = false;
 
     if (!request.messages.empty()) {
         messages = request.messages;
     } else if (!request.prompt.empty()) {
         // If the prompt already contains chat template tokens (e.g. <|im_start|>,
-        // [INST], <|begin_of_text|>), it was pre-formatted by the caller — pass
-        // it through verbatim to avoid double-applying the template.
+        // [INST], <|begin_of_text|>, <start_of_turn>), it was pre-formatted by the
+        // caller — pass it through verbatim to avoid double-applying the template.
+        //
+        // <start_of_turn> is Gemma's marker. Without it here, a correctly formatted
+        // multi-turn Gemma prompt falls through to the single-user-message path
+        // below, which collapses the whole conversation into one turn — the model
+        // then answers as if it had no history.
         if (request.prompt.find("<|im_start|>") != std::string::npos ||
             request.prompt.find("<|begin_of_text|>") != std::string::npos ||
+            request.prompt.find("<start_of_turn>") != std::string::npos ||
             request.prompt.find("[INST]") != std::string::npos) {
             RAC_LOG_INFO("LLM.LlamaCpp",
                          "Prompt already contains chat template tokens, using as-is (len=%zu)",
@@ -710,6 +737,27 @@ std::string LlamaCppTextGeneration::build_prompt(const TextGenerationRequest& re
 
     std::string formatted = apply_chat_template(messages, request.system_prompt, true);
     return formatted;
+}
+
+/**
+ * Last-resort prompt format for a GGUF whose chat template llama.cpp cannot
+ * apply. It has no special end-of-turn token, so the model will happily keep
+ * writing the *next* turn once it finishes the answer. Marking the flag is
+ * therefore not bookkeeping: run_decode_loop reads it to arm the matching
+ * "\nrole:" stop sequences, which is the only thing keeping the model's
+ * continuation out of the UI and the TTS.
+ */
+std::string LlamaCppTextGeneration::plain_text_fallback_prompt(
+    const std::vector<llama_chat_message>& chat_messages, bool add_assistant_token) {
+    prompt_used_fallback_format_ = true;
+    std::string fallback;
+    for (const auto& msg : chat_messages) {
+        fallback += std::string(msg.role) + ": " + msg.content + "\n";
+    }
+    if (add_assistant_token) {
+        fallback += "assistant: ";
+    }
+    return fallback;
 }
 
 std::string LlamaCppTextGeneration::apply_chat_template(
@@ -735,10 +783,31 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     model_template.resize(kChatTemplateBufSize);
     int32_t template_len = llama_model_meta_val_str(model_, "tokenizer.chat_template",
                                                     model_template.data(), model_template.size());
+    // llama_model_meta_val_str reports the FULL length but writes a truncated,
+    // NUL-terminated string when the buffer is too small. Resizing the string to
+    // that reported length therefore produced a template cut off at the buffer
+    // boundary and padded with NULs — and llm_chat_detect_template is pure
+    // substring matching over that string, so every marker past the cut was
+    // invisible. The detector then answered UNKNOWN, apply returned -1, and the
+    // model was prompted with the plain "role: content" fallback, which has no
+    // end-of-turn token: the model ran straight past its answer and the raw
+    // continuation ("...\nuser: /no_think") was rendered and spoken verbatim.
+    // Re-query at the exact size so long templates are read whole.
+    //
+    // `>=`, not `>`: the buffer holds size() bytes INCLUDING the NUL, so a
+    // template whose reported length is exactly size() had its last character
+    // overwritten by the terminator. That one dropped character is enough to cut
+    // a closing marker in half and send the detector back to UNKNOWN — the same
+    // failure as a badly truncated template, just harder to spot.
+    if (template_len >= static_cast<int32_t>(model_template.size())) {
+        model_template.resize(static_cast<size_t>(template_len) + 1);
+        template_len = llama_model_meta_val_str(model_, "tokenizer.chat_template",
+                                                model_template.data(), model_template.size());
+    }
 
     const char* tmpl_to_use = nullptr;
-    if (template_len > 0) {
-        model_template.resize(template_len);
+    if (template_len > 0 && template_len <= static_cast<int32_t>(model_template.size())) {
+        model_template.resize(static_cast<size_t>(template_len));
         tmpl_to_use = model_template.c_str();
     }
 
@@ -765,14 +834,7 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     if (result < 0) {
         RAC_LOG_INFO("LLM.LlamaCpp",
                      "Chat template failed (result=%d), using simple fallback format", result);
-        std::string fallback;
-        for (const auto& msg : chat_messages) {
-            fallback += std::string(msg.role) + ": " + msg.content + "\n";
-        }
-        if (add_assistant_token) {
-            fallback += "assistant: ";
-        }
-        return fallback;
+        return plain_text_fallback_prompt(chat_messages, add_assistant_token);
     }
 
     if (result > kFormattedPromptBufSize) {
@@ -794,14 +856,7 @@ std::string LlamaCppTextGeneration::apply_chat_template(
                          "Chat template retry failed (result=%d), using simple "
                          "fallback format",
                          result);
-            std::string fallback;
-            for (const auto& msg : chat_messages) {
-                fallback += std::string(msg.role) + ": " + msg.content + "\n";
-            }
-            if (add_assistant_token) {
-                fallback += "assistant: ";
-            }
-            return fallback;
+            return plain_text_fallback_prompt(chat_messages, add_assistant_token);
         }
     }
 
@@ -879,8 +934,23 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
         llama_sampler_reset(sampler);
     }
 
+    // A prompt built with the plain-text fallback format has no end-of-turn
+    // token, so its own turn markers become stop sequences for this request
+    // only. Without them the model writes the next turn and it is rendered and
+    // spoken as if it were the answer.
+    const std::vector<std::string>* stops = &kBuiltinStopSequences;
+    std::vector<std::string> stops_with_fallback;
+    if (prompt_used_fallback_format_) {
+        stops_with_fallback = kBuiltinStopSequences;
+        stops_with_fallback.insert(stops_with_fallback.end(),
+                                   kFallbackFormatStopSequences.begin(),
+                                   kFallbackFormatStopSequences.end());
+        stops = &stops_with_fallback;
+    }
+    const size_t max_stop_length = max_stop_len(*stops);
+
     std::string stop_window;
-    stop_window.reserve(kMaxBuiltinStopLen * 2);
+    stop_window.reserve(max_stop_length * 2);
 
     std::string partial_utf8_buffer;
     partial_utf8_buffer.reserve(8);
@@ -926,7 +996,7 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
             partial_utf8_buffer.erase(0, valid_upto);
 
             size_t found_stop_pos = std::string::npos;
-            for (const auto& stop_seq : kBuiltinStopSequences) {
+            for (const auto& stop_seq : *stops) {
                 size_t pos = stop_window.find(stop_seq);
                 if (pos != std::string::npos) {
                     if (found_stop_pos == std::string::npos || pos < found_stop_pos) {
@@ -946,8 +1016,8 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
                 break;
             }
 
-            if (stop_window.size() > kMaxBuiltinStopLen) {
-                size_t safe_len = stop_window.size() - kMaxBuiltinStopLen;
+            if (stop_window.size() > max_stop_length) {
+                size_t safe_len = stop_window.size() - max_stop_length;
                 // Don't cut inside a UTF-8 multi-byte sequence; back up until
                 // we're on a leading-byte boundary. Cast to uint8_t so bytes
                 // >= 0x80 aren't treated as negative signed char (UB on platforms

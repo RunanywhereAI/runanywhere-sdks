@@ -41,11 +41,14 @@ struct GenerationState {
     // llm_module's history normalizer, this is already current-turn-free and
     // pre-alternated, so run_generate_once forwards it as-is (no trailing pop).
     std::vector<std::string> history;
-    // Names of the tools advertised this turn (RUN-80). Used ONLY to build the
-    // QHexRT grammar spec ("toolcall_opt:<names>") when the backend supports
-    // grammar-constrained decoding; empty ⇒ no grammar attached. Non-grammar
-    // engines ignore it.
-    std::vector<std::string> tool_names;
+    // Pre-built grammar dialects (TC-1 + RUN-80). Empty = unconstrained.
+    // Built via build_tool_call_grammar(); scoped per turn by clearing both
+    // when tools are not live. run_generate_once attaches the dialect that
+    // matches the acquired engine (supports_grammar → qhexrt, else gbnf).
+    // Two dialects because llamacpp and qhexrt read rac_llm_options_t.grammar
+    // with incompatible conventions (raw GBNF vs kind-prefixed toolcall:).
+    std::string grammar_gbnf;
+    std::string grammar_qhexrt;
 };
 
 struct GenerationCancelBinding {
@@ -91,6 +94,11 @@ inline GenerationState generation_for_tool_step(const GenerationState& base, uin
                                                 runanywhere::v1::ToolChoiceMode tool_choice,
                                                 runanywhere::v1::ToolCallFormatName format) {
     GenerationState step = base;
+    // Grammar lifetime is owned by the run-loop / session via
+    // tool_grammar_constrained_this_turn (clear when tools are not live,
+    // including pure synthesis turns). Do NOT unconditionally clear here on
+    // iteration > 1 — that would drop grammar when keep_tools_available keeps
+    // tools live across multiple decision turns.
     const bool forced_decision = iteration == 1 && has_tool_choice &&
                                  tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
     if (!forced_decision) {
@@ -144,8 +152,7 @@ inline void publish_generation_completed_event(
         gen->set_model_id(ref.model_id);
     }
     if (raw.completion_tokens > 0) {
-        gen->set_tokens_count(raw.completion_tokens);
-        gen->set_tokens_used(raw.completion_tokens);
+        gen->set_output_tokens(raw.completion_tokens);
     }
     if (raw.prompt_tokens > 0) {
         gen->set_input_tokens(raw.prompt_tokens);
@@ -193,8 +200,7 @@ inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
         gen->set_model_id(agg.model_id);
     }
     if (agg.output_tokens > 0) {
-        gen->set_tokens_count(static_cast<int32_t>(agg.output_tokens));
-        gen->set_tokens_used(static_cast<int32_t>(agg.output_tokens));
+        gen->set_output_tokens(static_cast<int32_t>(agg.output_tokens));
     }
     if (agg.input_tokens > 0) {
         gen->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
@@ -212,6 +218,25 @@ inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
 #endif
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+// Copies the loop's aggregated token counts onto the ToolCallingResult so a
+// generate() that routed through the tool loop reports the same usage a non-tool
+// generate would (the loop can span several LLM turns; agg sums them). Guarded
+// by RAC_HAVE_PROTOBUF like the other ToolCallingResult writers here — the type
+// is unavailable on protobuf-less builds (Emscripten defaults it off).
+inline void set_tool_result_usage(runanywhere::v1::ToolCallingResult* result,
+                                  const GenerationTelemetryAgg& agg) {
+    if (!result || agg.generations == 0) {
+        return;
+    }
+    auto* usage = result->mutable_usage();
+    usage->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
+    usage->set_output_tokens(static_cast<int32_t>(agg.output_tokens));
+    usage->set_total_tokens(static_cast<int32_t>(agg.input_tokens + agg.output_tokens));
+    usage->set_decode_tokens_per_second(agg.tokens_per_second);
+}
+#endif  // RAC_HAVE_PROTOBUF
+
 // Emits the aggregate on every loop exit path (success, tool failure, cancel).
 struct ToolLoopTelemetryScope {
     GenerationTelemetryAgg agg;
@@ -221,12 +246,12 @@ struct ToolLoopTelemetryScope {
     ~ToolLoopTelemetryScope() { publish_tool_loop_telemetry(agg); }
 };
 
-// Whether this turn's decoding should be grammar-constrained to the live tool set
-// (QHexRT). Returns false — leave decoding unconstrained — when tool calls are
-// forbidden this turn (@p none_veto = tool_choice==NONE) or this is a pure
-// synthesis turn (@p a_call_was_made and tools are not kept available). The run
-// loop and the session are parallel implementations, so both derive their
-// tool_names-clearing decision from this ONE predicate to stay in lockstep.
+// Whether this turn's decoding should be grammar-constrained to the live tool set.
+// Returns false — leave decoding unconstrained — when tool calls are forbidden
+// this turn (@p none_veto = tool_choice==NONE) or this is a pure synthesis turn
+// (@p a_call_was_made and tools are not kept available). The run loop and the
+// session are parallel implementations, so both derive their grammar-clearing
+// decision from this ONE predicate to stay in lockstep.
 inline bool tool_grammar_constrained_this_turn(bool none_veto, bool a_call_was_made,
                                                bool keep_tools_available) {
     if (none_veto) {
@@ -315,6 +340,16 @@ inline bool run_generate_once(GenerationState& generation,
         generation.system_prompt.empty() ? nullptr : generation.system_prompt.c_str();
     options.disable_thinking = generation.disable_thinking ? RAC_TRUE : RAC_FALSE;
 
+    // Attach the pre-built grammar dialect for this engine. Grammar backends
+    // (QHexRT, supports_grammar=true) consume the kind-prefixed qhexrt spec;
+    // other engines that honor grammar (llamacpp GBNF) use grammar_gbnf.
+    // Empty specs leave decoding unconstrained.
+    if (ref.supports_grammar && !generation.grammar_qhexrt.empty()) {
+        options.grammar = generation.grammar_qhexrt.c_str();
+    } else if (!generation.grammar_gbnf.empty()) {
+        options.grammar = generation.grammar_gbnf.c_str();
+    }
+
     // Prior conversation turns (tool_calling.proto ToolCallingSessionCreateRequest.history).
     // Already excludes the current turn and is pre-alternated [user,asst,...], so unlike
     // llm_module's normalizer we forward it verbatim (no leading/trailing role fixups). The
@@ -329,27 +364,6 @@ inline bool run_generate_once(GenerationState& generation,
     }
     options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
     options.n_history = static_cast<int32_t>(history_ptrs.size());
-
-    // QHexRT grammar-constrained tool decoding (RUN-80). When the backend honors
-    // options.grammar AND a tool set is live, constrain decoding to "free chat OR
-    // exactly one [name(args)] call over the enumerated tools" (ToolCallOptional).
-    // This makes over-calling structurally impossible on QHexRT — the model can
-    // still answer in plain text; it just cannot invent or misformat a call. The
-    // spec string must outlive ops->generate (options.grammar aliases it), so it
-    // lives in this call frame. supports_grammar is false for llama.cpp/onnx/cloud
-    // (set per-framework in the lifecycle accessor), so options.grammar stays NULL
-    // there and behavior is byte-for-byte unchanged for non-grammar engines.
-    std::string grammar_spec;
-    if (ref.supports_grammar && !generation.tool_names.empty()) {
-        grammar_spec = "toolcall_opt:";
-        for (size_t i = 0; i < generation.tool_names.size(); ++i) {
-            if (i != 0) {
-                grammar_spec += ',';
-            }
-            grammar_spec += generation.tool_names[i];
-        }
-        options.grammar = grammar_spec.c_str();
-    }
 
     clear_lifecycle_llm_cancel(&ref);
 

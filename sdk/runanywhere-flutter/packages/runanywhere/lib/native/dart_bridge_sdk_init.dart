@@ -133,18 +133,13 @@ class DartBridgeSdkInit {
   }
 
   /// Throw a [StateError] when the C ABI signals a hard failure. Soft
-  /// failures (offline mode, missing auth config) come back with
-  /// `success=true` plus warnings — leave those to the caller.
+  /// failures (offline mode, missing auth config) come back without an
+  /// `error` submessage plus warnings — leave those to the caller.
   static void _assertSuccess(SdkInitResult result, String symbol) {
-    if (result.success) return;
-    if (result.hasError()) {
-      throw StateError(
-        '$symbol failed: ${result.error.message} '
-        '(code=${result.error.code})',
-      );
-    }
+    if (!result.hasError()) return;
     throw StateError(
-      '$symbol failed without error detail (phase=${result.phase.name})',
+      '$symbol failed: ${result.error.message} '
+      '(code=${result.error.code})',
     );
   }
 }

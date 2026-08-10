@@ -13,43 +13,27 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.embeddingsOptionsDefaults = exports.validateEmbeddingsConfiguration = exports.embeddingsConfigurationDefaults = void 0;
+exports.validateEmbeddingsOptions = exports.embeddingsOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
-const embeddingsConfigurationDefaults = () => ({
-    modelId: '',
-    embeddingDimension: 384,
-    maxSequenceLength: 512,
+const embeddingsOptionsDefaults = () => ({
     normalize: true,
-    maxTokens: 0,
-    normalizeMode: 0,
     pooling: 0,
+    nThreads: 0,
+    inputType: 0,
 });
-exports.embeddingsConfigurationDefaults = embeddingsConfigurationDefaults;
-const validateEmbeddingsConfiguration = (m) => {
-    if (m.modelId === '') {
+exports.embeddingsOptionsDefaults = embeddingsOptionsDefaults;
+const validateEmbeddingsOptions = (m) => {
+    if (m.batchSize !== undefined && (m.batchSize < 1 || m.batchSize > 8192)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.model_id',
-            message: 'model_id is required',
+            fieldPath: 'EmbeddingsOptions.batch_size',
+            message: `batch_size must be in 1...8192 (got ${m.batchSize})`,
         });
     }
-    if (m.embeddingDimension < 1) {
+    if (m.dimensions !== undefined && (m.dimensions < 1)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
-            message: `embedding_dimension must be >= 1 (got ${m.embeddingDimension})`,
-        });
-    }
-    if (m.maxSequenceLength < 1) {
-        throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
-            message: `max_sequence_length must be >= 1 (got ${m.maxSequenceLength})`,
+            fieldPath: 'EmbeddingsOptions.dimensions',
+            message: `dimensions must be >= 1 (got ${m.dimensions})`,
         });
     }
 };
-exports.validateEmbeddingsConfiguration = validateEmbeddingsConfiguration;
-const embeddingsOptionsDefaults = () => ({
-    normalize: true,
-    normalizeMode: 0,
-    pooling: 0,
-    nThreads: 0,
-});
-exports.embeddingsOptionsDefaults = embeddingsOptionsDefaults;
+exports.validateEmbeddingsOptions = validateEmbeddingsOptions;

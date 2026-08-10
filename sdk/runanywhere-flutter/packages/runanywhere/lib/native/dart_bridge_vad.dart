@@ -207,23 +207,14 @@ class DartBridgeVAD {
   }
 
   void _validateLifecycleRequest(vad_pb.VADProcessRequest request) {
-    if (!request.hasAudio()) {
+    // `VADAudioSource` is a plain message now, not a oneof (idl/vad_options.
+    // proto: `bytes audio_data = 1` alongside `encoding`/`sample_rate`/
+    // `channels`/`frame_offset_ms`) — `adapter_handle` and the `source`
+    // discriminator it used to share with `audio_data` are both gone.
+    if (!request.hasAudio() || request.audio.audioData.isEmpty) {
       throw ArgumentError(
-        'VADProcessRequest.audio is required for lifecycle VAD',
+        'VADProcessRequest.audio.audio_data is required for lifecycle VAD',
       );
-    }
-    switch (request.audio.whichSource()) {
-      case vad_pb.VADAudioSource_Source.audioData:
-        if (request.audio.audioData.isEmpty) {
-          throw ArgumentError('VADProcessRequest.audio.audio_data is required');
-        }
-        return;
-      case vad_pb.VADAudioSource_Source.adapterHandle:
-        throw UnsupportedError(
-          'VAD audio adapter_handle requires a platform adapter',
-        );
-      case vad_pb.VADAudioSource_Source.notSet:
-        throw ArgumentError('VADProcessRequest.audio.audio_data is required');
     }
   }
 

@@ -10,10 +10,12 @@
 
 // RunAnywhere IDL - reranking (cross-encoder relevance scoring) types.
 //
-// A reranker scores each candidate document/passage against a query and returns
-// the candidates re-ordered by relevance. Mirrors the shape of
-// segmentation.proto: a request (query + repeated candidates), a result
-// (repeated scored items), and a service lifecycle rpc.
+// A reranker scores each document/passage against a query and returns them
+// re-ordered by relevance. Wire types only: a request (query + repeated
+// documents + options) and a result (repeated scored items). There is no
+// service block - model lifecycle is the C ABI (rac_rerank_component_create /
+// load_model / unload / destroy), and scoring crosses the boundary as proto
+// bytes via rac_rerank_component_rerank_proto.
 
 import SwiftProtobuf
 
@@ -27,23 +29,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// A single candidate document/passage to be scored against the query. The id is
-/// caller-supplied and echoed back on the scored item so callers can correlate
-/// results with their own records without relying on ordering.
-public nonisolated struct RARerankCandidate: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var id: String = String()
-
-  public var text: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 public nonisolated struct RARerankOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -51,7 +36,14 @@ public nonisolated struct RARerankOptions: Sendable {
 
   /// When > 0, only the top_n highest-scoring candidates are returned (every
   /// candidate is still scored). 0 = return all candidates, ranked.
+  /// Industry name (Cohere rerank `top_n`).
   public var topN: UInt32 = 0
+
+  /// Per-document token budget; longer documents are truncated (tail
+  /// dropped) before scoring. 0 = the SDK default budget. This is the
+  /// direct knob on peak memory and per-pair latency on device.
+  /// Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+  public var maxTokensPerDoc: UInt32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -65,8 +57,6 @@ public nonisolated struct RARerankRequest: Sendable {
 
   public var query: String = String()
 
-  public var candidates: [RARerankCandidate] = []
-
   public var options: RARerankOptions {
     get {_options ?? RARerankOptions()}
     set {_options = newValue}
@@ -76,11 +66,31 @@ public nonisolated struct RARerankRequest: Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
 
+  /// The passages to score, in caller order. Results point back at these by
+  /// index. Cost is LINEAR (one model pass per document), so this is a
+  /// second-stage reranker over a retriever's output, not a corpus scan;
+  /// commons rejects more than 100,000 entries with
+  /// RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+  public var documents: [String] = []
+
+  /// Registry id of the reranker to score with. Unset = whatever model is
+  /// already resident under the rerank component. Mirrors
+  /// EmbeddingsRequest.model_id and the industry-universal `model` field.
+  public var modelID: String {
+    get {_modelID ?? String()}
+    set {_modelID = newValue}
+  }
+  /// Returns true if `modelID` has been explicitly set.
+  public var hasModelID: Bool {self._modelID != nil}
+  /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
+  public mutating func clearModelID() {self._modelID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _options: RARerankOptions? = nil
+  fileprivate var _modelID: String? = nil
 }
 
 public nonisolated struct RARerankScoredItem: Sendable {
@@ -88,18 +98,15 @@ public nonisolated struct RARerankScoredItem: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Echo of RerankCandidate.id for correlation.
-  public var id: String = String()
+  /// Relevance of this document to the query, normalized to [0, 1] (sigmoid
+  /// of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+  /// as relevant" as 0.45, and scores are not comparable across models.
+  /// Industry name (Cohere/Voyage `relevance_score`).
+  public var relevanceScore: Float = 0
 
-  /// Raw relevance score from the reranker (higher = more relevant). Not
-  /// normalized to a fixed range; comparable only within one result set.
-  public var score: Float = 0
-
-  /// Index of this candidate in the original RerankRequest.candidates list.
-  public var originalIndex: UInt32 = 0
-
-  /// 0-based position after sorting by score descending (0 = most relevant).
-  public var rank: UInt32 = 0
+  /// Index of this document in the original RerankRequest.documents list.
+  /// Industry name (`index`).
+  public var index: UInt32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -128,44 +135,9 @@ public nonisolated struct RARerankResult: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RARerankCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RerankCandidate"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
-    }
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARerankCandidate, rhs: RARerankCandidate) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.text != rhs.text {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RARerankOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RerankOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}top_n\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}top_n\0\u{3}max_tokens_per_doc\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -174,6 +146,7 @@ nonisolated extension RARerankOptions: SwiftProtobuf.Message, SwiftProtobuf._Mes
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.topN) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.maxTokensPerDoc) }()
       default: break
       }
     }
@@ -183,11 +156,15 @@ nonisolated extension RARerankOptions: SwiftProtobuf.Message, SwiftProtobuf._Mes
     if self.topN != 0 {
       try visitor.visitSingularUInt32Field(value: self.topN, fieldNumber: 1)
     }
+    if self.maxTokensPerDoc != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maxTokensPerDoc, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RARerankOptions, rhs: RARerankOptions) -> Bool {
     if lhs.topN != rhs.topN {return false}
+    if lhs.maxTokensPerDoc != rhs.maxTokensPerDoc {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -195,7 +172,7 @@ nonisolated extension RARerankOptions: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 nonisolated extension RARerankRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RerankRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{1}candidates\0\u{1}options\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{2}\u{2}options\0\u{1}documents\0\u{3}model_id\0\u{b}candidates\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -204,8 +181,9 @@ nonisolated extension RARerankRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.query) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.candidates) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.documents) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
       default: break
       }
     }
@@ -219,19 +197,23 @@ nonisolated extension RARerankRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
     if !self.query.isEmpty {
       try visitor.visitSingularStringField(value: self.query, fieldNumber: 1)
     }
-    if !self.candidates.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.candidates, fieldNumber: 2)
-    }
     try { if let v = self._options {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if !self.documents.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.documents, fieldNumber: 4)
+    }
+    try { if let v = self._modelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RARerankRequest, rhs: RARerankRequest) -> Bool {
     if lhs.query != rhs.query {return false}
-    if lhs.candidates != rhs.candidates {return false}
     if lhs._options != rhs._options {return false}
+    if lhs.documents != rhs.documents {return false}
+    if lhs._modelID != rhs._modelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -239,7 +221,7 @@ nonisolated extension RARerankRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RerankScoredItem"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}score\0\u{3}original_index\0\u{1}rank\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}relevance_score\0\u{1}index\0\u{b}id\0\u{b}rank\0\u{c}\u{1}\u{1}\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -247,36 +229,26 @@ nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.score) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.originalIndex) }()
-      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.rank) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.relevanceScore) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.index) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    if self.relevanceScore.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.relevanceScore, fieldNumber: 2)
     }
-    if self.score.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.score, fieldNumber: 2)
-    }
-    if self.originalIndex != 0 {
-      try visitor.visitSingularUInt32Field(value: self.originalIndex, fieldNumber: 3)
-    }
-    if self.rank != 0 {
-      try visitor.visitSingularUInt32Field(value: self.rank, fieldNumber: 4)
+    if self.index != 0 {
+      try visitor.visitSingularUInt32Field(value: self.index, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RARerankScoredItem, rhs: RARerankScoredItem) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.score != rhs.score {return false}
-    if lhs.originalIndex != rhs.originalIndex {return false}
-    if lhs.rank != rhs.rank {return false}
+    if lhs.relevanceScore != rhs.relevanceScore {return false}
+    if lhs.index != rhs.index {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

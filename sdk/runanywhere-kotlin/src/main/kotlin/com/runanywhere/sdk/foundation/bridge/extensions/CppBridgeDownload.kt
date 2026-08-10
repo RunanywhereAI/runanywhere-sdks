@@ -10,8 +10,6 @@ import ai.runanywhere.proto.v1.DownloadCancelResult
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
-import ai.runanywhere.proto.v1.DownloadResumeRequest
-import ai.runanywhere.proto.v1.DownloadResumeResult
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadStartResult
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -74,12 +72,10 @@ object CppBridgeDownload {
             "downloadCancel",
         )
 
-    fun resume(request: DownloadResumeRequest): DownloadResumeResult? =
-        decodeOrNull(
-            DownloadResumeResult.ADAPTER,
-            RunAnywhereBridge.racDownloadResumeProto(DownloadResumeRequest.ADAPTER.encode(request)),
-            "downloadResume",
-        )
+    // resume(_:) is deleted: DownloadResumeRequest/Result were removed
+    // outright (idl/download_service.proto) -- rac_download_resume_proto is
+    // a retired stub in commons; rac_download_start_proto resumes
+    // automatically now. Mirrors Swift's CppBridge+Download.swift.
 
     fun pollProgress(request: ai.runanywhere.proto.v1.DownloadSubscribeRequest): DownloadProgress? =
         decodeOrNull(

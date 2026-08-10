@@ -14,12 +14,8 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// SolutionType — discriminator for the kind of solution backing a
-/// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
-/// oneof arms so frontends can switch on a single enum value rather than
-/// inspecting the oneof shape.
-/// ---------------------------------------------------------------------------
+/// Frontends switch on the SolutionConfig oneof case. This enum exists only
+/// for logs and handles, and its numbers now match the oneof tags.
 class SolutionType extends $pb.ProtobufEnum {
   static const SolutionType SOLUTION_TYPE_UNSPECIFIED =
       SolutionType._(0, _omitEnumNames ? '' : 'SOLUTION_TYPE_UNSPECIFIED');
@@ -27,17 +23,17 @@ class SolutionType extends $pb.ProtobufEnum {
       SolutionType._(1, _omitEnumNames ? '' : 'SOLUTION_TYPE_VOICE_AGENT');
   static const SolutionType SOLUTION_TYPE_RAG =
       SolutionType._(2, _omitEnumNames ? '' : 'SOLUTION_TYPE_RAG');
-  static const SolutionType SOLUTION_TYPE_TIME_SERIES =
-      SolutionType._(4, _omitEnumNames ? '' : 'SOLUTION_TYPE_TIME_SERIES');
   static const SolutionType SOLUTION_TYPE_AGENT_LOOP =
-      SolutionType._(5, _omitEnumNames ? '' : 'SOLUTION_TYPE_AGENT_LOOP');
+      SolutionType._(4, _omitEnumNames ? '' : 'SOLUTION_TYPE_AGENT_LOOP');
+  static const SolutionType SOLUTION_TYPE_TIME_SERIES =
+      SolutionType._(5, _omitEnumNames ? '' : 'SOLUTION_TYPE_TIME_SERIES');
 
   static const $core.List<SolutionType> values = <SolutionType>[
     SOLUTION_TYPE_UNSPECIFIED,
     SOLUTION_TYPE_VOICE_AGENT,
     SOLUTION_TYPE_RAG,
-    SOLUTION_TYPE_TIME_SERIES,
     SOLUTION_TYPE_AGENT_LOOP,
+    SOLUTION_TYPE_TIME_SERIES,
   ];
 
   static final $core.List<SolutionType?> _byValue =

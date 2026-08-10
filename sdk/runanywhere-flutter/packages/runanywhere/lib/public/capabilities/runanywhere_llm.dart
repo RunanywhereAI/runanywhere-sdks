@@ -7,6 +7,8 @@ import 'dart:async';
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/chat.pb.dart' as chat_pb;
+import 'package:runanywhere/generated/chat.pbenum.dart' show MessageRole;
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
@@ -20,7 +22,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/structured_output.pb.dart'
-    show JSONSchema, StructuredOutputResult;
+    show StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
@@ -88,13 +90,8 @@ class RunAnywhereLLM {
           validateAvailability: true,
         ),
       );
-      if (!lifecycleResult.success) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          lifecycleResult.errorMessage.isNotEmpty
-              ? lifecycleResult.errorMessage
-              : 'Model lifecycle proto load failed',
-        );
+      if (lifecycleResult.hasError()) {
+        throw SDKException(lifecycleResult.error);
       }
 
       logger.info('Model loaded successfully: $modelId');
@@ -120,12 +117,8 @@ class RunAnywhereLLM {
         category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'LLM lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     logger.info('Model unloaded');
   }
@@ -170,7 +163,6 @@ class RunAnywhereLLM {
       final effectiveRequest = request.deepCopy();
       effectiveRequest.options = _canonicalOptions(
         request.hasOptions() ? request.options : null,
-        streaming: false,
       );
       final result = await _generateProto(effectiveRequest);
 
@@ -198,9 +190,7 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) {
-    return generateStreamRequest(
-      _toGenerateRequest(prompt, options, streaming: true),
-    );
+    return generateStreamRequest(_toGenerateRequest(prompt, options));
   }
 
   /// Generated-proto streaming text generation. Mirrors Swift
@@ -215,7 +205,6 @@ class RunAnywhereLLM {
     final effectiveRequest = request.deepCopy();
     effectiveRequest.options = _canonicalOptions(
       request.hasOptions() ? request.options : null,
-      streaming: true,
     );
     return _generateStreamProto(effectiveRequest);
   }
@@ -226,27 +215,26 @@ class RunAnywhereLLM {
 
   LLMGenerateRequest _toGenerateRequest(
     String prompt,
-    LLMGenerationOptions? options, {
-    bool streaming = false,
-  }) {
-    final requestOptions = _canonicalOptions(options, streaming: streaming);
+    LLMGenerationOptions? options,
+  ) {
+    // `LLMGenerateRequest.prompt` is reserved (idl/llm_service.proto): the
+    // whole conversation now travels as `messages`, oldest first, ending
+    // with the turn the model must answer. This single-prompt entry point
+    // has no history, so `messages` is just the one live user turn.
     return LLMGenerateRequest(
-      prompt: prompt,
-      emitThoughts: requestOptions.hasThinkingPattern(),
-      options: requestOptions,
+      options: _canonicalOptions(options),
+      messages: [chat_pb.ChatMessage(role: MessageRole.MESSAGE_ROLE_USER, content: prompt)],
     );
   }
 
-  LLMGenerationOptions _canonicalOptions(
-    LLMGenerationOptions? options, {
-    required bool streaming,
-  }) {
+  LLMGenerationOptions _canonicalOptions(LLMGenerationOptions? options) {
     // Fill unset fields from the generated defaults, which come from the
     // rac_default annotations in idl/llm_options.proto.
     final d = LLMGenerationOptionsConvenience.defaults();
     final requestOptions = (options ?? LLMGenerationOptions()).deepCopy();
-    if (!requestOptions.hasMaxTokens() || requestOptions.maxTokens <= 0) {
-      requestOptions.maxTokens = d.maxTokens;
+    if (!requestOptions.hasMaxOutputTokens() ||
+        requestOptions.maxOutputTokens <= 0) {
+      requestOptions.maxOutputTokens = d.maxOutputTokens;
     }
     if (!requestOptions.hasTemperature()) {
       requestOptions.temperature = d.temperature;
@@ -254,11 +242,10 @@ class RunAnywhereLLM {
     if (!requestOptions.hasTopP() || requestOptions.topP <= 0) {
       requestOptions.topP = d.topP;
     }
-    if (!requestOptions.hasRepetitionPenalty() ||
-        requestOptions.repetitionPenalty <= 0) {
-      requestOptions.repetitionPenalty = d.repetitionPenalty;
+    if (!requestOptions.hasRepeatPenalty() ||
+        requestOptions.repeatPenalty <= 0) {
+      requestOptions.repeatPenalty = d.repeatPenalty;
     }
-    requestOptions.streamingEnabled = streaming;
     return requestOptions;
   }
 
@@ -286,7 +273,7 @@ class RunAnywhereLLM {
   /// `RunAnywhere+TextGeneration.swift`.
   StructuredOutputResult extractStructuredOutput({
     required String text,
-    required JSONSchema schema,
+    required String schema,
   }) {
     return DartBridgeStructuredOutput.shared.parse(
       DartBridgeStructuredOutput.shared.makeParseRequest(
@@ -307,6 +294,9 @@ class RunAnywhereLLM {
 
   Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
     final controller = StreamController<LLMStreamEvent>(sync: false);
+    // onCancel also fires on normal completion; only cancel a still-running
+    // generation so a finished stream doesn't emit a spurious cancellation.
+    var completed = false;
 
     Future<void> run() async {
       try {
@@ -317,6 +307,7 @@ class RunAnywhereLLM {
         // remote round-trip (the old ~4s DNS stall) on every send.
         await DartBridge.ensureServicesReady();
       } catch (e) {
+        completed = true;
         if (!controller.isClosed) {
           controller.addError(
             e is SDKException ? e : SDKException.generationFailed('$e'),
@@ -327,6 +318,7 @@ class RunAnywhereLLM {
       }
       final upstream = DartBridgeLLM.shared.generateStreamProto(request);
       await controller.addStream(upstream);
+      completed = true;
       await controller.close();
     }
 
@@ -334,7 +326,9 @@ class RunAnywhereLLM {
     // so generation can't begin — and tokens can't be produced — before the
     // subscriber is ready. Mirrors the VLM bridge's onListen deferral.
     controller.onListen = () => unawaited(run());
-    controller.onCancel = _cancelProto;
+    controller.onCancel = () {
+      if (!completed) _cancelProto();
+    };
     return controller.stream;
   }
 

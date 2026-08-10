@@ -9,12 +9,7 @@ export interface PluginInfo {
     name: string;
     path: string;
 }
-/** Result of the plugin-list bridge calls (registeredNames / listLoaded). */
-export interface PluginInfoList {
-    plugins: PluginInfo[];
-}
 export declare const PluginInfo: MessageFns<PluginInfo>;
-export declare const PluginInfoList: MessageFns<PluginInfoList>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

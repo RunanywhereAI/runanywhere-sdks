@@ -109,6 +109,47 @@ describe('OPFSBridge multi-module hydration', () => {
       BUNDLE_PATH,
     )).rejects.toThrow('forced MEMFS write failure');
   });
+
+  it('releases the writable lock before falling back to the sync-access handle', async () => {
+    const writable = {
+      write: vi.fn().mockRejectedValue(new DOMException('over quota', 'QuotaExceededError')),
+      close: vi.fn().mockResolvedValue(undefined),
+      abort: vi.fn().mockResolvedValue(undefined),
+    };
+    const sync = {
+      truncate: vi.fn(),
+      write: vi.fn().mockReturnValue(0),
+      flush: vi.fn(),
+      close: vi.fn(),
+    };
+    const fileHandle = {
+      kind: 'file',
+      name: 'model.gguf',
+      createWritable: vi.fn().mockResolvedValue(writable),
+      createSyncAccessHandle: vi.fn().mockResolvedValue(sync),
+    } as unknown as FileSystemFileHandle;
+    const directory = {
+      kind: 'directory',
+      name: 'Models',
+      getFileHandle: vi.fn().mockResolvedValue(fileHandle),
+      getDirectoryHandle: vi.fn().mockRejectedValue(
+        new DOMException('not a directory', 'NotFoundError'),
+      ),
+    } as unknown as FileSystemDirectoryHandle;
+    const root = {
+      kind: 'directory',
+      name: 'root',
+      getDirectoryHandle: vi.fn().mockResolvedValue(directory),
+    } as unknown as FileSystemDirectoryHandle;
+    OPFSBridge.setPersistentRoot(root);
+
+    await OPFSBridge.writeFileToOPFS(['Models', 'model.gguf'], new Uint8Array([1, 2, 3]));
+
+    // An open writable holds an exclusive lock on the file, so it has to be
+    // aborted or the sync-access fallback cannot acquire the file either.
+    expect(writable.abort).toHaveBeenCalledOnce();
+    expect(sync.write).toHaveBeenCalledOnce();
+  });
 });
 
 function installPersistentFile(bytes: Uint8Array): ReturnType<typeof vi.fn> {

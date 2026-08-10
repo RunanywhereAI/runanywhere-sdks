@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 
 const mocks = vi.hoisted(() => ({
   captures: [] as Array<{
@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   captureStart: null as Promise<void> | null,
   playback: {
     play: vi.fn(),
+    playEncoded: vi.fn(),
     stop: vi.fn(),
     dispose: vi.fn(),
   },
@@ -50,6 +51,7 @@ vi.mock('../../../src/Infrastructure/AudioCapture', () => ({
 vi.mock('../../../src/Infrastructure/AudioPlayback', () => ({
   AudioPlayback: class {
     play = mocks.playback.play;
+    playEncoded = mocks.playback.playEncoded;
     stop = mocks.playback.stop;
     dispose = mocks.playback.dispose;
   },
@@ -108,6 +110,7 @@ describe('VoiceAgentMicDriver', () => {
     mocks.captures.length = 0;
     mocks.captureStart = null;
     mocks.playback.play.mockReset();
+    mocks.playback.playEncoded.mockReset();
     mocks.playback.stop.mockReset();
     mocks.playback.dispose.mockReset();
     mocks.processVoiceTurn.mockReset();
@@ -116,7 +119,10 @@ describe('VoiceAgentMicDriver', () => {
   it('keeps capture gated until synthesized reply playback completes', async () => {
     const playback = deferred<void>();
     mocks.processVoiceTurn.mockResolvedValue(turnResult());
-    mocks.playback.play.mockReturnValue(playback.promise);
+    // synthesizedAudio is a self-describing WAV container (commons wraps
+    // the raw TTS PCM before returning it) -- playback goes through
+    // playEncoded, not play (see VoiceAgentMicDriver.playResultAudio).
+    mocks.playback.playEncoded.mockReturnValue(playback.promise);
     const phases: string[] = [];
     const driver = new VoiceAgentMicDriver();
     await driver.start({ onPhase: (phase) => phases.push(phase) });
@@ -125,8 +131,15 @@ describe('VoiceAgentMicDriver', () => {
     emitUtterance(capture);
     await flush();
 
-    expect(mocks.playback.play).toHaveBeenCalledOnce();
-    expect(phases.at(-1)).toBe('processing');
+    expect(mocks.playback.playEncoded).toHaveBeenCalledOnce();
+    // While the reply is audible the phase is `speaking`, not `processing`.
+    // The driver owns playout, so it is the only layer that knows when sound is
+    // actually leaving the speaker — the pipeline's own states are emitted
+    // around synthesis, before any of it is played. Asserting `processing` here
+    // pinned the behaviour that put "Listening" on screen over an audible reply
+    // and hid the interrupt control mounted on the speaking state.
+    expect(phases).toContain('processing');
+    expect(phases.at(-1)).toBe('speaking');
     expect(capture.clearCount).toBe(12);
 
     playback.resolve();
@@ -137,7 +150,7 @@ describe('VoiceAgentMicDriver', () => {
   it('drops an in-flight turn after stop/restart instead of leaking old playback', async () => {
     const inference = deferred<ReturnType<typeof turnResult>>();
     mocks.processVoiceTurn.mockReturnValue(inference.promise);
-    mocks.playback.play.mockResolvedValue(undefined);
+    mocks.playback.playEncoded.mockResolvedValue(undefined);
     const onTurn = vi.fn();
     const driver = new VoiceAgentMicDriver();
     await driver.start({ onTurn });
@@ -151,7 +164,7 @@ describe('VoiceAgentMicDriver', () => {
     await flush();
 
     expect(onTurn).not.toHaveBeenCalled();
-    expect(mocks.playback.play).not.toHaveBeenCalled();
+    expect(mocks.playback.playEncoded).not.toHaveBeenCalled();
   });
 
   it('closes capture when microphone permission resolves after stop', async () => {

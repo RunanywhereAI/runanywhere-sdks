@@ -9,12 +9,12 @@
  *     The register/unregister entry points wire the RAG plugin into the
  *     registry; SDK callers do not invoke them directly.
  *   - `rac_rag_session_create_proto` / `rac_rag_session_destroy_proto` /
- *     `rac_rag_ingest_proto` / `rac_rag_query_proto` / `rac_rag_cancel_proto` /
- *     `rac_rag_clear_proto` /
+ *     `rac_rag_ingest_proto` / `rac_rag_query_proto` / `rac_rag_search_proto` /
+ *     `rac_rag_cancel_proto` / `rac_rag_clear_proto` /
  *     `rac_rag_stats_proto`: `SDK-facing default` over
  *     runanywhere.v1.RAGConfiguration / RAGDocument / RAGQueryOptions /
- *     RAGResult / RAGStatistics bytes. The session handle is carried as
- *     `rac_handle_t` for uniform frontend FFI.
+ *     RAGSearchRequest / RAGSearchResponse / RAGResult / RAGStatistics bytes.
+ *     The session handle is carried as `rac_handle_t` for uniform frontend FFI.
  */
 
 #ifndef RAC_RAG_H
@@ -91,6 +91,19 @@ RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* d
  */
 RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
                                          size_t query_proto_size, rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Retrieval-only search from serialized runanywhere.v1.RAGSearchRequest bytes.
+ *
+ * Runs embed → retrieve (and optional multi-query / LLM rerank) without answer
+ * generation. Embed-only sessions are supported; multi-query / session rerank
+ * without an LLM returns RAC_ERROR_INVALID_STATE.
+ *
+ * out_response receives serialized runanywhere.v1.RAGSearchResponse bytes.
+ */
+RAC_API rac_result_t rac_rag_search_proto(rac_handle_t session, const uint8_t* request_proto_bytes,
+                                          size_t request_proto_size,
+                                          rac_proto_buffer_t* out_response);
 
 /**
  * @brief Per-event callback for streaming RAG queries.

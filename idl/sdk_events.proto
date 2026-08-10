@@ -51,8 +51,8 @@ package runanywhere.v1;
 import "component_types.proto";
 import "download_service.proto";
 import "errors.proto";
-import "hardware_profile.proto";
 import "model_types.proto";
+import "rac_options.proto";
 import "storage_types.proto";
 import "voice_events.proto";
 
@@ -88,21 +88,23 @@ option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/
 // RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
 // in any SDK's enum).
 // ---------------------------------------------------------------------------
+// The rac_wire_string values are the stable lowercase keys that SDKError.component
+// carries; producers stringify through them, never through the constant name.
 enum SDKComponent {
-    SDK_COMPONENT_UNSPECIFIED          = 0;
-    SDK_COMPONENT_STT                  = 1;
-    SDK_COMPONENT_TTS                  = 2;
-    SDK_COMPONENT_VAD                  = 3;
-    SDK_COMPONENT_LLM                  = 4;
-    SDK_COMPONENT_VLM                  = 5;
-    SDK_COMPONENT_DIFFUSION            = 6;
-    SDK_COMPONENT_RAG                  = 7;
-    SDK_COMPONENT_EMBEDDINGS           = 8;
-    SDK_COMPONENT_VOICE_AGENT          = 9;
-    SDK_COMPONENT_WAKEWORD             = 10;
-    SDK_COMPONENT_SPEAKER_DIARIZATION  = 11;
-    SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12;
-    SDK_COMPONENT_RERANK                = 13;
+    SDK_COMPONENT_UNSPECIFIED           = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    SDK_COMPONENT_STT                   = 1  [(runanywhere.v1.rac_wire_string) = "stt"];
+    SDK_COMPONENT_TTS                   = 2  [(runanywhere.v1.rac_wire_string) = "tts"];
+    SDK_COMPONENT_VAD                   = 3  [(runanywhere.v1.rac_wire_string) = "vad"];
+    SDK_COMPONENT_LLM                   = 4  [(runanywhere.v1.rac_wire_string) = "llm"];
+    SDK_COMPONENT_VLM                   = 5  [(runanywhere.v1.rac_wire_string) = "vlm"];
+    SDK_COMPONENT_DIFFUSION             = 6  [(runanywhere.v1.rac_wire_string) = "diffusion"];
+    SDK_COMPONENT_RAG                   = 7  [(runanywhere.v1.rac_wire_string) = "rag"];
+    SDK_COMPONENT_EMBEDDINGS            = 8  [(runanywhere.v1.rac_wire_string) = "embeddings"];
+    SDK_COMPONENT_VOICE_AGENT           = 9  [(runanywhere.v1.rac_wire_string) = "voice_agent"];
+    SDK_COMPONENT_WAKEWORD              = 10 [(runanywhere.v1.rac_wire_string) = "wakeword"];
+    SDK_COMPONENT_SPEAKER_DIARIZATION   = 11 [(runanywhere.v1.rac_wire_string) = "speaker_diarization"];
+    SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12 [(runanywhere.v1.rac_wire_string) = "semantic_segmentation"];
+    SDK_COMPONENT_RERANK                = 13 [(runanywhere.v1.rac_wire_string) = "rerank"];
 }
 
 // ---------------------------------------------------------------------------
@@ -209,82 +211,17 @@ enum ConfigurationEventKind {
     CONFIGURATION_EVENT_KIND_SYNC_STARTED                = 6;
     CONFIGURATION_EVENT_KIND_SYNC_COMPLETED              = 7;
     CONFIGURATION_EVENT_KIND_SYNC_FAILED                 = 8;
-    CONFIGURATION_EVENT_KIND_SYNC_REQUESTED              = 9;
-    CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED          = 10;
-    CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED          = 11;
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED    = 12;
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED    = 13;
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED      = 14;
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED      = 15;
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED  = 16;
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED  = 17;
     CONFIGURATION_EVENT_KIND_CHANGED                     = 18;   // generic config_changed (Kotlin/Dart)
+
+    // Deleted: the 4 getter-echo pairs (SETTINGS_/ROUTING_POLICY_/
+    // PRIVACY_MODE_/ANALYTICS_STATUS_ REQUESTED+RETRIEVED) and the
+    // standalone SYNC_REQUESTED echo.
+    reserved 9 to 17;
 }
 
-// ---------------------------------------------------------------------------
-// Per-component initialization lifecycle. Mirrors RN
-//   events.ts:270-312 (ComponentInitializationEvent: 16 variants).
-// Distinct from `InitializationEvent` (overall SDK lifecycle).
-// ---------------------------------------------------------------------------
-message ComponentInitializationEvent {
-    ComponentInitializationEventKind kind            = 1;
-
-    // Single-component events (componentChecking / componentReady / …).
-    SDKComponent                     component       = 2;
-
-    // For COMPONENT_CHECKING / COMPONENT_INITIALIZING / COMPONENT_READY /
-    // download events.
-    string                           model_id        = 3;
-
-    // For COMPONENT_DOWNLOAD_REQUIRED — RN events.ts:285.
-    int64                            size_bytes      = 4;
-
-    // For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0.
-    float                            progress        = 5;
-
-    // For COMPONENT_FAILED / *_FAILED.
-    string                           error           = 6;
-
-    // For COMPONENT_STATE_CHANGED — RN events.ts:274-278.
-    string                           old_state       = 7;
-    string                           new_state       = 8;
-
-    // For multi-component events (initializationStarted / parallel/sequential /
-    // someComponentsReady).
-    repeated SDKComponent            components       = 9;
-    repeated SDKComponent            ready_components = 10;
-    repeated SDKComponent            pending_components = 11;
-
-    // For INITIALIZATION_COMPLETED — InitializationResult summary
-    // (success bool + count). Full result travels via dedicated RPC.
-    bool                             init_success     = 12;
-    int32                            ready_count      = 13;
-    int32                            failed_count     = 14;
-
-    // Typed equivalents of old_state/new_state for SDKs that want generated
-    // enum-backed component lifecycle state instead of parsing strings.
-    ComponentLifecycleState          previous_lifecycle_state = 15;
-    ComponentLifecycleState          current_lifecycle_state  = 16;
-}
-
-enum ComponentInitializationEventKind {
-    COMPONENT_INIT_EVENT_KIND_UNSPECIFIED                = 0;
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED     = 1;
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED   = 2;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED    = 3;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING         = 4;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED = 5;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED = 6;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS = 7;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED = 8;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING     = 9;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_READY            = 10;
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED           = 11;
-    COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED      = 12;
-    COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED    = 13;
-    COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY       = 14;
-    COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY      = 15;
-}
+// ComponentInitializationEvent was deleted: its fields and kinds moved into
+// ComponentLifecycleEvent / ComponentLifecycleEventKind below. Bring-up and
+// steady-state lifecycle are the same subject; they now share one message.
 
 // Snapshot of a component's current model-backed lifecycle state.
 message ComponentLifecycleSnapshot {
@@ -292,34 +229,40 @@ message ComponentLifecycleSnapshot {
     ComponentLifecycleState state         = 2;
     string                  model_id      = 3;
     int64                   updated_at_ms = 4;
-    string                  error_message = 5;
     ModelCategory           category      = 6;
     InferenceFramework      framework     = 7;
     string                  resolved_path = 8;
     int64                   loaded_at_unix_ms = 9;
     ModelInfo               model         = 10;
-}
-
-message ComponentLifecycleSnapshotRequest {
-    SDKComponent component = 1;
-    bool         include_model = 2;
+    optional SDKError       error         = 11;
 }
 
 message ComponentLifecycleSnapshotResult {
-    bool success = 1;
     repeated ComponentLifecycleSnapshot snapshots = 2;
-    string error_message = 3;
+    optional SDKError error = 4;
 }
 
 // Operation-aware lifecycle event. The oneof arms intentionally reference the
 // operation result/progress protos from this contract slice instead of adding
-// another broad event taxonomy.
+// another broad event taxonomy. Covers both component bring-up (absorbed from
+// ComponentInitializationEvent) and steady-state model lifecycle.
 message ComponentLifecycleEvent {
+    ComponentLifecycleEventKind kind           = 19;
     SDKComponent            component      = 1;
     ComponentLifecycleState previous_state = 2;
     ComponentLifecycleState current_state  = 3;
     string                  model_id       = 4;
     int64                   timestamp_ms   = 5;
+
+    // Absorbed from ComponentInitializationEvent.
+    int64                    size_bytes          = 20;   // COMPONENT_DOWNLOAD_REQUIRED
+    float                    progress            = 21;   // COMPONENT_DOWNLOAD_PROGRESS
+    repeated SDKComponent    components          = 22;    // multi-component events
+    repeated SDKComponent    ready_components    = 23;
+    repeated SDKComponent    pending_components  = 24;
+    int32                    ready_count         = 25;    // INITIALIZATION_COMPLETED summary
+    int32                    failed_count        = 26;
+    optional SDKError        error               = 27;
 
     oneof payload {
         ModelLoadResult       model_load_result        = 10;
@@ -332,6 +275,37 @@ message ComponentLifecycleEvent {
         ComponentLifecycleSnapshotResult snapshot_result = 17;
         StorageDeletePlan     storage_delete_plan       = 18;
     }
+}
+
+enum ComponentLifecycleEventKind {
+    COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED                = 0;
+    COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED              = 1;   // previous_state -> current_state carries this
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED       = 2;
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED     = 3;
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED     = 4;
+    COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS          = 5;
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY       = 6;
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED   = 7;
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT                   = 8;
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT             = 9;
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN         = 10;
+
+    // Absorbed from ComponentInitializationEventKind.
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED      = 11;
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED    = 12;
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING          = 13;
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED  = 14;
+    // _STARTED/_COMPLETED deleted: duplicates of ModelEventKind's
+    // MODEL_EVENT_KIND_DOWNLOAD_STARTED/COMPLETED, the one place download
+    // progress now lives.
+    reserved 15, 16;
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING       = 17;
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY              = 18;
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED             = 19;
+    COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED        = 20;
+    COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED      = 21;
+    COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY         = 22;
+    COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY        = 23;
 }
 
 // SDK session lifecycle independent of voice-agent turn sessions.
@@ -382,78 +356,82 @@ message GenerationEvent {
     // For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text.
     string              token            = 4;
 
-    // For STREAMING_UPDATE — the running response text and token count.
+    // For STREAMING_UPDATE — the running response text.
     string              streaming_text   = 5;
-    int32               tokens_count     = 6;
 
-    // For COMPLETED — full response, usage stats, latency.
+    // Output tokens so far on STREAMING_UPDATE; the final count on COMPLETED.
+    int32               output_tokens    = 6;
+
+    // For COMPLETED — full response.
     string              response         = 7;
-    int32               tokens_used      = 8;
-    int64               latency_ms       = 9;
-
-    // For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
-    int64               first_token_latency_ms = 10;
 
     // For FAILED.
-    string              error            = 11;
+    string              error            = 8;
 
     // For MODEL_LOADED / MODEL_UNLOADED — bound model.
-    string              model_id         = 12;
+    string              model_id         = 9;
 
-    // For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
-    double              cost_amount      = 13;
-    double              cost_saved_amount = 14;
+    // For COST_CALCULATED — Dart SDKGenerationCostCalculated.
+    double              cost_amount      = 10;
+    double              cost_saved_amount = 11;
 
-    // For ROUTING_DECISION — RN events.ts:89.
-    string              routing_target   = 15;
-    string              routing_reason   = 16;
+    // For ROUTING_DECISION.
+    string              routing_target   = 12;
+    string              routing_reason   = 13;
 
     // For cancellation / tool / structured-output / thinking events.
-    string              cancel_reason    = 17;
-    string              tool_call_id      = 18;
-    string              tool_name         = 19;
-    string              tool_payload_json = 20;
-    string              structured_schema_json = 21;
-    string              structured_output_json = 22;
-    string              thinking_text     = 23;
+    string              cancel_reason    = 14;
+    string              tool_call_id      = 15;
+    string              tool_name         = 16;
+    string              tool_payload_json = 17;
+    string              structured_schema_json = 18;
+    string              structured_output_json = 19;
+    string              thinking_text     = 20;
 
-    // For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-    // Enables totalTokens = input_tokens + tokens_used analytics
-    // from the event stream alone.
-    int32               input_tokens     = 24;
+    // Prompt-token count on COMPLETED. Total = input_tokens + output_tokens.
+    int32               input_tokens     = 21;
 
     // Telemetry metrics carried on the canonical event stream so the C++
     // destination router can derive the full telemetry payload from the
-    // proto SDKEvent alone (no parallel struct path). `framework` is the
-    // InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
-    double              tokens_per_second        = 25;
-    int64               time_to_first_token_ms   = 26;   // completion TTFT (FIRST_TOKEN uses first_token_latency_ms)
-    bool                is_streaming             = 27;
-    float               temperature              = 28;
-    int32               max_tokens               = 29;
-    int32               context_length           = 30;
-    string              model_name               = 31;
-    double              duration_ms              = 32;   // wall-clock generation duration
-    int32               framework                = 33;   // InferenceFramework enum int
-    int64               prompt_eval_time_ms      = 34;   // prompt eval (prefill) duration
+    // proto SDKEvent alone (no parallel struct path).
+    double              tokens_per_second        = 22;
+
+    // Time to first token, whichever kind reports it.
+    int64               time_to_first_token_ms   = 23;
+
+    bool                is_streaming             = 24;
+    float               temperature              = 25;
+    int32               max_tokens               = 26;
+    int32               context_length           = 27;
+    string              model_name               = 28;
+
+    // Whole-generation wall clock.
+    int64               total_duration_ms        = 29;
+
+    InferenceFramework  framework                = 30;
+
+    // Prefill (prompt eval) wall clock.
+    int64               prefill_duration_ms      = 31;
 }
 
 enum GenerationEventKind {
     GENERATION_EVENT_KIND_UNSPECIFIED            = 0;
-    GENERATION_EVENT_KIND_SESSION_STARTED        = 1;
-    GENERATION_EVENT_KIND_SESSION_ENDED          = 2;
+
+    // Sessions -> SessionEventKind. Model load/unload -> ModelEventKind.
+    // Cancel-requested -> CancellationEventKind. Cost -> the cost_amount /
+    // cost_saved_amount fields on the COMPLETED event. STREAM_COMPLETED ->
+    // COMPLETED (read is_streaming).
+    reserved 1, 2, 9, 10, 11, 13, 14;
+
     GENERATION_EVENT_KIND_STARTED                = 3;
     GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED  = 4;
     GENERATION_EVENT_KIND_TOKEN_GENERATED        = 5;
     GENERATION_EVENT_KIND_STREAMING_UPDATE       = 6;
+
+    // Exactly one success terminal, one failure terminal, one cancel terminal.
     GENERATION_EVENT_KIND_COMPLETED              = 7;
     GENERATION_EVENT_KIND_FAILED                 = 8;
-    GENERATION_EVENT_KIND_MODEL_LOADED           = 9;
-    GENERATION_EVENT_KIND_MODEL_UNLOADED         = 10;
-    GENERATION_EVENT_KIND_COST_CALCULATED        = 11;
     GENERATION_EVENT_KIND_ROUTING_DECISION       = 12;
-    GENERATION_EVENT_KIND_STREAM_COMPLETED       = 13;   // Kotlin LLMEvent.STREAM_COMPLETED
-    GENERATION_EVENT_KIND_CANCEL_REQUESTED       = 14;
     GENERATION_EVENT_KIND_CANCELLED              = 15;
     GENERATION_EVENT_KIND_TOOL_CALL_STARTED      = 16;
     GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED    = 17;
@@ -513,11 +491,9 @@ message VoiceLifecycleEvent {
     // For VOICE_SESSION_LISTENING — current audio level (RN events.ts:178).
     float          audio_level     = 8;
 
-    // For VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
-    // VOICE_SESSION_TURN_COMPLETED — RN events.ts:182-185.
-    string         transcription   = 9;
-    string         turn_response   = 10;
-    string         turn_audio_base64 = 11;
+    // VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
+    // VOICE_SESSION_TURN_COMPLETED reuse `text` (3) and `response_text` (5).
+    reserved 9, 10, 11;  // were transcription / turn_response / turn_audio_base64
 
     // For *_ERROR / *_FAILED.
     string         error           = 12;
@@ -526,26 +502,24 @@ message VoiceLifecycleEvent {
     // Telemetry metrics (STT transcription + TTS synthesis + model load) so
     // the C++ destination router derives the full telemetry payload from the
     // proto SDKEvent alone. Populated per-component (component on the SDKEvent
-    // envelope selects which subset applies). `framework` is the
-    // InferenceFramework enum stored as int32.
+    // envelope selects which subset applies).
     // -----------------------------------------------------------------------
-    string         model_id              = 13;
-    string         model_name            = 14;
-    int64          audio_length_ms       = 15;   // STT input audio length
-    int32          audio_size_bytes      = 16;
-    int32          word_count            = 17;   // STT
-    double         real_time_factor      = 18;   // STT
-    string         language              = 19;   // STT
-    int32          sample_rate           = 20;   // STT + TTS
-    bool           is_streaming          = 21;   // STT
-    int32          framework             = 22;   // InferenceFramework enum int
+    string              model_id                 = 13;
+    string              model_name               = 14;
+    int64               input_audio_duration_ms  = 15;   // STT input audio
+    int64               input_audio_bytes        = 16;
+    int32               word_count               = 17;   // STT
+    double              real_time_factor         = 18;   // STT
+    string              language                 = 19;   // STT
+    int32               sample_rate              = 20;   // STT + TTS
+    bool                is_streaming             = 21;   // STT
+    InferenceFramework  framework                = 22;
 
     // TTS synthesis metrics.
-    int32          character_count       = 23;
-    int64          audio_duration_ms     = 24;   // distinct from duration_ms(7); telemetry output_duration_ms
-    int32          audio_size_bytes_tts  = 25;
-    int64          processing_duration_ms = 26;  // telemetry processing_time_ms
-    double         characters_per_second = 27;
+    int32               character_count          = 23;
+    int64               output_audio_duration_ms = 24;   // TTS output audio
+    int64               output_audio_bytes       = 25;
+    int64               processing_duration_ms   = 26;   // telemetry processing_time_ms
 }
 
 enum VoiceEventKind {
@@ -554,7 +528,7 @@ enum VoiceEventKind {
     // Listening / detection.
     VOICE_EVENT_KIND_LISTENING_STARTED           = 1;
     VOICE_EVENT_KIND_LISTENING_ENDED             = 2;
-    VOICE_EVENT_KIND_SPEECH_DETECTED             = 3;
+    reserved 3;  // was SPEECH_DETECTED, a duplicate of SPEECH_STARTED (21)
 
     // Transcription.
     VOICE_EVENT_KIND_TRANSCRIPTION_STARTED       = 4;
@@ -603,18 +577,13 @@ enum VoiceEventKind {
     VOICE_EVENT_KIND_PLAYBACK_RESUMED            = 35;
     VOICE_EVENT_KIND_PLAYBACK_FAILED             = 36;
 
-    // Voice session orchestration (RN events.ts:177-187).
-    VOICE_EVENT_KIND_VOICE_SESSION_STARTED       = 37;
-    VOICE_EVENT_KIND_VOICE_SESSION_LISTENING     = 38;
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED = 39;
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED  = 40;
-    VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING    = 41;
-    VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED   = 42;
-    VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED     = 43;
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING      = 44;
-    VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED = 45;
-    VOICE_EVENT_KIND_VOICE_SESSION_STOPPED       = 46;
-    VOICE_EVENT_KIND_VOICE_SESSION_ERROR         = 47;
+    // Deleted: the VOICE_SESSION_* mirror family. Confirmed near-dead --
+    // exactly one hand-written reference in the whole tree
+    // (sdk/runanywhere-web/.../Foundation/EventBus.ts, VOICE_SESSION_TURN_COMPLETED)
+    // vs. the live STT_*/VAD_*/RECORDING_*/PLAYBACK_* families above, which
+    // this cut leaves untouched. That one Web reference moves to
+    // VOICE_EVENT_KIND_STT_COMPLETED / TRANSCRIPTION_FINAL in Phase D.
+    reserved 37 to 47;
 
     // VAD pause/resume (telemetry-only metrics).
     VOICE_EVENT_KIND_VAD_PAUSED                  = 48;
@@ -714,12 +683,33 @@ message ModelEvent {
 
     // Model-load + download/extraction telemetry metrics so the C++
     // destination router derives the telemetry payload from the proto
-    // SDKEvent alone. `framework` is the InferenceFramework enum stored as
-    // int32 (matches FrameworkEvent.framework).
-    string         model_name          = 13;
-    int64          model_size_bytes    = 14;
-    int64          duration_ms         = 15;   // load / download / extraction duration
-    int32          framework           = 16;   // InferenceFramework enum int
+    // SDKEvent alone.
+    string              model_name          = 13;
+    int64               model_size_bytes    = 14;
+    int64               duration_ms         = 15;   // load / download / extraction duration
+    InferenceFramework  framework           = 16;
+
+    // Absorbed from ModelRegistryEvent: registry-specific identity + results.
+    string   assignment_id      = 17;
+    SDKComponent assigned_component = 18;
+    string   source_path        = 19;
+
+    // Absorbed from DownloadEvent: task-scoped download results.
+    oneof result {
+        ModelRegistryRefreshResult refresh_result       = 20;
+        ModelListResult            list_result          = 21;
+        ModelGetResult             get_result           = 22;
+        ModelImportResult          import_result        = 23;
+        ModelDiscoveryResult       discovery_result     = 24;
+        ModelCompatibilityResult   compatibility_result = 25;
+        CurrentModelResult         current_model_result = 26;
+        DownloadPlanResult         plan_result          = 27;
+        DownloadStartResult        start_result         = 28;
+        DownloadProgress           download_progress    = 29;
+        DownloadCancelResult       cancel_result        = 30;
+    }
+    // 31 was resume_result: DownloadResumeResult is deleted -- starting a
+    // download IS resuming it, there is no separate resume verb.
 }
 
 enum ModelEventKind {
@@ -736,7 +726,7 @@ enum ModelEventKind {
     MODEL_EVENT_KIND_DOWNLOAD_COMPLETED     = 10;
     MODEL_EVENT_KIND_DOWNLOAD_FAILED        = 11;
     MODEL_EVENT_KIND_DOWNLOAD_CANCELLED     = 12;
-    MODEL_EVENT_KIND_LIST_REQUESTED         = 13;
+    reserved 13;  // was LIST_REQUESTED getter echo
     MODEL_EVENT_KIND_LIST_COMPLETED         = 14;
     MODEL_EVENT_KIND_LIST_FAILED            = 15;
     MODEL_EVENT_KIND_CATALOG_LOADED         = 16;
@@ -749,82 +739,41 @@ enum ModelEventKind {
     MODEL_EVENT_KIND_EXTRACTION_PROGRESS    = 23;
     MODEL_EVENT_KIND_EXTRACTION_COMPLETED   = 24;
     MODEL_EVENT_KIND_EXTRACTION_FAILED      = 25;
+
+    // Absorbed from ModelRegistryEventKind.
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED   = 26;
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED = 27;
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED    = 28;
+    MODEL_EVENT_KIND_ASSIGNMENT_STARTED         = 29;
+    MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED       = 30;
+    MODEL_EVENT_KIND_ASSIGNMENT_FAILED          = 31;
+    MODEL_EVENT_KIND_IMPORT_STARTED             = 32;
+    MODEL_EVENT_KIND_IMPORT_COMPLETED           = 33;
+    MODEL_EVENT_KIND_IMPORT_FAILED              = 34;
+    MODEL_EVENT_KIND_DISCOVERY_STARTED          = 35;
+    MODEL_EVENT_KIND_DISCOVERY_COMPLETED        = 36;
+    MODEL_EVENT_KIND_DISCOVERY_FAILED           = 37;
+    MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED      = 38;
+    reserved 39, 42;  // were REGISTRY_GET_STARTED / REGISTRY_LIST_STARTED getter echoes
+    MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED     = 40;
+    MODEL_EVENT_KIND_REGISTRY_GET_FAILED        = 41;
+    MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED    = 43;
+    MODEL_EVENT_KIND_REGISTRY_LIST_FAILED       = 44;
+
+    // Absorbed from DownloadEventKind.
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED           = 45;
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED         = 46;
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED            = 47;
+    MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED       = 48;
+    MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED       = 49;
+    MODEL_EVENT_KIND_DOWNLOAD_RESUMED                = 50;
+    MODEL_EVENT_KIND_DOWNLOAD_PAUSED                 = 51;
+    MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED  = 52;
 }
 
-message ModelRegistryEvent {
-    ModelRegistryEventKind kind = 1;
-    string                 model_id = 2;
-    string                 assignment_id = 3;
-    SDKComponent           assigned_component = 4;
-    InferenceFramework     framework = 5;
-    string                 source_path = 6;
-    string                 error = 7;
-
-    oneof result {
-        ModelRegistryRefreshResult refresh_result = 20;
-        ModelListResult            list_result = 21;
-        ModelGetResult             get_result = 22;
-        ModelImportResult          import_result = 23;
-        ModelDiscoveryResult       discovery_result = 24;
-        ModelCompatibilityResult   compatibility_result = 25;
-        CurrentModelResult         current_model_result = 26;
-    }
-}
-
-enum ModelRegistryEventKind {
-    MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED          = 0;
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED      = 1;
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED    = 2;
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED       = 3;
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED   = 4;
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED = 5;
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED    = 6;
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED       = 7;
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED     = 8;
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED        = 9;
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED    = 10;
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED  = 11;
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED     = 12;
-    MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED = 13;
-    MODEL_REGISTRY_EVENT_KIND_LIST_STARTED         = 14;
-    MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED       = 15;
-    MODEL_REGISTRY_EVENT_KIND_LIST_FAILED          = 16;
-    MODEL_REGISTRY_EVENT_KIND_GET_STARTED          = 17;
-    MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED        = 18;
-    MODEL_REGISTRY_EVENT_KIND_GET_FAILED           = 19;
-}
-
-message DownloadEvent {
-    DownloadEventKind kind = 1;
-    string            model_id = 2;
-    string            task_id = 3;
-    string            error = 4;
-
-    oneof payload {
-        DownloadPlanResult   plan_result = 20;
-        DownloadStartResult  start_result = 21;
-        DownloadProgress     progress = 22;
-        DownloadCancelResult cancel_result = 23;
-        DownloadResumeResult resume_result = 24;
-    }
-}
-
-enum DownloadEventKind {
-    DOWNLOAD_EVENT_KIND_UNSPECIFIED       = 0;
-    DOWNLOAD_EVENT_KIND_PLAN_STARTED      = 1;
-    DOWNLOAD_EVENT_KIND_PLAN_COMPLETED    = 2;
-    DOWNLOAD_EVENT_KIND_PLAN_FAILED       = 3;
-    DOWNLOAD_EVENT_KIND_STARTED           = 4;
-    DOWNLOAD_EVENT_KIND_PROGRESS          = 5;
-    DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED  = 6;
-    DOWNLOAD_EVENT_KIND_CANCELLED         = 7;
-    DOWNLOAD_EVENT_KIND_RESUME_REQUESTED  = 8;
-    DOWNLOAD_EVENT_KIND_RESUMED           = 9;
-    DOWNLOAD_EVENT_KIND_COMPLETED         = 10;
-    DOWNLOAD_EVENT_KIND_FAILED            = 11;
-    DOWNLOAD_EVENT_KIND_PAUSED            = 12;
-    DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED = 13;
-}
+// ModelRegistryEvent and DownloadEvent were deleted: their kinds moved into
+// ModelEventKind and their result oneofs into ModelEvent.result (see above).
+// A model download/registry op is one subject; it now has one event message.
 
 // ---------------------------------------------------------------------------
 // Storage events. Mirrors RN
@@ -855,13 +804,22 @@ message StorageEvent {
 
     // For CLEAR_CACHE_COMPLETED / CLEAN_TEMP_COMPLETED — bytes reclaimed.
     int64            freed_bytes       = 10;
+
+    // Absorbed from StorageLifecycleEvent.
+    int64            bytes             = 11;
+
+    oneof result {
+        StorageInfoResult         info_result          = 20;
+        StorageAvailabilityResult availability_result  = 21;
+        StorageDeletePlan         delete_plan          = 22;
+        StorageDeleteResult       delete_result        = 23;
+    }
 }
 
 enum StorageEventKind {
     STORAGE_EVENT_KIND_UNSPECIFIED            = 0;
-    STORAGE_EVENT_KIND_INFO_REQUESTED         = 1;
+    reserved 1, 3;  // were INFO_REQUESTED / MODELS_REQUESTED getter echoes
     STORAGE_EVENT_KIND_INFO_RETRIEVED         = 2;
-    STORAGE_EVENT_KIND_MODELS_REQUESTED       = 3;
     STORAGE_EVENT_KIND_MODELS_RETRIEVED       = 4;
     STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED    = 5;
     STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED  = 6;
@@ -876,39 +834,20 @@ enum StorageEventKind {
     STORAGE_EVENT_KIND_CACHE_MISS             = 15;
     STORAGE_EVENT_KIND_EVICTION               = 16;
     STORAGE_EVENT_KIND_DISK_FULL              = 17;
+
+    // Absorbed from StorageLifecycleEventKind.
+    STORAGE_EVENT_KIND_AVAILABILITY_CHECKED       = 18;
+    STORAGE_EVENT_KIND_AVAILABILITY_FAILED        = 19;
+    STORAGE_EVENT_KIND_DELETE_PLAN_CREATED        = 20;
+    STORAGE_EVENT_KIND_DELETE_PLAN_FAILED         = 21;
+    STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED   = 22;
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED      = 23;
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED    = 24;
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED       = 25;
 }
 
-message StorageLifecycleEvent {
-    StorageLifecycleEventKind kind = 1;
-    string                    model_id = 2;
-    string                    cache_key = 3;
-    int64                     bytes = 4;
-    string                    error = 5;
-
-    oneof result {
-        StorageInfoResult         info_result = 20;
-        StorageAvailabilityResult availability_result = 21;
-        StorageDeletePlan         delete_plan = 22;
-        StorageDeleteResult       delete_result = 23;
-    }
-}
-
-enum StorageLifecycleEventKind {
-    STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0;
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED = 1;
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED = 2;
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED = 3;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED = 4;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED = 5;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED = 6;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED = 7;
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED = 8;
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = 9;
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED = 10;
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED = 11;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED = 12;
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED = 13;
-}
+// StorageLifecycleEvent was deleted: its kinds moved into StorageEventKind
+// and its result oneof into StorageEvent.result (see above).
 
 // ===========================================================================
 // SECTION 11 — INFRA
@@ -1027,11 +966,8 @@ enum NetworkEventKind {
 message FrameworkEvent {
     FrameworkEventKind  kind             = 1;
 
-    // For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
-    // canonical InferenceFramework from model_types.proto, but stored as
-    // its enum int32 here to avoid cross-file message dependency just for
-    // a single field. Frontends decode via the shared codegen.
-    int32               framework        = 2;   // InferenceFramework
+    // For ADAPTER_REGISTERED / *_RETRIEVED — bound framework.
+    InferenceFramework  framework        = 2;
 
     // For ADAPTER_REGISTERED — adapter display name.
     string              adapter_name     = 3;
@@ -1057,17 +993,14 @@ enum FrameworkEventKind {
     FRAMEWORK_EVENT_KIND_UNSPECIFIED                    = 0;
     FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED             = 1;
     FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED           = 2;
-    FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED             = 3;
-    FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED             = 4;
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED           = 5;
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED           = 6;
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED         = 7;
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED         = 8;
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED = 9;
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED = 10;
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED = 11;
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED = 12;
     FRAMEWORK_EVENT_KIND_ERROR                          = 13;
+
+    // Deleted: the 10 getter echoes (ADAPTERS_REQUESTED/RETRIEVED,
+    // FRAMEWORKS_REQUESTED/RETRIEVED, AVAILABILITY_REQUESTED/RETRIEVED,
+    // MODELS_FOR_FRAMEWORK_REQUESTED/RETRIEVED,
+    // FRAMEWORKS_FOR_MODALITY_REQUESTED/RETRIEVED). The answer to a getter
+    // is the getter's return value, not an event.
+    reserved 3 to 12;
 }
 
 message HardwareRoutingEvent {
@@ -1078,7 +1011,6 @@ message HardwareRoutingEvent {
     string                   route = 5;
     string                   reason = 6;
     string                   error = 7;
-    HardwareProfileResult    hardware_profile = 20;
 }
 
 enum HardwareRoutingEventKind {
@@ -1092,37 +1024,12 @@ enum HardwareRoutingEventKind {
     HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING = 7;
 }
 
-// ---------------------------------------------------------------------------
-// Performance metrics events. Mirrors RN
-//   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
-// ---------------------------------------------------------------------------
-message PerformanceEvent {
-    PerformanceEventKind kind              = 1;
-
-    // For MEMORY_WARNING — usage in bytes (RN typed as number).
-    int64                memory_bytes      = 2;
-
-    // For THERMAL_STATE_CHANGED — engine-defined state string
-    // (e.g. "nominal", "fair", "serious", "critical"; Apple-specific
-    // names preserved as strings to avoid platform-coupled enums).
-    string               thermal_state     = 3;
-
-    // For LATENCY_MEASURED.
-    string               operation         = 4;
-    int64                milliseconds      = 5;
-
-    // For THROUGHPUT_MEASURED — RN events.ts:197.
-    double               tokens_per_second = 6;
-}
-
-enum PerformanceEventKind {
-    PERFORMANCE_EVENT_KIND_UNSPECIFIED          = 0;
-    PERFORMANCE_EVENT_KIND_MEMORY_WARNING       = 1;
-    PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED = 2;
-    PERFORMANCE_EVENT_KIND_LATENCY_MEASURED     = 3;
-    PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED  = 4;
-}
-
+// PerformanceEvent was deleted (had zero producers and zero readers, per
+// review): a memory/thermal/latency/throughput reading is a named number with
+// a unit, which TelemetryEvent already models. `name` carries what
+// PerformanceEventKind used to (e.g. "memory_warning", "thermal_state"),
+// `value` + `unit` carry the number (bytes / celsius-state / ms /
+// tokens_per_second), and `attributes` carries operation/thermal_state text.
 message TelemetryEvent {
     TelemetryEventKind kind = 1;
     string             name = 2;
@@ -1155,12 +1062,10 @@ enum CancellationEventKind {
     CANCELLATION_EVENT_KIND_FAILED      = 4;
 }
 
-message FailureEvent {
-    SDKComponent component = 1;
-    string       operation = 2;
-    SDKError     error = 3;
-    bool         recoverable = 4;
-}
+// FailureEvent was deleted: every field already exists on the envelope --
+// component -> SDKEvent.component, operation -> SDKEvent.operation_id,
+// error -> SDKEvent.error, recoverable -> SDKError.retryable. A failure is
+// any event whose envelope `error` is set; there is no separate arm for it.
 
 // ===========================================================================
 // SECTION 14 — ENVELOPE + SERVICE
@@ -1216,98 +1121,35 @@ message SDKEvent {
     // so retry/cancel/progress/failure events can share one operation id.
     string           operation_id   = 33;
 
-    // Cross-service correlation key supplied by the SDK/app or generated by
-    // the portable layer. Native/Web adapters may propagate it through HTTP
-    // headers or OS task metadata, but C++ owns the canonical event field.
-    string           correlation_id = 34;
-
     // Source that emitted the event: "cpp", "swift", "kotlin", "flutter",
     // "react_native", "web", or a backend/plugin key. This disambiguates
     // platform adapter facts from portable orchestration events.
     string           source         = 35;
 
-    // Optional tracing identifier for diagnostics. Empty when tracing is not
-    // enabled; do not use it as a business key.
-    string           trace_id       = 36;
+    // Monotonic, whole-stream ordering key, stamped by a single choke point in
+    // commons at emission time. Detects drops and reordering; the only
+    // correlation primitive a consumer needs beyond id / session_id /
+    // operation_id above. (correlation_id and trace_id were deleted: neither
+    // had a writer or a reader anywhere in the tree.)
+    uint64           seq            = 37;
 
     oneof event {
         InitializationEvent           initialization     = 3;
         ConfigurationEvent            configuration      = 4;
         GenerationEvent               generation         = 5;
-        ModelEvent                    model              = 6;
-        PerformanceEvent              performance        = 7;
+        ModelEvent                    model              = 6;   // + model_registry, + download
         NetworkEvent                  network            = 8;
-        StorageEvent                  storage            = 9;
+        StorageEvent                  storage            = 9;   // + storage_lifecycle
         FrameworkEvent                framework          = 10;
         DeviceEvent                   device             = 11;
-        ComponentInitializationEvent  component_init     = 12;
         VoiceLifecycleEvent           voice              = 17;
         VoiceEvent                    voice_pipeline     = 18;   // from voice_events.proto
-        ComponentLifecycleEvent       component_lifecycle = 19;
+        ComponentLifecycleEvent       component_lifecycle = 19;  // + component_init
         SessionEvent                  session            = 23;
         AuthEvent                     auth               = 24;
-        ModelRegistryEvent            model_registry     = 25;
-        DownloadEvent                 download           = 26;
-        StorageLifecycleEvent         storage_lifecycle  = 27;
         HardwareRoutingEvent          hardware_routing   = 28;
         CapabilityOperationEvent      capability         = 29;
-        TelemetryEvent                telemetry          = 30;
+        TelemetryEvent                telemetry          = 30;  // + performance
         CancellationEvent             cancellation       = 31;
-        FailureEvent                  failure            = 32;
     }
-}
-
-// Subscription-side filter for the canonical SDKEvent stream. Empty fields are
-// wildcards; implementations match populated fields against the envelope fields
-// above without interpreting payload-specific data.
-message SDKEventFilter {
-    repeated EventCategory    categories       = 1;
-    repeated SDKComponent     components       = 2;
-    repeated EventDestination destinations     = 3;
-    ErrorSeverity             minimum_severity = 4;
-    string                    session_id       = 5;
-    string                    operation_id     = 6;
-    string                    correlation_id   = 7;
-    string                    source           = 8;
-    string                    trace_id         = 9;
-}
-
-message SDKEventPublishRequest {
-    SDKEvent event = 1;
-
-    // When true, the portable event layer fills missing envelope metadata such
-    // as id, timestamp, destination, category/component defaults, source, and
-    // correlation fields before routing the event.
-    bool     normalize_envelope = 2;
-}
-
-message SDKEventPublishResult {
-    bool      accepted         = 1;
-    string    event_id         = 2;
-
-    // The event as accepted by the portable layer after optional envelope
-    // normalization. This is the same typed payload that serialized-proto
-    // bridges publish to subscribers.
-    optional SDKEvent normalized_event = 3;
-
-    string    error_message    = 4;
-    optional SDKError error    = 5;
-}
-
-message SDKEventSubscribeRequest {
-    SDKEventFilter filter = 1;
-
-    // Replays queued events before following live events when the backing
-    // bridge has a poll queue. Implementations without retention may ignore it
-    // and continue with live events only.
-    bool           replay_queued_events = 2;
-}
-
-// Logical SDK event service contract. C++ owns event envelope normalization,
-// routing/subscription matching, correlation/operation/source/trace metadata,
-// and the serialized-proto bridge. Platform adapters own OS notification APIs,
-// lifecycle callbacks, permission prompts, and host event-loop integration.
-service SDKEvents {
-    rpc Publish(SDKEventPublishRequest) returns (SDKEventPublishResult);
-    rpc Subscribe(SDKEventSubscribeRequest) returns (stream SDKEvent);
 }

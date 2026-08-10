@@ -25,6 +25,7 @@ import {
   openSheet,
   type OpenSheetOptions,
 } from './components/model-selection';
+import { icon, type IconName } from './components/icons';
 import { appLogger } from './services/app-logger';
 import { ConversationsStore, type StoredConversation } from './services/conversations-store';
 
@@ -66,6 +67,17 @@ interface TabDef {
   id: TabId;
   label: string;
   initializer: (el: HTMLElement) => TabLifecycle | undefined;
+  /**
+   * The surface this one was opened *from*, for panels reached by drilling in
+   * rather than from the sidebar.
+   *
+   * Without this the shell had no idea these panels were nested, and it showed:
+   * opening one cleared every nav highlight — so the sidebar pointed at nothing
+   * and the only "where am I" signal was the panel's own title — and no view
+   * offered a way back. On mobile, where the sidebar is a drawer, drilling into
+   * one of these was a dead end.
+   */
+  parent?: TabId;
 }
 
 interface NavItem {
@@ -73,7 +85,7 @@ interface NavItem {
   id: string;
   label: string;
   description: string;
-  icon: string;
+  icon: IconName;
   tabId?: TabId;
   action?: () => void;
 }
@@ -89,23 +101,134 @@ const CHAT_SHEET_OPTIONS: OpenSheetOptions = {
 };
 
 const TABS: TabDef[] = [
+  // Top-level surfaces: these have their own sidebar entry, so no parent.
   { id: 'chat', label: 'Assistant', initializer: initChatTab },
+  // Talk is a destination, not a diagnostic. It used to sit inside the Advanced hub
+  // with `parent: 'advanced'`, while Android gave it the drawer's second row — so a
+  // reader who learned it on the phone could not find it in the browser. Same name in
+  // both apps now ("Talk"), at the same level of the navigation.
+  { id: 'voice', label: 'Talk', initializer: initVoiceTab },
   { id: 'advanced', label: 'Advanced', initializer: initAdvancedHub },
   { id: 'storage', label: 'Downloads', initializer: initStorageTab },
   { id: 'settings', label: 'Settings', initializer: (el) => { initSettingsTab(el); return undefined; } },
-  { id: 'voice', label: 'Talk Mode', initializer: initVoiceTab },
-  { id: 'vision', label: 'Image & Live', initializer: initVisionTab },
-  { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab },
-  { id: 'documents', label: 'Documents', initializer: initDocumentsTab },
-  { id: 'transcribe', label: 'Transcribe', initializer: initTranscribeTab },
-  { id: 'speak', label: 'Read Aloud', initializer: initSpeakTab },
-  { id: 'vad', label: 'Voice Activity', initializer: initVadTab },
-  { id: 'diarization', label: 'Diarization', initializer: initDiarizationTab },
-  { id: 'solutions', label: 'Solutions', initializer: initSolutionsTab },
-  { id: 'benchmarks', label: 'Benchmarks', initializer: initBenchmarksTab },
+  // Drilled-into surfaces. `parent` is the surface a user most likely came from,
+  // and is only the fallback: switchTab records the actual origin, because some of
+  // these have two entrances (Image & Live is both an Advanced-adjacent surface and
+  // the composer's Live camera action) and a hardcoded parent would send half of
+  // those visitors somewhere they had never been.
+  { id: 'vision', label: 'Image & Live', initializer: initVisionTab, parent: 'chat' },
+  { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab, parent: 'advanced' },
+  { id: 'documents', label: 'Documents', initializer: initDocumentsTab, parent: 'advanced' },
+  { id: 'transcribe', label: 'Transcribe', initializer: initTranscribeTab, parent: 'advanced' },
+  { id: 'speak', label: 'Read Aloud', initializer: initSpeakTab, parent: 'advanced' },
+  { id: 'vad', label: 'Voice Activity', initializer: initVadTab, parent: 'advanced' },
+  { id: 'diarization', label: 'Diarization', initializer: initDiarizationTab, parent: 'advanced' },
+  { id: 'solutions', label: 'Solutions', initializer: initSolutionsTab, parent: 'advanced' },
+  { id: 'benchmarks', label: 'Benchmarks', initializer: initBenchmarksTab, parent: 'advanced' },
 ];
 
 const TAB_INDEX = new Map<TabId, number>(TABS.map((tab, index) => [tab.id, index]));
+
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Every surface has a URL, and the URL is a fragment: `#/vision`.
+ *
+ * WHY THIS EXISTS AT ALL. The active surface used to be a module-scope integer.
+ * So there was no way to link to a tab, the browser's Back button did nothing on
+ * a screen full of drilled-into panels, and a refresh — including the one the
+ * cross-origin-isolation service worker performs on Safari — always dumped the
+ * user back on the assistant, whatever they had been doing.
+ *
+ * WHY A FRAGMENT RATHER THAN THE HISTORY API. This example is a static bundle:
+ * Vite in development, a prebuilt static output on Vercel in production, and a
+ * plain directory of files for anyone who copies it. A path-based route only
+ * survives a refresh or a pasted link when the host rewrites every unknown path
+ * to `index.html` — a server-side contract this app would then depend on in
+ * three separate configs, and one that silently does not exist on a bare file
+ * server. A fragment is never sent to the server, so it works everywhere the
+ * bundle does, including `file://`. No router library: the whole mechanism is
+ * the four functions below.
+ */
+const DEFAULT_TAB: TabId = 'chat';
+
+/** The surface the current URL names; the default for an absent or bogus one. */
+function routeFromLocation(): TabId {
+  const slug = window.location.hash.replace(/^#\/?/, '').trim();
+  return TAB_INDEX.has(slug as TabId) ? (slug as TabId) : DEFAULT_TAB;
+}
+
+function hashForTab(tabId: TabId): string {
+  return `#/${tabId}`;
+}
+
+/** What this app writes into `history.state`, to recognise its own entries. */
+interface RouteHistoryState {
+  runanywhereDepth: number;
+}
+
+/**
+ * How many entries this app has pushed onto the session history.
+ *
+ * Re-read from `history.state` on every traversal so it stays correct through
+ * back *and* forward, rather than drifting the way a plain counter would. The
+ * toolbar's Back button reads it to tell "there is an entry of ours behind this
+ * one" from "this is where the user entered the site" — on a deep link straight
+ * into a nested surface, `history.back()` would leave the app entirely.
+ */
+let historyDepth = 0;
+
+function readHistoryDepth(state: unknown): number {
+  const depth = (state as RouteHistoryState | null)?.runanywhereDepth;
+  return typeof depth === 'number' && depth >= 0 ? depth : 0;
+}
+
+/**
+ * Go to a surface and record it in the browser's history.
+ *
+ * `replace` is for the initial route only: restoring the tab a URL already names
+ * must not leave a phantom entry behind the user's first Back press.
+ */
+function navigateToTab(tabId: TabId, options: { replace?: boolean } = {}): void {
+  if (!TAB_INDEX.has(tabId)) return;
+  const hash = hashForTab(tabId);
+  if (options.replace || window.location.hash === hash) {
+    // Already the current URL: re-selecting the surface you are on — tapping its
+    // nav row again, or "New chat" from the assistant — must not stack a
+    // duplicate entry that Back then has to walk through.
+    window.history.replaceState({ runanywhereDepth: historyDepth }, '', hash);
+  } else {
+    historyDepth += 1;
+    window.history.pushState({ runanywhereDepth: historyDepth }, '', hash);
+  }
+  applyRoute();
+}
+
+/** Show whatever surface the URL currently names. The one way a tab changes. */
+function applyRoute(): void {
+  const index = TAB_INDEX.get(routeFromLocation());
+  if (index !== undefined) switchTab(index);
+}
+
+/** Surfaces with their own sidebar entry — the only ones that can be highlighted. */
+const NAV_TAB_IDS = new Set<TabId>(TABS.filter((tab) => tab.parent === undefined).map((tab) => tab.id));
+
+/**
+ * Where each nested surface was actually opened from.
+ *
+ * Overrides TabDef.parent so Back retraces the user's own step: Image & Live reached
+ * from the composer returns to the assistant, and the same surface reached from
+ * the Advanced hub returns there.
+ */
+const tabOrigin = new Map<TabId, TabId>();
+
+/**
+ * Watches the current nested panel so a view re-render cannot drop the shell's
+ * Back button. Exactly one is live at a time — see syncBackButton.
+ */
+let backButtonObserver: MutationObserver | null = null;
 
 let activeTab = 0;
 let drawerOpen = false;
@@ -113,28 +236,41 @@ let drawerOpen = false;
 /** Per-panel lifecycle callbacks keyed by panel id. */
 const tabLifecycles: Record<string, TabLifecycle | undefined> = {};
 
-function icon(paths: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-}
-
+/**
+ * The shell's glyph names, aliased from the shared registry.
+ *
+ * The paths themselves used to live here as a 20-entry map, with a private
+ * `icon()` helper at 1.7px alongside a byte-identical one in `views/chat.ts` at
+ * the same weight — two copies of the same function, and one of four stroke
+ * weights in the app. Both now come from `components/icons.ts` at the §7 weight.
+ *
+ * Kept as an alias rather than rewriting 21 call sites to string literals: the
+ * names read as a table of contents for the nav, and `IconName` still makes a
+ * typo a compile error.
+ */
 const ICONS = {
-  sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>',
-  menu: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>',
-  newChat: '<path d="M12 5v14"/><path d="M5 12h14"/>',
-  model: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>',
-  storage: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
-  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.05A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.05A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.05A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.05A1.7 1.7 0 0 0 19.4 15z"/>',
-  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>',
-  image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>',
-  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>',
-  waveform: '<path d="M2 12h3l2-7 4 14 3-10 2 3h6"/>',
-  speaker: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 6a8 8 0 0 1 0 12"/>',
-  advanced: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>',
-  stack: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
-  gauge: '<path d="M12 14l4-4"/><path d="M4.93 19.07A10 10 0 1 1 19.07 19.07"/><path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
-  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
-} as const;
+  sparkles: 'sparkles',
+  menu: 'menu',
+  newChat: 'plus',
+  model: 'model',
+  /** Bytes ARRIVING, not bytes at rest — the Download action on a model row. The
+   * Downloads *destination* uses `storage`; a tray glyph on a bytes-at-rest screen
+   * mislabels it as an in-flight-transfer screen. */
+  downloads: 'download',
+  storage: 'storage',
+  settings: 'settings',
+  mic: 'mic',
+  image: 'image',
+  file: 'file',
+  waveform: 'waveform',
+  speaker: 'speaker',
+  advanced: 'advanced',
+  stack: 'stack',
+  gauge: 'gauge',
+  sun: 'sun',
+  moon: 'moon',
+  back: 'back',
+} as const satisfies Record<string, IconName>;
 
 // ---------------------------------------------------------------------------
 // Theme
@@ -145,21 +281,53 @@ const THEME_COLORS = { dark: '#191817', light: '#FCFBFA' } as const;
 
 type ThemeName = 'dark' | 'light';
 
-function effectiveTheme(): ThemeName {
-  const explicit = document.documentElement.dataset.theme;
-  if (explicit === 'light' || explicit === 'dark') return explicit;
+/**
+ * The user's explicit choice, or null when they have never toggled and are
+ * therefore still following the OS.
+ *
+ * This has to be tracked separately from `data-theme`, because the pre-paint
+ * script in index.html always resolves the attribute to a concrete value —
+ * `design-system.css` has no `prefers-color-scheme` fallback, by design, so an
+ * unset attribute would mean dark rather than "ask the OS". Reading the
+ * attribute back therefore cannot distinguish "chose light" from "OS is light",
+ * which is the difference that decides whether an OS change should be followed.
+ */
+let storedThemeChoice: ThemeName | null = readStoredThemeChoice();
+
+function readStoredThemeChoice(): ThemeName | null {
+  try {
+    const value = localStorage.getItem(THEME_STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null; // storage may be blocked; treat as "follow the OS"
+  }
+}
+
+function systemTheme(): ThemeName {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-function applyTheme(theme: ThemeName): void {
+function effectiveTheme(): ThemeName {
+  return storedThemeChoice ?? systemTheme();
+}
+
+/** Paints the current effective theme. Does not change the stored choice. */
+function renderTheme(): void {
+  const theme = effectiveTheme();
   document.documentElement.dataset.theme = theme;
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch { /* storage may not be available */ }
+  document.documentElement.style.colorScheme = theme;
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', THEME_COLORS[theme]);
   refreshThemeButton();
+}
+
+function applyTheme(theme: ThemeName): void {
+  storedThemeChoice = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch { /* storage may not be available */ }
+  renderTheme();
 }
 
 function refreshThemeButton(): void {
@@ -178,6 +346,7 @@ function navSections(): NavSection[] {
       title: '',
       items: [
         navTab('assistant', 'Assistant', 'Private chat with local models', ICONS.sparkles, 'chat'),
+        navTab('talk', 'Talk', 'Hands-free voice assistant', ICONS.mic, 'voice'),
         {
           type: 'action',
           id: 'models',
@@ -186,7 +355,11 @@ function navSections(): NavSection[] {
           icon: ICONS.model,
           action: () => openSheet(CHAT_SHEET_OPTIONS),
         },
-        navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.storage, 'storage'),
+        // "Downloads", not "Manage downloads", and the `storage` glyph, not the
+        // download tray: this row, the Advanced-hub row, the tab registry and the
+        // panel's own toolbar all name ONE destination, and they used to name it four
+        // different ways with two different glyphs.
+        navTab('downloads', 'Downloads', 'Models on this device, and space used', ICONS.storage, 'storage'),
       ],
     },
     {
@@ -203,7 +376,7 @@ function navTab(
   id: string,
   label: string,
   description: string,
-  itemIcon: string,
+  itemIcon: IconName,
   tabId: TabId,
 ): NavItem {
   return { type: 'tab', id, label, description, icon: itemIcon, tabId };
@@ -257,7 +430,7 @@ export function buildAppShell(): void {
         <div class="consumer-drawer__title">RunAnywhere</div>
       </div>
       <button type="button" class="shell-icon-btn consumer-drawer__close" id="consumer-close-drawer-btn" aria-label="Close menu">
-        ${icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>')}
+        ${icon('close')}
       </button>
     </div>
     <button type="button" class="consumer-new-chat" id="consumer-drawer-new-chat-btn">
@@ -269,6 +442,7 @@ export function buildAppShell(): void {
       <div class="consumer-recent-list" id="consumer-conversation-list"></div>
     </div>
     <nav class="tab-bar consumer-nav" id="consumer-nav" aria-label="Main navigation"></nav>
+    <div class="consumer-drawer__footer" id="consumer-runtime-slot"></div>
   `;
 
   const drawerScrim = document.createElement('button');
@@ -306,7 +480,11 @@ export function buildAppShell(): void {
   renderNav();
   wireShellActions();
   initializePanels();
-  switchTabById('chat');
+  // Restore the surface the URL names — a deep link, a refresh, or the reload
+  // the cross-origin-isolation service worker performs on its first install.
+  // `replace`, so the restored tab is the entry the user is already on.
+  historyDepth = readHistoryDepth(window.history.state);
+  navigateToTab(routeFromLocation(), { replace: true });
   void refreshConversationList();
 }
 
@@ -341,7 +519,7 @@ function renderNav(): void {
       if (!el) continue;
       el.addEventListener('click', () => {
         if (item.type === 'tab' && item.tabId) {
-          switchTabById(item.tabId);
+          navigateToTab(item.tabId);
         } else {
           item.action?.();
         }
@@ -352,24 +530,40 @@ function renderNav(): void {
 }
 
 function wireShellActions(): void {
-  refreshThemeButton();
+  renderTheme();
   document.getElementById('consumer-theme-btn')?.addEventListener('click', () => {
     applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
   });
-  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', refreshThemeButton);
+  // Only repaints while the user is still following the OS; once they toggle,
+  // `storedThemeChoice` wins and `renderTheme()` is a no-op.
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', renderTheme);
   document.getElementById('consumer-menu-btn')?.addEventListener('click', openDrawer);
   document.getElementById('consumer-close-drawer-btn')?.addEventListener('click', closeDrawer);
   document.getElementById('consumer-drawer-scrim')?.addEventListener('click', closeDrawer);
-  document.getElementById('consumer-settings-btn')?.addEventListener('click', () => switchTabById('settings'));
+  document.getElementById('consumer-settings-btn')?.addEventListener('click', () => navigateToTab('settings'));
   document.getElementById('consumer-new-chat-btn')?.addEventListener('click', startNewChat);
   document.getElementById('consumer-drawer-new-chat-btn')?.addEventListener('click', () => {
     startNewChat();
     closeDrawer();
   });
 
+  // Back and forward. `pushState` fires nothing, so this only ever runs for a
+  // real traversal — our own navigations call `applyRoute()` themselves.
+  window.addEventListener('popstate', (event) => {
+    historyDepth = readHistoryDepth(event.state);
+    applyRoute();
+  });
+  // A fragment typed or edited in the address bar fires `hashchange` but not
+  // `popstate`, so the two listeners together are what make the URL the single
+  // source of truth. Guarded because a traversal fires this one as well, right
+  // after the `popstate` that already applied the route.
+  window.addEventListener('hashchange', () => {
+    if (routeFromLocation() !== TABS[activeTab].id) applyRoute();
+  });
+
   window.addEventListener('runanywhere:navigate', (event) => {
     const tabId = (event as CustomEvent<{ tab: TabId }>).detail?.tab;
-    if (tabId) switchTabById(tabId);
+    if (tabId) navigateToTab(tabId);
   });
   ConversationsStore.onChange(() => {
     void refreshConversationList();
@@ -409,13 +603,110 @@ function setMobileDrawerAria(hidden: boolean): void {
 
 function startNewChat(): void {
   window.dispatchEvent(new CustomEvent('runanywhere:new-chat'));
-  switchTabById('chat');
+  navigateToTab('chat');
 }
 
-function switchTabById(tabId: TabId): void {
-  const index = TAB_INDEX.get(tabId);
-  if (index === undefined) return;
-  switchTab(index);
+/**
+ * Which sidebar entry should read as current for a given surface.
+ *
+ * Nested surfaces have no entry of their own, so they light their nearest
+ * ancestor that does. Walks the chain rather than reading `parent` once, so a
+ * surface nested two levels deep still resolves to a real nav entry.
+ */
+function navHighlightFor(tabId: TabId): TabId {
+  const seen = new Set<TabId>();
+  let current = tabId;
+  while (!NAV_TAB_IDS.has(current)) {
+    if (seen.has(current)) break;      // cycle guard: a mis-declared parent must not hang the shell
+    seen.add(current);
+    const parent = TABS[TAB_INDEX.get(current)!].parent;
+    if (parent === undefined) break;
+    current = parent;
+  }
+  return current;
+}
+
+/** Where Back goes: the surface actually navigated from, else the declared parent. */
+function backTargetFor(tab: TabDef): TabId | undefined {
+  if (tab.parent === undefined) return undefined;
+  return tabOrigin.get(tab.id) ?? tab.parent;
+}
+
+/**
+ * Keep a Back button in the current nested surface's toolbar.
+ *
+ * Owned by the shell rather than by each of the ten nested views: it is shell
+ * navigation, the views do not own it, and ten copies is ten chances for the
+ * label, icon and placement to drift.
+ *
+ * The views do own their toolbars, though, and rebuild them via innerHTML on
+ * model-state changes and user actions as well as on activation — which threw a
+ * one-shot injection away. So the shell re-asserts the button whenever the panel
+ * subtree changes, and stops watching as soon as the user leaves.
+ */
+function syncBackButton(tab: TabDef): void {
+  backButtonObserver?.disconnect();
+  backButtonObserver = null;
+
+  const panel = document.getElementById(`tab-${tab.id}`);
+  if (!panel) return;
+
+  const target = backTargetFor(tab);
+  if (target === undefined) {
+    panel.querySelector('.toolbar-back')?.remove();
+    return;
+  }
+
+  const label = `Back to ${TABS[TAB_INDEX.get(target)!].label}`;
+  ensureBackButton(panel, target, label);
+
+  backButtonObserver = new MutationObserver(() => {
+    // Re-inject only when it is actually gone. The insertion itself mutates the
+    // subtree and re-enters this callback, so this check is what terminates it.
+    if (!panel.querySelector('.toolbar-back')) ensureBackButton(panel, target, label);
+  });
+  backButtonObserver.observe(panel, { childList: true, subtree: true });
+}
+
+/** Insert or relabel the Back button in a panel's toolbar. */
+function ensureBackButton(panel: HTMLElement, target: TabId, label: string): void {
+  const toolbar = panel.firstElementChild;
+  if (!toolbar?.classList.contains('toolbar')) return;
+
+  const existing = toolbar.querySelector<HTMLButtonElement>('.toolbar-back');
+  if (existing) {
+    // Reuse the node so re-entering cannot stack duplicates, and relabel it in
+    // case this visit arrived from a different origin.
+    existing.setAttribute('aria-label', label);
+    existing.title = label;
+    existing.dataset.backTarget = target;
+    return;
+  }
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'shell-icon-btn toolbar-back';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.dataset.backTarget = target;
+  button.innerHTML = icon(ICONS.back);
+  button.addEventListener('click', () => {
+    // Prefer the browser's own history. It records where the user actually came
+    // from — better than any parent we could declare — and it keeps this button
+    // and the browser's Back in agreement: pushing a *new* entry here would mean
+    // the browser's Back immediately undid the toolbar's Back.
+    if (historyDepth > 0) {
+      window.history.back();
+      return;
+    }
+    // Nothing of ours behind this entry (a deep link straight into a nested
+    // surface), so `history.back()` would leave the site. Fall back to the
+    // declared parent, read at click time: this node gets relabelled in place,
+    // so a captured value could send a reused button to a stale surface.
+    const dest = button.dataset.backTarget;
+    if (dest) navigateToTab(dest as TabId);
+  });
+  toolbar.insertBefore(button, toolbar.firstChild);
 }
 
 function switchTab(index: number): void {
@@ -435,9 +726,30 @@ function switchTab(index: number): void {
     panel.classList.toggle('active', i === index);
   });
 
-  const activeId = TABS[index].id;
+  const activeTabDef = TABS[index];
+  const activeId = activeTabDef.id;
+
+  // Remember where a drilled-into surface was opened from, so Back returns the
+  // user to the surface they actually came from rather than a guess. Only set on
+  // a real change, so re-selecting the current tab cannot make it its own origin.
+  if (previousTab !== index && activeTabDef.parent !== undefined) {
+    tabOrigin.set(activeId, TABS[previousTab].id);
+  }
+
+  // A nested surface keeps its parent's nav entry lit. Highlighting nothing left
+  // the sidebar pointing at no current location at all.
+  const highlightId = navHighlightFor(activeId);
   document.querySelectorAll<HTMLElement>('.tab-item[data-tab]').forEach((item) => {
-    item.classList.toggle('active', item.dataset.tab === activeId);
+    const isCurrent = item.dataset.tab === highlightId;
+    item.classList.toggle('active', isCurrent);
+    // The highlight was purely visual — a screen reader had no way to tell which
+    // surface was open. aria-current is the right primitive here (these are
+    // navigation buttons, not an ARIA tablist).
+    if (isCurrent) {
+      item.setAttribute('aria-current', activeId === highlightId ? 'page' : 'true');
+    } else {
+      item.removeAttribute('aria-current');
+    }
   });
 
   if (previousTab !== index) {
@@ -447,6 +759,11 @@ function switchTab(index: number): void {
       appLogger.warning(`[App] Panel ${activeId} onActivate error:`, err);
     }
   }
+
+  // After onActivate, never before: several views rebuild their whole subtree
+  // there (Segmentation, Diarization and Benchmarks all re-render on activate),
+  // which silently discarded a button injected earlier in this same function.
+  syncBackButton(activeTabDef);
 }
 
 async function refreshConversationList(): Promise<void> {
@@ -507,7 +824,7 @@ function buildConversationRow(
     window.dispatchEvent(new CustomEvent('runanywhere:load-chat', {
       detail: { conversationId: conversation.id },
     }));
-    switchTabById('chat');
+    navigateToTab('chat');
     closeDrawer();
   });
 
@@ -521,7 +838,7 @@ function buildConversationRow(
       window.dispatchEvent(new CustomEvent('runanywhere:delete-chat', {
         detail: { conversationId: conversation.id },
       }));
-      if (current?.id === conversation.id) switchTabById('chat');
+      if (current?.id === conversation.id) navigateToTab('chat');
     }).catch((error) => {
       appLogger.warning('[App] Could not delete saved chat:', error);
     });
@@ -541,22 +858,36 @@ function formatSavedDate(timestamp: number): string {
 }
 
 function initAdvancedHub(el: HTMLElement): TabLifecycle {
+  // One glyph per row, all distinct (DESIGN_GUIDELINE.md §7). Three pairs used to
+  // collide here — waveform for both Transcribe and Voice Activity, mic for both
+  // Talk and Diarization, image for both Segmentation and (elsewhere) photo
+  // attachments — so adjacent rows in the same list were visually identical and
+  // the icon column carried no information at all.
+  //
+  // Every subtitle says what the reader gets, not which model does it. They used to
+  // read like release notes — "Semantic image segmentation (SegFormer)", "Full STT +
+  // LLM + TTS voice assistant" — and a parenthesised codename or a stack acronym is
+  // the one thing a reader deciding whether to tap cannot use. The model names live
+  // on the screens themselves, where a curious reader has already opted in. iOS
+  // `ConsumerAdvancedHubView` and Android `MoreScreen` carry the same rewrite.
   const hubItems: Array<{
     tab: TabId;
-    icon: string;
+    icon: IconName;
     title: string;
     subtitle: string;
   }> = [
-    { tab: 'voice', icon: ICONS.mic, title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
-    { tab: 'segmentation', icon: ICONS.image, title: 'Segmentation', subtitle: 'Semantic image segmentation (SegFormer)' },
-    { tab: 'documents', icon: ICONS.file, title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
-    { tab: 'transcribe', icon: ICONS.waveform, title: 'Transcribe', subtitle: 'Speech-to-text utility' },
-    { tab: 'speak', icon: ICONS.speaker, title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
-    { tab: 'vad', icon: ICONS.waveform, title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
-    { tab: 'diarization', icon: ICONS.mic, title: 'Diarization', subtitle: 'Speaker diarization — who spoke when (Sortformer)' },
-    { tab: 'storage', icon: ICONS.storage, title: 'Storage', subtitle: 'Models, cache, and browser files' },
-    { tab: 'benchmarks', icon: ICONS.gauge, title: 'Benchmarks', subtitle: 'Measure local model performance' },
-    { tab: 'solutions', icon: ICONS.stack, title: 'Solutions', subtitle: 'Run scripted SDK workflows' },
+    // Talk is deliberately absent: it is a primary nav row and the composer's mic
+    // button, so a third entrance filed under "Advanced" — where a reader looks for
+    // diagnostics — only said it was harder to reach than it is.
+    { tab: 'segmentation', icon: 'segments', title: 'Segmentation', subtitle: 'Split a photo into labelled regions' },
+    { tab: 'documents', icon: 'file', title: 'Documents', subtitle: 'Ask questions about your own files' },
+    { tab: 'transcribe', icon: 'waveform', title: 'Transcribe', subtitle: 'Turn a recording into text' },
+    { tab: 'speak', icon: 'speaker', title: 'Read Aloud', subtitle: 'Hear any text spoken on this device' },
+    { tab: 'vad', icon: 'pulse', title: 'Voice Activity', subtitle: 'See when speech starts and stops' },
+    { tab: 'diarization', icon: 'speakers', title: 'Diarization', subtitle: 'See who spoke when in a recording' },
+    { tab: 'storage', icon: 'storage', title: 'Downloads', subtitle: 'Models on this device, and space used' },
+    { tab: 'benchmarks', icon: 'gauge', title: 'Benchmarks', subtitle: 'Measure local model performance' },
+    { tab: 'solutions', icon: 'stack', title: 'Solutions', subtitle: 'Run saved multi-step workflows' },
   ];
 
   el.innerHTML = `
@@ -587,13 +918,13 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
   el.querySelectorAll<HTMLButtonElement>('[data-advanced-target]').forEach((button) => {
     button.addEventListener('click', () => {
       const tab = button.dataset.advancedTarget as TabId | undefined;
-      if (tab) switchTabById(tab);
+      if (tab) navigateToTab(tab);
     });
   });
   return {};
 }
 
-function advancedRow(item: { tab: TabId; icon: string; title: string; subtitle: string }): string {
+function advancedRow(item: { tab: TabId; icon: IconName; title: string; subtitle: string }): string {
   return `
     <button type="button" class="advanced-row" data-advanced-target="${item.tab}">
       <span class="advanced-row__icon">${icon(item.icon)}</span>
@@ -605,4 +936,19 @@ function advancedRow(item: { tab: TabId; icon: string; title: string; subtitle: 
 // Export for external probes.
 export function getActiveTab(): number {
   return activeTab;
+}
+
+/**
+ * The surface currently on screen, by id.
+ *
+ * `main.ts`'s readiness probe needs this: now that a URL can name any tab, the
+ * probe can no longer assume the assistant is the panel that must be showing.
+ */
+export function getActiveTabId(): string {
+  return TABS[activeTab].id;
+}
+
+/** True when the assistant is the routed surface — the only one with model UI. */
+export function isChatRouteActive(): boolean {
+  return TABS[activeTab].id === DEFAULT_TAB;
 }

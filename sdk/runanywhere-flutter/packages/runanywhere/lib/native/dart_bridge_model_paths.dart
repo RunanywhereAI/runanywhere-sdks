@@ -457,51 +457,28 @@ class DartBridgeModelPaths {
       ..strategyId = nullptr;
   }
 
+  // `ModelInfo.artifact_type` (the coarse classification field paralleling
+  // the `artifact` oneof) and `custom_strategy_id` were both reserved/deleted
+  // from idl/model_types.proto (see `reserved 23, 25, 26` on `ModelInfo`) —
+  // the `artifact` oneof (`singleFile`/`archive`/`multiFile`/`builtIn`) is
+  // now the SOLE declaration of artifact shape. There is no longer a "custom"
+  // strategy branch to detect here.
   int _artifactKind(ModelInfo model) {
     if (model.hasBuiltIn() && model.builtIn) return RacArtifactKind.builtIn;
-    if (model.hasCustomStrategyId() && model.customStrategyId.isNotEmpty) {
-      return RacArtifactKind.custom;
-    }
     if (model.hasMultiFile()) return RacArtifactKind.multiFile;
     if (model.hasArchive()) return RacArtifactKind.archive;
-
-    switch (model.artifactType) {
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
-        return RacArtifactKind.archive;
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY:
-        return RacArtifactKind.multiFile;
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM:
-        return RacArtifactKind.custom;
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE:
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED:
-      default:
-        return RacArtifactKind.singleFile;
-    }
+    return RacArtifactKind.singleFile;
   }
 
   int _archiveType(ModelInfo model) {
     final archiveType = model.hasArchive()
         ? model.archive.type
-        : _archiveTypeFromArtifactType(model.artifactType);
+        : model_enum.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED;
     // Delegates to commons' `rac_archive_type_from_proto` via the
     // `ProtoArchiveTypeCppBridge.toC()` extension. Returns
     // `RAC_ARCHIVE_TYPE_NONE` (-1) on UNSPECIFIED / unrecognized inputs,
     // matching the prior hand-written switch.
     return archiveType.toC();
-  }
-
-  model_enum.ArchiveType _archiveTypeFromArtifactType(
-    model_enum.ModelArtifactType artifactType,
-  ) {
-    switch (artifactType) {
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
-        return model_enum.ArchiveType.ARCHIVE_TYPE_TAR_GZ;
-      case model_enum.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
-        return model_enum.ArchiveType.ARCHIVE_TYPE_ZIP;
-      default:
-        return model_enum.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED;
-    }
   }
 
   int _archiveStructure(ModelInfo model) {

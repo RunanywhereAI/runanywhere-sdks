@@ -12,11 +12,10 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.speak
-import com.runanywhere.sdk.public.extensions.stopSpeaking
-import com.runanywhere.sdk.public.extensions.synthesize
+import com.runanywhere.sdk.public.api.SpeechHandle
+import com.runanywhere.sdk.public.api.TtsOptions
+import com.runanywhere.sdk.public.api.tts
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RATTSOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -46,6 +45,9 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
 
     private var job: Job? = null
 
+    /** The utterance currently playing out, held so [stop] can interrupt that exact one. */
+    private var speech: SpeechHandle? = null
+
     fun onTextChange(value: String) {
         text = value
     }
@@ -69,14 +71,14 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val voice = RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS).model
                 check(!isSystem(voice)) { "Choose a downloadable voice to generate audio." }
-                val output = RunAnywhere.synthesize(content, options())
+                val audio = RunAnywhere.tts.synthesize(content, options())
                 val elapsed = System.currentTimeMillis() - start
                 metrics = TtsMetrics(
-                    durationSec = output.duration_ms.takeIf { it > 0 }?.let { it / 1000.0 },
+                    durationSec = audio.durationMs.takeIf { it > 0 }?.let { it / 1000.0 },
                     processingMs = elapsed,
                     charsPerSec = if (elapsed > 0) content.length * 1000.0 / elapsed else null,
-                    sizeBytes = output.audio_data.size.toLong().takeIf { it > 0 },
-                    sampleRate = output.sample_rate.takeIf { it > 0 },
+                    sizeBytes = audio.data.size.toLong().takeIf { it > 0 },
+                    sampleRate = audio.sampleRate.takeIf { it > 0 },
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -95,38 +97,42 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         error = null
         isSpeaking = true
         job = viewModelScope.launch {
-            val start = System.currentTimeMillis()
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS)
-                val result = RunAnywhere.speak(content, options())
-                val elapsed = System.currentTimeMillis() - start
-                metrics = TtsMetrics(
-                    durationSec = result.duration_ms.takeIf { it > 0 }?.let { it / 1000.0 }
-                        ?: (elapsed / 1000.0),
-                    processingMs = elapsed,
-                    charsPerSec = if (elapsed > 0) content.length * 1000.0 / elapsed else null,
-                    sizeBytes = result.audio_size_bytes.takeIf { it > 0 },
-                    sampleRate = result.sample_rate.takeIf { it > 0 },
-                )
+                // `speak` hands back a handle and returns at once — it does not await the
+                // utterance. Awaiting the handle is what keeps [isSpeaking] true for the
+                // length of the audio, so the button can offer Stop and a second tap cannot
+                // start a second utterance over the first. Without it the flag flipped back
+                // within ~2 ms and two taps played two replies simultaneously.
+                val handle = RunAnywhere.tts.speak(content, options())
+                speech = handle
+                handle.waitForPlayout()
+                handle.error?.let { throw it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("tts speak failed", e)
                 error = e.message ?: "Speech failed"
             } finally {
+                speech = null
                 isSpeaking = false
             }
         }
     }
 
     fun stop() {
+        // Interrupt through the handle: it is the only thing that reaches the playback of
+        // *this* utterance. Deliberately no metrics are published for a stopped utterance —
+        // nothing measured about a run the user cut short would be true of the audio.
+        val handle = speech
+        speech = null
         job?.cancel()
-        viewModelScope.launch { runCatching { RunAnywhere.stopSpeaking() } }
+        viewModelScope.launch { runCatching { handle?.interrupt() ?: RunAnywhere.tts.stop() } }
         isSpeaking = false
         isGenerating = false
     }
 
-    private fun options() = RATTSOptions(language_code = "en-US", speaking_rate = speed, volume = 1f)
+    private fun options() = TtsOptions(language = "en-US", speed = speed)
 
     private fun isSystem(voice: RAModelInfo): Boolean =
         voice.id == "system-tts" || voice.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS

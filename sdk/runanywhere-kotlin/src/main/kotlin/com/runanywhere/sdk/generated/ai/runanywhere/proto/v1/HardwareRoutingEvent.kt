@@ -80,14 +80,6 @@ public class HardwareRoutingEvent(
     schemaIndex = 6,
   )
   public val error: String = "",
-  @field:WireField(
-    tag = 20,
-    adapter = "ai.runanywhere.proto.v1.HardwareProfileResult#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "hardwareProfile",
-    schemaIndex = 7,
-  )
-  public val hardware_profile: HardwareProfileResult? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HardwareRoutingEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -107,7 +99,6 @@ public class HardwareRoutingEvent(
     if (route != other.route) return false
     if (reason != other.reason) return false
     if (error != other.error) return false
-    if (hardware_profile != other.hardware_profile) return false
     return true
   }
 
@@ -122,7 +113,6 @@ public class HardwareRoutingEvent(
       result = result * 37 + route.hashCode()
       result = result * 37 + reason.hashCode()
       result = result * 37 + error.hashCode()
-      result = result * 37 + (hardware_profile?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -137,7 +127,6 @@ public class HardwareRoutingEvent(
     result += """route=${sanitize(route)}"""
     result += """reason=${sanitize(reason)}"""
     result += """error=${sanitize(error)}"""
-    if (hardware_profile != null) result += """hardware_profile=$hardware_profile"""
     return result.joinToString(prefix = "HardwareRoutingEvent{", separator = ", ", postfix = "}")
   }
 
@@ -149,9 +138,8 @@ public class HardwareRoutingEvent(
     route: String = this.route,
     reason: String = this.reason,
     error: String = this.error,
-    hardware_profile: HardwareProfileResult? = this.hardware_profile,
     unknownFields: ByteString = this.unknownFields,
-  ): HardwareRoutingEvent = HardwareRoutingEvent(kind, component, framework, capability, route, reason, error, hardware_profile, unknownFields)
+  ): HardwareRoutingEvent = HardwareRoutingEvent(kind, component, framework, capability, route, reason, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -187,9 +175,6 @@ public class HardwareRoutingEvent(
         if (value.error != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error)
         }
-        if (value.hardware_profile != null) {
-          size += HardwareProfileResult.ADAPTER.encodedSizeWithTag(20, value.hardware_profile)
-        }
         return size
       }
 
@@ -215,17 +200,11 @@ public class HardwareRoutingEvent(
         if (value.error != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error)
         }
-        if (value.hardware_profile != null) {
-          HardwareProfileResult.ADAPTER.encodeWithTag(writer, 20, value.hardware_profile)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HardwareRoutingEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.hardware_profile != null) {
-          HardwareProfileResult.ADAPTER.encodeWithTag(writer, 20, value.hardware_profile)
-        }
         if (value.error != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error)
         }
@@ -257,7 +236,6 @@ public class HardwareRoutingEvent(
         var route: String = ""
         var reason: String = ""
         var error: String = ""
-        var hardware_profile: HardwareProfileResult? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -279,7 +257,6 @@ public class HardwareRoutingEvent(
             5 -> route = ProtoAdapter.STRING.decode(reader)
             6 -> reason = ProtoAdapter.STRING.decode(reader)
             7 -> error = ProtoAdapter.STRING.decode(reader)
-            20 -> hardware_profile = HardwareProfileResult.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -291,13 +268,11 @@ public class HardwareRoutingEvent(
           route = route,
           reason = reason,
           error = error,
-          hardware_profile = hardware_profile,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: HardwareRoutingEvent): HardwareRoutingEvent = value.copy(
-        hardware_profile = value.hardware_profile?.let(HardwareProfileResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

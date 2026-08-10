@@ -352,47 +352,9 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
-// HTTP DOWNLOAD CONVENIENCE FUNCTIONS
-// =============================================================================
-
-rac_result_t rac_http_download(const char* url, const char* destination_path,
-                               rac_http_progress_callback_fn progress_callback,
-                               rac_http_complete_callback_fn complete_callback,
-                               void* callback_user_data, char** out_task_id) {
-    if (url == nullptr || destination_path == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
-    if (adapter == nullptr) {
-        return RAC_ERROR_ADAPTER_NOT_SET;
-    }
-
-    if (adapter->http_download == nullptr) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    return adapter->http_download(url, destination_path, progress_callback, complete_callback,
-                                  callback_user_data, out_task_id, adapter->user_data);
-}
-
-rac_result_t rac_http_download_cancel(const char* task_id) {
-    if (task_id == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
-    if (adapter == nullptr) {
-        return RAC_ERROR_ADAPTER_NOT_SET;
-    }
-
-    if (adapter->http_download_cancel == nullptr) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    return adapter->http_download_cancel(task_id, adapter->user_data);
-}
+// The rac_http_download / rac_http_download_cancel convenience wrappers were
+// removed: the download orchestrator reads the adapter slots directly, and no
+// SDK ever called the wrappers.
 
 // =============================================================================
 // GLOBAL MODEL REGISTRY

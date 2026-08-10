@@ -79,6 +79,26 @@ export interface LogDestination {
   flush(): void;
 }
 
+/**
+ * The severity a `[RAC][LEVEL][Category] …` line carries, or `null` when the
+ * line did not come from `rac_logger.cpp`. `WARN` is the token commons emits
+ * for warnings, which is why it is matched rather than `WARNING`.
+ */
+const NATIVE_LOG_LEVELS: ReadonlyMap<string, LogLevel> = new Map([
+  ['TRACE', LogLevel.LOG_LEVEL_TRACE],
+  ['DEBUG', LogLevel.LOG_LEVEL_DEBUG],
+  ['INFO', LogLevel.LOG_LEVEL_INFO],
+  ['WARN', LogLevel.LOG_LEVEL_WARNING],
+  ['ERROR', LogLevel.LOG_LEVEL_ERROR],
+  ['FATAL', LogLevel.LOG_LEVEL_FATAL],
+]);
+
+function nativeLogLevel(text: string): LogLevel | null {
+  const match = /^\s*\[RAC\]\[([A-Z?]+)\]/.exec(text);
+  const token = match?.[1];
+  return token ? NATIVE_LOG_LEVELS.get(token) ?? null : null;
+}
+
 export class SDKLogger {
   private static _level: LogLevel = LogLevel.LOG_LEVEL_INFO;
   private static _enabled = true;
@@ -162,6 +182,29 @@ export class SDKLogger {
 
   error(message: string): void {
     this.log(LogLevel.LOG_LEVEL_ERROR, message);
+  }
+
+  /**
+   * Log a line that the native runtime already levelled itself.
+   *
+   * Emscripten hands every commons diagnostic to `printErr`, because commons
+   * writes all of them to stderr (stdout is reserved for command results). A
+   * bridge that mapped that stream onto one console method therefore typed
+   * routine chatter — "Diffusion model registry initialized with 2 built-in
+   * models" — as `error`, and a reader auditing the console for real page
+   * errors had to pick them out of hundreds of INFO lines. The severity is
+   * right there in the text: `rac_logger.cpp` formats every line as
+   * `[RAC][LEVEL][Category] message`, so re-read it rather than inventing one.
+   * Anything that is not a RAC line (llama.cpp's own stderr, ONNX Runtime's,
+   * an Emscripten abort trace) has no level to read, so it falls back to the
+   * stream it arrived on: `print` is informational, `printErr` is a warning —
+   * loud enough to notice, not loud enough to bury real page errors.
+   */
+  native(text: string, stream: 'out' | 'err' = 'out'): void {
+    const fallback = stream === 'err'
+      ? LogLevel.LOG_LEVEL_WARNING
+      : LogLevel.LOG_LEVEL_INFO;
+    this.log(nativeLogLevel(text) ?? fallback, text);
   }
 
   /**

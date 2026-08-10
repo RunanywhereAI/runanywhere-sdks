@@ -1,37 +1,38 @@
 import {
-  LoRAAdapterConfig,
-  LoRAApplyRequest,
-  LoRAApplyResult,
-  LoRARemoveRequest,
-  LoRAState,
   LoraAdapterCatalogEntry,
   LoraAdapterCatalogGetRequest,
   LoraAdapterCatalogGetResult,
   LoraAdapterCatalogListRequest,
   LoraAdapterCatalogListResult,
   LoraAdapterCatalogQuery,
-  LoraAdapterDownloadCompletedRequest,
-  LoraAdapterDownloadCompletedResult,
-  LoraAdapterImportRequest,
-  LoraAdapterImportResult,
+  LoraAdapterConfig,
+  LoraApplyRequest,
+  LoraApplyResult,
   LoraCompatibilityResult,
-  type LoRAAdapterConfig as ProtoLoRAAdapterConfig,
-  type LoRAApplyRequest as ProtoLoRAApplyRequest,
-  type LoRAApplyResult as ProtoLoRAApplyResult,
-  type LoRARemoveRequest as ProtoLoRARemoveRequest,
-  type LoRAState as ProtoLoRAState,
+  LoraRemoveRequest,
+  LoraState,
   type LoraAdapterCatalogEntry as ProtoLoraAdapterCatalogEntry,
   type LoraAdapterCatalogGetRequest as ProtoLoraAdapterCatalogGetRequest,
   type LoraAdapterCatalogGetResult as ProtoLoraAdapterCatalogGetResult,
   type LoraAdapterCatalogListRequest as ProtoLoraAdapterCatalogListRequest,
   type LoraAdapterCatalogListResult as ProtoLoraAdapterCatalogListResult,
   type LoraAdapterCatalogQuery as ProtoLoraAdapterCatalogQuery,
-  type LoraAdapterDownloadCompletedRequest as ProtoLoraAdapterDownloadCompletedRequest,
-  type LoraAdapterDownloadCompletedResult as ProtoLoraAdapterDownloadCompletedResult,
-  type LoraAdapterImportRequest as ProtoLoraAdapterImportRequest,
-  type LoraAdapterImportResult as ProtoLoraAdapterImportResult,
+  type LoraAdapterConfig as ProtoLoraAdapterConfig,
+  type LoraApplyRequest as ProtoLoraApplyRequest,
+  type LoraApplyResult as ProtoLoraApplyResult,
   type LoraCompatibilityResult as ProtoLoraCompatibilityResult,
+  type LoraRemoveRequest as ProtoLoraRemoveRequest,
+  type LoraState as ProtoLoraState,
 } from '@runanywhere/proto-ts/lora_options';
+// LoraAdapterDownloadCompletedRequest/Result and LoraAdapterImportRequest/
+// Result were deleted outright from idl/lora_options.proto (the
+// "lora-delete-download-import-bookkeeping" simplification): adapter files
+// are now acquired through the models domain's download/import verbs, and
+// this LoRA domain carries no download/import state of its own -- a
+// non-empty LoraAdapterCatalogEntry.localPath is the only "downloaded"
+// signal. rac_lora_catalog_mark_download_completed_proto and
+// rac_lora_adapter_import_proto are permanently retired stubs on the C++
+// side (RAC_ERROR_NOT_IMPLEMENTED), so there is nothing left here to call.
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import {
   getLlamaBackendWorkerDeadReason,
@@ -80,7 +81,6 @@ export class LoRAProtoAdapter {
       '_rac_lora_catalog_list_proto',
       '_rac_lora_catalog_query_proto',
       '_rac_lora_catalog_get_proto',
-      '_rac_lora_catalog_mark_download_completed_proto',
     ]);
   }
 
@@ -183,122 +183,7 @@ export class LoRAProtoAdapter {
     );
   }
 
-  markDownloadCompleted(
-    request: ProtoLoraAdapterDownloadCompletedRequest,
-    registry?: number,
-  ): ProtoLoraAdapterDownloadCompletedResult | null {
-    if (!ensureExports(this.module, 'lora.catalog.markDownloadCompleted', [
-      '_rac_lora_catalog_mark_download_completed_proto',
-    ])) {
-      return null;
-    }
-    const registryHandle = this.registryHandle(
-      registry,
-      'lora.catalog.markDownloadCompleted',
-    );
-    if (!registryHandle) return null;
-    return this.bridge().withEncodedRequest(
-      request,
-      LoraAdapterDownloadCompletedRequest,
-      LoraAdapterDownloadCompletedResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_lora_catalog_mark_download_completed_proto!(
-          registryHandle,
-          requestPtr,
-          requestSize,
-          outResult,
-        )
-      ),
-      'rac_lora_catalog_mark_download_completed_proto',
-    );
-  }
-
-  /**
-   * Import a user-picked local adapter file through the canonical commons
-   * entry point. Commons owns matching, placement, artifact registration,
-   * and catalog completion; the caller stages the picked bytes first via
-   * stageImportBytes() so the WASM filesystem can read them.
-   */
-  importAdapter(
-    request: ProtoLoraAdapterImportRequest,
-    registry?: number,
-  ): ProtoLoraAdapterImportResult | null {
-    if (!ensureExports(this.module, 'lora.import', ['_rac_lora_adapter_import_proto'])) {
-      return null;
-    }
-    const registryHandle = this.registryHandle(registry, 'lora.import');
-    if (!registryHandle) return null;
-    return this.bridge().withEncodedRequest(
-      request,
-      LoraAdapterImportRequest,
-      LoraAdapterImportResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_lora_adapter_import_proto!(
-          registryHandle,
-          requestPtr,
-          requestSize,
-          outResult,
-        )
-      ),
-      'rac_lora_adapter_import_proto',
-    );
-  }
-
-  /**
-   * Stage user-picked adapter bytes into this module's filesystem so the
-   * commons import can read them as a plain source path. Returns the staged
-   * path, or null when the module exposes no FS surface.
-   */
-  stageImportBytes(filename: string, bytes: Uint8Array): string | null {
-    const fs = this.moduleFS();
-    if (!fs) {
-      logger.warning('lora.import: module has no FS surface; cannot stage bytes');
-      return null;
-    }
-    const directory = '/tmp/lora-import';
-    try {
-      fs.mkdirTree?.(directory);
-    } catch {
-      // directory already exists
-    }
-    const path = `${directory}/${filename}`;
-    try {
-      fs.writeFile(path, bytes);
-    } catch (err) {
-      logger.warning(`lora.import: failed to stage '${path}': ${String(err)}`);
-      return null;
-    }
-    return path;
-  }
-
-  /** Remove a previously staged import source (best-effort). */
-  removeStagedImport(path: string): void {
-    const fs = this.moduleFS();
-    try {
-      fs?.unlink?.(path);
-    } catch {
-      // best-effort cleanup
-    }
-  }
-
-  private moduleFS(): {
-    writeFile(path: string, data: Uint8Array): void;
-    mkdirTree?(path: string): void;
-    unlink?(path: string): void;
-  } | null {
-    const fs = (this.module as {
-      FS?: {
-        writeFile?(path: string, data: Uint8Array): void;
-        mkdirTree?(path: string): void;
-        unlink?(path: string): void;
-      };
-    }).FS;
-    return fs && typeof fs.writeFile === 'function'
-      ? (fs as ReturnType<LoRAProtoAdapter['moduleFS']>)
-      : null;
-  }
-
-  compatibility(config: ProtoLoRAAdapterConfig): ProtoLoraCompatibilityResult | null {
+  compatibility(config: ProtoLoraAdapterConfig): ProtoLoraCompatibilityResult | null {
     if (!ensureExports(this.module, 'lora.compatibility', [
       '_rac_lora_compatibility_proto',
     ])) {
@@ -306,7 +191,7 @@ export class LoRAProtoAdapter {
     }
     return this.bridge().withEncodedRequest(
       config,
-      LoRAAdapterConfig,
+      LoraAdapterConfig,
       LoraCompatibilityResult,
       (configPtr, configSize, outResult) => (
         this.module._rac_lora_compatibility_proto!(configPtr, configSize, outResult)
@@ -315,7 +200,7 @@ export class LoRAProtoAdapter {
     );
   }
 
-  async apply(request: ProtoLoRAApplyRequest): Promise<ProtoLoRAApplyResult | null> {
+  async apply(request: ProtoLoraApplyRequest): Promise<ProtoLoraApplyResult | null> {
     const host = getActiveBackendWorkerHost('llamacpp');
     if (mustUseLlamaBackendWorker()) {
       if (!host || host.diagnostics.executionContext !== 'worker') {
@@ -326,15 +211,15 @@ export class LoRAProtoAdapter {
         );
       }
       const response = await host.infer('lora.apply', {
-        requestBytes: LoRAApplyRequest.encode(request).finish(),
+        requestBytes: LoraApplyRequest.encode(request).finish(),
       }) as { resultBytes?: Uint8Array };
-      return response?.resultBytes ? LoRAApplyResult.decode(response.resultBytes) : null;
+      return response?.resultBytes ? LoraApplyResult.decode(response.resultBytes) : null;
     }
     if (!ensureExports(this.module, 'lora.apply', ['_rac_lora_apply_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
-      LoRAApplyRequest,
-      LoRAApplyResult,
+      LoraApplyRequest,
+      LoraApplyResult,
       (requestPtr, requestSize, outResult) => (
         this.module._rac_lora_apply_proto!(requestPtr, requestSize, outResult)
       ),
@@ -342,7 +227,7 @@ export class LoRAProtoAdapter {
     );
   }
 
-  async remove(request: ProtoLoRARemoveRequest): Promise<ProtoLoRAState | null> {
+  async remove(request: ProtoLoraRemoveRequest): Promise<ProtoLoraState | null> {
     const host = getActiveBackendWorkerHost('llamacpp');
     if (mustUseLlamaBackendWorker()) {
       if (!host || host.diagnostics.executionContext !== 'worker') {
@@ -353,15 +238,15 @@ export class LoRAProtoAdapter {
         );
       }
       const response = await host.infer('lora.remove', {
-        requestBytes: LoRARemoveRequest.encode(request).finish(),
+        requestBytes: LoraRemoveRequest.encode(request).finish(),
       }) as { resultBytes?: Uint8Array };
-      return response?.resultBytes ? LoRAState.decode(response.resultBytes) : null;
+      return response?.resultBytes ? LoraState.decode(response.resultBytes) : null;
     }
     if (!ensureExports(this.module, 'lora.remove', ['_rac_lora_remove_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
-      LoRARemoveRequest,
-      LoRAState,
+      LoraRemoveRequest,
+      LoraState,
       (requestPtr, requestSize, outState) => (
         this.module._rac_lora_remove_proto!(requestPtr, requestSize, outState)
       ),
@@ -369,12 +254,12 @@ export class LoRAProtoAdapter {
     );
   }
 
-  list(request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
+  list(request: ProtoLoraState = emptyLoRAState()): ProtoLoraState | null {
     if (!ensureExports(this.module, 'lora.list', ['_rac_lora_list_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
-      LoRAState,
-      LoRAState,
+      LoraState,
+      LoraState,
       (requestPtr, requestSize, outState) => (
         this.module._rac_lora_list_proto!(requestPtr, requestSize, outState)
       ),
@@ -382,12 +267,12 @@ export class LoRAProtoAdapter {
     );
   }
 
-  state(request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
+  state(request: ProtoLoraState = emptyLoRAState()): ProtoLoraState | null {
     if (!ensureExports(this.module, 'lora.state', ['_rac_lora_state_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
-      LoRAState,
-      LoRAState,
+      LoraState,
+      LoraState,
       (requestPtr, requestSize, outState) => (
         this.module._rac_lora_state_proto!(requestPtr, requestSize, outState)
       ),

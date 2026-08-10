@@ -63,6 +63,7 @@
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "../infrastructure/device/rac_device_live_state_internal.h"
 #include "../infrastructure/http/rac_http_internal.h"
+#include "rac/connect/rac_connect.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -70,6 +71,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/features/cua/rac_cua.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -126,7 +128,6 @@
 #include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_loader.h"
-#include "rac/router/rac_router_capabilities.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -4834,6 +4835,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeLifecyc
     return makeProtoCallResult(env, rc, &result, "racSttTranscribeLifecycleProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttStateLifecycleProto(JNIEnv* env,
+                                                                                   jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_stt_state_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racSttStateLifecycleProto");
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeStreamLifecycleProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
@@ -5245,6 +5256,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsListVoicesLifecyc
     return makeProtoCallResult(env, rc, &result, "racTtsListVoicesLifecycleProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsStateLifecycleProto(JNIEnv* env,
+                                                                                   jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_tts_state_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racTtsStateLifecycleProto");
+}
+
 // Swift-aligned: exposes rac_tts_stop_lifecycle_proto so Kotlin can stop an
 // in-flight lifecycle-owned TTS synthesis. The legacy
 // racTtsComponentCancel(handle) only addresses the per-component handle path;
@@ -5373,28 +5394,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentConfigur
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcessProto(
-    JNIEnv* env, jclass clazz, jlong handle, jfloatArray samplesArray, jbyteArray optionsProto) {
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestProto) {
     (void)clazz;
-    if (handle == 0L || samplesArray == nullptr)
+    if (handle == 0L)
         return nullptr;
-    const jsize numSamples = env->GetArrayLength(samplesArray);
-    jfloat* samples = numSamples > 0 ? env->GetFloatArrayElements(samplesArray, nullptr) : nullptr;
-    if (numSamples > 0 && samples == nullptr)
+    JByteArrayView request(env, requestProto, false);
+    if (!request.ok)
         return nullptr;
-    JByteArrayView options(env, optionsProto, true);
-    if (!options.ok) {
-        if (samples != nullptr)
-            env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
-        return nullptr;
-    }
 
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_vad_component_process_proto(
-        handleFromJLong(handle), reinterpret_cast<const float*>(samples),
-        static_cast<size_t>(numSamples), options.u8(), options.size(), &result);
-    if (samples != nullptr)
-        env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
+    rac_result_t rc = rac_vad_component_process_proto(handleFromJLong(handle), request.u8(),
+                                                      request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racVadComponentProcessProto");
 }
 
@@ -5774,6 +5785,55 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryProto(JNIEnv
     rac_proto_buffer_init(&result);
     rac_result_t rc = queryRag(handleFromJLong(handle), query.u8(), query.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racRagQueryProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSearchProto(JNIEnv* env, jclass clazz,
+                                                                           jlong handle,
+                                                                           jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (handle == 0L || !request.ok)
+        return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn searchRag = optionalNativeSymbol<Fn>("rac_rag_search_proto");
+    if (searchRag == nullptr)
+        return makeFeatureUnavailableResult(env, "racRagSearchProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = searchRag(handleFromJLong(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagSearchProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSearchRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray requestProto) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return nullptr;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_rag_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        const rac_result_t rc = start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                                    ? RAC_ERROR_CANCELLED
+                                    : RAC_ERROR_INVALID_STATE;
+        return makeProtoCallResult(env, rc, &result, "racRagSearchRequestProto");
+    }
+    rac::jni::RequestCompletionGuard completion(&g_rag_request_relay, request_id);
+
+    JByteArrayView request(env, requestProto);
+    if (handle == 0L || !request.ok)
+        return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn searchRag = optionalNativeSymbol<Fn>("rac_rag_search_proto");
+    if (searchRag == nullptr)
+        return makeFeatureUnavailableResult(env, "racRagSearchRequestProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = searchRag(handleFromJLong(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagSearchRequestProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -6334,18 +6394,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessTur
 // listener).
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentFeedAudioProto(
-    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jint sampleRateHz, jint channels,
-    jint encoding, jboolean isFinal) {
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray frameProto) {
     (void)clazz;
-    JByteArrayView audio(env, audioData);
-    if (handle == 0L || !audio.ok)
+    JByteArrayView frame(env, frameProto);
+    if (handle == 0L || !frame.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_voice_agent_feed_audio_proto(
-        reinterpret_cast<rac_voice_agent_handle_t>(handle), audio.data(), audio.size(),
-        static_cast<int32_t>(sampleRateHz), static_cast<int32_t>(channels),
-        static_cast<int32_t>(encoding), isFinal == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &result);
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), frame.u8(), frame.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racVoiceAgentFeedAudioProto");
 }
 
@@ -7034,50 +7091,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racApiErrorFromResponse
 // =============================================================================
 // JNI FUNCTIONS - Engine Router Capabilities
 //
-// `rac_router_frameworks_for_capability_proto` consumes a serialized
-// FrameworksForCapabilityRequest and returns a serialized
-// FrameworksForCapabilityResponse. Kotlin replaces the local when-mapping
-// in RunAnywhere+Frameworks.jvmAndroid.kt with one call here.
-// =============================================================================
-
-JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterFrameworksForCapabilityProto(
-    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
-    const jsize length = requestProto != nullptr ? env->GetArrayLength(requestProto) : 0;
-    jbyte* requestBytes = length > 0 ? env->GetByteArrayElements(requestProto, nullptr) : nullptr;
-    if (length > 0 && requestBytes == nullptr) {
-        LOGe("racRouterFrameworksForCapabilityProto: failed to access JNI byte array");
-        return nullptr;
-    }
-
-    uint8_t* responseBytes = nullptr;
-    size_t responseSize = 0;
-    rac_result_t rc = rac_router_frameworks_for_capability_proto(
-        reinterpret_cast<const uint8_t*>(requestBytes), static_cast<size_t>(length), &responseBytes,
-        &responseSize);
-    if (requestBytes != nullptr) {
-        env->ReleaseByteArrayElements(requestProto, requestBytes, JNI_ABORT);
-    }
-    if (rc != RAC_SUCCESS) {
-        rac_router_frameworks_for_capability_proto_free(responseBytes);
-        LOGe("racRouterFrameworksForCapabilityProto: failed with code %d", rc);
-        return nullptr;
-    }
-
-    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(responseSize));
-    if (jArr == nullptr) {
-        rac_router_frameworks_for_capability_proto_free(responseBytes);
-        LOGe("racRouterFrameworksForCapabilityProto: failed to allocate jbyteArray");
-        return nullptr;
-    }
-    if (responseSize > 0) {
-        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(responseSize),
-                                reinterpret_cast<const jbyte*>(responseBytes));
-    }
-    rac_router_frameworks_for_capability_proto_free(responseBytes);
-    return env->ExceptionCheck() ? nullptr : jArr;
-}
-
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputParseProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
@@ -8057,6 +8070,33 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFile
 }
 
 // =============================================================================
+// CONNECT CLIENT — commons-owned role policy and handshake validation.
+// Android owns discovery and the socket transport, while these proto thunks
+// keep platform eligibility, protocol negotiation, and model binding in C++.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectGetPlatformPolicyProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_get_platform_policy_proto,
+                             "racConnectGetPlatformPolicyProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClientCreateHelloProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_client_create_hello_proto,
+                             "racConnectClientCreateHelloProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClientValidateHostProto(
+    JNIEnv* env, jclass clazz, jbyteArray responseProto) {
+    return callProtoBufferFn(env, responseProto, rac_connect_client_validate_host_proto,
+                             "racConnectClientValidateHostProto");
+}
+
+// =============================================================================
 // TWO-PHASE SDK INIT — rac_sdk_init_phase1_proto /
 // rac_sdk_init_phase2_proto / rac_sdk_retry_http_proto. Mirrors Swift's
 // CppBridge.SdkInit. phase1/phase2 take a serialized request and return a
@@ -8221,4 +8261,67 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformUnregister(J
         return static_cast<jint>(plugin_result);
     }
     return static_cast<jint>(backend_result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Computer-Use Agent (CUA) scaffold (rac_cua.h)
+//
+// Stateless profile-driven bridge. Mirrors the iOS `RunAnywhere.CUA` facade
+// (RunAnywhere+CUA.swift), which calls `rac_cua_system_prompt` /
+// `rac_cua_parse_action` directly. The parse thunk marshals the flat
+// `rac_cua_action_t` struct into the Kotlin JNI DTO `RacCuaAction` (same
+// field-by-field pattern as RacDirectoryEntry, in reverse), which the
+// public facade maps into the structured `CuaAction` value type.
+// =============================================================================
+
+// Renders the profile system prompt for a declared coordinate space. Returns
+// the prompt string, or null for an unknown profile (rac returns -1).
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaSystemPrompt(
+    JNIEnv* env, jclass clazz, jstring profileId, jint displayW, jint displayH) {
+    (void)clazz;
+    if (profileId == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+
+    // Capacity query: pass a NULL buffer to learn the full length (mirrors the
+    // Swift facade's two-call pattern).
+    int needed = rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                                       static_cast<uint32_t>(displayH), nullptr, 0);
+    if (needed <= 0) {
+        return nullptr;
+    }
+
+    std::vector<char> buffer(static_cast<size_t>(needed) + 1, '\0');
+    rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                          static_cast<uint32_t>(displayH), buffer.data(), buffer.size());
+    return env->NewStringUTF(buffer.data());
+}
+
+// Parses a CUA model's raw output into a serialized runanywhere.v1.CuaAction,
+// rescaling coordinates to the caller's viewport. Returns null for an unknown
+// profile; the decoded parse_ok flag distinguishes "no tool call found". The
+// Kotlin facade decodes the proto with Wire — no hand-mirrored struct DTO.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaParseAction(
+    JNIEnv* env, jclass clazz, jstring profileId, jstring modelOutput, jint viewportW,
+    jint viewportH) {
+    (void)clazz;
+    if (profileId == nullptr || modelOutput == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+    std::string output = getCString(env, modelOutput);
+
+    rac_proto_buffer_t buffer = {};
+    rac_result_t rc = rac_cua_parse_action_proto(profile.c_str(), output.c_str(),
+                                                 static_cast<uint32_t>(viewportW),
+                                                 static_cast<uint32_t>(viewportH), &buffer);
+    if (RAC_FAILED(rc)) {
+        // Unknown profile — return null (Swift parity) rather than throwing.
+        rac_proto_buffer_free(&buffer);
+        return nullptr;
+    }
+    return makeProtoBufferByteArray(env, &buffer, "racCuaParseAction");
 }

@@ -54,10 +54,11 @@ def main(argv: Optional[list] = None) -> int:
     # Wire the verbosity flags (previously parsed but unused): --verbose raises the runtime log
     # level (the native core reads RUNANYWHERE_LOG_LEVEL at init), --quiet lowers it AND suppresses
     # CLI status/progress lines. Respect a log level the user already set in the environment.
-    if args.verbose and "RUNANYWHERE_LOG_LEVEL" not in os.environ:
-        os.environ["RUNANYWHERE_LOG_LEVEL"] = "debug"
-    elif args.quiet and "RUNANYWHERE_LOG_LEVEL" not in os.environ:
-        os.environ["RUNANYWHERE_LOG_LEVEL"] = "error"
+    if "RUNANYWHERE_LOG_LEVEL" not in os.environ:
+        # The native core defaults to warning and prints benign slot/registry lines on every
+        # command (NULL get_vendor_id/http_download — Python downloads via urllib, path-based
+        # model resolution, MLX-unavailable). Keep normal runs clean; -v restores the full logs.
+        os.environ["RUNANYWHERE_LOG_LEVEL"] = "debug" if args.verbose else "error"
     output.set_quiet(args.quiet)
     if getattr(args, "version", False):
         from .. import __version__

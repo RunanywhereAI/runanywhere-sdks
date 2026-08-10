@@ -50,7 +50,7 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final sdkModels = await sdk.RunAnywhere.models.available();
+      final sdkModels = await sdk.RunAnywhere.models.list();
 
       // Native device-aware QHexRT registration is authoritative. Older app
       // versions may have left generic logical HNPU rows in the persistent
@@ -133,24 +133,30 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('Starting download for model: ${model.name}');
 
-      await for (final progress in sdk.RunAnywhere.downloads.start(model.id)) {
-        final totalBytes = progress.totalBytes.toInt();
-        final progressValue = totalBytes > 0
-            ? progress.bytesDownloaded.toInt() / totalBytes
-            : progress.stageProgress.toDouble();
-
-        _downloadProgress[model.id] = progressValue;
-        progressHandler(progressValue);
-        notifyListeners();
-
-        // Check if completed or failed
-        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-          debugPrint('Download completed for model: ${model.name}');
-          break;
-        } else if (progress.stage ==
-                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
-            progress.errorMessage.isNotEmpty) {
-          throw Exception('Download failed: ${progress.errorMessage}');
+      await for (final event in sdk.RunAnywhere.models.download(model.id)) {
+        switch (event) {
+          case sdk.DownloadProgressEvent(
+            :final bytesDone,
+            :final bytesTotal,
+          ):
+            final percent = bytesTotal > 0 ? bytesDone / bytesTotal : 0.0;
+            _downloadProgress[model.id] = percent;
+            progressHandler(percent);
+            notifyListeners();
+          case sdk.DownloadVerifying():
+            debugPrint('Verifying model: ${model.name}');
+          case sdk.DownloadExtracting():
+            debugPrint('Extracting model: ${model.name}');
+          case sdk.DownloadCompleted():
+            debugPrint('Download completed for model: ${model.name}');
+          case sdk.DownloadFailed(:final error):
+            throw error;
+          case sdk.DownloadCancelled():
+            throw sdk.SDKException.cancelled(
+              'Download cancelled for ${model.name}',
+            );
+          case sdk.DownloadStarted():
+            break;
         }
       }
 
@@ -173,7 +179,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('Deleting model: ${model.name}');
 
-      await sdk.RunAnywhere.deleteModel(model.id);
+      await sdk.RunAnywhere.models.delete(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -196,48 +202,17 @@ class ModelListViewModel extends ChangeNotifier {
       // model loaded for the right capability. Re-calling load() each
       // time the user taps Send was triggering an unnecessary native
       // re-init for the same handle.
-      final alreadyLoadedId = switch (model.category) {
-        ModelCategory.MODEL_CATEGORY_LANGUAGE =>
-          await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION =>
-          sdk.RunAnywhere.stt.currentModelId,
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS =>
-          sdk.RunAnywhere.tts.currentVoiceId,
-        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION =>
-          sdk.RunAnywhere.vad.currentModelId,
-        _ => await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
-      };
-
-      if (alreadyLoadedId == model.id) {
+      final state = await sdk.RunAnywhere.models.state();
+      if (state.loaded[model.category]?.id == model.id) {
         debugPrint('Model ${model.name} already loaded — skipping reload');
         _currentModel = model;
         return;
       }
 
       debugPrint('Loading model: ${model.name}');
-
-      switch (model.category) {
-        case ModelCategory.MODEL_CATEGORY_LANGUAGE:
-          await sdk.RunAnywhere.llm.load(model.id);
-          break;
-        case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-          await sdk.RunAnywhere.stt.load(model.id);
-          break;
-        case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-          await sdk.RunAnywhere.tts.loadVoice(model.id);
-          break;
-        case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-          // Route VAD models through the VAD lifecycle (mirrors iOS, which
-          // preloads with category .voiceActivityDetection). Falling through
-          // to llm.load would load a 2 MB silero model as an LLM and fail.
-          await sdk.RunAnywhere.vad.loadModel(model.id);
-          break;
-        default:
-          // After the picker filters (model_types.dart), only contexts the
-          // sheet already skips preload for (RAG, VLM/multimodal) reach
-          // here; their views own the correct lifecycle call.
-          await sdk.RunAnywhere.llm.load(model.id);
-      }
+      // One entry point: the SDK routes the id to the right component by
+      // the model's own category.
+      await sdk.RunAnywhere.models.load(model.id);
 
       _currentModel = model;
       debugPrint('Model ${model.name} loaded successfully');

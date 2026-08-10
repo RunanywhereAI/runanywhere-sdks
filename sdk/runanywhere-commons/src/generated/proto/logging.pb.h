@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -602,11 +603,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LogEntry final : public ::google::p
     kFileFieldNumber = 6,
     kFunctionFieldNumber = 8,
     kModelIdFieldNumber = 10,
-    kFrameworkFieldNumber = 11,
     kTimestampUnixMsFieldNumber = 1,
     kLevelFieldNumber = 2,
     kLineFieldNumber = 7,
     kErrorCodeFieldNumber = 9,
+    kFrameworkFieldNumber = 11,
     kMetadataFieldNumber = 5,
   };
   // string category = 3;
@@ -684,21 +685,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LogEntry final : public ::google::p
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
-  // string framework = 11;
-  void clear_framework() ;
-  [[nodiscard]] const ::std::string& framework() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_framework(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_framework();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_framework();
-  void set_allocated_framework(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_framework() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_framework(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_framework();
-
-  public:
   // int64 timestamp_unix_ms = 1;
   void clear_timestamp_unix_ms() ;
   [[nodiscard]] ::int64_t timestamp_unix_ms() const;
@@ -739,6 +725,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LogEntry final : public ::google::p
   void _internal_set_error_code(::int32_t value);
 
   public:
+  // .runanywhere.v1.InferenceFramework framework = 11;
+  void clear_framework() ;
+  [[nodiscard]] ::runanywhere::v1::InferenceFramework framework() const;
+  void set_framework(::runanywhere::v1::InferenceFramework value);
+
+  private:
+  ::runanywhere::v1::InferenceFramework _internal_framework() const;
+  void _internal_set_framework(::runanywhere::v1::InferenceFramework value);
+
+  public:
   // map<string, string> metadata = 5;
   [[nodiscard]] int metadata_size()
       const;
@@ -760,7 +756,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LogEntry final : public ::google::p
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<4, 11,
-                          1, 92,
+                          1, 83,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -793,11 +789,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LogEntry final : public ::google::p
     ::google::protobuf::internal::ArenaStringPtr file_;
     ::google::protobuf::internal::ArenaStringPtr function_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr framework_;
     ::int64_t timestamp_unix_ms_;
     int level_;
     ::int32_t line_;
     ::int32_t error_code_;
+    int framework_;
     ::google::protobuf::internal::MapField<LogEntry_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -951,7 +947,7 @@ inline void LoggingConfiguration::_internal_set_enable_remote_logging(bool value
 inline void LogEntry::clear_timestamp_unix_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_unix_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int64_t LogEntry::timestamp_unix_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LogEntry.timestamp_unix_ms)
@@ -959,7 +955,7 @@ inline ::int64_t LogEntry::timestamp_unix_ms() const {
 }
 inline void LogEntry::set_timestamp_unix_ms(::int64_t value) {
   _internal_set_timestamp_unix_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LogEntry.timestamp_unix_ms)
 }
 inline ::int64_t LogEntry::_internal_timestamp_unix_ms() const {
@@ -975,7 +971,7 @@ inline void LogEntry::_internal_set_timestamp_unix_ms(::int64_t value) {
 inline void LogEntry::clear_level() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.level_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::runanywhere::v1::LogLevel LogEntry::level() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LogEntry.level)
@@ -983,7 +979,7 @@ inline ::runanywhere::v1::LogLevel LogEntry::level() const {
 }
 inline void LogEntry::set_level(::runanywhere::v1::LogLevel value) {
   _internal_set_level(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LogEntry.level)
 }
 inline ::runanywhere::v1::LogLevel LogEntry::_internal_level() const {
@@ -1222,7 +1218,7 @@ inline void LogEntry::set_allocated_file(::std::string* PROTOBUF_NULLABLE value)
 inline void LogEntry::clear_line() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.line_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int32_t LogEntry::line() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LogEntry.line)
@@ -1230,7 +1226,7 @@ inline ::int32_t LogEntry::line() const {
 }
 inline void LogEntry::set_line(::int32_t value) {
   _internal_set_line(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LogEntry.line)
 }
 inline ::int32_t LogEntry::_internal_line() const {
@@ -1310,7 +1306,7 @@ inline void LogEntry::set_allocated_function(::std::string* PROTOBUF_NULLABLE va
 inline void LogEntry::clear_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::int32_t LogEntry::error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LogEntry.error_code)
@@ -1318,7 +1314,7 @@ inline ::int32_t LogEntry::error_code() const {
 }
 inline void LogEntry::set_error_code(::int32_t value) {
   _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LogEntry.error_code)
 }
 inline ::int32_t LogEntry::_internal_error_code() const {
@@ -1394,68 +1390,28 @@ inline void LogEntry::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE va
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LogEntry.model_id)
 }
 
-// string framework = 11;
+// .runanywhere.v1.InferenceFramework framework = 11;
 inline void LogEntry::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.framework_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.framework_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
-inline const ::std::string& LogEntry::framework() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline ::runanywhere::v1::InferenceFramework LogEntry::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LogEntry.framework)
   return _internal_framework();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void LogEntry::set_framework(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  _impl_.framework_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+inline void LogEntry::set_framework(::runanywhere::v1::InferenceFramework value) {
+  _internal_set_framework(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LogEntry.framework)
 }
-inline ::std::string* PROTOBUF_NONNULL LogEntry::mutable_framework()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  ::std::string* _s = _internal_mutable_framework();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LogEntry.framework)
-  return _s;
-}
-inline const ::std::string& LogEntry::_internal_framework() const {
+inline ::runanywhere::v1::InferenceFramework LogEntry::_internal_framework() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.framework_.Get();
+  return static_cast<::runanywhere::v1::InferenceFramework>(_impl_.framework_);
 }
-inline void LogEntry::_internal_set_framework(const ::std::string& value) {
+inline void LogEntry::_internal_set_framework(::runanywhere::v1::InferenceFramework value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.framework_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL LogEntry::_internal_mutable_framework() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.framework_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE LogEntry::release_framework() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.LogEntry.framework)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  auto* released = _impl_.framework_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.framework_.Set("", GetArena());
-  }
-  return released;
-}
-inline void LogEntry::set_allocated_framework(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  }
-  _impl_.framework_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.framework_.IsDefault()) {
-    _impl_.framework_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LogEntry.framework)
+  _impl_.framework_ = value;
 }
 
 #ifdef __GNUC__

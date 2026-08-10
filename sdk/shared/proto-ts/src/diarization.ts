@@ -7,52 +7,9 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
-
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-export enum DiarizationAudioEncoding {
-  DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-  DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-  DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function diarizationAudioEncodingFromJSON(object: any): DiarizationAudioEncoding {
-  switch (object) {
-    case 0:
-    case "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED;
-    case 1:
-    case "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
-    case 2:
-    case "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return DiarizationAudioEncoding.UNRECOGNIZED;
-  }
-}
-
-export function diarizationAudioEncodingToJSON(object: DiarizationAudioEncoding): string {
-  switch (object) {
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED:
-      return "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE:
-      return "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE:
-      return "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-    case DiarizationAudioEncoding.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
 
 export enum DiarizationStreamEventKind {
   DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -106,12 +63,33 @@ export function diarizationStreamEventKindToJSON(object: DiarizationStreamEventK
 }
 
 export interface DiarizationOptions {
-  sampleRateHz?: number | undefined;
-  channelCount?: number | undefined;
-  encoding?: DiarizationAudioEncoding | undefined;
+  /**
+   * Only 16 kHz is accepted: the engine does not resample, and any other
+   * rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+   */
+  sampleRate?: number | undefined;
+  channels?:
+    | number
+    | undefined;
+  /**
+   * Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+   * AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+   * float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+   * and AUDIO_ENCODING_UNSPECIFIED are rejected with
+   * RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
+   */
+  encoding?: AudioEncoding | undefined;
   threshold?: number | undefined;
   minimumDurationMs: number;
   mergeGapMs: number;
+  /**
+   * Speaker-count hint: an upper bound, not an exact count. Unset =
+   * auto-detect. An engine that detects more than max_speakers speakers
+   * ranks them by total active duration, drops the weakest, and re-densifies
+   * the speaker indices. Values above the loaded model's speaker capacity
+   * are clamped.
+   */
+  maxSpeakers?: number | undefined;
 }
 
 export interface DiarizationRequest {
@@ -150,22 +128,23 @@ export interface DiarizationStreamEvent {
 
 function createBaseDiarizationOptions(): DiarizationOptions {
   return {
-    sampleRateHz: undefined,
-    channelCount: undefined,
+    sampleRate: undefined,
+    channels: undefined,
     encoding: undefined,
     threshold: undefined,
     minimumDurationMs: 0,
     mergeGapMs: 0,
+    maxSpeakers: undefined,
   };
 }
 
 export const DiarizationOptions: MessageFns<DiarizationOptions> = {
   encode(message: DiarizationOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sampleRateHz !== undefined) {
-      writer.uint32(8).int32(message.sampleRateHz);
+    if (message.sampleRate !== undefined) {
+      writer.uint32(8).int32(message.sampleRate);
     }
-    if (message.channelCount !== undefined) {
-      writer.uint32(16).int32(message.channelCount);
+    if (message.channels !== undefined) {
+      writer.uint32(16).int32(message.channels);
     }
     if (message.encoding !== undefined) {
       writer.uint32(24).int32(message.encoding);
@@ -178,6 +157,9 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
     }
     if (message.mergeGapMs !== 0) {
       writer.uint32(48).int64(message.mergeGapMs);
+    }
+    if (message.maxSpeakers !== undefined) {
+      writer.uint32(64).int32(message.maxSpeakers);
     }
     return writer;
   },
@@ -194,7 +176,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
             break;
           }
 
-          message.sampleRateHz = reader.int32();
+          message.sampleRate = reader.int32();
           continue;
         }
         case 2: {
@@ -202,7 +184,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
             break;
           }
 
-          message.channelCount = reader.int32();
+          message.channels = reader.int32();
           continue;
         }
         case 3: {
@@ -237,6 +219,14 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
           message.mergeGapMs = longToNumber(reader.int64());
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.maxSpeakers = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -248,17 +238,13 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
 
   fromJSON(object: any): DiarizationOptions {
     return {
-      sampleRateHz: isSet(object.sampleRateHz)
-        ? globalThis.Number(object.sampleRateHz)
-        : isSet(object.sample_rate_hz)
-        ? globalThis.Number(object.sample_rate_hz)
+      sampleRate: isSet(object.sampleRate)
+        ? globalThis.Number(object.sampleRate)
+        : isSet(object.sample_rate)
+        ? globalThis.Number(object.sample_rate)
         : undefined,
-      channelCount: isSet(object.channelCount)
-        ? globalThis.Number(object.channelCount)
-        : isSet(object.channel_count)
-        ? globalThis.Number(object.channel_count)
-        : undefined,
-      encoding: isSet(object.encoding) ? diarizationAudioEncodingFromJSON(object.encoding) : undefined,
+      channels: isSet(object.channels) ? globalThis.Number(object.channels) : undefined,
+      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : undefined,
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : undefined,
       minimumDurationMs: isSet(object.minimumDurationMs)
         ? globalThis.Number(object.minimumDurationMs)
@@ -270,19 +256,24 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
         : isSet(object.merge_gap_ms)
         ? globalThis.Number(object.merge_gap_ms)
         : 0,
+      maxSpeakers: isSet(object.maxSpeakers)
+        ? globalThis.Number(object.maxSpeakers)
+        : isSet(object.max_speakers)
+        ? globalThis.Number(object.max_speakers)
+        : undefined,
     };
   },
 
   toJSON(message: DiarizationOptions): unknown {
     const obj: any = {};
-    if (message.sampleRateHz !== undefined) {
-      obj.sampleRateHz = Math.round(message.sampleRateHz);
+    if (message.sampleRate !== undefined) {
+      obj.sampleRate = Math.round(message.sampleRate);
     }
-    if (message.channelCount !== undefined) {
-      obj.channelCount = Math.round(message.channelCount);
+    if (message.channels !== undefined) {
+      obj.channels = Math.round(message.channels);
     }
     if (message.encoding !== undefined) {
-      obj.encoding = diarizationAudioEncodingToJSON(message.encoding);
+      obj.encoding = audioEncodingToJSON(message.encoding);
     }
     if (message.threshold !== undefined) {
       obj.threshold = message.threshold;
@@ -293,6 +284,9 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
     if (message.mergeGapMs !== 0) {
       obj.mergeGapMs = Math.round(message.mergeGapMs);
     }
+    if (message.maxSpeakers !== undefined) {
+      obj.maxSpeakers = Math.round(message.maxSpeakers);
+    }
     return obj;
   },
 
@@ -301,12 +295,13 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<DiarizationOptions>, I>>(object: I): DiarizationOptions {
     const message = createBaseDiarizationOptions();
-    message.sampleRateHz = object.sampleRateHz ?? undefined;
-    message.channelCount = object.channelCount ?? undefined;
+    message.sampleRate = object.sampleRate ?? undefined;
+    message.channels = object.channels ?? undefined;
     message.encoding = object.encoding ?? undefined;
     message.threshold = object.threshold ?? undefined;
     message.minimumDurationMs = object.minimumDurationMs ?? 0;
     message.mergeGapMs = object.mergeGapMs ?? 0;
+    message.maxSpeakers = object.maxSpeakers ?? undefined;
     return message;
   },
 };

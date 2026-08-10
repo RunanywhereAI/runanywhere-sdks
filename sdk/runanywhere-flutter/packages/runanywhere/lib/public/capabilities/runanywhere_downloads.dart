@@ -75,7 +75,7 @@ class RunAnywhereDownloads {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: 'Model not found: $modelId',
+        error: SDKException.modelNotFound(modelId).error,
       );
       return;
     }
@@ -84,11 +84,17 @@ class RunAnywhereDownloads {
       DownloadPlanRequest(
         modelId: modelId,
         model: model,
-        resumeExisting: true,
+        // `resume_existing` was deleted (idl/download_service.proto):
+        // starting a download IS resuming it, so `DownloadPlanRequest`
+        // carries no separate resume opt-in anymore.
+        //
         // Commons self-heals oversize partials at plan time and verifies
-        // declared checksums during transfer (Swift parity).
+        // declared checksums during transfer whenever the catalog has one
+        // (Swift parity) — `verify_checksums` was renamed/inverted to
+        // `skip_checksum_verification` (opt OUT, default verify), so leaving
+        // it unset here preserves the old "verify when checksum present"
+        // behavior.
         validateExistingBytes: true,
-        verifyChecksums: model.checksumSha256.isNotEmpty,
         allowMeteredNetwork: true,
       ),
     );
@@ -96,9 +102,11 @@ class RunAnywhereDownloads {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: planResult.errorMessage.isNotEmpty
-            ? planResult.errorMessage
-            : 'Download cannot start for model: $modelId',
+        error: planResult.hasError()
+            ? planResult.error
+            : SDKException.internalError(
+                'Download cannot start for model: $modelId',
+              ).error,
       );
       return;
     }
@@ -113,21 +121,27 @@ class RunAnywhereDownloads {
       DownloadStartRequest(
         modelId: modelId,
         plan: planResult,
-        resume: planResult.canResume,
-        // Commons owns the completion registry mutation: the orchestrator's
+        // `resume` was deleted (idl/download_service.proto): starting a
+        // download IS resuming it, no separate opt-in field remains.
+        //
+        // `update_registry_on_completion` was renamed/inverted to
+        // `skip_registry_update` (opt OUT, default update). Commons owns the
+        // completion registry mutation by default: the orchestrator's
         // self-heal calls rac_model_registry_update_download_status, which
         // also persists the durable .rac-manifest.binpb sidecar restored on
-        // the next cold launch.
-        updateRegistryOnCompletion: true,
+        // the next cold launch. Leaving `skipRegistryUpdate` unset (false)
+        // preserves the old "always update" behavior.
       ),
     );
     if (!startResult.accepted) {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: startResult.errorMessage.isNotEmpty
-            ? startResult.errorMessage
-            : 'Download start was rejected for model: $modelId',
+        error: startResult.hasError()
+            ? startResult.error
+            : SDKException.internalError(
+                'Download start was rejected for model: $modelId',
+              ).error,
       );
       return;
     }
@@ -153,17 +167,21 @@ class RunAnywhereDownloads {
       await for (final progress in progressStream) {
         yield progress;
 
-        if (progress.stage == DownloadStage.DOWNLOAD_STAGE_DOWNLOADING) {
+        // `DownloadStage` was deleted outright (idl/download_service.proto):
+        // it duplicated `DownloadState` (both had DOWNLOADING/EXTRACTING/
+        // COMPLETED) with no defined FAILED moment. `state` is the single
+        // phase field now.
+        if (progress.state == DownloadState.DOWNLOAD_STATE_DOWNLOADING) {
           final pct = (progress.stageProgress * 100).toStringAsFixed(1);
           if (progress.bytesDownloaded.toInt() % (1024 * 1024) < 10000) {
             logger.debug('Download progress: $pct%');
           }
-        } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
+        } else if (progress.state == DownloadState.DOWNLOAD_STATE_EXTRACTING) {
           logger.info('Extracting model...');
-        } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
+        } else if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
           logger.info('Download completed for model: $modelId');
-        } else if (progress.errorMessage.isNotEmpty) {
-          logger.error('Download failed: ${progress.errorMessage}');
+        } else if (progress.hasError()) {
+          logger.error('Download failed: ${progress.error.message}');
         }
 
         if (_isTerminalState(progress.state)) {
@@ -223,18 +241,11 @@ class RunAnywhereDownloads {
     return DartBridgeDownload.instance.cancelProto(request);
   }
 
-  Future<DownloadResumeResult> resume(DownloadResumeRequest request) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    final result = await DartBridgeDownload.instance.resumeProto(request);
-    if (result.accepted &&
-        result.modelId.isNotEmpty &&
-        result.taskId.isNotEmpty) {
-      _activeTaskIdsByModel[result.modelId] = result.taskId;
-    }
-    return result;
-  }
+  // `resume(DownloadResumeRequest)` is gone: `DownloadResumeRequest`/`Result`
+  // and `rac_download_resume_proto` are deleted outright (idl/download_
+  // service.proto — starting a download IS resuming it, so there is no
+  // separate resume verb or wire request anymore). Callers resume a partial
+  // download by calling `start(modelId)` again.
 
   Future<DownloadProgress?> pollProgress(
     DownloadSubscribeRequest request,
@@ -251,10 +262,13 @@ class RunAnywhereDownloads {
       throw SDKException.notInitialized();
     }
 
+    // `delete_files` was renamed with an inverted polarity to
+    // `keep_files_on_disk` (idl/storage_types.proto): the old
+    // `deleteFiles: true` (do delete) is the new proto3 zero default
+    // (`keepFilesOnDisk` unset/false), so it is simply omitted here.
     return DartBridgeStorage.instance.deleteProto(
       StorageDeleteRequest(
         modelIds: [modelId],
-        deleteFiles: true,
         clearRegistryPaths: true,
         unloadIfLoaded: true,
         allowPlatformDelete: true,
@@ -267,11 +281,23 @@ class RunAnywhereDownloads {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final metrics = await list();
+    // Read the models through the result-bearing API rather than `list()`:
+    // `list()` reports a failed lookup as an empty list, which would become a
+    // delete request carrying no model ids. Commons no-ops on that and reports
+    // no error, so the caller is told a destructive operation succeeded when
+    // nothing was examined, let alone deleted.
+    final infoResult = await getStorageInfoResult(
+      StorageInfoRequest(includeModels: true),
+    );
+    if (infoResult.hasError()) {
+      return StorageDeleteResult(error: infoResult.error);
+    }
+
+    // `delete_files` was renamed with an inverted polarity to
+    // `keep_files_on_disk` (idl/storage_types.proto) — see [delete].
     return DartBridgeStorage.instance.deleteProto(
       StorageDeleteRequest(
-        modelIds: metrics.map((m) => m.modelId),
-        deleteFiles: true,
+        modelIds: infoResult.info.models.map((m) => m.modelId),
         clearRegistryPaths: true,
         unloadIfLoaded: true,
         allowPlatformDelete: true,
@@ -297,8 +323,7 @@ class RunAnywhereDownloads {
   ]) async {
     if (!DartBridge.isInitialized) {
       return StorageInfoResult(
-        success: false,
-        errorMessage: 'SDK not initialized',
+        error: SDKException.notInitialized().error,
       );
     }
 

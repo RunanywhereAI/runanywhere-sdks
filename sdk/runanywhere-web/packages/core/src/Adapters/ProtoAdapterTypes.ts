@@ -1,4 +1,4 @@
-import type { LoRAState as ProtoLoRAState } from '@runanywhere/proto-ts/lora_options';
+import type { LoraState as ProtoLoRAState } from '@runanywhere/proto-ts/lora_options';
 import { SDKException } from '../Foundation/SDKException.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
@@ -39,18 +39,14 @@ export interface ModalityProtoModule extends ProtoWasmModule {
 
   _rac_stt_component_transcribe_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_stt_component_transcribe_stream_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
   ): number;
@@ -65,6 +61,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_stt_state_lifecycle_proto?(outResult: number): number;
 
   _rac_tts_component_list_voices_proto?(
     handle: number,
@@ -99,6 +96,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
   ): number;
   _rac_tts_stop_lifecycle_proto?(outResult: number): number;
   _rac_tts_list_voices_lifecycle_proto?(outResult: number): number;
+  _rac_tts_state_lifecycle_proto?(outResult: number): number;
 
   _rac_vad_component_configure_proto?(
     handle: number,
@@ -107,10 +105,8 @@ export interface ModalityProtoModule extends ProtoWasmModule {
   ): number;
   _rac_vad_component_process_proto?(
     handle: number,
-    samples: number,
-    numSamples: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_vad_component_get_statistics_proto?(
@@ -276,6 +272,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     querySize: number,
     outResult: number,
   ): number;
+  _rac_rag_search_proto?(
+    session: number,
+    requestBytes: number,
+    requestSize: number,
+    outResponse: number,
+  ): number;
   _rac_rag_query_stream_proto?(
     session: number,
     queryBytes: number,
@@ -439,8 +441,6 @@ export function modalityModuleFor(
 export function emptyLoRAState(): ProtoLoRAState {
   return {
     loadedAdapters: [],
-    hasActiveAdapters: false,
-    errorCode: 0,
   };
 }
 

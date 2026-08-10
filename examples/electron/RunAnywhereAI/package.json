@@ -1,6 +1,16 @@
 {
-  "name": "runanywhere-electron-demo",
-  "version": "1.0.0",
-  "description": "RunAnywhere Electron SDK demo app (Chat, Structured, Tools, Vision, Embeddings, Voice).",
-  "main": "main.js"
+  "name": "runanywhere-ai-desktop",
+  "productName": "RunAnywhere AI",
+  "version": "0.1.0",
+  "description": "Private, on-device AI for Windows \u2014 chat, reasoning, your own knowledge base, voice, and vision. Nothing leaves your machine.",
+  "author": "RunAnywhere",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:gpu": "electron . --gpu",
+    "icon": "electron assets/make-icon.js",
+    "test": "node --test \"test/unit/**/*.test.js\""
+  }
 }

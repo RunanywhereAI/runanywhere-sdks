@@ -5,183 +5,14 @@
 //   protoc               v7.35.1
 // source: stt_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STTLanguageDetectionResult = exports.STTServiceState = exports.STTStreamEvent = exports.STTPartialResult = exports.STTOutput = exports.TranscriptionMetadata = exports.TranscriptionAlternative = exports.WordTimestamp = exports.STTTranscriptionRequest_MetadataEntry = exports.STTTranscriptionRequest = exports.STTAudioSource = exports.STTOptions = exports.STTConfiguration = exports.STTStreamEventKind = exports.STTAudioEncoding = exports.STTLanguage = exports.protobufPackage = void 0;
-exports.sTTLanguageFromJSON = sTTLanguageFromJSON;
-exports.sTTLanguageToJSON = sTTLanguageToJSON;
-exports.sTTAudioEncodingFromJSON = sTTAudioEncodingFromJSON;
-exports.sTTAudioEncodingToJSON = sTTAudioEncodingToJSON;
+exports.STTServiceState = exports.STTStreamEvent = exports.STTPartialResult = exports.STTOutput = exports.TranscriptionMetadata = exports.TranscriptionAlternative = exports.WordTimestamp = exports.STTTranscriptionRequest_MetadataEntry = exports.STTTranscriptionRequest = exports.STTAudioSource = exports.STTOptions = exports.STTConfiguration = exports.STTStreamEventKind = exports.protobufPackage = void 0;
 exports.sTTStreamEventKindFromJSON = sTTStreamEventKindFromJSON;
 exports.sTTStreamEventKindToJSON = sTTStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * STT language hint. Sources pre-IDL:
- *   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
- *   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
- *   Dart   STTOptions language nullable; auto-detect when null
- *   RN     STTOptions.language?: string (free-form)
- *   Web    STTTranscribeOptions.language?: string (free-form)
- *   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
- * Free-form BCP-47 strings are collapsed to base language codes here.
- * AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
- * back to the backend default (typically "en").
- * ---------------------------------------------------------------------------
- * `rac_wire_string` annotations expose the BCP-47 base code for each value via
- * the codegen-generated `wireString` accessor (see idl/rac_options.proto and
- * idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
- * from this annotation; the unspecified case falls back to "" by default.
- */
-var STTLanguage;
-(function (STTLanguage) {
-    STTLanguage[STTLanguage["STT_LANGUAGE_UNSPECIFIED"] = 0] = "STT_LANGUAGE_UNSPECIFIED";
-    /** STT_LANGUAGE_AUTO - Auto-detect from audio */
-    STTLanguage[STTLanguage["STT_LANGUAGE_AUTO"] = 1] = "STT_LANGUAGE_AUTO";
-    STTLanguage[STTLanguage["STT_LANGUAGE_EN"] = 2] = "STT_LANGUAGE_EN";
-    STTLanguage[STTLanguage["STT_LANGUAGE_ES"] = 3] = "STT_LANGUAGE_ES";
-    STTLanguage[STTLanguage["STT_LANGUAGE_FR"] = 4] = "STT_LANGUAGE_FR";
-    STTLanguage[STTLanguage["STT_LANGUAGE_DE"] = 5] = "STT_LANGUAGE_DE";
-    STTLanguage[STTLanguage["STT_LANGUAGE_ZH"] = 6] = "STT_LANGUAGE_ZH";
-    STTLanguage[STTLanguage["STT_LANGUAGE_JA"] = 7] = "STT_LANGUAGE_JA";
-    STTLanguage[STTLanguage["STT_LANGUAGE_KO"] = 8] = "STT_LANGUAGE_KO";
-    STTLanguage[STTLanguage["STT_LANGUAGE_IT"] = 9] = "STT_LANGUAGE_IT";
-    STTLanguage[STTLanguage["STT_LANGUAGE_PT"] = 10] = "STT_LANGUAGE_PT";
-    STTLanguage[STTLanguage["STT_LANGUAGE_AR"] = 11] = "STT_LANGUAGE_AR";
-    STTLanguage[STTLanguage["STT_LANGUAGE_RU"] = 12] = "STT_LANGUAGE_RU";
-    STTLanguage[STTLanguage["STT_LANGUAGE_HI"] = 13] = "STT_LANGUAGE_HI";
-    STTLanguage[STTLanguage["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(STTLanguage || (exports.STTLanguage = STTLanguage = {}));
-function sTTLanguageFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "STT_LANGUAGE_UNSPECIFIED":
-            return STTLanguage.STT_LANGUAGE_UNSPECIFIED;
-        case 1:
-        case "STT_LANGUAGE_AUTO":
-            return STTLanguage.STT_LANGUAGE_AUTO;
-        case 2:
-        case "STT_LANGUAGE_EN":
-            return STTLanguage.STT_LANGUAGE_EN;
-        case 3:
-        case "STT_LANGUAGE_ES":
-            return STTLanguage.STT_LANGUAGE_ES;
-        case 4:
-        case "STT_LANGUAGE_FR":
-            return STTLanguage.STT_LANGUAGE_FR;
-        case 5:
-        case "STT_LANGUAGE_DE":
-            return STTLanguage.STT_LANGUAGE_DE;
-        case 6:
-        case "STT_LANGUAGE_ZH":
-            return STTLanguage.STT_LANGUAGE_ZH;
-        case 7:
-        case "STT_LANGUAGE_JA":
-            return STTLanguage.STT_LANGUAGE_JA;
-        case 8:
-        case "STT_LANGUAGE_KO":
-            return STTLanguage.STT_LANGUAGE_KO;
-        case 9:
-        case "STT_LANGUAGE_IT":
-            return STTLanguage.STT_LANGUAGE_IT;
-        case 10:
-        case "STT_LANGUAGE_PT":
-            return STTLanguage.STT_LANGUAGE_PT;
-        case 11:
-        case "STT_LANGUAGE_AR":
-            return STTLanguage.STT_LANGUAGE_AR;
-        case 12:
-        case "STT_LANGUAGE_RU":
-            return STTLanguage.STT_LANGUAGE_RU;
-        case 13:
-        case "STT_LANGUAGE_HI":
-            return STTLanguage.STT_LANGUAGE_HI;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return STTLanguage.UNRECOGNIZED;
-    }
-}
-function sTTLanguageToJSON(object) {
-    switch (object) {
-        case STTLanguage.STT_LANGUAGE_UNSPECIFIED:
-            return "STT_LANGUAGE_UNSPECIFIED";
-        case STTLanguage.STT_LANGUAGE_AUTO:
-            return "STT_LANGUAGE_AUTO";
-        case STTLanguage.STT_LANGUAGE_EN:
-            return "STT_LANGUAGE_EN";
-        case STTLanguage.STT_LANGUAGE_ES:
-            return "STT_LANGUAGE_ES";
-        case STTLanguage.STT_LANGUAGE_FR:
-            return "STT_LANGUAGE_FR";
-        case STTLanguage.STT_LANGUAGE_DE:
-            return "STT_LANGUAGE_DE";
-        case STTLanguage.STT_LANGUAGE_ZH:
-            return "STT_LANGUAGE_ZH";
-        case STTLanguage.STT_LANGUAGE_JA:
-            return "STT_LANGUAGE_JA";
-        case STTLanguage.STT_LANGUAGE_KO:
-            return "STT_LANGUAGE_KO";
-        case STTLanguage.STT_LANGUAGE_IT:
-            return "STT_LANGUAGE_IT";
-        case STTLanguage.STT_LANGUAGE_PT:
-            return "STT_LANGUAGE_PT";
-        case STTLanguage.STT_LANGUAGE_AR:
-            return "STT_LANGUAGE_AR";
-        case STTLanguage.STT_LANGUAGE_RU:
-            return "STT_LANGUAGE_RU";
-        case STTLanguage.STT_LANGUAGE_HI:
-            return "STT_LANGUAGE_HI";
-        case STTLanguage.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var STTAudioEncoding;
-(function (STTAudioEncoding) {
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "STT_AUDIO_ENCODING_UNSPECIFIED";
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_S16_LE"] = 1] = "STT_AUDIO_ENCODING_PCM_S16_LE";
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_F32_LE"] = 2] = "STT_AUDIO_ENCODING_PCM_F32_LE";
-    /** STT_AUDIO_ENCODING_CONTAINER - WAV/MP3/FLAC/etc.; see AudioFormat. */
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_CONTAINER"] = 3] = "STT_AUDIO_ENCODING_CONTAINER";
-    STTAudioEncoding[STTAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(STTAudioEncoding || (exports.STTAudioEncoding = STTAudioEncoding = {}));
-function sTTAudioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "STT_AUDIO_ENCODING_UNSPECIFIED":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "STT_AUDIO_ENCODING_PCM_S16_LE":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
-        case 2:
-        case "STT_AUDIO_ENCODING_PCM_F32_LE":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE;
-        case 3:
-        case "STT_AUDIO_ENCODING_CONTAINER":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return STTAudioEncoding.UNRECOGNIZED;
-    }
-}
-function sTTAudioEncodingToJSON(object) {
-    switch (object) {
-        case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
-            return "STT_AUDIO_ENCODING_UNSPECIFIED";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
-            return "STT_AUDIO_ENCODING_PCM_S16_LE";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
-            return "STT_AUDIO_ENCODING_PCM_F32_LE";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
-            return "STT_AUDIO_ENCODING_CONTAINER";
-        case STTAudioEncoding.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var STTStreamEventKind;
 (function (STTStreamEventKind) {
     STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "STT_STREAM_EVENT_KIND_UNSPECIFIED";
@@ -240,17 +71,14 @@ function sTTStreamEventKindToJSON(object) {
 function createBaseSTTConfiguration() {
     return {
         modelId: "",
-        language: 0,
+        language: undefined,
         sampleRate: 0,
         enableVad: false,
         audioFormat: 0,
         enablePunctuation: false,
         enableDiarization: false,
-        vocabularyList: [],
-        maxAlternatives: 0,
         enableWordTimestamps: false,
         preferredFramework: undefined,
-        languageCode: undefined,
     };
 }
 exports.STTConfiguration = {
@@ -258,8 +86,8 @@ exports.STTConfiguration = {
         if (message.modelId !== "") {
             writer.uint32(10).string(message.modelId);
         }
-        if (message.language !== 0) {
-            writer.uint32(16).int32(message.language);
+        if (message.language !== undefined) {
+            writer.uint32(106).string(message.language);
         }
         if (message.sampleRate !== 0) {
             writer.uint32(24).int32(message.sampleRate);
@@ -276,20 +104,11 @@ exports.STTConfiguration = {
         if (message.enableDiarization !== false) {
             writer.uint32(56).bool(message.enableDiarization);
         }
-        for (const v of message.vocabularyList) {
-            writer.uint32(66).string(v);
-        }
-        if (message.maxAlternatives !== 0) {
-            writer.uint32(72).int32(message.maxAlternatives);
-        }
         if (message.enableWordTimestamps !== false) {
             writer.uint32(80).bool(message.enableWordTimestamps);
         }
         if (message.preferredFramework !== undefined) {
             writer.uint32(88).int32(message.preferredFramework);
-        }
-        if (message.languageCode !== undefined) {
-            writer.uint32(98).string(message.languageCode);
         }
         return writer;
     },
@@ -307,11 +126,11 @@ exports.STTConfiguration = {
                     message.modelId = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
+                case 13: {
+                    if (tag !== 106) {
                         break;
                     }
-                    message.language = reader.int32();
+                    message.language = reader.string();
                     continue;
                 }
                 case 3: {
@@ -349,20 +168,6 @@ exports.STTConfiguration = {
                     message.enableDiarization = reader.bool();
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.vocabularyList.push(reader.string());
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.maxAlternatives = reader.int32();
-                    continue;
-                }
                 case 10: {
                     if (tag !== 80) {
                         break;
@@ -375,13 +180,6 @@ exports.STTConfiguration = {
                         break;
                     }
                     message.preferredFramework = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
                     continue;
                 }
             }
@@ -399,7 +197,7 @@ exports.STTConfiguration = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
                 : isSet(object.sample_rate)
@@ -425,16 +223,6 @@ exports.STTConfiguration = {
                 : isSet(object.enable_diarization)
                     ? globalThis.Boolean(object.enable_diarization)
                     : false,
-            vocabularyList: globalThis.Array.isArray(object?.vocabularyList)
-                ? object.vocabularyList.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.vocabulary_list)
-                    ? object.vocabulary_list.map((e) => globalThis.String(e))
-                    : [],
-            maxAlternatives: isSet(object.maxAlternatives)
-                ? globalThis.Number(object.maxAlternatives)
-                : isSet(object.max_alternatives)
-                    ? globalThis.Number(object.max_alternatives)
-                    : 0,
             enableWordTimestamps: isSet(object.enableWordTimestamps)
                 ? globalThis.Boolean(object.enableWordTimestamps)
                 : isSet(object.enable_word_timestamps)
@@ -445,11 +233,6 @@ exports.STTConfiguration = {
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
                     : undefined,
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -457,8 +240,8 @@ exports.STTConfiguration = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.language !== 0) {
-            obj.language = sTTLanguageToJSON(message.language);
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         if (message.sampleRate !== 0) {
             obj.sampleRate = Math.round(message.sampleRate);
@@ -475,20 +258,11 @@ exports.STTConfiguration = {
         if (message.enableDiarization !== false) {
             obj.enableDiarization = message.enableDiarization;
         }
-        if (message.vocabularyList?.length) {
-            obj.vocabularyList = message.vocabularyList;
-        }
-        if (message.maxAlternatives !== 0) {
-            obj.maxAlternatives = Math.round(message.maxAlternatives);
-        }
         if (message.enableWordTimestamps !== false) {
             obj.enableWordTimestamps = message.enableWordTimestamps;
         }
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
-        }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
         }
         return obj;
     },
@@ -498,89 +272,46 @@ exports.STTConfiguration = {
     fromPartial(object) {
         const message = createBaseSTTConfiguration();
         message.modelId = object.modelId ?? "";
-        message.language = object.language ?? 0;
+        message.language = object.language ?? undefined;
         message.sampleRate = object.sampleRate ?? 0;
         message.enableVad = object.enableVad ?? false;
         message.audioFormat = object.audioFormat ?? 0;
         message.enablePunctuation = object.enablePunctuation ?? false;
         message.enableDiarization = object.enableDiarization ?? false;
-        message.vocabularyList = object.vocabularyList?.map((e) => e) || [];
-        message.maxAlternatives = object.maxAlternatives ?? 0;
         message.enableWordTimestamps = object.enableWordTimestamps ?? false;
         message.preferredFramework = object.preferredFramework ?? undefined;
-        message.languageCode = object.languageCode ?? undefined;
         return message;
     },
 };
 function createBaseSTTOptions() {
     return {
-        language: 0,
+        language: undefined,
         enablePunctuation: false,
-        enableDiarization: false,
-        maxSpeakers: 0,
-        vocabularyList: [],
+        diarize: false,
+        speakersExpected: undefined,
         enableWordTimestamps: false,
-        beamSize: 0,
-        languageCode: undefined,
-        detectLanguage: false,
-        audioFormat: 0,
-        sampleRate: 0,
-        maxAlternatives: 0,
-        chunkDurationMs: 0,
-        endpointSilenceMs: 0,
-        suppressBlank: false,
-        translateToEnglish: false,
+        silenceDurationMs: 0,
     };
 }
 exports.STTOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.language !== 0) {
-            writer.uint32(8).int32(message.language);
+        if (message.language !== undefined) {
+            writer.uint32(138).string(message.language);
         }
         if (message.enablePunctuation !== false) {
             writer.uint32(16).bool(message.enablePunctuation);
         }
-        if (message.enableDiarization !== false) {
-            writer.uint32(24).bool(message.enableDiarization);
+        if (message.diarize !== false) {
+            writer.uint32(24).bool(message.diarize);
         }
-        if (message.maxSpeakers !== 0) {
-            writer.uint32(32).int32(message.maxSpeakers);
-        }
-        for (const v of message.vocabularyList) {
-            writer.uint32(42).string(v);
+        if (message.speakersExpected !== undefined) {
+            writer.uint32(32).int32(message.speakersExpected);
         }
         if (message.enableWordTimestamps !== false) {
             writer.uint32(48).bool(message.enableWordTimestamps);
         }
-        if (message.beamSize !== 0) {
-            writer.uint32(56).int32(message.beamSize);
-        }
-        if (message.languageCode !== undefined) {
-            writer.uint32(66).string(message.languageCode);
-        }
-        if (message.detectLanguage !== false) {
-            writer.uint32(72).bool(message.detectLanguage);
-        }
-        if (message.audioFormat !== 0) {
-            writer.uint32(80).int32(message.audioFormat);
-        }
-        if (message.sampleRate !== 0) {
-            writer.uint32(88).int32(message.sampleRate);
-        }
-        if (message.maxAlternatives !== 0) {
-            writer.uint32(96).int32(message.maxAlternatives);
-        }
-        if (message.chunkDurationMs !== 0) {
-            writer.uint32(104).int32(message.chunkDurationMs);
-        }
-        if (message.endpointSilenceMs !== 0) {
-            writer.uint32(112).int32(message.endpointSilenceMs);
-        }
-        if (message.suppressBlank !== false) {
-            writer.uint32(120).bool(message.suppressBlank);
-        }
-        if (message.translateToEnglish !== false) {
-            writer.uint32(128).bool(message.translateToEnglish);
+        if (message.silenceDurationMs !== 0) {
+            writer.uint32(112).int32(message.silenceDurationMs);
         }
         return writer;
     },
@@ -591,11 +322,11 @@ exports.STTOptions = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
+                case 17: {
+                    if (tag !== 138) {
                         break;
                     }
-                    message.language = reader.int32();
+                    message.language = reader.string();
                     continue;
                 }
                 case 2: {
@@ -609,21 +340,14 @@ exports.STTOptions = {
                     if (tag !== 24) {
                         break;
                     }
-                    message.enableDiarization = reader.bool();
+                    message.diarize = reader.bool();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.maxSpeakers = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.vocabularyList.push(reader.string());
+                    message.speakersExpected = reader.int32();
                     continue;
                 }
                 case 6: {
@@ -633,74 +357,11 @@ exports.STTOptions = {
                     message.enableWordTimestamps = reader.bool();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.beamSize = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.detectLanguage = reader.bool();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.audioFormat = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.sampleRate = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.maxAlternatives = reader.int32();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.chunkDurationMs = reader.int32();
-                    continue;
-                }
                 case 14: {
                     if (tag !== 112) {
                         break;
                     }
-                    message.endpointSilenceMs = reader.int32();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.suppressBlank = reader.bool();
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 128) {
-                        break;
-                    }
-                    message.translateToEnglish = reader.bool();
+                    message.silenceDurationMs = reader.int32();
                     continue;
                 }
             }
@@ -713,133 +374,49 @@ exports.STTOptions = {
     },
     fromJSON(object) {
         return {
-            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
             enablePunctuation: isSet(object.enablePunctuation)
                 ? globalThis.Boolean(object.enablePunctuation)
                 : isSet(object.enable_punctuation)
                     ? globalThis.Boolean(object.enable_punctuation)
                     : false,
-            enableDiarization: isSet(object.enableDiarization)
-                ? globalThis.Boolean(object.enableDiarization)
-                : isSet(object.enable_diarization)
-                    ? globalThis.Boolean(object.enable_diarization)
-                    : false,
-            maxSpeakers: isSet(object.maxSpeakers)
-                ? globalThis.Number(object.maxSpeakers)
-                : isSet(object.max_speakers)
-                    ? globalThis.Number(object.max_speakers)
-                    : 0,
-            vocabularyList: globalThis.Array.isArray(object?.vocabularyList)
-                ? object.vocabularyList.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.vocabulary_list)
-                    ? object.vocabulary_list.map((e) => globalThis.String(e))
-                    : [],
+            diarize: isSet(object.diarize) ? globalThis.Boolean(object.diarize) : false,
+            speakersExpected: isSet(object.speakersExpected)
+                ? globalThis.Number(object.speakersExpected)
+                : isSet(object.speakers_expected)
+                    ? globalThis.Number(object.speakers_expected)
+                    : undefined,
             enableWordTimestamps: isSet(object.enableWordTimestamps)
                 ? globalThis.Boolean(object.enableWordTimestamps)
                 : isSet(object.enable_word_timestamps)
                     ? globalThis.Boolean(object.enable_word_timestamps)
                     : false,
-            beamSize: isSet(object.beamSize)
-                ? globalThis.Number(object.beamSize)
-                : isSet(object.beam_size)
-                    ? globalThis.Number(object.beam_size)
+            silenceDurationMs: isSet(object.silenceDurationMs)
+                ? globalThis.Number(object.silenceDurationMs)
+                : isSet(object.silence_duration_ms)
+                    ? globalThis.Number(object.silence_duration_ms)
                     : 0,
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
-            detectLanguage: isSet(object.detectLanguage)
-                ? globalThis.Boolean(object.detectLanguage)
-                : isSet(object.detect_language)
-                    ? globalThis.Boolean(object.detect_language)
-                    : false,
-            audioFormat: isSet(object.audioFormat)
-                ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
-                : isSet(object.audio_format)
-                    ? (0, model_types_1.audioFormatFromJSON)(object.audio_format)
-                    : 0,
-            sampleRate: isSet(object.sampleRate)
-                ? globalThis.Number(object.sampleRate)
-                : isSet(object.sample_rate)
-                    ? globalThis.Number(object.sample_rate)
-                    : 0,
-            maxAlternatives: isSet(object.maxAlternatives)
-                ? globalThis.Number(object.maxAlternatives)
-                : isSet(object.max_alternatives)
-                    ? globalThis.Number(object.max_alternatives)
-                    : 0,
-            chunkDurationMs: isSet(object.chunkDurationMs)
-                ? globalThis.Number(object.chunkDurationMs)
-                : isSet(object.chunk_duration_ms)
-                    ? globalThis.Number(object.chunk_duration_ms)
-                    : 0,
-            endpointSilenceMs: isSet(object.endpointSilenceMs)
-                ? globalThis.Number(object.endpointSilenceMs)
-                : isSet(object.endpoint_silence_ms)
-                    ? globalThis.Number(object.endpoint_silence_ms)
-                    : 0,
-            suppressBlank: isSet(object.suppressBlank)
-                ? globalThis.Boolean(object.suppressBlank)
-                : isSet(object.suppress_blank)
-                    ? globalThis.Boolean(object.suppress_blank)
-                    : false,
-            translateToEnglish: isSet(object.translateToEnglish)
-                ? globalThis.Boolean(object.translateToEnglish)
-                : isSet(object.translate_to_english)
-                    ? globalThis.Boolean(object.translate_to_english)
-                    : false,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.language !== 0) {
-            obj.language = sTTLanguageToJSON(message.language);
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         if (message.enablePunctuation !== false) {
             obj.enablePunctuation = message.enablePunctuation;
         }
-        if (message.enableDiarization !== false) {
-            obj.enableDiarization = message.enableDiarization;
+        if (message.diarize !== false) {
+            obj.diarize = message.diarize;
         }
-        if (message.maxSpeakers !== 0) {
-            obj.maxSpeakers = Math.round(message.maxSpeakers);
-        }
-        if (message.vocabularyList?.length) {
-            obj.vocabularyList = message.vocabularyList;
+        if (message.speakersExpected !== undefined) {
+            obj.speakersExpected = Math.round(message.speakersExpected);
         }
         if (message.enableWordTimestamps !== false) {
             obj.enableWordTimestamps = message.enableWordTimestamps;
         }
-        if (message.beamSize !== 0) {
-            obj.beamSize = Math.round(message.beamSize);
-        }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
-        }
-        if (message.detectLanguage !== false) {
-            obj.detectLanguage = message.detectLanguage;
-        }
-        if (message.audioFormat !== 0) {
-            obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
-        }
-        if (message.sampleRate !== 0) {
-            obj.sampleRate = Math.round(message.sampleRate);
-        }
-        if (message.maxAlternatives !== 0) {
-            obj.maxAlternatives = Math.round(message.maxAlternatives);
-        }
-        if (message.chunkDurationMs !== 0) {
-            obj.chunkDurationMs = Math.round(message.chunkDurationMs);
-        }
-        if (message.endpointSilenceMs !== 0) {
-            obj.endpointSilenceMs = Math.round(message.endpointSilenceMs);
-        }
-        if (message.suppressBlank !== false) {
-            obj.suppressBlank = message.suppressBlank;
-        }
-        if (message.translateToEnglish !== false) {
-            obj.translateToEnglish = message.translateToEnglish;
+        if (message.silenceDurationMs !== 0) {
+            obj.silenceDurationMs = Math.round(message.silenceDurationMs);
         }
         return obj;
     },
@@ -848,22 +425,12 @@ exports.STTOptions = {
     },
     fromPartial(object) {
         const message = createBaseSTTOptions();
-        message.language = object.language ?? 0;
+        message.language = object.language ?? undefined;
         message.enablePunctuation = object.enablePunctuation ?? false;
-        message.enableDiarization = object.enableDiarization ?? false;
-        message.maxSpeakers = object.maxSpeakers ?? 0;
-        message.vocabularyList = object.vocabularyList?.map((e) => e) || [];
+        message.diarize = object.diarize ?? false;
+        message.speakersExpected = object.speakersExpected ?? undefined;
         message.enableWordTimestamps = object.enableWordTimestamps ?? false;
-        message.beamSize = object.beamSize ?? 0;
-        message.languageCode = object.languageCode ?? undefined;
-        message.detectLanguage = object.detectLanguage ?? false;
-        message.audioFormat = object.audioFormat ?? 0;
-        message.sampleRate = object.sampleRate ?? 0;
-        message.maxAlternatives = object.maxAlternatives ?? 0;
-        message.chunkDurationMs = object.chunkDurationMs ?? 0;
-        message.endpointSilenceMs = object.endpointSilenceMs ?? 0;
-        message.suppressBlank = object.suppressBlank ?? false;
-        message.translateToEnglish = object.translateToEnglish ?? false;
+        message.silenceDurationMs = object.silenceDurationMs ?? 0;
         return message;
     },
 };
@@ -871,12 +438,10 @@ function createBaseSTTAudioSource() {
     return {
         audioData: undefined,
         fileUri: undefined,
-        adapterHandle: undefined,
         encoding: 0,
         audioFormat: 0,
         sampleRate: 0,
         channels: 0,
-        bitsPerSample: 0,
         durationMs: 0,
     };
 }
@@ -887,9 +452,6 @@ exports.STTAudioSource = {
         }
         if (message.fileUri !== undefined) {
             writer.uint32(18).string(message.fileUri);
-        }
-        if (message.adapterHandle !== undefined) {
-            writer.uint32(26).string(message.adapterHandle);
         }
         if (message.encoding !== 0) {
             writer.uint32(32).int32(message.encoding);
@@ -902,9 +464,6 @@ exports.STTAudioSource = {
         }
         if (message.channels !== 0) {
             writer.uint32(56).int32(message.channels);
-        }
-        if (message.bitsPerSample !== 0) {
-            writer.uint32(64).int32(message.bitsPerSample);
         }
         if (message.durationMs !== 0) {
             writer.uint32(72).int64(message.durationMs);
@@ -930,13 +489,6 @@ exports.STTAudioSource = {
                         break;
                     }
                     message.fileUri = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.adapterHandle = reader.string();
                     continue;
                 }
                 case 4: {
@@ -967,13 +519,6 @@ exports.STTAudioSource = {
                     message.channels = reader.int32();
                     continue;
                 }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.bitsPerSample = reader.int32();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 72) {
                         break;
@@ -1001,12 +546,7 @@ exports.STTAudioSource = {
                 : isSet(object.file_uri)
                     ? globalThis.String(object.file_uri)
                     : undefined,
-            adapterHandle: isSet(object.adapterHandle)
-                ? globalThis.String(object.adapterHandle)
-                : isSet(object.adapter_handle)
-                    ? globalThis.String(object.adapter_handle)
-                    : undefined,
-            encoding: isSet(object.encoding) ? sTTAudioEncodingFromJSON(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             audioFormat: isSet(object.audioFormat)
                 ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
                 : isSet(object.audio_format)
@@ -1018,11 +558,6 @@ exports.STTAudioSource = {
                     ? globalThis.Number(object.sample_rate)
                     : 0,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            bitsPerSample: isSet(object.bitsPerSample)
-                ? globalThis.Number(object.bitsPerSample)
-                : isSet(object.bits_per_sample)
-                    ? globalThis.Number(object.bits_per_sample)
-                    : 0,
             durationMs: isSet(object.durationMs)
                 ? globalThis.Number(object.durationMs)
                 : isSet(object.duration_ms)
@@ -1038,11 +573,8 @@ exports.STTAudioSource = {
         if (message.fileUri !== undefined) {
             obj.fileUri = message.fileUri;
         }
-        if (message.adapterHandle !== undefined) {
-            obj.adapterHandle = message.adapterHandle;
-        }
         if (message.encoding !== 0) {
-            obj.encoding = sTTAudioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.audioFormat !== 0) {
             obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
@@ -1052,9 +584,6 @@ exports.STTAudioSource = {
         }
         if (message.channels !== 0) {
             obj.channels = Math.round(message.channels);
-        }
-        if (message.bitsPerSample !== 0) {
-            obj.bitsPerSample = Math.round(message.bitsPerSample);
         }
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
@@ -1068,12 +597,10 @@ exports.STTAudioSource = {
         const message = createBaseSTTAudioSource();
         message.audioData = object.audioData ?? undefined;
         message.fileUri = object.fileUri ?? undefined;
-        message.adapterHandle = object.adapterHandle ?? undefined;
         message.encoding = object.encoding ?? 0;
         message.audioFormat = object.audioFormat ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.channels = object.channels ?? 0;
-        message.bitsPerSample = object.bitsPerSample ?? 0;
         message.durationMs = object.durationMs ?? 0;
         return message;
     },
@@ -1480,7 +1007,7 @@ exports.TranscriptionAlternative = {
     },
 };
 function createBaseTranscriptionMetadata() {
-    return { modelId: "", processingTimeMs: 0, audioLengthMs: 0, realTimeFactor: 0 };
+    return { modelId: "", processingTimeMs: 0 };
 }
 exports.TranscriptionMetadata = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1489,12 +1016,6 @@ exports.TranscriptionMetadata = {
         }
         if (message.processingTimeMs !== 0) {
             writer.uint32(16).int64(message.processingTimeMs);
-        }
-        if (message.audioLengthMs !== 0) {
-            writer.uint32(24).int64(message.audioLengthMs);
-        }
-        if (message.realTimeFactor !== 0) {
-            writer.uint32(37).float(message.realTimeFactor);
         }
         return writer;
     },
@@ -1519,20 +1040,6 @@ exports.TranscriptionMetadata = {
                     message.processingTimeMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.audioLengthMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.realTimeFactor = reader.float();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1553,16 +1060,6 @@ exports.TranscriptionMetadata = {
                 : isSet(object.processing_time_ms)
                     ? globalThis.Number(object.processing_time_ms)
                     : 0,
-            audioLengthMs: isSet(object.audioLengthMs)
-                ? globalThis.Number(object.audioLengthMs)
-                : isSet(object.audio_length_ms)
-                    ? globalThis.Number(object.audio_length_ms)
-                    : 0,
-            realTimeFactor: isSet(object.realTimeFactor)
-                ? globalThis.Number(object.realTimeFactor)
-                : isSet(object.real_time_factor)
-                    ? globalThis.Number(object.real_time_factor)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -1573,12 +1070,6 @@ exports.TranscriptionMetadata = {
         if (message.processingTimeMs !== 0) {
             obj.processingTimeMs = Math.round(message.processingTimeMs);
         }
-        if (message.audioLengthMs !== 0) {
-            obj.audioLengthMs = Math.round(message.audioLengthMs);
-        }
-        if (message.realTimeFactor !== 0) {
-            obj.realTimeFactor = message.realTimeFactor;
-        }
         return obj;
     },
     create(base) {
@@ -1588,26 +1079,21 @@ exports.TranscriptionMetadata = {
         const message = createBaseTranscriptionMetadata();
         message.modelId = object.modelId ?? "";
         message.processingTimeMs = object.processingTimeMs ?? 0;
-        message.audioLengthMs = object.audioLengthMs ?? 0;
-        message.realTimeFactor = object.realTimeFactor ?? 0;
         return message;
     },
 };
 function createBaseSTTOutput() {
     return {
         text: "",
-        language: 0,
         confidence: 0,
+        language: undefined,
         words: [],
         alternatives: [],
         metadata: undefined,
-        languageCode: undefined,
         timestampMs: 0,
         durationMs: 0,
-        speakerIds: [],
-        errorMessage: undefined,
-        errorCode: 0,
         segmentIndex: 0,
+        error: undefined,
     };
 }
 exports.STTOutput = {
@@ -1615,11 +1101,11 @@ exports.STTOutput = {
         if (message.text !== "") {
             writer.uint32(10).string(message.text);
         }
-        if (message.language !== 0) {
-            writer.uint32(16).int32(message.language);
-        }
         if (message.confidence !== 0) {
             writer.uint32(29).float(message.confidence);
+        }
+        if (message.language !== undefined) {
+            writer.uint32(114).string(message.language);
         }
         for (const v of message.words) {
             exports.WordTimestamp.encode(v, writer.uint32(34).fork()).join();
@@ -1630,26 +1116,17 @@ exports.STTOutput = {
         if (message.metadata !== undefined) {
             exports.TranscriptionMetadata.encode(message.metadata, writer.uint32(50).fork()).join();
         }
-        if (message.languageCode !== undefined) {
-            writer.uint32(58).string(message.languageCode);
-        }
         if (message.timestampMs !== 0) {
             writer.uint32(64).int64(message.timestampMs);
         }
         if (message.durationMs !== 0) {
             writer.uint32(72).int64(message.durationMs);
         }
-        for (const v of message.speakerIds) {
-            writer.uint32(82).string(v);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(90).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(96).int32(message.errorCode);
-        }
         if (message.segmentIndex !== 0) {
             writer.uint32(104).int32(message.segmentIndex);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(122).fork()).join();
         }
         return writer;
     },
@@ -1667,18 +1144,18 @@ exports.STTOutput = {
                     message.text = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.language = reader.int32();
-                    continue;
-                }
                 case 3: {
                     if (tag !== 29) {
                         break;
                     }
                     message.confidence = reader.float();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.language = reader.string();
                     continue;
                 }
                 case 4: {
@@ -1702,13 +1179,6 @@ exports.STTOutput = {
                     message.metadata = exports.TranscriptionMetadata.decode(reader, reader.uint32());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 64) {
                         break;
@@ -1723,32 +1193,18 @@ exports.STTOutput = {
                     message.durationMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.speakerIds.push(reader.string());
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
                 case 13: {
                     if (tag !== 104) {
                         break;
                     }
                     message.segmentIndex = reader.int32();
+                    continue;
+                }
+                case 15: {
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1762,18 +1218,13 @@ exports.STTOutput = {
     fromJSON(object) {
         return {
             text: isSet(object.text) ? globalThis.String(object.text) : "",
-            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
             confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
             words: globalThis.Array.isArray(object?.words) ? object.words.map((e) => exports.WordTimestamp.fromJSON(e)) : [],
             alternatives: globalThis.Array.isArray(object?.alternatives)
                 ? object.alternatives.map((e) => exports.TranscriptionAlternative.fromJSON(e))
                 : [],
             metadata: isSet(object.metadata) ? exports.TranscriptionMetadata.fromJSON(object.metadata) : undefined,
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
             timestampMs: isSet(object.timestampMs)
                 ? globalThis.Number(object.timestampMs)
                 : isSet(object.timestamp_ms)
@@ -1784,26 +1235,12 @@ exports.STTOutput = {
                 : isSet(object.duration_ms)
                     ? globalThis.Number(object.duration_ms)
                     : 0,
-            speakerIds: globalThis.Array.isArray(object?.speakerIds)
-                ? object.speakerIds.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.speaker_ids)
-                    ? object.speaker_ids.map((e) => globalThis.String(e))
-                    : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             segmentIndex: isSet(object.segmentIndex)
                 ? globalThis.Number(object.segmentIndex)
                 : isSet(object.segment_index)
                     ? globalThis.Number(object.segment_index)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1811,11 +1248,11 @@ exports.STTOutput = {
         if (message.text !== "") {
             obj.text = message.text;
         }
-        if (message.language !== 0) {
-            obj.language = sTTLanguageToJSON(message.language);
-        }
         if (message.confidence !== 0) {
             obj.confidence = message.confidence;
+        }
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         if (message.words?.length) {
             obj.words = message.words.map((e) => exports.WordTimestamp.toJSON(e));
@@ -1826,26 +1263,17 @@ exports.STTOutput = {
         if (message.metadata !== undefined) {
             obj.metadata = exports.TranscriptionMetadata.toJSON(message.metadata);
         }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
-        }
         if (message.timestampMs !== 0) {
             obj.timestampMs = Math.round(message.timestampMs);
         }
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
         }
-        if (message.speakerIds?.length) {
-            obj.speakerIds = message.speakerIds;
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.segmentIndex !== 0) {
             obj.segmentIndex = Math.round(message.segmentIndex);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1855,39 +1283,24 @@ exports.STTOutput = {
     fromPartial(object) {
         const message = createBaseSTTOutput();
         message.text = object.text ?? "";
-        message.language = object.language ?? 0;
         message.confidence = object.confidence ?? 0;
+        message.language = object.language ?? undefined;
         message.words = object.words?.map((e) => exports.WordTimestamp.fromPartial(e)) || [];
         message.alternatives = object.alternatives?.map((e) => exports.TranscriptionAlternative.fromPartial(e)) || [];
         message.metadata = (object.metadata !== undefined && object.metadata !== null)
             ? exports.TranscriptionMetadata.fromPartial(object.metadata)
             : undefined;
-        message.languageCode = object.languageCode ?? undefined;
         message.timestampMs = object.timestampMs ?? 0;
         message.durationMs = object.durationMs ?? 0;
-        message.speakerIds = object.speakerIds?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.segmentIndex = object.segmentIndex ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseSTTPartialResult() {
-    return {
-        text: "",
-        isFinal: false,
-        stability: 0,
-        confidence: 0,
-        language: 0,
-        timestampMs: 0,
-        alternatives: [],
-        languageCode: undefined,
-        requestId: "",
-        segmentIndex: 0,
-        audioStartMs: 0,
-        audioEndMs: 0,
-        finalOutput: undefined,
-    };
+    return { text: "", isFinal: false, language: undefined };
 }
 exports.STTPartialResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1897,38 +1310,8 @@ exports.STTPartialResult = {
         if (message.isFinal !== false) {
             writer.uint32(16).bool(message.isFinal);
         }
-        if (message.stability !== 0) {
-            writer.uint32(29).float(message.stability);
-        }
-        if (message.confidence !== 0) {
-            writer.uint32(37).float(message.confidence);
-        }
-        if (message.language !== 0) {
-            writer.uint32(40).int32(message.language);
-        }
-        if (message.timestampMs !== 0) {
-            writer.uint32(48).int64(message.timestampMs);
-        }
-        for (const v of message.alternatives) {
-            exports.TranscriptionAlternative.encode(v, writer.uint32(58).fork()).join();
-        }
-        if (message.languageCode !== undefined) {
-            writer.uint32(66).string(message.languageCode);
-        }
-        if (message.requestId !== "") {
-            writer.uint32(74).string(message.requestId);
-        }
-        if (message.segmentIndex !== 0) {
-            writer.uint32(80).int32(message.segmentIndex);
-        }
-        if (message.audioStartMs !== 0) {
-            writer.uint32(88).int64(message.audioStartMs);
-        }
-        if (message.audioEndMs !== 0) {
-            writer.uint32(96).int64(message.audioEndMs);
-        }
-        if (message.finalOutput !== undefined) {
-            exports.STTOutput.encode(message.finalOutput, writer.uint32(106).fork()).join();
+        if (message.language !== undefined) {
+            writer.uint32(114).string(message.language);
         }
         return writer;
     },
@@ -1953,81 +1336,11 @@ exports.STTPartialResult = {
                     message.isFinal = reader.bool();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 29) {
+                case 14: {
+                    if (tag !== 114) {
                         break;
                     }
-                    message.stability = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.confidence = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.language = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.timestampMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.alternatives.push(exports.TranscriptionAlternative.decode(reader, reader.uint32()));
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.segmentIndex = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.audioStartMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.audioEndMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 106) {
-                        break;
-                    }
-                    message.finalOutput = exports.STTOutput.decode(reader, reader.uint32());
+                    message.language = reader.string();
                     continue;
                 }
             }
@@ -2046,47 +1359,7 @@ exports.STTPartialResult = {
                 : isSet(object.is_final)
                     ? globalThis.Boolean(object.is_final)
                     : false,
-            stability: isSet(object.stability) ? globalThis.Number(object.stability) : 0,
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
-            timestampMs: isSet(object.timestampMs)
-                ? globalThis.Number(object.timestampMs)
-                : isSet(object.timestamp_ms)
-                    ? globalThis.Number(object.timestamp_ms)
-                    : 0,
-            alternatives: globalThis.Array.isArray(object?.alternatives)
-                ? object.alternatives.map((e) => exports.TranscriptionAlternative.fromJSON(e))
-                : [],
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            segmentIndex: isSet(object.segmentIndex)
-                ? globalThis.Number(object.segmentIndex)
-                : isSet(object.segment_index)
-                    ? globalThis.Number(object.segment_index)
-                    : 0,
-            audioStartMs: isSet(object.audioStartMs)
-                ? globalThis.Number(object.audioStartMs)
-                : isSet(object.audio_start_ms)
-                    ? globalThis.Number(object.audio_start_ms)
-                    : 0,
-            audioEndMs: isSet(object.audioEndMs)
-                ? globalThis.Number(object.audioEndMs)
-                : isSet(object.audio_end_ms)
-                    ? globalThis.Number(object.audio_end_ms)
-                    : 0,
-            finalOutput: isSet(object.finalOutput)
-                ? exports.STTOutput.fromJSON(object.finalOutput)
-                : isSet(object.final_output)
-                    ? exports.STTOutput.fromJSON(object.final_output)
-                    : undefined,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
         };
     },
     toJSON(message) {
@@ -2097,38 +1370,8 @@ exports.STTPartialResult = {
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;
         }
-        if (message.stability !== 0) {
-            obj.stability = message.stability;
-        }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
-        if (message.language !== 0) {
-            obj.language = sTTLanguageToJSON(message.language);
-        }
-        if (message.timestampMs !== 0) {
-            obj.timestampMs = Math.round(message.timestampMs);
-        }
-        if (message.alternatives?.length) {
-            obj.alternatives = message.alternatives.map((e) => exports.TranscriptionAlternative.toJSON(e));
-        }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
-        }
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
-        if (message.segmentIndex !== 0) {
-            obj.segmentIndex = Math.round(message.segmentIndex);
-        }
-        if (message.audioStartMs !== 0) {
-            obj.audioStartMs = Math.round(message.audioStartMs);
-        }
-        if (message.audioEndMs !== 0) {
-            obj.audioEndMs = Math.round(message.audioEndMs);
-        }
-        if (message.finalOutput !== undefined) {
-            obj.finalOutput = exports.STTOutput.toJSON(message.finalOutput);
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         return obj;
     },
@@ -2139,19 +1382,7 @@ exports.STTPartialResult = {
         const message = createBaseSTTPartialResult();
         message.text = object.text ?? "";
         message.isFinal = object.isFinal ?? false;
-        message.stability = object.stability ?? 0;
-        message.confidence = object.confidence ?? 0;
-        message.language = object.language ?? 0;
-        message.timestampMs = object.timestampMs ?? 0;
-        message.alternatives = object.alternatives?.map((e) => exports.TranscriptionAlternative.fromPartial(e)) || [];
-        message.languageCode = object.languageCode ?? undefined;
-        message.requestId = object.requestId ?? "";
-        message.segmentIndex = object.segmentIndex ?? 0;
-        message.audioStartMs = object.audioStartMs ?? 0;
-        message.audioEndMs = object.audioEndMs ?? 0;
-        message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
-            ? exports.STTOutput.fromPartial(object.finalOutput)
-            : undefined;
+        message.language = object.language ?? undefined;
         return message;
     },
 };
@@ -2163,8 +1394,7 @@ function createBaseSTTStreamEvent() {
         kind: 0,
         partial: undefined,
         finalOutput: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.STTStreamEvent = {
@@ -2187,11 +1417,8 @@ exports.STTStreamEvent = {
         if (message.finalOutput !== undefined) {
             exports.STTOutput.encode(message.finalOutput, writer.uint32(50).fork()).join();
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(58).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(64).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
@@ -2244,18 +1471,11 @@ exports.STTStreamEvent = {
                     message.finalOutput = exports.STTOutput.decode(reader, reader.uint32());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
+                case 9: {
+                    if (tag !== 74) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2286,16 +1506,7 @@ exports.STTStreamEvent = {
                 : isSet(object.final_output)
                     ? exports.STTOutput.fromJSON(object.final_output)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2318,11 +1529,8 @@ exports.STTStreamEvent = {
         if (message.finalOutput !== undefined) {
             obj.finalOutput = exports.STTOutput.toJSON(message.finalOutput);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2341,20 +1549,14 @@ exports.STTStreamEvent = {
         message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
             ? exports.STTOutput.fromPartial(object.finalOutput)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseSTTServiceState() {
-    return {
-        isReady: false,
-        currentModel: undefined,
-        supportsStreaming: false,
-        supportedLanguageCodes: [],
-        errorMessage: undefined,
-        errorCode: 0,
-    };
+    return { isReady: false, currentModel: undefined, supportsStreaming: false, supportedLanguageCodes: [] };
 }
 exports.STTServiceState = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2369,12 +1571,6 @@ exports.STTServiceState = {
         }
         for (const v of message.supportedLanguageCodes) {
             writer.uint32(34).string(v);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(42).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(48).int32(message.errorCode);
         }
         return writer;
     },
@@ -2413,20 +1609,6 @@ exports.STTServiceState = {
                     message.supportedLanguageCodes.push(reader.string());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2457,16 +1639,6 @@ exports.STTServiceState = {
                 : globalThis.Array.isArray(object?.supported_language_codes)
                     ? object.supported_language_codes.map((e) => globalThis.String(e))
                     : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -2483,12 +1655,6 @@ exports.STTServiceState = {
         if (message.supportedLanguageCodes?.length) {
             obj.supportedLanguageCodes = message.supportedLanguageCodes;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         return obj;
     },
     create(base) {
@@ -2500,112 +1666,6 @@ exports.STTServiceState = {
         message.currentModel = object.currentModel ?? undefined;
         message.supportsStreaming = object.supportsStreaming ?? false;
         message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
-        return message;
-    },
-};
-function createBaseSTTLanguageDetectionResult() {
-    return { language: 0, languageCode: undefined, confidence: 0, alternatives: [] };
-}
-exports.STTLanguageDetectionResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.language !== 0) {
-            writer.uint32(8).int32(message.language);
-        }
-        if (message.languageCode !== undefined) {
-            writer.uint32(18).string(message.languageCode);
-        }
-        if (message.confidence !== 0) {
-            writer.uint32(29).float(message.confidence);
-        }
-        for (const v of message.alternatives) {
-            writer.uint32(34).string(v);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseSTTLanguageDetectionResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.language = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 29) {
-                        break;
-                    }
-                    message.confidence = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.alternatives.push(reader.string());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-            alternatives: globalThis.Array.isArray(object?.alternatives)
-                ? object.alternatives.map((e) => globalThis.String(e))
-                : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.language !== 0) {
-            obj.language = sTTLanguageToJSON(message.language);
-        }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
-        }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
-        if (message.alternatives?.length) {
-            obj.alternatives = message.alternatives;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.STTLanguageDetectionResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseSTTLanguageDetectionResult();
-        message.language = object.language ?? 0;
-        message.languageCode = object.languageCode ?? undefined;
-        message.confidence = object.confidence ?? 0;
-        message.alternatives = object.alternatives?.map((e) => e) || [];
         return message;
     },
 };

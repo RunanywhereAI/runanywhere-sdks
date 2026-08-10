@@ -45,8 +45,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::HybridRoutedMetadata
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::HybridRoutingContext
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::CloudSttBackendConfig
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::HybridSttTranscribeOptions
@@ -95,7 +93,7 @@ constexpr HybridSttTranscribeOptions::ParseTableT_ HybridSttTranscribeOptions::I
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridSttTranscribeOptions, _impl_.sample_rate_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.sample_rate_)}},
-      // int32 audio_format = 3;
+      // .runanywhere.v1.AudioFormat audio_format = 3;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridSttTranscribeOptions, _impl_.audio_format_), 2>(),
        {24, 2, 0,
         PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.audio_format_)}},
@@ -106,8 +104,8 @@ constexpr HybridSttTranscribeOptions::ParseTableT_ HybridSttTranscribeOptions::I
       {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.language_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 sample_rate = 2;
       {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.sample_rate_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 audio_format = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.audio_format_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // .runanywhere.v1.AudioFormat audio_format = 3;
+      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeOptions, _impl_.audio_format_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     // no aux_entries
     {{
@@ -127,7 +125,7 @@ inline constexpr HybridSttTranscribeOptions::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         sample_rate_{0},
-        audio_format_{0} {}
+        audio_format_{static_cast< ::runanywhere::v1::AudioFormat >(0)} {}
 
 template <typename>
 constexpr HybridSttTranscribeOptions::HybridSttTranscribeOptions(::_pbi::ConstantInitialized,
@@ -170,7 +168,7 @@ constexpr auto HybridSttTranscribeOptions::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
+      &file_reflection_data[9],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -221,130 +219,6 @@ const ::_pbi::ClassData* HybridSttTranscribeOptions_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class HybridRoutingContext::_Internal {
- public:
-};
-
-constexpr HybridRoutingContext::ParseTableT_ HybridRoutingContext::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(HybridRoutingContext,
-                            _impl_._cached_size_),  // no hasbits
-      0, // no _extensions_
-      0, 0,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967295,  // skipmap
-      offsetof(ParseTableT_, field_names),  // no field_entries
-      0,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridRoutingContext>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, // no field_entries, or aux_entries
-    {{
-    }},
-  };
-}
-
-template <typename>
-constexpr HybridRoutingContext::HybridRoutingContext(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::internal::ZeroFieldsBase(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      ) {
-}
-inline void* PROTOBUF_NONNULL HybridRoutingContext::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) HybridRoutingContext(arena);
-}
-constexpr auto HybridRoutingContext::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(HybridRoutingContext), alignof(HybridRoutingContext));
-}
-constexpr auto HybridRoutingContext::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &HybridRoutingContext::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<HybridRoutingContext>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &HybridRoutingContext::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<HybridRoutingContext>(), &HybridRoutingContext::ByteSizeLong,
-              &HybridRoutingContext::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(HybridRoutingContext, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_hybrid_5frouter_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct HybridRoutingContextGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr HybridRoutingContextGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 HybridRoutingContext_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(HybridRoutingContext::InternalGenerateClassData_(
-            _default, &HybridRoutingContext_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<HybridRoutingContext>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~HybridRoutingContextGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) HybridRoutingContext _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<HybridRoutingContext>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(HybridRoutingContextGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST HybridRoutingContextGlobalsTypeInternal HybridRoutingContext_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* HybridRoutingContext_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return HybridRoutingContext_globals_.GetClassData();
-#else
-  return HybridRoutingContext_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class HybridRoutedMetadata::_Internal {
  public:
   using HasBits = decltype(::std::declval<HybridRoutedMetadata>()._impl_._has_bits_);
@@ -357,11 +231,11 @@ constexpr HybridRoutedMetadata::ParseTableT_ HybridRoutedMetadata::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_._has_bits_),
       0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
+      8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
+      4294967040,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      8,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -371,34 +245,37 @@ constexpr HybridRoutedMetadata::ParseTableT_ HybridRoutedMetadata::InternalGener
       ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridRoutedMetadata>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // bool served_on_device = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridRoutedMetadata, _impl_.served_on_device_), 5>(),
+       {64, 5, 0,
+        PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.served_on_device_)}},
       // string chosen_model_id = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.chosen_model_id_)}},
       // bool was_fallback = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridRoutedMetadata, _impl_.was_fallback_), 2>(),
-       {16, 2, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridRoutedMetadata, _impl_.was_fallback_), 4>(),
+       {16, 4, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.was_fallback_)}},
       // int32 attempt_count = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutedMetadata, _impl_.attempt_count_), 3>(),
-       {24, 3, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutedMetadata, _impl_.attempt_count_), 2>(),
+       {24, 2, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.attempt_count_)}},
       // int32 primary_error_code = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutedMetadata, _impl_.primary_error_code_), 4>(),
-       {32, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutedMetadata, _impl_.primary_error_code_), 3>(),
+       {32, 3, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_error_code_)}},
       // string primary_error_message = 5;
       {::_pbi::TcParser::FastUS1,
        {42, 1, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_error_message_)}},
-      // float confidence = 6;
+      // optional float confidence = 6;
       {::_pbi::TcParser::FastF32S1,
-       {53, 5, 0,
+       {53, 6, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.confidence_)}},
-      // float primary_confidence = 7;
+      // optional float primary_confidence = 7;
       {::_pbi::TcParser::FastF32S1,
-       {61, 6, 0,
+       {61, 7, 0,
         PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_confidence_)}},
     }}, {{
       65535, 65535
@@ -406,21 +283,23 @@ constexpr HybridRoutedMetadata::ParseTableT_ HybridRoutedMetadata::InternalGener
       // string chosen_model_id = 1;
       {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.chosen_model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // bool was_fallback = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.was_fallback_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.was_fallback_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int32 attempt_count = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.attempt_count_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.attempt_count_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 primary_error_code = 4;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_error_code_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_error_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string primary_error_message = 5;
       {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // float confidence = 6;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.confidence_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // float primary_confidence = 7;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_confidence_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional float confidence = 6;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.confidence_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional float primary_confidence = 7;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_confidence_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // bool served_on_device = 8;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.served_on_device_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
-      "\43\17\0\0\0\25\0\0"
+      "\43\17\0\0\0\25\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.HybridRoutedMetadata"
       "chosen_model_id"
       "primary_error_message"
@@ -439,9 +318,10 @@ inline constexpr HybridRoutedMetadata::Impl_::Impl_(
         primary_error_message_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        was_fallback_{false},
         attempt_count_{0},
         primary_error_code_{0},
+        was_fallback_{false},
+        served_on_device_{false},
         confidence_{0},
         primary_confidence_{0} {}
 
@@ -549,11 +429,11 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
     {
       PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      3,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -563,40 +443,35 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
       ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridModelDescriptor>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // string provider = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 1, 0,
-        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.provider_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // string model_id = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_)}},
-      // .runanywhere.v1.HybridModelType model_type = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.model_type_), 2>(),
+      // bool is_on_device = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridModelDescriptor, _impl_.is_on_device_), 2>(),
        {16, 2, 0,
-        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_)}},
-      // .runanywhere.v1.HybridBackendKind backend = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.backend_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_)}},
+        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.is_on_device_)}},
+      // string engine = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.engine_)}},
     }}, {{
       65535, 65535
     }}, {{
       // string model_id = 1;
       {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.HybridModelType model_type = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.HybridBackendKind backend = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string provider = 4;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.provider_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // bool is_on_device = 2;
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.is_on_device_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // string engine = 3;
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.engine_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\44\10\0\0\10\0\0\0"
+      "\44\10\0\6\0\0\0\0"
       "runanywhere.v1.HybridModelDescriptor"
       "model_id"
-      "provider"
+      "engine"
     }},
   };
 }
@@ -609,11 +484,10 @@ inline constexpr HybridModelDescriptor::Impl_::Impl_(
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        provider_(
+        engine_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        model_type_{static_cast< ::runanywhere::v1::HybridModelType >(0)},
-        backend_{static_cast< ::runanywhere::v1::HybridBackendKind >(0)} {}
+        is_on_device_{false} {}
 
 template <typename>
 constexpr HybridModelDescriptor::HybridModelDescriptor(::_pbi::ConstantInitialized,
@@ -889,14 +763,14 @@ constexpr ConfidenceCascade::ParseTableT_ ConfidenceCascade::InternalGeneratePar
       ::_pbi::TcParser::GetTable<::runanywhere::v1::ConfidenceCascade>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // float threshold = 1;
+      // float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {13, 0, 0,
         PROTOBUF_FIELD_OFFSET(ConfidenceCascade, _impl_.threshold_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // float threshold = 1;
+      // float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(ConfidenceCascade, _impl_.threshold_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     }},
     // no aux_entries
@@ -1148,7 +1022,7 @@ constexpr auto CloudSttBackendConfig::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
+      &file_reflection_data[8],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -1225,14 +1099,14 @@ constexpr BatteryFilter::ParseTableT_ BatteryFilter::InternalGenerateParseTable_
       ::_pbi::TcParser::GetTable<::runanywhere::v1::BatteryFilter>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // int32 min_battery_percent = 1;
+      // int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(BatteryFilter, _impl_.min_battery_percent_), 0>(),
        {8, 0, 0,
         PROTOBUF_FIELD_OFFSET(BatteryFilter, _impl_.min_battery_percent_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // int32 min_battery_percent = 1;
+      // int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
       {PROTOBUF_FIELD_OFFSET(BatteryFilter, _impl_.min_battery_percent_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
@@ -1352,11 +1226,11 @@ constexpr HybridSttTranscribeResponse::ParseTableT_ HybridSttTranscribeResponse:
     {
       PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      4, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967280,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      4,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1366,10 +1240,13 @@ constexpr HybridSttTranscribeResponse::ParseTableT_ HybridSttTranscribeResponse:
       ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridSttTranscribeResponse>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.HybridRoutedMetadata routing = 4;
+      {::_pbi::TcParser::FastMtS1,
+       {34, 2, 0,
+        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.routing_)}},
       // int32 rc = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridSttTranscribeResponse, _impl_.rc_), 4>(),
-       {8, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridSttTranscribeResponse, _impl_.rc_), 3>(),
+       {8, 3, 0,
         PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.rc_)}},
       // string text = 2;
       {::_pbi::TcParser::FastUS1,
@@ -1379,29 +1256,17 @@ constexpr HybridSttTranscribeResponse::ParseTableT_ HybridSttTranscribeResponse:
       {::_pbi::TcParser::FastUS1,
        {26, 1, 0,
         PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.detected_language_)}},
-      // .runanywhere.v1.HybridRoutedMetadata routing = 4;
-      {::_pbi::TcParser::FastMtS1,
-       {34, 3, 0,
-        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.routing_)}},
-      // string error_msg = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.error_msg_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // int32 rc = 1;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.rc_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.rc_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string text = 2;
       {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string detected_language = 3;
       {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.detected_language_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // .runanywhere.v1.HybridRoutedMetadata routing = 4;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.routing_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string error_msg = 5;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.error_msg_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.routing_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1411,11 +1276,10 @@ constexpr HybridSttTranscribeResponse::ParseTableT_ HybridSttTranscribeResponse:
         #endif
     }},
     {{
-      "\52\0\4\21\0\11\0\0"
+      "\52\0\4\21\0\0\0\0"
       "runanywhere.v1.HybridSttTranscribeResponse"
       "text"
       "detected_language"
-      "error_msg"
     }},
   };
 }
@@ -1429,9 +1293,6 @@ inline constexpr HybridSttTranscribeResponse::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         detected_language_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_msg_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         routing_{nullptr},
@@ -1478,7 +1339,7 @@ constexpr auto HybridSttTranscribeResponse::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[12],
+      &file_reflection_data[11],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -1541,12 +1402,12 @@ constexpr HybridSttTranscribeRequest::ParseTableT_ HybridSttTranscribeRequest::I
     {
       PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      2,  // num_aux_entries
+      2,  // num_field_entries
+      1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -1555,35 +1416,23 @@ constexpr HybridSttTranscribeRequest::ParseTableT_ HybridSttTranscribeRequest::I
       ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridSttTranscribeRequest>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.HybridSttTranscribeOptions options = 2;
+      {::_pbi::TcParser::FastMtS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.options_)}},
       // bytes audio_bytes = 1;
       {::_pbi::TcParser::FastBS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.audio_bytes_)}},
-      // .runanywhere.v1.HybridRoutingContext context = 2;
-      {::_pbi::TcParser::FastMtS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.context_)}},
-      // .runanywhere.v1.HybridSttTranscribeOptions options = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 2, 1,
-        PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.options_)}},
     }}, {{
       65535, 65535
     }}, {{
       // bytes audio_bytes = 1;
       {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.audio_bytes_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // .runanywhere.v1.HybridRoutingContext context = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.context_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // .runanywhere.v1.HybridSttTranscribeOptions options = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.options_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.HybridSttTranscribeOptions options = 2;
+      {PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.options_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::HybridRoutingContext>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::HybridRoutingContext_globals_},
-        #endif
         #ifndef PROTOBUF_MESSAGE_GLOBALS
         {::_pbi::TcParser::GetTable<::runanywhere::v1::HybridSttTranscribeOptions>()},
         #else
@@ -1603,7 +1452,6 @@ inline constexpr HybridSttTranscribeRequest::Impl_::Impl_(
         audio_bytes_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        context_{nullptr},
         options_{nullptr} {}
 
 template <typename>
@@ -1647,7 +1495,7 @@ constexpr auto HybridSttTranscribeRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[11],
+      &file_reflection_data[10],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -1710,11 +1558,11 @@ constexpr HybridFilter::ParseTableT_ HybridFilter::InternalGenerateParseTable_(c
       PROTOBUF_FIELD_OFFSET(HybridFilter,
                             _impl_._cached_size_),  // no hasbits
       0, // no _extensions_
-      5, 0,  // max_field_number, fast_idx_mask
+      3, 0,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967266,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      3,  // num_field_entries
       2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1730,11 +1578,9 @@ constexpr HybridFilter::ParseTableT_ HybridFilter::InternalGenerateParseTable_(c
     }}, {{
       // bool network = 1;
       {PROTOBUF_FIELD_OFFSET(HybridFilter, _impl_.kind_.network_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kBool)},
-      // int32 quality_tier = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridFilter, _impl_.kind_.quality_tier_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kInt32)},
-      // .runanywhere.v1.BatteryFilter battery = 4;
+      // .runanywhere.v1.BatteryFilter battery = 2;
       {PROTOBUF_FIELD_OFFSET(HybridFilter, _impl_.kind_.battery_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
-      // .runanywhere.v1.CustomFilter custom = 5;
+      // .runanywhere.v1.CustomFilter custom = 3;
       {PROTOBUF_FIELD_OFFSET(HybridFilter, _impl_.kind_.custom_), _Internal::kOneofCaseOffset + 0, 1, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
@@ -2011,12 +1857,12 @@ constexpr HybridRoutingPolicy::ParseTableT_ HybridRoutingPolicy::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      2,  // num_aux_entries
+      5,  // num_field_entries
+      3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -2032,21 +1878,35 @@ constexpr HybridRoutingPolicy::ParseTableT_ HybridRoutingPolicy::InternalGenerat
         PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.hard_filters_)}},
       // .runanywhere.v1.HybridCascade cascade = 2;
       {::_pbi::TcParser::FastMtS1,
-       {18, 1, 1,
+       {18, 2, 1,
         PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_)}},
-      // .runanywhere.v1.HybridRank rank = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutingPolicy, _impl_.rank_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_)}},
+      // .runanywhere.v1.HybridInferenceMode mode = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutingPolicy, _impl_.mode_), 3>(),
+       {24, 3, 0,
+        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.mode_)}},
+      // int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutingPolicy, _impl_.attempt_timeout_ms_), 4>(),
+       {32, 4, 0,
+        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.attempt_timeout_ms_)}},
+      // repeated .runanywhere.v1.HybridModelDescriptor models = 5;
+      {::_pbi::TcParser::FastMtR1,
+       {42, 1, 2,
+        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.models_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // repeated .runanywhere.v1.HybridFilter hard_filters = 1;
       {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.hard_filters_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // .runanywhere.v1.HybridCascade cascade = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // .runanywhere.v1.HybridRank rank = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.HybridInferenceMode mode = 3;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.mode_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.attempt_timeout_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // repeated .runanywhere.v1.HybridModelDescriptor models = 5;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.models_), _Internal::kHasBitsOffset + 1, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2058,6 +1918,11 @@ constexpr HybridRoutingPolicy::ParseTableT_ HybridRoutingPolicy::InternalGenerat
         {::_pbi::TcParser::GetTable<::runanywhere::v1::HybridCascade>()},
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::HybridCascade_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::HybridModelDescriptor>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::HybridModelDescriptor_globals_},
         #endif
     }},
     {{
@@ -2075,8 +1940,14 @@ inline constexpr HybridRoutingPolicy::Impl_::Impl_(
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.hard_filters_)>()
          }
         ,
+        models_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::HybridRoutingPolicy,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.models_)>()
+         }
+        ,
         cascade_{nullptr},
-        rank_{static_cast< ::runanywhere::v1::HybridRank >(0)} {}
+        mode_{static_cast< ::runanywhere::v1::HybridInferenceMode >(0)},
+        attempt_timeout_ms_{0} {}
 
 template <typename>
 constexpr HybridRoutingPolicy::HybridRoutingPolicy(::_pbi::ConstantInitialized,
@@ -2173,7 +2044,7 @@ const ::_pbi::ClassData* HybridRoutingPolicy_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_hybrid_5frouter_2eproto[4];
+    file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_hybrid_5frouter_2eproto = nullptr;
 const ::uint32_t
@@ -2181,7 +2052,6 @@ const ::uint32_t
         protodesc_cold) = {
         0x004, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridFilter, _impl_._oneof_case_[0]),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridFilter, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridFilter, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridFilter, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridFilter, _impl_.kind_),
@@ -2209,27 +2079,29 @@ const ::uint32_t
         0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_._has_bits_),
-        6, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.hard_filters_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.cascade_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.rank_),
-        0,
-        1,
-        2,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_type_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.backend_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.provider_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.mode_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.attempt_timeout_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.models_),
         0,
         2,
         3,
+        4,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.is_on_device_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.engine_),
+        0,
+        2,
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_._has_bits_),
-        10, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.chosen_model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.was_fallback_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.attempt_count_),
@@ -2237,14 +2109,15 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.primary_error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.confidence_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.primary_confidence_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_.served_on_device_),
         0,
+        4,
         2,
         3,
-        4,
         1,
-        5,
         6,
-        0x000, // bitmap
+        7,
+        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_._has_bits_),
         9, // hasbit index offset
@@ -2271,42 +2144,37 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeRequest, _impl_._has_bits_),
-        6, // hasbit index offset
+        5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeRequest, _impl_.audio_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeRequest, _impl_.context_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeRequest, _impl_.options_),
         0,
         1,
-        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_._has_bits_),
-        8, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_.rc_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_.detected_language_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_.routing_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeResponse, _impl_.error_msg_),
-        4,
+        3,
         0,
         1,
-        3,
         2,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::HybridFilter)},
-        {7, sizeof(::runanywhere::v1::BatteryFilter)},
-        {12, sizeof(::runanywhere::v1::CustomFilter)},
-        {19, sizeof(::runanywhere::v1::HybridCascade)},
-        {23, sizeof(::runanywhere::v1::ConfidenceCascade)},
-        {28, sizeof(::runanywhere::v1::HybridRoutingPolicy)},
-        {37, sizeof(::runanywhere::v1::HybridModelDescriptor)},
-        {48, sizeof(::runanywhere::v1::HybridRoutedMetadata)},
-        {65, sizeof(::runanywhere::v1::HybridRoutingContext)},
-        {66, sizeof(::runanywhere::v1::CloudSttBackendConfig)},
-        {81, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
-        {90, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
+        {6, sizeof(::runanywhere::v1::BatteryFilter)},
+        {11, sizeof(::runanywhere::v1::CustomFilter)},
+        {18, sizeof(::runanywhere::v1::HybridCascade)},
+        {22, sizeof(::runanywhere::v1::ConfidenceCascade)},
+        {27, sizeof(::runanywhere::v1::HybridRoutingPolicy)},
+        {40, sizeof(::runanywhere::v1::HybridModelDescriptor)},
+        {49, sizeof(::runanywhere::v1::HybridRoutedMetadata)},
+        {68, sizeof(::runanywhere::v1::CloudSttBackendConfig)},
+        {83, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
+        {92, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
         {99, sizeof(::runanywhere::v1::HybridSttTranscribeResponse)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
@@ -2319,7 +2187,6 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::HybridRoutingPolicy_globals_,
         &::runanywhere::v1::HybridModelDescriptor_globals_,
         &::runanywhere::v1::HybridRoutedMetadata_globals_,
-        &::runanywhere::v1::HybridRoutingContext_globals_,
         &::runanywhere::v1::CloudSttBackendConfig_globals_,
         &::runanywhere::v1::HybridSttTranscribeOptions_globals_,
         &::runanywhere::v1::HybridSttTranscribeRequest_globals_,
@@ -2327,76 +2194,74 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_hybrid_5frouter_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\023hybrid_router.proto\022\016runanywhere.v1\"\251\001"
-    "\n\014HybridFilter\022\021\n\007network\030\001 \001(\010H\000\022\026\n\014qua"
-    "lity_tier\030\003 \001(\005H\000\0220\n\007battery\030\004 \001(\0132\035.run"
-    "anywhere.v1.BatteryFilterH\000\022.\n\006custom\030\005 "
-    "\001(\0132\034.runanywhere.v1.CustomFilterH\000B\006\n\004k"
-    "indJ\004\010\002\020\003\",\n\rBatteryFilter\022\033\n\023min_batter"
-    "y_percent\030\001 \001(\005\"1\n\014CustomFilter\022\014\n\004name\030"
-    "\001 \001(\t\022\023\n\013description\030\002 \001(\t\"P\n\rHybridCasc"
-    "ade\0227\n\nconfidence\030\001 \001(\0132!.runanywhere.v1"
-    ".ConfidenceCascadeH\000B\006\n\004kind\"&\n\021Confiden"
-    "ceCascade\022\021\n\tthreshold\030\001 \001(\002\"\243\001\n\023HybridR"
-    "outingPolicy\0222\n\014hard_filters\030\001 \003(\0132\034.run"
-    "anywhere.v1.HybridFilter\022.\n\007cascade\030\002 \001("
-    "\0132\035.runanywhere.v1.HybridCascade\022(\n\004rank"
-    "\030\003 \001(\0162\032.runanywhere.v1.HybridRank\"\244\001\n\025H"
-    "ybridModelDescriptor\022\020\n\010model_id\030\001 \001(\t\0223"
-    "\n\nmodel_type\030\002 \001(\0162\037.runanywhere.v1.Hybr"
-    "idModelType\0222\n\007backend\030\003 \001(\0162!.runanywhe"
-    "re.v1.HybridBackendKind\022\020\n\010provider\030\004 \001("
-    "\t\"\307\001\n\024HybridRoutedMetadata\022\027\n\017chosen_mod"
-    "el_id\030\001 \001(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\ratt"
-    "empt_count\030\003 \001(\005\022\032\n\022primary_error_code\030\004"
-    " \001(\005\022\035\n\025primary_error_message\030\005 \001(\t\022\022\n\nc"
-    "onfidence\030\006 \001(\002\022\032\n\022primary_confidence\030\007 "
-    "\001(\002\".\n\024HybridRoutingContextJ\004\010\001\020\002J\004\010\002\020\003J"
-    "\004\010\003\020\004J\004\010\004\020\005\"\206\001\n\025CloudSttBackendConfig\022\020\n"
-    "\010provider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t\022\017\n\007api_ke"
-    "y\030\003 \001(\t\022\025\n\rlanguage_code\030\004 \001(\t\022\020\n\010base_u"
-    "rl\030\005 \001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y\n\032HybridSt"
-    "tTranscribeOptions\022\020\n\010language\030\001 \001(\t\022\023\n\013"
-    "sample_rate\030\002 \001(\005\022\024\n\014audio_format\030\003 \001(\005\""
-    "\245\001\n\032HybridSttTranscribeRequest\022\023\n\013audio_"
-    "bytes\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$.runanywhe"
-    "re.v1.HybridRoutingContext\022;\n\007options\030\003 "
-    "\001(\0132*.runanywhere.v1.HybridSttTranscribe"
-    "Options\"\234\001\n\033HybridSttTranscribeResponse\022"
-    "\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_la"
-    "nguage\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132$.runanywh"
-    "ere.v1.HybridRoutedMetadata\022\021\n\terror_msg"
-    "\030\005 \001(\t*\274\001\n\020HybridCapability\022!\n\035HYBRID_CA"
-    "PABILITY_UNSPECIFIED\020\000\022\031\n\025HYBRID_CAPABIL"
-    "ITY_LLM\020\001\022\031\n\025HYBRID_CAPABILITY_VLM\020\002\022\031\n\025"
-    "HYBRID_CAPABILITY_STT\020\003\022\031\n\025HYBRID_CAPABI"
-    "LITY_TTS\020\004\022\031\n\025HYBRID_CAPABILITY_VAD\020\005*\244\001"
-    "\n\021HybridBackendKind\022\036\n\032HYBRID_BACKEND_UN"
-    "SPECIFIED\020\000\022\033\n\027HYBRID_BACKEND_LLAMACPP\020\001"
-    "\022\035\n\031HYBRID_BACKEND_OPENROUTER\020\002\022\031\n\025HYBRI"
-    "D_BACKEND_SHERPA\020\003\022\030\n\024HYBRID_BACKEND_CLO"
-    "UD\020\004*q\n\017HybridModelType\022!\n\035HYBRID_MODEL_"
-    "TYPE_UNSPECIFIED\020\000\022\035\n\031HYBRID_MODEL_TYPE_"
-    "OFFLINE\020\001\022\034\n\030HYBRID_MODEL_TYPE_ONLINE\020\002*"
-    "r\n\nHybridRank\022\033\n\027HYBRID_RANK_UNSPECIFIED"
-    "\020\000\022\"\n\036HYBRID_RANK_PREFER_LOCAL_FIRST\020\001\022#"
-    "\n\037HYBRID_RANK_PREFER_ONLINE_FIRST\020\002B\214\001\n\027"
-    "ai.runanywhere.proto.v1B\021HybridRouterPro"
-    "toP\001Z<github.com/runanywhere/runanywhere"
-    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
-    "unanywhere.V1\272\002\002RAb\006proto3"
+    "\n\023hybrid_router.proto\022\016runanywhere.v1\032\021m"
+    "odel_types.proto\032\021rac_options.proto\"\213\001\n\014"
+    "HybridFilter\022\021\n\007network\030\001 \001(\010H\000\0220\n\007batte"
+    "ry\030\002 \001(\0132\035.runanywhere.v1.BatteryFilterH"
+    "\000\022.\n\006custom\030\003 \001(\0132\034.runanywhere.v1.Custo"
+    "mFilterH\000B\006\n\004kind\"<\n\rBatteryFilter\022+\n\023mi"
+    "n_battery_percent\030\001 \001(\005B\016\212\265\030\00220\240\265\030\000\250\265\030d\""
+    "1\n\014CustomFilter\022\014\n\004name\030\001 \001(\t\022\023\n\013descrip"
+    "tion\030\002 \001(\t\"P\n\rHybridCascade\0227\n\nconfidenc"
+    "e\030\001 \001(\0132!.runanywhere.v1.ConfidenceCasca"
+    "deH\000B\006\n\004kind\"E\n\021ConfidenceCascade\0220\n\tthr"
+    "eshold\030\001 \001(\002B\035\212\265\030\0030.5\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
+    "\000\360\?\"\212\002\n\023HybridRoutingPolicy\0222\n\014hard_filt"
+    "ers\030\001 \003(\0132\034.runanywhere.v1.HybridFilter\022"
+    ".\n\007cascade\030\002 \001(\0132\035.runanywhere.v1.Hybrid"
+    "Cascade\0221\n\004mode\030\003 \001(\0162#.runanywhere.v1.H"
+    "ybridInferenceMode\022%\n\022attempt_timeout_ms"
+    "\030\004 \001(\005B\t\212\265\030\0010\240\265\030\000\0225\n\006models\030\005 \003(\0132%.runa"
+    "nywhere.v1.HybridModelDescriptor\"O\n\025Hybr"
+    "idModelDescriptor\022\020\n\010model_id\030\001 \001(\t\022\024\n\014i"
+    "s_on_device\030\002 \001(\010\022\016\n\006engine\030\003 \001(\t\"\221\002\n\024Hy"
+    "bridRoutedMetadata\022\027\n\017chosen_model_id\030\001 "
+    "\001(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\rattempt_cou"
+    "nt\030\003 \001(\005\022\032\n\022primary_error_code\030\004 \001(\005\022\035\n\025"
+    "primary_error_message\030\005 \001(\t\022\027\n\nconfidenc"
+    "e\030\006 \001(\002H\000\210\001\001\022\037\n\022primary_confidence\030\007 \001(\002"
+    "H\001\210\001\001\022\030\n\020served_on_device\030\010 \001(\010B\r\n\013_conf"
+    "idenceB\025\n\023_primary_confidence\"\206\001\n\025CloudS"
+    "ttBackendConfig\022\020\n\010provider\030\001 \001(\t\022\r\n\005mod"
+    "el\030\002 \001(\t\022\017\n\007api_key\030\003 \001(\t\022\025\n\rlanguage_co"
+    "de\030\004 \001(\t\022\020\n\010base_url\030\005 \001(\t\022\022\n\ntimeout_ms"
+    "\030\006 \001(\005\"v\n\032HybridSttTranscribeOptions\022\020\n\010"
+    "language\030\001 \001(\t\022\023\n\013sample_rate\030\002 \001(\005\0221\n\014a"
+    "udio_format\030\003 \001(\0162\033.runanywhere.v1.Audio"
+    "Format\"n\n\032HybridSttTranscribeRequest\022\023\n\013"
+    "audio_bytes\030\001 \001(\014\022;\n\007options\030\002 \001(\0132*.run"
+    "anywhere.v1.HybridSttTranscribeOptions\"\211"
+    "\001\n\033HybridSttTranscribeResponse\022\n\n\002rc\030\001 \001"
+    "(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_language\030\003 "
+    "\001(\t\0225\n\007routing\030\004 \001(\0132$.runanywhere.v1.Hy"
+    "bridRoutedMetadata*\346\001\n\023HybridInferenceMo"
+    "de\022%\n!HYBRID_INFERENCE_MODE_UNSPECIFIED\020"
+    "\000\022*\n&HYBRID_INFERENCE_MODE_PREFER_ON_DEV"
+    "ICE\020\001\022(\n$HYBRID_INFERENCE_MODE_ONLY_ON_D"
+    "EVICE\020\002\022)\n%HYBRID_INFERENCE_MODE_PREFER_"
+    "IN_CLOUD\020\003\022\'\n#HYBRID_INFERENCE_MODE_ONLY"
+    "_IN_CLOUD\020\004B\214\001\n\027ai.runanywhere.proto.v1B"
+    "\021HybridRouterProtoP\001Z<github.com/runanyw"
+    "here/runanywhere-sdks/idl/v1;runanywhere"
+    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
+    "o3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_hybrid_5frouter_2eproto_deps[2] = {
+        &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_hybrid_5frouter_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5frouter_2eproto = {
     false,
     false,
-    2306,
+    2002,
     descriptor_table_protodef_hybrid_5frouter_2eproto,
     "hybrid_router.proto",
     &descriptor_table_hybrid_5frouter_2eproto_once,
-    nullptr,
-    0,
-    13,
+    descriptor_table_hybrid_5frouter_2eproto_deps,
+    2,
+    12,
     schemas,
     file_message_globals,
     TableStruct_hybrid_5frouter_2eproto::offsets,
@@ -2406,33 +2271,12 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5froute
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridCapability_descriptor() {
+HybridInferenceMode_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
   return file_level_enum_descriptors_hybrid_5frouter_2eproto[0];
 }
-PROTOBUF_CONSTINIT const uint32_t HybridCapability_internal_data_[] = {
-    393216u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridBackendKind_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridBackendKind_internal_data_[] = {
+PROTOBUF_CONSTINIT const uint32_t HybridInferenceMode_internal_data_[] = {
     327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridModelType_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[2];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridModelType_internal_data_[] = {
-    196608u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridRank_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[3];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridRank_internal_data_[] = {
-    196608u, 0u, };
 // ===================================================================
 
 void HybridFilter::set_allocated_battery(::runanywhere::v1::BatteryFilter* PROTOBUF_NULLABLE battery) {
@@ -2498,9 +2342,6 @@ HybridFilter::HybridFilter(
       case kNetwork:
         _impl_.kind_.network_ = from._impl_.kind_.network_;
         break;
-      case kQualityTier:
-        _impl_.kind_.quality_tier_ = from._impl_.kind_.quality_tier_;
-        break;
       case kBattery:
         _impl_.kind_.battery_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.kind_.battery_);
         break;
@@ -2543,10 +2384,6 @@ void HybridFilter::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   switch (kind_case()) {
     case kNetwork: {
-      // No need to clear
-      break;
-    }
-    case kQualityTier: {
       // No need to clear
       break;
     }
@@ -2636,21 +2473,15 @@ PROTOBUF_NOINLINE void HybridFilter::Clear() {
           1, this_._internal_network(), target);
       break;
     }
-    case kQualityTier: {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_quality_tier(), target);
-      break;
-    }
     case kBattery: {
       target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-          4, *this_._impl_.kind_.battery_, this_._impl_.kind_.battery_->GetCachedSize(), target,
+          2, *this_._impl_.kind_.battery_, this_._impl_.kind_.battery_->GetCachedSize(), target,
           stream);
       break;
     }
     case kCustom: {
       target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-          5, *this_._impl_.kind_.custom_, this_._impl_.kind_.custom_->GetCachedSize(), target,
+          3, *this_._impl_.kind_.custom_, this_._impl_.kind_.custom_->GetCachedSize(), target,
           stream);
       break;
     }
@@ -2686,19 +2517,13 @@ PROTOBUF_NOINLINE void HybridFilter::Clear() {
       total_size += 2;
       break;
     }
-    // int32 quality_tier = 3;
-    case kQualityTier: {
-      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-          this_._internal_quality_tier());
-      break;
-    }
-    // .runanywhere.v1.BatteryFilter battery = 4;
+    // .runanywhere.v1.BatteryFilter battery = 2;
     case kBattery: {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.kind_.battery_);
       break;
     }
-    // .runanywhere.v1.CustomFilter custom = 5;
+    // .runanywhere.v1.CustomFilter custom = 3;
     case kCustom: {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.kind_.custom_);
@@ -2739,10 +2564,6 @@ void HybridFilter::MergeImpl(::google::protobuf::MessageLite& to_msg,
     switch (oneof_from_case) {
       case kNetwork: {
         _this->_impl_.kind_.network_ = from._impl_.kind_.network_;
-        break;
-      }
-      case kQualityTier: {
-        _this->_impl_.kind_.quality_tier_ = from._impl_.kind_.quality_tier_;
         break;
       }
       case kBattery: {
@@ -2889,7 +2710,7 @@ PROTOBUF_NOINLINE void BatteryFilter::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // int32 min_battery_percent = 1;
+  // int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (this_._internal_min_battery_percent() != 0) {
       target =
@@ -2922,7 +2743,7 @@ PROTOBUF_NOINLINE void BatteryFilter::Clear() {
   (void)cached_has_bits;
 
    {
-    // int32 min_battery_percent = 1;
+    // int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
     cached_has_bits = this_._impl_._has_bits_[0];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_min_battery_percent() != 0) {
@@ -3592,7 +3413,7 @@ PROTOBUF_NOINLINE void ConfidenceCascade::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // float threshold = 1;
+  // float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
       target = stream->EnsureSpace(target);
@@ -3625,7 +3446,7 @@ PROTOBUF_NOINLINE void ConfidenceCascade::Clear() {
   (void)cached_has_bits;
 
    {
-    // float threshold = 1;
+    // float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     cached_has_bits = this_._impl_._has_bits_[0];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
@@ -3701,6 +3522,13 @@ PROTOBUF_NDEBUG_INLINE HybridRoutingPolicy::Impl_::Impl_(
               PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.hard_filters_)>()
           , from.hard_filters_
         }
+        ,
+        models_ {
+          visibility, ::_pbi::InternalMetadataOffset::Build<
+              ::runanywhere::v1::HybridRoutingPolicy,
+              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.models_)>()
+          , from.models_
+        }
      {}
 
 HybridRoutingPolicy::HybridRoutingPolicy(
@@ -3718,10 +3546,16 @@ HybridRoutingPolicy::HybridRoutingPolicy(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.cascade_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+  _impl_.cascade_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.cascade_)
                 : nullptr;
-  _impl_.rank_ = from._impl_.rank_;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, mode_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, mode_),
+           offsetof(Impl_, attempt_timeout_ms_) -
+               offsetof(Impl_, mode_) +
+               sizeof(Impl_::attempt_timeout_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridRoutingPolicy)
 }
@@ -3733,6 +3567,11 @@ PROTOBUF_NDEBUG_INLINE HybridRoutingPolicy::Impl_::Impl_(
             ::runanywhere::v1::HybridRoutingPolicy,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.hard_filters_)>()
          }
+        ,
+        models_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::HybridRoutingPolicy,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.models_)>()
+         }
      {}
 
 inline void HybridRoutingPolicy::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
@@ -3740,9 +3579,9 @@ inline void HybridRoutingPolicy::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE aren
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, cascade_),
            0,
-           offsetof(Impl_, rank_) -
+           offsetof(Impl_, attempt_timeout_ms_) -
                offsetof(Impl_, cascade_) +
-               sizeof(Impl_::rank_));
+               sizeof(Impl_::attempt_timeout_ms_));
 }
 HybridRoutingPolicy::~HybridRoutingPolicy() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.HybridRoutingPolicy)
@@ -3793,16 +3632,23 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.hard_filters_.Clear();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.models_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.cascade_ != nullptr);
       _impl_.cascade_->Clear();
     }
   }
-  _impl_.rank_ = 0;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
+    ::memset(&_impl_.mode_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.attempt_timeout_ms_) -
+        reinterpret_cast<char*>(&_impl_.mode_)) + sizeof(_impl_.attempt_timeout_ms_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -3840,18 +3686,40 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
   }
 
   // .runanywhere.v1.HybridCascade cascade = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         2, *this_._impl_.cascade_, this_._impl_.cascade_->GetCachedSize(), target,
         stream);
   }
 
-  // .runanywhere.v1.HybridRank rank = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_rank() != 0) {
+  // .runanywhere.v1.HybridInferenceMode mode = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_mode() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          3, this_._internal_rank(), target);
+          3, this_._internal_mode(), target);
+    }
+  }
+
+  // int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_attempt_timeout_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_attempt_timeout_ms(), target);
+    }
+  }
+
+  // repeated .runanywhere.v1.HybridModelDescriptor models = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_models_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_models().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              5, repfield, repfield.GetCachedSize(),
+              target, stream);
     }
   }
 
@@ -3880,7 +3748,7 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // repeated .runanywhere.v1.HybridFilter hard_filters = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_hard_filters_size();
@@ -3888,16 +3756,30 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
         total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
-    // .runanywhere.v1.HybridCascade cascade = 2;
+    // repeated .runanywhere.v1.HybridModelDescriptor models = 5;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1UL * this_._internal_models_size();
+      for (const auto& msg : this_._internal_models()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // .runanywhere.v1.HybridCascade cascade = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.cascade_);
     }
-    // .runanywhere.v1.HybridRank rank = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_rank() != 0) {
+    // .runanywhere.v1.HybridInferenceMode mode = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_mode() != 0) {
         total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_rank());
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_mode());
+      }
+    }
+    // int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_attempt_timeout_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_attempt_timeout_ms());
       }
     }
   }
@@ -3919,13 +3801,18 @@ void HybridRoutingPolicy::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_hard_filters()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_hard_filters());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_mutable_models()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_models());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.cascade_ != nullptr);
       if (_this->_impl_.cascade_ == nullptr) {
         _this->_impl_.cascade_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.cascade_);
@@ -3933,9 +3820,14 @@ void HybridRoutingPolicy::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.cascade_->MergeFrom(*from._impl_.cascade_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_rank() != 0) {
-        _this->_impl_.rank_ = from._impl_.rank_;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_mode() != 0) {
+        _this->_impl_.mode_ = from._impl_.mode_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_attempt_timeout_ms() != 0) {
+        _this->_impl_.attempt_timeout_ms_ = from._impl_.attempt_timeout_ms_;
       }
     }
   }
@@ -3957,9 +3849,10 @@ void HybridRoutingPolicy::InternalSwap(HybridRoutingPolicy* PROTOBUF_RESTRICT PR
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.hard_filters_.InternalSwap(&other->_impl_.hard_filters_);
+  _impl_.models_.InternalSwap(&other->_impl_.models_);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_)
-      + sizeof(HybridRoutingPolicy::_impl_.rank_)
+      PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.attempt_timeout_ms_)
+      + sizeof(HybridRoutingPolicy::_impl_.attempt_timeout_ms_)
       - PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_)>(
           reinterpret_cast<char*>(&_impl_.cascade_),
           reinterpret_cast<char*>(&other->_impl_.cascade_));
@@ -3986,7 +3879,7 @@ PROTOBUF_NDEBUG_INLINE HybridModelDescriptor::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         model_id_(arena, from.model_id_),
-        provider_(arena, from.provider_) {}
+        engine_(arena, from.engine_) {}
 
 HybridModelDescriptor::HybridModelDescriptor(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4002,13 +3895,7 @@ HybridModelDescriptor::HybridModelDescriptor(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, model_type_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, model_type_),
-           offsetof(Impl_, backend_) -
-               offsetof(Impl_, model_type_) +
-               sizeof(Impl_::backend_));
+  _impl_.is_on_device_ = from._impl_.is_on_device_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridModelDescriptor)
 }
@@ -4017,16 +3904,11 @@ PROTOBUF_NDEBUG_INLINE HybridModelDescriptor::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         model_id_(arena),
-        provider_(arena) {}
+        engine_(arena) {}
 
 inline void HybridModelDescriptor::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, model_type_),
-           0,
-           offsetof(Impl_, backend_) -
-               offsetof(Impl_, model_type_) +
-               sizeof(Impl_::backend_));
+  _impl_.is_on_device_ = {};
 }
 HybridModelDescriptor::~HybridModelDescriptor() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.HybridModelDescriptor)
@@ -4040,7 +3922,7 @@ inline void HybridModelDescriptor::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.provider_.Destroy();
+  this_._impl_.engine_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -4083,14 +3965,10 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.provider_.ClearNonDefaultToEmpty();
+      _impl_.engine_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
-    ::memset(&_impl_.model_type_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.backend_) -
-        reinterpret_cast<char*>(&_impl_.model_type_)) + sizeof(_impl_.backend_));
-  }
+  _impl_.is_on_device_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -4124,31 +4002,22 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
     }
   }
 
-  // .runanywhere.v1.HybridModelType model_type = 2;
+  // bool is_on_device = 2;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_model_type() != 0) {
+    if (this_._internal_is_on_device() != 0) {
       target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          2, this_._internal_model_type(), target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_is_on_device(), target);
     }
   }
 
-  // .runanywhere.v1.HybridBackendKind backend = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_backend() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          3, this_._internal_backend(), target);
-    }
-  }
-
-  // string provider = 4;
+  // string engine = 3;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_provider().empty()) {
-      const ::std::string& _s = this_._internal_provider();
+    if (!this_._internal_engine().empty()) {
+      const ::std::string& _s = this_._internal_engine();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.HybridModelDescriptor.provider");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.HybridModelDescriptor.engine");
+      target = stream->WriteStringMaybeAliased(3, _s, target);
     }
   }
 
@@ -4177,7 +4046,7 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     // string model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -4185,25 +4054,17 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string provider = 4;
+    // string engine = 3;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_provider().empty()) {
+      if (!this_._internal_engine().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_provider());
+                                        this_._internal_engine());
       }
     }
-    // .runanywhere.v1.HybridModelType model_type = 2;
+    // bool is_on_device = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_model_type() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_model_type());
-      }
-    }
-    // .runanywhere.v1.HybridBackendKind backend = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_backend() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_backend());
+      if (this_._internal_is_on_device() != 0) {
+        total_size += 2;
       }
     }
   }
@@ -4224,7 +4085,7 @@ void HybridModelDescriptor::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -4235,22 +4096,17 @@ void HybridModelDescriptor::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_provider().empty()) {
-        _this->_internal_set_provider(from._internal_provider());
+      if (!from._internal_engine().empty()) {
+        _this->_internal_set_engine(from._internal_engine());
       } else {
-        if (_this->_impl_.provider_.IsDefault()) {
-          _this->_internal_set_provider("");
+        if (_this->_impl_.engine_.IsDefault()) {
+          _this->_internal_set_engine("");
         }
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_model_type() != 0) {
-        _this->_impl_.model_type_ = from._impl_.model_type_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_backend() != 0) {
-        _this->_impl_.backend_ = from._impl_.backend_;
+      if (from._internal_is_on_device() != 0) {
+        _this->_impl_.is_on_device_ = from._impl_.is_on_device_;
       }
     }
   }
@@ -4274,13 +4130,8 @@ void HybridModelDescriptor::InternalSwap(HybridModelDescriptor* PROTOBUF_RESTRIC
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.provider_, &other->_impl_.provider_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_)
-      + sizeof(HybridModelDescriptor::_impl_.backend_)
-      - PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_)>(
-          reinterpret_cast<char*>(&_impl_.model_type_),
-          reinterpret_cast<char*>(&other->_impl_.model_type_));
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.engine_, &other->_impl_.engine_, arena);
+  swap(_impl_.is_on_device_, other->_impl_.is_on_device_);
 }
 
 ::google::protobuf::Metadata HybridModelDescriptor::GetMetadata() const {
@@ -4321,11 +4172,11 @@ HybridRoutedMetadata::HybridRoutedMetadata(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, was_fallback_),
+               offsetof(Impl_, attempt_count_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, was_fallback_),
+               offsetof(Impl_, attempt_count_),
            offsetof(Impl_, primary_confidence_) -
-               offsetof(Impl_, was_fallback_) +
+               offsetof(Impl_, attempt_count_) +
                sizeof(Impl_::primary_confidence_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridRoutedMetadata)
@@ -4340,10 +4191,10 @@ PROTOBUF_NDEBUG_INLINE HybridRoutedMetadata::Impl_::Impl_(
 inline void HybridRoutedMetadata::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, was_fallback_),
+               offsetof(Impl_, attempt_count_),
            0,
            offsetof(Impl_, primary_confidence_) -
-               offsetof(Impl_, was_fallback_) +
+               offsetof(Impl_, attempt_count_) +
                sizeof(Impl_::primary_confidence_));
 }
 HybridRoutedMetadata::~HybridRoutedMetadata() {
@@ -4404,10 +4255,10 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
       _impl_.primary_error_message_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
-    ::memset(&_impl_.was_fallback_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
+    ::memset(&_impl_.attempt_count_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.primary_confidence_) -
-        reinterpret_cast<char*>(&_impl_.was_fallback_)) + sizeof(_impl_.primary_confidence_));
+        reinterpret_cast<char*>(&_impl_.attempt_count_)) + sizeof(_impl_.primary_confidence_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4443,7 +4294,7 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
   }
 
   // bool was_fallback = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_was_fallback() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -4452,7 +4303,7 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
   }
 
   // int32 attempt_count = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_attempt_count() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
@@ -4461,7 +4312,7 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
   }
 
   // int32 primary_error_code = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_primary_error_code() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -4479,21 +4330,26 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
     }
   }
 
-  // float confidence = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          6, this_._internal_confidence(), target);
-    }
+  // optional float confidence = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(
+        6, this_._internal_confidence(), target);
   }
 
-  // float primary_confidence = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_primary_confidence()) != 0) {
+  // optional float primary_confidence = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(
+        7, this_._internal_primary_confidence(), target);
+  }
+
+  // bool served_on_device = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_served_on_device() != 0) {
       target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          7, this_._internal_primary_confidence(), target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          8, this_._internal_served_on_device(), target);
     }
   }
 
@@ -4522,7 +4378,8 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  total_size += ::absl::popcount(0x000000c0U & cached_has_bits) * 5;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string chosen_model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_chosen_model_id().empty()) {
@@ -4537,36 +4394,30 @@ PROTOBUF_NOINLINE void HybridRoutedMetadata::Clear() {
                                         this_._internal_primary_error_message());
       }
     }
-    // bool was_fallback = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_was_fallback() != 0) {
-        total_size += 2;
-      }
-    }
     // int32 attempt_count = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_attempt_count() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_attempt_count());
       }
     }
     // int32 primary_error_code = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_primary_error_code() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_primary_error_code());
       }
     }
-    // float confidence = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
-        total_size += 5;
+    // bool was_fallback = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_was_fallback() != 0) {
+        total_size += 2;
       }
     }
-    // float primary_confidence = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_primary_confidence()) != 0) {
-        total_size += 5;
+    // bool served_on_device = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_served_on_device() != 0) {
+        total_size += 2;
       }
     }
   }
@@ -4587,7 +4438,7 @@ void HybridRoutedMetadata::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_chosen_model_id().empty()) {
         _this->_internal_set_chosen_model_id(from._internal_chosen_model_id());
@@ -4607,29 +4458,30 @@ void HybridRoutedMetadata::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_was_fallback() != 0) {
-        _this->_impl_.was_fallback_ = from._impl_.was_fallback_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_attempt_count() != 0) {
         _this->_impl_.attempt_count_ = from._impl_.attempt_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_primary_error_code() != 0) {
         _this->_impl_.primary_error_code_ = from._impl_.primary_error_code_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_was_fallback() != 0) {
+        _this->_impl_.was_fallback_ = from._impl_.was_fallback_;
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
-        _this->_impl_.confidence_ = from._impl_.confidence_;
+      if (from._internal_served_on_device() != 0) {
+        _this->_impl_.served_on_device_ = from._impl_.served_on_device_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_primary_confidence()) != 0) {
-        _this->_impl_.primary_confidence_ = from._impl_.primary_confidence_;
-      }
+      _this->_impl_.confidence_ = from._impl_.confidence_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _this->_impl_.primary_confidence_ = from._impl_.primary_confidence_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -4656,76 +4508,13 @@ void HybridRoutedMetadata::InternalSwap(HybridRoutedMetadata* PROTOBUF_RESTRICT 
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.primary_confidence_)
       + sizeof(HybridRoutedMetadata::_impl_.primary_confidence_)
-      - PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.was_fallback_)>(
-          reinterpret_cast<char*>(&_impl_.was_fallback_),
-          reinterpret_cast<char*>(&other->_impl_.was_fallback_));
+      - PROTOBUF_FIELD_OFFSET(HybridRoutedMetadata, _impl_.attempt_count_)>(
+          reinterpret_cast<char*>(&_impl_.attempt_count_),
+          reinterpret_cast<char*>(&other->_impl_.attempt_count_));
 }
 
 ::google::protobuf::Metadata HybridRoutedMetadata::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-HybridRoutingContext::HybridRoutingContext(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, HybridRoutingContext_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.HybridRoutingContext)
-}
-HybridRoutingContext::HybridRoutingContext(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const HybridRoutingContext& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, HybridRoutingContext_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  HybridRoutingContext* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridRoutingContext)
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull HybridRoutingContext_class_data_ =
-        HybridRoutingContext::InternalGenerateClassData_(HybridRoutingContext_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-HybridRoutingContext::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&HybridRoutingContext_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(HybridRoutingContext_class_data_.tc_table);
-  return HybridRoutingContext_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-HybridRoutingContext::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&HybridRoutingContext_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&HybridRoutingContext_globals_));
-  return HybridRoutingContext_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const HybridRoutingContext::ParseTableT_
-    HybridRoutingContext::_table_ =
-        HybridRoutingContext::InternalGenerateParseTable_(HybridRoutingContext_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-
-
-
-
-
-
-
-::google::protobuf::Metadata HybridRoutingContext::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
@@ -5260,12 +5049,12 @@ PROTOBUF_NOINLINE void HybridSttTranscribeOptions::Clear() {
     }
   }
 
-  // int32 audio_format = 3;
+  // .runanywhere.v1.AudioFormat audio_format = 3;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_audio_format() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_audio_format(), target);
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          3, this_._internal_audio_format(), target);
     }
   }
 
@@ -5309,11 +5098,11 @@ PROTOBUF_NOINLINE void HybridSttTranscribeOptions::Clear() {
             this_._internal_sample_rate());
       }
     }
-    // int32 audio_format = 3;
+    // .runanywhere.v1.AudioFormat audio_format = 3;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_audio_format() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_audio_format());
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_audio_format());
       }
     }
   }
@@ -5420,10 +5209,7 @@ HybridSttTranscribeRequest::HybridSttTranscribeRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.context_ = (CheckHasBit(cached_has_bits, 0x00000002U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.context_)
-                : nullptr;
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -5437,12 +5223,7 @@ PROTOBUF_NDEBUG_INLINE HybridSttTranscribeRequest::Impl_::Impl_(
 
 inline void HybridSttTranscribeRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, context_),
-           0,
-           offsetof(Impl_, options_) -
-               offsetof(Impl_, context_) +
-               sizeof(Impl_::options_));
+  _impl_.options_ = {};
 }
 HybridSttTranscribeRequest::~HybridSttTranscribeRequest() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.HybridSttTranscribeRequest)
@@ -5456,7 +5237,6 @@ inline void HybridSttTranscribeRequest::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.audio_bytes_.Destroy();
-  delete this_._impl_.context_;
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
 }
@@ -5495,15 +5275,11 @@ PROTOBUF_NOINLINE void HybridSttTranscribeRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.audio_bytes_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(_impl_.context_ != nullptr);
-      _impl_.context_->Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
     }
@@ -5539,17 +5315,10 @@ PROTOBUF_NOINLINE void HybridSttTranscribeRequest::Clear() {
     }
   }
 
-  // .runanywhere.v1.HybridRoutingContext context = 2;
+  // .runanywhere.v1.HybridSttTranscribeOptions options = 2;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        2, *this_._impl_.context_, this_._impl_.context_->GetCachedSize(), target,
-        stream);
-  }
-
-  // .runanywhere.v1.HybridSttTranscribeOptions options = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        3, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
+        2, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
   }
 
@@ -5578,7 +5347,7 @@ PROTOBUF_NOINLINE void HybridSttTranscribeRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     // bytes audio_bytes = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_audio_bytes().empty()) {
@@ -5586,13 +5355,8 @@ PROTOBUF_NOINLINE void HybridSttTranscribeRequest::Clear() {
                                         this_._internal_audio_bytes());
       }
     }
-    // .runanywhere.v1.HybridRoutingContext context = 2;
+    // .runanywhere.v1.HybridSttTranscribeOptions options = 2;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.context_);
-    }
-    // .runanywhere.v1.HybridSttTranscribeOptions options = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
     }
@@ -5615,7 +5379,7 @@ void HybridSttTranscribeRequest::MergeImpl(::google::protobuf::MessageLite& to_m
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_audio_bytes().empty()) {
         _this->_internal_set_audio_bytes(from._internal_audio_bytes());
@@ -5626,14 +5390,6 @@ void HybridSttTranscribeRequest::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(from._impl_.context_ != nullptr);
-      if (_this->_impl_.context_ == nullptr) {
-        _this->_impl_.context_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.context_);
-      } else {
-        _this->_impl_.context_->MergeFrom(*from._impl_.context_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
@@ -5662,12 +5418,7 @@ void HybridSttTranscribeRequest::InternalSwap(HybridSttTranscribeRequest* PROTOB
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.audio_bytes_, &other->_impl_.audio_bytes_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.options_)
-      + sizeof(HybridSttTranscribeRequest::_impl_.options_)
-      - PROTOBUF_FIELD_OFFSET(HybridSttTranscribeRequest, _impl_.context_)>(
-          reinterpret_cast<char*>(&_impl_.context_),
-          reinterpret_cast<char*>(&other->_impl_.context_));
+  swap(_impl_.options_, other->_impl_.options_);
 }
 
 ::google::protobuf::Metadata HybridSttTranscribeRequest::GetMetadata() const {
@@ -5691,8 +5442,7 @@ PROTOBUF_NDEBUG_INLINE HybridSttTranscribeResponse::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         text_(arena, from.text_),
-        detected_language_(arena, from.detected_language_),
-        error_msg_(arena, from.error_msg_) {}
+        detected_language_(arena, from.detected_language_) {}
 
 HybridSttTranscribeResponse::HybridSttTranscribeResponse(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5709,7 +5459,7 @@ HybridSttTranscribeResponse::HybridSttTranscribeResponse(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.routing_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.routing_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.routing_)
                 : nullptr;
   _impl_.rc_ = from._impl_.rc_;
@@ -5721,8 +5471,7 @@ PROTOBUF_NDEBUG_INLINE HybridSttTranscribeResponse::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         text_(arena),
-        detected_language_(arena),
-        error_msg_(arena) {}
+        detected_language_(arena) {}
 
 inline void HybridSttTranscribeResponse::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -5746,7 +5495,6 @@ inline void HybridSttTranscribeResponse::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
   this_._impl_.detected_language_.Destroy();
-  this_._impl_.error_msg_.Destroy();
   delete this_._impl_.routing_;
   this_._impl_.~Impl_();
 }
@@ -5785,7 +5533,7 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.text_.ClearNonDefaultToEmpty();
     }
@@ -5793,9 +5541,6 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
       _impl_.detected_language_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_msg_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.routing_ != nullptr);
       _impl_.routing_->Clear();
     }
@@ -5825,7 +5570,7 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // int32 rc = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_rc() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<1>(
@@ -5854,20 +5599,10 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
   }
 
   // .runanywhere.v1.HybridRoutedMetadata routing = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         4, *this_._impl_.routing_, this_._impl_.routing_->GetCachedSize(), target,
         stream);
-  }
-
-  // string error_msg = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_error_msg().empty()) {
-      const ::std::string& _s = this_._internal_error_msg();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.HybridSttTranscribeResponse.error_msg");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5895,7 +5630,7 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     // string text = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_text().empty()) {
@@ -5910,20 +5645,13 @@ PROTOBUF_NOINLINE void HybridSttTranscribeResponse::Clear() {
                                         this_._internal_detected_language());
       }
     }
-    // string error_msg = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_error_msg().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_msg());
-      }
-    }
     // .runanywhere.v1.HybridRoutedMetadata routing = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.routing_);
     }
     // int32 rc = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_rc() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_rc());
@@ -5948,7 +5676,7 @@ void HybridSttTranscribeResponse::MergeImpl(::google::protobuf::MessageLite& to_
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_text().empty()) {
         _this->_internal_set_text(from._internal_text());
@@ -5968,15 +5696,6 @@ void HybridSttTranscribeResponse::MergeImpl(::google::protobuf::MessageLite& to_
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_error_msg().empty()) {
-        _this->_internal_set_error_msg(from._internal_error_msg());
-      } else {
-        if (_this->_impl_.error_msg_.IsDefault()) {
-          _this->_internal_set_error_msg("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.routing_ != nullptr);
       if (_this->_impl_.routing_ == nullptr) {
         _this->_impl_.routing_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.routing_);
@@ -5984,7 +5703,7 @@ void HybridSttTranscribeResponse::MergeImpl(::google::protobuf::MessageLite& to_
         _this->_impl_.routing_->MergeFrom(*from._impl_.routing_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_rc() != 0) {
         _this->_impl_.rc_ = from._impl_.rc_;
       }
@@ -6011,7 +5730,6 @@ void HybridSttTranscribeResponse::InternalSwap(HybridSttTranscribeResponse* PROT
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.detected_language_, &other->_impl_.detected_language_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_msg_, &other->_impl_.error_msg_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(HybridSttTranscribeResponse, _impl_.rc_)
       + sizeof(HybridSttTranscribeResponse::_impl_.rc_)

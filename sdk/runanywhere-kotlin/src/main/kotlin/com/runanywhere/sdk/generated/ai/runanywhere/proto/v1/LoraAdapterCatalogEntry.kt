@@ -30,25 +30,15 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Catalog entry for a LoRA adapter registered with the SDK.
- * Apps register entries at startup; SDKs query "which adapters work with this
- * model" without reinventing detection logic per platform.
- *
- * `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
- * Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
- * nullable / has-bit-tracked field.
- * ---------------------------------------------------------------------------
+ * The adapter-specific facts only. Everything generic about the artifact —
+ * where it is fetched from, how large it is, how to verify it, who published
+ * it, and whether it has been fetched — lives on the ModelInfo record for
+ * this adapter.
  */
 public class LoraAdapterCatalogEntry(
-  /**
-   * unique adapter identifier
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -56,9 +46,6 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 0,
   )
   public val id: String = "",
-  /**
-   * human-readable display name
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -66,155 +53,52 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 1,
   )
   public val name: String = "",
-  /**
-   * short description
-   */
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
-  )
-  public val description: String = "",
-  /**
-   * direct download URL (.gguf)
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val url: String = "",
-  /**
-   * filename to save as on disk
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val filename: String = "",
   compatible_models: List<String> = emptyList(),
   /**
-   * file size, 0 if unknown
+   * Publisher-recommended strength. Unset means 1.0.
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sizeBytes",
-    schemaIndex = 6,
-  )
-  public val size_bytes: Long = 0L,
-  /**
-   * optional adapter author
-   */
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 7,
-  )
-  public val author: String? = null,
-  /**
-   * recommended adapter scale
-   */
-  @field:WireField(
-    tag = 9,
+    tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "defaultScale",
-    schemaIndex = 8,
+    schemaIndex = 3,
   )
-  public val default_scale: Float = 0f,
-  /**
-   * lowercase hex SHA-256
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "checksumSha256",
-    schemaIndex = 9,
-  )
-  public val checksum_sha256: String? = null,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 10,
-  )
-  public val license: String? = null,
+  public val default_scale: Float? = null,
   tags: List<String> = emptyList(),
-  metadata: Map<String, String> = emptyMap(),
   /**
-   * Stable platform-normalized local artifact path after native/Web has
-   * completed download/import and reported the result back to commons.
-   */
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "localPath",
-    schemaIndex = 13,
-  )
-  public val local_path: String? = null,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "isDownloaded",
-    schemaIndex = 14,
-  )
-  public val is_downloaded: Boolean? = null,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    jsonName = "downloadedAtUnixMs",
-    schemaIndex = 15,
-  )
-  public val downloaded_at_unix_ms: Long? = null,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "isImported",
-    schemaIndex = 16,
-  )
-  public val is_imported: Boolean? = null,
-  @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "statusMessage",
-    schemaIndex = 17,
-  )
-  public val status_message: String? = null,
-  unknownFields: ByteString = ByteString.EMPTY,
-) : Message<LoraAdapterCatalogEntry, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * explicit base model IDs
+   * Non-empty means the adapter file is on disk. This is the single
+   * definition of "downloaded".
    */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "localPath",
+    schemaIndex = 5,
+  )
+  public val local_path: String? = null,
+  unknownFields: ByteString = ByteString.EMPTY,
+) : Message<LoraAdapterCatalogEntry, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Explicit base model ids this adapter works with.
+   */
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
     jsonName = "compatibleModels",
-    schemaIndex = 5,
+    schemaIndex = 2,
   )
   public val compatible_models: List<String> =
       immutableCopyOf("compatible_models", compatible_models)
 
   @field:WireField(
-    tag = 12,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 11,
+    schemaIndex = 4,
   )
   public val tags: List<String> = immutableCopyOf("tags", tags)
-
-  @field:WireField(
-    tag = 13,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 12,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -228,22 +112,10 @@ public class LoraAdapterCatalogEntry(
     if (unknownFields != other.unknownFields) return false
     if (id != other.id) return false
     if (name != other.name) return false
-    if (description != other.description) return false
-    if (url != other.url) return false
-    if (filename != other.filename) return false
     if (compatible_models != other.compatible_models) return false
-    if (size_bytes != other.size_bytes) return false
-    if (author != other.author) return false
     if (default_scale != other.default_scale) return false
-    if (checksum_sha256 != other.checksum_sha256) return false
-    if (license != other.license) return false
     if (tags != other.tags) return false
-    if (metadata != other.metadata) return false
     if (local_path != other.local_path) return false
-    if (is_downloaded != other.is_downloaded) return false
-    if (downloaded_at_unix_ms != other.downloaded_at_unix_ms) return false
-    if (is_imported != other.is_imported) return false
-    if (status_message != other.status_message) return false
     return true
   }
 
@@ -253,22 +125,10 @@ public class LoraAdapterCatalogEntry(
       result = unknownFields.hashCode()
       result = result * 37 + id.hashCode()
       result = result * 37 + name.hashCode()
-      result = result * 37 + description.hashCode()
-      result = result * 37 + url.hashCode()
-      result = result * 37 + filename.hashCode()
       result = result * 37 + compatible_models.hashCode()
-      result = result * 37 + size_bytes.hashCode()
-      result = result * 37 + (author?.hashCode() ?: 0)
-      result = result * 37 + default_scale.hashCode()
-      result = result * 37 + (checksum_sha256?.hashCode() ?: 0)
-      result = result * 37 + (license?.hashCode() ?: 0)
+      result = result * 37 + (default_scale?.hashCode() ?: 0)
       result = result * 37 + tags.hashCode()
-      result = result * 37 + metadata.hashCode()
       result = result * 37 + (local_path?.hashCode() ?: 0)
-      result = result * 37 + (is_downloaded?.hashCode() ?: 0)
-      result = result * 37 + (downloaded_at_unix_ms?.hashCode() ?: 0)
-      result = result * 37 + (is_imported?.hashCode() ?: 0)
-      result = result * 37 + (status_message?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -278,46 +138,22 @@ public class LoraAdapterCatalogEntry(
     val result = mutableListOf<String>()
     result += """id=${sanitize(id)}"""
     result += """name=${sanitize(name)}"""
-    result += """description=${sanitize(description)}"""
-    result += """url=${sanitize(url)}"""
-    result += """filename=${sanitize(filename)}"""
     if (compatible_models.isNotEmpty()) result += """compatible_models=${sanitize(compatible_models)}"""
-    result += """size_bytes=$size_bytes"""
-    if (author != null) result += """author=${sanitize(author)}"""
-    result += """default_scale=$default_scale"""
-    if (checksum_sha256 != null) result += """checksum_sha256=${sanitize(checksum_sha256)}"""
-    if (license != null) result += """license=${sanitize(license)}"""
+    if (default_scale != null) result += """default_scale=$default_scale"""
     if (tags.isNotEmpty()) result += """tags=${sanitize(tags)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (local_path != null) result += """local_path=${sanitize(local_path)}"""
-    if (is_downloaded != null) result += """is_downloaded=$is_downloaded"""
-    if (downloaded_at_unix_ms != null) result += """downloaded_at_unix_ms=$downloaded_at_unix_ms"""
-    if (is_imported != null) result += """is_imported=$is_imported"""
-    if (status_message != null) result += """status_message=${sanitize(status_message)}"""
     return result.joinToString(prefix = "LoraAdapterCatalogEntry{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     id: String = this.id,
     name: String = this.name,
-    description: String = this.description,
-    url: String = this.url,
-    filename: String = this.filename,
     compatible_models: List<String> = this.compatible_models,
-    size_bytes: Long = this.size_bytes,
-    author: String? = this.author,
-    default_scale: Float = this.default_scale,
-    checksum_sha256: String? = this.checksum_sha256,
-    license: String? = this.license,
+    default_scale: Float? = this.default_scale,
     tags: List<String> = this.tags,
-    metadata: Map<String, String> = this.metadata,
     local_path: String? = this.local_path,
-    is_downloaded: Boolean? = this.is_downloaded,
-    downloaded_at_unix_ms: Long? = this.downloaded_at_unix_ms,
-    is_imported: Boolean? = this.is_imported,
-    status_message: String? = this.status_message,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterCatalogEntry = LoraAdapterCatalogEntry(id, name, description, url, filename, compatible_models, size_bytes, author, default_scale, checksum_sha256, license, tags, metadata, local_path, is_downloaded, downloaded_at_unix_ms, is_imported, status_message, unknownFields)
+  ): LoraAdapterCatalogEntry = LoraAdapterCatalogEntry(id, name, compatible_models, default_scale, tags, local_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -330,9 +166,6 @@ public class LoraAdapterCatalogEntry(
       null, 
       "lora_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: LoraAdapterCatalogEntry): Int {
         var size = value.unknownFields.size
         if (value.id != "") {
@@ -341,32 +174,10 @@ public class LoraAdapterCatalogEntry(
         if (value.name != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.name)
         }
-        if (value.description != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.description)
-        }
-        if (value.url != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.url)
-        }
-        if (value.filename != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.filename)
-        }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.compatible_models)
-        if (value.size_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.size_bytes)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.author)
-        if (!value.default_scale.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(9, value.default_scale)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.checksum_sha256)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.license)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(12, value.tags)
-        size += metadataAdapter.encodedSizeWithTag(13, value.metadata)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.local_path)
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.is_downloaded)
-        size += ProtoAdapter.INT64.encodedSizeWithTag(16, value.downloaded_at_unix_ms)
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(17, value.is_imported)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.status_message)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.compatible_models)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.default_scale)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.tags)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.local_path)
         return size
       }
 
@@ -377,63 +188,19 @@ public class LoraAdapterCatalogEntry(
         if (value.name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.name)
         }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.description)
-        }
-        if (value.url != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.url)
-        }
-        if (value.filename != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.filename)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.compatible_models)
-        if (value.size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.size_bytes)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.author)
-        if (!value.default_scale.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 9, value.default_scale)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.license)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 12, value.tags)
-        metadataAdapter.encodeWithTag(writer, 13, value.metadata)
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.local_path)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.is_downloaded)
-        ProtoAdapter.INT64.encodeWithTag(writer, 16, value.downloaded_at_unix_ms)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.is_imported)
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.status_message)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.compatible_models)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.default_scale)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.tags)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.local_path)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterCatalogEntry) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.status_message)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.is_imported)
-        ProtoAdapter.INT64.encodeWithTag(writer, 16, value.downloaded_at_unix_ms)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.is_downloaded)
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.local_path)
-        metadataAdapter.encodeWithTag(writer, 13, value.metadata)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 12, value.tags)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.license)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
-        if (!value.default_scale.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 9, value.default_scale)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.author)
-        if (value.size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.size_bytes)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.compatible_models)
-        if (value.filename != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.filename)
-        }
-        if (value.url != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.url)
-        }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.description)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.local_path)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.tags)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.default_scale)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.compatible_models)
         if (value.name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.name)
         }
@@ -445,64 +212,28 @@ public class LoraAdapterCatalogEntry(
       override fun decode(reader: ProtoReader): LoraAdapterCatalogEntry {
         var id: String = ""
         var name: String = ""
-        var description: String = ""
-        var url: String = ""
-        var filename: String = ""
         val compatible_models = mutableListOf<String>()
-        var size_bytes: Long = 0L
-        var author: String? = null
-        var default_scale: Float = 0f
-        var checksum_sha256: String? = null
-        var license: String? = null
+        var default_scale: Float? = null
         val tags = mutableListOf<String>()
-        val metadata = mutableMapOf<String, String>()
         var local_path: String? = null
-        var is_downloaded: Boolean? = null
-        var downloaded_at_unix_ms: Long? = null
-        var is_imported: Boolean? = null
-        var status_message: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> name = ProtoAdapter.STRING.decode(reader)
-            3 -> description = ProtoAdapter.STRING.decode(reader)
-            4 -> url = ProtoAdapter.STRING.decode(reader)
-            5 -> filename = ProtoAdapter.STRING.decode(reader)
-            6 -> compatible_models.add(ProtoAdapter.STRING.decode(reader))
-            7 -> size_bytes = ProtoAdapter.INT64.decode(reader)
-            8 -> author = ProtoAdapter.STRING.decode(reader)
-            9 -> default_scale = ProtoAdapter.FLOAT.decode(reader)
-            10 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
-            11 -> license = ProtoAdapter.STRING.decode(reader)
-            12 -> tags.add(ProtoAdapter.STRING.decode(reader))
-            13 -> metadata.putAll(metadataAdapter.decode(reader))
-            14 -> local_path = ProtoAdapter.STRING.decode(reader)
-            15 -> is_downloaded = ProtoAdapter.BOOL.decode(reader)
-            16 -> downloaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
-            17 -> is_imported = ProtoAdapter.BOOL.decode(reader)
-            18 -> status_message = ProtoAdapter.STRING.decode(reader)
+            3 -> compatible_models.add(ProtoAdapter.STRING.decode(reader))
+            4 -> default_scale = ProtoAdapter.FLOAT.decode(reader)
+            5 -> tags.add(ProtoAdapter.STRING.decode(reader))
+            6 -> local_path = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterCatalogEntry(
           id = id,
           name = name,
-          description = description,
-          url = url,
-          filename = filename,
           compatible_models = compatible_models,
-          size_bytes = size_bytes,
-          author = author,
           default_scale = default_scale,
-          checksum_sha256 = checksum_sha256,
-          license = license,
           tags = tags,
-          metadata = metadata,
           local_path = local_path,
-          is_downloaded = is_downloaded,
-          downloaded_at_unix_ms = downloaded_at_unix_ms,
-          is_imported = is_imported,
-          status_message = status_message,
           unknownFields = unknownFields
         )
       }

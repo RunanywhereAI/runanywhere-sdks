@@ -37,6 +37,7 @@ import {
   type BrowserStorageAnalyzerModule,
 } from '../Adapters/StorageAdapter.js';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
+import { TelemetryAdapter, type TelemetryModule } from '../Adapters/TelemetryAdapter.js';
 import {
   getModuleForCapability,
   registerWasmModule,
@@ -125,6 +126,7 @@ export class CommonsModule {
   private _deviceRegistrationAdapter: DeviceRegistrationAdapter | null = null;
   /** Browser filesystem/quota callbacks and native storage-analyzer handle. */
   private _storageAnalyzerAdapter: BrowserStorageAnalyzerAdapter | null = null;
+  private _telemetryAdapter: TelemetryAdapter | null = null;
 
   /** Override the default URL to the racommons.js glue file. */
   wasmUrl: string | null = null;
@@ -175,6 +177,16 @@ export class CommonsModule {
       failures.push(error);
     };
 
+    // Telemetry first: it flushes the final batch through the still-registered
+    // fetch transport before the module + event sink are torn down.
+    if (this._telemetryAdapter) {
+      try {
+        this._telemetryAdapter.uninstall();
+        this._telemetryAdapter = null;
+      } catch (error) {
+        recordFailure('TelemetryAdapter uninstall', error);
+      }
+    }
     if (this._storageAnalyzerAdapter) {
       try {
         this._storageAnalyzerAdapter.cleanup();
@@ -258,6 +270,7 @@ export class CommonsModule {
       this._storageAnalyzerAdapter = await BrowserStorageAnalyzerAdapter.install(
         existing as unknown as BrowserStorageAnalyzerModule,
       );
+      this._telemetryAdapter = TelemetryAdapter.install(existing as unknown as TelemetryModule, configuration);
       this._loaded = true;
       return;
     }
@@ -278,8 +291,11 @@ export class CommonsModule {
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
       this._module = await createModule({
-        print: (text) => logger.info(text),
-        printErr: (text) => logger.info(text),
+        // Both Emscripten streams carry levelled commons lines (commons sends
+        // every diagnostic to stderr), so read the level out of the line
+        // rather than flattening the stream onto one console method.
+        print: (text) => logger.native(text, 'out'),
+        printErr: (text) => logger.native(text, 'err'),
         locateFile: (path) => baseUrl + path,
       });
       this._nativeShutdownComplete = false;
@@ -303,10 +319,19 @@ export class CommonsModule {
       // commons module runs with NULL callbacks (stderr logging, file ops
       // return RAC_ERROR_FEATURE_NOT_AVAILABLE).
       await this._initRACommons();
+      // Install the telemetry sink BEFORE phase 1 so the sdk.init events emitted
+      // during phase 1 are captured (desktop bindings create the telemetry
+      // manager before rac_sdk_init_phase1 for the same reason). The adapter
+      // delivers batches over the browser fetch API, independent of any WASM
+      // transport registration.
+      this._telemetryAdapter = TelemetryAdapter.install(
+        this._module as unknown as TelemetryModule,
+        configuration,
+      );
       // Lazy import to avoid a static circular dependency with
       // `../Public/RunAnywhere`.
-      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere.js');
-      completeNativePhase1ForModule(this._module);
+      const { completeNativePhase1ForModule } = await import('../Public/SDKCore.js');
+      await completeNativePhase1ForModule(this._module);
 
       // Register against the 'commons' capability so the SDK facade's
       // commons-level calls (init, auth, model registry, lifecycle, events,

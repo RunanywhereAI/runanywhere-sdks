@@ -116,11 +116,14 @@ int main() {
     CHECK(callback_event.severity() == runanywhere::v1::ERROR_SEVERITY_ERROR,
           "failure event severity is error");
     CHECK(callback_event.has_error(), "failure event includes envelope error");
-    CHECK(callback_event.has_failure(), "failure event uses typed payload");
-    CHECK(callback_event.failure().error().c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
-          "failure payload preserves C ABI error code");
-    CHECK(callback_event.failure().operation() == "unitTestOperation",
-          "failure payload preserves operation");
+    // FailureEvent was deleted: a failure is any event whose envelope `error`
+    // is set, with component/operation/error/retryable living directly on
+    // the SDKEvent envelope (component, operation_id, error, error.retryable)
+    // rather than a separate typed payload.
+    CHECK(callback_event.error().c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
+          "failure envelope preserves C ABI error code");
+    CHECK(callback_event.operation_id() == "unitTestOperation",
+          "failure envelope preserves operation");
 
     runanywhere::v1::SDKEvent polled_failure;
     CHECK(poll_event(&polled_failure), "poll returns queued SDKEvent bytes");
@@ -161,7 +164,7 @@ int main() {
     rac_sdk_event_clear_queue();
     {
         runanywhere::v1::SdkInitPhase1Request phase1_request;
-        phase1_request.set_environment(runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT);
+        phase1_request.set_environment(runanywhere::v1::SDK_ENVIRONMENT_DEVELOPMENT);
         phase1_request.set_device_id("device-1");
         const std::string phase1_bytes = phase1_request.SerializeAsString();
         rac_proto_buffer_t phase1_result;
@@ -319,7 +322,7 @@ int main() {
         if (!poll_event(&polled)) {
             break;
         }
-        if (polled.has_failure() && polled.failure().operation() == "burstOperation") {
+        if (polled.has_error() && polled.operation_id() == "burstOperation") {
             ++decoded;
         }
     }

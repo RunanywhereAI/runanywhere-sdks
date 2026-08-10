@@ -1,10 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,21 +27,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.components.rememberBreath
 import com.runanywhere.runanywhereai.ui.screens.models.brand
 import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
-import com.runanywhere.runanywhereai.ui.screens.models.shortLabel
+import com.runanywhere.runanywhereai.ui.screens.models.consumerBackendShortLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatTopBar(
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
@@ -77,6 +75,7 @@ fun ChatTopBar(
         title = {
             ModelCard(
                 model = model,
+                hostedModel = hostedModel,
                 fallbackModelName = conversationModelName,
                 generating = generating,
                 onClick = onModelClick,
@@ -89,7 +88,7 @@ fun ChatTopBar(
             IconButton(onClick = onNewChat) {
                 Icon(RACIcons.Outline.Plus, contentDescription = "New chat")
             }
-            if (hasMessages || model?.supports_lora == true) {
+            if (hasMessages || (hostedModel == null && model?.supports_lora == true)) {
                 IconButton(onClick = { overflowExpanded = true }) {
                     Icon(RACIcons.Outline.DotsVertical, contentDescription = "More chat actions")
                 }
@@ -107,7 +106,7 @@ fun ChatTopBar(
                             },
                         )
                     }
-                    if (model?.supports_lora == true) {
+                    if (hostedModel == null && model?.supports_lora == true) {
                         DropdownMenuItem(
                             text = { Text(if (loraActive) "Adapters active" else "Adapters") },
                             leadingIcon = { Icon(RACIcons.Outline.Adjustments, contentDescription = null) },
@@ -126,42 +125,38 @@ fun ChatTopBar(
 @Composable
 private fun ModelCard(
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     fallbackModelName: String?,
     generating: Boolean,
     onClick: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    val brand = model?.brand()
+    val brand = if (hostedModel == null) model?.brand() else null
     // Mirrors iOS loadConversation restore: with no model loaded, the
     // conversation's recorded model is shown as a preselection (not loaded).
     val statusText = when {
         generating -> "Generating…"
+        hostedModel != null -> "Ready on host"
         model != null -> "Ready"
         fallbackModelName != null -> "Not loaded"
         else -> "Tap to choose"
     }
-    val backendStatusText = if (model != null && !generating) {
-        "${model.framework.shortLabel()} · $statusText"
+    val backendStatusText = if (hostedModel != null && !generating) {
+        "Host · $statusText"
+    } else if (model != null && !generating) {
+        "${model.framework.consumerBackendShortLabel()} · $statusText"
     } else {
         statusText
     }
     val dotColor = when {
         generating -> MaterialTheme.colorScheme.primary
-        model != null -> primaryGreen
+        hostedModel != null || model != null -> primaryGreen
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val dotAlpha = if (generating) {
-        val transition = rememberInfiniteTransition(label = "generating")
-        val alpha by transition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-            label = "generatingDot",
-        )
-        alpha
-    } else {
-        1f
-    }
+    // On the shared 1.6 s pulse, so the status dot breathes in step with the chat's thinking
+    // pips instead of at its own 700 ms rate. Steady when the turn is done, or under
+    // reduced motion.
+    val dotAlpha = if (generating) rememberBreath(min = 0.3f, label = "generatingDot") else 1f
 
     Card(modifier = Modifier.clickable(onClick = onClick).widthIn(max = 200.dp)) {
         Row(
@@ -169,7 +164,7 @@ private fun ModelCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = brand?.icon ?: RACIcons.Outline.Bolt,
+                imageVector = if (hostedModel != null) RACIcons.Outline.Desktop else brand?.icon ?: RACIcons.Outline.Bolt,
                 contentDescription = "Model",
                 tint = brand?.color ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(dimens.spacingSm),
@@ -177,9 +172,12 @@ private fun ModelCard(
 
             Column(modifier = Modifier.padding(end = dimens.spacingSm)) {
                 Text(
-                    // The same cleaned title the picker shows, so the bar reads
-                    // "SmolLM2 360M" instead of clipping "SmolLM2 360M Q8_0".
-                    text = model?.displayTitle() ?: fallbackModelName ?: "Select Model",
+                    // Hosted Connect models keep their host display name; local
+                    // models use the same cleaned title the picker shows.
+                    text = hostedModel?.displayName
+                        ?: model?.displayTitle()
+                        ?: fallbackModelName
+                        ?: "Select Model",
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,
@@ -191,7 +189,7 @@ private fun ModelCard(
                     Spacer(
                         Modifier
                             .size(dimens.spacingSm)
-                            .alpha(dotAlpha)
+                            .graphicsLayer { alpha = dotAlpha }
                             .background(dotColor, CircleShape),
                     )
                     Text(

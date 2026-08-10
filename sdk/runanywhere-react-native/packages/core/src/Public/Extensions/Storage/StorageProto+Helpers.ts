@@ -24,8 +24,12 @@ import type {
 } from '@runanywhere/proto-ts/storage_types';
 
 /**
- * Build a `DeviceStorageInfo` with `usedPercent` derived from the byte
- * counts. Mirrors Swift `RADeviceStorageInfo.init(totalBytes:freeBytes:usedBytes:)`.
+ * Build a `DeviceStorageInfo`. Mirrors Swift
+ * `RADeviceStorageInfo.init(totalBytes:freeBytes:usedBytes:)`.
+ *
+ * `usedPercent` is deleted outright — it is a pure derivation of
+ * `usedBytes`/`totalBytes` with no independent writer; callers needing it
+ * should use {@link usagePercentage} below instead of a stored field.
  */
 export function makeDeviceStorageInfo(
   totalBytes: number,
@@ -36,7 +40,6 @@ export function makeDeviceStorageInfo(
     totalBytes,
     freeBytes,
     usedBytes,
-    usedPercent: totalBytes > 0 ? (usedBytes / totalBytes) * 100.0 : 0.0,
   });
 }
 
@@ -58,13 +61,18 @@ export function makeAppStorageInfo(
   });
 }
 
-/** Empty storage snapshot. Mirrors Swift `RAStorageInfo.empty`. */
+/**
+ * Empty storage snapshot. Mirrors Swift `RAStorageInfo.empty`.
+ *
+ * `totalModels` is deleted outright — `models.length` is the sole count
+ * signal now (unlike `totalModelsBytes`, which stays a live field per its
+ * idl comment).
+ */
 export function emptyStorageInfo(): StorageInfo {
   return StorageInfoMessage.fromPartial({
     app: AppStorageInfoMessage.fromPartial({}),
     device: DeviceStorageInfoMessage.fromPartial({}),
     models: [],
-    totalModels: 0,
     totalModelsBytes: 0,
   });
 }
@@ -102,16 +110,17 @@ export function usagePercentage(device: DeviceStorageInfo): number {
 /**
  * Build a `ModelStorageMetrics`. Mirrors Swift
  * `RAModelStorageMetrics.init(modelID:sizeOnDiskBytes:lastUsedMs:)`.
+ *
+ * `lastUsedMs` is deleted outright — the message now carries only
+ * `modelId`/`sizeOnDiskBytes`, so this helper drops its third parameter.
  */
 export function makeModelStorageMetrics(
   modelId: string,
-  sizeOnDiskBytes: number,
-  lastUsedMs?: number
+  sizeOnDiskBytes: number
 ): ModelStorageMetrics {
   return ModelStorageMetricsMessage.fromPartial({
     modelId,
     sizeOnDiskBytes,
-    ...(lastUsedMs !== undefined ? { lastUsedMs } : {}),
   });
 }
 

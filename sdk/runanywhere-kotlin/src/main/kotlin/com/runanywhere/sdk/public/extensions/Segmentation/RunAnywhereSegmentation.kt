@@ -22,6 +22,7 @@ import com.runanywhere.sdk.public.types.RASegmentationResult
  * download weights or create a second model owner; commons resolves the
  * lifecycle-owned service and returns source-dimension masks.
  */
+@Deprecated("Use RunAnywhere.segmentation.segment(image, options).")
 suspend fun RunAnywhere.segment(request: RASegmentationRequest): RASegmentationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK")

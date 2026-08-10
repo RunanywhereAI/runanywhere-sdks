@@ -47,6 +47,7 @@ struct CatalogEntry {
   int32_t context_length;      // 0 = unknown/not applicable
   bool supports_thinking;
   int64_t memory_required_bytes = 0; // 0 = unknown/not applicable
+  const char *cua_profile = ""; // Computer-Use-Agent profile id ("" = none)
 };
 
 /** All built-in entries. */

@@ -65,10 +65,10 @@ void set_component_operation_admitted_test_hook(ComponentOperationAdmittedTestHo
 
 rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto,
                                 rac_diarization_options_t* out_options,
-                                runanywhere::v1::DiarizationAudioEncoding* out_encoding);
+                                runanywhere::v1::AudioEncoding* out_encoding);
 
 rac_result_t decode_audio(const uint8_t* bytes, size_t size,
-                          runanywhere::v1::DiarizationAudioEncoding encoding, int32_t channel_count,
+                          runanywhere::v1::AudioEncoding encoding, int32_t channel_count,
                           bool require_nonempty, std::vector<float>* out_samples);
 
 rac_result_t result_to_proto(const rac_diarization_result_t& result, const char* fallback_model_id,

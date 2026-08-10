@@ -375,7 +375,7 @@ TestResult test_segment_option_spec() {
     result.details = "segment subcommand not registered by configure_app";
     return result;
   }
-  const std::string want_desc = "Semantic segmentation of an image (per-class mask summary)";
+  const std::string want_desc = "Label every pixel of an image by class";
   if (seg->get_description() != want_desc) {
     result.expected = want_desc;
     result.actual = seg->get_description();

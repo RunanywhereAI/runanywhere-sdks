@@ -6,106 +6,117 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { EventCategory, eventCategoryFromJSON, eventCategoryToJSON } from "./component_types";
-import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON } from "./errors";
+import { LLMGenerationOptions } from "./llm_options";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { TTSOptions } from "./tts_options";
-import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
+import { VADConfiguration } from "./vad_options";
+import { VoiceAgentComponentStates } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * Empty request type — the voice agent already has its config set via
- * `rac_voice_agent_init()` at handle creation time. The Stream rpc just
- * opens a new event subscription on an existing handle.
- */
-export interface VoiceAgentRequest {
-  /**
-   * Optional: filter the stream to only certain VoiceEvent.payload arms
-   * (e.g. "user_said,assistant_token"). Empty = all events.
-   */
-  eventFilter: string;
-  sessionId: string;
-  categories: EventCategory[];
-  minSeverity: ErrorSeverity;
-  replayFromSeq: number;
-  includeAudio: boolean;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * One-shot voice-turn result.
- *
- * Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
- * `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
- * `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
- * Returned by the `processVoiceTurn` ergonomic API where a single audio
- * blob produces transcription + assistant response + synthesized audio in
- * one call (as opposed to the streaming path served by the Stream rpc).
- * ---------------------------------------------------------------------------
- */
 export interface VoiceAgentResult {
-  /** Whether the input audio passed VAD's speech-detected check. */
   speechDetected: boolean;
-  /** Transcribed text from STT. Unset when speech_detected=false. */
-  transcription?:
-    | string
-    | undefined;
-  /**
-   * Generated assistant response text from the LLM. Unset when STT
-   * produced no transcription or LLM was skipped.
-   */
-  assistantResponse?:
-    | string
-    | undefined;
-  /**
-   * Thinking content extracted from `<think>...</think>` tags
-   * (qwen3, deepseek-r1). Unset when the active LLM does not emit
-   * a chain-of-thought trace.
-   */
-  thinkingContent?:
-    | string
-    | undefined;
-  /**
-   * Synthesized audio data from TTS. Encoding follows AudioFrameEvent
-   * conventions (typically PCM-F32-LE, sample rate per voice). Unset
-   * when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
-   */
-  synthesizedAudio?:
-    | Uint8Array
-    | undefined;
-  /**
-   * Component states captured at the end of the turn — useful for UIs
-   * surfacing readiness / partial-failure breakdowns alongside the
-   * final result. Unset when the caller does not ask for it.
-   */
-  finalState?:
-    | VoiceAgentComponentStates
-    | undefined;
-  /**
-   * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
-   * or unknown.
-   */
-  synthesizedAudioSampleRateHz: number;
-  synthesizedAudioChannels: number;
-  synthesizedAudioEncoding: AudioEncoding;
-  sessionId: string;
-  turnId: string;
-  sttTimeMs: number;
-  llmTimeMs: number;
-  ttsTimeMs: number;
-  totalTimeMs: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  transcription?: string | undefined;
+  assistantResponse?: string | undefined;
+  thinkingContent?: string | undefined;
+  synthesizedAudio?: Uint8Array | undefined;
+  finalState?: VoiceAgentComponentStates | undefined;
 }
 
+/**
+ * Turn detection. Field names, units and semantics follow OpenAI Realtime
+ * `session.audio.input.turn_detection`.
+ */
+export interface TurnDetection {
+  type: TurnDetection_Type;
+  /**
+   * Activation threshold, 0..1 — the same normalized scale as
+   * VADConfiguration.activation_threshold, and the value that wins on the
+   * voice-agent path when both are set. Raise it for noisy rooms.
+   * 0 means unset; commons applies 0.5.
+   */
+  threshold: number;
+  /**
+   * Silence after speech before the turn is closed.
+   * 0 means unset; commons applies 500.
+   */
+  silenceDurationMs: number;
+  /**
+   * Audio retained before speech onset so the first word is not clipped.
+   * 0 means unset; commons applies 300.
+   */
+  prefixPaddingMs: number;
+  /**
+   * Unset means true. False makes the agent finish its sentence
+   * (kiosk, scripted disclosure).
+   */
+  interruptResponse?:
+    | boolean
+    | undefined;
+  /** Unset means true. False means the app drives replies itself via say(). */
+  createResponse?: boolean | undefined;
+}
+
+export enum TurnDetection_Type {
+  /** TURN_DETECTION_TYPE_UNSPECIFIED - treated as VAD */
+  TURN_DETECTION_TYPE_UNSPECIFIED = 0,
+  /** TURN_DETECTION_TYPE_VAD - the VAD decides end-of-turn */
+  TURN_DETECTION_TYPE_VAD = 1,
+  /** TURN_DETECTION_TYPE_MANUAL - push-to-talk: app closes the turn */
+  TURN_DETECTION_TYPE_MANUAL = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function turnDetection_TypeFromJSON(object: any): TurnDetection_Type {
+  switch (object) {
+    case 0:
+    case "TURN_DETECTION_TYPE_UNSPECIFIED":
+      return TurnDetection_Type.TURN_DETECTION_TYPE_UNSPECIFIED;
+    case 1:
+    case "TURN_DETECTION_TYPE_VAD":
+      return TurnDetection_Type.TURN_DETECTION_TYPE_VAD;
+    case 2:
+    case "TURN_DETECTION_TYPE_MANUAL":
+      return TurnDetection_Type.TURN_DETECTION_TYPE_MANUAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TurnDetection_Type.UNRECOGNIZED;
+  }
+}
+
+export function turnDetection_TypeToJSON(object: TurnDetection_Type): string {
+  switch (object) {
+    case TurnDetection_Type.TURN_DETECTION_TYPE_UNSPECIFIED:
+      return "TURN_DETECTION_TYPE_UNSPECIFIED";
+    case TurnDetection_Type.TURN_DETECTION_TYPE_VAD:
+      return "TURN_DETECTION_TYPE_VAD";
+    case TurnDetection_Type.TURN_DETECTION_TYPE_MANUAL:
+      return "TURN_DETECTION_TYPE_MANUAL";
+    case TurnDetection_Type.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * One-shot turn: audio in, transcription plus response plus audio out.
+ *
+ * audio_data must be PCM signed 16-bit little-endian, mono, 16 kHz. Commons
+ * rejects any other encoding, but it does NOT check or resample the sample
+ * rate or the channel count — feeding anything else yields a wrong transcript
+ * rather than an error.
+ */
 export interface VoiceAgentTurnRequest {
   requestId: string;
   sessionId: string;
   audioData: Uint8Array;
-  sampleRateHz: number;
-  channels: number;
-  encoding: AudioEncoding;
-  sessionConfig?: VoiceSessionConfig | undefined;
+  /**
+   * BCP-47 STT language for this turn only. Overrides
+   * VoiceAgentComposeConfig.language. Unset means the session language, or
+   * model auto-detection when that is unset too.
+   */
+  language?: string | undefined;
   metadata: { [key: string]: string };
 }
 
@@ -114,144 +125,64 @@ export interface VoiceAgentTurnRequest_MetadataEntry {
   value: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Voice session behavior configuration.
- *
- * Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
- * Controls runtime behavior of the voice agent's session loop — silence
- * timing, speech threshold, auto-TTS playback, continuous mode, and
- * LLM thinking-mode toggle.
- * ---------------------------------------------------------------------------
- */
-export interface VoiceSessionConfig {
+/** Streamed capture frame. Same fixed input contract as VoiceAgentTurnRequest. */
+export interface VoiceAgentAudioFrame {
+  audioData: Uint8Array;
+  sampleRateHz: number;
+  channels: number;
   /**
-   * Silence duration (milliseconds) before processing the speech
-   * buffer. Default per Swift/Kotlin: 1500 ms.
+   * Commons accepts AUDIO_ENCODING_UNSPECIFIED and AUDIO_ENCODING_PCM_S16_LE
+   * and rejects every other value.
    */
-  silenceDurationMs: number;
-  /**
-   * Minimum audio level to detect speech (0.0 - 1.0). Default per
-   * Swift/Kotlin: 0.1.
-   */
-  speechThreshold: number;
-  /** Whether to auto-play TTS response after synthesis. Default true. */
-  autoPlayTts: boolean;
-  /** Whether to auto-resume listening after TTS playback. Default true. */
-  continuousMode: boolean;
-  /**
-   * Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
-   * Default false.
-   */
-  thinkingModeEnabled: boolean;
-  /** Optional per-turn LLM max token limit. 0 = LLM/default. */
-  maxTokens: number;
-  /** Maximum recording duration before forcing an end-of-turn. 0 = default. */
-  maxRecordingDurationMs: number;
-  /** Optional language/voice hints passed to STT/TTS adapters. */
-  languageCode?: string | undefined;
-  voiceId?: string | undefined;
+  encoding: AudioEncoding;
+  isFinal: boolean;
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Audio pipeline state-manager configuration.
- *
- * Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
- * to prevent microphone/TTS feedback loops.
- * ---------------------------------------------------------------------------
- */
-export interface AudioPipelineConfig {
-  cooldownDurationMs: number;
-  strictTransitions: boolean;
-  maxTtsDurationMs: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Aggregated voice-agent compose configuration.
- *
- * Mirrors the C ABI `rac_voice_agent_config_t` and Swift
- * `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
- * (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
- * new message provides the fine-grained sub-component view consumed by the
- * `rac_voice_agent_initialize()` C entry-point.
- *
- * Each sub-config string field uses a "model_id" naming convention; the
- * runtime resolves IDs against the model registry. An empty string means
- * "use the currently loaded model/voice for that capability".
- * ---------------------------------------------------------------------------
+ * Each component takes a path or an id; commons resolves the id through the
+ * model registry.
  */
 export interface VoiceAgentComposeConfig {
   /**
-   * -------------------------------------------------------------------
-   * STT sub-config (mirrors rac_voice_agent_stt_config_t).
-   * -------------------------------------------------------------------
+   * Normal choice is the id (resolved via the model registry); path is the
+   * escape hatch for an artifact you staged yourself.
    */
   sttModelPath?: string | undefined;
   sttModelId?: string | undefined;
-  sttModelName?:
-    | string
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
-   * LLM sub-config (mirrors rac_voice_agent_llm_config_t).
-   * -------------------------------------------------------------------
-   */
   llmModelPath?: string | undefined;
   llmModelId?: string | undefined;
-  llmModelName?:
-    | string
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
-   * TTS sub-config (mirrors rac_voice_agent_tts_config_t).
-   * -------------------------------------------------------------------
-   */
   ttsVoicePath?: string | undefined;
   ttsVoiceId?: string | undefined;
-  ttsVoiceName?:
-    | string
+  vadConfig?: VADConfiguration | undefined;
+  llmGeneration?:
+    | LLMGenerationOptions
     | undefined;
   /**
-   * -------------------------------------------------------------------
-   * VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-   * -------------------------------------------------------------------
+   * System prompt for the agent. Governs persona AND spoken delivery
+   * ("talk quickly", "sound warm"), not just content. Same name and role as
+   * OpenAI Realtime `session.instructions`. Unset uses the commons voice
+   * default (short, spoken, no markdown).
+   *
+   * This is the only system prompt the voice path reads:
+   * llm_generation.system_prompt is IGNORED here.
    */
-  vadSampleRate: number;
-  /** default 0.1 */
-  vadFrameLength: number;
-  /** default 0.005 */
-  vadEnergyThreshold: number;
-  /**
-   * -------------------------------------------------------------------
-   * Session-behavior sub-config. Optional so the C ABI can be invoked
-   * without runtime-behavior overrides (engine defaults applied).
-   * -------------------------------------------------------------------
-   */
-  sessionConfig?:
-    | VoiceSessionConfig
+  instructions?: string | undefined;
+  turnDetection?:
+    | TurnDetection
     | undefined;
   /**
-   * Audio state-machine behavior. Optional so defaults can be applied by
-   * the native voice-agent implementation.
+   * BCP-47 STT language for the whole session. One spelling across this
+   * domain and stt_options.proto. Unset means the model auto-detects.
+   * Per-turn override: VoiceAgentTurnRequest.language.
    */
-  audioPipelineConfig?:
-    | AudioPipelineConfig
-    | undefined;
-  /** Correlation and defaults for event streams and one-shot turn APIs. */
-  sessionId?: string | undefined;
-  defaultLanguageCode?: string | undefined;
+  language?: string | undefined;
 }
 
-/** Helper-level proto requests for voice-agent sub-components. */
 export interface VoiceAgentTranscribeProtoRequest {
   audioData: Uint8Array;
   sessionId: string;
-  sampleRate: number;
-  languageHint: string;
-  channels: number;
-  encoding: AudioEncoding;
+  /** BCP-47. Empty means auto-detect. */
+  language: string;
 }
 
 export interface VoiceAgentSynthesizeSpeechProtoRequest {
@@ -259,180 +190,6 @@ export interface VoiceAgentSynthesizeSpeechProtoRequest {
   sessionId: string;
   options?: TTSOptions | undefined;
 }
-
-function createBaseVoiceAgentRequest(): VoiceAgentRequest {
-  return { eventFilter: "", sessionId: "", categories: [], minSeverity: 0, replayFromSeq: 0, includeAudio: false };
-}
-
-export const VoiceAgentRequest: MessageFns<VoiceAgentRequest> = {
-  encode(message: VoiceAgentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.eventFilter !== "") {
-      writer.uint32(10).string(message.eventFilter);
-    }
-    if (message.sessionId !== "") {
-      writer.uint32(18).string(message.sessionId);
-    }
-    writer.uint32(26).fork();
-    for (const v of message.categories) {
-      writer.int32(v);
-    }
-    writer.join();
-    if (message.minSeverity !== 0) {
-      writer.uint32(32).int32(message.minSeverity);
-    }
-    if (message.replayFromSeq !== 0) {
-      writer.uint32(40).uint64(message.replayFromSeq);
-    }
-    if (message.includeAudio !== false) {
-      writer.uint32(48).bool(message.includeAudio);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): VoiceAgentRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVoiceAgentRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.eventFilter = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag === 24) {
-            message.categories.push(reader.int32() as any);
-
-            continue;
-          }
-
-          if (tag === 26) {
-            const end2 = reader.uint32() + reader.pos;
-            while (reader.pos < end2) {
-              message.categories.push(reader.int32() as any);
-            }
-
-            continue;
-          }
-
-          break;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.minSeverity = reader.int32() as any;
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.replayFromSeq = longToNumber(reader.uint64());
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.includeAudio = reader.bool();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VoiceAgentRequest {
-    return {
-      eventFilter: isSet(object.eventFilter)
-        ? globalThis.String(object.eventFilter)
-        : isSet(object.event_filter)
-        ? globalThis.String(object.event_filter)
-        : "",
-      sessionId: isSet(object.sessionId)
-        ? globalThis.String(object.sessionId)
-        : isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : "",
-      categories: globalThis.Array.isArray(object?.categories)
-        ? object.categories.map((e: any) => eventCategoryFromJSON(e))
-        : [],
-      minSeverity: isSet(object.minSeverity)
-        ? errorSeverityFromJSON(object.minSeverity)
-        : isSet(object.min_severity)
-        ? errorSeverityFromJSON(object.min_severity)
-        : 0,
-      replayFromSeq: isSet(object.replayFromSeq)
-        ? globalThis.Number(object.replayFromSeq)
-        : isSet(object.replay_from_seq)
-        ? globalThis.Number(object.replay_from_seq)
-        : 0,
-      includeAudio: isSet(object.includeAudio)
-        ? globalThis.Boolean(object.includeAudio)
-        : isSet(object.include_audio)
-        ? globalThis.Boolean(object.include_audio)
-        : false,
-    };
-  },
-
-  toJSON(message: VoiceAgentRequest): unknown {
-    const obj: any = {};
-    if (message.eventFilter !== "") {
-      obj.eventFilter = message.eventFilter;
-    }
-    if (message.sessionId !== "") {
-      obj.sessionId = message.sessionId;
-    }
-    if (message.categories?.length) {
-      obj.categories = message.categories.map((e) => eventCategoryToJSON(e));
-    }
-    if (message.minSeverity !== 0) {
-      obj.minSeverity = errorSeverityToJSON(message.minSeverity);
-    }
-    if (message.replayFromSeq !== 0) {
-      obj.replayFromSeq = Math.round(message.replayFromSeq);
-    }
-    if (message.includeAudio !== false) {
-      obj.includeAudio = message.includeAudio;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(base?: I): VoiceAgentRequest {
-    return VoiceAgentRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(object: I): VoiceAgentRequest {
-    const message = createBaseVoiceAgentRequest();
-    message.eventFilter = object.eventFilter ?? "";
-    message.sessionId = object.sessionId ?? "";
-    message.categories = object.categories?.map((e) => e) || [];
-    message.minSeverity = object.minSeverity ?? 0;
-    message.replayFromSeq = object.replayFromSeq ?? 0;
-    message.includeAudio = object.includeAudio ?? false;
-    return message;
-  },
-};
 
 function createBaseVoiceAgentResult(): VoiceAgentResult {
   return {
@@ -442,17 +199,6 @@ function createBaseVoiceAgentResult(): VoiceAgentResult {
     thinkingContent: undefined,
     synthesizedAudio: undefined,
     finalState: undefined,
-    synthesizedAudioSampleRateHz: 0,
-    synthesizedAudioChannels: 0,
-    synthesizedAudioEncoding: 0,
-    sessionId: "",
-    turnId: "",
-    sttTimeMs: 0,
-    llmTimeMs: 0,
-    ttsTimeMs: 0,
-    totalTimeMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
   };
 }
 
@@ -475,39 +221,6 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     }
     if (message.finalState !== undefined) {
       VoiceAgentComponentStates.encode(message.finalState, writer.uint32(50).fork()).join();
-    }
-    if (message.synthesizedAudioSampleRateHz !== 0) {
-      writer.uint32(56).int32(message.synthesizedAudioSampleRateHz);
-    }
-    if (message.synthesizedAudioChannels !== 0) {
-      writer.uint32(64).int32(message.synthesizedAudioChannels);
-    }
-    if (message.synthesizedAudioEncoding !== 0) {
-      writer.uint32(72).int32(message.synthesizedAudioEncoding);
-    }
-    if (message.sessionId !== "") {
-      writer.uint32(82).string(message.sessionId);
-    }
-    if (message.turnId !== "") {
-      writer.uint32(90).string(message.turnId);
-    }
-    if (message.sttTimeMs !== 0) {
-      writer.uint32(96).int64(message.sttTimeMs);
-    }
-    if (message.llmTimeMs !== 0) {
-      writer.uint32(104).int64(message.llmTimeMs);
-    }
-    if (message.ttsTimeMs !== 0) {
-      writer.uint32(112).int64(message.ttsTimeMs);
-    }
-    if (message.totalTimeMs !== 0) {
-      writer.uint32(120).int64(message.totalTimeMs);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(130).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(136).int32(message.errorCode);
     }
     return writer;
   },
@@ -567,94 +280,6 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
           message.finalState = VoiceAgentComponentStates.decode(reader, reader.uint32());
           continue;
         }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.synthesizedAudioSampleRateHz = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.synthesizedAudioChannels = reader.int32();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.synthesizedAudioEncoding = reader.int32() as any;
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.turnId = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.sttTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 13: {
-          if (tag !== 104) {
-            break;
-          }
-
-          message.llmTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 14: {
-          if (tag !== 112) {
-            break;
-          }
-
-          message.ttsTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 15: {
-          if (tag !== 120) {
-            break;
-          }
-
-          message.totalTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 16: {
-          if (tag !== 130) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -692,61 +317,6 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
         : isSet(object.final_state)
         ? VoiceAgentComponentStates.fromJSON(object.final_state)
         : undefined,
-      synthesizedAudioSampleRateHz: isSet(object.synthesizedAudioSampleRateHz)
-        ? globalThis.Number(object.synthesizedAudioSampleRateHz)
-        : isSet(object.synthesized_audio_sample_rate_hz)
-        ? globalThis.Number(object.synthesized_audio_sample_rate_hz)
-        : 0,
-      synthesizedAudioChannels: isSet(object.synthesizedAudioChannels)
-        ? globalThis.Number(object.synthesizedAudioChannels)
-        : isSet(object.synthesized_audio_channels)
-        ? globalThis.Number(object.synthesized_audio_channels)
-        : 0,
-      synthesizedAudioEncoding: isSet(object.synthesizedAudioEncoding)
-        ? audioEncodingFromJSON(object.synthesizedAudioEncoding)
-        : isSet(object.synthesized_audio_encoding)
-        ? audioEncodingFromJSON(object.synthesized_audio_encoding)
-        : 0,
-      sessionId: isSet(object.sessionId)
-        ? globalThis.String(object.sessionId)
-        : isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : "",
-      turnId: isSet(object.turnId)
-        ? globalThis.String(object.turnId)
-        : isSet(object.turn_id)
-        ? globalThis.String(object.turn_id)
-        : "",
-      sttTimeMs: isSet(object.sttTimeMs)
-        ? globalThis.Number(object.sttTimeMs)
-        : isSet(object.stt_time_ms)
-        ? globalThis.Number(object.stt_time_ms)
-        : 0,
-      llmTimeMs: isSet(object.llmTimeMs)
-        ? globalThis.Number(object.llmTimeMs)
-        : isSet(object.llm_time_ms)
-        ? globalThis.Number(object.llm_time_ms)
-        : 0,
-      ttsTimeMs: isSet(object.ttsTimeMs)
-        ? globalThis.Number(object.ttsTimeMs)
-        : isSet(object.tts_time_ms)
-        ? globalThis.Number(object.tts_time_ms)
-        : 0,
-      totalTimeMs: isSet(object.totalTimeMs)
-        ? globalThis.Number(object.totalTimeMs)
-        : isSet(object.total_time_ms)
-        ? globalThis.Number(object.total_time_ms)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
     };
   },
 
@@ -770,39 +340,6 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     if (message.finalState !== undefined) {
       obj.finalState = VoiceAgentComponentStates.toJSON(message.finalState);
     }
-    if (message.synthesizedAudioSampleRateHz !== 0) {
-      obj.synthesizedAudioSampleRateHz = Math.round(message.synthesizedAudioSampleRateHz);
-    }
-    if (message.synthesizedAudioChannels !== 0) {
-      obj.synthesizedAudioChannels = Math.round(message.synthesizedAudioChannels);
-    }
-    if (message.synthesizedAudioEncoding !== 0) {
-      obj.synthesizedAudioEncoding = audioEncodingToJSON(message.synthesizedAudioEncoding);
-    }
-    if (message.sessionId !== "") {
-      obj.sessionId = message.sessionId;
-    }
-    if (message.turnId !== "") {
-      obj.turnId = message.turnId;
-    }
-    if (message.sttTimeMs !== 0) {
-      obj.sttTimeMs = Math.round(message.sttTimeMs);
-    }
-    if (message.llmTimeMs !== 0) {
-      obj.llmTimeMs = Math.round(message.llmTimeMs);
-    }
-    if (message.ttsTimeMs !== 0) {
-      obj.ttsTimeMs = Math.round(message.ttsTimeMs);
-    }
-    if (message.totalTimeMs !== 0) {
-      obj.totalTimeMs = Math.round(message.totalTimeMs);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     return obj;
   },
 
@@ -819,32 +356,175 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     message.finalState = (object.finalState !== undefined && object.finalState !== null)
       ? VoiceAgentComponentStates.fromPartial(object.finalState)
       : undefined;
-    message.synthesizedAudioSampleRateHz = object.synthesizedAudioSampleRateHz ?? 0;
-    message.synthesizedAudioChannels = object.synthesizedAudioChannels ?? 0;
-    message.synthesizedAudioEncoding = object.synthesizedAudioEncoding ?? 0;
-    message.sessionId = object.sessionId ?? "";
-    message.turnId = object.turnId ?? "";
-    message.sttTimeMs = object.sttTimeMs ?? 0;
-    message.llmTimeMs = object.llmTimeMs ?? 0;
-    message.ttsTimeMs = object.ttsTimeMs ?? 0;
-    message.totalTimeMs = object.totalTimeMs ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseTurnDetection(): TurnDetection {
+  return {
+    type: 0,
+    threshold: 0,
+    silenceDurationMs: 0,
+    prefixPaddingMs: 0,
+    interruptResponse: undefined,
+    createResponse: undefined,
+  };
+}
+
+export const TurnDetection: MessageFns<TurnDetection> = {
+  encode(message: TurnDetection, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.type !== 0) {
+      writer.uint32(8).int32(message.type);
+    }
+    if (message.threshold !== 0) {
+      writer.uint32(21).float(message.threshold);
+    }
+    if (message.silenceDurationMs !== 0) {
+      writer.uint32(24).int32(message.silenceDurationMs);
+    }
+    if (message.prefixPaddingMs !== 0) {
+      writer.uint32(32).int32(message.prefixPaddingMs);
+    }
+    if (message.interruptResponse !== undefined) {
+      writer.uint32(40).bool(message.interruptResponse);
+    }
+    if (message.createResponse !== undefined) {
+      writer.uint32(48).bool(message.createResponse);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TurnDetection {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTurnDetection();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.type = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 21) {
+            break;
+          }
+
+          message.threshold = reader.float();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.silenceDurationMs = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.prefixPaddingMs = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.interruptResponse = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.createResponse = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TurnDetection {
+    return {
+      type: isSet(object.type) ? turnDetection_TypeFromJSON(object.type) : 0,
+      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      silenceDurationMs: isSet(object.silenceDurationMs)
+        ? globalThis.Number(object.silenceDurationMs)
+        : isSet(object.silence_duration_ms)
+        ? globalThis.Number(object.silence_duration_ms)
+        : 0,
+      prefixPaddingMs: isSet(object.prefixPaddingMs)
+        ? globalThis.Number(object.prefixPaddingMs)
+        : isSet(object.prefix_padding_ms)
+        ? globalThis.Number(object.prefix_padding_ms)
+        : 0,
+      interruptResponse: isSet(object.interruptResponse)
+        ? globalThis.Boolean(object.interruptResponse)
+        : isSet(object.interrupt_response)
+        ? globalThis.Boolean(object.interrupt_response)
+        : undefined,
+      createResponse: isSet(object.createResponse)
+        ? globalThis.Boolean(object.createResponse)
+        : isSet(object.create_response)
+        ? globalThis.Boolean(object.create_response)
+        : undefined,
+    };
+  },
+
+  toJSON(message: TurnDetection): unknown {
+    const obj: any = {};
+    if (message.type !== 0) {
+      obj.type = turnDetection_TypeToJSON(message.type);
+    }
+    if (message.threshold !== 0) {
+      obj.threshold = message.threshold;
+    }
+    if (message.silenceDurationMs !== 0) {
+      obj.silenceDurationMs = Math.round(message.silenceDurationMs);
+    }
+    if (message.prefixPaddingMs !== 0) {
+      obj.prefixPaddingMs = Math.round(message.prefixPaddingMs);
+    }
+    if (message.interruptResponse !== undefined) {
+      obj.interruptResponse = message.interruptResponse;
+    }
+    if (message.createResponse !== undefined) {
+      obj.createResponse = message.createResponse;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TurnDetection>, I>>(base?: I): TurnDetection {
+    return TurnDetection.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TurnDetection>, I>>(object: I): TurnDetection {
+    const message = createBaseTurnDetection();
+    message.type = object.type ?? 0;
+    message.threshold = object.threshold ?? 0;
+    message.silenceDurationMs = object.silenceDurationMs ?? 0;
+    message.prefixPaddingMs = object.prefixPaddingMs ?? 0;
+    message.interruptResponse = object.interruptResponse ?? undefined;
+    message.createResponse = object.createResponse ?? undefined;
     return message;
   },
 };
 
 function createBaseVoiceAgentTurnRequest(): VoiceAgentTurnRequest {
-  return {
-    requestId: "",
-    sessionId: "",
-    audioData: new Uint8Array(0),
-    sampleRateHz: 0,
-    channels: 0,
-    encoding: 0,
-    sessionConfig: undefined,
-    metadata: {},
-  };
+  return { requestId: "", sessionId: "", audioData: new Uint8Array(0), language: undefined, metadata: {} };
 }
 
 export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
@@ -858,20 +538,11 @@ export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
     if (message.audioData.length !== 0) {
       writer.uint32(26).bytes(message.audioData);
     }
-    if (message.sampleRateHz !== 0) {
-      writer.uint32(32).int32(message.sampleRateHz);
-    }
-    if (message.channels !== 0) {
-      writer.uint32(40).int32(message.channels);
-    }
-    if (message.encoding !== 0) {
-      writer.uint32(48).int32(message.encoding);
-    }
-    if (message.sessionConfig !== undefined) {
-      VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(58).fork()).join();
+    if (message.language !== undefined) {
+      writer.uint32(34).string(message.language);
     }
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      VoiceAgentTurnRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(66).fork()).join();
+      VoiceAgentTurnRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
     });
     return writer;
   },
@@ -908,45 +579,21 @@ export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
           continue;
         }
         case 4: {
-          if (tag !== 32) {
+          if (tag !== 34) {
             break;
           }
 
-          message.sampleRateHz = reader.int32();
+          message.language = reader.string();
           continue;
         }
         case 5: {
-          if (tag !== 40) {
+          if (tag !== 42) {
             break;
           }
 
-          message.channels = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.encoding = reader.int32() as any;
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.sessionConfig = VoiceSessionConfig.decode(reader, reader.uint32());
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          const entry8 = VoiceAgentTurnRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry8.value !== undefined) {
-            message.metadata[entry8.key] = entry8.value;
+          const entry5 = VoiceAgentTurnRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry5.value !== undefined) {
+            message.metadata[entry5.key] = entry5.value;
           }
           continue;
         }
@@ -976,18 +623,7 @@ export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
         : isSet(object.audio_data)
         ? bytesFromBase64(object.audio_data)
         : new Uint8Array(0),
-      sampleRateHz: isSet(object.sampleRateHz)
-        ? globalThis.Number(object.sampleRateHz)
-        : isSet(object.sample_rate_hz)
-        ? globalThis.Number(object.sample_rate_hz)
-        : 0,
-      channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
-      sessionConfig: isSet(object.sessionConfig)
-        ? VoiceSessionConfig.fromJSON(object.sessionConfig)
-        : isSet(object.session_config)
-        ? VoiceSessionConfig.fromJSON(object.session_config)
-        : undefined,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
       metadata: isObject(object.metadata)
         ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
           (acc: { [key: string]: string }, [key, value]: [string, any]) => {
@@ -1011,17 +647,8 @@ export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
     if (message.audioData.length !== 0) {
       obj.audioData = base64FromBytes(message.audioData);
     }
-    if (message.sampleRateHz !== 0) {
-      obj.sampleRateHz = Math.round(message.sampleRateHz);
-    }
-    if (message.channels !== 0) {
-      obj.channels = Math.round(message.channels);
-    }
-    if (message.encoding !== 0) {
-      obj.encoding = audioEncodingToJSON(message.encoding);
-    }
-    if (message.sessionConfig !== undefined) {
-      obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     if (message.metadata) {
       const entries = globalThis.Object.entries(message.metadata) as [string, string][];
@@ -1043,12 +670,7 @@ export const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest> = {
     message.requestId = object.requestId ?? "";
     message.sessionId = object.sessionId ?? "";
     message.audioData = object.audioData ?? new Uint8Array(0);
-    message.sampleRateHz = object.sampleRateHz ?? 0;
-    message.channels = object.channels ?? 0;
-    message.encoding = object.encoding ?? 0;
-    message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
-      ? VoiceSessionConfig.fromPartial(object.sessionConfig)
-      : undefined;
+    message.language = object.language ?? undefined;
     message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
       (acc: { [key: string]: string }, [key, value]: [string, string]) => {
         if (value !== undefined) {
@@ -1142,271 +764,43 @@ export const VoiceAgentTurnRequest_MetadataEntry: MessageFns<VoiceAgentTurnReque
   },
 };
 
-function createBaseVoiceSessionConfig(): VoiceSessionConfig {
-  return {
-    silenceDurationMs: 0,
-    speechThreshold: 0,
-    autoPlayTts: false,
-    continuousMode: false,
-    thinkingModeEnabled: false,
-    maxTokens: 0,
-    maxRecordingDurationMs: 0,
-    languageCode: undefined,
-    voiceId: undefined,
-  };
+function createBaseVoiceAgentAudioFrame(): VoiceAgentAudioFrame {
+  return { audioData: new Uint8Array(0), sampleRateHz: 0, channels: 0, encoding: 0, isFinal: false };
 }
 
-export const VoiceSessionConfig: MessageFns<VoiceSessionConfig> = {
-  encode(message: VoiceSessionConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.silenceDurationMs !== 0) {
-      writer.uint32(8).int32(message.silenceDurationMs);
+export const VoiceAgentAudioFrame: MessageFns<VoiceAgentAudioFrame> = {
+  encode(message: VoiceAgentAudioFrame, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.audioData.length !== 0) {
+      writer.uint32(10).bytes(message.audioData);
     }
-    if (message.speechThreshold !== 0) {
-      writer.uint32(21).float(message.speechThreshold);
+    if (message.sampleRateHz !== 0) {
+      writer.uint32(16).int32(message.sampleRateHz);
     }
-    if (message.autoPlayTts !== false) {
-      writer.uint32(24).bool(message.autoPlayTts);
+    if (message.channels !== 0) {
+      writer.uint32(24).int32(message.channels);
     }
-    if (message.continuousMode !== false) {
-      writer.uint32(32).bool(message.continuousMode);
+    if (message.encoding !== 0) {
+      writer.uint32(32).int32(message.encoding);
     }
-    if (message.thinkingModeEnabled !== false) {
-      writer.uint32(40).bool(message.thinkingModeEnabled);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(48).int32(message.maxTokens);
-    }
-    if (message.maxRecordingDurationMs !== 0) {
-      writer.uint32(56).int32(message.maxRecordingDurationMs);
-    }
-    if (message.languageCode !== undefined) {
-      writer.uint32(66).string(message.languageCode);
-    }
-    if (message.voiceId !== undefined) {
-      writer.uint32(74).string(message.voiceId);
+    if (message.isFinal !== false) {
+      writer.uint32(40).bool(message.isFinal);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): VoiceSessionConfig {
+  decode(input: BinaryReader | Uint8Array, length?: number): VoiceAgentAudioFrame {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVoiceSessionConfig();
+    const message = createBaseVoiceAgentAudioFrame();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 8) {
+          if (tag !== 10) {
             break;
           }
 
-          message.silenceDurationMs = reader.int32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.speechThreshold = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.autoPlayTts = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.continuousMode = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.thinkingModeEnabled = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.maxRecordingDurationMs = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.languageCode = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.voiceId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VoiceSessionConfig {
-    return {
-      silenceDurationMs: isSet(object.silenceDurationMs)
-        ? globalThis.Number(object.silenceDurationMs)
-        : isSet(object.silence_duration_ms)
-        ? globalThis.Number(object.silence_duration_ms)
-        : 0,
-      speechThreshold: isSet(object.speechThreshold)
-        ? globalThis.Number(object.speechThreshold)
-        : isSet(object.speech_threshold)
-        ? globalThis.Number(object.speech_threshold)
-        : 0,
-      autoPlayTts: isSet(object.autoPlayTts)
-        ? globalThis.Boolean(object.autoPlayTts)
-        : isSet(object.auto_play_tts)
-        ? globalThis.Boolean(object.auto_play_tts)
-        : false,
-      continuousMode: isSet(object.continuousMode)
-        ? globalThis.Boolean(object.continuousMode)
-        : isSet(object.continuous_mode)
-        ? globalThis.Boolean(object.continuous_mode)
-        : false,
-      thinkingModeEnabled: isSet(object.thinkingModeEnabled)
-        ? globalThis.Boolean(object.thinkingModeEnabled)
-        : isSet(object.thinking_mode_enabled)
-        ? globalThis.Boolean(object.thinking_mode_enabled)
-        : false,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      maxRecordingDurationMs: isSet(object.maxRecordingDurationMs)
-        ? globalThis.Number(object.maxRecordingDurationMs)
-        : isSet(object.max_recording_duration_ms)
-        ? globalThis.Number(object.max_recording_duration_ms)
-        : 0,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
-      voiceId: isSet(object.voiceId)
-        ? globalThis.String(object.voiceId)
-        : isSet(object.voice_id)
-        ? globalThis.String(object.voice_id)
-        : undefined,
-    };
-  },
-
-  toJSON(message: VoiceSessionConfig): unknown {
-    const obj: any = {};
-    if (message.silenceDurationMs !== 0) {
-      obj.silenceDurationMs = Math.round(message.silenceDurationMs);
-    }
-    if (message.speechThreshold !== 0) {
-      obj.speechThreshold = message.speechThreshold;
-    }
-    if (message.autoPlayTts !== false) {
-      obj.autoPlayTts = message.autoPlayTts;
-    }
-    if (message.continuousMode !== false) {
-      obj.continuousMode = message.continuousMode;
-    }
-    if (message.thinkingModeEnabled !== false) {
-      obj.thinkingModeEnabled = message.thinkingModeEnabled;
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.maxRecordingDurationMs !== 0) {
-      obj.maxRecordingDurationMs = Math.round(message.maxRecordingDurationMs);
-    }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
-    }
-    if (message.voiceId !== undefined) {
-      obj.voiceId = message.voiceId;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(base?: I): VoiceSessionConfig {
-    return VoiceSessionConfig.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(object: I): VoiceSessionConfig {
-    const message = createBaseVoiceSessionConfig();
-    message.silenceDurationMs = object.silenceDurationMs ?? 0;
-    message.speechThreshold = object.speechThreshold ?? 0;
-    message.autoPlayTts = object.autoPlayTts ?? false;
-    message.continuousMode = object.continuousMode ?? false;
-    message.thinkingModeEnabled = object.thinkingModeEnabled ?? false;
-    message.maxTokens = object.maxTokens ?? 0;
-    message.maxRecordingDurationMs = object.maxRecordingDurationMs ?? 0;
-    message.languageCode = object.languageCode ?? undefined;
-    message.voiceId = object.voiceId ?? undefined;
-    return message;
-  },
-};
-
-function createBaseAudioPipelineConfig(): AudioPipelineConfig {
-  return { cooldownDurationMs: 0, strictTransitions: false, maxTtsDurationMs: 0 };
-}
-
-export const AudioPipelineConfig: MessageFns<AudioPipelineConfig> = {
-  encode(message: AudioPipelineConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.cooldownDurationMs !== 0) {
-      writer.uint32(8).int32(message.cooldownDurationMs);
-    }
-    if (message.strictTransitions !== false) {
-      writer.uint32(16).bool(message.strictTransitions);
-    }
-    if (message.maxTtsDurationMs !== 0) {
-      writer.uint32(24).int32(message.maxTtsDurationMs);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AudioPipelineConfig {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAudioPipelineConfig();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.cooldownDurationMs = reader.int32();
+          message.audioData = reader.bytes();
           continue;
         }
         case 2: {
@@ -1414,7 +808,7 @@ export const AudioPipelineConfig: MessageFns<AudioPipelineConfig> = {
             break;
           }
 
-          message.strictTransitions = reader.bool();
+          message.sampleRateHz = reader.int32();
           continue;
         }
         case 3: {
@@ -1422,7 +816,23 @@ export const AudioPipelineConfig: MessageFns<AudioPipelineConfig> = {
             break;
           }
 
-          message.maxTtsDurationMs = reader.int32();
+          message.channels = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.encoding = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isFinal = reader.bool();
           continue;
         }
       }
@@ -1434,48 +844,58 @@ export const AudioPipelineConfig: MessageFns<AudioPipelineConfig> = {
     return message;
   },
 
-  fromJSON(object: any): AudioPipelineConfig {
+  fromJSON(object: any): VoiceAgentAudioFrame {
     return {
-      cooldownDurationMs: isSet(object.cooldownDurationMs)
-        ? globalThis.Number(object.cooldownDurationMs)
-        : isSet(object.cooldown_duration_ms)
-        ? globalThis.Number(object.cooldown_duration_ms)
+      audioData: isSet(object.audioData)
+        ? bytesFromBase64(object.audioData)
+        : isSet(object.audio_data)
+        ? bytesFromBase64(object.audio_data)
+        : new Uint8Array(0),
+      sampleRateHz: isSet(object.sampleRateHz)
+        ? globalThis.Number(object.sampleRateHz)
+        : isSet(object.sample_rate_hz)
+        ? globalThis.Number(object.sample_rate_hz)
         : 0,
-      strictTransitions: isSet(object.strictTransitions)
-        ? globalThis.Boolean(object.strictTransitions)
-        : isSet(object.strict_transitions)
-        ? globalThis.Boolean(object.strict_transitions)
+      channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+      isFinal: isSet(object.isFinal)
+        ? globalThis.Boolean(object.isFinal)
+        : isSet(object.is_final)
+        ? globalThis.Boolean(object.is_final)
         : false,
-      maxTtsDurationMs: isSet(object.maxTtsDurationMs)
-        ? globalThis.Number(object.maxTtsDurationMs)
-        : isSet(object.max_tts_duration_ms)
-        ? globalThis.Number(object.max_tts_duration_ms)
-        : 0,
     };
   },
 
-  toJSON(message: AudioPipelineConfig): unknown {
+  toJSON(message: VoiceAgentAudioFrame): unknown {
     const obj: any = {};
-    if (message.cooldownDurationMs !== 0) {
-      obj.cooldownDurationMs = Math.round(message.cooldownDurationMs);
+    if (message.audioData.length !== 0) {
+      obj.audioData = base64FromBytes(message.audioData);
     }
-    if (message.strictTransitions !== false) {
-      obj.strictTransitions = message.strictTransitions;
+    if (message.sampleRateHz !== 0) {
+      obj.sampleRateHz = Math.round(message.sampleRateHz);
     }
-    if (message.maxTtsDurationMs !== 0) {
-      obj.maxTtsDurationMs = Math.round(message.maxTtsDurationMs);
+    if (message.channels !== 0) {
+      obj.channels = Math.round(message.channels);
+    }
+    if (message.encoding !== 0) {
+      obj.encoding = audioEncodingToJSON(message.encoding);
+    }
+    if (message.isFinal !== false) {
+      obj.isFinal = message.isFinal;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(base?: I): AudioPipelineConfig {
-    return AudioPipelineConfig.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<VoiceAgentAudioFrame>, I>>(base?: I): VoiceAgentAudioFrame {
+    return VoiceAgentAudioFrame.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(object: I): AudioPipelineConfig {
-    const message = createBaseAudioPipelineConfig();
-    message.cooldownDurationMs = object.cooldownDurationMs ?? 0;
-    message.strictTransitions = object.strictTransitions ?? false;
-    message.maxTtsDurationMs = object.maxTtsDurationMs ?? 0;
+  fromPartial<I extends Exact<DeepPartial<VoiceAgentAudioFrame>, I>>(object: I): VoiceAgentAudioFrame {
+    const message = createBaseVoiceAgentAudioFrame();
+    message.audioData = object.audioData ?? new Uint8Array(0);
+    message.sampleRateHz = object.sampleRateHz ?? 0;
+    message.channels = object.channels ?? 0;
+    message.encoding = object.encoding ?? 0;
+    message.isFinal = object.isFinal ?? false;
     return message;
   },
 };
@@ -1484,20 +904,15 @@ function createBaseVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
   return {
     sttModelPath: undefined,
     sttModelId: undefined,
-    sttModelName: undefined,
     llmModelPath: undefined,
     llmModelId: undefined,
-    llmModelName: undefined,
     ttsVoicePath: undefined,
     ttsVoiceId: undefined,
-    ttsVoiceName: undefined,
-    vadSampleRate: 0,
-    vadFrameLength: 0,
-    vadEnergyThreshold: 0,
-    sessionConfig: undefined,
-    audioPipelineConfig: undefined,
-    sessionId: undefined,
-    defaultLanguageCode: undefined,
+    vadConfig: undefined,
+    llmGeneration: undefined,
+    instructions: undefined,
+    turnDetection: undefined,
+    language: undefined,
   };
 }
 
@@ -1509,47 +924,32 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.sttModelId !== undefined) {
       writer.uint32(18).string(message.sttModelId);
     }
-    if (message.sttModelName !== undefined) {
-      writer.uint32(26).string(message.sttModelName);
-    }
     if (message.llmModelPath !== undefined) {
-      writer.uint32(34).string(message.llmModelPath);
+      writer.uint32(26).string(message.llmModelPath);
     }
     if (message.llmModelId !== undefined) {
-      writer.uint32(42).string(message.llmModelId);
-    }
-    if (message.llmModelName !== undefined) {
-      writer.uint32(50).string(message.llmModelName);
+      writer.uint32(34).string(message.llmModelId);
     }
     if (message.ttsVoicePath !== undefined) {
-      writer.uint32(58).string(message.ttsVoicePath);
+      writer.uint32(42).string(message.ttsVoicePath);
     }
     if (message.ttsVoiceId !== undefined) {
-      writer.uint32(66).string(message.ttsVoiceId);
+      writer.uint32(50).string(message.ttsVoiceId);
     }
-    if (message.ttsVoiceName !== undefined) {
-      writer.uint32(74).string(message.ttsVoiceName);
+    if (message.vadConfig !== undefined) {
+      VADConfiguration.encode(message.vadConfig, writer.uint32(58).fork()).join();
     }
-    if (message.vadSampleRate !== 0) {
-      writer.uint32(80).int32(message.vadSampleRate);
+    if (message.llmGeneration !== undefined) {
+      LLMGenerationOptions.encode(message.llmGeneration, writer.uint32(66).fork()).join();
     }
-    if (message.vadFrameLength !== 0) {
-      writer.uint32(93).float(message.vadFrameLength);
+    if (message.instructions !== undefined) {
+      writer.uint32(74).string(message.instructions);
     }
-    if (message.vadEnergyThreshold !== 0) {
-      writer.uint32(101).float(message.vadEnergyThreshold);
+    if (message.turnDetection !== undefined) {
+      TurnDetection.encode(message.turnDetection, writer.uint32(82).fork()).join();
     }
-    if (message.sessionConfig !== undefined) {
-      VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).join();
-    }
-    if (message.audioPipelineConfig !== undefined) {
-      AudioPipelineConfig.encode(message.audioPipelineConfig, writer.uint32(170).fork()).join();
-    }
-    if (message.sessionId !== undefined) {
-      writer.uint32(178).string(message.sessionId);
-    }
-    if (message.defaultLanguageCode !== undefined) {
-      writer.uint32(186).string(message.defaultLanguageCode);
+    if (message.language !== undefined) {
+      writer.uint32(90).string(message.language);
     }
     return writer;
   },
@@ -1582,7 +982,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.sttModelName = reader.string();
+          message.llmModelPath = reader.string();
           continue;
         }
         case 4: {
@@ -1590,7 +990,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.llmModelPath = reader.string();
+          message.llmModelId = reader.string();
           continue;
         }
         case 5: {
@@ -1598,7 +998,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.llmModelId = reader.string();
+          message.ttsVoicePath = reader.string();
           continue;
         }
         case 6: {
@@ -1606,7 +1006,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.llmModelName = reader.string();
+          message.ttsVoiceId = reader.string();
           continue;
         }
         case 7: {
@@ -1614,7 +1014,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.ttsVoicePath = reader.string();
+          message.vadConfig = VADConfiguration.decode(reader, reader.uint32());
           continue;
         }
         case 8: {
@@ -1622,7 +1022,7 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.ttsVoiceId = reader.string();
+          message.llmGeneration = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
         case 9: {
@@ -1630,63 +1030,23 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
             break;
           }
 
-          message.ttsVoiceName = reader.string();
+          message.instructions = reader.string();
           continue;
         }
         case 10: {
-          if (tag !== 80) {
+          if (tag !== 82) {
             break;
           }
 
-          message.vadSampleRate = reader.int32();
+          message.turnDetection = TurnDetection.decode(reader, reader.uint32());
           continue;
         }
         case 11: {
-          if (tag !== 93) {
+          if (tag !== 90) {
             break;
           }
 
-          message.vadFrameLength = reader.float();
-          continue;
-        }
-        case 12: {
-          if (tag !== 101) {
-            break;
-          }
-
-          message.vadEnergyThreshold = reader.float();
-          continue;
-        }
-        case 20: {
-          if (tag !== 162) {
-            break;
-          }
-
-          message.sessionConfig = VoiceSessionConfig.decode(reader, reader.uint32());
-          continue;
-        }
-        case 21: {
-          if (tag !== 170) {
-            break;
-          }
-
-          message.audioPipelineConfig = AudioPipelineConfig.decode(reader, reader.uint32());
-          continue;
-        }
-        case 22: {
-          if (tag !== 178) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-        case 23: {
-          if (tag !== 186) {
-            break;
-          }
-
-          message.defaultLanguageCode = reader.string();
+          message.language = reader.string();
           continue;
         }
       }
@@ -1710,11 +1070,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
         : isSet(object.stt_model_id)
         ? globalThis.String(object.stt_model_id)
         : undefined,
-      sttModelName: isSet(object.sttModelName)
-        ? globalThis.String(object.sttModelName)
-        : isSet(object.stt_model_name)
-        ? globalThis.String(object.stt_model_name)
-        : undefined,
       llmModelPath: isSet(object.llmModelPath)
         ? globalThis.String(object.llmModelPath)
         : isSet(object.llm_model_path)
@@ -1724,11 +1079,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
         ? globalThis.String(object.llmModelId)
         : isSet(object.llm_model_id)
         ? globalThis.String(object.llm_model_id)
-        : undefined,
-      llmModelName: isSet(object.llmModelName)
-        ? globalThis.String(object.llmModelName)
-        : isSet(object.llm_model_name)
-        ? globalThis.String(object.llm_model_name)
         : undefined,
       ttsVoicePath: isSet(object.ttsVoicePath)
         ? globalThis.String(object.ttsVoicePath)
@@ -1740,46 +1090,23 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
         : isSet(object.tts_voice_id)
         ? globalThis.String(object.tts_voice_id)
         : undefined,
-      ttsVoiceName: isSet(object.ttsVoiceName)
-        ? globalThis.String(object.ttsVoiceName)
-        : isSet(object.tts_voice_name)
-        ? globalThis.String(object.tts_voice_name)
+      vadConfig: isSet(object.vadConfig)
+        ? VADConfiguration.fromJSON(object.vadConfig)
+        : isSet(object.vad_config)
+        ? VADConfiguration.fromJSON(object.vad_config)
         : undefined,
-      vadSampleRate: isSet(object.vadSampleRate)
-        ? globalThis.Number(object.vadSampleRate)
-        : isSet(object.vad_sample_rate)
-        ? globalThis.Number(object.vad_sample_rate)
-        : 0,
-      vadFrameLength: isSet(object.vadFrameLength)
-        ? globalThis.Number(object.vadFrameLength)
-        : isSet(object.vad_frame_length)
-        ? globalThis.Number(object.vad_frame_length)
-        : 0,
-      vadEnergyThreshold: isSet(object.vadEnergyThreshold)
-        ? globalThis.Number(object.vadEnergyThreshold)
-        : isSet(object.vad_energy_threshold)
-        ? globalThis.Number(object.vad_energy_threshold)
-        : 0,
-      sessionConfig: isSet(object.sessionConfig)
-        ? VoiceSessionConfig.fromJSON(object.sessionConfig)
-        : isSet(object.session_config)
-        ? VoiceSessionConfig.fromJSON(object.session_config)
+      llmGeneration: isSet(object.llmGeneration)
+        ? LLMGenerationOptions.fromJSON(object.llmGeneration)
+        : isSet(object.llm_generation)
+        ? LLMGenerationOptions.fromJSON(object.llm_generation)
         : undefined,
-      audioPipelineConfig: isSet(object.audioPipelineConfig)
-        ? AudioPipelineConfig.fromJSON(object.audioPipelineConfig)
-        : isSet(object.audio_pipeline_config)
-        ? AudioPipelineConfig.fromJSON(object.audio_pipeline_config)
+      instructions: isSet(object.instructions) ? globalThis.String(object.instructions) : undefined,
+      turnDetection: isSet(object.turnDetection)
+        ? TurnDetection.fromJSON(object.turnDetection)
+        : isSet(object.turn_detection)
+        ? TurnDetection.fromJSON(object.turn_detection)
         : undefined,
-      sessionId: isSet(object.sessionId)
-        ? globalThis.String(object.sessionId)
-        : isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : undefined,
-      defaultLanguageCode: isSet(object.defaultLanguageCode)
-        ? globalThis.String(object.defaultLanguageCode)
-        : isSet(object.default_language_code)
-        ? globalThis.String(object.default_language_code)
-        : undefined,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
     };
   },
 
@@ -1791,17 +1118,11 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.sttModelId !== undefined) {
       obj.sttModelId = message.sttModelId;
     }
-    if (message.sttModelName !== undefined) {
-      obj.sttModelName = message.sttModelName;
-    }
     if (message.llmModelPath !== undefined) {
       obj.llmModelPath = message.llmModelPath;
     }
     if (message.llmModelId !== undefined) {
       obj.llmModelId = message.llmModelId;
-    }
-    if (message.llmModelName !== undefined) {
-      obj.llmModelName = message.llmModelName;
     }
     if (message.ttsVoicePath !== undefined) {
       obj.ttsVoicePath = message.ttsVoicePath;
@@ -1809,29 +1130,20 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.ttsVoiceId !== undefined) {
       obj.ttsVoiceId = message.ttsVoiceId;
     }
-    if (message.ttsVoiceName !== undefined) {
-      obj.ttsVoiceName = message.ttsVoiceName;
+    if (message.vadConfig !== undefined) {
+      obj.vadConfig = VADConfiguration.toJSON(message.vadConfig);
     }
-    if (message.vadSampleRate !== 0) {
-      obj.vadSampleRate = Math.round(message.vadSampleRate);
+    if (message.llmGeneration !== undefined) {
+      obj.llmGeneration = LLMGenerationOptions.toJSON(message.llmGeneration);
     }
-    if (message.vadFrameLength !== 0) {
-      obj.vadFrameLength = message.vadFrameLength;
+    if (message.instructions !== undefined) {
+      obj.instructions = message.instructions;
     }
-    if (message.vadEnergyThreshold !== 0) {
-      obj.vadEnergyThreshold = message.vadEnergyThreshold;
+    if (message.turnDetection !== undefined) {
+      obj.turnDetection = TurnDetection.toJSON(message.turnDetection);
     }
-    if (message.sessionConfig !== undefined) {
-      obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
-    }
-    if (message.audioPipelineConfig !== undefined) {
-      obj.audioPipelineConfig = AudioPipelineConfig.toJSON(message.audioPipelineConfig);
-    }
-    if (message.sessionId !== undefined) {
-      obj.sessionId = message.sessionId;
-    }
-    if (message.defaultLanguageCode !== undefined) {
-      obj.defaultLanguageCode = message.defaultLanguageCode;
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     return obj;
   },
@@ -1843,30 +1155,27 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     const message = createBaseVoiceAgentComposeConfig();
     message.sttModelPath = object.sttModelPath ?? undefined;
     message.sttModelId = object.sttModelId ?? undefined;
-    message.sttModelName = object.sttModelName ?? undefined;
     message.llmModelPath = object.llmModelPath ?? undefined;
     message.llmModelId = object.llmModelId ?? undefined;
-    message.llmModelName = object.llmModelName ?? undefined;
     message.ttsVoicePath = object.ttsVoicePath ?? undefined;
     message.ttsVoiceId = object.ttsVoiceId ?? undefined;
-    message.ttsVoiceName = object.ttsVoiceName ?? undefined;
-    message.vadSampleRate = object.vadSampleRate ?? 0;
-    message.vadFrameLength = object.vadFrameLength ?? 0;
-    message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
-    message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
-      ? VoiceSessionConfig.fromPartial(object.sessionConfig)
+    message.vadConfig = (object.vadConfig !== undefined && object.vadConfig !== null)
+      ? VADConfiguration.fromPartial(object.vadConfig)
       : undefined;
-    message.audioPipelineConfig = (object.audioPipelineConfig !== undefined && object.audioPipelineConfig !== null)
-      ? AudioPipelineConfig.fromPartial(object.audioPipelineConfig)
+    message.llmGeneration = (object.llmGeneration !== undefined && object.llmGeneration !== null)
+      ? LLMGenerationOptions.fromPartial(object.llmGeneration)
       : undefined;
-    message.sessionId = object.sessionId ?? undefined;
-    message.defaultLanguageCode = object.defaultLanguageCode ?? undefined;
+    message.instructions = object.instructions ?? undefined;
+    message.turnDetection = (object.turnDetection !== undefined && object.turnDetection !== null)
+      ? TurnDetection.fromPartial(object.turnDetection)
+      : undefined;
+    message.language = object.language ?? undefined;
     return message;
   },
 };
 
 function createBaseVoiceAgentTranscribeProtoRequest(): VoiceAgentTranscribeProtoRequest {
-  return { audioData: new Uint8Array(0), sessionId: "", sampleRate: 0, languageHint: "", channels: 0, encoding: 0 };
+  return { audioData: new Uint8Array(0), sessionId: "", language: "" };
 }
 
 export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribeProtoRequest> = {
@@ -1877,17 +1186,8 @@ export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribePr
     if (message.sessionId !== "") {
       writer.uint32(18).string(message.sessionId);
     }
-    if (message.sampleRate !== 0) {
-      writer.uint32(24).int32(message.sampleRate);
-    }
-    if (message.languageHint !== "") {
-      writer.uint32(34).string(message.languageHint);
-    }
-    if (message.channels !== 0) {
-      writer.uint32(40).int32(message.channels);
-    }
-    if (message.encoding !== 0) {
-      writer.uint32(48).int32(message.encoding);
+    if (message.language !== "") {
+      writer.uint32(26).string(message.language);
     }
     return writer;
   },
@@ -1916,35 +1216,11 @@ export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribePr
           continue;
         }
         case 3: {
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.sampleRate = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.languageHint = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.channels = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.encoding = reader.int32() as any;
+          message.language = reader.string();
           continue;
         }
       }
@@ -1968,18 +1244,7 @@ export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribePr
         : isSet(object.session_id)
         ? globalThis.String(object.session_id)
         : "",
-      sampleRate: isSet(object.sampleRate)
-        ? globalThis.Number(object.sampleRate)
-        : isSet(object.sample_rate)
-        ? globalThis.Number(object.sample_rate)
-        : 0,
-      languageHint: isSet(object.languageHint)
-        ? globalThis.String(object.languageHint)
-        : isSet(object.language_hint)
-        ? globalThis.String(object.language_hint)
-        : "",
-      channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+      language: isSet(object.language) ? globalThis.String(object.language) : "",
     };
   },
 
@@ -1991,17 +1256,8 @@ export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribePr
     if (message.sessionId !== "") {
       obj.sessionId = message.sessionId;
     }
-    if (message.sampleRate !== 0) {
-      obj.sampleRate = Math.round(message.sampleRate);
-    }
-    if (message.languageHint !== "") {
-      obj.languageHint = message.languageHint;
-    }
-    if (message.channels !== 0) {
-      obj.channels = Math.round(message.channels);
-    }
-    if (message.encoding !== 0) {
-      obj.encoding = audioEncodingToJSON(message.encoding);
+    if (message.language !== "") {
+      obj.language = message.language;
     }
     return obj;
   },
@@ -2017,10 +1273,7 @@ export const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribePr
     const message = createBaseVoiceAgentTranscribeProtoRequest();
     message.audioData = object.audioData ?? new Uint8Array(0);
     message.sessionId = object.sessionId ?? "";
-    message.sampleRate = object.sampleRate ?? 0;
-    message.languageHint = object.languageHint ?? "";
-    message.channels = object.channels ?? 0;
-    message.encoding = object.encoding ?? 0;
+    message.language = object.language ?? "";
     return message;
   },
 };
@@ -2155,17 +1408,6 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
-
-function longToNumber(int64: { toString(): string }): number {
-  const num = globalThis.Number(int64.toString());
-  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-  }
-  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-  }
-  return num;
-}
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

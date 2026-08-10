@@ -30,6 +30,18 @@ if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
 endif()
 message(STATUS "llama.cpp source: ${RAC_LLAMACPP_GIT_REPOSITORY} @ ${RAC_LLAMACPP_VERSION}")
 
+# Keep the cross-platform armv7 compatibility patch first. On iOS, chain the
+# Metal residency-set capability guard after it instead of replacing it.
+set(LLAMACPP_PATCH_COMMAND
+    ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/patch_ggml_armv7.cmake"
+)
+if(RAC_PLATFORM_IOS)
+    list(APPEND LLAMACPP_PATCH_COMMAND
+        COMMAND git apply --3way --unidiff-zero --ignore-whitespace
+                "${CMAKE_CURRENT_LIST_DIR}/patches/001-metal-residency-set-guard.patch"
+    )
+endif()
+
 FetchContent_Declare(
     llamacpp
     GIT_REPOSITORY ${RAC_LLAMACPP_GIT_REPOSITORY}
@@ -38,7 +50,7 @@ FetchContent_Declare(
     GIT_PROGRESS   TRUE
     # Fix the ggml arch/arm/quants.c armv7 build break (raw AArch64-only vqtbl1q_u8 -> portable wrapper).
     # Idempotent + no-op when the pattern/file is absent, so it is safe on every arch and future llama.cpp bump.
-    PATCH_COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/patch_ggml_armv7.cmake"
+    PATCH_COMMAND ${LLAMACPP_PATCH_COMMAND}
 )
 
 # Configure llama.cpp build options

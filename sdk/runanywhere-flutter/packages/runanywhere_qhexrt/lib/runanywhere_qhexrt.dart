@@ -7,16 +7,19 @@
 /// `runanywhere.v1.NpuCapability` proto message.
 ///
 /// ```dart
+/// import 'package:runanywhere/runanywhere.dart';
 /// import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 ///
 /// final npu = QHexRT.probeNpu();
-/// if (npu.qhexrtSupported) {
+/// if (npu.supported) {
 ///   await QHexRT.register();
-///   await RunAnywhere.registerModel(
-///     id: 'my-qhexrt-model',
-///     name: 'My QHexRT Model',
-///     url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
-///     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+///   await RunAnywhere.models.register(
+///     ModelRegistration.url(
+///       id: 'my-qhexrt-model',
+///       name: 'My QHexRT Model',
+///       url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
+///       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+///     ),
 ///   );
 /// }
 /// ```

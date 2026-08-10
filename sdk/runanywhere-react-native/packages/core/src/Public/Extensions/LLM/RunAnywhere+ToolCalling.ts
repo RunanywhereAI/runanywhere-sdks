@@ -12,21 +12,20 @@ import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
-  ToolParameterType,
   ToolCall,
   ToolResult,
   ToolCallingResult,
   ToolCallingOptions,
-  ToolCallingSessionCreateRequest,
   ToolCallFormatName,
+  ToolCallingRole,
   type ToolDefinition,
-  type ToolParameter,
   type ToolValue,
   type ToolValueArray,
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
+import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
-import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToBase64 } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
@@ -53,7 +52,6 @@ export interface RegisteredTool {
 
 export type {
   ToolDefinition,
-  ToolParameter,
   ToolCall,
   ToolResult,
   ToolCallingOptions,
@@ -63,7 +61,6 @@ export type {
   ToolValueArray,
   ToolValueObject,
 };
-export { ToolParameterType };
 
 // ---------------------------------------------------------------------------
 // ToolValue ↔ plain-JSON bridge (RN-layer mirror of commons'
@@ -148,6 +145,47 @@ function toolValueMapToJsonString(map: Record<string, ToolValue>): string {
   return JSON.stringify(out);
 }
 
+/** Convert a proto `ToolValue` argument map into plain JSON values. */
+export function toolValueMapToJson(
+  map: Record<string, ToolValue>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(map)) {
+    out[key] = toolValueToPlainJson(value);
+  }
+  return out;
+}
+
+/** Convert plain JSON values into the proto `ToolValue` map executors return. */
+export function toolValueMapFromJson(
+  map: Record<string, unknown>
+): Record<string, ToolValue> {
+  const out: Record<string, ToolValue> = {};
+  for (const [key, value] of Object.entries(map)) {
+    out[key] = plainJsonToToolValue(value);
+  }
+  return out;
+}
+
+/**
+ * Convert a flat alternating `[user0, asst0, user1, asst1, ...]` history
+ * (excluding the current turn) into the wire `ToolCallingHistoryTurn[]`.
+ * Mirrors `chat.proto`'s role mapping (`MESSAGE_ROLE_USER` ->
+ * `TOOL_CALLING_ROLE_USER`, `MESSAGE_ROLE_ASSISTANT` ->
+ * `TOOL_CALLING_ROLE_ASSISTANT`).
+ */
+function toToolCallingHistory(
+  turns: string[]
+): { role: ToolCallingRole; content: string }[] {
+  return turns.map((content, index) => ({
+    role:
+      index % 2 === 0
+        ? ToolCallingRole.TOOL_CALLING_ROLE_USER
+        : ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT,
+    content,
+  }));
+}
+
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
 /**
@@ -183,6 +221,11 @@ export function clearTools(): Promise<void> {
  * Execute a single parsed tool call against the registry. Used by
  * `generateWithTools` as the native-callback trampoline and exposed for
  * tests / hosts that want to drive tool execution manually.
+ *
+ * `ToolResult.success` is renamed `isError` with inverted polarity: the
+ * proto3 zero value (`false`) is now the "good result" default (Anthropic
+ * `is_error`, MCP `isError`), so every `success: false` below becomes
+ * `isError: true` and `success: true` becomes `isError: false`.
  */
 export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   const tool = registeredTools.get(toolCall.name);
@@ -194,7 +237,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Unknown tool: ${toolCall.name}`,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -213,7 +256,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Failed to parse tool arguments: ${errorMessage}`,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -226,7 +269,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: toolValueMapToJsonString(result),
-      success: true,
+      isError: false,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -238,7 +281,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: errorMessage,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -255,18 +298,15 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 export interface GenerateWithToolsOptions {
   signal?: AbortSignal;
   /**
-   * LLM generation options channel — Swift parity
-   * (`generateWithTools(prompt:options:toolOptions:...)`): tool options that
-   * are unset fall back to these, and `topP` comes from here exclusively.
-   * Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-   * (maxTokens 100, temperature 0.8, topP 1.0).
+   * Sampling/system-prompt channel forwarded onto the request's
+   * `ToolCallingOptions`. `maxOutputTokens`/`temperature`/`reasoning` are
+   * deleted from `ToolCallingOptions` outright (idl: they duplicated the
+   * enclosing `LLMGenerationOptions` in the two embeddings that had one,
+   * and the standalone run-loop request has none) — only `topP` and
+   * `systemPrompt` still have a channel here; the run loop otherwise keeps
+   * commons' own greedy generation defaults.
    */
-  llmOptions?: Partial<
-    Pick<
-      LLMGenerationOptions,
-      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
-    >
-  >;
+  llmOptions?: Partial<Pick<LLMGenerationOptions, 'topP' | 'systemPrompt'>>;
   /**
    * Swift parity: when omitted the proto field stays UNSET so commons applies
    * its documented default (true). Hosts that delegate validation to their
@@ -286,6 +326,14 @@ export interface GenerateWithToolsOptions {
  * Generate a response with tool calling. Commons owns the multi-iteration
  * run loop through `rac_tool_calling_run_loop_proto`; this
  * function only forwards the request and supplies the JS executor trampoline.
+ *
+ * `ToolCallingSessionCreateRequest` is collapsed to 3 fields — `prompt`,
+ * `history` (now typed `ToolCallingHistoryTurn[]`, not `string[]`), and
+ * `options: ToolCallingOptions` — deleting the 14 flat knobs that used to be
+ * re-published on the request; every one of them now lives on `options`
+ * alone (or, for `temperature`/`maxTokens`, nowhere: the run loop keeps
+ * commons' own greedy defaults, since this request has no enclosing
+ * `LLMGenerationOptions` to inherit them from).
  *
  * Pass an `AbortSignal` via `extra.signal` to cancel the in-flight loop —
  * Nitro publishes the native run-loop handle synchronously so we can fan an
@@ -307,7 +355,7 @@ export async function generateWithTools(
   const native = requireNativeModule();
   const runLoopWithHandle = (
     requestBytes: ArrayBuffer,
-    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<string>,
     onHandle: (runLoopHandle: number) => void
   ) =>
     native.toolRunLoopProtoWithHandle(
@@ -322,43 +370,31 @@ export async function generateWithTools(
   const tools = options?.tools ?? (await getRegisteredTools());
   const format =
     options?.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-  // Field fallbacks mirror Swift makeRunLoopRequest
-  // (RunAnywhere+ToolCalling.swift:491-536): tool options take precedence,
-  // unset values fall back to the LLM options channel, whose defaults are
-  // Swift's RALLMGenerationOptions.defaults().
-  const llm = extra?.llmOptions;
-  const toolMaxTokens = options?.maxTokens;
-  const request = ToolCallingSessionCreateRequest.fromPartial({
-    prompt,
-    maxTokens:
-      toolMaxTokens !== undefined && toolMaxTokens > 0
-        ? toolMaxTokens
-        : (llm?.maxTokens ?? 100),
-    temperature: options?.temperature ?? llm?.temperature ?? 0.8,
-    topP: llm?.topP ?? 1.0,
-    systemPrompt: options?.systemPrompt || llm?.systemPrompt || '',
+  const toolCalling = ToolCallingOptions.fromPartial({
     tools,
     format,
-    maxToolCalls: options?.maxToolCalls ?? 5,
+    maxToolCalls: options?.maxToolCalls,
     keepToolsAvailable: options?.keepToolsAvailable ?? false,
-    // Leave unset unless the caller chose — commons defaults to true.
-    validateCalls: extra?.validateCalls,
-    // Thread the OpenAI-style tool_choice /
-    // forced_tool_name knobs into the canonical request envelope (idl
-    // fields 7/8). Commons build_options_snapshot copies them onto every
-    // synthesized ToolCallingOptions before format/validate proto calls.
     toolChoice: options?.toolChoice,
     forcedToolName: options?.forcedToolName,
-    // Suppress thinking when requested (commons prepends the no-think directive).
-    disableThinking:
-      (options?.disableThinking ?? false) || (llm?.disableThinking ?? false),
     autoExecute: options?.autoExecute ?? true,
     replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
     requireJsonArguments: options?.requireJsonArguments ?? false,
-    // Prior turns as a flat alternating [user0, asst0, ...] list (excluding the
-    // current turn, which is `prompt`); commons threads these into every
-    // generate in the loop so multi-turn tool use keeps context.
-    history: extra?.history ?? [],
+    disableThinking: options?.disableThinking ?? false,
+    parallelToolCalls: options?.parallelToolCalls ?? false,
+    topP: extra?.llmOptions?.topP,
+    systemPrompt: extra?.llmOptions?.systemPrompt,
+    // Leave unset unless the caller chose — commons defaults to true.
+    validateCalls: extra?.validateCalls,
+  });
+  const request = ToolCallingSessionCreateRequest.fromPartial({
+    prompt,
+    // Prior turns as a flat alternating [user0, asst0, ...] list of message
+    // contents (excluding the current turn, which is `prompt`); commons
+    // flattens role-tagged history back to this same alternating shape, so
+    // round-tripping through USER/ASSISTANT roles here is lossless.
+    history: toToolCallingHistory(extra?.history ?? []),
+    options: toolCalling,
   });
 
   logger.debug(
@@ -369,10 +405,12 @@ export async function generateWithTools(
     request,
     ToolCallingSessionCreateRequest
   );
-  const onExecute = async (toolCallBytes: ArrayBuffer) => {
+  const onExecute = async (toolCallBytes: ArrayBuffer): Promise<string> => {
     const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
     const result = await executeTool(toolCall);
-    return encodeProtoMessage(result, ToolResult);
+    // Return base64 rather than an ArrayBuffer: the native run loop reads the
+    // result off the JS thread, where a JS ArrayBuffer's data() is unreadable.
+    return bytesToBase64(arrayBufferToBytes(encodeProtoMessage(result, ToolResult)));
   };
 
   const signal = extra?.signal;

@@ -235,7 +235,7 @@ public extension RunAnywhere {
         }
 
         private func ensureReady() async throws {
-            guard RunAnywhere.isInitialized else {
+            guard RunAnywhere.isReady else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             try await RunAnywhere.ensureServicesReady()

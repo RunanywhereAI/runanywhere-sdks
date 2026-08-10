@@ -51,6 +51,7 @@ public extension RunAnywhere {
         /// Loads the requested embedding model into the commons lifecycle if
         /// it is not already loaded, then issues a single-text embed call
         /// through the lifecycle-aware proto ABI.
+        @available(*, deprecated, renamed: "embed(_:options:)")
         public func embed(
             _ text: String,
             modelID: String,
@@ -69,11 +70,12 @@ public extension RunAnywhere {
         /// The request's `modelID` is honoured when set; otherwise the
         /// supplied `modelID` argument is used.
         @discardableResult
+        @available(*, deprecated, renamed: "embed(_:options:)")
         public func embedBatch(
             _ request: RAEmbeddingsRequest,
             modelID: String
         ) async throws -> RAEmbeddingsResult {
-            guard RunAnywhere.isInitialized else {
+            guard RunAnywhere.isReady else {
                 throw SDKException(
                     code: .notInitialized,
                     message: "SDK not initialized",
@@ -99,7 +101,7 @@ public extension RunAnywhere {
 
         /// Unload the currently-loaded embeddings model. No-op if none.
         public func unload() async throws {
-            guard RunAnywhere.isInitialized else {
+            guard RunAnywhere.isReady else {
                 throw SDKException(
                     code: .notInitialized,
                     message: "SDK not initialized",
@@ -119,16 +121,9 @@ public extension RunAnywhere {
             var unloadRequest = RAModelUnloadRequest()
             unloadRequest.modelID = modelID
             unloadRequest.category = .embedding
-            let result = await RunAnywhere.unloadModel(unloadRequest)
-            if !result.success {
-                let message = result.errorMessage.isEmpty
-                    ? "Embeddings lifecycle unload failed"
-                    : result.errorMessage
-                throw SDKException(
-                    code: .processingFailed,
-                    message: message,
-                    category: .internal
-                )
+            let result = await RunAnywhere.performUnload(unloadRequest)
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
         }
 
@@ -145,16 +140,9 @@ public extension RunAnywhere {
             loadRequest.category = .embedding
             loadRequest.forceReload = true
             loadRequest.validateAvailability = true
-            let result = await RunAnywhere.loadModel(loadRequest)
-            if !result.success {
-                let message = result.errorMessage.isEmpty
-                    ? "Embeddings lifecycle load failed"
-                    : result.errorMessage
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: message,
-                    category: .internal
-                )
+            let result = await RunAnywhere.performLoad(loadRequest)
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
         }
 

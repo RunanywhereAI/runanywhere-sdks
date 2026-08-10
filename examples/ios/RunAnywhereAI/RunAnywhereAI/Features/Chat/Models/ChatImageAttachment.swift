@@ -11,6 +11,6 @@ import RunAnywhere
 struct ChatImageAttachment: Identifiable {
     let id = UUID()
     let data: Data
-    let image: RAVLMImage
+    let image: ImageInput
     let filename: String
 }

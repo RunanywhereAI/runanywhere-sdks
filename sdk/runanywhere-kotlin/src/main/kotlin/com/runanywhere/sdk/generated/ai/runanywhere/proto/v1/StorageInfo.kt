@@ -31,15 +31,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Aggregate storage view: device capacity + app footprint + per-model rows.
- * `total_models` and `total_models_bytes` are denormalized for receivers that
- * would otherwise re-iterate `models` to compute them (Web binding, RN host).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class StorageInfo(
   @field:WireField(
     tag = 1,
@@ -56,20 +47,16 @@ public class StorageInfo(
   )
   public val device: DeviceStorageInfo? = null,
   models: List<ModelStorageMetrics> = emptyList(),
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalModels",
-    schemaIndex = 3,
-  )
-  public val total_models: Int = 0,
+  /**
+   * total_models_bytes (5) is NOT a pure derivation -- kept live; see
+   * storage_event_publisher.cpp and two facade readers.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalModelsBytes",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val total_models_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -95,7 +82,6 @@ public class StorageInfo(
     if (app != other.app) return false
     if (device != other.device) return false
     if (models != other.models) return false
-    if (total_models != other.total_models) return false
     if (total_models_bytes != other.total_models_bytes) return false
     return true
   }
@@ -107,7 +93,6 @@ public class StorageInfo(
       result = result * 37 + (app?.hashCode() ?: 0)
       result = result * 37 + (device?.hashCode() ?: 0)
       result = result * 37 + models.hashCode()
-      result = result * 37 + total_models.hashCode()
       result = result * 37 + total_models_bytes.hashCode()
       super.hashCode = result
     }
@@ -119,7 +104,6 @@ public class StorageInfo(
     if (app != null) result += """app=$app"""
     if (device != null) result += """device=$device"""
     if (models.isNotEmpty()) result += """models=$models"""
-    result += """total_models=$total_models"""
     result += """total_models_bytes=$total_models_bytes"""
     return result.joinToString(prefix = "StorageInfo{", separator = ", ", postfix = "}")
   }
@@ -128,10 +112,9 @@ public class StorageInfo(
     app: AppStorageInfo? = this.app,
     device: DeviceStorageInfo? = this.device,
     models: List<ModelStorageMetrics> = this.models,
-    total_models: Int = this.total_models,
     total_models_bytes: Long = this.total_models_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageInfo = StorageInfo(app, device, models, total_models, total_models_bytes, unknownFields)
+  ): StorageInfo = StorageInfo(app, device, models, total_models_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,9 +135,6 @@ public class StorageInfo(
           size += DeviceStorageInfo.ADAPTER.encodedSizeWithTag(2, value.device)
         }
         size += ModelStorageMetrics.ADAPTER.asRepeated().encodedSizeWithTag(3, value.models)
-        if (value.total_models != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.total_models)
-        }
         if (value.total_models_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.total_models_bytes)
         }
@@ -169,9 +149,6 @@ public class StorageInfo(
           DeviceStorageInfo.ADAPTER.encodeWithTag(writer, 2, value.device)
         }
         ModelStorageMetrics.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.models)
-        if (value.total_models != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_models)
-        }
         if (value.total_models_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_models_bytes)
         }
@@ -182,9 +159,6 @@ public class StorageInfo(
         writer.writeBytes(value.unknownFields)
         if (value.total_models_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_models_bytes)
-        }
-        if (value.total_models != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_models)
         }
         ModelStorageMetrics.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.models)
         if (value.device != null) {
@@ -199,14 +173,12 @@ public class StorageInfo(
         var app: AppStorageInfo? = null
         var device: DeviceStorageInfo? = null
         val models = mutableListOf<ModelStorageMetrics>()
-        var total_models: Int = 0
         var total_models_bytes: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> app = AppStorageInfo.ADAPTER.decode(reader)
             2 -> device = DeviceStorageInfo.ADAPTER.decode(reader)
             3 -> models.add(ModelStorageMetrics.ADAPTER.decode(reader))
-            4 -> total_models = ProtoAdapter.INT32.decode(reader)
             5 -> total_models_bytes = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -215,7 +187,6 @@ public class StorageInfo(
           app = app,
           device = device,
           models = models,
-          total_models = total_models,
           total_models_bytes = total_models_bytes,
           unknownFields = unknownFields
         )

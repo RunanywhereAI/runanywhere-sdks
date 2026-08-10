@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -31,17 +30,10 @@ import okio.ByteString
 
 public class ModelRegistryFetchAssignmentsResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ModelInfoList#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val models: ModelInfoList? = null,
   @field:WireField(
@@ -49,7 +41,7 @@ public class ModelRegistryFetchAssignmentsResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelCount",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val model_count: Int = 0,
   @field:WireField(
@@ -57,25 +49,15 @@ public class ModelRegistryFetchAssignmentsResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "fetchedAtUnixMs",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val fetched_at_unix_ms: Long = 0L,
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 4,
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 3,
   )
-  public val error_code: Int = 0,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 5,
-  )
-  public val error_message: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelRegistryFetchAssignmentsResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -88,12 +70,10 @@ public class ModelRegistryFetchAssignmentsResult(
     if (other === this) return true
     if (other !is ModelRegistryFetchAssignmentsResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (models != other.models) return false
     if (model_count != other.model_count) return false
     if (fetched_at_unix_ms != other.fetched_at_unix_ms) return false
-    if (error_code != other.error_code) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -101,12 +81,10 @@ public class ModelRegistryFetchAssignmentsResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (models?.hashCode() ?: 0)
       result = result * 37 + model_count.hashCode()
       result = result * 37 + fetched_at_unix_ms.hashCode()
-      result = result * 37 + error_code.hashCode()
-      result = result * 37 + error_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -114,24 +92,20 @@ public class ModelRegistryFetchAssignmentsResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (models != null) result += """models=$models"""
     result += """model_count=$model_count"""
     result += """fetched_at_unix_ms=$fetched_at_unix_ms"""
-    result += """error_code=$error_code"""
-    result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelRegistryFetchAssignmentsResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     models: ModelInfoList? = this.models,
     model_count: Int = this.model_count,
     fetched_at_unix_ms: Long = this.fetched_at_unix_ms,
-    error_code: Int = this.error_code,
-    error_message: String = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelRegistryFetchAssignmentsResult = ModelRegistryFetchAssignmentsResult(success, models, model_count, fetched_at_unix_ms, error_code, error_message, unknownFields)
+  ): ModelRegistryFetchAssignmentsResult = ModelRegistryFetchAssignmentsResult(models, model_count, fetched_at_unix_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -146,9 +120,6 @@ public class ModelRegistryFetchAssignmentsResult(
     ) {
       override fun encodedSize(`value`: ModelRegistryFetchAssignmentsResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.models != null) {
           size += ModelInfoList.ADAPTER.encodedSizeWithTag(2, value.models)
         }
@@ -158,19 +129,11 @@ public class ModelRegistryFetchAssignmentsResult(
         if (value.fetched_at_unix_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.fetched_at_unix_ms)
         }
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelRegistryFetchAssignmentsResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.models != null) {
           ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
         }
@@ -180,23 +143,13 @@ public class ModelRegistryFetchAssignmentsResult(
         if (value.fetched_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.fetched_at_unix_ms)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelRegistryFetchAssignmentsResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         if (value.fetched_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.fetched_at_unix_ms)
         }
@@ -206,42 +159,34 @@ public class ModelRegistryFetchAssignmentsResult(
         if (value.models != null) {
           ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelRegistryFetchAssignmentsResult {
-        var success: Boolean = false
         var models: ModelInfoList? = null
         var model_count: Int = 0
         var fetched_at_unix_ms: Long = 0L
-        var error_code: Int = 0
-        var error_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> models = ModelInfoList.ADAPTER.decode(reader)
             3 -> model_count = ProtoAdapter.INT32.decode(reader)
             4 -> fetched_at_unix_ms = ProtoAdapter.INT64.decode(reader)
-            5 -> error_code = ProtoAdapter.INT32.decode(reader)
-            6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelRegistryFetchAssignmentsResult(
-          success = success,
           models = models,
           model_count = model_count,
           fetched_at_unix_ms = fetched_at_unix_ms,
-          error_code = error_code,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelRegistryFetchAssignmentsResult): ModelRegistryFetchAssignmentsResult = value.copy(
         models = value.models?.let(ModelInfoList.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

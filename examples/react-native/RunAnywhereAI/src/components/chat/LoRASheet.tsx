@@ -24,13 +24,15 @@ import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { RunAnywhere } from '@runanywhere/core';
+import type { AppliedAdapter } from '@runanywhere/core';
 import {
-  LoRARemoveRequest,
   LoraAdapterCatalogQuery,
-  type LoRAAdapterInfo,
-  type LoRAState,
   type LoraAdapterCatalogEntry,
 } from '@runanywhere/proto-ts/lora_options';
+import {
+  downloadLoraArtifact,
+  getLoraArtifactInfo,
+} from '../../utils/loraArtifacts';
 import {
   typography,
   useTheme,
@@ -43,7 +45,7 @@ interface LoRASheetProps {
   modelId: string | null;
   onClose: () => void;
   /** Lets the parent (ChatScreen badge) track the loaded-adapter count. */
-  onAdaptersChanged?: (adapters: LoRAAdapterInfo[]) => void;
+  onAdaptersChanged?: (adapters: AppliedAdapter[]) => void;
 }
 
 const LORA_SNAP_POINTS = ['75%'];
@@ -70,29 +72,24 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   const [availableAdapters, setAvailableAdapters] = useState<
     LoraAdapterCatalogEntry[]
   >([]);
-  const [loadedAdapters, setLoadedAdapters] = useState<LoRAAdapterInfo[]>([]);
+  const [loadedAdapters, setLoadedAdapters] = useState<AppliedAdapter[]>([]);
   const [scales, setScales] = useState<Record<string, number>>({});
   const [isLoadingLoRA, setIsLoadingLoRA] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // `LoraAdapterCatalogEntry` no longer carries description/sizeBytes/
+  // localPath (idl/lora_options.proto: those generic artifact facts moved to
+  // the ModelInfo record for the adapter) — fetched per-entry via
+  // `getLoraArtifactInfo` and kept keyed by catalog entry id.
+  const [artifactInfo, setArtifactInfo] = useState<
+    Record<string, { localPath: string | null; sizeBytes: number; description: string }>
+  >({});
 
   const updateLoaded = useCallback(
-    (adapters: LoRAAdapterInfo[]) => {
+    (adapters: AppliedAdapter[]) => {
       setLoadedAdapters(adapters);
       onAdaptersChanged?.(adapters);
     },
     [onAdaptersChanged]
-  );
-
-  /** Mirrors iOS LLMViewModel.handleLoraState. */
-  const handleLoraState = useCallback(
-    (state: LoRAState) => {
-      if (state.errorMessage) {
-        setError(state.errorMessage);
-        return;
-      }
-      updateLoaded(state.loadedAdapters);
-    },
-    [updateLoaded]
   );
 
   /** Mirrors iOS refreshAvailableAdapters + refreshLoraAdapters. */
@@ -108,18 +105,32 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
       return;
     }
     try {
-      const result = await RunAnywhere.lora.queryCatalog(
+      const result = await RunAnywhere.lora.catalog.query(
         LoraAdapterCatalogQuery.fromPartial({ modelId })
       );
-      if (!result.success) {
-        throw new Error(result.errorMessage || 'LoRA catalog query failed');
+      if (result.error) {
+        throw new Error(result.error.message || 'LoRA catalog query failed');
       }
       setAvailableAdapters(result.entries);
-      handleLoraState(await RunAnywhere.lora.list());
+      const infoEntries = await Promise.all(
+        result.entries.map(async (entry) => [
+          entry.id,
+          await getLoraArtifactInfo(entry.id),
+        ] as const)
+      );
+      setArtifactInfo(
+        Object.fromEntries(
+          infoEntries
+            .filter(([, info]) => info !== null)
+            .map(([id, info]) => [id, info!])
+        )
+      );
+      const state = await RunAnywhere.lora.list();
+      updateLoaded(state.applied);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [modelId, handleLoraState, updateLoaded]);
+  }, [modelId, updateLoaded]);
 
   // Only refresh once the user actually opens the sheet — the sheet is mounted
   // (hidden) on the chat screen at startup, so an unconditional mount-refresh
@@ -135,18 +146,10 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
       setError(null);
       try {
         const scale = scales[entry.id] ?? entry.defaultScale;
-        const localPath =
-          entry.isDownloaded && entry.localPath
-            ? entry.localPath
-            : await RunAnywhere.lora.download(entry);
-        const result = await RunAnywhere.lora.applyCatalogAdapter(entry, {
-          localPath,
-          scale,
-        });
-        if (!result.success) {
-          throw new Error(result.errorMessage || 'LoRA apply failed');
+        if (!artifactInfo[entry.id]?.localPath) {
+          await downloadLoraArtifact(entry.id);
         }
-        updateLoaded(result.adapters);
+        await RunAnywhere.lora.apply(entry.id, scale);
         await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -154,44 +157,38 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
         setIsLoadingLoRA(false);
       }
     },
-    [scales, updateLoaded, refresh]
+    [scales, artifactInfo, refresh]
   );
 
   /** Mirrors iOS removeLoraAdapter(path:). */
   const handleRemove = useCallback(
-    async (path: string) => {
+    async (adapterId: string) => {
       try {
-        handleLoraState(
-          await RunAnywhere.lora.remove(
-            LoRARemoveRequest.fromPartial({ adapterPaths: [path] })
-          )
-        );
+        await RunAnywhere.lora.remove(adapterId);
+        await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [handleLoraState]
+    [refresh]
   );
 
   /** Mirrors iOS clearLoraAdapters. */
   const handleClearAll = useCallback(async () => {
     try {
-      handleLoraState(
-        await RunAnywhere.lora.remove(
-          LoRARemoveRequest.fromPartial({ clearAll: true })
-        )
-      );
+      await RunAnywhere.lora.removeAll();
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [handleLoraState]);
+  }, [refresh]);
 
   const isApplied = useCallback(
     (entry: LoraAdapterCatalogEntry) =>
       loadedAdapters.some(
         (adapter) =>
-          adapter.adapterId === entry.id ||
-          (entry.localPath != null && adapter.adapterPath === entry.localPath)
+          adapter.id === entry.id ||
+          (!!entry.localPath && adapter.id === entry.localPath)
       ),
     [loadedAdapters]
   );
@@ -223,18 +220,19 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
             <Text style={styles.sectionHeader}>AVAILABLE FOR THIS MODEL</Text>
             {availableAdapters.map((entry) => {
               const applied = isApplied(entry);
-              const downloaded = Boolean(entry.isDownloaded && entry.localPath);
-              const scale = scales[entry.id] ?? entry.defaultScale;
+              const info = artifactInfo[entry.id];
+              const downloaded = Boolean(info?.localPath);
+              const scale = scales[entry.id] ?? entry.defaultScale ?? 1.0;
               return (
                 <View key={entry.id} style={styles.card}>
                   <View style={styles.cardHeader}>
                     <View style={styles.cardInfo}>
                       <Text style={styles.adapterName}>{entry.name}</Text>
                       <Text style={styles.adapterDescription}>
-                        {entry.description}
+                        {info?.description}
                       </Text>
                       <Text style={styles.adapterSize}>
-                        {formatBytes(entry.sizeBytes)}
+                        {formatBytes(info?.sizeBytes ?? 0)}
                       </Text>
                     </View>
                     {applied ? (
@@ -314,24 +312,20 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionHeader}>LOADED ADAPTERS</Text>
             {loadedAdapters.map((adapter) => (
-              <View key={adapter.adapterPath} style={styles.card}>
+              <View key={adapter.id} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardInfo}>
                     <Text style={styles.adapterName} numberOfLines={1}>
-                      {lastPathComponent(adapter.adapterPath)}
+                      {lastPathComponent(adapter.id)}
                     </Text>
                     <View style={styles.loadedMetaRow}>
                       <Text style={styles.adapterSize}>
                         Scale: {adapter.scale.toFixed(1)}
                       </Text>
-                      {adapter.applied && (
-                        <Text style={styles.badgeAppliedText}>Applied</Text>
-                      )}
+                      <Text style={styles.badgeAppliedText}>Applied</Text>
                     </View>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemove(adapter.adapterPath)}
-                  >
+                  <TouchableOpacity onPress={() => handleRemove(adapter.id)}>
                     <Icon
                       name="close-circle"
                       size={22}

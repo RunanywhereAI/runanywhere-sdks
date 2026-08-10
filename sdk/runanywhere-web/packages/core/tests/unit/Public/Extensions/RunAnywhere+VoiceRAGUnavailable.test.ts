@@ -6,14 +6,16 @@ import {
   type ModalityProtoModule,
 } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
-import type { RAGQueryOptions } from '@runanywhere/proto-ts/rag';
-import type { RAGResult } from '@runanywhere/proto-ts/rag_service';
+// `rag_service` was absorbed into `rag.ts` -- `RAGResult` lives there now
+// alongside `RAGQueryOptions`/`RAGSearchRequest`.
+import type { RAGQueryOptions, RAGResult, RAGSearchRequest } from '@runanywhere/proto-ts/rag';
 import {
   RAG,
   createRAGNativeProvider,
   createDefaultRAGConfiguration,
   ragGetStatistics,
   ragQuery,
+  ragSearch,
   setRAGProvider,
   setRAGSessionHandle,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
@@ -77,7 +79,14 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     expect(VoiceAgent.availability().available).toBe(false);
   });
 
-  it('rejects native Web RAG persistence until a browser storage-backed provider exists', async () => {
+  // `RAGConfiguration.persistIndex`/`.indexPath` were deleted outright
+  // (idl/rag.proto): the RAG index is in-memory only now, so
+  // NativeRAGSessionProvider has nothing left to reject at construction or
+  // pipeline-create time -- it unconditionally reports `persistent: false`
+  // instead of gating on a persistence request. These two tests used to
+  // pin the (now structurally gone) persistence-rejection error path; they
+  // now pin the unconditional non-persistent reality instead.
+  it('creates a native Web RAG session with the config, and always reports non-persistent capabilities', async () => {
     ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
     const provider = createRAGNativeProvider();
     setRAGProvider(provider);
@@ -87,29 +96,23 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     await expect(provider.ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
-      embeddingModelPath: '/models/embed.onnx',
-      llmModelPath: '/models/llm.gguf',
-      persistIndex: true,
-      indexPath: 'opfs://runanywhere/rag/docs',
-    }))).rejects.toMatchObject({
-      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      proto: { nestedMessage: expect.stringContaining('browser storage-backed index adapter') },
-    });
+    }))).resolves.toBeUndefined();
 
     expect(RAG.capabilities().persistent).toBe(false);
   });
 
-  it('rejects persistent config at native Web RAG provider construction', () => {
+  it('accepts a plain (non-persistent) config at native Web RAG provider construction', () => {
     ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
 
     expect(() => createRAGNativeProvider({
       config: {
-        persistIndex: true,
-        indexPath: 'opfs://runanywhere/rag/docs',
+        embeddingModelId: 'all-minilm-l6-v2',
       },
-    })).toThrow(SDKException);
+    })).not.toThrow();
 
+    // Construction alone does not register the provider as active -- Swift
+    // parity requires an explicit setRAGProvider()/setRAGSessionHandle()
+    // call, same as the "keeps RAG unavailable" case above.
     expect(RAG.availability().available).toBe(false);
   });
 
@@ -146,33 +149,101 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     const query = vi.spyOn(adapter, 'query').mockImplementation((session, options) => {
       expect(session).toBe(7);
       capturedQuery = options;
-      return emptyRAGResult(options.question);
+      return Promise.resolve(emptyRAGResult(options.query));
     });
+    // `RAGConfiguration.similarityThreshold` was renamed `.scoreThreshold`.
     setRAGProvider(createRAGNativeProvider({
       adapter,
       session: 7,
       config: {
         llmModelId: 'test-llm',
-        similarityThreshold: 0.35,
+        scoreThreshold: 0.35,
       },
     }));
 
+    // `RAGQueryOverrides`'s flat `similarityThreshold`/`enableMultiQuery`/
+    // `multiQueryCount`/`scopePrefix` knobs moved onto the nested
+    // `retrieval: RAGRetrievalOptions`; `similarityThreshold` was itself
+    // renamed `scoreThreshold` (idl/rag.proto).
     await expect(ragQuery('What is indexed?', {
-      similarityThreshold: 0,
-      enableMultiQuery: true,
-      multiQueryCount: 5,
-      scopePrefix: 'chat/session-7/',
+      retrieval: {
+        scoreThreshold: 0,
+        enableMultiQuery: true,
+        multiQueryCount: 5,
+        scopePrefix: 'chat/session-7/',
+      },
     })).resolves.toMatchObject({
       answer: 'no-op answer for: What is indexed?',
     });
 
     expect(query).toHaveBeenCalledOnce();
     expect(capturedQuery).toMatchObject({
-      question: 'What is indexed?',
-      similarityThreshold: 0,
-      enableMultiQuery: true,
-      multiQueryCount: 5,
-      scopePrefix: 'chat/session-7/',
+      query: 'What is indexed?',
+      retrieval: {
+        scoreThreshold: 0,
+        enableMultiQuery: true,
+        multiQueryCount: 5,
+        scopePrefix: 'chat/session-7/',
+      },
+    });
+  });
+
+  it('routes ragSearch through rac_rag_search_proto without generation', async () => {
+    const adapter = new RAGProtoAdapter(fakeRAGModule());
+    let captured: RAGSearchRequest | undefined;
+    vi.spyOn(adapter, 'search').mockImplementation(async (session, request) => {
+      expect(session).toBe(7);
+      captured = request;
+      return {
+        chunks: [{
+          chunkId: 'c1',
+          text: 'indexed fact',
+          // `RAGSearchResult.similarityScore`→`.score`; `.rank` was deleted
+          // outright (reconstruct from array index instead).
+          score: 0.88,
+          metadata: {},
+          startOffset: 0,
+          endOffset: 12,
+          tokenCount: 2,
+        }],
+        retrievalTimeMs: 3,
+        requestId: 'search-1',
+      };
+    });
+    // `RAGConfiguration.similarityThreshold` was renamed `.scoreThreshold`.
+    setRAGProvider(createRAGNativeProvider({
+      adapter,
+      session: 7,
+      config: { topK: 4, scoreThreshold: 0.2 },
+    }));
+
+    await expect(ragSearch('What is indexed?', 2)).resolves.toEqual([
+      expect.objectContaining({ text: 'indexed fact', score: 0.88 }),
+    ]);
+    // `RAGSearchRequest` is `{ query, retrieval? }` now; `question` renamed
+    // `query` and `retrievalTopK`/`similarityThreshold` moved onto the
+    // nested `retrieval: RAGRetrievalOptions`.
+    expect(captured).toMatchObject({
+      query: 'What is indexed?',
+      retrieval: {
+        topK: 2,
+        scoreThreshold: 0.2,
+      },
+    });
+  });
+
+  it('surfaces a clear error when rac_rag_search_proto is missing', async () => {
+    const adapter = new RAGProtoAdapter(fakeRAGModule());
+    vi.spyOn(adapter, 'search').mockResolvedValue(null);
+    setRAGProvider(createRAGNativeProvider({
+      adapter,
+      session: 7,
+      config: { topK: 3 },
+    }));
+
+    await expect(ragSearch('What is indexed?')).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('rac_rag_search_proto') },
     });
   });
 
@@ -188,19 +259,16 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       async ragGetDocumentCount() {
         return 1;
       },
+      // `RAGStatistics` was trimmed to 5 real fields + optional `error` --
+      // `indexPath`/`statsJson`/`isPersistent`/`lastQueryMs`/`errorMessage`/
+      // `errorCode` were all deleted outright (idl/rag.proto).
       async ragGetStatistics() {
         return {
           indexedDocuments: 1,
           indexedChunks: 4,
           totalTokensIndexed: 0,
           lastUpdatedMs: 0,
-          indexPath: undefined,
-          statsJson: undefined,
           vectorStoreSizeBytes: 0,
-          isPersistent: false,
-          lastQueryMs: 0,
-          errorMessage: undefined,
-          errorCode: 0,
         };
       },
     });
@@ -248,19 +316,17 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 });
 
-function emptyRAGResult(question: string): RAGResult {
+// `RAGResult.totalTimeMs`/`.promptTokens`/`.completionTokens`/`.totalTokens`/
+// `.errorMessage`/`.errorCode` were all deleted outright (idl/rag.proto):
+// `retrievalTimeMs + generationTimeMs` is the closest surviving equivalent
+// for total time, and `.usage: TokenUsage` replaced the flat token counts.
+function emptyRAGResult(query: string): RAGResult {
   return {
-    answer: `no-op answer for: ${question}`,
+    answer: `no-op answer for: ${query}`,
     retrievedChunks: [],
     contextUsed: '',
     retrievalTimeMs: 0,
     generationTimeMs: 0,
-    totalTimeMs: 0,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    errorMessage: undefined,
-    errorCode: 0,
     requestId: 'test-rag-query',
   };
 }

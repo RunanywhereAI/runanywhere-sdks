@@ -30,20 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Word-level timestamp.
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:260          WordTimestamp (TimeInterval seconds)
- *   Kotlin STTTypes.kt:141             WordTimestamp (Double seconds)
- *   Dart   generation_types.dart:124   WordTimestamp (double seconds, conf?)
- *   RN     STTTypes.ts:55              WordTimestamp (number seconds)
- *   Web    STTTypes.ts:18              STTWord       (number ms)
- *   C ABI  rac_stt_types.h:175         rac_stt_word_t (int64 ms)
- *
- * Canonicalize on int64 *_ms (matches C ABI and Web).
- * ---------------------------------------------------------------------------
- */
 public class WordTimestamp(
   @field:WireField(
     tag = 1,
@@ -75,6 +61,10 @@ public class WordTimestamp(
     schemaIndex = 3,
   )
   public val confidence: Float = 0f,
+  /**
+   * Always empty today: no backend fills this. Kept live -- read by all
+   * five SDK facades as public API -- pending real diarization wiring.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

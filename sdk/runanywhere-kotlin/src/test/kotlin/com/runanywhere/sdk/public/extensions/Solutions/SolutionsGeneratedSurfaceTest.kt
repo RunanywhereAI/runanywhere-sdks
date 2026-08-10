@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.public.extensions.Solutions
 
 import ai.runanywhere.proto.v1.SolutionConfig
-import ai.runanywhere.proto.v1.SolutionType
 import ai.runanywhere.proto.v1.VoiceAgentConfig
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.SolutionHandle
@@ -22,6 +21,9 @@ import kotlin.test.assertTrue
 class SolutionsGeneratedSurfaceTest {
     @Test
     fun `generated SolutionConfig carries voice agent oneof fields`() {
+        // `VoiceAgentConfig.type_kind` is deleted outright (idl/solutions.proto)
+        // with no replacement field on this message; `SolutionConfig`'s own
+        // oneof arm selection (voice_agent) is the sole discriminator now.
         val config =
             SolutionConfig(
                 voice_agent =
@@ -33,7 +35,6 @@ class SolutionsGeneratedSurfaceTest {
                         sample_rate_hz = 16000,
                         chunk_ms = 20,
                         max_context_tokens = 4096,
-                        type_kind = SolutionType.SOLUTION_TYPE_VOICE_AGENT,
                     ),
             )
 
@@ -45,7 +46,6 @@ class SolutionsGeneratedSurfaceTest {
         assertEquals(16000, voiceAgent.sample_rate_hz)
         assertEquals(20, voiceAgent.chunk_ms)
         assertEquals(4096, voiceAgent.max_context_tokens)
-        assertEquals(SolutionType.SOLUTION_TYPE_VOICE_AGENT, voiceAgent.type_kind)
     }
 
     @Test

@@ -1,18 +1,12 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,21 +43,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.screens.chat.MarkdownText
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
-import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
-import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 @Composable
@@ -77,15 +74,23 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
     val resultRequester = remember { BringIntoViewRequester() }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
+    val busy = visionVm.status.isBusy
+    val deviceHasCamera = remember(context) { context.hasAnyCamera() }
 
     var liveMode by remember(openLiveCamera) { mutableStateOf(openLiveCamera) }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { visionVm.onImagePicked(decodeBitmap(context, it)) }
+    // The Android photo picker rather than ACTION_GET_CONTENT: no storage permission, photos only,
+    // and the Compat contract falls back to a document picker on devices without the system one.
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        // A cancelled pick returns null and must leave the staged image alone; anything else is
+        // pre-flighted against the same policy the chat composer uses.
+        uri?.let(visionVm::onImagePicked)
     }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        visionVm.onImagePicked(bitmap)
-    }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview(),
+    ) { bitmap -> visionVm.onImageCaptured(bitmap) }
     // CAMERA is declared in the manifest (for Live mode), which makes the runtime
     // grant mandatory for the system-camera capture intent too.
     val captureWithGrant = rememberLauncherForActivityResult(
@@ -107,7 +112,7 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
     }
 
     val canDescribe = model != null && visionVm.image != null &&
-        visionVm.prompt.isNotBlank() && !visionVm.isGenerating
+        visionVm.prompt.isNotBlank() && !busy && !visionVm.isPreparingImage
 
     Column(
         modifier = Modifier
@@ -117,27 +122,36 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-            Text("Images & Live", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Attach a photo, capture one, or open live camera mode with an on-device vision model.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ScreenLede(
+            "Attach a photo, capture one, or open live camera mode with an on-device " +
+                "vision model.",
+        )
 
-        ModelCard(
+        ModelPickerCard(
+            label = "Image model",
             model = model,
-            enabled = !visionVm.isGenerating,
+            icon = RACIcons.Outline.Eye,
+            enabled = !busy,
             onClick = { showSheet = true },
         )
+
+        // Named rather than implied by a greyed-out button. "Ask about image" being dim says
+        // nothing about which of the three preconditions is missing, and no model is the one
+        // the user cannot guess.
+        if (model == null) {
+            VisionNoticeStrip(
+                message = "No vision model is loaded.",
+                detail = "Choose one above — it downloads once, then runs on this device.",
+                onClick = { showSheet = true },
+            )
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
             FilterChip(selected = !liveMode, onClick = { liveMode = false }, label = { Text("Photo") })
             FilterChip(
                 selected = liveMode,
                 onClick = { liveMode = true },
-                enabled = !visionVm.isGenerating,
+                enabled = !busy,
                 label = { Text("Live camera") },
             )
         }
@@ -148,43 +162,81 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             return@Column
         }
 
-        ImagePreview(bitmap = visionVm.image)
+        ImagePreview(
+            image = visionVm.image,
+            preparing = visionVm.isPreparingImage,
+            onClear = visionVm::clearImage.takeIf { !busy },
+        )
+
+        visionVm.imageRejection?.let { reason ->
+            VisionRejectionStrip(reason = reason, onDismiss = visionVm::dismissImageRejection)
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-            OutlinedButton(onClick = { galleryLauncher.launch("image/*") }, modifier = Modifier.weight(1f)) {
-                Text("Gallery")
+            OutlinedButton(
+                onClick = {
+                    galleryLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                enabled = !busy && !visionVm.isPreparingImage,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(RACIcons.Outline.Image, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                Text("Gallery", modifier = Modifier.padding(start = dimens.spacingSm))
             }
-            OutlinedButton(onClick = { onCapture() }, modifier = Modifier.weight(1f)) {
-                Text("Camera")
+            OutlinedButton(
+                onClick = { onCapture() },
+                // A capture button on a device with no camera throws ActivityNotFoundException
+                // when tapped. Disabled here and explained below, rather than crashing.
+                enabled = deviceHasCamera && !busy && !visionVm.isPreparingImage,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(RACIcons.Outline.Camera, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                Text("Camera", modifier = Modifier.padding(start = dimens.spacingSm))
             }
+        }
+
+        if (!deviceHasCamera) {
+            Text(
+                "This device has no camera, so photos have to come from the gallery.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         OutlinedTextField(
             value = visionVm.prompt,
             onValueChange = visionVm::onPromptChange,
             modifier = Modifier.fillMaxWidth(),
+            enabled = !busy,
             label = { Text("Prompt") },
             minLines = 2,
             maxLines = 4,
         )
 
         Button(
-            onClick = { if (visionVm.isGenerating) visionVm.stop() else visionVm.describe() },
-            enabled = visionVm.isGenerating || canDescribe,
+            onClick = { if (visionVm.status.isRunning) visionVm.stop() else visionVm.describe() },
+            enabled = visionVm.status.isRunning || canDescribe,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
-                imageVector = if (visionVm.isGenerating) RACIcons.Outline.PlayerStop else RACIcons.Outline.Eye,
+                imageVector = if (busy) RACIcons.Outline.PlayerStop else RACIcons.Outline.Eye,
                 contentDescription = null,
                 modifier = Modifier.size(dimens.iconSm),
             )
             Text(
-                text = if (visionVm.isGenerating) "Stop" else "Ask about image",
+                text = when {
+                    visionVm.status is VisionRunStatus.Stopping -> "Stopping…"
+                    visionVm.status.isRunning -> "Stop"
+                    else -> "Ask about image"
+                },
                 modifier = Modifier.padding(start = dimens.spacingSm),
             )
         }
 
-        if (visionVm.isGenerating && visionVm.description.isBlank()) {
+        // Only before the first token: once text is streaming, the text itself is the progress.
+        if (visionVm.status.isBusy && visionVm.description.isBlank()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -192,7 +244,11 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(dimens.iconMd), strokeWidth = 2.dp)
                 Text(
-                    text = "Analyzing image…",
+                    text = if (visionVm.status is VisionRunStatus.Stopping) {
+                        "Stopping…"
+                    } else {
+                        "Analyzing image…"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = dimens.spacingSm),
@@ -200,12 +256,19 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             }
         }
 
-        val hasTerminalContent = !visionVm.isGenerating && (
-            visionVm.description.isNotBlank() || visionVm.metrics != null || visionVm.error != null
-        )
-        if (hasTerminalContent) {
-            LaunchedEffect(visionVm.description, visionVm.metrics, visionVm.error) {
-                resultRequester.bringIntoView()
+        val answer = visionVm.description
+        val status = visionVm.status
+        val hasResultBlock = answer.isNotBlank() ||
+            status is VisionRunStatus.Done ||
+            status is VisionRunStatus.Cancelled ||
+            status is VisionRunStatus.Failed
+        if (hasResultBlock) {
+            // Scroll the answer into view when the run *settles*, not on every delta. Keying this
+            // on the streamed text re-scrolls the column on each token, which both jitters the
+            // page and drags the Stop button out from under the finger reaching for it — a
+            // cancel control that moves while you aim at it is not a cancel control.
+            LaunchedEffect(status) {
+                if (!status.isBusy) resultRequester.bringIntoView()
             }
 
             Column(
@@ -214,22 +277,48 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
                     .bringIntoViewRequester(resultRequester),
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
             ) {
-                if (visionVm.description.isNotBlank()) {
+                if (answer.isNotBlank()) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = RoundedCornerShape(dimens.radiusLg),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         MarkdownText(
-                            markdown = visionVm.description,
+                            markdown = answer,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(dimens.spacingLg),
                         )
                     }
                 }
-                visionVm.metrics?.let { StatsCard(it) }
-                visionVm.error?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                when (status) {
+                    is VisionRunStatus.Done -> {
+                        // The budget that cut the answer off is ours, not the model's. Left
+                        // unsaid, an answer ending mid-word reads as the model having failed.
+                        if (status.truncated) {
+                            Text(
+                                text = "The answer reached this screen's length limit and stops " +
+                                    "here. Ask a narrower question for a complete one.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        StatsCard(status.metrics)
+                    }
+                    VisionRunStatus.Cancelled -> Text(
+                        text = if (answer.isBlank()) {
+                            "Stopped before the model answered."
+                        } else {
+                            "Stopped — the answer above is incomplete."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    is VisionRunStatus.Failed -> Text(
+                        text = status.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    else -> Unit
                 }
             }
         }
@@ -246,72 +335,35 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
     }
 }
 
+/** The one thing standing between this screen and an answer, plus the tap that clears it. */
 @Composable
-private fun ImagePreview(bitmap: Bitmap?) {
-    val dimens = LocalDimens.current
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(240.dp)
-            .clip(RoundedCornerShape(dimens.radiusLg))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Selected image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-                Icon(
-                    imageVector = RACIcons.Outline.Eye,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(dimens.iconLg),
-                )
-                Text(
-                    "Pick or capture an image",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelCard(model: RAModelInfo?, enabled: Boolean, onClick: () -> Unit) {
+private fun VisionNoticeStrip(message: String, detail: String, onClick: () -> Unit) {
     val dimens = LocalDimens.current
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        onClick = onClick,
     ) {
         Row(
-            modifier = Modifier
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(dimens.spacingLg),
+            modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
             Icon(
-                imageVector = RACIcons.Outline.Eye,
+                imageVector = RACIcons.Outline.Model,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
+                modifier = Modifier.size(dimens.iconSm),
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text("Image model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(model?.name ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
-                model?.let {
-                    BackendBadge(framework = it.framework, compact = true)
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(message, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Icon(
                 imageVector = RACIcons.Outline.ChevronRight,
@@ -323,6 +375,131 @@ private fun ModelCard(model: RAModelInfo?, enabled: Boolean, onClick: () -> Unit
     }
 }
 
+/**
+ * The file this screen would not take, and why.
+ *
+ * Error-coloured, and dismissible rather than self-clearing: a pick that is silently dropped is
+ * indistinguishable from a picker that never returned.
+ */
+@Composable
+private fun VisionRejectionStrip(reason: String, onDismiss: () -> Unit) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = dimens.spacingMd,
+                end = dimens.spacingXs,
+                top = dimens.spacingXs,
+                bottom = dimens.spacingXs,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                RACIcons.Outline.AlertTriangle,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+            Text(reason, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = onDismiss, modifier = Modifier.size(DISMISS_TARGET)) {
+                Icon(
+                    RACIcons.Outline.Close,
+                    contentDescription = "Dismiss",
+                    modifier = Modifier.size(dimens.iconSm),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImagePreview(
+    image: StagedVisionImage?,
+    preparing: Boolean,
+    /** Null while a run holds the image — swapping it mid-inference is not offered. */
+    onClear: (() -> Unit)?,
+) {
+    val dimens = LocalDimens.current
+    Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PREVIEW_HEIGHT)
+                .clip(RoundedCornerShape(dimens.radiusLg))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                preparing -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(dimens.iconMd), strokeWidth = 2.dp)
+                    Text(
+                        "Opening image…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                image != null -> Image(
+                    bitmap = image.bitmap.asImageBitmap(),
+                    contentDescription = "Selected image: ${image.name}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                else -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    Icon(
+                        imageVector = RACIcons.Outline.Eye,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(dimens.iconLg),
+                    )
+                    Text(
+                        "Pick or capture an image",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        // The name below the frame, not over it: two photos from the same album crop to the
+        // same rectangle, and the caption is the only way to tell which one is loaded.
+        if (image != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            ) {
+                Text(
+                    text = image.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onClear != null) {
+                    IconButton(onClick = onClear, modifier = Modifier.size(DISMISS_TARGET)) {
+                        Icon(
+                            RACIcons.Outline.Close,
+                            contentDescription = "Remove image",
+                            modifier = Modifier.size(dimens.iconSm),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun StatsCard(metrics: VlmMetrics) {
     val dimens = LocalDimens.current
@@ -330,7 +507,6 @@ private fun StatsCard(metrics: VlmMetrics) {
         add("Tokens" to metrics.tokens.toString())
         if (metrics.tokensPerSecond > 0) add("Speed" to String.format(Locale.US, "%.1f tok/s", metrics.tokensPerSecond))
         add("Processing" to String.format(Locale.US, "%.1fs", metrics.processingMs / 1000.0))
-        if (metrics.imageEncodeMs > 0) add("Image encode" to "${metrics.imageEncodeMs}ms")
         if (metrics.ttftMs > 0) add("Time to first token" to "${metrics.ttftMs}ms")
     }
     Column(
@@ -358,44 +534,7 @@ private fun StatsCard(metrics: VlmMetrics) {
     }
 }
 
-// Cap the longest edge so a 12-50MP photo does not decode at full native
-// resolution and blow the heap. VLM backends downscale well below this anyway.
-private const val MAX_DECODE_EDGE = 1568
+private val PREVIEW_HEIGHT = 240.dp
 
-private fun decodeBitmap(context: Context, uri: Uri): Bitmap? =
-    // Catch Throwable (not just Exception): a huge photo can raise
-    // OutOfMemoryError even after downsampling, and we want that to degrade to a
-    // null image (empty preview) rather than crash. runCatching{} only covers
-    // Exception, so the decode is wrapped in an explicit try/catch instead.
-    try {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            decodeDownsampled(context, uri)
-        } else {
-            val source = ImageDecoder.createSource(context.contentResolver, uri)
-            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                val longest = maxOf(info.size.width, info.size.height)
-                if (longest > MAX_DECODE_EDGE) decoder.setTargetSampleSize(sampleSizeFor(longest))
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                decoder.isMutableRequired = false
-            }
-        }
-    } catch (t: Throwable) {
-        null
-    }
-
-private fun decodeDownsampled(context: Context, uri: Uri): Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = if (longest > MAX_DECODE_EDGE) sampleSizeFor(longest) else 1
-    }
-    return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-}
-
-/** Smallest power-of-two sample size that brings [longest] at or under [MAX_DECODE_EDGE]. */
-private fun sampleSizeFor(longest: Int): Int {
-    var sample = 1
-    while (longest / sample > MAX_DECODE_EDGE) sample *= 2
-    return sample
-}
+/** Above the 44 dp coarse-pointer floor: these sit beside text the user is already aiming at. */
+private val DISMISS_TARGET = 44.dp

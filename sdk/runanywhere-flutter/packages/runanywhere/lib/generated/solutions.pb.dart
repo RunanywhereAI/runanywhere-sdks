@@ -10,12 +10,12 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'llm_options.pb.dart' as $0;
 import 'solutions.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -24,7 +24,6 @@ export 'solutions.pbenum.dart';
 
 enum SolutionConfig_Config { voiceAgent, rag, agentLoop, timeSeries, notSet }
 
-/// Top-level union dispatched to the matching solution loader.
 class SolutionConfig extends $pb.GeneratedMessage {
   factory SolutionConfig({
     VoiceAgentConfig? voiceAgent,
@@ -148,15 +147,6 @@ class SolutionConfig extends $pb.GeneratedMessage {
   TimeSeriesConfig ensureTimeSeries() => $_ensure(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionHandle — opaque, serialisable descriptor for a started solution.
-///
-/// The native side owns a `rac_solution_handle_t`; this message is the
-/// language-agnostic shape that frontends (Swift `SolutionHandle` class,
-/// Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
-/// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
-/// are issued against the C handle keyed by `handle_id`.
-/// ---------------------------------------------------------------------------
 class SolutionHandle extends $pb.GeneratedMessage {
   factory SolutionHandle({
     $core.String? handleId,
@@ -210,8 +200,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<SolutionHandle>(create);
   static SolutionHandle? _defaultInstance;
 
-  /// Stable, opaque identifier minted by the core for this solution
-  /// instance. Used as the lookup key for lifecycle calls.
   @$pb.TagNumber(1)
   $core.String get handleId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -221,10 +209,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearHandleId() => $_clearField(1);
 
-  /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "time_series", "agent_loop". Free-form for
-  /// forward-compat with future solutions; canonical values match the
-  /// `SolutionType` enum names lower-cased.
   @$pb.TagNumber(2)
   $core.String get solutionType => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -234,7 +218,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSolutionType() => $_clearField(2);
 
-  /// Wall-clock creation timestamp (ms since Unix epoch).
   @$pb.TagNumber(3)
   $fixnum.Int64 get createdAtMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -244,8 +227,7 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearCreatedAtMs() => $_clearField(3);
 
-  /// Optional engine-specific state string (e.g. "created", "running",
-  /// "stopped"). Empty when the host hasn't surfaced state.
+  /// Engine-specific, e.g. "running" or "stopped".
   @$pb.TagNumber(4)
   $core.String get state => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -256,48 +238,39 @@ class SolutionHandle extends $pb.GeneratedMessage {
   void clearState() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// VoiceAgent — the canonical streaming voice AI loop.
-/// ---------------------------------------------------------------------------
 class VoiceAgentConfig extends $pb.GeneratedMessage {
   factory VoiceAgentConfig({
     $core.String? llmModelId,
     $core.String? sttModelId,
     $core.String? ttsModelId,
     $core.String? vadModelId,
+    $core.String? ttsVoiceId,
     $core.int? sampleRateHz,
     $core.int? chunkMs,
     AudioSource? audioSource,
+    $core.String? audioFilePath,
     $core.bool? enableBargeIn,
     $core.int? bargeInThresholdMs,
-    $core.String? systemPrompt,
+    $0.LLMGenerationOptions? generation,
     $core.int? maxContextTokens,
-    $core.double? temperature,
     $core.bool? emitPartials,
-    $core.bool? emitThoughts,
-    $core.String? audioFilePath,
-    SolutionType? typeKind,
-    $core.String? ttsVoiceId,
   }) {
     final result = create();
     if (llmModelId != null) result.llmModelId = llmModelId;
     if (sttModelId != null) result.sttModelId = sttModelId;
     if (ttsModelId != null) result.ttsModelId = ttsModelId;
     if (vadModelId != null) result.vadModelId = vadModelId;
+    if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
     if (sampleRateHz != null) result.sampleRateHz = sampleRateHz;
     if (chunkMs != null) result.chunkMs = chunkMs;
     if (audioSource != null) result.audioSource = audioSource;
+    if (audioFilePath != null) result.audioFilePath = audioFilePath;
     if (enableBargeIn != null) result.enableBargeIn = enableBargeIn;
     if (bargeInThresholdMs != null)
       result.bargeInThresholdMs = bargeInThresholdMs;
-    if (systemPrompt != null) result.systemPrompt = systemPrompt;
+    if (generation != null) result.generation = generation;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
-    if (temperature != null) result.temperature = temperature;
     if (emitPartials != null) result.emitPartials = emitPartials;
-    if (emitThoughts != null) result.emitThoughts = emitThoughts;
-    if (audioFilePath != null) result.audioFilePath = audioFilePath;
-    if (typeKind != null) result.typeKind = typeKind;
-    if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
     return result;
   }
 
@@ -318,22 +291,18 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sttModelId')
     ..aOS(3, _omitFieldNames ? '' : 'ttsModelId')
     ..aOS(4, _omitFieldNames ? '' : 'vadModelId')
-    ..aI(5, _omitFieldNames ? '' : 'sampleRateHz')
-    ..aI(6, _omitFieldNames ? '' : 'chunkMs')
-    ..aE<AudioSource>(7, _omitFieldNames ? '' : 'audioSource',
+    ..aOS(5, _omitFieldNames ? '' : 'ttsVoiceId')
+    ..aI(6, _omitFieldNames ? '' : 'sampleRateHz')
+    ..aI(7, _omitFieldNames ? '' : 'chunkMs')
+    ..aE<AudioSource>(8, _omitFieldNames ? '' : 'audioSource',
         enumValues: AudioSource.values)
-    ..aOB(8, _omitFieldNames ? '' : 'enableBargeIn')
-    ..aI(9, _omitFieldNames ? '' : 'bargeInThresholdMs')
-    ..aOS(10, _omitFieldNames ? '' : 'systemPrompt')
-    ..aI(11, _omitFieldNames ? '' : 'maxContextTokens')
-    ..aD(12, _omitFieldNames ? '' : 'temperature',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOB(13, _omitFieldNames ? '' : 'emitPartials')
-    ..aOB(14, _omitFieldNames ? '' : 'emitThoughts')
-    ..aOS(15, _omitFieldNames ? '' : 'audioFilePath')
-    ..aE<SolutionType>(16, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
-    ..aOS(17, _omitFieldNames ? '' : 'ttsVoiceId')
+    ..aOS(9, _omitFieldNames ? '' : 'audioFilePath')
+    ..aOB(10, _omitFieldNames ? '' : 'enableBargeIn')
+    ..aI(11, _omitFieldNames ? '' : 'bargeInThresholdMs')
+    ..aOM<$0.LLMGenerationOptions>(12, _omitFieldNames ? '' : 'generation',
+        subBuilder: $0.LLMGenerationOptions.create)
+    ..aI(13, _omitFieldNames ? '' : 'maxContextTokens')
+    ..aOB(14, _omitFieldNames ? '' : 'emitPartials')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -355,7 +324,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VoiceAgentConfig>(create);
   static VoiceAgentConfig? _defaultInstance;
 
-  /// Model identifiers — resolved against the model registry.
   @$pb.TagNumber(1)
   $core.String get llmModelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -392,143 +360,102 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearVadModelId() => $_clearField(4);
 
-  /// Audio configuration.
   @$pb.TagNumber(5)
-  $core.int get sampleRateHz => $_getIZ(4);
+  $core.String get ttsVoiceId => $_getSZ(4);
   @$pb.TagNumber(5)
-  set sampleRateHz($core.int value) => $_setSignedInt32(4, value);
+  set ttsVoiceId($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasSampleRateHz() => $_has(4);
+  $core.bool hasTtsVoiceId() => $_has(4);
   @$pb.TagNumber(5)
-  void clearSampleRateHz() => $_clearField(5);
+  void clearTtsVoiceId() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get chunkMs => $_getIZ(5);
+  $core.int get sampleRateHz => $_getIZ(5);
   @$pb.TagNumber(6)
-  set chunkMs($core.int value) => $_setSignedInt32(5, value);
+  set sampleRateHz($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasChunkMs() => $_has(5);
+  $core.bool hasSampleRateHz() => $_has(5);
   @$pb.TagNumber(6)
-  void clearChunkMs() => $_clearField(6);
+  void clearSampleRateHz() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  AudioSource get audioSource => $_getN(6);
+  $core.int get chunkMs => $_getIZ(6);
   @$pb.TagNumber(7)
-  set audioSource(AudioSource value) => $_setField(7, value);
+  set chunkMs($core.int value) => $_setSignedInt32(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasAudioSource() => $_has(6);
+  $core.bool hasChunkMs() => $_has(6);
   @$pb.TagNumber(7)
-  void clearAudioSource() => $_clearField(7);
+  void clearChunkMs() => $_clearField(7);
 
-  /// Barge-in behavior.
+  /// audio_file_path applies when audio_source is FILE.
   @$pb.TagNumber(8)
-  $core.bool get enableBargeIn => $_getBF(7);
+  AudioSource get audioSource => $_getN(7);
   @$pb.TagNumber(8)
-  set enableBargeIn($core.bool value) => $_setBool(7, value);
+  set audioSource(AudioSource value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasEnableBargeIn() => $_has(7);
+  $core.bool hasAudioSource() => $_has(7);
   @$pb.TagNumber(8)
-  void clearEnableBargeIn() => $_clearField(8);
+  void clearAudioSource() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.int get bargeInThresholdMs => $_getIZ(8);
+  $core.String get audioFilePath => $_getSZ(8);
   @$pb.TagNumber(9)
-  set bargeInThresholdMs($core.int value) => $_setSignedInt32(8, value);
+  set audioFilePath($core.String value) => $_setString(8, value);
   @$pb.TagNumber(9)
-  $core.bool hasBargeInThresholdMs() => $_has(8);
+  $core.bool hasAudioFilePath() => $_has(8);
   @$pb.TagNumber(9)
-  void clearBargeInThresholdMs() => $_clearField(9);
+  void clearAudioFilePath() => $_clearField(9);
 
-  /// LLM behavior.
+  /// Unset means enabled.
   @$pb.TagNumber(10)
-  $core.String get systemPrompt => $_getSZ(9);
+  $core.bool get enableBargeIn => $_getBF(9);
   @$pb.TagNumber(10)
-  set systemPrompt($core.String value) => $_setString(9, value);
+  set enableBargeIn($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(10)
-  $core.bool hasSystemPrompt() => $_has(9);
+  $core.bool hasEnableBargeIn() => $_has(9);
   @$pb.TagNumber(10)
-  void clearSystemPrompt() => $_clearField(10);
+  void clearEnableBargeIn() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.int get maxContextTokens => $_getIZ(10);
+  $core.int get bargeInThresholdMs => $_getIZ(10);
   @$pb.TagNumber(11)
-  set maxContextTokens($core.int value) => $_setSignedInt32(10, value);
+  set bargeInThresholdMs($core.int value) => $_setSignedInt32(10, value);
   @$pb.TagNumber(11)
-  $core.bool hasMaxContextTokens() => $_has(10);
+  $core.bool hasBargeInThresholdMs() => $_has(10);
   @$pb.TagNumber(11)
-  void clearMaxContextTokens() => $_clearField(11);
+  void clearBargeInThresholdMs() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.double get temperature => $_getN(11);
+  $0.LLMGenerationOptions get generation => $_getN(11);
   @$pb.TagNumber(12)
-  set temperature($core.double value) => $_setFloat(11, value);
+  set generation($0.LLMGenerationOptions value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasTemperature() => $_has(11);
+  $core.bool hasGeneration() => $_has(11);
   @$pb.TagNumber(12)
-  void clearTemperature() => $_clearField(12);
+  void clearGeneration() => $_clearField(12);
+  @$pb.TagNumber(12)
+  $0.LLMGenerationOptions ensureGeneration() => $_ensure(11);
 
-  /// Emit partial transcripts as UserSaidEvent{is_final=false}.
   @$pb.TagNumber(13)
-  $core.bool get emitPartials => $_getBF(12);
+  $core.int get maxContextTokens => $_getIZ(12);
   @$pb.TagNumber(13)
-  set emitPartials($core.bool value) => $_setBool(12, value);
+  set maxContextTokens($core.int value) => $_setSignedInt32(12, value);
   @$pb.TagNumber(13)
-  $core.bool hasEmitPartials() => $_has(12);
+  $core.bool hasMaxContextTokens() => $_has(12);
   @$pb.TagNumber(13)
-  void clearEmitPartials() => $_clearField(13);
+  void clearMaxContextTokens() => $_clearField(13);
 
-  /// Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
+  /// Emit partial transcripts as non-final user-said events.
   @$pb.TagNumber(14)
-  $core.bool get emitThoughts => $_getBF(13);
+  $core.bool get emitPartials => $_getBF(13);
   @$pb.TagNumber(14)
-  set emitThoughts($core.bool value) => $_setBool(13, value);
+  set emitPartials($core.bool value) => $_setBool(13, value);
   @$pb.TagNumber(14)
-  $core.bool hasEmitThoughts() => $_has(13);
+  $core.bool hasEmitPartials() => $_has(13);
   @$pb.TagNumber(14)
-  void clearEmitThoughts() => $_clearField(14);
-
-  /// Absolute path to an audio file. Required when `audio_source` is
-  /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
-  @$pb.TagNumber(15)
-  $core.String get audioFilePath => $_getSZ(14);
-  @$pb.TagNumber(15)
-  set audioFilePath($core.String value) => $_setString(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasAudioFilePath() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearAudioFilePath() => $_clearField(15);
-
-  /// Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-  /// oneof arm; provided so callers that pass this message standalone (or
-  /// log it) can read a single discriminator. Defaults to UNSPECIFIED.
-  @$pb.TagNumber(16)
-  SolutionType get typeKind => $_getN(15);
-  @$pb.TagNumber(16)
-  set typeKind(SolutionType value) => $_setField(16, value);
-  @$pb.TagNumber(16)
-  $core.bool hasTypeKind() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearTypeKind() => $_clearField(16);
-
-  /// pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-  /// (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-  /// fall back to using tts_model_id as the voice id — correct for
-  /// single-voice engines, wrong for multi-voice. Aligns the caller-facing
-  /// VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-  /// (voice_agent_service.proto:214) which already exposes tts_voice_id.
-  @$pb.TagNumber(17)
-  $core.String get ttsVoiceId => $_getSZ(16);
-  @$pb.TagNumber(17)
-  set ttsVoiceId($core.String value) => $_setString(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasTtsVoiceId() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearTtsVoiceId() => $_clearField(17);
+  void clearEmitPartials() => $_clearField(14);
 }
 
-/// ---------------------------------------------------------------------------
-/// RAG — retrieve → rerank → prompt → LLM.
-/// ---------------------------------------------------------------------------
 class RAGConfig extends $pb.GeneratedMessage {
   factory RAGConfig({
     $core.String? embedModelId,
@@ -542,7 +469,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     $core.double? bm25B,
     $core.int? rrfK,
     $core.String? promptTemplate,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (embedModelId != null) result.embedModelId = embedModelId;
@@ -556,7 +482,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     if (bm25B != null) result.bm25B = bm25B;
     if (rrfK != null) result.rrfK = rrfK;
     if (promptTemplate != null) result.promptTemplate = promptTemplate;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -585,8 +510,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     ..aD(9, _omitFieldNames ? '' : 'bm25B', fieldType: $pb.PbFieldType.OF)
     ..aI(10, _omitFieldNames ? '' : 'rrfK')
     ..aOS(11, _omitFieldNames ? '' : 'promptTemplate')
-    ..aE<SolutionType>(12, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -634,7 +557,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLlmModelId() => $_clearField(3);
 
-  /// Vector store — USearch (in-process HNSW, default) or remote pgvector.
   @$pb.TagNumber(4)
   VectorStore get vectorStore => $_getN(3);
   @$pb.TagNumber(4)
@@ -653,6 +575,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearVectorStorePath() => $_clearField(5);
 
+  /// Retrieve this many candidates, then keep this many after reranking.
   @$pb.TagNumber(6)
   $core.int get retrieveK => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -671,7 +594,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearRerankTop() => $_clearField(7);
 
-  /// BM25 parameters.
+  /// BM25 term-saturation and length-normalization parameters.
   @$pb.TagNumber(8)
   $core.double get bm25K1 => $_getN(7);
   @$pb.TagNumber(8)
@@ -690,7 +613,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearBm25B() => $_clearField(9);
 
-  /// RRF fusion parameter.
+  /// Reciprocal-rank-fusion smoothing constant.
   @$pb.TagNumber(10)
   $core.int get rrfK => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -700,7 +623,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearRrfK() => $_clearField(10);
 
-  /// Prompt template. Supports {{context}} and {{query}} placeholders.
   @$pb.TagNumber(11)
   $core.String get promptTemplate => $_getSZ(10);
   @$pb.TagNumber(11)
@@ -709,21 +631,8 @@ class RAGConfig extends $pb.GeneratedMessage {
   $core.bool hasPromptTemplate() => $_has(10);
   @$pb.TagNumber(11)
   void clearPromptTemplate() => $_clearField(11);
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  @$pb.TagNumber(12)
-  SolutionType get typeKind => $_getN(11);
-  @$pb.TagNumber(12)
-  set typeKind(SolutionType value) => $_setField(12, value);
-  @$pb.TagNumber(12)
-  $core.bool hasTypeKind() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearTypeKind() => $_clearField(12);
 }
 
-/// ---------------------------------------------------------------------------
-/// Agent loop — multi-turn LLM with tool calling.
-/// ---------------------------------------------------------------------------
 class AgentLoopConfig extends $pb.GeneratedMessage {
   factory AgentLoopConfig({
     $core.String? llmModelId,
@@ -731,7 +640,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
     $core.Iterable<ToolSpec>? tools,
     $core.int? maxIterations,
     $core.int? maxContextTokens,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (llmModelId != null) result.llmModelId = llmModelId;
@@ -739,7 +647,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
     if (tools != null) result.tools.addAll(tools);
     if (maxIterations != null) result.maxIterations = maxIterations;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -762,8 +669,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
         subBuilder: ToolSpec.create)
     ..aI(4, _omitFieldNames ? '' : 'maxIterations')
     ..aI(5, _omitFieldNames ? '' : 'maxContextTokens')
-    ..aE<SolutionType>(6, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -823,16 +728,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
   $core.bool hasMaxContextTokens() => $_has(4);
   @$pb.TagNumber(5)
   void clearMaxContextTokens() => $_clearField(5);
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  @$pb.TagNumber(6)
-  SolutionType get typeKind => $_getN(5);
-  @$pb.TagNumber(6)
-  set typeKind(SolutionType value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTypeKind() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTypeKind() => $_clearField(6);
 }
 
 class ToolSpec extends $pb.GeneratedMessage {
@@ -902,6 +797,7 @@ class ToolSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDescription() => $_clearField(2);
 
+  /// OpenAI-compatible parameters schema.
   @$pb.TagNumber(3)
   $core.String get jsonSchema => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -912,9 +808,6 @@ class ToolSpec extends $pb.GeneratedMessage {
   void clearJsonSchema() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Time series — window + anomaly_detect + generate_text.
-/// ---------------------------------------------------------------------------
 class TimeSeriesConfig extends $pb.GeneratedMessage {
   factory TimeSeriesConfig({
     $core.String? anomalyModelId,
@@ -922,7 +815,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     $core.int? windowSize,
     $core.int? stride,
     $core.double? anomalyThreshold,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (anomalyModelId != null) result.anomalyModelId = anomalyModelId;
@@ -930,7 +822,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     if (windowSize != null) result.windowSize = windowSize;
     if (stride != null) result.stride = stride;
     if (anomalyThreshold != null) result.anomalyThreshold = anomalyThreshold;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -953,8 +844,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'stride')
     ..aD(5, _omitFieldNames ? '' : 'anomalyThreshold',
         fieldType: $pb.PbFieldType.OF)
-    ..aE<SolutionType>(6, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -994,6 +883,7 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLlmModelId() => $_clearField(2);
 
+  /// Samples per window, and how far the window advances each step.
   @$pb.TagNumber(3)
   $core.int get windowSize => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -1020,50 +910,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   $core.bool hasAnomalyThreshold() => $_has(4);
   @$pb.TagNumber(5)
   void clearAnomalyThreshold() => $_clearField(5);
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  @$pb.TagNumber(6)
-  SolutionType get typeKind => $_getN(5);
-  @$pb.TagNumber(6)
-  set typeKind(SolutionType value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTypeKind() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTypeKind() => $_clearField(6);
-}
-
-/// Logical solutions service contract. Solution lifecycle verbs (create/start/
-/// stop/destroy) mirror the `rac_solution_handle_t` C ABI. Host UI, progress
-/// surfacing, and side effects remain adapter-owned; this service describes
-/// only the portable ergonomic entry points over generated messages.
-class SolutionsApi {
-  final $pb.RpcClient _client;
-
-  SolutionsApi(this._client);
-
-  /// Instantiate a solution from a SolutionConfig oneof.
-  $async.Future<SolutionHandle> create_(
-          $pb.ClientContext? ctx, SolutionConfig request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Create', request, SolutionHandle());
-
-  /// Transition the solution to a running state.
-  $async.Future<SolutionHandle> start(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Start', request, SolutionHandle());
-
-  /// Transition the solution to a stopped state (resumable).
-  $async.Future<SolutionHandle> stop(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Stop', request, SolutionHandle());
-
-  /// Terminate the solution and release native resources.
-  $async.Future<SolutionHandle> destroy(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Destroy', request, SolutionHandle());
 }
 
 const $core.bool _omitFieldNames =

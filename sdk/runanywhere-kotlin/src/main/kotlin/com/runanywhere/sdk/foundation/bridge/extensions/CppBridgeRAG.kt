@@ -11,6 +11,8 @@ import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import ai.runanywhere.proto.v1.RAGSearchRequest
+import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -24,6 +26,10 @@ import com.squareup.wire.ProtoAdapter
 
 internal data class NativeRAGQueryRequest(
     val queryProto: ByteArray,
+)
+
+internal data class NativeRAGSearchRequest(
+    val requestProto: ByteArray,
 )
 
 object CppBridgeRAG {
@@ -64,6 +70,12 @@ object CppBridgeRAG {
     internal fun prepareQuery(options: RAGQueryOptions): NativeRAGQueryRequest =
         NativeRAGQueryRequest(
             queryProto = RAGQueryOptions.ADAPTER.encode(options),
+        )
+
+    /** Encode immutable retrieval-only search request before cancellable JNI admission. */
+    internal fun prepareSearch(request: RAGSearchRequest): NativeRAGSearchRequest =
+        NativeRAGSearchRequest(
+            requestProto = RAGSearchRequest.ADAPTER.encode(request),
         )
 
     internal fun queryRequest(
@@ -134,6 +146,93 @@ object CppBridgeRAG {
             RunAnywhereBridge.racRagStatsProto(requireSession()),
             "racRagStatsProto",
         )
+
+    // Handle-scoped API. The native ABI keys every call on an explicit session
+    // handle, so RagSession owns its own corpus instead of sharing the
+    // singleton above; two sessions can be open at once.
+
+    internal fun openSession(config: RARAGConfiguration): Long {
+        val outRc = intArrayOf(RunAnywhereBridge.RAC_SUCCESS)
+        val handle =
+            RunAnywhereBridge.racRagSessionCreateProtoWithError(
+                RAGConfiguration.ADAPTER.encode(config),
+                outRc,
+            )
+        if (handle == 0L) throw createSessionException(outRc[0])
+        return handle
+    }
+
+    internal fun closeSession(handle: Long) {
+        if (handle != 0L) RunAnywhereBridge.racRagSessionDestroyProto(handle)
+    }
+
+    internal fun ingestOn(handle: Long, document: RARAGDocument): RARAGStatistics =
+        decodeOrThrow(
+            RAGStatistics.ADAPTER,
+            RunAnywhereBridge.racRagIngestProto(handle, RAGDocument.ADAPTER.encode(document)),
+            "racRagIngestProto",
+        )
+
+    internal fun clearOn(handle: Long): RARAGStatistics =
+        decodeOrThrow(
+            RAGStatistics.ADAPTER,
+            RunAnywhereBridge.racRagClearProto(handle),
+            "racRagClearProto",
+        )
+
+    internal fun statsOn(handle: Long): RARAGStatistics =
+        decodeOrThrow(
+            RAGStatistics.ADAPTER,
+            RunAnywhereBridge.racRagStatsProto(handle),
+            "racRagStatsProto",
+        )
+
+    internal fun queryOn(
+        handle: Long,
+        requestId: Long,
+        request: NativeRAGQueryRequest,
+    ): RAGResult =
+        decodeOrThrow(
+            RAGResult.ADAPTER,
+            RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto),
+            "racRagQueryRequestProto",
+        )
+
+    internal fun searchOn(
+        handle: Long,
+        requestId: Long,
+        request: NativeRAGSearchRequest,
+    ): RAGSearchResponse =
+        decodeOrThrow(
+            RAGSearchResponse.ADAPTER,
+            RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto),
+            "racRagSearchRequestProto",
+        )
+
+    internal fun queryStreamOn(
+        handle: Long,
+        requestId: Long,
+        request: NativeRAGQueryRequest,
+        onEvent: (RAGStreamEvent) -> Boolean,
+    ) {
+        val rc =
+            RunAnywhereBridge.racRagQueryStreamRequestProto(
+                requestId,
+                handle,
+                request.queryProto,
+                NativeProtoProgressListener { bytes -> onEvent(RAGStreamEvent.ADAPTER.decode(bytes)) },
+            )
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagQueryStreamRequestProto failed: $rc")
+        }
+    }
+
+    internal fun cancelRequestOn(handle: Long, requestId: Long) {
+        val rc = RunAnywhereBridge.racRagCancelRequestProto(requestId, handle)
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagCancelRequestProto failed: $rc")
+        }
+    }
 
     private fun requireSession(): Long =
         sessionHandle.takeIf { it != 0L } ?: throw SDKException.notInitialized("RAG session not created")

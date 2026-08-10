@@ -9,6 +9,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
+import { speakableText } from '../speech';
+import { formatChat } from '../chat-template';
+import type { ChatTemplate, ChatTurn, FormatOptions } from '../chat-template';
+import { downsample, pcm16Bytes, rms } from '../audio';
 import {
   RAGConfiguration,
   RAGDocument,
@@ -16,6 +20,11 @@ import {
   RAGResult,
   RAGStatistics,
 } from '../proto/rag';
+import { SDKEnvironment } from '../proto/model_types';
+import {
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+} from '../proto/sdk_init';
 import { createRagSessionFromCatalog } from '../rag';
 import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
@@ -25,7 +34,7 @@ import { toAsyncIterable, streamWithMetrics } from '../stream';
 import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
 import type { EventListener, Modality } from '../events';
-import { CATALOG } from '../catalog';
+import { catalogEntries } from '../catalog';
 import { SDKException, asSDKException } from '../errors';
 import type { RpcMessage } from './rpc';
 
@@ -56,7 +65,16 @@ function rejectAllPending(err: Error): void {
   pending.clear();
 }
 
+// The args of the last successful initialize(), replayed onto a REPLACEMENT host.
+// The native addon's initialised state is per-process, so a re-forked host starts
+// uninitialised: without this, one host crash leaves the app alive but every
+// feature failing "not initialized" until the user restarts it.
+let initArgs: { secureDir?: string; baseDir?: string; cp?: ControlPlaneOptions } | null = null;
+let sawFirstPort = false;
+
 ipcRenderer.on('runanywhere-port', (event) => {
+  const isReplacement = sawFirstPort;
+  sawFirstPort = true;
   port = event.ports[0];
   port.onmessage = (ev: MessageEvent) => {
     const m = ev.data as RpcMessage;
@@ -73,6 +91,22 @@ ipcRenderer.on('runanywhere-port', (event) => {
   };
   port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
+  if (isReplacement && initArgs) {
+    // Re-initialise BEFORE opening the gate, so calls queued behind `ready` do not
+    // race the init and fail. If it fails there is nothing further we can do here;
+    // the next call surfaces the error.
+    const { secureDir, baseDir, cp } = initArgs;
+    new Promise<void>((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve: () => resolve(), reject });
+      port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
+    })
+      .then(() => runControlPlane(cp)) // re-run auth + telemetry on the fresh host
+      .then(() => bus.emit({ type: 'initialized' }))
+      .catch(() => { /* surfaced by the caller's next request */ })
+      .finally(() => markReady());
+    return;
+  }
   markReady();
 });
 
@@ -107,21 +141,110 @@ function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
   });
 }
 
+/** Control-plane credentials for {@link initialize}. */
+type ControlPlaneOptions = { apiKey?: string; baseUrl?: string; environment?: string };
+
+/** The host OS as the backend's platform enum (macos/linux/windows) — the binding
+ * ("electron") is reported separately as sdk_binding. */
+function osPlatform(): string {
+  if (process.platform === 'darwin') return 'macos';
+  if (process.platform === 'win32') return 'windows';
+  return 'linux';
+}
+
+/** Run the desktop two-phase init (telemetry + auth) over the host's v3 RPCs.
+ * Best-effort: HTTP/auth failures are non-fatal and never block local inference. */
+async function runControlPlane(cp?: ControlPlaneOptions): Promise<void> {
+  if (!cp) return;
+  const apiKey = (cp.apiKey ?? '').trim();
+  let baseUrl = (cp.baseUrl ?? '').trim();
+  if (!apiKey && !baseUrl) return;
+  const isProd = (cp.environment ?? 'production') === 'production';
+  try {
+    const has = (await send('v3.hasControlPlane', [])) as boolean;
+    if (!has) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'RunAnywhere.initialize: apiKey/baseUrl supplied but this build has no desktop ' +
+          'control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry'
+      );
+      return;
+    }
+    if (!baseUrl && !isProd) baseUrl = (await send('v3.devStagingBaseUrl', [])) as string;
+    if (!baseUrl || (isProd && !apiKey)) return;
+    const deviceId = (await send('v3.devicePersistentId', [])) as string;
+    const version = (await send('version', [])) as string;
+    const platform = osPlatform();
+    const protoEnv = isProd
+      ? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+      : SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+    const phase1Bytes = SdkInitPhase1Request.encode({
+      environment: protoEnv,
+      apiKey,
+      baseUrl,
+      deviceId,
+      platform,
+      sdkVersion: version,
+    }).finish();
+    const phase2Bytes = SdkInitPhase2Request.encode({
+      buildToken: '',
+    }).finish();
+    await send('v3.configureControlPlane', [
+      {
+        environment: isProd ? 2 : 0,
+        apiKey,
+        baseUrl,
+        deviceId,
+        platform,
+        sdkVersion: version,
+        sdkBinding: 'electron',
+        appIdentifier: 'ai.runanywhere.electron',
+        appName: 'RunAnywhere Electron',
+        appVersion: version,
+        phase1Bytes,
+        phase2Bytes,
+      },
+    ]);
+  } catch {
+    // telemetry/auth failure must not block local inference
+  }
+}
+
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
-  initialize: (secureDir?: string, baseDir?: string) =>
-    emitAfter(send('initialize', [secureDir, baseDir]), () => bus.emit({ type: 'initialized' })),
+  initialize: (secureDir?: string, baseDir?: string, controlPlane?: ControlPlaneOptions) =>
+    emitAfter(
+      // Base bring-up first, then the desktop control plane (auth + telemetry).
+      send('initialize', [secureDir, baseDir]).then(() => runControlPlane(controlPlane)),
+      () => {
+        // Remembered so a re-forked host is initialised automatically (see above).
+        initArgs = { secureDir, baseDir, cp: controlPlane };
+        bus.emit({ type: 'initialized' });
+      }
+    ),
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
 
+  // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
+  // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
+  // this by hand in an app folds >8kHz energy into the band Whisper reads.
+  downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
+  pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
+  rms: (samples: Float32Array) => rms(samples),
+
   // ---- reasoning ----
   // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
   splitThinking: (text: string) => splitThinking(text),
+  // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
+  speakableText: (text: string) => speakableText(text),
+  // Render a conversation in the markup the model was trained on. Without this a
+  // multi-turn chat collapses into a single user turn and the model "forgets".
+  formatChat: (turns: ChatTurn[], template?: ChatTemplate, opts?: FormatOptions) => formatChat(turns, template, opts),
 
   // ---- model catalog + storage ----
-  catalog: () => CATALOG,
+  catalog: () => catalogEntries(),
   // modelStatus/exists run their fs work in the utility host (off the renderer
   // thread), so both are async RPCs.
   modelStatus: () => send('modelStatus', []),
@@ -267,8 +390,23 @@ contextBridge.exposeInMainWorld('runanywhere', {
     return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
   },
   ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
-    const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
-    return RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array) as RagResult;
+    const bytes = RAGQueryOptions.encode(
+      RAGQueryOptions.fromPartial({
+        query: query.query,
+        generation: query.generation,
+        retrieval: {
+          topK: query.retrievalTopK,
+          scoreThreshold: query.scoreThreshold,
+        },
+      })
+    ).finish();
+    const raw = RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array);
+    // RAGResult dropped total_time_ms (deleted from idl/rag.proto); derive it —
+    // retrieval + generation is the whole of what the pipeline measures per-call.
+    return {
+      ...raw,
+      totalTimeMs: raw.retrievalTimeMs + raw.generationTimeMs,
+    } as RagResult;
   },
   ragStats: async (handle: number): Promise<RagStats> =>
     RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,

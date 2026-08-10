@@ -12,33 +12,26 @@
 
 import 'dart:core' as $core;
 
-import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'errors.pb.dart' as $0;
-import 'sdk_init.pbenum.dart';
+import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-export 'sdk_init.pbenum.dart';
-
-/// ---------------------------------------------------------------------------
-/// Phase 1 input — synchronous core initialization. Carries the only
-/// platform-supplied values commons cannot derive on its own: API credentials
-/// + environment + device id (resolved by platform Keychain/Keystore lookup).
-///
-/// Platform adapter callbacks (file I/O, secure storage, HTTP transport, log,
-/// memory) are registered separately via rac_platform_adapter_t prior to
-/// calling this entry point. This message is purely the data envelope.
-/// ---------------------------------------------------------------------------
+/// The only platform-supplied values commons cannot derive itself. Platform
+/// adapter callbacks are registered separately through rac_platform_adapter_t
+/// before this call; this message is purely the data envelope.
 class SdkInitPhase1Request extends $pb.GeneratedMessage {
   factory SdkInitPhase1Request({
-    SdkInitEnvironment? environment,
+    $1.SDKEnvironment? environment,
     $core.String? apiKey,
     $core.String? baseUrl,
     $core.String? deviceId,
     $core.String? platform,
     $core.String? sdkVersion,
+    $core.int? requestTimeoutMs,
+    $core.int? maxRetries,
   }) {
     final result = create();
     if (environment != null) result.environment = environment;
@@ -47,6 +40,8 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
     if (deviceId != null) result.deviceId = deviceId;
     if (platform != null) result.platform = platform;
     if (sdkVersion != null) result.sdkVersion = sdkVersion;
+    if (requestTimeoutMs != null) result.requestTimeoutMs = requestTimeoutMs;
+    if (maxRetries != null) result.maxRetries = maxRetries;
     return result;
   }
 
@@ -63,13 +58,15 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'SdkInitPhase1Request',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aE<SdkInitEnvironment>(1, _omitFieldNames ? '' : 'environment',
-        enumValues: SdkInitEnvironment.values)
+    ..aE<$1.SDKEnvironment>(1, _omitFieldNames ? '' : 'environment',
+        enumValues: $1.SDKEnvironment.values)
     ..aOS(2, _omitFieldNames ? '' : 'apiKey')
     ..aOS(3, _omitFieldNames ? '' : 'baseUrl')
     ..aOS(4, _omitFieldNames ? '' : 'deviceId')
     ..aOS(5, _omitFieldNames ? '' : 'platform')
     ..aOS(6, _omitFieldNames ? '' : 'sdkVersion')
+    ..aI(7, _omitFieldNames ? '' : 'requestTimeoutMs')
+    ..aI(8, _omitFieldNames ? '' : 'maxRetries')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -91,10 +88,13 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<SdkInitPhase1Request>(create);
   static SdkInitPhase1Request? _defaultInstance;
 
+  /// model_types.proto's SDKEnvironment is the single environment vocabulary.
+  /// Its zero is UNSPECIFIED, so an omitted field means unset, not
+  /// "development": commons must fail closed rather than pick an environment.
   @$pb.TagNumber(1)
-  SdkInitEnvironment get environment => $_getN(0);
+  $1.SDKEnvironment get environment => $_getN(0);
   @$pb.TagNumber(1)
-  set environment(SdkInitEnvironment value) => $_setField(1, value);
+  set environment($1.SDKEnvironment value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasEnvironment() => $_has(0);
   @$pb.TagNumber(1)
@@ -144,30 +144,40 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
   $core.bool hasSdkVersion() => $_has(5);
   @$pb.TagNumber(6)
   void clearSdkVersion() => $_clearField(6);
+
+  /// Caller override for NetworkDefaults.request_timeout_ms. Unset = the pool
+  /// default (60000). openai-python / anthropic-python `timeout`.
+  @$pb.TagNumber(7)
+  $core.int get requestTimeoutMs => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set requestTimeoutMs($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasRequestTimeoutMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequestTimeoutMs() => $_clearField(7);
+
+  /// Caller override for NetworkDefaults.max_retries. Unset = the pool
+  /// default (3). openai-python / anthropic-python `max_retries`; 0 disables
+  /// retries.
+  @$pb.TagNumber(8)
+  $core.int get maxRetries => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set maxRetries($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasMaxRetries() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearMaxRetries() => $_clearField(8);
 }
 
-/// ---------------------------------------------------------------------------
-/// Phase 2 input — async services initialization. Most state is already
-/// resident in commons after Phase 1; this envelope carries the few per-call
-/// hints that remain SDK-owned while the deterministic orchestration lives in
-/// commons.
-/// ---------------------------------------------------------------------------
+/// The one value that legitimately varies between a dev build and a release.
+/// Telemetry flushing and registry/local-file reconciliation are commons
+/// behaviour, not per-call hints.
 class SdkInitPhase2Request extends $pb.GeneratedMessage {
   factory SdkInitPhase2Request({
     $core.String? buildToken,
-    $core.bool? forceRefreshAssignments,
-    $core.bool? flushTelemetry,
-    $core.bool? discoverDownloadedModels,
-    $core.bool? rescanLocalModels,
   }) {
     final result = create();
     if (buildToken != null) result.buildToken = buildToken;
-    if (forceRefreshAssignments != null)
-      result.forceRefreshAssignments = forceRefreshAssignments;
-    if (flushTelemetry != null) result.flushTelemetry = flushTelemetry;
-    if (discoverDownloadedModels != null)
-      result.discoverDownloadedModels = discoverDownloadedModels;
-    if (rescanLocalModels != null) result.rescanLocalModels = rescanLocalModels;
     return result;
   }
 
@@ -185,10 +195,6 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'buildToken')
-    ..aOB(2, _omitFieldNames ? '' : 'forceRefreshAssignments')
-    ..aOB(3, _omitFieldNames ? '' : 'flushTelemetry')
-    ..aOB(4, _omitFieldNames ? '' : 'discoverDownloadedModels')
-    ..aOB(5, _omitFieldNames ? '' : 'rescanLocalModels')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -218,79 +224,25 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
   $core.bool hasBuildToken() => $_has(0);
   @$pb.TagNumber(1)
   void clearBuildToken() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.bool get forceRefreshAssignments => $_getBF(1);
-  @$pb.TagNumber(2)
-  set forceRefreshAssignments($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasForceRefreshAssignments() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearForceRefreshAssignments() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get flushTelemetry => $_getBF(2);
-  @$pb.TagNumber(3)
-  set flushTelemetry($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasFlushTelemetry() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearFlushTelemetry() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.bool get discoverDownloadedModels => $_getBF(3);
-  @$pb.TagNumber(4)
-  set discoverDownloadedModels($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDiscoverDownloadedModels() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDiscoverDownloadedModels() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.bool get rescanLocalModels => $_getBF(4);
-  @$pb.TagNumber(5)
-  set rescanLocalModels($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasRescanLocalModels() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearRescanLocalModels() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result envelope returned by Phase 1 / Phase 2 / retryHTTP. Mirrors the
-/// Swift RunAnywhere.swift Phase 2 logging shape (phase + duration + outcome
-/// counts) so each SDK reports the same structured result to its consumer.
+/// Returned by Phase 1, Phase 2, and retryHTTP.
 ///
-/// success = true when the phase reached its terminal step. Even successful
-/// Phase 2 results may carry warnings: HTTP/auth setup is allowed to fail in
-/// offline mode; the SDK continues with cached/local models. In that case
-/// success=true, http_configured=false, and warning carries the offline-mode
-/// notice.
-/// ---------------------------------------------------------------------------
+/// A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
+/// to fail in offline mode, in which case error is unset and warning holds the
+/// offline notice while the SDK continues on cached models.
 class SdkInitResult extends $pb.GeneratedMessage {
   factory SdkInitResult({
-    SdkInitPhase? phase,
-    $core.bool? success,
     $0.SDKError? error,
-    $core.bool? httpConfigured,
-    $core.bool? deviceRegistered,
     $core.int? linkedModelsCount,
-    $core.int? discoveredOrphans,
     $core.String? warning,
-    $fixnum.Int64? durationMs,
     $core.bool? hasCompletedHttpSetup,
     $core.bool? httpApplicable,
   }) {
     final result = create();
-    if (phase != null) result.phase = phase;
-    if (success != null) result.success = success;
     if (error != null) result.error = error;
-    if (httpConfigured != null) result.httpConfigured = httpConfigured;
-    if (deviceRegistered != null) result.deviceRegistered = deviceRegistered;
     if (linkedModelsCount != null) result.linkedModelsCount = linkedModelsCount;
-    if (discoveredOrphans != null) result.discoveredOrphans = discoveredOrphans;
     if (warning != null) result.warning = warning;
-    if (durationMs != null) result.durationMs = durationMs;
     if (hasCompletedHttpSetup != null)
       result.hasCompletedHttpSetup = hasCompletedHttpSetup;
     if (httpApplicable != null) result.httpApplicable = httpApplicable;
@@ -310,21 +262,13 @@ class SdkInitResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'SdkInitResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aE<SdkInitPhase>(1, _omitFieldNames ? '' : 'phase',
-        enumValues: SdkInitPhase.values)
-    ..aOB(2, _omitFieldNames ? '' : 'success')
-    ..aOM<$0.SDKError>(3, _omitFieldNames ? '' : 'error',
+    ..aOM<$0.SDKError>(1, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
-    ..aOB(4, _omitFieldNames ? '' : 'httpConfigured')
-    ..aOB(5, _omitFieldNames ? '' : 'deviceRegistered')
-    ..aI(6, _omitFieldNames ? '' : 'linkedModelsCount',
+    ..aI(2, _omitFieldNames ? '' : 'linkedModelsCount',
         fieldType: $pb.PbFieldType.OU3)
-    ..aI(7, _omitFieldNames ? '' : 'discoveredOrphans',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aOS(8, _omitFieldNames ? '' : 'warning')
-    ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
-    ..aOB(10, _omitFieldNames ? '' : 'hasCompletedHttpSetup')
-    ..aOB(11, _omitFieldNames ? '' : 'httpApplicable')
+    ..aOS(3, _omitFieldNames ? '' : 'warning')
+    ..aOB(4, _omitFieldNames ? '' : 'hasCompletedHttpSetup')
+    ..aOB(5, _omitFieldNames ? '' : 'httpApplicable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -347,121 +291,56 @@ class SdkInitResult extends $pb.GeneratedMessage {
   static SdkInitResult? _defaultInstance;
 
   @$pb.TagNumber(1)
-  SdkInitPhase get phase => $_getN(0);
+  $0.SDKError get error => $_getN(0);
   @$pb.TagNumber(1)
-  set phase(SdkInitPhase value) => $_setField(1, value);
+  set error($0.SDKError value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasPhase() => $_has(0);
+  $core.bool hasError() => $_has(0);
   @$pb.TagNumber(1)
-  void clearPhase() => $_clearField(1);
+  void clearError() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $0.SDKError ensureError() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $core.bool get success => $_getBF(1);
+  $core.int get linkedModelsCount => $_getIZ(1);
   @$pb.TagNumber(2)
-  set success($core.bool value) => $_setBool(1, value);
+  set linkedModelsCount($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasSuccess() => $_has(1);
+  $core.bool hasLinkedModelsCount() => $_has(1);
   @$pb.TagNumber(2)
-  void clearSuccess() => $_clearField(2);
+  void clearLinkedModelsCount() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $0.SDKError get error => $_getN(2);
+  $core.String get warning => $_getSZ(2);
   @$pb.TagNumber(3)
-  set error($0.SDKError value) => $_setField(3, value);
+  set warning($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasError() => $_has(2);
+  $core.bool hasWarning() => $_has(2);
   @$pb.TagNumber(3)
-  void clearError() => $_clearField(3);
-  @$pb.TagNumber(3)
-  $0.SDKError ensureError() => $_ensure(2);
+  void clearWarning() => $_clearField(3);
 
+  /// The cross-phase latched bit that survives between calls. SDKs read this
+  /// to decide whether an authenticated call can proceed without a retryHTTP.
   @$pb.TagNumber(4)
-  $core.bool get httpConfigured => $_getBF(3);
+  $core.bool get hasCompletedHttpSetup => $_getBF(3);
   @$pb.TagNumber(4)
-  set httpConfigured($core.bool value) => $_setBool(3, value);
+  set hasCompletedHttpSetup($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasHttpConfigured() => $_has(3);
+  $core.bool hasHasCompletedHttpSetup() => $_has(3);
   @$pb.TagNumber(4)
-  void clearHttpConfigured() => $_clearField(4);
+  void clearHasCompletedHttpSetup() => $_clearField(4);
 
+  /// Whether this configuration has a usable credential and URL pair at all.
+  /// Local-only development builds set it false so platform SDKs stop
+  /// retrying HTTP on every guarded call.
   @$pb.TagNumber(5)
-  $core.bool get deviceRegistered => $_getBF(4);
+  $core.bool get httpApplicable => $_getBF(4);
   @$pb.TagNumber(5)
-  set deviceRegistered($core.bool value) => $_setBool(4, value);
+  set httpApplicable($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasDeviceRegistered() => $_has(4);
+  $core.bool hasHttpApplicable() => $_has(4);
   @$pb.TagNumber(5)
-  void clearDeviceRegistered() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get linkedModelsCount => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set linkedModelsCount($core.int value) => $_setUnsignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasLinkedModelsCount() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearLinkedModelsCount() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.int get discoveredOrphans => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set discoveredOrphans($core.int value) => $_setUnsignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasDiscoveredOrphans() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearDiscoveredOrphans() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get warning => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set warning($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasWarning() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearWarning() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $fixnum.Int64 get durationMs => $_getI64(8);
-  @$pb.TagNumber(9)
-  set durationMs($fixnum.Int64 value) => $_setInt64(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasDurationMs() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearDurationMs() => $_clearField(9);
-
-  /// Explicit two-phase HTTP-setup completion flag,
-  /// decoupled from services-init completion so SDKs that initialize
-  /// offline (no connectivity) can still report success=true with
-  /// has_completed_http_setup=false and retry HTTP later via the
-  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
-  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
-  /// signal Flutter / Web / RN consume to decide whether the next
-  /// download/authenticated call can proceed without a retryHTTP step.
-  ///
-  /// Distinct from `http_configured` (field 4) which historically meant
-  /// "HTTP transport wired up at this phase's call site"; this field is
-  /// the cross-phase latched bit that survives between phase calls.
-  @$pb.TagNumber(10)
-  $core.bool get hasCompletedHttpSetup => $_getBF(9);
-  @$pb.TagNumber(10)
-  set hasCompletedHttpSetup($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasHasCompletedHttpSetup() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearHasCompletedHttpSetup() => $_clearField(10);
-
-  /// True when this SDK configuration has a usable network credential/url
-  /// pair and therefore HTTP/auth setup can eventually succeed. Local-only
-  /// development builds without baked-in Supabase config set this false so
-  /// platform SDKs do not retry HTTP on every guarded API call.
-  @$pb.TagNumber(11)
-  $core.bool get httpApplicable => $_getBF(10);
-  @$pb.TagNumber(11)
-  set httpApplicable($core.bool value) => $_setBool(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasHttpApplicable() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearHttpApplicable() => $_clearField(11);
+  void clearHttpApplicable() => $_clearField(5);
 }
 
 const $core.bool _omitFieldNames =

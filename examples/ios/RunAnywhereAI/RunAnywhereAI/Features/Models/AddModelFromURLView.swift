@@ -150,12 +150,14 @@ struct AddModelFromURLView: View {
         errorMessage = nil
 
         do {
-            let model = try await RunAnywhere.registerModel(
-                name: modelName,
-                url: modelURL,
-                framework: selectedFramework,
-                memoryRequirement: Int64(estimatedSize),
-                supportsThinking: supportsThinking
+            let model = try await RunAnywhere.models.register(
+                .url(
+                    modelURL,
+                    name: modelName,
+                    framework: selectedFramework,
+                    memoryRequirementBytes: Int64(estimatedSize),
+                    supportsThinking: supportsThinking
+                )
             )
             await MainActor.run {
                 onModelAdded(model)

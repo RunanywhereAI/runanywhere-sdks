@@ -29,10 +29,6 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class PipelineOptions(
-  /**
-   * Maximum end-to-end latency budget in milliseconds. The pipeline emits
-   * a MetricsEvent with is_over_budget=true if exceeded.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -41,10 +37,6 @@ public class PipelineOptions(
     schemaIndex = 0,
   )
   public val latency_budget_ms: Int = 0,
-  /**
-   * When true, the pipeline emits MetricsEvent on every VAD barge-in and
-   * on pipeline stop.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -54,8 +46,7 @@ public class PipelineOptions(
   )
   public val emit_metrics: Boolean = false,
   /**
-   * When true, the pipeline validates the DAG for deadlocks and
-   * disconnected edges before running.
+   * Reject a spec with unknown operators instead of skipping them.
    */
   @field:WireField(
     tag = 3,

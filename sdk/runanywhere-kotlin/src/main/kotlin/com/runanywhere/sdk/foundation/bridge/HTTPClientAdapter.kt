@@ -194,7 +194,7 @@ public object HTTPClientAdapter {
     ): ByteArray {
         val snapshot = configuration ?: throw SDKException.networkError("HTTP adapter not configured")
         val url = buildURL(base = snapshot.baseURL, path = path)
-        val token = resolveToken(requiresAuth = requiresAuth, apiKey = snapshot.apiKey)
+        val token = resolveToken(requiresAuth = requiresAuth)
         requireCurrentConfiguration(snapshot)
 
         val headers =
@@ -228,19 +228,16 @@ public object HTTPClientAdapter {
     }
 
     /**
-     * Resolve the auth token for a request. Mirrors Swift's
-     * `rac_auth_get_valid_token` + refresh fallback:
-     *  - When auth is not required → return the API key (may be empty).
-     *  - When auth is required and a valid token is available → use it.
-     *  - Otherwise fall back to the API key, throwing if none is set.
+     * Resolve the bearer token for a request. Mirrors Swift's
+     * `rac_auth_get_valid_token` + refresh fallback. The API key is never a
+     * bearer substitute — it already travels in the `apikey` header, and
+     * putting it in `Authorization: Bearer` turns a missing-token failure
+     * into the backend's misleading "Invalid JWT token: Not enough segments".
+     * An empty return means no Authorization header is sent.
      */
-    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String?): String {
-        if (!requiresAuth) return apiKey ?: ""
-        val token = platformResolveAuthToken()
-        if (!token.isNullOrEmpty()) return token
-        // Keyless staging: no token and no key means the request goes out
-        // unauthenticated (the backend attributes it to the PUBLIC org)
-        return apiKey ?: ""
+    private suspend fun resolveToken(requiresAuth: Boolean): String {
+        if (!requiresAuth) return ""
+        return platformResolveAuthToken().orEmpty()
     }
 
     /**

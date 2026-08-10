@@ -1,7 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
+import com.runanywhere.sdk.public.api.FinishReason
+import com.runanywhere.sdk.public.api.LlmOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 
 internal const val DEFAULT_VISION_PROMPT = "Describe this image in detail."
 
@@ -35,22 +36,33 @@ internal object VisionGenerationPolicy {
         return maxOf(1, cap)
     }
 
+    /**
+     * Whether a finished request was cut off by the budget [options] asked for.
+     *
+     * Derived from the app's own ceiling rather than read off the result, because the VLM path
+     * does not report a finish reason today: `GenerationResult.finishReason` arrives as STOP for
+     * a truncated answer exactly as it does for a complete one. The number being compared is one
+     * this object chose, so nothing here depends on SDK internals — and the day the reason is
+     * populated, that becomes the authoritative half of the test.
+     */
+    fun wasTruncated(options: LlmOptions, finishReason: FinishReason, outputTokens: Int): Boolean =
+        finishReason == FinishReason.LENGTH ||
+            (options.maxOutputTokens > 0 && outputTokens >= options.maxOutputTokens)
+
     fun options(
-        prompt: String,
         model: RAModelInfo,
         mode: VisionAnswerMode,
         userLimit: Int? = null,
         systemPrompt: String? = null,
-    ): RAVLMGenerationOptions =
-        RAVLMGenerationOptions(
-            prompt = prompt,
-            max_tokens = maxTokens(model.context_length, mode, userLimit),
+    ): LlmOptions =
+        LlmOptions(
+            maxOutputTokens = maxTokens(model.context_length, mode, userLimit),
             // Pin the complete greedy configuration. Temperature alone is
             // sufficient today, but explicit top-p/top-k avoids default drift.
             temperature = 0f,
-            top_p = 0f,
-            top_k = 0,
-            system_prompt = systemPrompt?.takeIf { it.isNotBlank() },
+            topP = 0f,
+            topK = 0,
+            systemPrompt = systemPrompt?.takeIf { it.isNotBlank() },
         )
 
     private const val CONTEXT_OUTPUT_DIVISOR = 4

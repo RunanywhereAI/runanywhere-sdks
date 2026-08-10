@@ -21,30 +21,46 @@
  */
 
 import {
-  HybridBackendKind,
+  HybridInferenceMode,
   HybridModelDescriptor,
-  HybridModelType,
-  HybridRank,
   HybridRoutedMetadata,
   HybridRoutingPolicy,
   HybridSttTranscribeRequest,
   HybridSttTranscribeResponse,
 } from '@runanywhere/proto-ts/hybrid_router';
+import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import type {
   BatteryFilter,
   ConfidenceCascade,
   CustomFilter,
   HybridCascade,
   HybridFilter,
-  HybridRoutingContext,
   HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
-import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
-// Re-export the wire enums so callers can use them directly without importing
-// from `@runanywhere/proto-ts` (the structured-types-as-data rule: provider is
-// data, backend is a wire enum).
-export { HybridBackendKind, HybridModelType, HybridRank };
+/**
+ * Plugin-registry engine name for a hybrid candidate — a free-form string
+ * (`rac_plugin_find_for_engine`'s lookup key), not a closed enum.
+ * `HybridBackendKind` was deleted outright (idl/hybrid_router.proto):
+ * `HybridModelDescriptor.backend` + `.provider` were replaced by a single
+ * `engine: string` field so a new backend name is not a proto change. Kept
+ * as a type alias (not a re-exported proto enum) so existing call sites that
+ * imported `HybridBackendKind` as a type keep compiling; the members below
+ * are the only values commons currently pins on.
+ */
+export type HybridBackendKind = string;
+export const HybridBackendKind = {
+  UNSPECIFIED: '' as HybridBackendKind,
+  LLAMACPP: 'llamacpp' as HybridBackendKind,
+  /** On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer). */
+  SHERPA: 'sherpa' as HybridBackendKind,
+  /**
+   * Generic cloud speech (the "cloud" engine). The concrete HTTP provider
+   * (Sarvam first) is resolved by the cloud engine from its own config, not
+   * carried on the descriptor anymore.
+   */
+  CLOUD: 'cloud' as HybridBackendKind,
+} as const;
 
 // Re-export the generated routing metadata so downstream consumers keep a
 // stable `HybridRoutedMetadata` import path from this module. The hand-written
@@ -59,7 +75,10 @@ export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
 /** Suggested default confidence threshold for an STT confidence cascade.
  * Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the
  * router uses the threshold carried in the installed policy; this is only the
- * recommended value to build it with. */
+ * recommended value to build it with. Sourced from the generated pool
+ * (`idl/sdk_defaults.proto`'s `HybridDefaults.stt_confidence_threshold`),
+ * which mirrors — but does not wire-share — `hybrid_router.proto`'s
+ * `ConfidenceCascade.threshold` rac_default. */
 export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThreshold;
 
 // ---------------------------------------------------------------------------
@@ -72,6 +91,11 @@ export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThres
  * semantics are evaluated inside commons (NETWORK / Battery against the
  * device-state vtable snapshot; Custom against the registered named
  * predicate). Discriminated union mirroring Swift's `HybridFilter`.
+ *
+ * The `'quality'` case is reserved: `HybridFilter`'s proto oneof only has
+ * network/battery/custom arms (idl/hybrid_router.proto) -- there has never
+ * been a wire slot for a quality tier. Commons treats it as a no-op today;
+ * kept for wire/API parity with Kotlin/Swift (`.quality(tier:)`).
  */
 export type HybridFilterSpec =
   | { kind: 'network' }
@@ -136,15 +160,28 @@ export function confidenceCascade(
 
 /**
  * The full routing policy attached to a model pair: filters (AND-composed),
- * an optional cascade, and a rank. Defaults to `PREFER_LOCAL_FIRST` with no
- * filters or cascade — i.e. "use the local candidate, fall back to online on
- * hard failure". Mirrors Swift's `HybridRoutingPolicy` /
- * Kotlin's `SimpleRouterPolicy` + `AdvanceRouterPolicy`.
+ * an optional cascade, and a rank. `preferLocal` defaults to `true` (prefer the
+ * local candidate first) with no filters or cascade — i.e. "use the local
+ * candidate, fall back to online on hard failure". Mirrors Swift's
+ * `HybridRoutingPolicy` / Kotlin's `SimpleRouterPolicy` + `AdvanceRouterPolicy`.
+ *
+ * `preferLocal` keeps its pre-realignment public name/semantics; only the
+ * proto-building step below maps it onto the wire's `HybridInferenceMode`
+ * (idl/hybrid_router.proto renamed the boolean `prefer_local` to a 4-value
+ * `mode` enum plus an ordered `models` list). Commons
+ * (rac_stt_hybrid_router_proto.cpp) has not wired up a `models` consumer yet
+ * -- it still drives routing off the two separately registered
+ * offline/online service descriptors (`setPair`'s two `_set_*_service_proto`
+ * calls) and reads only `mode` from this policy to decide rank direction.
+ * Anything other than PREFER_IN_CLOUD/ONLY_IN_CLOUD is treated as
+ * local-first, so `preferLocal: true` maps to `PREFER_ON_DEVICE` and `false`
+ * to `PREFER_IN_CLOUD`, preserving the exact pre-realignment behavior.
  */
 export interface HybridRoutingPolicySpec {
   hardFilters?: HybridFilterSpec[];
   cascade?: HybridCascadeSpec;
-  rank?: HybridRank;
+  /** Prefer the local candidate first when true (the default). */
+  preferLocal?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,35 +200,35 @@ export interface HybridRoutingPolicySpec {
  */
 export interface HybridModelSpec {
   id: string;
-  modelType: HybridModelType;
-  backend: HybridBackendKind;
   /**
-   * Concrete cloud provider when `backend === CLOUD` (e.g. "sarvam"). Empty
-   * for non-cloud backends; marshalled into the descriptor's `provider`
-   * field (proto tag 4) so the cloud engine selects the HTTP backend.
+   * True for an on-device (offline) model, false for a cloud (online) one.
+   * Marshalled into the descriptor's `isOnDevice` field (idl/hybrid_router.proto
+   * renamed `is_local` -> `is_on_device`).
    */
-  provider?: string;
+  isLocal: boolean;
+  backend: HybridBackendKind;
 }
 
 /** Convenience for an on-device sherpa model. */
 export function offlineSherpa(id: string): HybridModelSpec {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_OFFLINE,
-    backend: HybridBackendKind.HYBRID_BACKEND_SHERPA,
+    isLocal: true,
+    backend: HybridBackendKind.SHERPA,
   };
 }
 
-/** Convenience for a cloud model (registered via `Cloud.register`). */
-export function onlineCloud(
-  id: string,
-  provider: string = DEFAULT_CLOUD_PROVIDER,
-): HybridModelSpec {
+/**
+ * Convenience for a cloud model (registered via `Cloud.register`). The
+ * concrete HTTP provider (Sarvam first) is resolved by the cloud engine from
+ * the config the caller registered — it no longer rides on this descriptor
+ * (idl/hybrid_router.proto deleted `HybridModelDescriptor.provider` outright).
+ */
+export function onlineCloud(id: string): HybridModelSpec {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_ONLINE,
-    backend: HybridBackendKind.HYBRID_BACKEND_CLOUD,
-    provider,
+    isLocal: false,
+    backend: HybridBackendKind.CLOUD,
   };
 }
 
@@ -208,8 +245,14 @@ export interface HybridTranscribeOptions {
   language?: string;
   /** Sample-rate hint for raw PCM input. 0 = engine default (16000). */
   sampleRate?: number;
-  /** `rac_audio_format_enum_t`: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-   * 0 leaves the format unspecified. */
+  /**
+   * Container the bytes are already in
+   * (`@runanywhere/proto-ts/model_types` `AudioFormat` numeric value).
+   * `HybridSttTranscribeOptions.audioFormat` was retyped from an untyped
+   * int32 to the shared `AudioFormat` enum (idl/hybrid_router.proto); the
+   * numeric values are unchanged. 0 leaves the format unspecified (headerless
+   * PCM16, which commons wraps in a WAV container).
+   */
   audioFormat?: number;
 }
 
@@ -243,13 +286,18 @@ export function customFiltersOf(
     .map((f) => ({ name: f.name, check: f.check }));
 }
 
-/** Encode a model spec as `runanywhere.v1.HybridModelDescriptor` bytes. */
+/**
+ * Encode a model spec as `runanywhere.v1.HybridModelDescriptor` bytes.
+ * `HybridModelDescriptor.provider` was deleted outright and `.backend`
+ * (the closed `HybridBackendKind` enum) was replaced by a single free-form
+ * `engine: string` field carrying the same plugin-registry lookup key
+ * (idl/hybrid_router.proto).
+ */
 export function encodeModelDescriptor(model: HybridModelSpec): Uint8Array {
   const descriptor: HybridModelDescriptor = {
     modelId: model.id,
-    modelType: model.modelType,
-    backend: model.backend,
-    provider: model.provider ?? '',
+    isOnDevice: model.isLocal,
+    engine: model.backend,
   };
   return HybridModelDescriptor.encode(descriptor).finish();
 }
@@ -260,7 +308,10 @@ function encodeFilter(filter: HybridFilterSpec): HybridFilter {
       // Emit `true` explicitly so the oneof case is set on the wire.
       return { network: true };
     case 'quality':
-      return { qualityTier: filter.tier ?? 1 };
+      // HybridFilter's oneof only has network/battery/custom arms -- there
+      // has never been a wire slot for a quality tier. No-op, matching
+      // Swift's `.quality` encode case.
+      return {};
     case 'battery': {
       const battery: BatteryFilter = { minBatteryPercent: filter.minPercent ?? 20 };
       return { battery };
@@ -286,19 +337,27 @@ export function encodeRoutingPolicy(policy: HybridRoutingPolicySpec): Uint8Array
   const message: HybridRoutingPolicy = {
     hardFilters: (policy.hardFilters ?? []).map(encodeFilter),
     cascade: policy.cascade ? encodeCascade(policy.cascade) : undefined,
-    rank: policy.rank ?? HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+    // preferLocal -> mode: see the HybridRoutingPolicySpec doc comment above.
+    mode: (policy.preferLocal ?? true)
+      ? HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE
+      : HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD,
+    attemptTimeoutMs: 0,
+    models: [],
   };
   return HybridRoutingPolicy.encode(message).finish();
 }
 
-/** Encode a `runanywhere.v1.HybridSttTranscribeRequest`. HybridRoutingContext
- * currently has no fields — device-state lives behind the device-state vtable;
- * the empty (present) message keeps the wire shape stable. */
+/**
+ * Encode a `runanywhere.v1.HybridSttTranscribeRequest`. `HybridRoutingContext`
+ * / `HybridSttTranscribeRequest.context` were deleted outright
+ * (idl/hybrid_router.proto): device-state still lives entirely behind the
+ * `rac_hybrid_device_state` vtable, so there is no per-call context left to
+ * set.
+ */
 export function encodeTranscribeRequest(
   audio: Uint8Array,
   options: HybridTranscribeOptions = {},
 ): Uint8Array {
-  const context: HybridRoutingContext = {};
   const sttOptions: HybridSttTranscribeOptions = {
     language: options.language ?? '',
     sampleRate: options.sampleRate ?? 0,
@@ -306,7 +365,6 @@ export function encodeTranscribeRequest(
   };
   const request: HybridSttTranscribeRequest = {
     audioBytes: audio,
-    context,
     options: sttOptions,
   };
   return HybridSttTranscribeRequest.encode(request).finish();
@@ -326,17 +384,21 @@ function decodeRoutedMetadata(
     primaryErrorMessage: routing?.primaryErrorMessage ?? '',
     confidence: routing?.confidence ?? Number.NaN,
     primaryConfidence: routing?.primaryConfidence ?? Number.NaN,
+    servedOnDevice: routing?.servedOnDevice ?? false,
   };
 }
 
 /**
  * Decoded `runanywhere.v1.HybridSttTranscribeResponse`, split into the public
- * result + the native rc/error so the caller can raise an exception on a
- * non-zero rc. Pure: no WASM, no state.
+ * result + the native rc so the caller can raise an exception on a non-zero
+ * rc. Pure: no WASM, no state.
+ *
+ * `HybridSttTranscribeResponse.errorMsg` was deleted outright
+ * (idl/hybrid_router.proto): the response now carries only the bare `rc` on
+ * failure, with no human-readable message field.
  */
 export interface DecodedTranscribeResponse {
   rc: number;
-  errorMessage: string;
   result: HybridTranscribeResult;
 }
 
@@ -344,7 +406,6 @@ export function decodeTranscribeResponse(bytes: Uint8Array): DecodedTranscribeRe
   const response: HybridSttTranscribeResponse = HybridSttTranscribeResponse.decode(bytes);
   return {
     rc: response.rc,
-    errorMessage: response.errorMsg ?? '',
     result: {
       text: response.text,
       detectedLanguage: response.detectedLanguage,

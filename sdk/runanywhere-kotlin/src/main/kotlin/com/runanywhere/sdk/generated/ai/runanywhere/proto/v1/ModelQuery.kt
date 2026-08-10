@@ -33,6 +33,7 @@ import okio.ByteString
  * Registry/query filters shared by SDK model-management APIs. UI-only
  * presentation state and platform filesystem handles are intentionally not
  * represented here.
+ * Filters only. Ordering is the client's -- a local catalog is tens of rows.
  */
 public class ModelQuery(
   @field:WireField(
@@ -61,52 +62,27 @@ public class ModelQuery(
   )
   public val downloaded_only: Boolean? = null,
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    jsonName = "availableOnly",
-    schemaIndex = 4,
-  )
-  public val available_only: Boolean? = null,
-  @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     jsonName = "maxSizeBytes",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val max_size_bytes: Long? = null,
+  /**
+   * Optional so "no search" is expressible; empty string is not a filter.
+   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "searchQuery",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
-  public val search_query: String = "",
-  @field:WireField(
-    tag = 8,
-    adapter = "ai.runanywhere.proto.v1.ModelSource#ADAPTER",
-    schemaIndex = 7,
-  )
-  public val source: ModelSource? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "ai.runanywhere.proto.v1.ModelQuerySortField#ADAPTER",
-    jsonName = "sortField",
-    schemaIndex = 8,
-  )
-  public val sort_field: ModelQuerySortField? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "ai.runanywhere.proto.v1.ModelQuerySortOrder#ADAPTER",
-    jsonName = "sortOrder",
-    schemaIndex = 9,
-  )
-  public val sort_order: ModelQuerySortOrder? = null,
+  public val search_query: String? = null,
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.ModelRegistryStatus#ADAPTER",
     jsonName = "registryStatus",
-    schemaIndex = 10,
+    schemaIndex = 6,
   )
   public val registry_status: ModelRegistryStatus? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -125,12 +101,8 @@ public class ModelQuery(
     if (category != other.category) return false
     if (format != other.format) return false
     if (downloaded_only != other.downloaded_only) return false
-    if (available_only != other.available_only) return false
     if (max_size_bytes != other.max_size_bytes) return false
     if (search_query != other.search_query) return false
-    if (source != other.source) return false
-    if (sort_field != other.sort_field) return false
-    if (sort_order != other.sort_order) return false
     if (registry_status != other.registry_status) return false
     return true
   }
@@ -143,12 +115,8 @@ public class ModelQuery(
       result = result * 37 + (category?.hashCode() ?: 0)
       result = result * 37 + (format?.hashCode() ?: 0)
       result = result * 37 + (downloaded_only?.hashCode() ?: 0)
-      result = result * 37 + (available_only?.hashCode() ?: 0)
       result = result * 37 + (max_size_bytes?.hashCode() ?: 0)
-      result = result * 37 + search_query.hashCode()
-      result = result * 37 + (source?.hashCode() ?: 0)
-      result = result * 37 + (sort_field?.hashCode() ?: 0)
-      result = result * 37 + (sort_order?.hashCode() ?: 0)
+      result = result * 37 + (search_query?.hashCode() ?: 0)
       result = result * 37 + (registry_status?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -161,12 +129,8 @@ public class ModelQuery(
     if (category != null) result += """category=$category"""
     if (format != null) result += """format=$format"""
     if (downloaded_only != null) result += """downloaded_only=$downloaded_only"""
-    if (available_only != null) result += """available_only=$available_only"""
     if (max_size_bytes != null) result += """max_size_bytes=$max_size_bytes"""
-    result += """search_query=${sanitize(search_query)}"""
-    if (source != null) result += """source=$source"""
-    if (sort_field != null) result += """sort_field=$sort_field"""
-    if (sort_order != null) result += """sort_order=$sort_order"""
+    if (search_query != null) result += """search_query=${sanitize(search_query)}"""
     if (registry_status != null) result += """registry_status=$registry_status"""
     return result.joinToString(prefix = "ModelQuery{", separator = ", ", postfix = "}")
   }
@@ -176,15 +140,11 @@ public class ModelQuery(
     category: ModelCategory? = this.category,
     format: ModelFormat? = this.format,
     downloaded_only: Boolean? = this.downloaded_only,
-    available_only: Boolean? = this.available_only,
     max_size_bytes: Long? = this.max_size_bytes,
-    search_query: String = this.search_query,
-    source: ModelSource? = this.source,
-    sort_field: ModelQuerySortField? = this.sort_field,
-    sort_order: ModelQuerySortOrder? = this.sort_order,
+    search_query: String? = this.search_query,
     registry_status: ModelRegistryStatus? = this.registry_status,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelQuery = ModelQuery(framework, category, format, downloaded_only, available_only, max_size_bytes, search_query, source, sort_field, sort_order, registry_status, unknownFields)
+  ): ModelQuery = ModelQuery(framework, category, format, downloaded_only, max_size_bytes, search_query, registry_status, unknownFields)
 
   public companion object {
     @JvmField
@@ -202,14 +162,8 @@ public class ModelQuery(
         size += ModelCategory.ADAPTER.encodedSizeWithTag(2, value.category)
         size += ModelFormat.ADAPTER.encodedSizeWithTag(3, value.format)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.downloaded_only)
-        size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.available_only)
         size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.max_size_bytes)
-        if (value.search_query != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.search_query)
-        }
-        size += ModelSource.ADAPTER.encodedSizeWithTag(8, value.source)
-        size += ModelQuerySortField.ADAPTER.encodedSizeWithTag(9, value.sort_field)
-        size += ModelQuerySortOrder.ADAPTER.encodedSizeWithTag(10, value.sort_order)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.search_query)
         size += ModelRegistryStatus.ADAPTER.encodedSizeWithTag(11, value.registry_status)
         return size
       }
@@ -219,14 +173,8 @@ public class ModelQuery(
         ModelCategory.ADAPTER.encodeWithTag(writer, 2, value.category)
         ModelFormat.ADAPTER.encodeWithTag(writer, 3, value.format)
         ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.downloaded_only)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.available_only)
         ProtoAdapter.INT64.encodeWithTag(writer, 6, value.max_size_bytes)
-        if (value.search_query != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.search_query)
-        }
-        ModelSource.ADAPTER.encodeWithTag(writer, 8, value.source)
-        ModelQuerySortField.ADAPTER.encodeWithTag(writer, 9, value.sort_field)
-        ModelQuerySortOrder.ADAPTER.encodeWithTag(writer, 10, value.sort_order)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.search_query)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 11, value.registry_status)
         writer.writeBytes(value.unknownFields)
       }
@@ -234,14 +182,8 @@ public class ModelQuery(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelQuery) {
         writer.writeBytes(value.unknownFields)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 11, value.registry_status)
-        ModelQuerySortOrder.ADAPTER.encodeWithTag(writer, 10, value.sort_order)
-        ModelQuerySortField.ADAPTER.encodeWithTag(writer, 9, value.sort_field)
-        ModelSource.ADAPTER.encodeWithTag(writer, 8, value.source)
-        if (value.search_query != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.search_query)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.search_query)
         ProtoAdapter.INT64.encodeWithTag(writer, 6, value.max_size_bytes)
-        ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.available_only)
         ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.downloaded_only)
         ModelFormat.ADAPTER.encodeWithTag(writer, 3, value.format)
         ModelCategory.ADAPTER.encodeWithTag(writer, 2, value.category)
@@ -253,12 +195,8 @@ public class ModelQuery(
         var category: ModelCategory? = null
         var format: ModelFormat? = null
         var downloaded_only: Boolean? = null
-        var available_only: Boolean? = null
         var max_size_bytes: Long? = null
-        var search_query: String = ""
-        var source: ModelSource? = null
-        var sort_field: ModelQuerySortField? = null
-        var sort_order: ModelQuerySortOrder? = null
+        var search_query: String? = null
         var registry_status: ModelRegistryStatus? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -278,24 +216,8 @@ public class ModelQuery(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> downloaded_only = ProtoAdapter.BOOL.decode(reader)
-            5 -> available_only = ProtoAdapter.BOOL.decode(reader)
             6 -> max_size_bytes = ProtoAdapter.INT64.decode(reader)
             7 -> search_query = ProtoAdapter.STRING.decode(reader)
-            8 -> try {
-              source = ModelSource.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            9 -> try {
-              sort_field = ModelQuerySortField.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            10 -> try {
-              sort_order = ModelQuerySortOrder.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             11 -> try {
               registry_status = ModelRegistryStatus.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -309,12 +231,8 @@ public class ModelQuery(
           category = category,
           format = format,
           downloaded_only = downloaded_only,
-          available_only = available_only,
           max_size_bytes = max_size_bytes,
           search_query = search_query,
-          source = source,
-          sort_field = sort_field,
-          sort_order = sort_order,
           registry_status = registry_status,
           unknownFields = unknownFields
         )

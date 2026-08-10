@@ -28,9 +28,14 @@ export { NpuCapability, HexagonArch };
  * The unknown/unsupported fallback used when the native probe is unavailable
  * (non-Android platforms, non-Snapdragon devices, or an older commons without
  * rac_qhexrt_probe_proto).
+ *
+ * `archName` was renamed `socModel` ("SM8750"-style vendor SoC string).
+ * `socId` is now optional and ABSENT means unavailable (idl comment: "never
+ * a -1 or 0 sentinel; a default-constructed message is already
+ * 'unavailable'"), so this fallback leaves it unset rather than -1.
  */
 function unknownNpuCapability(): NpuCapability {
-  return NpuCapability.fromPartial({ socId: -1, archName: 'unknown' });
+  return NpuCapability.fromPartial({ socModel: 'unknown' });
 }
 
 function decodeNpuCapability(buffer: ArrayBuffer | null): NpuCapability {
@@ -59,7 +64,7 @@ function decodeNpuCapability(buffer: ArrayBuffer | null): NpuCapability {
  * import { RunAnywhere } from '@runanywhere/core';
  *
  * const npu = await QHexRT.probeNpu();
- * if (!npu.qhexrtSupported) {
+ * if (!npu.supported) {
  *   // warn: this device is not in the validated V75/V79/V81 set
  * }
  * await QHexRT.register();
@@ -101,7 +106,7 @@ export const QHexRT = {
    * Does NOT load QNN or the engine. Decodes the serialized
    * `runanywhere.v1.NpuCapability` proto emitted by QHexRT's
    * rac_qhexrt_probe_proto(). Returns the unknown/unsupported fallback
-   * (socId -1, archName "unknown") when the native module is unavailable
+   * (socModel "unknown", socId unset) when the native module is unavailable
    * (e.g. non-Snapdragon devices).
    */
   async probeNpu(): Promise<NpuCapability> {

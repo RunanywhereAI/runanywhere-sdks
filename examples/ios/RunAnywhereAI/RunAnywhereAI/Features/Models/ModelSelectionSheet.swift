@@ -88,6 +88,9 @@ enum ModelSelectionContext {
 struct ModelSelectionSheet: View {
     @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
+    #if os(iOS)
+    @ObservedObject private var connectController = ConnectClientController.shared
+    #endif
 
     @Environment(\.dismiss)
     var dismiss
@@ -215,6 +218,9 @@ struct ModelSelectionSheet: View {
                 List {
                     searchSection
                     addFromHuggingFaceSection
+                    #if os(iOS)
+                    connectSection
+                    #endif
                     recommendedSection
                     orgsSection
                 }
@@ -262,6 +268,166 @@ struct ModelSelectionSheet: View {
         #endif
     }
 
+    #if os(iOS)
+    @ViewBuilder private var connectSection: some View {
+        if context == .llm && searchText.isEmpty {
+            Section {
+                switch connectController.session.status {
+                case .idle:
+                    connectDiscoveryButton(
+                        title: "Connect to a local host",
+                        subtitle: "Use a language model hosted on a Mac on your local network",
+                        systemImage: "macbook.and.iphone"
+                    )
+
+                case .discovering:
+                    if let host = connectController.discoveredHost {
+                        discoveredHostButton(host)
+                    } else {
+                        connectProgressRow(
+                            title: "Looking for Macs",
+                            subtitle: "Searching your local network"
+                        )
+                    }
+
+                case .connecting:
+                    connectProgressRow(
+                        title: "Connecting",
+                        subtitle: connectController.session.connectingHost?.displayName ?? "Checking the selected Mac"
+                    )
+
+                case .connected:
+                    connectedHostRow
+
+                case let .disconnected(reason):
+                    connectDiscoveryButton(
+                        title: "Find a Mac Again",
+                        subtitle: reason,
+                        systemImage: "arrow.clockwise"
+                    )
+
+                case let .failed(message):
+                    connectDiscoveryButton(
+                        title: "Try Connect Again",
+                        subtitle: message,
+                        systemImage: "arrow.clockwise"
+                    )
+
+                case .hosting:
+                    EmptyView()
+                }
+            } header: {
+                Label("Connect", systemImage: "network")
+            } footer: {
+                Text("Local Network access is requested only after you choose to find a Mac.")
+                    .font(AppTypography.caption)
+            }
+        }
+    }
+
+    private func connectDiscoveryButton(
+        title: String,
+        subtitle: String,
+        systemImage: String
+    ) -> some View {
+        Button {
+            Task { await connectController.startDiscovery() }
+        } label: {
+            connectRowLabel(
+                title: title,
+                subtitle: subtitle,
+                systemImage: systemImage,
+                tint: AppColors.primaryAccent
+            ) {
+                Text("Find Mac")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.primaryAccent)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func discoveredHostButton(_ host: ConnectHost) -> some View {
+        Button {
+            Task {
+                await connectController.connect(to: host)
+                if connectController.isConnected {
+                    dismiss()
+                }
+            }
+        } label: {
+            connectRowLabel(
+                title: host.displayName,
+                subtitle: "Language model available on this Mac",
+                systemImage: "desktopcomputer",
+                tint: AppColors.primaryAccent
+            ) {
+                Text("Connect")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.primaryAccent)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var connectedHostRow: some View {
+        connectRowLabel(
+            title: connectController.session.activeHost?.displayName ?? "Connected Mac",
+            subtitle: connectController.session.activeModel?.displayName ?? "Hosted language model",
+            systemImage: "checkmark.circle.fill",
+            tint: AppColors.statusGreen
+        ) {
+            Button("Use") { dismiss() }
+                .font(AppTypography.caption)
+        }
+    }
+
+    private func connectProgressRow(title: String, subtitle: String) -> some View {
+        connectRowLabel(
+            title: title,
+            subtitle: subtitle,
+            systemImage: "network",
+            tint: AppColors.primaryAccent
+        ) {
+            ProgressView()
+                .controlSize(.small)
+        }
+    }
+
+    private func connectRowLabel<Trailing: View>(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+            trailing()
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, AppSpacing.small)
+    }
+    #endif
+
     // MARK: - Sections
 
     private var searchSection: some View {
@@ -305,7 +471,13 @@ struct ModelSelectionSheet: View {
                             Text("Add from Hugging Face")
                                 .font(AppTypography.subheadline.weight(.semibold))
                                 .foregroundColor(AppColors.textPrimary)
-                            Text("Search and download any GGUF model")
+                            // A row's subtitle exists to tell a hesitant reader what is
+                            // behind it, and "GGUF" is the one word that guarantees they
+                            // stop — it names a container format nobody outside the field
+                            // has heard of. The format constraint is real, so it is stated
+                            // inside the search sheet as a consequence, not as this row's
+                            // promise. Android and the web sheet carry the same wording.
+                            Text("Browse thousands of community chat models")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.textSecondary)
                         }
@@ -383,7 +555,8 @@ struct ModelSelectionSheet: View {
                     ForEach(ready) { group in
                         NavigationLink {
                             ModelOrgDetailView(
-                                group: group,
+                                org: group.org,
+                                visibleModelIDs: Set(group.models.map(\.id)),
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,
@@ -403,7 +576,8 @@ struct ModelSelectionSheet: View {
                     ForEach(rest) { group in
                         NavigationLink {
                             ModelOrgDetailView(
-                                group: group,
+                                org: group.org,
+                                visibleModelIDs: Set(group.models.map(\.id)),
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,
@@ -513,43 +687,20 @@ extension ModelSelectionSheet {
     }
 
     private func loadModelForContext(_ model: RAModelInfo) async throws {
-        let category: RAModelCategory
         switch context {
-        case .llm: category = .language
-        case .stt: category = .speechRecognition
-        case .tts: category = .speechSynthesis
-        case .vad: category = .voiceActivityDetection
-        case .voice: category = voiceContextCategory(for: model)
-        case .vlm: category = .multimodal
-        case .diarization: category = .speakerDiarization
-        case .segmentation: category = .semanticSegmentation
         case .ragEmbedding, .ragLLM:
             // RAG models are referenced by local file path at pipeline creation time,
             // not pre-loaded into memory via the SDK model loader.
             return
-        }
-        try await loadViaCanonicalAPI(modelID: model.id, category: category)
-    }
-
-    private func voiceContextCategory(for model: RAModelInfo) -> RAModelCategory {
-        switch model.category {
-        case .speechRecognition: return .speechRecognition
-        case .speechSynthesis: return .speechSynthesis
-        default: return .language
+        default:
+            try await loadViaCanonicalAPI(modelID: model.id)
         }
     }
 
-    private func loadViaCanonicalAPI(modelID: String, category: RAModelCategory) async throws {
-        var request = RAModelLoadRequest()
-        request.modelID = modelID
-        request.category = category
-        let result = await RunAnywhere.loadModel(request)
-        if !result.success {
-            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
-        }
-        let resolvedID = result.modelID.isEmpty ? modelID : result.modelID
+    private func loadViaCanonicalAPI(modelID: String) async throws {
+        try await RunAnywhere.models.load(id: modelID)
         Logger(subsystem: "com.runanywhere", category: "Models").info(
-            "Model load succeeded for \(resolvedID, privacy: .public)"
+            "Model load succeeded for \(modelID, privacy: .public)"
         )
     }
 
@@ -557,7 +708,7 @@ extension ModelSelectionSheet {
         let isLLM = context == .llm ||
             (context == .voice && [.language, .multimodal].contains(model.category))
 
-        // `RunAnywhere.loadModel` already published the canonical
+        // `RunAnywhere.models.load` already published the canonical
         // component-lifecycle event the LLM/VLM ViewModels subscribe to, so the
         // app only updates its own shared selection state here.
         if isLLM {
@@ -565,6 +716,12 @@ extension ModelSelectionSheet {
                 viewModel.setCurrentModel(model)
             }
         }
+
+        #if os(iOS)
+        if context == .llm, connectController.isConnected {
+            connectController.disconnect()
+        }
+        #endif
 
         await onModelSelected(model)
     }

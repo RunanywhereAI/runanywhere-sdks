@@ -39,23 +39,39 @@ import kotlin.Suppress
  * RN's ComponentInitializationEvent.components: SDKComponent\[\] but not yet
  * in any SDK's enum).
  * ---------------------------------------------------------------------------
+ * The rac_wire_string values are the stable lowercase keys that SDKError.component
+ * carries; producers stringify through them, never through the constant name.
  */
 public enum class SDKComponent(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   SDK_COMPONENT_UNSPECIFIED(0),
+  @RacWireStringOption("stt")
   SDK_COMPONENT_STT(1),
+  @RacWireStringOption("tts")
   SDK_COMPONENT_TTS(2),
+  @RacWireStringOption("vad")
   SDK_COMPONENT_VAD(3),
+  @RacWireStringOption("llm")
   SDK_COMPONENT_LLM(4),
+  @RacWireStringOption("vlm")
   SDK_COMPONENT_VLM(5),
+  @RacWireStringOption("diffusion")
   SDK_COMPONENT_DIFFUSION(6),
+  @RacWireStringOption("rag")
   SDK_COMPONENT_RAG(7),
+  @RacWireStringOption("embeddings")
   SDK_COMPONENT_EMBEDDINGS(8),
+  @RacWireStringOption("voice_agent")
   SDK_COMPONENT_VOICE_AGENT(9),
+  @RacWireStringOption("wakeword")
   SDK_COMPONENT_WAKEWORD(10),
+  @RacWireStringOption("speaker_diarization")
   SDK_COMPONENT_SPEAKER_DIARIZATION(11),
+  @RacWireStringOption("semantic_segmentation")
   SDK_COMPONENT_SEMANTIC_SEGMENTATION(12),
+  @RacWireStringOption("rerank")
   SDK_COMPONENT_RERANK(13),
   ;
 

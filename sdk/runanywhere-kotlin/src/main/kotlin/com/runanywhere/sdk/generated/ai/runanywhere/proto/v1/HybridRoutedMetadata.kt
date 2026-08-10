@@ -31,10 +31,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Metadata returned alongside the capability result describing what the
- * router did. Always populated even on success.
- * ---------------------------------------------------------------------------
+ * What the router actually did, including the failed primary attempt.
  */
 public class HybridRoutedMetadata(
   @field:WireField(
@@ -61,10 +58,6 @@ public class HybridRoutedMetadata(
     schemaIndex = 2,
   )
   public val attempt_count: Int = 0,
-  /**
-   * Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-   * the primary served the request or no fallback occurred.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -82,29 +75,37 @@ public class HybridRoutedMetadata(
   )
   public val primary_error_message: String = "",
   /**
-   * Final confidence of the result that was actually returned. NaN when
-   * the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
+   * Absent (not NaN, not 0.0) when the engine reports no quality score.
    */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 5,
   )
-  public val confidence: Float = 0f,
+  public val confidence: Float? = null,
   /**
-   * Primary's confidence captured BEFORE cascading to the secondary.
-   * Populated only when `was_fallback = true` AND the fallback fired on
-   * confidence (not on an error). NaN otherwise.
+   * Absent unless a confidence cascade discarded a primary answer.
    */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "primaryConfidence",
     schemaIndex = 6,
   )
-  public val primary_confidence: Float = 0f,
+  public val primary_confidence: Float? = null,
+  /**
+   * True when the answer was produced ON DEVICE. This is the field an app
+   * reads to truthfully claim "processed on your device"; never infer it by
+   * comparing chosen_model_id.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "servedOnDevice",
+    schemaIndex = 7,
+  )
+  public val served_on_device: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridRoutedMetadata, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -124,6 +125,7 @@ public class HybridRoutedMetadata(
     if (primary_error_message != other.primary_error_message) return false
     if (confidence != other.confidence) return false
     if (primary_confidence != other.primary_confidence) return false
+    if (served_on_device != other.served_on_device) return false
     return true
   }
 
@@ -136,8 +138,9 @@ public class HybridRoutedMetadata(
       result = result * 37 + attempt_count.hashCode()
       result = result * 37 + primary_error_code.hashCode()
       result = result * 37 + primary_error_message.hashCode()
-      result = result * 37 + confidence.hashCode()
-      result = result * 37 + primary_confidence.hashCode()
+      result = result * 37 + (confidence?.hashCode() ?: 0)
+      result = result * 37 + (primary_confidence?.hashCode() ?: 0)
+      result = result * 37 + served_on_device.hashCode()
       super.hashCode = result
     }
     return result
@@ -150,8 +153,9 @@ public class HybridRoutedMetadata(
     result += """attempt_count=$attempt_count"""
     result += """primary_error_code=$primary_error_code"""
     result += """primary_error_message=${sanitize(primary_error_message)}"""
-    result += """confidence=$confidence"""
-    result += """primary_confidence=$primary_confidence"""
+    if (confidence != null) result += """confidence=$confidence"""
+    if (primary_confidence != null) result += """primary_confidence=$primary_confidence"""
+    result += """served_on_device=$served_on_device"""
     return result.joinToString(prefix = "HybridRoutedMetadata{", separator = ", ", postfix = "}")
   }
 
@@ -161,10 +165,11 @@ public class HybridRoutedMetadata(
     attempt_count: Int = this.attempt_count,
     primary_error_code: Int = this.primary_error_code,
     primary_error_message: String = this.primary_error_message,
-    confidence: Float = this.confidence,
-    primary_confidence: Float = this.primary_confidence,
+    confidence: Float? = this.confidence,
+    primary_confidence: Float? = this.primary_confidence,
+    served_on_device: Boolean = this.served_on_device,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridRoutedMetadata = HybridRoutedMetadata(chosen_model_id, was_fallback, attempt_count, primary_error_code, primary_error_message, confidence, primary_confidence, unknownFields)
+  ): HybridRoutedMetadata = HybridRoutedMetadata(chosen_model_id, was_fallback, attempt_count, primary_error_code, primary_error_message, confidence, primary_confidence, served_on_device, unknownFields)
 
   public companion object {
     @JvmField
@@ -194,11 +199,10 @@ public class HybridRoutedMetadata(
         if (value.primary_error_message != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.primary_error_message)
         }
-        if (!value.confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.confidence)
-        }
-        if (!value.primary_confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(7, value.primary_confidence)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.confidence)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(7, value.primary_confidence)
+        if (value.served_on_device != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.served_on_device)
         }
         return size
       }
@@ -219,23 +223,21 @@ public class HybridRoutedMetadata(
         if (value.primary_error_message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.primary_error_message)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.confidence)
-        }
-        if (!value.primary_confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.primary_confidence)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.confidence)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.primary_confidence)
+        if (value.served_on_device != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.served_on_device)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridRoutedMetadata) {
         writer.writeBytes(value.unknownFields)
-        if (!value.primary_confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.primary_confidence)
+        if (value.served_on_device != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.served_on_device)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.confidence)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.primary_confidence)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.confidence)
         if (value.primary_error_message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.primary_error_message)
         }
@@ -259,8 +261,9 @@ public class HybridRoutedMetadata(
         var attempt_count: Int = 0
         var primary_error_code: Int = 0
         var primary_error_message: String = ""
-        var confidence: Float = 0f
-        var primary_confidence: Float = 0f
+        var confidence: Float? = null
+        var primary_confidence: Float? = null
+        var served_on_device: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> chosen_model_id = ProtoAdapter.STRING.decode(reader)
@@ -270,6 +273,7 @@ public class HybridRoutedMetadata(
             5 -> primary_error_message = ProtoAdapter.STRING.decode(reader)
             6 -> confidence = ProtoAdapter.FLOAT.decode(reader)
             7 -> primary_confidence = ProtoAdapter.FLOAT.decode(reader)
+            8 -> served_on_device = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -281,6 +285,7 @@ public class HybridRoutedMetadata(
           primary_error_message = primary_error_message,
           confidence = confidence,
           primary_confidence = primary_confidence,
+          served_on_device = served_on_device,
           unknownFields = unknownFields
         )
       }

@@ -29,14 +29,14 @@ test('two-phase init exposes ready-state and emits lifecycle + telemetry events'
     assert.ok(seen.includes('servicesReady'), 'servicesReady event fired');
 
     // Model lifecycle events.
-    const llm = await RunAnywhere.loadLLM('qwen2.5-0.5b');
+    const llm = await RunAnywhere.loadLLM('qwen3.5-0.8b');
     assert.ok(seen.includes('modelLoaded:llm'), 'modelLoaded event fired');
 
     // generateStream emits a 'generation' telemetry event with metrics on completion.
     let genResult = null;
     const off2 = RunAnywhere.events.on((e) => { if (e.type === 'generation') genResult = e.result; });
     // eslint-disable-next-line no-unused-vars
-    for await (const _e of llm.generateStream('Say hi in one short sentence.', { maxTokens: 16 })) {
+    for await (const _e of llm.generateStream('Say hi in one short sentence.', { maxOutputTokens: 16 })) {
       /* drain the stream */
     }
     off2();

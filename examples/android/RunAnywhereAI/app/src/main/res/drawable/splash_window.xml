@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The cold-start launch window on API 24-30, which have no platform splash
+  contract: the brand mark centred on the app's own background, so the first thing
+  drawn matches what Compose draws a moment later.
+
+  On Android 12+ (values-v31/themes.xml) the platform owns the launch window
+  instead and this drawable is unused; the mark there comes from
+  `windowSplashScreenAnimatedIcon`.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/brand_window_background" />
+    <item
+        android:drawable="@drawable/runanywhere_logo"
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp" />
+</layer-list>

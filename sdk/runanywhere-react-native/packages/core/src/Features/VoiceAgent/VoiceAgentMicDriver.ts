@@ -23,8 +23,12 @@ import { AudioPlaybackManager } from '../VoiceSession/AudioPlaybackManager';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule } from '../../native';
 import { arrayBufferToBytes } from '../../services/ProtoBytes';
-import { VoiceAgentResult as VoiceAgentResultMessage } from '@runanywhere/proto-ts/voice_agent_service';
-import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { encodeProtoMessage } from '../../services/ProtoWire';
+import {
+  VoiceAgentAudioFrame,
+  VoiceAgentResult as VoiceAgentResultMessage,
+} from '@runanywhere/proto-ts/voice_agent_service';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;
@@ -122,19 +126,28 @@ export class VoiceAgentMicDriver {
         if (this.stopped) return;
         try {
           const resultBytes = await native.voiceAgentFeedAudioProto(
-            VoiceAgentMicDriver.toArrayBuffer(chunk),
-            SAMPLE_RATE_HZ,
-            CHANNELS,
-            AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
-            false
+            encodeProtoMessage(
+              VoiceAgentAudioFrame.fromPartial({
+                audioData: chunk,
+                // Renamed from `sampleRate`.
+                sampleRateHz: SAMPLE_RATE_HZ,
+                channels: CHANNELS,
+                encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+                isFinal: false,
+              }),
+              VoiceAgentAudioFrame
+            )
           );
           if (this.stopped) return;
           const bytes = arrayBufferToBytes(resultBytes);
           if (bytes.byteLength === 0) continue; // utterance still open
 
           const result = VoiceAgentResultMessage.decode(bytes);
-          if (result.errorMessage && result.errorMessage.length > 0) {
-            this.logger.warning(`Voice turn failed: ${result.errorMessage}`);
+          // `VoiceAgentResult.error` is deleted outright — a turn failure now
+          // surfaces on `finalState.error` (`VoiceAgentComponentStates`).
+          const turnError = result.finalState?.error;
+          if (turnError) {
+            this.logger.warning(`Voice turn failed: ${turnError.message}`);
           }
           if (await this.playReply(result)) {
             // Drop frames captured during the turn + playback.

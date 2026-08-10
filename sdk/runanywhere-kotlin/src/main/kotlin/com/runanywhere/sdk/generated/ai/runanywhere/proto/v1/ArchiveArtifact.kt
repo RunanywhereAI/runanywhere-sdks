@@ -16,8 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -28,7 +26,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 public class ArchiveArtifact(
@@ -46,8 +43,6 @@ public class ArchiveArtifact(
     schemaIndex = 1,
   )
   public val structure: ArchiveStructure = ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED,
-  required_patterns: List<String> = emptyList(),
-  optional_patterns: List<String> = emptyList(),
   /**
    * Full manifest form for archive artifacts after extraction. Archive
    * extraction policy is portable; native filesystem permissions and handles
@@ -57,31 +52,11 @@ public class ArchiveArtifact(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
     jsonName = "expectedFiles",
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val expected_files: ExpectedModelFiles? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ArchiveArtifact, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "requiredPatterns",
-    schemaIndex = 2,
-  )
-  public val required_patterns: List<String> =
-      immutableCopyOf("required_patterns", required_patterns)
-
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "optionalPatterns",
-    schemaIndex = 3,
-  )
-  public val optional_patterns: List<String> =
-      immutableCopyOf("optional_patterns", optional_patterns)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -94,8 +69,6 @@ public class ArchiveArtifact(
     if (unknownFields != other.unknownFields) return false
     if (type != other.type) return false
     if (structure != other.structure) return false
-    if (required_patterns != other.required_patterns) return false
-    if (optional_patterns != other.optional_patterns) return false
     if (expected_files != other.expected_files) return false
     return true
   }
@@ -106,8 +79,6 @@ public class ArchiveArtifact(
       result = unknownFields.hashCode()
       result = result * 37 + type.hashCode()
       result = result * 37 + structure.hashCode()
-      result = result * 37 + required_patterns.hashCode()
-      result = result * 37 + optional_patterns.hashCode()
       result = result * 37 + (expected_files?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -118,8 +89,6 @@ public class ArchiveArtifact(
     val result = mutableListOf<String>()
     result += """type=$type"""
     result += """structure=$structure"""
-    if (required_patterns.isNotEmpty()) result += """required_patterns=${sanitize(required_patterns)}"""
-    if (optional_patterns.isNotEmpty()) result += """optional_patterns=${sanitize(optional_patterns)}"""
     if (expected_files != null) result += """expected_files=$expected_files"""
     return result.joinToString(prefix = "ArchiveArtifact{", separator = ", ", postfix = "}")
   }
@@ -127,11 +96,9 @@ public class ArchiveArtifact(
   public fun copy(
     type: ArchiveType = this.type,
     structure: ArchiveStructure = this.structure,
-    required_patterns: List<String> = this.required_patterns,
-    optional_patterns: List<String> = this.optional_patterns,
     expected_files: ExpectedModelFiles? = this.expected_files,
     unknownFields: ByteString = this.unknownFields,
-  ): ArchiveArtifact = ArchiveArtifact(type, structure, required_patterns, optional_patterns, expected_files, unknownFields)
+  ): ArchiveArtifact = ArchiveArtifact(type, structure, expected_files, unknownFields)
 
   public companion object {
     @JvmField
@@ -151,8 +118,6 @@ public class ArchiveArtifact(
         if (value.structure != ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED) {
           size += ArchiveStructure.ADAPTER.encodedSizeWithTag(2, value.structure)
         }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.required_patterns)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.optional_patterns)
         size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(5, value.expected_files)
         return size
       }
@@ -164,8 +129,6 @@ public class ArchiveArtifact(
         if (value.structure != ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED) {
           ArchiveStructure.ADAPTER.encodeWithTag(writer, 2, value.structure)
         }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 5, value.expected_files)
         writer.writeBytes(value.unknownFields)
       }
@@ -173,8 +136,6 @@ public class ArchiveArtifact(
       override fun encode(writer: ReverseProtoWriter, `value`: ArchiveArtifact) {
         writer.writeBytes(value.unknownFields)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 5, value.expected_files)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
         if (value.structure != ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED) {
           ArchiveStructure.ADAPTER.encodeWithTag(writer, 2, value.structure)
         }
@@ -186,8 +147,6 @@ public class ArchiveArtifact(
       override fun decode(reader: ProtoReader): ArchiveArtifact {
         var type: ArchiveType = ArchiveType.ARCHIVE_TYPE_UNSPECIFIED
         var structure: ArchiveStructure = ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED
-        val required_patterns = mutableListOf<String>()
-        val optional_patterns = mutableListOf<String>()
         var expected_files: ExpectedModelFiles? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -201,8 +160,6 @@ public class ArchiveArtifact(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            3 -> required_patterns.add(ProtoAdapter.STRING.decode(reader))
-            4 -> optional_patterns.add(ProtoAdapter.STRING.decode(reader))
             5 -> expected_files = ExpectedModelFiles.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -210,8 +167,6 @@ public class ArchiveArtifact(
         return ArchiveArtifact(
           type = type,
           structure = structure,
-          required_patterns = required_patterns,
-          optional_patterns = optional_patterns,
           expected_files = expected_files,
           unknownFields = unknownFields
         )

@@ -18,12 +18,16 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
+import 'package:runanywhere/generated/thinking_tag_pattern.pbenum.dart'
+    show ReasoningMode;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
         ToolCallFormatName,
+        ToolCallingHistoryTurn,
         ToolCallingOptions,
         ToolCallingResult,
+        ToolCallingRole,
         ToolCallingSessionCreateRequest,
         ToolCallingSessionEvent,
         ToolCallingSessionEvent_Kind,
@@ -123,7 +127,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: false,
+        isError: true,
         error: 'Tool not found: ${toolCall.name}',
       );
     }
@@ -138,7 +142,7 @@ class RunAnywhereTools {
           return ToolResult(
             toolCallId: toolCall.id,
             name: toolCall.name,
-            success: false,
+            isError: true,
             error:
                 'Failed to parse tool arguments: expected a JSON object, '
                 'got ${decoded.runtimeType}',
@@ -148,7 +152,7 @@ class RunAnywhereTools {
         return ToolResult(
           toolCallId: toolCall.id,
           name: toolCall.name,
-          success: false,
+          isError: true,
           error: 'Failed to parse tool arguments: $e',
         );
       }
@@ -161,7 +165,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: true,
+        isError: false,
         resultJson: jsonEncode(result),
       );
     } catch (e) {
@@ -169,7 +173,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: false,
+        isError: true,
         error: e.toString(),
       );
     }
@@ -209,17 +213,16 @@ class RunAnywhereTools {
     ToolChoiceMode? toolChoice,
     String? forcedToolName,
     bool? validateCalls,
+    bool? parallelToolCalls,
     List<String> history = const [],
   }) async {
     // Swift default: `options: RALLMGenerationOptions = .defaults()`.
     final llm = llmOptions ?? _defaultLLMOptions();
     // Swift: `toolOptions ?? (options.hasToolCalling ? options.toolCalling
-    // : RAToolCallingOptions.defaults())`.
+    // : RAToolCallingOptions())`.
     final opts =
         (options ??
-                (llm.hasToolCalling()
-                    ? llm.toolCalling
-                    : _defaultToolOptions()))
+                (llm.hasToolCalling() ? llm.toolCalling : _defaultToolOptions()))
             .deepCopy();
     if (toolChoice != null) {
       opts.toolChoice = toolChoice;
@@ -227,50 +230,60 @@ class RunAnywhereTools {
     if (forcedToolName != null) {
       opts.forcedToolName = forcedToolName;
     }
-    final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
+    if (parallelToolCalls != null) {
+      opts.parallelToolCalls = parallelToolCalls;
+    }
+    if (validateCalls != null) {
+      opts.validateCalls = validateCalls;
+    }
+    if (opts.tools.isEmpty) {
+      opts.tools.addAll(getRegisteredTools());
+    }
+
+    // idl/tool_calling.proto collapsed ToolCallingSessionCreateRequest to
+    // prompt/history/options — every generation knob (tools, format,
+    // maxToolCalls, autoExecute, replaceSystemPrompt, requireJsonArguments,
+    // keepToolsAvailable, parallelToolCalls, validateCalls, toolChoice,
+    // forcedToolName, disableThinking, systemPrompt, topP) lives exclusively
+    // on ToolCallingOptions now. temperature/maxOutputTokens have no home on
+    // the new request shape at all (commons keeps its own greedy defaults
+    // for the tool loop) and are intentionally dropped. Mirrors Swift
+    // `generateWithTools` (RunAnywhere+ToolCalling.swift:262-321).
+    if (!opts.hasTopP()) {
+      opts.topP = llm.topP;
+    }
+    if (!opts.hasSystemPrompt() || opts.systemPrompt.isEmpty) {
+      if (llm.hasSystemPrompt() && llm.systemPrompt.isNotEmpty) {
+        opts.systemPrompt = llm.systemPrompt;
+      }
+    }
+    // Suppress thinking when either options surface asks for it.
+    opts.disableThinking =
+        opts.disableThinking ||
+        (llm.hasReasoning() &&
+            llm.reasoning.mode == ReasoningMode.REASONING_MODE_OFF);
+
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
 
-    // Mirrors Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:491-548).
+    // Mirrors Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:431-452):
+    // prior conversation turns as a flat alternating list [user0, asst0, ...],
+    // EXCLUDING the current turn (which is `prompt`), mapped onto alternating
+    // USER/ASSISTANT ToolCallingHistoryTurn entries.
+    final historyTurns = [
+      for (var i = 0; i < history.length; i++)
+        ToolCallingHistoryTurn(
+          role: i.isEven
+              ? ToolCallingRole.TOOL_CALLING_ROLE_USER
+              : ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT,
+          content: history[i],
+        ),
+    ];
+
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
-      tools: tools,
-      format: opts.format,
-      maxToolCalls: opts.maxToolCallCount,
-      keepToolsAvailable: opts.keepToolsAvailable,
-      maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
-          ? opts.maxTokens
-          : llm.maxTokens,
-      temperature: opts.hasTemperature() ? opts.temperature : llm.temperature,
-      topP: llm.topP,
-      // Suppress thinking when either options surface asks for it.
-      disableThinking: opts.disableThinking || llm.disableThinking,
-      autoExecute: autoExecute,
-      replaceSystemPrompt: opts.replaceSystemPrompt,
-      requireJsonArguments: opts.requireJsonArguments,
-      // Prior conversation turns as a flat alternating list
-      // [user0, asst0, ...], EXCLUDING the current turn (which is `prompt`).
-      // Flutter uses the session ABI — commons threads these into every
-      // generate in the loop so multi-turn tool use keeps context.
-      history: history,
+      history: historyTurns,
+      options: opts,
     );
-    // `validate_calls` is `optional bool` on the proto — leave it UNSET when
-    // the caller did not supply a value so commons applies its documented
-    // default (true).
-    if (validateCalls != null) {
-      request.validateCalls = validateCalls;
-    }
-    if (opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
-      request.toolChoice = opts.toolChoice;
-    }
-    if (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty) {
-      request.forcedToolName = opts.forcedToolName;
-    }
-    // System prompt: tool options win, then the LLM options.
-    if (opts.hasSystemPrompt() && opts.systemPrompt.isNotEmpty) {
-      request.systemPrompt = opts.systemPrompt;
-    } else if (llm.hasSystemPrompt() && llm.systemPrompt.isNotEmpty) {
-      request.systemPrompt = llm.systemPrompt;
-    }
 
     final session = DartBridgeToolCalling.shared.createSession(request);
     // Publish the active session handle so consumers can

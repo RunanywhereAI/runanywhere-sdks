@@ -32,6 +32,7 @@ class VoiceAgentViewModel extends ChangeNotifier {
   // Proto-event subscription owns the active stream; nothing else needs to
   // reach the adapter.
   StreamSubscription<sdk.VoiceEvent>? _eventSubscription;
+  sdk.VoiceSession? _session;
   bool _isInitialized = false;
   bool _disposed = false;
 
@@ -48,11 +49,12 @@ class VoiceAgentViewModel extends ChangeNotifier {
   /// In-progress assistant response (streamed per token).
   String assistantResponse = '';
 
-  /// Audio level (0.0 to 1.0) for visualization.
-  double audioLevel = 0.0;
-
   /// Whether speech is currently detected (for pulsing animation).
   bool isSpeechDetected = false;
+
+  /// Microphone activity for the level bars. The voice event grammar reports
+  /// speech start/end rather than a continuous level.
+  double get micActivity => isSpeechDetected ? 0.9 : 0.15;
 
   /// Error message to display, or null.
   String? errorMessage;
@@ -102,10 +104,19 @@ class VoiceAgentViewModel extends ChangeNotifier {
   /// (useful after model loading in another view / the selection sheet).
   Future<void> refreshComponentStates() async {
     try {
-      final llmModelId = sdk.RunAnywhere.llm.currentModelId;
-      final sttModelId = sdk.RunAnywhere.stt.currentModelId;
-      final ttsVoiceId = sdk.RunAnywhere.tts.currentVoiceId;
-      final vadModelId = sdk.RunAnywhere.vad.currentModelId;
+      final state = await sdk.RunAnywhere.models.state();
+      final llmModelId =
+          state.loaded[proto.ModelCategory.MODEL_CATEGORY_LANGUAGE]?.id;
+      final sttModelId = state
+          .loaded[proto.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION]
+          ?.id;
+      final ttsVoiceId = state
+          .loaded[proto.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS]
+          ?.id;
+      final vadModelId = state
+          .loaded[proto.ModelCategory
+              .MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION]
+          ?.id;
 
       sttModelState = sttModelId != null
           ? UiModelLoadState.loaded
@@ -152,24 +163,29 @@ class VoiceAgentViewModel extends ChangeNotifier {
     _notify();
 
     try {
-      if (!sdk.RunAnywhere.voice.isReady) {
+      if (!allModelsLoaded) {
         sessionState = UiVoiceSessionState.error;
-        errorMessage = 'Please load STT, LLM, TTS, and VAD models first';
+        errorMessage = 'Please load STT, LLM, and TTS models first';
         _notify();
         return;
       }
 
-      final voice = sdk.RunAnywhere.voice;
-      await voice.initializeWithLoadedModels();
+      final session = await sdk.RunAnywhere.voice.createSession(
+        stt: sdk.ModelRef(currentSTTModel),
+        llm: sdk.ModelRef(currentLLMModel),
+        tts: sdk.ModelRef(currentTTSModel),
+      );
+      _session = session;
 
-      _eventSubscription = voice.eventStream().listen(
-        _handleProtoEvent,
+      _eventSubscription = session.events.listen(
+        _handleVoiceEvent,
         onError: (Object error) {
           sessionState = UiVoiceSessionState.error;
           errorMessage = 'Voice agent error: $error';
           _notify();
         },
       );
+      await session.start();
 
       sessionState = UiVoiceSessionState.connected;
       _notify();
@@ -187,13 +203,12 @@ class VoiceAgentViewModel extends ChangeNotifier {
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    // Release native voice-agent + VAD handles (cross-SDK parity:
-    // RunAnywhere.cleanupVoiceAgent() on session end).
     try {
-      sdk.RunAnywhere.voice.cleanup();
+      await _session?.close();
     } catch (e) {
       debugPrint('Voice cleanup: $e');
     }
+    _session = null;
 
     // Commit any assistant response that finished generating but hadn't yet
     // reached PIPELINE_STATE_SPEAKING (where it is normally committed), so a
@@ -205,7 +220,6 @@ class VoiceAgentViewModel extends ChangeNotifier {
     sessionState = UiVoiceSessionState.disconnected;
     currentTranscript = '';
     assistantResponse = '';
-    audioLevel = 0.0;
     isSpeechDetected = false;
     _notify();
   }
@@ -216,112 +230,55 @@ class VoiceAgentViewModel extends ChangeNotifier {
     _notify();
   }
 
-  // --- Proto event handling ----------------------------------------------------------------
+  // --- Event handling --------------------------------------------------------
 
-  /// Drive UI state from canonical VoiceEvent proto messages. Turn-completion
-  /// aggregation is rebuilt locally from the proto state transitions.
-  void _handleProtoEvent(sdk.VoiceEvent event) {
-    switch (event.whichPayload()) {
-      case sdk.VoiceEvent_Payload.state:
-        _handlePipelineState(event.state.current);
-        break;
-
-      case sdk.VoiceEvent_Payload.vad:
-        final vad = event.vad;
-        // VADEvent.type is VADStreamEventKind; start/end ride
-        // SPEECH_ACTIVITY with direction on the is_speech bool.
-        if (vad.type ==
-            sdk.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
-          isSpeechDetected = vad.isSpeech;
-          if (!vad.isSpeech) {
-            sessionState = UiVoiceSessionState.processing;
-          }
-          _notify();
-        }
-        break;
-
-      case sdk.VoiceEvent_Payload.speechTurnDetection:
-        _handleSpeechTurn(event.speechTurnDetection.kind);
-        break;
-
-      case sdk.VoiceEvent_Payload.wakewordDetected:
+  /// Drive UI state from the SDK's voice event grammar.
+  void _handleVoiceEvent(sdk.VoiceEvent event) {
+    switch (event) {
+      case sdk.VoiceSpeechStarted():
+        isSpeechDetected = true;
         sessionState = UiVoiceSessionState.listening;
+      case sdk.VoiceSpeechEnded():
         isSpeechDetected = false;
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.userSaid:
-        final text = event.userSaid.text;
-        if (text.isNotEmpty) {
-          // A new user utterance means the previous assistant reply is done.
-          // Commit it as its own bubble BEFORE appending this user turn — the
-          // mic-driver / process-turn path doesn't reliably emit
-          // agent-response/SPEAKING signals, so without this the next reply's
-          // tokens accumulate into the previous reply's buffer and the bubbles
-          // merge. Idempotent: a no-op if already committed elsewhere.
-          _commitAssistantResponse();
-          conversation.add(
-            ConversationTurn(
-              role: proto.MessageRole.MESSAGE_ROLE_USER,
-              text: text,
-            ),
-          );
-        }
-        // Clear in-progress transcript so the committed bubble above
-        // is not double-rendered.
-        currentTranscript = '';
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.assistantToken:
-        // Streaming per-token for typewriter UX.
-        assistantResponse += event.assistantToken.text;
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.audio:
-        sessionState = UiVoiceSessionState.speaking;
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.error:
-        sessionState = UiVoiceSessionState.error;
-        errorMessage = event.error.message;
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.audioLevel:
-        audioLevel = event.audioLevel.rms.clamp(0.0, 1.0);
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.agentResponseStarted:
-        // A new assistant reply is starting — flush any prior uncommitted
-        // response into its own turn first, so consecutive replies never merge
-        // into one bubble (the next assistant tokens then accumulate fresh).
-        _commitAssistantResponse();
         sessionState = UiVoiceSessionState.processing;
-        _notify();
-        break;
+      case sdk.VoiceUserTranscribed(:final text, :final isFinal):
+        if (isFinal) {
+          if (text.isNotEmpty) {
+            // A new user utterance closes the previous assistant reply, so
+            // commit it before appending this turn.
+            _commitAssistantResponse();
+            conversation.add(
+              ConversationTurn(
+                role: proto.MessageRole.MESSAGE_ROLE_USER,
+                text: text,
+              ),
+            );
+          }
+          currentTranscript = '';
+        } else {
+          currentTranscript = text;
+        }
+      case sdk.VoiceAgentResponse(:final text):
+        assistantResponse = text;
+      case sdk.VoiceAgentStateChanged(:final state):
+        _handleAgentState(state);
+      case sdk.VoiceError(:final message, :final recoverable):
+        errorMessage = message;
+        if (!recoverable) sessionState = UiVoiceSessionState.error;
+    }
+    _notify();
+  }
 
-      case sdk.VoiceEvent_Payload.agentResponseCompleted:
-        // Canonical end-of-reply: commit the accumulated tokens as their own
-        // assistant turn. Idempotent with the SPEAKING-state commit below — the
-        // first to fire commits and clears; the other sees an empty buffer.
+  void _handleAgentState(sdk.AgentState state) {
+    switch (state) {
+      case sdk.AgentState.listening:
+        sessionState = UiVoiceSessionState.listening;
+      case sdk.AgentState.thinking:
+        sessionState = UiVoiceSessionState.processing;
+      case sdk.AgentState.speaking:
+        sessionState = UiVoiceSessionState.speaking;
+        // The reply finished generating; commit it as its own bubble.
         _commitAssistantResponse();
-        _notify();
-        break;
-
-      case sdk.VoiceEvent_Payload.interrupted:
-      case sdk.VoiceEvent_Payload.metrics:
-      case sdk.VoiceEvent_Payload.componentStateChanged:
-      case sdk.VoiceEvent_Payload.sessionError:
-      case sdk.VoiceEvent_Payload.sessionStarted:
-      case sdk.VoiceEvent_Payload.sessionStopped:
-      case sdk.VoiceEvent_Payload.turnLifecycle:
-      case sdk.VoiceEvent_Payload.componentProgress:
-      case sdk.VoiceEvent_Payload.notSet:
-        break;
     }
   }
 
@@ -340,49 +297,7 @@ class VoiceAgentViewModel extends ChangeNotifier {
     assistantResponse = '';
   }
 
-  void _handlePipelineState(sdk.PipelineState state) {
-    switch (state) {
-      case sdk.PipelineState.PIPELINE_STATE_IDLE:
-      case sdk.PipelineState.PIPELINE_STATE_LISTENING:
-        sessionState = UiVoiceSessionState.listening;
-        _notify();
-        break;
-      case sdk.PipelineState.PIPELINE_STATE_THINKING:
-        sessionState = UiVoiceSessionState.processing;
-        _notify();
-        break;
-      case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
-        sessionState = UiVoiceSessionState.speaking;
-        // Flush accumulated assistant tokens as a completed turn.
-        _commitAssistantResponse();
-        _notify();
-        break;
-      case sdk.PipelineState.PIPELINE_STATE_STOPPED:
-        unawaited(stopConversation());
-        break;
-      default:
-        break;
-    }
-  }
 
-  void _handleSpeechTurn(proto.SpeechTurnDetectionEventKind kind) {
-    switch (kind) {
-      case proto.SpeechTurnDetectionEventKind
-            .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
-        isSpeechDetected = true;
-        sessionState = UiVoiceSessionState.listening;
-        _notify();
-        break;
-      case proto.SpeechTurnDetectionEventKind
-            .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
-        isSpeechDetected = false;
-        sessionState = UiVoiceSessionState.processing;
-        _notify();
-        break;
-      default:
-        break;
-    }
-  }
 
   // --- Cleanup --------------------------------------------------------------------------------
 
@@ -396,12 +311,9 @@ class VoiceAgentViewModel extends ChangeNotifier {
     _disposed = true;
     unawaited(_eventSubscription?.cancel());
     _eventSubscription = null;
-    // Release the agent on VM teardown (view's dispose), mirroring iOS/Android.
-    try {
-      sdk.RunAnywhere.voice.cleanup();
-    } catch (e) {
-      debugPrint('Voice cleanup: $e');
-    }
+    // Release the session on VM teardown (view's dispose).
+    unawaited(_session?.close());
+    _session = null;
     super.dispose();
   }
 }

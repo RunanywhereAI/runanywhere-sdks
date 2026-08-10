@@ -77,9 +77,8 @@ export class TTSProtoAdapter {
   async synthesizeLifecycle(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): Promise<ProtoTTSOutput | null> {
-    const request = lifecycleRequest(text, options, ssml);
+    const request = lifecycleRequest(text, options);
     const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycle');
     if (host) {
       const response = await host.infer('tts.synthesize', {
@@ -116,10 +115,9 @@ export class TTSProtoAdapter {
   synthesizeLifecycleStreamEvents(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): AsyncIterable<ProtoTTSStreamEvent> {
     const requestBytes = TTSSynthesisRequest.encode(
-      lifecycleRequest(text, options, ssml),
+      lifecycleRequest(text, options),
     ).finish();
     const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycleStream');
     if (host) {
@@ -148,8 +146,7 @@ export class TTSProtoAdapter {
       undefined,
       (rc) => TTSStreamEvent.fromPartial({
         kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR,
-        errorCode: rc,
-        errorMessage: `TTS stream failed: ${rc}`,
+        error: SDKException.fromCode(rc, `TTS stream failed: ${rc}`).proto,
       }),
     );
   }
@@ -157,9 +154,8 @@ export class TTSProtoAdapter {
   synthesizeLifecycleStream(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): AsyncIterable<ProtoTTSOutput> {
-    const events = this.synthesizeLifecycleStreamEvents(text, options, ssml);
+    const events = this.synthesizeLifecycleStreamEvents(text, options);
     return outputsFromLifecycleEvents(events);
   }
 
@@ -186,6 +182,19 @@ export class TTSProtoAdapter {
       TTSServiceState,
       (outResult) => this.module._rac_tts_stop_lifecycle_proto!(outResult),
       'rac_tts_stop_lifecycle_proto',
+    );
+  }
+
+  stateLifecycle(): ProtoTTSServiceState | null {
+    if (!ensureExports(this.module, 'tts.stateLifecycle', [
+      '_rac_tts_state_lifecycle_proto',
+    ])) {
+      return null;
+    }
+    return this.bridge().callResultProto(
+      TTSServiceState,
+      (outResult) => this.module._rac_tts_state_lifecycle_proto!(outResult),
+      'rac_tts_state_lifecycle_proto',
     );
   }
 
@@ -288,13 +297,11 @@ export class TTSProtoAdapter {
 function lifecycleRequest(
   text: string,
   options: ProtoTTSOptions,
-  ssml?: string,
 ): ReturnType<typeof TTSSynthesisRequest.create> {
   return TTSSynthesisRequest.create({
+    requestId: '',
     text,
-    ssml,
     options,
-    metadata: {},
   });
 }
 
@@ -310,8 +317,7 @@ async function* outputsFromLifecycleEvents(
       yield TTSOutput.fromPartial({
         isFinal: true,
         timestampMs: Date.now(),
-        errorCode: event.errorCode,
-        errorMessage: event.errorMessage ?? 'TTS lifecycle stream failed',
+        error: event.error ?? SDKException.processingFailed('TTS lifecycle stream failed').proto,
       });
     }
   }

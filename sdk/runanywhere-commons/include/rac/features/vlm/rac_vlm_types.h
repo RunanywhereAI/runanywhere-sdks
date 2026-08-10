@@ -245,21 +245,21 @@ typedef struct rac_vlm_options {
 /**
  * @brief Default VLM generation options
  *
- * Values come from the `rac_default` annotations on
- * runanywhere.v1.VLMGenerationOptions, via the generated
- * rac_defaults_generated.h. Change idl/vlm_options.proto, not this declaration:
- * the five platform SDKs generate their defaults from the same annotations, and
- * they had already drifted to three different max_tokens values before this was
- * a single declaration.
+ * runanywhere.v1.VLMGenerationOptions was deleted from idl/vlm_options.proto:
+ * its sampling fields were name-for-name copies of LLMGenerationOptions, so
+ * VLMGenerationRequest.options is now LLMGenerationOptions directly (same
+ * names, same defaults, same validation as the text API). These C defaults
+ * therefore come from the RAC_DEFAULT_LLM_GENERATION_OPTIONS_* constants
+ * (rac_default annotations on LLMGenerationOptions), not a VLM-specific set.
  *
  * Declared as a `static const` (like RAC_LLM_OPTIONS_DEFAULT) rather than a
  * compound-literal macro: Swift's Clang importer can import a const global but
  * not a struct-literal macro.
  */
 static const rac_vlm_options_t RAC_VLM_OPTIONS_DEFAULT = {
-    .max_tokens = RAC_DEFAULT_VLM_GENERATION_OPTIONS_MAX_TOKENS,
-    .temperature = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TEMPERATURE,
-    .top_p = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TOP_P,
+    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_OUTPUT_TOKENS,
+    .temperature = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TEMPERATURE,
+    .top_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_P,
     .stop_sequences = RAC_NULL,
     .num_stop_sequences = 0,
     .streaming_enabled = RAC_TRUE,
@@ -270,10 +270,10 @@ static const rac_vlm_options_t RAC_VLM_OPTIONS_DEFAULT = {
     .model_family = RAC_VLM_MODEL_FAMILY_AUTO,
     .custom_chat_template = RAC_NULL,
     .image_marker_override = RAC_NULL,
-    .top_k = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TOP_K,
+    .top_k = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_K,
     .seed = 0,
-    .repetition_penalty = RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY,
-    .min_p = 0.0f,
+    .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY,
+    .min_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MIN_P,
     .emit_image_embeddings = RAC_FALSE};
 
 // =============================================================================

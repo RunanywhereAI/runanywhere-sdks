@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import RunAnywhere
 
 // MARK: - Loading Model Overlay
 

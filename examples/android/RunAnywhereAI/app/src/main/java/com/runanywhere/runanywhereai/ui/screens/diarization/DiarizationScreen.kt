@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -100,9 +99,9 @@ fun DiarizationScreen(viewModel: DiarizationViewModel = viewModel()) {
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
         Text(
-            text = "Diarization",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
+            text = "Split a recording into speaker turns on-device with NVIDIA Sortformer.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         modelCard(viewModel) { modelPicker.launch(arrayOf("*/*")) }
@@ -214,20 +213,23 @@ private fun resultCard(viewModel: DiarizationViewModel) {
                 )
             }
         }
+        // v3 segments carry a speaker id but no ordinal, so the chip palette is
+        // keyed off first-appearance order.
+        val speakerOrder = viewModel.segments.map { it.speakerId }.distinct()
         viewModel.segments.forEach { segment ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
             ) {
-                SpeakerChip(index = segment.speaker_index, id = segment.speaker_id)
+                SpeakerChip(index = speakerOrder.indexOf(segment.speakerId), id = segment.speakerId)
                 Text(
-                    "${formatMs(segment.start_ms)} – ${formatMs(segment.end_ms)}",
+                    "${formatMs(segment.startMs)} – ${formatMs(segment.endMs)}",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    formatDuration(segment.end_ms - segment.start_ms),
+                    formatDuration(segment.endMs - segment.startMs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

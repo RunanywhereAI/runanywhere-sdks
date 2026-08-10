@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RunAnywhere } from '@runanywhere/core';
+import { RunAnywhere, formatFramework } from '@runanywhere/core';
 import type { StorageInfo } from '@runanywhere/proto-ts/storage_types';
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import {
@@ -50,7 +50,7 @@ export const StorageScreen: React.FC = () => {
     setIsRefreshing(true);
     try {
       const [storage, models] = await Promise.all([
-        RunAnywhere.getStorageInfo(),
+        RunAnywhere.storage.info(),
         listDownloadedCatalogModels(),
       ]);
       setStorageInfo(storage);
@@ -65,12 +65,12 @@ export const StorageScreen: React.FC = () => {
   }, [refresh]);
 
   const clearCache = async () => {
-    await RunAnywhere.clearCache();
+    await RunAnywhere.storage.clearCache();
     await refresh();
   };
 
   const cleanTempFiles = async () => {
-    await RunAnywhere.cleanTempFiles();
+    await RunAnywhere.storage.cleanTempFiles();
     await refresh();
   };
 
@@ -82,7 +82,7 @@ export const StorageScreen: React.FC = () => {
         style: 'destructive',
         onPress: () => {
           void (async () => {
-            await RunAnywhere.deleteModel(model.id);
+            await RunAnywhere.models.delete(model.id);
             await refresh();
           })();
         },
@@ -179,7 +179,7 @@ export const StorageScreen: React.FC = () => {
                             { color: frameworkColor },
                           ]}
                         >
-                          {RunAnywhere.formatFramework(framework)}
+                          {formatFramework(framework)}
                         </Text>
                       </View>
                     </View>

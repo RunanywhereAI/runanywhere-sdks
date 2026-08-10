@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -31,27 +30,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Activity transition emitted by the VAD as it watches a stream.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:235               (SpeechActivityEvent enum: started/ended)
- *   Kotlin VADTypes.kt:171                  (SpeechActivityEvent enum: STARTED/ENDED)
- *   Dart   runanywhere_vad.dart:28          (SpeechActivityEvent enum: started/ended)
- *   RN     VADTypes.ts:43                   ('started' | 'ended' string union)
- *   Web    VADTypes.ts:8                    (SpeechActivity enum: Started/Ended/Ongoing)
- *   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
- *                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
- *
- * Distinct from voice_events.proto's `VADEvent`, which carries the broader
- * pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
- * `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
- * component-level transition.
- * ---------------------------------------------------------------------------
+ * Narrow component-level transition: this detector said speech started or
+ * ended. Barge-in is a session-level decision, not a detector verdict — it is
+ * reported by InterruptedEvent / InterruptReason in voice_events.proto.
  */
 public class SpeechActivityEvent(
-  /**
-   * Which transition happened.
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.SpeechActivityKind#ADAPTER",
@@ -61,8 +44,7 @@ public class SpeechActivityEvent(
   )
   public val event_type: SpeechActivityKind = SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED,
   /**
-   * Wall-clock time of the transition, in milliseconds since epoch.
-   * Aligns with rac_vad_output_t::timestamp_ms.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 2,
@@ -73,36 +55,37 @@ public class SpeechActivityEvent(
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Optional duration of the speech / silence that triggered this event,
-   * in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
-   * utterance length; left zero on SPEECH_STARTED.
+   * Ms from the start of session audio when speech began. Set on both
+   * STARTED and ENDED. Includes prefix_padding_ms (OpenAI audio_start_ms).
    */
   @field:WireField(
     tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "durationMs",
+    jsonName = "audioStartMs",
     schemaIndex = 2,
   )
-  public val duration_ms: Int = 0,
+  public val audio_start_ms: Long = 0L,
+  /**
+   * Ms from the start of session audio when speech ended; 0 on STARTED.
+   * Includes min_silence_duration_ms (OpenAI audio_end_ms).
+   */
   @field:WireField(
     tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioEndMs",
     schemaIndex = 3,
   )
-  public val confidence: Float = 0f,
+  public val audio_end_ms: Long = 0L,
+  /**
+   * Correlates STARTED with its ENDED (OpenAI item_id).
+   */
   @field:WireField(
     tag = 5,
-    adapter = "ai.runanywhere.proto.v1.VADResult#ADAPTER",
-    schemaIndex = 4,
-  )
-  public val result: VADResult? = null,
-  @field:WireField(
-    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "segmentId",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val segment_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -119,48 +102,44 @@ public class SpeechActivityEvent(
     if (unknownFields != other.unknownFields) return false
     if (event_type != other.event_type) return false
     if (timestamp_ms != other.timestamp_ms) return false
-    if (duration_ms != other.duration_ms) return false
-    if (confidence != other.confidence) return false
-    if (result != other.result) return false
+    if (audio_start_ms != other.audio_start_ms) return false
+    if (audio_end_ms != other.audio_end_ms) return false
     if (segment_id != other.segment_id) return false
     return true
   }
 
   override fun hashCode(): Int {
-    var result_ = super.hashCode
-    if (result_ == 0) {
-      result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + event_type.hashCode()
-      result_ = result_ * 37 + timestamp_ms.hashCode()
-      result_ = result_ * 37 + duration_ms.hashCode()
-      result_ = result_ * 37 + confidence.hashCode()
-      result_ = result_ * 37 + (result?.hashCode() ?: 0)
-      result_ = result_ * 37 + (segment_id?.hashCode() ?: 0)
-      super.hashCode = result_
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + event_type.hashCode()
+      result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + audio_start_ms.hashCode()
+      result = result * 37 + audio_end_ms.hashCode()
+      result = result * 37 + (segment_id?.hashCode() ?: 0)
+      super.hashCode = result
     }
-    return result_
+    return result
   }
 
   override fun toString(): String {
-    val result_ = mutableListOf<String>()
-    result_ += """event_type=$event_type"""
-    result_ += """timestamp_ms=$timestamp_ms"""
-    result_ += """duration_ms=$duration_ms"""
-    result_ += """confidence=$confidence"""
-    if (result != null) result_ += """result=$result"""
-    if (segment_id != null) result_ += """segment_id=${sanitize(segment_id)}"""
-    return result_.joinToString(prefix = "SpeechActivityEvent{", separator = ", ", postfix = "}")
+    val result = mutableListOf<String>()
+    result += """event_type=$event_type"""
+    result += """timestamp_ms=$timestamp_ms"""
+    result += """audio_start_ms=$audio_start_ms"""
+    result += """audio_end_ms=$audio_end_ms"""
+    if (segment_id != null) result += """segment_id=${sanitize(segment_id)}"""
+    return result.joinToString(prefix = "SpeechActivityEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     event_type: SpeechActivityKind = this.event_type,
     timestamp_ms: Long = this.timestamp_ms,
-    duration_ms: Int = this.duration_ms,
-    confidence: Float = this.confidence,
-    result: VADResult? = this.result,
+    audio_start_ms: Long = this.audio_start_ms,
+    audio_end_ms: Long = this.audio_end_ms,
     segment_id: String? = this.segment_id,
     unknownFields: ByteString = this.unknownFields,
-  ): SpeechActivityEvent = SpeechActivityEvent(event_type, timestamp_ms, duration_ms, confidence, result, segment_id, unknownFields)
+  ): SpeechActivityEvent = SpeechActivityEvent(event_type, timestamp_ms, audio_start_ms, audio_end_ms, segment_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -181,14 +160,13 @@ public class SpeechActivityEvent(
         if (value.timestamp_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_ms)
         }
-        if (value.duration_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.duration_ms)
+        if (value.audio_start_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.audio_start_ms)
         }
-        if (!value.confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.confidence)
+        if (value.audio_end_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.audio_end_ms)
         }
-        size += VADResult.ADAPTER.encodedSizeWithTag(5, value.result)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.segment_id)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.segment_id)
         return size
       }
 
@@ -199,26 +177,24 @@ public class SpeechActivityEvent(
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_ms)
         }
-        if (value.duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.duration_ms)
+        if (value.audio_start_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_start_ms)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
+        if (value.audio_end_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_end_ms)
         }
-        VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.segment_id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.segment_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SpeechActivityEvent) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.segment_id)
-        VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.segment_id)
+        if (value.audio_end_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_end_ms)
         }
-        if (value.duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.duration_ms)
+        if (value.audio_start_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_start_ms)
         }
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_ms)
@@ -231,9 +207,8 @@ public class SpeechActivityEvent(
       override fun decode(reader: ProtoReader): SpeechActivityEvent {
         var event_type: SpeechActivityKind = SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED
         var timestamp_ms: Long = 0L
-        var duration_ms: Int = 0
-        var confidence: Float = 0f
-        var result: VADResult? = null
+        var audio_start_ms: Long = 0L
+        var audio_end_ms: Long = 0L
         var segment_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -243,26 +218,23 @@ public class SpeechActivityEvent(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             2 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
-            3 -> duration_ms = ProtoAdapter.INT32.decode(reader)
-            4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
-            5 -> result = VADResult.ADAPTER.decode(reader)
-            6 -> segment_id = ProtoAdapter.STRING.decode(reader)
+            3 -> audio_start_ms = ProtoAdapter.INT64.decode(reader)
+            4 -> audio_end_ms = ProtoAdapter.INT64.decode(reader)
+            5 -> segment_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SpeechActivityEvent(
           event_type = event_type,
           timestamp_ms = timestamp_ms,
-          duration_ms = duration_ms,
-          confidence = confidence,
-          result = result,
+          audio_start_ms = audio_start_ms,
+          audio_end_ms = audio_end_ms,
           segment_id = segment_id,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: SpeechActivityEvent): SpeechActivityEvent = value.copy(
-        result = value.result?.let(VADResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

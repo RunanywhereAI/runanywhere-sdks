@@ -12,6 +12,8 @@
 // The STT model wants 16 kHz mono PCM16 bytes; the TTS model returns float32 at
 // its own sample rate. These helpers bridge to/from those formats.
 
+import { SDKException } from './errors';
+
 /** Clamp+scale float32 samples in [-1,1] to signed 16-bit PCM. */
 export function float32ToPcm16(input: Float32Array): Int16Array {
   const out = new Int16Array(input.length);
@@ -43,7 +45,12 @@ export function pcm16Bytes(input: Float32Array): Uint8Array {
  * downsampling, e.g. a 48 kHz mic capture down to the 16 kHz the STT model wants).
  */
 export function downsample(input: Float32Array, inRate: number, outRate: number): Float32Array {
-  if (outRate <= 0 || inRate <= 0) throw new Error('downsample: rates must be positive');
+  if (outRate <= 0 || inRate <= 0) {
+    throw SDKException.validationFailed({
+      fieldPath: inRate <= 0 ? 'inRate' : 'outRate',
+      message: 'downsample: sample rates must be positive',
+    });
+  }
   if (outRate >= inRate) return input.slice();
   const ratio = inRate / outRate;
   const outLen = Math.floor(input.length / ratio);

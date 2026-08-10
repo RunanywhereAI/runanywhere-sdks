@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.diffusion
 
-import ai.runanywhere.proto.v1.DiffusionMode
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -12,8 +11,8 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.generateImage
-import com.runanywhere.sdk.public.types.RADiffusionGenerationOptions
+import com.runanywhere.sdk.public.api.ImageOptions
+import com.runanywhere.sdk.public.api.images
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -28,7 +27,9 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class DiffusionViewModel(application: Application) : AndroidViewModel(application) {
 
-    var prompt by mutableStateOf("a red apple")
+    // Starts empty. A pre-filled prompt reads as a result the app already has, and it makes
+    // the first tap of Generate produce someone else's picture rather than the user's.
+    var prompt by mutableStateOf("")
         private set
     var isGenerating by mutableStateOf(false)
         private set
@@ -45,6 +46,16 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
         prompt = value
     }
 
+    /**
+     * Abandons the in-flight generation. The engine call itself is not interruptible, so this
+     * releases the UI rather than the NPU — which is why the screen says "Stopping…" and not
+     * "Cancelled" until the job actually unwinds.
+     */
+    fun cancel() {
+        job?.cancel()
+        job = null
+    }
+
     fun generate() {
         if (isGenerating || prompt.isBlank()) return
         val text = prompt.trim()
@@ -54,20 +65,15 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
             val start = System.currentTimeMillis()
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.IMAGE_GENERATION)
-                val result = RunAnywhere.generateImage(
-                    RADiffusionGenerationOptions(
-                        prompt = text,
-                        width = 256,
-                        height = 256,
-                        mode = DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
-                    ),
+                val result = RunAnywhere.images.generate(
+                    text,
+                    ImageOptions(width = 256, height = 256),
                 )
-                val bmp = withContext(Dispatchers.Default) {
-                    toBitmap(result.image_data.toByteArray(), result.width, result.height)
+                val first = result.images.firstOrNull()
+                image = first?.let {
+                    withContext(Dispatchers.Default) { toBitmap(it.bytes, it.width, it.height) }
                 }
-                image = bmp
-                lastLatencyMs = result.total_time_ms.takeIf { it > 0 }
-                    ?: (System.currentTimeMillis() - start)
+                lastLatencyMs = System.currentTimeMillis() - start
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

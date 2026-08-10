@@ -430,7 +430,7 @@ int main() {
         model.set_category(runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
         model.set_format(runanywhere::v1::MODEL_FORMAT_ONNX);
         model.set_local_path(model_path.string());
-        model.set_is_downloaded(true);
+        model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
         model.set_is_available(true);
         std::string model_bytes;
         CHECK(model.SerializeToString(&model_bytes) &&
@@ -451,7 +451,7 @@ int main() {
         CHECK(load_rc == RAC_SUCCESS &&
                   load_result.ParseFromArray(lifecycle_output.data,
                                              static_cast<int>(lifecycle_output.size)) &&
-                  load_result.success() && load_result.model_id() == model.id(),
+                  load_result.has_error() == false && load_result.model_id() == model.id(),
               "canonical lifecycle loads the diarization model");
         rac_proto_buffer_free(&lifecycle_output);
 
@@ -499,7 +499,7 @@ int main() {
         CHECK(unload_rc == RAC_SUCCESS &&
                   unload_result.ParseFromArray(lifecycle_output.data,
                                                static_cast<int>(lifecycle_output.size)) &&
-                  unload_result.success() && unload_result.unloaded_model_ids_size() == 1 &&
+                  unload_result.has_error() == false && unload_result.unloaded_model_ids_size() == 1 &&
                   unload_result.unloaded_model_ids(0) == model.id(),
               "canonical lifecycle unloads the diarization model");
         rac_proto_buffer_free(&lifecycle_output);
@@ -565,7 +565,7 @@ int main() {
 
     request.Clear();
     request.set_audio_data(std::string(1, '\0'));
-    request.mutable_options()->set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+    request.mutable_options()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -584,7 +584,7 @@ int main() {
 
     request.Clear();
     request.set_audio_data(f32le(0.1f) + f32le(0.2f));
-    request.mutable_options()->set_channel_count(2);
+    request.mutable_options()->set_channels(2);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -621,19 +621,19 @@ int main() {
     };
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(4000);
+        opts.set_sample_rate(4000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
               "sample_rate_hz below 8000 is rejected");
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(96000);
+        opts.set_sample_rate(96000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
               "sample_rate_hz above 48000 is rejected");
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(16000);
+        opts.set_sample_rate(16000);
         CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
               "sample_rate_hz 16000 (the model's fixed rate) is accepted");
     }
@@ -642,7 +642,7 @@ int main() {
         // not resample, so the boundary rate is rejected rather than silently
         // producing wrong features/timestamps.
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(48000);
+        opts.set_sample_rate(48000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
               "in-range sample_rate_hz other than 16000 is rejected (16 kHz-only frontend)");
     }
@@ -678,7 +678,7 @@ int main() {
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        opts.set_encoding(runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
               "offline diarize rejects an unspecified audio encoding");
     }
@@ -688,7 +688,7 @@ int main() {
     request.Clear();
     request.set_audio_data(s16le(16384) + s16le(-16384));
     request.mutable_options()->set_encoding(
-        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+        runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -838,7 +838,7 @@ int main() {
     }
     {
         runanywhere::v1::DiarizationOptions unsupported_enc;
-        unsupported_enc.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        unsupported_enc.set_encoding(runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED);
         std::string unsupported_enc_bytes;
         (void)unsupported_enc.SerializeToString(&unsupported_enc_bytes);
         uint64_t unsupported_enc_session = 777;
@@ -853,7 +853,7 @@ int main() {
     // ---- S16-configured stream: stored encoding drives feed decode ----------
     {
         runanywhere::v1::DiarizationOptions s16_opts;
-        s16_opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+        s16_opts.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         std::string s16_opts_bytes;
         (void)s16_opts.SerializeToString(&s16_opts_bytes);
         uint64_t s16_session = 0;

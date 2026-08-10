@@ -1,19 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
+import { AudioEncoding } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-export declare enum DiarizationAudioEncoding {
-    DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-    DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-    DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-    UNRECOGNIZED = -1
-}
-export declare function diarizationAudioEncodingFromJSON(object: any): DiarizationAudioEncoding;
-export declare function diarizationAudioEncodingToJSON(object: DiarizationAudioEncoding): string;
 export declare enum DiarizationStreamEventKind {
     DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
     DIARIZATION_STREAM_EVENT_KIND_STARTED = 1,
@@ -25,12 +13,31 @@ export declare enum DiarizationStreamEventKind {
 export declare function diarizationStreamEventKindFromJSON(object: any): DiarizationStreamEventKind;
 export declare function diarizationStreamEventKindToJSON(object: DiarizationStreamEventKind): string;
 export interface DiarizationOptions {
-    sampleRateHz?: number | undefined;
-    channelCount?: number | undefined;
-    encoding?: DiarizationAudioEncoding | undefined;
+    /**
+     * Only 16 kHz is accepted: the engine does not resample, and any other
+     * rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+     */
+    sampleRate?: number | undefined;
+    channels?: number | undefined;
+    /**
+     * Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+     * AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+     * float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+     * and AUDIO_ENCODING_UNSPECIFIED are rejected with
+     * RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
+     */
+    encoding?: AudioEncoding | undefined;
     threshold?: number | undefined;
     minimumDurationMs: number;
     mergeGapMs: number;
+    /**
+     * Speaker-count hint: an upper bound, not an exact count. Unset =
+     * auto-detect. An engine that detects more than max_speakers speakers
+     * ranks them by total active duration, drops the weakest, and re-densifies
+     * the speaker indices. Values above the loaded model's speaker capacity
+     * are clamped.
+     */
+    maxSpeakers?: number | undefined;
 }
 export interface DiarizationRequest {
     audioData: Uint8Array;

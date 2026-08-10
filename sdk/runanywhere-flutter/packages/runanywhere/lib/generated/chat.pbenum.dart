@@ -88,46 +88,5 @@ class ChatMessageStatus extends $pb.ProtobufEnum {
   const ChatMessageStatus._(super.value, super.name);
 }
 
-class ChatStreamEventKind extends $pb.ProtobufEnum {
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_UNSPECIFIED =
-      ChatStreamEventKind._(
-          0, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_UNSPECIFIED');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED =
-      ChatStreamEventKind._(
-          1, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_TOKEN =
-      ChatStreamEventKind._(
-          2, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_TOKEN');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_TOOL_CALL =
-      ChatStreamEventKind._(
-          3, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_TOOL_CALL');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_TOOL_RESULT =
-      ChatStreamEventKind._(
-          4, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_TOOL_RESULT');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED =
-      ChatStreamEventKind._(
-          5, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED');
-  static const ChatStreamEventKind CHAT_STREAM_EVENT_KIND_ERROR =
-      ChatStreamEventKind._(
-          6, _omitEnumNames ? '' : 'CHAT_STREAM_EVENT_KIND_ERROR');
-
-  static const $core.List<ChatStreamEventKind> values = <ChatStreamEventKind>[
-    CHAT_STREAM_EVENT_KIND_UNSPECIFIED,
-    CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED,
-    CHAT_STREAM_EVENT_KIND_TOKEN,
-    CHAT_STREAM_EVENT_KIND_TOOL_CALL,
-    CHAT_STREAM_EVENT_KIND_TOOL_RESULT,
-    CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED,
-    CHAT_STREAM_EVENT_KIND_ERROR,
-  ];
-
-  static final $core.List<ChatStreamEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
-  static ChatStreamEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ChatStreamEventKind._(super.value, super.name);
-}
-
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

@@ -29,8 +29,6 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace {
 PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
-        // ::runanywhere::v1::RerankCandidate
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_rerank_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::RerankOptions
         {&::_pbi::kDescriptorMethods, &::descriptor_table_rerank_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::RerankRequest
@@ -56,11 +54,11 @@ constexpr RerankScoredItem::ParseTableT_ RerankScoredItem::InternalGenerateParse
     {
       PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      3, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967289,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      2,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -70,39 +68,24 @@ constexpr RerankScoredItem::ParseTableT_ RerankScoredItem::InternalGenerateParse
       ::_pbi::TcParser::GetTable<::runanywhere::v1::RerankScoredItem>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // uint32 rank = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RerankScoredItem, _impl_.rank_), 3>(),
-       {32, 3, 0,
-        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.rank_)}},
-      // string id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.id_)}},
-      // float score = 2;
+      // float relevance_score = 2;
       {::_pbi::TcParser::FastF32S1,
-       {21, 1, 0,
-        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.score_)}},
-      // uint32 original_index = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RerankScoredItem, _impl_.original_index_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.original_index_)}},
+       {21, 0, 0,
+        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.relevance_score_)}},
+      // uint32 index = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RerankScoredItem, _impl_.index_), 1>(),
+       {24, 1, 0,
+        PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.index_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // string id = 1;
-      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // float score = 2;
-      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.score_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // uint32 original_index = 3;
-      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.original_index_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-      // uint32 rank = 4;
-      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.rank_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      // float relevance_score = 2;
+      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.relevance_score_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // uint32 index = 3;
+      {PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.index_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
     }},
     // no aux_entries
     {{
-      "\37\2\0\0\0\0\0\0"
-      "runanywhere.v1.RerankScoredItem"
-      "id"
     }},
   };
 }
@@ -112,12 +95,8 @@ inline constexpr RerankScoredItem::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        score_{0},
-        original_index_{0u},
-        rank_{0u} {}
+        relevance_score_{0},
+        index_{0u} {}
 
 template <typename>
 constexpr RerankScoredItem::RerankScoredItem(::_pbi::ConstantInitialized,
@@ -135,7 +114,7 @@ inline void* PROTOBUF_NONNULL RerankScoredItem::PlacementNew_(
   return ::new (mem) RerankScoredItem(arena);
 }
 constexpr auto RerankScoredItem::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(RerankScoredItem), alignof(RerankScoredItem));
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(RerankScoredItem), alignof(RerankScoredItem));
 }
 constexpr auto RerankScoredItem::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -160,7 +139,7 @@ constexpr auto RerankScoredItem::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[3],
+      &file_reflection_data[2],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_rerank_2eproto,
@@ -223,11 +202,11 @@ constexpr RerankOptions::ParseTableT_ RerankOptions::InternalGenerateParseTable_
     {
       PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_._has_bits_),
       0, // no _extensions_
-      1, 0,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967294,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      1,  // num_field_entries
+      2,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -237,15 +216,21 @@ constexpr RerankOptions::ParseTableT_ RerankOptions::InternalGenerateParseTable_
       ::_pbi::TcParser::GetTable<::runanywhere::v1::RerankOptions>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // uint32 top_n = 1;
+      // uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RerankOptions, _impl_.max_tokens_per_doc_), 1>(),
+       {16, 1, 0,
+        PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.max_tokens_per_doc_)}},
+      // uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RerankOptions, _impl_.top_n_), 0>(),
        {8, 0, 0,
         PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.top_n_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // uint32 top_n = 1;
+      // uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
       {PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.top_n_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      // uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+      {PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.max_tokens_per_doc_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
     }},
     // no aux_entries
     {{
@@ -258,7 +243,8 @@ inline constexpr RerankOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        top_n_{0u} {}
+        top_n_{0u},
+        max_tokens_per_doc_{0u} {}
 
 template <typename>
 constexpr RerankOptions::RerankOptions(::_pbi::ConstantInitialized,
@@ -301,7 +287,7 @@ constexpr auto RerankOptions::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[1],
+      &file_reflection_data[0],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_rerank_2eproto,
@@ -348,162 +334,6 @@ const ::_pbi::ClassData* RerankOptions_get_class_data() {
   return RerankOptions_globals_.GetClassData();
 #else
   return RerankOptions_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class RerankCandidate::_Internal {
- public:
-  using HasBits = decltype(::std::declval<RerankCandidate>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_._has_bits_);
-};
-
-constexpr RerankCandidate::ParseTableT_ RerankCandidate::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_._has_bits_),
-      0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::RerankCandidate>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // string text = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_.text_)}},
-      // string id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_.id_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string id = 1;
-      {PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_.id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string text = 2;
-      {PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_.text_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
-      "\36\2\4\0\0\0\0\0"
-      "runanywhere.v1.RerankCandidate"
-      "id"
-      "text"
-    }},
-  };
-}
-
-
-inline constexpr RerankCandidate::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()) {}
-
-template <typename>
-constexpr RerankCandidate::RerankCandidate(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL RerankCandidate::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) RerankCandidate(arena);
-}
-constexpr auto RerankCandidate::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(RerankCandidate), alignof(RerankCandidate));
-}
-constexpr auto RerankCandidate::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &RerankCandidate::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<RerankCandidate>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &RerankCandidate::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<RerankCandidate>(), &RerankCandidate::ByteSizeLong,
-              &RerankCandidate::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(RerankCandidate, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[0],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_rerank_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct RerankCandidateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr RerankCandidateGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 RerankCandidate_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(RerankCandidate::InternalGenerateClassData_(
-            _default, &RerankCandidate_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<RerankCandidate>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~RerankCandidateGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) RerankCandidate _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<RerankCandidate>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(RerankCandidateGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST RerankCandidateGlobalsTypeInternal RerankCandidate_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* RerankCandidate_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return RerankCandidate_globals_.GetClassData();
-#else
-  return RerankCandidate_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -628,7 +458,7 @@ constexpr auto RerankResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[4],
+      &file_reflection_data[3],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_rerank_2eproto,
@@ -691,12 +521,12 @@ constexpr RerankRequest::ParseTableT_ RerankRequest::InternalGenerateParseTable_
     {
       PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967266,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      2,  // num_aux_entries
+      4,  // num_field_entries
+      1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -706,34 +536,38 @@ constexpr RerankRequest::ParseTableT_ RerankRequest::InternalGenerateParseTable_
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // string query = 1;
+      // string query = 1 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::FastUS1,
        {10, 1, 0,
         PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.query_)}},
-      // repeated .runanywhere.v1.RerankCandidate candidates = 2;
-      {::_pbi::TcParser::FastMtR1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.candidates_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional .runanywhere.v1.RerankOptions options = 3;
       {::_pbi::TcParser::FastMtS1,
-       {26, 2, 1,
+       {26, 3, 0,
         PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.options_)}},
+      // repeated string documents = 4;
+      {::_pbi::TcParser::FastUR1,
+       {34, 0, 0,
+        PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.documents_)}},
+      // optional string model_id = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 2, 0,
+        PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.model_id_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // string query = 1;
+      // string query = 1 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.query_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // repeated .runanywhere.v1.RerankCandidate candidates = 2;
-      {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.candidates_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.RerankOptions options = 3;
-      {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.options_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.options_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // repeated string documents = 4;
+      {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.documents_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+      // optional string model_id = 5;
+      {PROTOBUF_FIELD_OFFSET(RerankRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::RerankCandidate>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::RerankCandidate_globals_},
-        #endif
         #ifndef PROTOBUF_MESSAGE_GLOBALS
         {::_pbi::TcParser::GetTable<::runanywhere::v1::RerankOptions>()},
         #else
@@ -741,9 +575,11 @@ constexpr RerankRequest::ParseTableT_ RerankRequest::InternalGenerateParseTable_
         #endif
     }},
     {{
-      "\34\5\0\0\0\0\0\0"
+      "\34\5\0\11\10\0\0\0"
       "runanywhere.v1.RerankRequest"
       "query"
+      "documents"
+      "model_id"
     }},
   };
 }
@@ -753,12 +589,15 @@ inline constexpr RerankRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        candidates_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+        documents_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::RerankRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.candidates_)>()
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.documents_)>()
          }
         ,
         query_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         options_{nullptr} {}
@@ -804,7 +643,7 @@ constexpr auto RerankRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[2],
+      &file_reflection_data[1],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_rerank_2eproto,
@@ -865,37 +704,30 @@ const ::uint32_t
     TableStruct_rerank_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankCandidate, _impl_._has_bits_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankOptions, _impl_._has_bits_),
         5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankCandidate, _impl_.id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankCandidate, _impl_.text_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankOptions, _impl_.top_n_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankOptions, _impl_.max_tokens_per_doc_),
         0,
         1,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankOptions, _impl_._has_bits_),
-        4, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankOptions, _impl_.top_n_),
-        0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_._has_bits_),
-        6, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.query_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.candidates_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.options_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.documents_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.model_id_),
         1,
+        3,
         0,
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.score_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.original_index_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.rank_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.relevance_score_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankScoredItem, _impl_.index_),
         0,
         1,
-        2,
-        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankResult, _impl_._has_bits_),
         6, // hasbit index offset
@@ -909,15 +741,13 @@ const ::uint32_t
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, sizeof(::runanywhere::v1::RerankCandidate)},
-        {7, sizeof(::runanywhere::v1::RerankOptions)},
-        {12, sizeof(::runanywhere::v1::RerankRequest)},
-        {21, sizeof(::runanywhere::v1::RerankScoredItem)},
-        {32, sizeof(::runanywhere::v1::RerankResult)},
+        {0, sizeof(::runanywhere::v1::RerankOptions)},
+        {7, sizeof(::runanywhere::v1::RerankRequest)},
+        {18, sizeof(::runanywhere::v1::RerankScoredItem)},
+        {25, sizeof(::runanywhere::v1::RerankResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
-        &::runanywhere::v1::RerankCandidate_globals_,
         &::runanywhere::v1::RerankOptions_globals_,
         &::runanywhere::v1::RerankRequest_globals_,
         &::runanywhere::v1::RerankScoredItem_globals_,
@@ -925,36 +755,38 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_rerank_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\014rerank.proto\022\016runanywhere.v1\"+\n\017Rerank"
-    "Candidate\022\n\n\002id\030\001 \001(\t\022\014\n\004text\030\002 \001(\t\"\036\n\rR"
-    "erankOptions\022\r\n\005top_n\030\001 \001(\r\"\224\001\n\rRerankRe"
-    "quest\022\r\n\005query\030\001 \001(\t\0223\n\ncandidates\030\002 \003(\013"
-    "2\037.runanywhere.v1.RerankCandidate\0223\n\007opt"
-    "ions\030\003 \001(\0132\035.runanywhere.v1.RerankOption"
-    "sH\000\210\001\001B\n\n\010_options\"S\n\020RerankScoredItem\022\n"
-    "\n\002id\030\001 \001(\t\022\r\n\005score\030\002 \001(\002\022\026\n\016original_in"
-    "dex\030\003 \001(\r\022\014\n\004rank\030\004 \001(\r\"m\n\014RerankResult\022"
-    "/\n\005items\030\001 \003(\0132 .runanywhere.v1.RerankSc"
-    "oredItem\022\032\n\022processing_time_ms\030\002 \001(\003\022\020\n\010"
-    "model_id\030\003 \001(\t2R\n\tReranking\022E\n\006Rerank\022\035."
-    "runanywhere.v1.RerankRequest\032\034.runanywhe"
-    "re.v1.RerankResultB\206\001\n\027ai.runanywhere.pr"
-    "oto.v1B\013RerankProtoP\001Z<github.com/runany"
-    "where/runanywhere-sdks/idl/v1;runanywher"
-    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
-    "to3"
+    "\n\014rerank.proto\022\016runanywhere.v1\032\021rac_opti"
+    "ons.proto\"H\n\rRerankOptions\022\024\n\005top_n\030\001 \001("
+    "\rB\005\212\265\030\0010\022!\n\022max_tokens_per_doc\030\002 \001(\rB\005\212\265"
+    "\030\0010\"\256\001\n\rRerankRequest\022\023\n\005query\030\001 \001(\tB\004\220\265"
+    "\030\001\0223\n\007options\030\003 \001(\0132\035.runanywhere.v1.Rer"
+    "ankOptionsH\000\210\001\001\022\021\n\tdocuments\030\004 \003(\t\022\025\n\010mo"
+    "del_id\030\005 \001(\tH\001\210\001\001B\n\n\010_optionsB\013\n\t_model_"
+    "idJ\004\010\002\020\003R\ncandidates\"P\n\020RerankScoredItem"
+    "\022\027\n\017relevance_score\030\002 \001(\002\022\r\n\005index\030\003 \001(\r"
+    "J\004\010\001\020\002J\004\010\004\020\005R\002idR\004rank\"m\n\014RerankResult\022/"
+    "\n\005items\030\001 \003(\0132 .runanywhere.v1.RerankSco"
+    "redItem\022\032\n\022processing_time_ms\030\002 \001(\003\022\020\n\010m"
+    "odel_id\030\003 \001(\tB\206\001\n\027ai.runanywhere.proto.v"
+    "1B\013RerankProtoP\001Z<github.com/runanywhere"
+    "/runanywhere-sdks/idl/v1;runanywherev1\370\001"
+    "\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_rerank_2eproto_deps[1] = {
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_rerank_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rerank_2eproto = {
     false,
     false,
-    683,
+    638,
     descriptor_table_protodef_rerank_2eproto,
     "rerank.proto",
     &descriptor_table_rerank_2eproto_once,
-    nullptr,
-    0,
-    5,
+    descriptor_table_rerank_2eproto_deps,
+    1,
+    4,
     schemas,
     file_message_globals,
     TableStruct_rerank_2eproto::offsets,
@@ -963,258 +795,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rerank_2eproto
 };
 namespace runanywhere {
 namespace v1 {
-// ===================================================================
-
-RerankCandidate::RerankCandidate(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, RerankCandidate_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.RerankCandidate)
-}
-PROTOBUF_NDEBUG_INLINE RerankCandidate::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::RerankCandidate& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        id_(arena, from.id_),
-        text_(arena, from.text_) {}
-
-RerankCandidate::RerankCandidate(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const RerankCandidate& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, RerankCandidate_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  RerankCandidate* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.RerankCandidate)
-}
-PROTOBUF_NDEBUG_INLINE RerankCandidate::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        id_(arena),
-        text_(arena) {}
-
-inline void RerankCandidate::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-}
-RerankCandidate::~RerankCandidate() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.RerankCandidate)
-  SharedDtor(*this);
-}
-inline void RerankCandidate::SharedDtor(MessageLite& self) {
-  RerankCandidate& this_ = static_cast<RerankCandidate&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.id_.Destroy();
-  this_._impl_.text_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull RerankCandidate_class_data_ =
-        RerankCandidate::InternalGenerateClassData_(RerankCandidate_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-RerankCandidate::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&RerankCandidate_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(RerankCandidate_class_data_.tc_table);
-  return RerankCandidate_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-RerankCandidate::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&RerankCandidate_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&RerankCandidate_globals_));
-  return RerankCandidate_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const RerankCandidate::ParseTableT_
-    RerankCandidate::_table_ =
-        RerankCandidate::InternalGenerateParseTable_(RerankCandidate_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void RerankCandidate::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.RerankCandidate)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.text_.ClearNonDefaultToEmpty();
-    }
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL RerankCandidate::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const RerankCandidate& this_ = static_cast<const RerankCandidate&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL RerankCandidate::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const RerankCandidate& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.RerankCandidate)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_id().empty()) {
-      const ::std::string& _s = this_._internal_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RerankCandidate.id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // string text = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_text().empty()) {
-      const ::std::string& _s = this_._internal_text();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RerankCandidate.text");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.RerankCandidate)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t RerankCandidate::ByteSizeLong(const MessageLite& base) {
-  const RerankCandidate& this_ = static_cast<const RerankCandidate&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t RerankCandidate::ByteSizeLong() const {
-  const RerankCandidate& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.RerankCandidate)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // string id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_id());
-      }
-    }
-    // string text = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_text().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_text());
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void RerankCandidate::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<RerankCandidate*>(&to_msg);
-  auto& from = static_cast<const RerankCandidate&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.RerankCandidate)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_id().empty()) {
-        _this->_internal_set_id(from._internal_id());
-      } else {
-        if (_this->_impl_.id_.IsDefault()) {
-          _this->_internal_set_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_text().empty()) {
-        _this->_internal_set_text(from._internal_text());
-      } else {
-        if (_this->_impl_.text_.IsDefault()) {
-          _this->_internal_set_text("");
-        }
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void RerankCandidate::CopyFrom(const RerankCandidate& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.RerankCandidate)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void RerankCandidate::InternalSwap(RerankCandidate* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.id_, &other->_impl_.id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
-}
-
-::google::protobuf::Metadata RerankCandidate::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
 // ===================================================================
 
 RerankOptions::RerankOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -1244,7 +824,12 @@ PROTOBUF_NDEBUG_INLINE RerankOptions::Impl_::Impl_(
 
 inline void RerankOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.top_n_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, top_n_),
+           0,
+           offsetof(Impl_, max_tokens_per_doc_) -
+               offsetof(Impl_, top_n_) +
+               sizeof(Impl_::max_tokens_per_doc_));
 }
 RerankOptions::~RerankOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.RerankOptions)
@@ -1293,7 +878,12 @@ PROTOBUF_NOINLINE void RerankOptions::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.top_n_ = 0u;
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    ::memset(&_impl_.top_n_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.max_tokens_per_doc_) -
+        reinterpret_cast<char*>(&_impl_.top_n_)) + sizeof(_impl_.max_tokens_per_doc_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1317,12 +907,21 @@ PROTOBUF_NOINLINE void RerankOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // uint32 top_n = 1;
+  // uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (this_._internal_top_n() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
           1, this_._internal_top_n(), target);
+    }
+  }
+
+  // uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_max_tokens_per_doc() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
+          2, this_._internal_max_tokens_per_doc(), target);
     }
   }
 
@@ -1349,13 +948,21 @@ PROTOBUF_NOINLINE void RerankOptions::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void)cached_has_bits;
 
-   {
-    // uint32 top_n = 1;
-    cached_has_bits = this_._impl_._has_bits_[0];
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_top_n() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_top_n());
+      }
+    }
+    // uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_max_tokens_per_doc() != 0) {
+        total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
+            this_._internal_max_tokens_per_doc());
       }
     }
   }
@@ -1376,9 +983,16 @@ void RerankOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (from._internal_top_n() != 0) {
-      _this->_impl_.top_n_ = from._impl_.top_n_;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (from._internal_top_n() != 0) {
+        _this->_impl_.top_n_ = from._impl_.top_n_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_max_tokens_per_doc() != 0) {
+        _this->_impl_.max_tokens_per_doc_ = from._impl_.max_tokens_per_doc_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1398,7 +1012,12 @@ void RerankOptions::InternalSwap(RerankOptions* PROTOBUF_RESTRICT PROTOBUF_NONNU
   using ::std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  swap(_impl_.top_n_, other->_impl_.top_n_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.max_tokens_per_doc_)
+      + sizeof(RerankOptions::_impl_.max_tokens_per_doc_)
+      - PROTOBUF_FIELD_OFFSET(RerankOptions, _impl_.top_n_)>(
+          reinterpret_cast<char*>(&_impl_.top_n_),
+          reinterpret_cast<char*>(&other->_impl_.top_n_));
 }
 
 ::google::protobuf::Metadata RerankOptions::GetMetadata() const {
@@ -1421,14 +1040,15 @@ PROTOBUF_NDEBUG_INLINE RerankRequest::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::RerankRequest& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        candidates_ {
+        documents_ {
           visibility, ::_pbi::InternalMetadataOffset::Build<
               ::runanywhere::v1::RerankRequest,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.candidates_)>()
-          , from.candidates_
+              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.documents_)>()
+          , from.documents_
         }
         ,
-        query_(arena, from.query_) {}
+        query_(arena, from.query_),
+        model_id_(arena, from.model_id_) {}
 
 RerankRequest::RerankRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -1445,7 +1065,7 @@ RerankRequest::RerankRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000008U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -1455,12 +1075,13 @@ PROTOBUF_NDEBUG_INLINE RerankRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        candidates_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+        documents_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::RerankRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.candidates_)>()
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RerankRequest, _impl_.documents_)>()
          }
         ,
-        query_(arena) {}
+        query_(arena),
+        model_id_(arena) {}
 
 inline void RerankRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -1478,6 +1099,7 @@ inline void RerankRequest::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.query_.Destroy();
+  this_._impl_.model_id_.Destroy();
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
 }
@@ -1516,14 +1138,17 @@ PROTOBUF_NOINLINE void RerankRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.candidates_.Clear();
+      _impl_.documents_.Clear();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _impl_.query_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
     }
@@ -1551,7 +1176,7 @@ PROTOBUF_NOINLINE void RerankRequest::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string query = 1;
+  // string query = 1 [(.runanywhere.v1.rac_required) = true];
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (!this_._internal_query().empty()) {
       const ::std::string& _s = this_._internal_query();
@@ -1561,24 +1186,29 @@ PROTOBUF_NOINLINE void RerankRequest::Clear() {
     }
   }
 
-  // repeated .runanywhere.v1.RerankCandidate candidates = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    for (unsigned i = 0, n = static_cast<unsigned>(
-                             this_._internal_candidates_size());
-         i < n; i++) {
-      const auto& repfield = this_._internal_candidates().Get(i);
-      target =
-          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-              2, repfield, repfield.GetCachedSize(),
-              target, stream);
-    }
-  }
-
   // optional .runanywhere.v1.RerankOptions options = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         3, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
+  }
+
+  // repeated string documents = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    for (int i = 0, n = this_._internal_documents_size(); i < n; ++i) {
+      const auto& s = this_._internal_documents().Get(i);
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          s.data(), static_cast<int>(s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RerankRequest.documents");
+      target = stream->WriteString(4, s, target);
+    }
+  }
+
+  // optional string model_id = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_model_id();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RerankRequest.model_id");
+    target = stream->WriteStringMaybeAliased(5, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1606,23 +1236,30 @@ PROTOBUF_NOINLINE void RerankRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    // repeated .runanywhere.v1.RerankCandidate candidates = 2;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // repeated string documents = 4;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1UL * this_._internal_candidates_size();
-      for (const auto& msg : this_._internal_candidates()) {
-        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_documents().size());
+      for (int i = 0, n = this_._internal_documents().size(); i < n; ++i) {
+        total_size += ::google::protobuf::internal::WireFormatLite::StringSize(
+            this_._internal_documents().Get(i));
       }
     }
-    // string query = 1;
+    // string query = 1 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!this_._internal_query().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_query());
       }
     }
-    // optional .runanywhere.v1.RerankOptions options = 3;
+    // optional string model_id = 5;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_model_id());
+    }
+    // optional .runanywhere.v1.RerankOptions options = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
     }
@@ -1645,11 +1282,11 @@ void RerankRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_mutable_candidates()->InternalMergeFromWithArena(
+      _this->_internal_mutable_documents()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
-          from._internal_candidates());
+          from._internal_documents());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!from._internal_query().empty()) {
@@ -1661,6 +1298,9 @@ void RerankRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_model_id(from._internal_model_id());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
@@ -1688,8 +1328,9 @@ void RerankRequest::InternalSwap(RerankRequest* PROTOBUF_RESTRICT PROTOBUF_NONNU
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.candidates_.InternalSwap(&other->_impl_.candidates_);
+  _impl_.documents_.InternalSwap(&other->_impl_.documents_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.query_, &other->_impl_.query_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   swap(_impl_.options_, other->_impl_.options_);
 }
 
@@ -1707,52 +1348,30 @@ RerankScoredItem::RerankScoredItem(::google::protobuf::Arena* PROTOBUF_NULLABLE 
   SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.RerankScoredItem)
 }
-PROTOBUF_NDEBUG_INLINE RerankScoredItem::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::RerankScoredItem& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        id_(arena, from.id_) {}
-
 RerankScoredItem::RerankScoredItem(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const RerankScoredItem& from)
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RerankScoredItem& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, RerankScoredItem_get_class_data()) {
-
+    : ::google::protobuf::Message(arena, RerankScoredItem_get_class_data()),
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
+    : ::google::protobuf::Message(arena),
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  RerankScoredItem* const _this = this;
-  (void)_this;
+      _impl_(from._impl_) {
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, score_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, score_),
-           offsetof(Impl_, rank_) -
-               offsetof(Impl_, score_) +
-               sizeof(Impl_::rank_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.RerankScoredItem)
 }
 PROTOBUF_NDEBUG_INLINE RerankScoredItem::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        id_(arena) {}
+      : _cached_size_{0} {}
 
 inline void RerankScoredItem::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, score_),
+               offsetof(Impl_, relevance_score_),
            0,
-           offsetof(Impl_, rank_) -
-               offsetof(Impl_, score_) +
-               sizeof(Impl_::rank_));
+           offsetof(Impl_, index_) -
+               offsetof(Impl_, relevance_score_) +
+               sizeof(Impl_::index_));
 }
 RerankScoredItem::~RerankScoredItem() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.RerankScoredItem)
@@ -1765,7 +1384,6 @@ inline void RerankScoredItem::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.id_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -1803,13 +1421,10 @@ PROTOBUF_NOINLINE void RerankScoredItem::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.id_.ClearNonDefaultToEmpty();
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
-    ::memset(&_impl_.score_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.rank_) -
-        reinterpret_cast<char*>(&_impl_.score_)) + sizeof(_impl_.rank_));
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    ::memset(&_impl_.relevance_score_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.index_) -
+        reinterpret_cast<char*>(&_impl_.relevance_score_)) + sizeof(_impl_.index_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1834,40 +1449,21 @@ PROTOBUF_NOINLINE void RerankScoredItem::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string id = 1;
+  // float relevance_score = 2;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_id().empty()) {
-      const ::std::string& _s = this_._internal_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RerankScoredItem.id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // float score = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_score()) != 0) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_relevance_score()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          2, this_._internal_score(), target);
+          2, this_._internal_relevance_score(), target);
     }
   }
 
-  // uint32 original_index = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_original_index() != 0) {
+  // uint32 index = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_index() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
-          3, this_._internal_original_index(), target);
-    }
-  }
-
-  // uint32 rank = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_rank() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
-          4, this_._internal_rank(), target);
+          3, this_._internal_index(), target);
     }
   }
 
@@ -1896,32 +1492,18 @@ PROTOBUF_NOINLINE void RerankScoredItem::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string id = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // float relevance_score = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_id());
-      }
-    }
-    // float score = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_score()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_relevance_score()) != 0) {
         total_size += 5;
       }
     }
-    // uint32 original_index = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_original_index() != 0) {
+    // uint32 index = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_index() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
-            this_._internal_original_index());
-      }
-    }
-    // uint32 rank = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_rank() != 0) {
-        total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
-            this_._internal_rank());
+            this_._internal_index());
       }
     }
   }
@@ -1942,29 +1524,15 @@ void RerankScoredItem::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_id().empty()) {
-        _this->_internal_set_id(from._internal_id());
-      } else {
-        if (_this->_impl_.id_.IsDefault()) {
-          _this->_internal_set_id("");
-        }
+      if (::absl::bit_cast<::uint32_t>(from._internal_relevance_score()) != 0) {
+        _this->_impl_.relevance_score_ = from._impl_.relevance_score_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_score()) != 0) {
-        _this->_impl_.score_ = from._impl_.score_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_original_index() != 0) {
-        _this->_impl_.original_index_ = from._impl_.original_index_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_rank() != 0) {
-        _this->_impl_.rank_ = from._impl_.rank_;
+      if (from._internal_index() != 0) {
+        _this->_impl_.index_ = from._impl_.index_;
       }
     }
   }
@@ -1983,17 +1551,14 @@ void RerankScoredItem::CopyFrom(const RerankScoredItem& from) {
 
 void RerankScoredItem::InternalSwap(RerankScoredItem* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.id_, &other->_impl_.id_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.rank_)
-      + sizeof(RerankScoredItem::_impl_.rank_)
-      - PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.score_)>(
-          reinterpret_cast<char*>(&_impl_.score_),
-          reinterpret_cast<char*>(&other->_impl_.score_));
+      PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.index_)
+      + sizeof(RerankScoredItem::_impl_.index_)
+      - PROTOBUF_FIELD_OFFSET(RerankScoredItem, _impl_.relevance_score_)>(
+          reinterpret_cast<char*>(&_impl_.relevance_score_),
+          reinterpret_cast<char*>(&other->_impl_.relevance_score_));
 }
 
 ::google::protobuf::Metadata RerankScoredItem::GetMetadata() const {

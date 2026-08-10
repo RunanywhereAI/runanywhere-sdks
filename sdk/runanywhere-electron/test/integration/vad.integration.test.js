@@ -58,7 +58,7 @@ test('silence stays non-speech through and after calibration', SKIP, () => {
 test('a high threshold suppresses speech even after calibration', SKIP, () => {
   const vad = RunAnywhere.createVad();
   calibrate(vad);
-  vad.setThreshold(0.9); // above the loud-frame energy
+  vad.setActivationThreshold(0.9); // above the loud-frame energy
   let detected = false;
   let phase = 0;
   for (let i = 0; i < 8; i++) {

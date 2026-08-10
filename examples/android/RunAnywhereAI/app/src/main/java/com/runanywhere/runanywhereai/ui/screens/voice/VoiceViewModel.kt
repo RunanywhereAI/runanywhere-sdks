@@ -1,8 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.voice
 
-import ai.runanywhere.proto.v1.PipelineState
-import ai.runanywhere.proto.v1.TokenKind
-import ai.runanywhere.proto.v1.VoiceEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,18 +13,21 @@ import com.runanywhere.runanywhereai.util.RACLog
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.ui.screens.stt.AudioRecorder
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
-import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.initializeVoiceAgentWithLoadedModels
-import com.runanywhere.sdk.public.extensions.loadModel
-import com.runanywhere.sdk.public.extensions.speak
-import com.runanywhere.sdk.public.extensions.stopSpeaking
-import com.runanywhere.sdk.public.extensions.streamVoiceAgent
-import com.runanywhere.sdk.public.extensions.transcribe
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.api.AgentState
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.GenerationEvent
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ModelRef
+import com.runanywhere.sdk.public.api.TokenKind
+import com.runanywhere.sdk.public.api.TtsOptions
+import com.runanywhere.sdk.public.api.VoiceEvent
+import com.runanywhere.sdk.public.api.VoiceSession
+import com.runanywhere.sdk.public.api.llm
+import com.runanywhere.sdk.public.api.models
+import com.runanywhere.sdk.public.api.stt
+import com.runanywhere.sdk.public.api.tts
+import com.runanywhere.sdk.public.api.voice
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAModelLoadRequest
-import com.runanywhere.sdk.public.types.RATTSOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -37,7 +37,14 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
-enum class VoiceState { IDLE, STARTING, LISTENING, TRANSCRIBING, THINKING, SPEAKING }
+/**
+ * What the panel may claim about the pipeline.
+ *
+ * [FAILED] is deliberately not folded into [IDLE]: a session the core killed and one the user
+ * ended look identical from IDLE, and the difference is the whole reason the screen keeps the
+ * error line — "Ready to talk" over a turn that just died is the panel disagreeing with itself.
+ */
+enum class VoiceState { IDLE, STARTING, LISTENING, TRANSCRIBING, THINKING, SPEAKING, FAILED }
 
 data class VoiceTurn(val text: String, val isUser: Boolean)
 
@@ -49,9 +56,33 @@ class VoiceViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * The live hypothesis for what the user is saying, or null when there is nothing in flight.
+     *
+     * Held apart from [turns] because it is a guess that will be revised — words visibly change
+     * under the reader as more audio arrives. Appending it as a turn would make the transcript
+     * rewrite itself in place, which reads as the app malfunctioning rather than as recognition
+     * working. The screen renders it with an explicit "still hearing you" treatment instead.
+     */
+    var partialTranscript by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Whether the detector currently hears speech. Kept separate from [state]: the VAD firing is
+     * not a pipeline state change, and letting it drive one is what previously let the panel claim
+     * "Transcribing" during a pause while the agent was in fact still listening.
+     */
+    var isSpeechDetected by mutableStateOf(false)
+        private set
+
+    /** True from the moment [interrupt] is called until the agent stops speaking. */
+    var isInterrupting by mutableStateOf(false)
+        private set
+
     private var job: Job? = null
     private var cleanupJob: Job? = null
     private var assistantTurnIndex: Int? = null
+    private var session: VoiceSession? = null
 
     // NPU per-turn-swap path: a single-slot Hexagon NPU cannot hold the STT and the chat LLM at once, so
     // the shared voice-agent (which requires all components co-resident) can't run there. When both the
@@ -87,7 +118,9 @@ class VoiceViewModel : ViewModel() {
             return
         }
         when (state) {
-            VoiceState.IDLE -> startConversation()
+            // FAILED holds no session (releaseFailedSession closed it), so the tap starts a fresh
+            // one exactly as it does from IDLE — there is nothing left to stop.
+            VoiceState.IDLE, VoiceState.FAILED -> startConversation()
             else -> stop()
         }
     }
@@ -98,20 +131,24 @@ class VoiceViewModel : ViewModel() {
         val pendingCleanup = cleanupJob
         job = viewModelScope.launch {
             try {
-                // A previous Talk collector may still be returning from a
-                // blocking native turn. Never reinitialize its handle until
-                // capture has stopped and cleanup has completed.
+                // A previous session may still be returning from a blocking
+                // native turn. Never open a new one until it has closed.
                 pendingCleanup?.join()
                 state = VoiceState.STARTING
-                // The voice agent binds all component handles at initialization.
-                // Query each process-wide lifecycle immediately beforehand.
-                RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
-                RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
-                RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS)
-                RuntimeModelSelection.queryCurrent(ModelSelectionContext.VAD)
-                RunAnywhere.initializeVoiceAgentWithLoadedModels()
+                val stt = sttModel ?: error("Choose a speech-recognition model first.")
+                val llm = llmModel ?: error("Choose a chat model first.")
+                val tts = ttsModel ?: error("Choose a voice first.")
+                // The session downloads and loads its own models and ensures a VAD.
+                val opened = RunAnywhere.voice.createSession(
+                    stt = ModelRef(stt.id),
+                    llm = ModelRef(llm.id),
+                    tts = ModelRef(tts.id),
+                    generation = voiceGenOptions(),
+                )
+                session = opened
                 state = VoiceState.LISTENING
-                RunAnywhere.streamVoiceAgent().collect(::handleEvent)
+                opened.start()
+                opened.events.collect(::handleEvent)
             } catch (e: CancellationException) {
                 // User-driven stop cancels the collector; leave the UI in the stopped state.
             } catch (e: Exception) {
@@ -124,6 +161,7 @@ class VoiceViewModel : ViewModel() {
 
     private fun startRecordingNpu() {
         error = null
+        partialTranscript = null
         pcm.reset()
         try {
             recorder.start(
@@ -154,14 +192,17 @@ class VoiceViewModel : ViewModel() {
             try {
                 // 1. Load Whisper (evicts the LLM on the single NPU slot) and transcribe the recording.
                 state = VoiceState.TRANSCRIBING
-                withContext(Dispatchers.IO) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = stt.id)) }
-                val transcript = RunAnywhere.transcribe(audio).text.trim()
+                RunAnywhere.models.load(stt.id)
+                val transcript = RunAnywhere.stt
+                    .transcribe(AudioInput.pcm16(audio, AudioRecorder.SAMPLE_RATE))
+                    .text
+                    .trim()
                 if (transcript.isBlank()) { state = VoiceState.IDLE; return@launch }
                 turns += VoiceTurn(transcript, isUser = true)
                 assistantTurnIndex = null
                 // 2. Load the chat LLM (evicts Whisper) and produce the reply.
                 state = VoiceState.THINKING
-                withContext(Dispatchers.IO) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = llm.id)) }
+                RunAnywhere.models.load(llm.id)
                 // 3. Speak. Two regimes, forced by the single Hexagon slot:
                 //    - A system/platform TTS runs on the CPU, so it plays WHILE the NPU LLM keeps
                 //      generating -> true streaming: each sentence is spoken the moment it lands.
@@ -199,11 +240,10 @@ class VoiceViewModel : ViewModel() {
                 chunks.send(s)
             }
         }
-        RunAnywhere.generateStream(prompt, voiceGenOptions()).collect { ev ->
-            ev.token?.let { tok ->
-                if (tok.isEmpty()) return@let
-                appendAssistantToken(tok)
-                buf.append(tok)
+        RunAnywhere.llm.generateStream(prompt, voiceGenOptions()).collect { ev ->
+            if (ev is GenerationEvent.TextDelta && ev.text.isNotEmpty()) {
+                appendAssistantToken(ev.text)
+                buf.append(ev.text)
                 emit(VoiceTtsChunkPolicy.drainSentences(buf, flush = false))
             }
         }
@@ -216,29 +256,31 @@ class VoiceViewModel : ViewModel() {
     // whole reply, then (loading the NPU TTS if needed) speak it sentence-by-sentence.
     private suspend fun bufferedTurn(prompt: String, tts: RAModelInfo?) {
         val sb = StringBuilder()
-        RunAnywhere.generateStream(prompt, voiceGenOptions()).collect { ev ->
-            ev.token?.let { if (it.isNotEmpty()) { sb.append(it); appendAssistantToken(it) } }
+        RunAnywhere.llm.generateStream(prompt, voiceGenOptions()).collect { ev ->
+            if (ev is GenerationEvent.TextDelta && ev.text.isNotEmpty()) {
+                sb.append(ev.text)
+                appendAssistantToken(ev.text)
+            }
         }
         val buf = StringBuilder(sb)
         val sentences = VoiceTtsChunkPolicy.drainSentences(buf, flush = true)
         if (sentences.isEmpty() || tts == null) return
         state = VoiceState.SPEAKING
-        if (isNpu(tts)) withContext(Dispatchers.IO) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = tts.id)) }
+        if (isNpu(tts)) RunAnywhere.models.load(tts.id)
         for (chunk in sentences) speakChunk(chunk)
     }
 
     private fun voiceGenOptions() =
-        RALLMGenerationOptions(
-            max_tokens = 200,
+        LlmOptions(
+            maxOutputTokens = 200,
             temperature = 0.7f,
-            top_p = 0.95f,
+            topP = 0.95f,
             // Same persona as chat so the small on-device models use conversation context instead of
             // defaulting to a defensive "I don't have personal information" refusal.
-            system_prompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+            systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
         )
 
-    private fun ttsOptions() =
-        RATTSOptions(language_code = "en-US", speaking_rate = 1f, volume = 1f)
+    private fun ttsOptions() = TtsOptions(language = "en-US", speed = 1f)
 
     // Speak one chunk, hard-splitting anything longer than the engine can take and skipping
     // blank/symbol-only text (an empty phoneme sequence also fails synthesis). A single failed chunk
@@ -247,7 +289,7 @@ class VoiceViewModel : ViewModel() {
         for (piece in VoiceTtsChunkPolicy.capForTts(text)) {
             if (piece.isBlank()) continue
             try {
-                RunAnywhere.speak(piece, ttsOptions())
+                RunAnywhere.tts.speak(piece, ttsOptions())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -257,27 +299,64 @@ class VoiceViewModel : ViewModel() {
     }
 
     fun stop() {
+        // Every stop path clears the in-flight indicators: a partial hypothesis or a "hearing you"
+        // marker left standing over an ended conversation is a claim about a microphone that is no
+        // longer open.
+        partialTranscript = null
+        isSpeechDetected = false
+        isInterrupting = false
         if (useNpuSwap) {
             recorder.stop()
             job?.cancel(); job = null
             assistantTurnIndex = null
-            viewModelScope.launch { runCatching { RunAnywhere.stopSpeaking() } }
+            viewModelScope.launch { runCatching { RunAnywhere.tts.stop() } }
             state = VoiceState.IDLE
             return
         }
-        val session = job
-        session?.cancel()
+        endAgentSession(VoiceState.IDLE)
+    }
+
+    /**
+     * Hand the microphone back after the core reports a session it cannot continue.
+     *
+     * This used to be a label change and nothing else: [state] dropped to [VoiceState.IDLE] while
+     * the session object, its mic driver and that driver's AudioRecord all kept running — measured
+     * on the emulator as an active MIC record client (`RecordActivityMonitor … silenced:false`)
+     * underneath a panel reading "Ready to talk". A pipeline the core has given up on must not hold
+     * a live microphone, and "Ready to talk" must not stand in for "the last turn died". Mirrors
+     * iOS `VoiceAgentViewModel.releaseFailedSession`, which settles on its own error state for the
+     * same reason.
+     */
+    private fun releaseFailedSession() {
+        partialTranscript = null
+        isSpeechDetected = false
+        isInterrupting = false
+        endAgentSession(VoiceState.FAILED)
+    }
+
+    /**
+     * Cancel the event collector, close the session off-main, and settle on [next].
+     *
+     * Safe to call from inside the collector: cancelling the job that is running this unwinds it at
+     * its next suspension point, and the close is awaited by a separate coroutine that the next
+     * [startConversation] joins before opening another session.
+     */
+    private fun endAgentSession(next: VoiceState) {
+        val sessionJob = job
+        sessionJob?.cancel()
         job = null
         assistantTurnIndex = null
-        state = VoiceState.IDLE
+        state = next
         val previousCleanup = cleanupJob
+        val openSession = session
+        session = null
         cleanupJob = viewModelScope.launch(Dispatchers.IO) {
-            // streamVoiceAgent completes only after its mic driver has
-            // cancelAndJoined, so cleanup cannot race an active feed call.
-            session?.join()
+            // close() joins the session's mic driver, so cleanup cannot race an
+            // active feed call.
+            sessionJob?.join()
             previousCleanup?.join()
-            runCatching { RunAnywhere.cleanupVoiceAgent() }
-                .onFailure { RACLog.w("voice agent cleanup failed: ${it.message}") }
+            runCatching { openSession?.close() }
+                .onFailure { RACLog.w("voice session close failed: ${it.message}") }
         }
     }
 
@@ -287,59 +366,87 @@ class VoiceViewModel : ViewModel() {
         error = null
     }
 
-    private fun handleEvent(event: VoiceEvent) {
-        event.state?.current?.let(::handlePipelineState)
-        event.vad?.let {
-            state = if (it.is_speech) VoiceState.LISTENING else VoiceState.TRANSCRIBING
-        }
-        event.user_said?.let { userSaid ->
-            val text = userSaid.text.trim()
-            if (userSaid.is_final && text.isNotBlank()) {
-                turns += VoiceTurn(text, isUser = true)
-                assistantTurnIndex = null
+    /**
+     * Barge-in: cut the agent off mid-utterance and hand the turn back.
+     *
+     * The single most-used control in a real voice conversation — someone who has heard enough
+     * talks over the assistant rather than hanging up. The session stays open throughout, which is
+     * the whole difference between interrupting and ending the conversation.
+     */
+    fun interrupt() {
+        if (state != VoiceState.SPEAKING || isInterrupting) return
+        val open = session
+        isInterrupting = true
+        viewModelScope.launch {
+            try {
+                if (open != null) {
+                    open.interrupt()
+                } else {
+                    // NPU per-turn-swap path: there is no long-lived session to keep open, so
+                    // barge-in is "abandon this reply" — cancel the turn coroutine (it owns the
+                    // blocking speak calls) and silence playback. The transcript is untouched, so
+                    // the next tap simply starts another turn.
+                    job?.cancel()
+                    job = null
+                    runCatching { RunAnywhere.tts.stop() }
+                    state = VoiceState.IDLE
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed interrupt leaves the session usable, so this is a notice rather than a
+                // terminal state — dropping to IDLE here would end a conversation that is still live.
+                RACLog.w("voice interrupt failed: ${e.message}")
+                error = e.message ?: "Could not stop the reply"
+            } finally {
+                isInterrupting = false
             }
-        }
-        event.agent_response_started?.let {
-            state = VoiceState.THINKING
-            ensureAssistantTurn()
-        }
-        event.assistant_token?.let { token ->
-            if (token.text.isNotEmpty() && token.kind.isDisplayableVoiceAnswer()) {
-                state = VoiceState.THINKING
-                appendAssistantToken(token.text)
-            }
-        }
-        if (event.audio != null || event.agent_response_completed != null) {
-            state = VoiceState.SPEAKING
-        }
-        event.session_stopped?.let { state = VoiceState.IDLE }
-        val message = event.session_error?.message?.takeIf { it.isNotBlank() }
-            ?: event.error?.message?.takeIf { it.isNotBlank() }
-        if (message != null) {
-            error = message
-            state = VoiceState.IDLE
         }
     }
 
-    private fun handlePipelineState(pipelineState: PipelineState) {
-        state = when (pipelineState) {
-            PipelineState.PIPELINE_STATE_IDLE,
-            PipelineState.PIPELINE_STATE_STOPPED,
-            -> VoiceState.IDLE
-            PipelineState.PIPELINE_STATE_LISTENING,
-            PipelineState.PIPELINE_STATE_WAITING_WAKEWORD,
-            -> VoiceState.LISTENING
-            PipelineState.PIPELINE_STATE_PROCESSING_SPEECH -> VoiceState.TRANSCRIBING
-            PipelineState.PIPELINE_STATE_THINKING,
-            PipelineState.PIPELINE_STATE_GENERATING_RESPONSE,
-            -> VoiceState.THINKING
-            PipelineState.PIPELINE_STATE_SPEAKING,
-            PipelineState.PIPELINE_STATE_PLAYING_TTS,
-            -> VoiceState.SPEAKING
-            PipelineState.PIPELINE_STATE_ERROR -> VoiceState.IDLE
-            PipelineState.PIPELINE_STATE_COOLDOWN,
-            PipelineState.PIPELINE_STATE_UNSPECIFIED,
-            -> state
+    private fun handleEvent(event: VoiceEvent) {
+        when (event) {
+            is VoiceEvent.UserTranscribed -> {
+                val text = event.text.trim()
+                if (event.isFinal) {
+                    partialTranscript = null
+                    if (text.isNotBlank()) {
+                        // A notice about a turn that failed stops being true the moment the next
+                        // one is understood; left standing it reads as a fault in the turn the
+                        // reader is watching succeed.
+                        error = null
+                        turns += VoiceTurn(text, isUser = true)
+                        assistantTurnIndex = null
+                    }
+                } else {
+                    partialTranscript = text.takeIf { it.isNotBlank() }
+                }
+            }
+            // The pipeline's own state is the only thing allowed to move [state]. Every other event
+            // updates the region it actually describes, so the status line and the transcript can
+            // never make two different claims about the same moment.
+            is VoiceEvent.AgentStateChanged -> {
+                state = when (event.state) {
+                    AgentState.LISTENING -> VoiceState.LISTENING
+                    AgentState.THINKING -> VoiceState.THINKING
+                    AgentState.SPEAKING -> VoiceState.SPEAKING
+                }
+                if (event.state != AgentState.LISTENING) isSpeechDetected = false
+                // Leaving SPEAKING is what actually ends an interrupt, whether the interrupt caused
+                // it or the agent simply reached the end of the sentence.
+                if (event.state != AgentState.SPEAKING) isInterrupting = false
+            }
+            is VoiceEvent.AgentResponse -> appendAssistantToken(event.text)
+            is VoiceEvent.SpeechStarted -> isSpeechDetected = true
+            is VoiceEvent.SpeechEnded -> isSpeechDetected = false
+            // A recoverable failure describes one turn, so the conversation — and the open
+            // microphone behind it — carries on and only the notice changes. A non-recoverable one
+            // describes the session, and a session the core has abandoned has to be released, not
+            // relabelled.
+            is VoiceEvent.Error -> {
+                error = event.message
+                if (!event.recoverable) releaseFailedSession()
+            }
         }
     }
 
@@ -358,6 +465,3 @@ class VoiceViewModel : ViewModel() {
         stop()
     }
 }
-
-internal fun TokenKind.isDisplayableVoiceAnswer(): Boolean =
-    this == TokenKind.TOKEN_KIND_ANSWER || this == TokenKind.TOKEN_KIND_UNSPECIFIED

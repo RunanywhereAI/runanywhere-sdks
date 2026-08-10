@@ -89,6 +89,9 @@
 #include "rac_vlm_service.h"
 #include "rac_vlm_types.h"
 
+// CUA (Computer-Use-Agent scaffold)
+#include "rac_cua.h"
+
 // Diffusion (Image Generation)
 #include "rac_diffusion.h"
 #include "rac_diffusion_model_registry.h"
@@ -147,9 +150,10 @@
 #include "rac_tts_platform.h"
 
 // =============================================================================
-// NETWORK - Environment, Auth, API Types, Dev Config
+// NETWORK - Connect, Environment, Auth, API Types, Dev Config
 // =============================================================================
 
+#include "rac_connect.h"
 #include "rac_api_types.h"
 #include "rac_auth_manager.h"
 #include "rac_client_info.h"
