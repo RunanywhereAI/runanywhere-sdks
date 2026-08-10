@@ -52,8 +52,14 @@ static rac_result_t posixCreateDirectory(const char* path, int recursive, void* 
         }
     }
 
-    if (mkdir(path, 0755) == 0 || errno == EEXIST) {
+    if (mkdir(path, 0755) == 0) {
         return RAC_SUCCESS;
+    }
+    if (errno == EEXIST) {
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            return RAC_SUCCESS;
+        }
     }
     return RAC_ERROR_DIRECTORY_CREATION_FAILED;
 }
