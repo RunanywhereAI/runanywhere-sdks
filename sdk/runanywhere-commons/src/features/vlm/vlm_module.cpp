@@ -1075,7 +1075,8 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
     }
     (void)is_final;  // kind (COMPLETED/ERROR) is the sole terminal discriminator now.
 
-    runanywhere::v1::VLMStreamEvent event;
+    thread_local runanywhere::v1::VLMStreamEvent event;
+    event.Clear();
     event.set_timestamp_us(now_us());
     event.set_request_id(ctx->request_id);
     event.set_kind(kind);
@@ -1098,7 +1099,7 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
         }
     }
 
-    std::vector<uint8_t> bytes;
+    thread_local std::vector<uint8_t> bytes;
     if (!serialize_vlm_stream_event(event, &bytes)) {
         return RAC_FALSE;
     }
@@ -1113,6 +1114,17 @@ rac_bool_t dispatch_vlm_terminal_once(GeneratedStreamCtx* ctx,
         return RAC_TRUE;
     }
     ctx->terminal_sent = true;
+    
+    runanywhere::v1::SDKEvent event;
+    populate_envelope(&event, error_code != 0 ? runanywhere::v1::ERROR_SEVERITY_ERROR : runanywhere::v1::ERROR_SEVERITY_INFO);
+    auto* generation = event.mutable_generation();
+    generation->set_kind(error_code != 0 ? runanywhere::v1::GENERATION_EVENT_KIND_FAILED : runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
+    generation->set_streaming_text(ctx->text);
+    generation->set_output_tokens(ctx->token_count);
+    if (ctx->ref && ctx->ref->model_id)
+        generation->set_model_id(ctx->ref->model_id);
+    publish_event(event);
+
     return dispatch_vlm_stream_event(ctx, kind, nullptr, true, result, error_message, error_code);
 }
 
@@ -1137,7 +1149,6 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
                              ? runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED
                              : runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
     generation->set_token(display);
-    generation->set_streaming_text(ctx->text);
     generation->set_output_tokens(ctx->token_count);
     if (ctx->ref->model_id)
         generation->set_model_id(ctx->ref->model_id);
@@ -1427,6 +1438,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     ctx.ref = &ref;
     ctx.request_id = request.request_id();
     ctx.started_ms = now_ms();
+    ctx.text.reserve(2048);
 
     dispatch_vlm_stream_event(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_STARTED, nullptr, false,
                               nullptr, nullptr, 0);

@@ -63,8 +63,10 @@ static void clear_cache_internal() {
         rac_model_info_free(model);
     }
     g_cached_models.clear();
+    g_cached_models.shrink_to_fit();
 #ifdef RAC_HAVE_PROTOBUF
     g_cached_model_proto_bytes.clear();
+    g_cached_model_proto_bytes.shrink_to_fit();
 #endif
     g_cache_valid = false;
 }

@@ -142,6 +142,11 @@ RAC_API rac_result_t rac_vad_stream_stop_proto(uint64_t session_id);
  */
 RAC_API rac_result_t rac_vad_stream_cancel_proto(uint64_t session_id);
 
+/**
+ * @brief Teardown all VAD streaming sessions for a handle.
+ */
+RAC_API void rac_vad_stream_component_teardown(rac_handle_t handle);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
