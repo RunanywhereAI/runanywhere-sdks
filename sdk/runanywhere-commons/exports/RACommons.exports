@@ -395,7 +395,10 @@ _rac_registry_unload_plugin
 _rac_bundle_policy_register
 _rac_bundle_policy_unregister
 
-# Desktop host bootstrap used by the standalone CLI.
+# Desktop host bootstrap, shared by rcli and the Electron addon. The device_*
+# entries are the desktop arm of rac_device_callbacks_t (rac_device_manager.h),
+# the same contract Swift and Kotlin fill from their platform layers. Commons
+# still owns the registration flow itself.
 _rac_desktop_adapter_init
 _rac_desktop_default_base_dir
 _rac_desktop_device_callbacks_register

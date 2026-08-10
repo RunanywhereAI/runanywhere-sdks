@@ -3,8 +3,8 @@
  * @brief Desktop rac_device_callbacks_t — hardware probing + registration POST.
  *
  * The device manager's inversion-of-control surface, written once for every
- * desktop consumer (rcli, the Electron addon, runanywhere-server) rather than
- * once per binary. Commons still owns the registration flow itself: it decides
+ * desktop consumer (rcli and the Electron addon today) rather than once per
+ * binary. Commons still owns the registration flow itself: it decides
  * whether registration is needed, builds the JSON, picks the endpoint, and
  * parses the response. This file only answers the four questions commons
  * cannot answer portably — what machine is this, what is its id, has it
