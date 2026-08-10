@@ -64,7 +64,14 @@ endif()
 
 rac_add_engine_plugin(cloud
     TARGET_NAME         rac_backend_cloud
-    CXX_STANDARD        17
+    # 20, not 17, because the commons headers this engine includes
+    # (rac/features/stt/rac_stt_types.h's RAC_STT_*_DEFAULT, and this engine's own
+    # k_cloud_manifest / g_cloud_engine_vtable) use DESIGNATED INITIALIZERS.
+    # GCC/Clang accept those in C++17 as an extension, so the Android and POSIX
+    # builds never noticed; MSVC rejects them outright (C7555), which made this
+    # engine — and therefore the whole Windows configure — fail to compile.
+    # rac_commons itself is already C++20.
+    CXX_STANDARD        20
     ${_CLOUD_SHARED_ONLY_ARG}
     SOURCES             ${CLOUD_BACKEND_SOURCES}
     LINK_LIBRARIES      nlohmann_json::nlohmann_json

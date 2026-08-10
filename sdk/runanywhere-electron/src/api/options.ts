@@ -9,13 +9,14 @@ import type {
   AudioFormat,
   ImageMode,
   InferenceFramework,
+  JsonSchema,
+  ModelCategory,
   NormalizeMode,
   PoolingMode,
   ReasoningMode,
   ToolChoice,
   ToolDefinition,
 } from './types';
-import type { JsonSchema } from '../grammar';
 
 // ---------------------------------------------------------------------------
 // Option objects
@@ -27,8 +28,14 @@ export interface ReasoningOptions {
   mode?: ReasoningMode;
   /** Stream thought tokens to the caller. Default false. */
   includeInOutput?: boolean;
-  /** Tag pair to treat as thinking; null uses the model's own. */
-  pattern?: string;
+  /** Tag pair to treat as thinking; absent uses the model's own. */
+  pattern?: ThinkingPattern;
+}
+
+/** The markers wrapping a model's reasoning, for families whose tags differ. */
+export interface ThinkingPattern {
+  open: string;
+  close: string;
 }
 
 /** A schema the output must satisfy. */
@@ -59,6 +66,14 @@ export interface LlmOptions {
   tools?: ToolDefinition[];
   toolChoice?: ToolChoice;
   maxToolCalls?: number;
+  /** Let one model turn request several tools before the follow-up turn. */
+  parallelToolCalls?: boolean;
+  /**
+   * Check a call against the registry and its schema before running it.
+   * Commons defaults this on; turn it off when the executor itself decides
+   * what is callable (a dynamic registry, an authorization check).
+   */
+  validateCalls?: boolean;
 }
 
 /** Transcription controls. */
@@ -148,7 +163,18 @@ export interface RagConfig {
   topK?: number;
   chunkSize?: number;
   chunkOverlap?: number;
-  scoreThreshold?: number;
+  /**
+   * Minimum similarity a chunk needs to be retrieved. Carried to commons as
+   * `RAGConfiguration.score_threshold`; the public name follows the spec and
+   * Swift, which do not leak the wire rename.
+   */
+  similarityThreshold?: number;
+  /**
+   * Where to persist the index. Declared for cross-SDK parity and not yet
+   * honoured: `idl/rag.proto` has no persist field, so commons cannot receive
+   * it. Swift declares it and drops it the same way.
+   */
+  persistPath?: string;
 }
 
 /** Placement controls applied when a model loads. */
@@ -158,6 +184,12 @@ export interface LoadOptions {
   contextLength?: number;
   threads?: number;
   useGpu?: boolean;
+  /**
+   * Categories that must survive this load when memory is short. A voice turn
+   * passes `['SPEECH_TO_TEXT', 'TEXT_TO_SPEECH']` so answering out loud does not
+   * evict the microphone. The category being loaded is always kept.
+   */
+  keepResident?: ModelCategory[];
 }
 
 // ---------------------------------------------------------------------------
@@ -165,18 +197,15 @@ export interface LoadOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Defaults for {@link LlmOptions}. The sampling numbers come from the
- * `rac_default` annotations on `LLMGenerationOptions` in `idl/llm_options.proto`
- * (512 / 0.7 / 1.0), which is the cross-SDK source of truth. ts-proto emits
- * proto3 zeros rather than those annotations, so they are transcribed here.
+ * Defaults for {@link LlmOptions} that have no counterpart in
+ * `idl/llm_options.proto`. Every sampling knob used to be transcribed here;
+ * they are gone because both paths below now leave an unset field absent and
+ * let commons apply its own `rac_default` annotation, which is the cross-SDK
+ * source of truth. `maxToolCalls` went the same way in F5, when the tool loop
+ * moved into commons; what is left is the one knob the SDK still decides.
  */
 export const LLM_DEFAULTS = {
-  maxOutputTokens: 512,
-  temperature: 0.7,
-  topP: 1.0,
-  stopSequences: [] as string[],
   toolChoice: 'AUTO' as ToolChoice,
-  maxToolCalls: 5,
 } as const;
 
 /** Spec defaults for {@link ReasoningOptions}. */
@@ -252,19 +281,21 @@ export interface NativeGenerateOptions {
 }
 
 /**
- * Map {@link LlmOptions} onto the addon's keys, applying spec defaults. `grammar`
- * and `history` are computed by the caller (structured output, chat messages) and
- * merged in rather than being public option fields.
+ * Map {@link LlmOptions} onto the addon's keys. An unset field is omitted so the
+ * addon keeps `RAC_LLM_OPTIONS_DEFAULT`, which carries the same
+ * `rac_default` annotations the proto path uses. `grammar` and `history` are
+ * computed by the caller and merged in rather than being public option fields.
+ *
+ * Only the VLM path still goes through here; LLM generation is proto-native.
  */
 export function toNativeGenerateOptions(
   o: LlmOptions = {},
   extra: { grammar?: string; history?: string[] } = {}
 ): NativeGenerateOptions {
-  const native: NativeGenerateOptions = {
-    maxTokens: o.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-    temperature: o.temperature ?? LLM_DEFAULTS.temperature,
-    topP: o.topP ?? LLM_DEFAULTS.topP,
-  };
+  const native: NativeGenerateOptions = {};
+  if (o.maxOutputTokens !== undefined) native.maxTokens = o.maxOutputTokens;
+  if (o.temperature !== undefined) native.temperature = o.temperature;
+  if (o.topP !== undefined) native.topP = o.topP;
   if (o.topK !== undefined) native.topK = o.topK;
   if (o.minP !== undefined) native.minP = o.minP;
   if (o.frequencyPenalty !== undefined) native.frequencyPenalty = o.frequencyPenalty;
@@ -272,8 +303,7 @@ export function toNativeGenerateOptions(
   if (o.repetitionPenalty !== undefined) native.repetitionPenalty = o.repetitionPenalty;
   if (o.seed !== undefined) native.seed = o.seed;
   if (o.systemPrompt !== undefined) native.systemPrompt = o.systemPrompt;
-  const stops = o.stopSequences ?? LLM_DEFAULTS.stopSequences;
-  if (stops.length) native.stopSequences = [...stops];
+  if (o.stopSequences?.length) native.stopSequences = [...o.stopSequences];
   if (o.reasoning?.mode === 'OFF') native.disableThinking = true;
   if (extra.grammar) native.grammar = extra.grammar;
   if (extra.history && extra.history.length) native.history = [...extra.history];

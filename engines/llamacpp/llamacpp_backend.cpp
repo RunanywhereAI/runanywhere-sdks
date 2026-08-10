@@ -320,6 +320,8 @@ DeviceType LlamaCppBackend::get_device_type() const {
     return DeviceType::METAL;
 #elif defined(GGML_USE_CUDA)
     return DeviceType::CUDA;
+#elif defined(GGML_USE_VULKAN)
+    return DeviceType::VULKAN;
 #elif defined(GGML_USE_WEBGPU)
     return DeviceType::WEBGPU;
 #else
@@ -546,7 +548,8 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     // constraint. common_fit_params does not yet account for host memory in
     // CPU-only builds (upstream PR:
     // https://github.com/ggml-org/llama.cpp/pull/19711).
-#if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) && !defined(GGML_USE_WEBGPU)
+#if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) && !defined(GGML_USE_VULKAN) && \
+    !defined(GGML_USE_WEBGPU)
     if (fit_status == COMMON_PARAMS_FIT_STATUS_SUCCESS) {
         RAC_LOG_INFO("LLM.LlamaCpp",
                      "CPU-only build: common_fit_params fitted to "

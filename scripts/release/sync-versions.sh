@@ -24,6 +24,7 @@
 #   sdk/runanywhere-web/package.json                       (root version)
 #   sdk/runanywhere-web/packages/*/package.json            (each package version)
 #   sdk/runanywhere-web/.../Version.ts                     (web SDK_VERSION constant)
+#   sdk/runanywhere-electron/package.json + package-lock.json  (Electron/Node package version)
 #   sdk/runanywhere-react-native/package.json              (root)
 #   sdk/runanywhere-react-native/packages/*/package.json   (each package + first-party deps)
 #   sdk/runanywhere-react-native backend Gradle fallbacks  (native archive version)
@@ -293,6 +294,12 @@ done
 bump_line "${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/Foundation/Version.ts" \
     "export const SDK_VERSION = '[^']+'" \
     "export const SDK_VERSION = '${NEW_VERSION}'"
+
+# 4a. Electron SDK package
+echo ""
+echo ">> Electron SDK:"
+bump_json_version "${REPO_ROOT}/sdk/runanywhere-electron/package.json"
+bump_npm_lock_root_version "${REPO_ROOT}/sdk/runanywhere-electron/package-lock.json"
 
 # 5. React Native SDK packages
 echo ""

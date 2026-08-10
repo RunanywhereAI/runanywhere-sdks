@@ -2,31 +2,20 @@
  * @file control_plane.cpp
  * @brief Control-plane network wiring for rcli — see control_plane.h.
  *
- * The CLI supplies platform callbacks (device info + HTTP via the registered
- * curl transport) and drives the canonical commons entry points. Request
- * building (rac_auth_build_authenticate_request, device registration JSON)
- * and response parsing (rac_auth_handle_authenticate_response,
- * SdkInitResult) stay in commons per the repo layering rule.
+ * The CLI drives the canonical commons entry points and adds only what is
+ * genuinely CLI-shaped: a buffered POST helper the telemetry commands reuse and
+ * the login flow's user-facing error text. Device callbacks are installed by
+ * bootstrap.cpp through the ordinary rac_device_manager surface; request
+ * building and response parsing stay in commons, per the repo layering rule.
  */
 
 #include "net/control_plane.h"
 
 #include <cstdlib>
-#include <cstring>
-#include <thread>
 #include <vector>
 
-#if defined(__APPLE__)
-#include <sys/sysctl.h>
-#endif
-#if !defined(_WIN32)
-#include <sys/utsname.h>
-#include <unistd.h>
-#endif
-
-#include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_sdk_state.h"
-#include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -59,207 +48,20 @@ std::string single_line_preview(const std::string& body) {
     return preview;
 }
 
-std::string query_hostname() {
-#if defined(_WIN32)
-    const char* name = std::getenv("COMPUTERNAME");
-    return name != nullptr ? name : "windows-host";
-#else
-    struct utsname info{};
-    if (uname(&info) == 0 && info.nodename[0] != '\0') {
-        return info.nodename;
-    }
-    return "desktop-host";
-#endif
-}
-
-std::string query_device_model() {
-#if defined(__APPLE__)
-    char model[128] = {};
-    size_t size = sizeof(model);
-    if (sysctlbyname("hw.model", model, &size, nullptr, 0) == 0 && model[0] != '\0') {
-        return model;
-    }
-    return "Mac";
-#elif defined(_WIN32)
-    return "Windows PC";
-#else
-    struct utsname info{};
-    if (uname(&info) == 0 && info.machine[0] != '\0') {
-        return std::string(info.sysname[0] != '\0' ? info.sysname : "Linux") + " " + info.machine;
-    }
-    return "Linux PC";
-#endif
-}
-
-std::string query_os_version() {
-#if defined(_WIN32)
-    return {};
-#else
-    struct utsname info{};
-    if (uname(&info) == 0 && info.release[0] != '\0') {
-        // Backend os_version column caps at 20 chars.
-        return std::string(info.release).substr(0, 20);
-    }
-    return {};
-#endif
-}
-
-std::string query_chip_name() {
-#if defined(__APPLE__)
-    char brand[256] = {};
-    size_t size = sizeof(brand);
-    if (sysctlbyname("machdep.cpu.brand_string", brand, &size, nullptr, 0) == 0 &&
-        brand[0] != '\0') {
-        return brand;
-    }
-#endif
-    return {};
-}
-
-const char* architecture_name() {
-#if defined(__aarch64__) || defined(_M_ARM64)
-    return "arm64";
-#else
-    return "x86_64";
-#endif
-}
-
-// ---------------------------------------------------------------------------
-// Device-manager callbacks. The device manager reads the strings we hand it
-// after the callback returns (it builds the registration JSON immediately),
-// so all backing storage is file-static — the CLI drives one control-plane
-// flow at a time.
-// ---------------------------------------------------------------------------
-
-struct DeviceBridgeState {
-    bool registered_this_process = false;
-    std::string device_id;       // rac_state persistent UUID snapshot
-    std::string device_name;     // hostname
-    std::string response_body;   // outlives the http_post callback
-    std::string response_error;  // outlives the http_post callback
-};
-
-DeviceBridgeState& device_state() {
-    static DeviceBridgeState state;
-    return state;
-}
-
-void device_get_info(rac_device_registration_info_t* out_info, void* /*user_data*/) {
-    if (out_info == nullptr) {
-        return;
-    }
-    DeviceBridgeState& state = device_state();
-    state.device_name = query_hostname();
-
-    *out_info = {};
-    out_info->device_model = device_model().c_str();
-    out_info->device_name = state.device_name.c_str();
-    out_info->platform = platform_name();
-    out_info->os_version = os_version_string().c_str();
-    out_info->form_factor = "desktop";
-    out_info->architecture = architecture_name();
-    static const std::string chip = query_chip_name();
-    out_info->chip_name = chip.c_str();
-
-    rac_memory_info_t memory{};
-    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
-    if (adapter != nullptr && adapter->get_memory_info != nullptr &&
-        adapter->get_memory_info(&memory, adapter->user_data) == RAC_SUCCESS) {
-        out_info->total_memory = static_cast<int64_t>(memory.total_bytes);
-        out_info->available_memory = static_cast<int64_t>(memory.available_bytes);
-    }
-
-    out_info->has_neural_engine = RAC_FALSE;
-    out_info->neural_engine_cores = 0;
-#if defined(__APPLE__)
-    out_info->gpu_family = "apple";
-#else
-    out_info->gpu_family = nullptr;
-#endif
-    out_info->battery_level = -1.0;  // desktop: unavailable → null on the wire
-    out_info->battery_state = nullptr;
-    out_info->is_low_power_mode = RAC_FALSE;
-    out_info->core_count = static_cast<int32_t>(std::thread::hardware_concurrency());
-    out_info->performance_cores = 0;
-    out_info->efficiency_cores = 0;
-    out_info->device_fingerprint = nullptr;  // commons falls back to device_id
-}
-
-const char* device_get_id(void* /*user_data*/) {
-    DeviceBridgeState& state = device_state();
-    const char* device_id = rac_state_get_device_id();
-    state.device_id = device_id != nullptr ? device_id : "";
-    return state.device_id.c_str();
-}
-
-rac_bool_t device_is_registered(void* /*user_data*/) {
-    return device_state().registered_this_process ? RAC_TRUE : RAC_FALSE;
-}
-
-void device_set_registered(rac_bool_t registered, void* /*user_data*/) {
-    device_state().registered_this_process = (registered == RAC_TRUE);
-}
-
-rac_result_t device_http_post(const char* endpoint, const char* json_body,
-                              rac_bool_t requires_auth, rac_device_http_response_t* out_response,
-                              void* /*user_data*/) {
-    if (endpoint == nullptr || json_body == nullptr || out_response == nullptr) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    DeviceBridgeState& state = device_state();
-    const HttpResult result = control_plane_post(endpoint, json_body, requires_auth == RAC_TRUE);
-    state.response_body = result.body;
-    state.response_error = result.ok() ? std::string() : result.describe();
-
-    *out_response = {};
-    out_response->status_code = result.status;
-    out_response->response_body = state.response_body.empty() ? nullptr
-                                                              : state.response_body.c_str();
-    if (result.ok()) {
-        out_response->result = RAC_SUCCESS;
-        return RAC_SUCCESS;
-    }
-    out_response->result =
-        result.transport != RAC_SUCCESS ? result.transport : RAC_ERROR_HTTP_ERROR;
-    out_response->error_message = state.response_error.c_str();
-    return out_response->result;
-}
-
 }  // namespace
 
 const char* platform_name() {
-#if defined(__APPLE__)
-    return "macos";
-#elif defined(__linux__)
-    return "linux";
-#elif defined(_WIN32)
-    return "windows";
-#else
-    return "desktop";
-#endif
+    return rac_desktop_platform_name();
 }
 
 const std::string& device_model() {
-    static const std::string model = query_device_model();
+    static const std::string model = rac_desktop_device_model();
     return model;
 }
 
 const std::string& os_version_string() {
-    static const std::string version = query_os_version();
+    static const std::string version = rac_desktop_os_version();
     return version;
-}
-
-void register_device_callbacks() {
-    rac_device_callbacks_t callbacks = {};
-    callbacks.get_device_info = device_get_info;
-    callbacks.get_device_id = device_get_id;
-    callbacks.is_registered = device_is_registered;
-    callbacks.set_registered = device_set_registered;
-    callbacks.http_post = device_http_post;
-    callbacks.user_data = nullptr;
-    if (rac_device_manager_set_callbacks(&callbacks) != RAC_SUCCESS) {
-        out::status_line("warning: device manager callbacks failed to install");
-    }
 }
 
 std::string HttpResult::describe() const {

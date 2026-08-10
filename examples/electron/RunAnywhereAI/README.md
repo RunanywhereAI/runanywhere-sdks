@@ -36,6 +36,7 @@ and a native prebuild present under `sdk/runanywhere-electron/prebuilds/`.
 | --- | --- |
 | `main.js` | Electron main: forks the utility host (native addon), owns the window + local JSON store |
 | `preload.js` | Loads the SDK preload (`window.runanywhere`) and exposes `window.appStore` |
+| `model-catalog.js` | The app's model table. Staged into the SDK by `preload.js` and by the utility host (`main.js` passes it as `catalogPath`), which is what makes a catalog id resolvable in both processes |
 | `renderer.js` / `index.html` | The UI — Chat, Models, Settings, Structured, Tools, Vision, Embeddings, Knowledge, Voice, VAD |
 | `assets/make-icon.js` | Regenerates `assets/icon.ico` + `icon.png` (zero deps) — `npm run icon` |
 

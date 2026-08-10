@@ -731,6 +731,32 @@ jobs:
             sdk/runanywhere-web/test-results
           if-no-files-found: ignore
 
+  electron-unit:
+    # The Electron SDK's unit suite is hermetic: pure TS/JS, no native addon and
+    # no model, so it runs on the cheap Linux runner alongside the other
+    # per-SDK frontend lanes. The addon compile and the integration suite need
+    # MSVC plus a built commons and stay in electron-sdk-ci.yml, which is
+    # path-filtered; this job runs on every PR.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
+      # Not a member of the root Yarn workspace — it installs standalone from
+      # its own package-lock.json.
+      - name: Install dependencies
+        working-directory: sdk/runanywhere-electron
+        run: npm ci --no-audit --no-fund
+      - name: Type-check + build
+        working-directory: sdk/runanywhere-electron
+        run: npm run build
+      - name: Unit tests
+        working-directory: sdk/runanywhere-electron
+        run: npm test
+
   # Dedicated validation lane — runs the source-of-truth validation scripts
   # so deprecated-surface drift and RAC_API export drift cannot land silently.
   validation:

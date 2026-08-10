@@ -15,11 +15,11 @@
 #        RAC_ERROR_BACKEND_UNAVAILABLE. No QHexRT header/lib needed. The public
 #        repo links cleanly.
 #
-#   2) Engine IS available (internal / authorized Android builds):
+#   2) Engine IS available (internal / authorized Android + Windows-ARM64 builds):
 #      - QHEXRT_ROOT points at the prebuilt tree:
 #            $QHEXRT_ROOT/include/qhexrt/qhexrt_c.h
-#            $QHEXRT_ROOT/lib/<abi>/libqhexrt_core.a
-#            $QHEXRT_ROOT/lib/<abi>/libqhexrt_host.a
+#            $QHEXRT_ROOT/lib/<abi>/<core archive>
+#            $QHEXRT_ROOT/lib/<abi>/<host archive>
 #        (defaults to the atomically selected engines/qhexrt/prebuilt/current,
 #        whose immutable versions are gitignored).
 #      - RAC_QHEXRT_ENGINE_AVAILABLE=1; qhexrt_llm_ops.cpp compiles against the
@@ -27,9 +27,22 @@
 #        shippable QHexRT binary; runtime symbols stay internal to the carrier).
 #      - Publishes a routable vtable exposing RAC_PRIMITIVE_GENERATE_TEXT.
 #
-# OFF by default: the QNN runtime + NPU firmware are Android/Snapdragon-only and
-# absent on CI hosts. Downstream Android builds set -DRAC_BACKEND_QHEXRT=ON
-# (+ optionally -DQHEXRT_ROOT=<path>).
+# Two host platforms carry a real Hexagon NPU, and they use different toolchains,
+# so the ABI directory and archive naming differ:
+#
+#   Android arm64-v8a : lib/arm64-v8a/libqhexrt_{core,host}.a  (AArch64 ELF, NDK)
+#   Windows on ARM64  : lib/win-arm64/qhexrt_{core,host}.lib   (ARM64 COFF, MSVC)
+#
+# Windows on ARM64 (Snapdragon X / X2 Elite) is NOT a simulator: QAIRT ships a
+# native aarch64-windows-msvc HTP stack, so the same published v81 context
+# binaries load unmodified. It differs only in packaging — flat DLL staging
+# (QnnHtp.dll / QnnSystem.dll / QnnHtpPrepare.dll / QnnHtpV81Stub.dll plus the
+# v81 skel AND its .cat, all in ONE directory; there is no ADSP_LIBRARY_PATH) and
+# no FastRPC/rpcmem, so tensors bind clientBuf instead of the zero-copy ion path.
+#
+# OFF by default: the QNN runtime + NPU firmware are Snapdragon-only and absent
+# on CI hosts. Downstream Android / Windows-ARM64 builds set
+# -DRAC_BACKEND_QHEXRT=ON (+ optionally -DQHEXRT_ROOT=<path>).
 # =============================================================================
 
 option(RAC_BACKEND_QHEXRT "Build QHexRT (Qualcomm Hexagon NPU) engine plugin" OFF)
@@ -117,7 +130,53 @@ int qhexrt_header_surface_probe(void) {
     unset(RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE CACHE)
 endfunction()
 
+# The public C ABI the SDK adapter links. One list, two inspectors: `nm` for the
+# NDK's ELF archives, `dumpbin` for MSVC's COFF ones (MSVC ships no nm at all).
+set(QHEXRT_REQUIRED_SYMBOLS
+    qhx_runtime_create qhx_runtime_free qhx_runtime_device
+    qhx_model_load qhx_model_free
+    qhx_session_create qhx_session_free qhx_session_reset qhx_session_cancel
+    qhx_gen_cfg_default qhx_generate_options_default
+    qhx_generate qhx_generate_ex qhx_status_str qhx_version)
+
+function(_qhexrt_require_lib_symbols archive)
+    if(NOT QHEXRT_DUMPBIN)
+        get_filename_component(_qhexrt_msvc_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        find_program(QHEXRT_DUMPBIN NAMES dumpbin HINTS "${_qhexrt_msvc_bin}")
+    endif()
+    if(NOT QHEXRT_DUMPBIN)
+        message(FATAL_ERROR
+            "dumpbin is required to validate the QHexRT .lib ABI; set -DQHEXRT_DUMPBIN=<path>")
+    endif()
+
+    # /LINKERMEMBER:1 dumps the archive's own symbol directory, which lists only
+    # DEFINED public symbols — the MSVC equivalent of `nm --defined-only`.
+    # ARM64 COFF carries no leading-underscore decoration, so the C names match
+    # the header verbatim.
+    execute_process(
+        COMMAND "${QHEXRT_DUMPBIN}" /NOLOGO /LINKERMEMBER:1 "${archive}"
+        RESULT_VARIABLE _qhexrt_dumpbin_status
+        OUTPUT_VARIABLE _qhexrt_dumpbin_output
+        ERROR_VARIABLE _qhexrt_dumpbin_error)
+    if(NOT _qhexrt_dumpbin_status EQUAL 0)
+        message(FATAL_ERROR "Unable to inspect QHexRT archive symbols: ${_qhexrt_dumpbin_error}")
+    endif()
+
+    string(REPLACE "\r\n" "\n" _qhexrt_dumpbin_output "${_qhexrt_dumpbin_output}")
+    foreach(_qhexrt_required_symbol IN LISTS QHEXRT_REQUIRED_SYMBOLS)
+        # Anchored on both sides so qhx_generate does not match qhx_generate_ex.
+        if(NOT _qhexrt_dumpbin_output MATCHES "[ \t]${_qhexrt_required_symbol}\n")
+            message(FATAL_ERROR
+                "QHexRT core archive omits required defined symbol: ${_qhexrt_required_symbol}")
+        endif()
+    endforeach()
+endfunction()
+
 function(_qhexrt_require_archive_symbols archive)
+    if(MSVC)
+        _qhexrt_require_lib_symbols("${archive}")
+        return()
+    endif()
     if(NOT CMAKE_NM OR NOT EXISTS "${CMAKE_NM}")
         message(FATAL_ERROR "CMAKE_NM is required to validate the QHexRT archive ABI")
     endif()
@@ -140,12 +199,7 @@ function(_qhexrt_require_archive_symbols archive)
 
     string(REPLACE "\r\n" "\n" _qhexrt_nm_output "${_qhexrt_nm_output}")
     string(REPLACE "\n" ";" _qhexrt_nm_lines "${_qhexrt_nm_output}")
-    foreach(_qhexrt_required_symbol IN ITEMS
-        qhx_runtime_create qhx_runtime_free qhx_runtime_device
-        qhx_model_load qhx_model_free
-        qhx_session_create qhx_session_free qhx_session_reset qhx_session_cancel
-        qhx_gen_cfg_default qhx_generate_options_default
-        qhx_generate qhx_generate_ex qhx_status_str qhx_version)
+    foreach(_qhexrt_required_symbol IN LISTS QHEXRT_REQUIRED_SYMBOLS)
         set(_qhexrt_symbol_defined FALSE)
         foreach(_qhexrt_nm_line IN LISTS _qhexrt_nm_lines)
             if(_qhexrt_nm_line MATCHES
@@ -227,9 +281,30 @@ if(NOT _qhexrt_root_explicit AND _qhexrt_root_selected)
     endif()
 endif()
 
-# ABI subdir under QHEXRT_ROOT/lib (arm64-v8a is the shipped Snapdragon target).
-set(_qhexrt_abi "${ANDROID_ABI}")
-if(NOT _qhexrt_abi)
+# Target selection: which hosts can actually drive the Hexagon NPU, and what the
+# prebuilt tree is named for each. Off-platform builds keep the Android naming so
+# the shell's diagnostics and paths stay well-defined; they never read the files.
+set(_qhexrt_platform_supported FALSE)
+set(_qhexrt_core_name "libqhexrt_core.a")
+set(_qhexrt_host_name "libqhexrt_host.a")
+if(RAC_PLATFORM_ANDROID)
+    # ABI subdir under QHEXRT_ROOT/lib (arm64-v8a is the shipped Snapdragon target).
+    set(_qhexrt_abi "${ANDROID_ABI}")
+    if(NOT _qhexrt_abi)
+        set(_qhexrt_abi "${CMAKE_ANDROID_ARCH_ABI}")
+    endif()
+    if(_qhexrt_abi STREQUAL "arm64-v8a")
+        set(_qhexrt_platform_supported TRUE)
+    endif()
+elseif(RAC_PLATFORM_WINDOWS AND
+       (CMAKE_SYSTEM_PROCESSOR MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$" OR
+        CMAKE_GENERATOR_PLATFORM MATCHES "^([Aa][Rr][Mm]64)$"))
+    # Snapdragon X / X2 Elite. MSVC emits ARM64 COFF `.lib`, not ELF `.a`.
+    set(_qhexrt_platform_supported TRUE)
+    set(_qhexrt_abi "win-arm64")
+    set(_qhexrt_core_name "qhexrt_core.lib")
+    set(_qhexrt_host_name "qhexrt_host.lib")
+else()
     set(_qhexrt_abi "arm64-v8a")
 endif()
 
@@ -266,14 +341,14 @@ endif()
 # paths (not find_library): the Android NDK toolchain re-roots find_library
 # PATHS under the sysroot (CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY), which would
 # never see this out-of-sysroot prebuilt tree.
-set(QHEXRT_CORE_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_core.a")
-set(QHEXRT_HOST_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_host.a")
+set(QHEXRT_CORE_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/${_qhexrt_core_name}")
+set(QHEXRT_HOST_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/${_qhexrt_host_name}")
 set(QHEXRT_HEADER "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
 set(QHEXRT_IDENTITY_MANIFEST "${QHEXRT_ROOT}/qhexrt-prebuilt.json")
 set(QHEXRT_BUILD_RECEIPT "${QHEXRT_ROOT}/qhexrt-build-receipt.json")
 set(_qhexrt_prebuilt_valid FALSE)
 
-if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
+if(_qhexrt_platform_supported AND _qhexrt_root_selected)
     if(NOT EXISTS "${QHEXRT_CORE_LIB}" OR NOT EXISTS "${QHEXRT_HOST_LIB}" OR
        NOT EXISTS "${QHEXRT_HEADER}" OR NOT EXISTS "${QHEXRT_IDENTITY_MANIFEST}" OR
        NOT EXISTS "${QHEXRT_BUILD_RECEIPT}")
@@ -320,28 +395,41 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
     endif()
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.source"
         "git_dirty,git_sha,state_sha256" source)
-    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build"
-        "android_abi,archive_evidence,build_type,cmake_cache_sha256,cmake_system,compiler,ndk,qnn_sdk" build)
+    # The receipt's `build` object differs by toolchain: an MSVC build binds no
+    # NDK, and its archive evidence is a COFF parse rather than llvm-ar/readelf
+    # hashes. Everything else is identical.
+    if(_qhexrt_abi STREQUAL "win-arm64")
+        _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build"
+            "android_abi,archive_evidence,build_type,cmake_cache_sha256,cmake_system,compiler,qnn_sdk" build)
+    else()
+        _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build"
+            "android_abi,archive_evidence,build_type,cmake_cache_sha256,cmake_system,compiler,ndk,qnn_sdk" build)
+        _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.ndk"
+            "metadata_file,metadata_sha256" build ndk)
+    endif()
     string(JSON _qhexrt_build_abi GET "${_qhexrt_identity_json}" build android_abi)
     if(NOT _qhexrt_build_abi STREQUAL _qhexrt_abi)
-        message(FATAL_ERROR "QHexRT receipt build ABI does not match selected Android ABI")
+        message(FATAL_ERROR "QHexRT receipt build ABI does not match the selected ABI")
     endif()
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.cmake_system"
         "crosscompiling,name,processor,state_file_sha256" build cmake_system)
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.compiler"
         "id,sha256,state_file_sha256,version,version_output_sha256" build compiler)
-    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.ndk"
-        "metadata_file,metadata_sha256" build ndk)
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.qnn_sdk"
         "metadata_file,metadata_sha256" build qnn_sdk)
-    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence"
-        "core,host,llvm_ar_sha256,llvm_readelf_sha256" build archive_evidence)
+    if(_qhexrt_abi STREQUAL "win-arm64")
+        _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence"
+            "coff_reader,core,host" build archive_evidence)
+    else()
+        _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence"
+            "core,host,llvm_ar_sha256,llvm_readelf_sha256" build archive_evidence)
+    endif()
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence.core"
         "member_count" build archive_evidence core)
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence.host"
         "member_count" build archive_evidence host)
     _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.files"
-        "include/qhexrt/qhexrt_c.h,lib/${_qhexrt_abi}/libqhexrt_core.a,lib/${_qhexrt_abi}/libqhexrt_host.a" files)
+        "include/qhexrt/qhexrt_c.h,lib/${_qhexrt_abi}/${_qhexrt_core_name},lib/${_qhexrt_abi}/${_qhexrt_host_name}" files)
     string(JSON _qhexrt_receipt_sha ERROR_VARIABLE _qhexrt_receipt_error
         GET "${_qhexrt_identity_json}" build_receipt_sha256)
     string(LENGTH "${_qhexrt_receipt_sha}" _qhexrt_receipt_sha_length)
@@ -380,8 +468,8 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
     endif()
     foreach(_qhexrt_relative IN ITEMS
         "include/qhexrt/qhexrt_c.h"
-        "lib/${_qhexrt_abi}/libqhexrt_core.a"
-        "lib/${_qhexrt_abi}/libqhexrt_host.a")
+        "lib/${_qhexrt_abi}/${_qhexrt_core_name}"
+        "lib/${_qhexrt_abi}/${_qhexrt_host_name}")
         set(_qhexrt_path "${QHEXRT_ROOT}/${_qhexrt_relative}")
         _qhexrt_require_json_keys(_qhexrt_identity_json
             "manifest.files.${_qhexrt_relative}" "sha256,size_bytes" files "${_qhexrt_relative}")
@@ -417,7 +505,7 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
     set(_qhexrt_prebuilt_valid TRUE)
 endif()
 
-if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
+if(_qhexrt_platform_supported AND _qhexrt_prebuilt_valid)
     set(RAC_QHEXRT_ENGINE_AVAILABLE 1)
     message(STATUS "  QHexRT engine discovered:")
     message(STATUS "    header: ${QHEXRT_HEADER}")
@@ -435,11 +523,17 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
     list(APPEND QHEXRT_INCLUDE_DIRS "${QHEXRT_ROOT}/include")
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=1)
 
-    # core references host symbols; wrap both archives in a link group so static
-    # resolution is order-independent. dl + pthread are QHexRT's own deps.
-    list(APPEND QHEXRT_LINK_LIBS
-        -Wl,--start-group "${QHEXRT_CORE_LIB}" "${QHEXRT_HOST_LIB}" -Wl,--end-group
-        ${CMAKE_DL_LIBS})
+    # core references host symbols. GNU ld needs an explicit link group for that
+    # to resolve order-independently; MSVC's linker already resolves statics
+    # across the whole input set and rejects the -Wl form. dl + pthread are
+    # QHexRT's own deps (both no-ops on Windows).
+    if(MSVC)
+        list(APPEND QHEXRT_LINK_LIBS "${QHEXRT_CORE_LIB}" "${QHEXRT_HOST_LIB}")
+    else()
+        list(APPEND QHEXRT_LINK_LIBS
+            -Wl,--start-group "${QHEXRT_CORE_LIB}" "${QHEXRT_HOST_LIB}" -Wl,--end-group
+            ${CMAKE_DL_LIBS})
+    endif()
     find_package(Threads REQUIRED)
     list(APPEND QHEXRT_LINK_LIBS Threads::Threads)
 
@@ -449,8 +543,14 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
     # device that the app already bundles in jniLibs. Detect the stub in the
     # prebuilt core and link the matching cdsprpc stub so the static link resolves;
     # the real vendor lib backs it at runtime. Override with -DQHEXRT_LIBCDSPRPC=.
-    file(STRINGS "${QHEXRT_CORE_LIB}" _qhexrt_core_fastrpc
-        REGEX "remote_handle64_open" LIMIT_COUNT 1)
+    #
+    # Android only: Windows on ARM64 has no FastRPC/rpcmem at all, so a
+    # Windows-built core never carries the stub and there is nothing to resolve.
+    set(_qhexrt_core_fastrpc "")
+    if(RAC_PLATFORM_ANDROID)
+        file(STRINGS "${QHEXRT_CORE_LIB}" _qhexrt_core_fastrpc
+            REGEX "remote_handle64_open" LIMIT_COUNT 1)
+    endif()
     if(_qhexrt_core_fastrpc)
         if(NOT QHEXRT_LIBCDSPRPC)
             find_file(QHEXRT_LIBCDSPRPC libcdsprpc.so
@@ -472,8 +572,9 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
 else()
     set(RAC_QHEXRT_ENGINE_AVAILABLE 0)
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=0)
-    if(NOT RAC_PLATFORM_ANDROID)
-        message(STATUS "  QHexRT engine is Android-only on Snapdragon; building shell for ${RAC_PLATFORM_NAME}")
+    if(NOT _qhexrt_platform_supported)
+        message(STATUS "  QHexRT engine runs on Snapdragon Android and Windows on ARM64; "
+                       "building shell for ${RAC_PLATFORM_NAME}")
     else()
         message(STATUS "  QHexRT engine archive absent under QHEXRT_ROOT=${QHEXRT_ROOT}")
     endif()
@@ -506,6 +607,11 @@ if(RAC_PLATFORM_ANDROID)
         -Wl,--gc-sections
         -Wl,-z,max-page-size=16384
         -Wl,-z,common-page-size=16384)
+elseif(MSVC)
+    # engines/ is a sibling of sdk/runanywhere-commons/, so it does NOT inherit
+    # that directory's MSVC defaults. <mutex>/<filesystem> need an exception
+    # model, and the sources are UTF-8.
+    target_compile_options(rac_backend_qhexrt PRIVATE /EHsc /Zc:__cplusplus /utf-8)
 endif()
 
 # =============================================================================
@@ -554,3 +660,5 @@ endif()
 message(STATUS "QHexRT Backend Configuration:")
 message(STATUS "  Engine available: ${RAC_QHEXRT_ENGINE_AVAILABLE}")
 message(STATUS "  Platform:         ${RAC_PLATFORM_NAME}")
+message(STATUS "  NPU host:         ${_qhexrt_platform_supported}")
+message(STATUS "  Prebuilt ABI:     ${_qhexrt_abi}")

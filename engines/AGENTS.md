@@ -81,7 +81,7 @@ engine exists in this tree.
 | **cloud** | STT (`stt_ops`) | none — HTTP to a provider (Sarvam today) | **3** (no runtime — HTTP) | **ON** | priority 50, modality-agnostic name. `runtimes=NULL` → always eligible, never runtime-rejected. Provider via `config_json["provider"]`. Multi-modality-ready. |
 | **neurt** | LLM (`llm_ops`) + DIFFUSION (`diffusion_ops`) | **NeuRT** (sibling `neurun` repo): prebuilt Core ML graphs on the Apple Neural Engine, plus our Stable-Diffusion pipeline on `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), identity-named. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(neurt)`. The engine `neurt` uses the runtime `coreml` (different names now — the collision is gone). CMake pins `RAC_NEURT_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. **Needs the neurun checkout** (`NEURT_ROOT`) to be ROUTABLE: both modalities are implemented there. Without it the engine builds as a **non-routable shell** — an all-NULL vtable whose capability check returns `RAC_ERROR_BACKEND_UNAVAILABLE`, so registration is REFUSED rather than accepted-and-useless (the same two-mode pattern as `qhexrt`). This is what lets CI build the Apple targets at all, since neurun is a separate PRIVATE repo. Packaging is still guarded: `build-core-xcframework.sh` refuses to ship a stub unless `RAC_ALLOW_NEURT_STUB=1`. Priority stays BELOW mlx's 110 on purpose — ANE models arrive by name pin, not by priority. |
 | **mlx** | LLM (`llm_ops`) + STT (`stt_ops`) + TTS (`tts_ops`) + EMBED (`embedding_ops`) + VLM (`vlm_ops`) | **our** Swift `mlx-swift-lm` callback bridge (Apple MLX) | **1** — bundles its own runtime (mlx-swift) | **ON (Apple)** | priority 110. PUBLIC availability but Apple-gated: `mlx_capability_check` silent-rejects non-Apple, and `RAC_BACKEND_MLX` is forced OFF off-Apple. Declares `RAC_RUNTIME_CPU` + `RAC_RUNTIME_METAL` (hints); formats SAFETENSORS + FOLDER. `SHARED_ONLY`. Multi-modality (5 filled slots). |
-| **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android builds link the prebuilt under `QHEXRT_ROOT`. |
+| **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android arm64-v8a and Windows ARM64 builds link their platform prebuilt under `QHEXRT_ROOT`. |
 
 `RAC_PRIMITIVE_RERANK` was **revived as a first-class cross-encoder reranking
 primitive in ABI v8** at **wire value 11**, with its `rerank_ops` slot promoted
@@ -319,11 +319,12 @@ No new plugin, no rename, no ABI bump — the engine already owns one
 
 ## Private engine shells
 
-`qhexrt` is private and Android/Snapdragon-only. Public builds compile the same
-`rac_plugin_entry_qhexrt` symbol as a not-routable shell when the prebuilt
-archive is absent; authorized builds set `-DRAC_BACKEND_QHEXRT=ON` and point
-`QHEXRT_ROOT` at the private archive to expose LLM, VLM, STT, and TTS over QNN
-context bundles. The source for the private runtime never enters this repo.
+`qhexrt` is private and Snapdragon-only: Android arm64-v8a and Windows ARM64 are
+the supported hosts. Public builds compile the same `rac_plugin_entry_qhexrt`
+symbol as a not-routable shell when the matching prebuilt archive is absent;
+authorized builds set `-DRAC_BACKEND_QHEXRT=ON` and point `QHEXRT_ROOT` at the
+private archive to expose LLM, VLM, STT, and TTS over QNN context bundles. The
+source for the private runtime never enters this repo.
 
 ---
 

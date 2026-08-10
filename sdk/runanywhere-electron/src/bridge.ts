@@ -1,7 +1,8 @@
 // bridge.ts — loads the native N-API addon and adapts its callback-based
 // streaming into an AsyncIterable. The addon is resolved from (in order): the
 // RUNANYWHERE_NATIVE_PATH env var, the local dev build output, or the packaged
-// location. Sidecar DLLs (onnxruntime, sherpa) must sit next to the .node.
+// location. Sidecar DLLs (onnxruntime, sherpa, the QAIRT/QNN runtime) must sit
+// next to the .node; on Windows that directory is put on PATH before the load.
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -26,7 +27,9 @@ export interface NativeGenerationMetrics {
 /** Raw surface exported by runanywhere_native.node. */
 export interface NativeAddon {
   readonly version: string;
-  initialize(secureDir: string, baseDir?: string): void;
+  initialize(secureDir: string, baseDir?: string): Promise<void>;
+  /** Free / total / used RAM from the platform adapter. Cheap enough to stay sync. */
+  memoryInfo(): { totalBytes: number; availableBytes: number; usedBytes: number };
   // Desktop control plane (telemetry + auth). Present only when the addon is
   // built with the desktop libcurl transport (RAC_DESKTOP_ADAPTER=ON); guarded
   // by `hasControlPlane`. `configureControlPlane` runs the two-phase init off the
@@ -49,11 +52,26 @@ export interface NativeAddon {
     phase1Bytes: Uint8Array,
     phase2Bytes: Uint8Array
   ): Promise<Uint8Array>;
-  secureSet(key: string, value: string): void;
-  secureGet(key: string): string | null;
-  secureDelete(key: string): void;
+  /** Re-run the auth handshake a run that started offline skipped. SdkInitResult bytes. */
+  retryControlPlane?(): Promise<Uint8Array>;
+  /** Drain the telemetry queue now; commons retries a failed batch on its own. */
+  telemetryFlush?(): Promise<void>;
+  /** In-memory reads from the auth manager and rac_state. */
+  authState?(): {
+    authenticated: boolean;
+    needsRefresh: boolean;
+    expiresAtUnixSec: number;
+    userId: string;
+    organizationId: string;
+    deviceRegistered: boolean;
+  };
+  /** Drop tokens from memory and the secure store. */
+  clearAuth?(): Promise<void>;
+  secureSet(key: string, value: string): Promise<void>;
+  secureGet(key: string): Promise<string | null>;
+  secureDelete(key: string): Promise<void>;
   // A bare threshold number (legacy) or a full config object.
-  createVad(thresholdOrConfig?: number | object): number;
+  createVad(thresholdOrConfig?: number | object): Promise<number>;
   vadProcess(handle: number, samples: Float32Array): boolean;
   vadIsActive(handle: number): boolean;
   vadSetThreshold(handle: number, threshold: number): void;
@@ -64,14 +82,14 @@ export interface NativeAddon {
     recentAverage?: number;
     recentMax?: number;
   };
-  unloadVad(handle: number): void;
+  unloadVad(handle: number): Promise<void>;
   loadModel(
     modelPath: string,
     id?: string,
     name?: string,
     /** Load-time placement: rac_llm_config_t's preferred_framework / context_length. */
     config?: { framework?: number; contextLength?: number }
-  ): number;
+  ): Promise<number>;
   // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
   // detects whether arg 3 is the callback or a generation-options object.
   generate(
@@ -81,11 +99,11 @@ export interface NativeAddon {
     onToken?: (t: string) => void
   ): Promise<NativeGenerationMetrics>;
   cancelGenerate(handle: number): void;
-  unloadModel(handle: number): void;
-  loraApply(handle: number, adapterPath: string, scale?: number): void;
-  loraRemove(handle: number, adapterPath?: string): void;
+  unloadModel(handle: number): Promise<void>;
+  loraApply(handle: number, adapterPath: string, scale?: number): Promise<void>;
+  loraRemove(handle: number, adapterPath?: string): Promise<void>;
   loraList(handle: number): Array<{ id: string; scale: number }>;
-  loadVlmModel(modelPath: string, mmprojPath: string, id?: string, name?: string): number;
+  loadVlmModel(modelPath: string, mmprojPath: string, id?: string, name?: string): Promise<number>;
   // The image is a path string or { path } | { base64 } | { rgb, width, height }.
   generateVlm(
     handle: number,
@@ -95,23 +113,23 @@ export interface NativeAddon {
     onToken?: (t: string) => void
   ): Promise<NativeGenerationMetrics>;
   cancelVlm(handle: number): void;
-  unloadVlmModel(handle: number): void;
-  loadEmbeddingModel(modelPath: string, configJson?: string): number;
-  embed(handle: number, text: string, options?: object): Float32Array;
-  embedBatch(handle: number, texts: string[], options?: object): Float32Array[];
-  unloadEmbeddingModel(handle: number): void;
-  loadSttModel(modelDir: string, id?: string, name?: string): number;
+  unloadVlmModel(handle: number): Promise<void>;
+  loadEmbeddingModel(modelPath: string, configJson?: string): Promise<number>;
+  embed(handle: number, text: string, options?: object): Promise<Float32Array>;
+  embedBatch(handle: number, texts: string[], options?: object): Promise<Float32Array[]>;
+  unloadEmbeddingModel(handle: number): Promise<void>;
+  loadSttModel(modelDir: string, id?: string, name?: string): Promise<number>;
   transcribe(
     handle: number,
     pcm16: Uint8Array,
     options?: object
-  ): {
+  ): Promise<{
     text: string;
     language?: string;
     confidence: number;
     processingTimeMs: number;
     words: Array<{ text: string; startMs: number; endMs: number; confidence: number }>;
-  };
+  }>;
   transcribeStream(
     handle: number,
     pcm16: Uint8Array,
@@ -124,13 +142,13 @@ export interface NativeAddon {
     supportsStreaming: boolean;
     languagesJson?: string;
   };
-  unloadSttModel(handle: number): void;
-  loadTtsVoice(voiceDir: string, id?: string, name?: string): number;
+  unloadSttModel(handle: number): Promise<void>;
+  loadTtsVoice(voiceDir: string, id?: string, name?: string): Promise<number>;
   synthesize(
     handle: number,
     text: string,
     options?: object
-  ): { sampleRate: number; samples: Float32Array; audioFormat: number; durationMs: number };
+  ): Promise<{ sampleRate: number; samples: Float32Array; audioFormat: number; durationMs: number }>;
   synthesizeStream(
     handle: number,
     text: string,
@@ -139,40 +157,40 @@ export interface NativeAddon {
   ): Promise<void>;
   ttsStop(handle: number): void;
   ttsInfo(handle: number): { voiceId?: string; languagesJson?: string };
-  unloadTtsVoice(handle: number): void;
-  loadRerankModel(modelPath: string, id?: string): number;
+  unloadTtsVoice(handle: number): Promise<void>;
+  loadRerankModel(modelPath: string, id?: string): Promise<number>;
   rerank(
     handle: number,
     query: string,
     documents: string[],
     topN?: number
-  ): Array<{ index: number; score: number; rank: number }>;
-  unloadRerankModel(handle: number): void;
-  loadDiarizationModel(modelPath: string, id?: string): number;
+  ): Promise<Array<{ index: number; score: number; rank: number }>>;
+  unloadRerankModel(handle: number): Promise<void>;
+  loadDiarizationModel(modelPath: string, id?: string): Promise<number>;
   diarize(
     handle: number,
     samples: Float32Array,
     options?: object
-  ): {
+  ): Promise<{
     segments: Array<{ speakerId: string; speakerIndex: number; startMs: number; endMs: number }>;
     speakerCount: number;
     durationMs: number;
-  };
-  unloadDiarizationModel(handle: number): void;
-  loadSegmentationModel(modelPath: string, id?: string): number;
+  }>;
+  unloadDiarizationModel(handle: number): Promise<void>;
+  loadSegmentationModel(modelPath: string, id?: string): Promise<number>;
   segment(
     handle: number,
     image: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
     options?: object
-  ): {
+  ): Promise<{
     width: number;
     height: number;
     classMask: Uint16Array;
     classes: Array<{ classId: number; label?: string; pixelCount: number; fraction: number }>;
     diagnosticRgba?: Uint8Array;
-  };
-  unloadSegmentationModel(handle: number): void;
-  shutdown(): void;
+  }>;
+  unloadSegmentationModel(handle: number): Promise<void>;
+  shutdown(): Promise<void>;
   // Model registry + RAG (proto-byte). registerModel populates commons' global
   // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
   // and return serialized runanywhere.v1 RAG protos as bytes.
@@ -193,6 +211,159 @@ export interface NativeAddon {
   ragStats(handle: number): Uint8Array;
   ragClear(handle: number): Uint8Array;
   ragDestroySession(handle: number): void;
+
+  // Model lifecycle + registry (native/model_bridge.cpp). Every entry point takes
+  // serialized runanywhere.v1 request bytes and resolves the serialized reply on a
+  // worker thread, so a multi-GB load never occupies the host's event loop.
+  modelLoad(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelResolvePaths(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelUnload(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelCurrent(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelComponentSnapshot(component: number): Promise<Uint8Array>;
+  modelLifecycleReset(): void;
+  modelRegistryRegister(modelInfoBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryUpdate(modelInfoBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryGet(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryList(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryRemove(modelId: string): Promise<Uint8Array>;
+  modelRegistryRefresh(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryDiscover(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegistryImport(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelCompatibility(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegisterFromUrl(requestBytes: Uint8Array): Promise<Uint8Array>;
+  modelRegisterMultiFile(requestBytes: Uint8Array): Promise<Uint8Array>;
+
+  // LLM over the proto ABI (native/llm_bridge.cpp). Handle-free: these read the
+  // model the lifecycle load put in commons' own store. `llmGenerateStreamProto`
+  // delivers one serialized LLMStreamEvent per callback.
+  llmGenerateProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  llmGenerateStreamProto(
+    requestBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<void>;
+  llmCancelProto(): Promise<Uint8Array>;
+  structuredGenerate(requestBytes: Uint8Array): Promise<Uint8Array>;
+  structuredParse(requestBytes: Uint8Array): Promise<Uint8Array>;
+  structuredValidate(requestBytes: Uint8Array): Promise<Uint8Array>;
+
+  // Tool calling over the commons run loop (native/tool_bridge.cpp). `onEvent`
+  // is duplex: commons parks its loop on the reply to a `toolCall` event, so the
+  // callback must resolve to serialized ToolResult bytes.
+  toolRunLoopProto(
+    requestBytes: Uint8Array,
+    onEvent: (event: { handle?: number; toolCall?: Uint8Array }) =>
+      | Uint8Array
+      | undefined
+      | Promise<Uint8Array | undefined>
+  ): Promise<Uint8Array>;
+  toolRunLoopCancelProto(handle: number): void;
+
+  // VLM over the proto ABI (native/vlm_bridge.cpp). Handle-free; the image
+  // travels inside the request as a VLMImage.
+  vlmGenerateProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  vlmStreamProto(
+    requestBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<void>;
+  vlmCancelProto(): Promise<Uint8Array>;
+
+  // STT / TTS / VAD over the lifecycle proto ABI (native/speech_bridge.cpp).
+  sttTranscribeProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  ttsSynthesizeProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  vadProcessProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  vadConfigureProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  sttTranscribeStreamProto(
+    requestBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<void>;
+  ttsSynthesizeStreamProto(
+    requestBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<void>;
+  sttStateProto(): Promise<Uint8Array>;
+  ttsStopProto(): Promise<Uint8Array>;
+  ttsListVoicesProto(): Promise<Uint8Array>;
+  ttsStateProto(): Promise<Uint8Array>;
+  vadStartProto(): Promise<Uint8Array>;
+  vadStopProto(): Promise<Uint8Array>;
+  vadResetProto(): Promise<Uint8Array>;
+
+  // Composed voice agent (native/voice_bridge.cpp). The one migrated feature
+  // that is handle-bound: `voiceCreateProto` resolves the agent handle as a
+  // number and every other call takes it back. `voiceEventsProto` registers the
+  // long-lived VoiceEvent stream and resolves when `voiceDestroyProto` tears the
+  // agent down.
+  voiceCreateProto(configBytes: Uint8Array): Promise<number>;
+  voiceDestroyProto(handle: number): Promise<void>;
+  voiceEventsProto(handle: number, onEvent: (eventBytes: Uint8Array) => void): Promise<void>;
+  voiceInitializeProto(handle: number, configBytes: Uint8Array): Promise<Uint8Array>;
+  voiceStatesProto(handle: number): Promise<Uint8Array>;
+  voiceFeedAudioProto(handle: number, frameBytes: Uint8Array): Promise<Uint8Array>;
+  voiceProcessVoiceTurnProto(handle: number, pcm16: Uint8Array): Promise<Uint8Array>;
+  voiceProcessTurnProto(
+    handle: number,
+    requestBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<void>;
+  voiceCancelTurnProto(handle: number, requestBytes: Uint8Array): Promise<void>;
+
+  // Embeddings / rerank / diarization / segmentation (native/data_bridge.cpp).
+  // Only rerank takes a handle; commons has no lifecycle variant for it.
+  embedBatchProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  rerankProto(handle: number, requestBytes: Uint8Array): Promise<Uint8Array>;
+  diarizeProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  segmentProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+
+  // Downloads and storage (native/download_bridge.cpp). Downloads are keyed by
+  // model/task id inside commons; progress arrives on one process-wide callback.
+  // The storage entry points hide the analyzer handle the addon builds from its
+  // rac_storage_callbacks_t.
+  downloadPlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  downloadStartProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  downloadCancelProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  downloadProgressProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  downloadCleanupProto(): Promise<number>;
+  downloadSubscribeProgress(onProgress: (progressBytes: Uint8Array) => void): void;
+  downloadUnsubscribeProgress(): void;
+  storageInfoProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  storageAvailabilityProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  storageDeletePlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  storageDeleteProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+
+  // LoRA over the lifecycle ABI (native/lora_bridge.cpp). Handle-free: these
+  // act on the language model rac_model_lifecycle_load_proto made resident.
+  loraApplyProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraRemoveProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraListProto(stateBytes: Uint8Array): Promise<Uint8Array>;
+  loraStateProto(stateBytes: Uint8Array): Promise<Uint8Array>;
+}
+
+/**
+ * Make the addon's own directory reachable by the Windows loader.
+ *
+ * The .node's STATIC imports (onnxruntime.dll, sherpa) already resolve from
+ * beside it — the loader searches a module's own directory for its dependents.
+ * A dependency the engine opens at RUNTIME by bare name does not: QHexRT calls
+ * `LoadLibraryW("QnnHtp.dll")`, which takes the standard search order (the
+ * EXECUTABLE's directory, the system dirs, then PATH) and never looks beside the
+ * .node. In an Electron app that executable is electron.exe, buried in
+ * node_modules — so a QAIRT runtime staged next to the addon would be invisible
+ * and the NPU would silently look absent.
+ *
+ * PATH is the only entry in that order a library can move. Prepend, so a staged
+ * runtime beats a differently-versioned QAIRT already on the machine's PATH; the
+ * whole flat set (QnnHtp/QnnSystem/QnnHtpPrepare/QnnHtpV<arch>Stub plus the skel
+ * and its .cat) then resolves out of that one directory, which is the invariant
+ * the Hexagon stack requires on Windows (there is no ADSP_LIBRARY_PATH here).
+ */
+function addSidecarDirToDllSearch(dir: string): void {
+  if (process.platform !== 'win32') return;
+  const current = process.env.PATH ?? '';
+  const already = current
+    .split(path.delimiter)
+    .some((entry) => entry && path.resolve(entry).toLowerCase() === dir.toLowerCase());
+  if (already) return;
+  process.env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
 }
 
 function resolveAddon(): NativeAddon {
@@ -204,6 +375,14 @@ function resolveAddon(): NativeAddon {
       'runanywhere_native.node'
     ),
     // Local dev build (repo build dir): dist -> electron -> sdk -> repo root.
+    // Windows has one build tree per architecture; try the one matching this
+    // process before the x64 default.
+    ...(process.arch === 'arm64'
+      ? [path.resolve(
+          __dirname, '..', '..', '..', 'build', 'windows-arm64-release', 'sdk',
+          'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
+        )]
+      : []),
     path.resolve(
       __dirname, '..', '..', '..', 'build', 'windows-release', 'sdk',
       'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
@@ -214,6 +393,7 @@ function resolveAddon(): NativeAddon {
 
   for (const p of candidates) {
     if (fs.existsSync(p)) {
+      addSidecarDirToDllSearch(path.dirname(p));
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       return require(p) as NativeAddon;
     }

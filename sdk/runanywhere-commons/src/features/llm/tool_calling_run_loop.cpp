@@ -300,8 +300,24 @@ std::string format_prompt_proto(const LoopContext& ctx,
 bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_output,
                                  std::string* out_clean_text,
                                  std::vector<runanywhere::v1::ToolCall>* out_tool_calls) {
+    // A REASONING model puts its thinking block first, and the bare-Pythonic
+    // detector is anchored at the first non-space character on purpose (so
+    // ordinary prose and markdown links can never be mistaken for a call). Those
+    // two facts collide: measured on Qwen3-0.6B over QHexRT, the model emitted a
+    // textbook `[calculate(expression="(37 + 5) * 3")]` after its </think> and
+    // the loop saw no call at all — so the raw call was handed back to the user
+    // AS THE ANSWER and the tool never ran. Parse the post-thinking body instead.
+    // Use the same extractor the display split uses, because the tag pair is
+    // usually unresolved here and it falls back to the default set.
+    std::string body = llm_output;
+    if (ctx.grammar_backend) {
+        std::string thinking;
+        rac::llm::tool_calling::split_display_text_and_thinking(llm_output, &body, &thinking,
+                                                                ctx.generation);
+    }
+
     runanywhere::v1::ToolParseRequest request;
-    request.set_text(llm_output);
+    request.set_text(body);
     *request.mutable_options() = build_options_snapshot(ctx);
     // Grammar backends emit bare `[name(args)]` (no format tag), so drop the explicit
     // format hint and let the parser auto-detect it — detect_format routes a bare call to
@@ -330,8 +346,14 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
     }
     rac_proto_buffer_free(&out);
 
+    // No call: hand back the RAW output unchanged, so the end-of-loop display
+    // split still sees the thinking block. A call: the pre-call text of a
+    // decision turn is superseded by the synthesis turn that follows, so the
+    // parser's remainder is all that is wanted.
     if (out_clean_text) {
-        *out_clean_text = result.remaining_text();
+        *out_clean_text = (result.has_tool_call() && result.tool_calls_size() > 0)
+                              ? result.remaining_text()
+                              : llm_output;
     }
     if (result.has_tool_call() && result.tool_calls_size() > 0) {
         if (out_tool_calls) {

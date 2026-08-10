@@ -483,4 +483,18 @@ void session_close(Session* s) {
     runtime_release();
 }
 
+bool device_arch(char* out, size_t out_size) {
+    if (out == nullptr || out_size == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    qhx_runtime* rt = runtime_acquire();
+    if (rt == nullptr) {
+        return false;
+    }
+    qhx_runtime_device(rt, out, static_cast<int>(out_size), nullptr, nullptr);
+    runtime_release();
+    return out[0] != '\0';
+}
+
 }  // namespace qhexrt_engine

@@ -42,6 +42,27 @@
 
 #include "rac/qhexrt/rac_qhexrt.h"
 
+/**
+ * @brief 1 when this build targets a host QHexRT's runtime can actually drive.
+ *
+ * Two such hosts today, and both run the SAME published arch-pinned bundles:
+ *
+ *   - Snapdragon Android (arm64-v8a) — the original target.
+ *   - Windows on ARM64 (Snapdragon X / X2 Elite) — a real Hexagon target, not a
+ *     simulator: QAIRT ships a native `lib/aarch64-windows-msvc` HTP stack, so a
+ *     v81 context binary loads unmodified. Only packaging differs (flat DLL
+ *     staging, no FastRPC/rpcmem so tensors bind clientBuf).
+ *
+ * Everything else — macOS, Linux, iOS, WASM, Windows x64 — stays unsupported and
+ * compiles the not-routable shell exactly as before.
+ */
+#if (defined(__ANDROID__) && defined(__aarch64__)) || \
+    (defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__)))
+#define RAC_QHEXRT_PLATFORM_SUPPORTED 1
+#else
+#define RAC_QHEXRT_PLATFORM_SUPPORTED 0
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

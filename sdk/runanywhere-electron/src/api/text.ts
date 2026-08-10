@@ -1,167 +1,63 @@
 // text.ts — the `llm` and `vlm` namespaces plus the tool registry.
 //
-// Tool calling runs here rather than in commons: the C tool-calling ABI is
-// proto-only and the Electron addon does not bind it, so the loop is built from
-// grammar-constrained selection (real decoding constraints, not prompt-and-hope)
-// over `rac_llm_options_t.grammar`.
+// LLM generation is proto-native: commons owns the chat template, the thinking
+// split, the token accounting, and the JSON extraction, so this file shapes a
+// request and reads a result rather than reconstructing any of it.
+//
+// Tool calling is proto-native too. Commons runs the whole loop — prompt
+// dialect, parsing, validation, execution order, follow-up turn, cancellation —
+// and the only part left here is the registry of executor functions, which
+// cannot live anywhere but the host language.
 
 import { SDKException } from '../errors';
-import { jsonSchemaToGrammar } from '../grammar';
-import type { JsonSchema } from '../grammar';
-import { splitThinking } from '../thinking';
-import type { LoadSlot, NativeStreamResult, RaBackend } from './backend';
+import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
-import { LLM_DEFAULTS, toNativeGenerateOptions } from './options';
-import type { LlmOptions } from './options';
 import {
-  FinishReason,
-  ModelCategory,
-  TokenKind,
-  newRequestId,
-  requireOneOf,
-} from './types';
+  LlmAbi,
+  LLMStreamEventKind,
+  toPublicFinishReason,
+  toPublicMetrics,
+  toProtoMessages,
+  toProtoOptions,
+} from './llm-abi';
+import type { LLMGenerationResult } from './llm-abi';
+import { ModelAbi } from './model-abi';
+import {
+  VlmAbi,
+  VLMGenerationRequest,
+  VLMStreamEventKind,
+  materializeImage,
+  toPublicVlmFinishReason,
+  toPublicVlmMetrics,
+} from './vlm-abi';
+import {
+  ToolAbi,
+  ToolCallingOptions,
+  ToolCallingSessionCreateRequest,
+  toHistoryTurns,
+  toProtoTool,
+  toProtoToolChoice,
+  toPublicCalls,
+} from './tool-abi';
+import type { ToolRun } from './tool-abi';
+import { LLM_DEFAULTS } from './options';
+import type { LlmOptions } from './options';
+import type { ChatMessage as ProtoChatMessage } from '@runanywhere/proto-ts/chat';
+import { MessageRole } from '@runanywhere/proto-ts/chat';
+import { ModelCategory as ProtoModelCategory } from '@runanywhere/proto-ts/model_types';
+import { FinishReason, ReasoningMode, TokenKind, newRequestId } from './types';
 import type {
   ChatMessage,
   GenerationEvent,
   GenerationResult,
   ImageInput,
+  JsonSchema,
   StructuredResult,
   ToolCall,
   ToolDefinition,
   ToolExecutor,
 } from './types';
-
-// ---------------------------------------------------------------------------
-// Prompt shaping
-// ---------------------------------------------------------------------------
-
-/** A prompt plus the history and system turn the engine needs alongside it. */
-interface ShapedPrompt {
-  prompt: string;
-  /** Alternating user/assistant turns, oldest first. */
-  history: string[];
-  systemPrompt?: string;
-}
-
-// rac_llm_options_t.history is a strictly alternating user/assistant array that
-// excludes the system prompt and the current prompt, so tool turns are folded into
-// the user turn they answer.
-function shapePrompt(input: string | ChatMessage[]): ShapedPrompt {
-  if (typeof input === 'string') return { prompt: input, history: [] };
-  if (!input.length) {
-    throw SDKException.validationFailed({
-      fieldPath: 'messages',
-      message: 'at least one message is required',
-    });
-  }
-  const system = input.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
-  const turns: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-  for (const m of input) {
-    if (m.role === 'system') continue;
-    const role = m.role === 'assistant' ? 'assistant' : 'user';
-    const content = m.role === 'tool' ? `Tool result: ${m.content}` : m.content;
-    const last = turns[turns.length - 1];
-    if (last && last.role === role) last.content += `\n${content}`;
-    else turns.push({ role, content });
-  }
-  if (!turns.length) {
-    throw SDKException.validationFailed({
-      fieldPath: 'messages',
-      message: 'messages must contain at least one non-system turn',
-    });
-  }
-  // The final turn is the live prompt; whatever precedes it is history, trimmed to
-  // start on a user turn so the alternation the engine expects holds.
-  const current = turns.pop() as { role: 'user' | 'assistant'; content: string };
-  while (turns.length && turns[0].role !== 'user') turns.shift();
-  return {
-    prompt: current.content,
-    history: turns.map((t) => t.content),
-    systemPrompt: system || undefined,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Streamed thinking classification
-// ---------------------------------------------------------------------------
-
-const THINK_TAGS = [
-  { open: '<think>', close: '</think>' },
-  { open: '<thinking>', close: '</thinking>' },
-];
-const LONGEST_TAG = Math.max(...THINK_TAGS.flatMap((t) => [t.open.length, t.close.length]));
-
-/**
- * Classifies streamed text as answer or thought, tolerating a tag split across
- * token boundaries by holding back the last few characters until they can no
- * longer be the prefix of a tag.
- */
-class ThinkingSplitter {
-  private pending = '';
-  private closeTag: string | null = null;
-
-  /** Classify one incoming token, returning the parts that are now unambiguous. */
-  push(token: string): Array<{ text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }> {
-    this.pending += token;
-    return this.drain(false);
-  }
-
-  /** Flush whatever is held back once the stream has ended. */
-  flush(): Array<{ text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }> {
-    return this.drain(true);
-  }
-
-  private drain(
-    final: boolean
-  ): Array<{ text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }> {
-    const out: Array<{ text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }> = [];
-    for (;;) {
-      if (this.closeTag) {
-        const at = this.pending.indexOf(this.closeTag);
-        if (at >= 0) {
-          if (at > 0) out.push({ text: this.pending.slice(0, at), kind: TokenKind.THOUGHT });
-          this.pending = this.pending.slice(at + this.closeTag.length);
-          this.closeTag = null;
-          continue;
-        }
-        const safe = this.safeLength(final);
-        if (safe > 0) {
-          out.push({ text: this.pending.slice(0, safe), kind: TokenKind.THOUGHT });
-          this.pending = this.pending.slice(safe);
-        }
-        return out;
-      }
-      let best = -1;
-      let bestTag: (typeof THINK_TAGS)[number] | null = null;
-      for (const tag of THINK_TAGS) {
-        const at = this.pending.indexOf(tag.open);
-        if (at >= 0 && (best < 0 || at < best)) {
-          best = at;
-          bestTag = tag;
-        }
-      }
-      if (best >= 0 && bestTag) {
-        if (best > 0) out.push({ text: this.pending.slice(0, best), kind: TokenKind.TEXT });
-        this.pending = this.pending.slice(best + bestTag.open.length);
-        this.closeTag = bestTag.close;
-        continue;
-      }
-      const safe = this.safeLength(final);
-      if (safe > 0) {
-        out.push({ text: this.pending.slice(0, safe), kind: TokenKind.TEXT });
-        this.pending = this.pending.slice(safe);
-      }
-      return out;
-    }
-  }
-
-  // Everything except a trailing run that could still grow into a tag.
-  private safeLength(final: boolean): number {
-    if (final) return this.pending.length;
-    return Math.max(0, this.pending.length - (LONGEST_TAG - 1));
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Tool registry
@@ -175,41 +71,13 @@ export interface ToolsNamespace {
   unregister(name: string): void;
   /** Every registered tool, in registration order. */
   list(): ToolDefinition[];
+  /** Forget every registered tool. */
+  clear(): void;
 }
 
 interface RegisteredTool {
   definition: ToolDefinition;
   executor: ToolExecutor;
-}
-
-const NO_TOOL = '__none';
-// Enough room for a tool call's JSON object regardless of the answer budget.
-const TOOL_SELECTION_TOKENS = 256;
-
-function toolPickerGrammar(tools: ToolDefinition[], allowNone: boolean): string {
-  const branches: JsonSchema[] = tools.map((t) => ({
-    type: 'object',
-    properties: { name: { const: t.name }, arguments: t.parameters as JsonSchema },
-    required: ['name', 'arguments'],
-  }));
-  if (allowNone) {
-    branches.push({
-      type: 'object',
-      properties: { name: { const: NO_TOOL }, arguments: { type: 'object', properties: {} } },
-      required: ['name'],
-    });
-  }
-  return jsonSchemaToGrammar(branches.length === 1 ? branches[0] : { anyOf: branches });
-}
-
-function toolPickerPrompt(prompt: string, tools: ToolDefinition[], allowNone: boolean): string {
-  const listed = tools
-    .map((t) => `- ${t.name}${t.description ? ': ' + t.description : ''}`)
-    .join('\n');
-  const escape = allowNone
-    ? `\nIf no tool is needed, reply with {"name": "${NO_TOOL}"}.`
-    : '';
-  return `${prompt}\n\nAvailable tools:\n${listed}${escape}\n\nReply with a single JSON tool call.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,104 +91,14 @@ export interface TextDeps {
   requireReady(): void;
 }
 
-/** Load the model a request names, or use whatever already occupies the slot. */
-async function resolveModelFor(
-  deps: TextDeps,
-  slot: LoadSlot,
-  category: ModelCategory,
-  requested: string | undefined
-): Promise<string> {
-  const current = await deps.backend.loaded(slot);
-  if (!requested) {
-    if (current) return current.id;
-    throw SDKException.validationFailed({
-      fieldPath: 'options.model',
-      message: `no ${slot} model is loaded — pass options.model or call models.load() first`,
-    });
-  }
-  if (current && current.id === requested) return current.id;
-  const loaded = await deps.backend.ensure(slot, requested);
-  deps.hub.emit({ type: 'modelLoaded', id: loaded.id, category });
-  return loaded.id;
-}
-
-// A cancelled stream reports CANCELLED; hitting the token ceiling reports LENGTH.
-function finishReasonFor(
-  native: NativeStreamResult | null,
-  maxOutputTokens: number,
-  toolCalls: ToolCall[]
-): FinishReason {
-  if (native?.cancelled) return FinishReason.CANCELLED;
-  if (toolCalls.length) return FinishReason.TOOL_CALLS;
-  if (native && native.outputTokens > 0 && native.outputTokens >= maxOutputTokens) {
-    return FinishReason.LENGTH;
-  }
-  return FinishReason.STOP;
-}
-
-interface RawGeneration {
-  text: string;
-  thinkingText?: string;
-  native: NativeStreamResult | null;
-  fallbackTtftMs: number;
-  fallbackTokens: number;
-  elapsedMs: number;
-}
-
-// One streaming call, collected. Metrics come from the engine's completion
-// callback when it supplied them, otherwise from wall-clock timing here.
-async function runOnce(
-  call: (onToken: (t: string) => void) => Promise<NativeStreamResult>
-): Promise<RawGeneration> {
-  const startedAt = Date.now();
-  let firstAt = -1;
-  let tokens = 0;
-  let text = '';
-  const native = await call((token) => {
-    if (firstAt < 0) firstAt = Date.now();
-    tokens += 1;
-    text += token;
-  });
-  const split = splitThinking(text);
-  return {
-    text: split.thinking ? split.response : text,
-    thinkingText: split.thinking || undefined,
-    native,
-    fallbackTtftMs: firstAt < 0 ? 0 : firstAt - startedAt,
-    fallbackTokens: tokens,
-    elapsedMs: Date.now() - startedAt,
-  };
-}
-
-function metricsFrom(
-  raw: RawGeneration,
-  requestId: string,
-  model: string
-): {
-  inputTokens: number;
-  outputTokens: number;
-  timeToFirstTokenMs: number;
-  tokensPerSecond: number;
-  requestId: string;
-  model: string;
-} {
-  const n = raw.native;
-  const useNative = !!n && n.hasMetrics;
-  const outputTokens = useNative ? (n as NativeStreamResult).outputTokens : raw.fallbackTokens;
-  const ttft = useNative ? (n as NativeStreamResult).timeToFirstTokenMs : raw.fallbackTtftMs;
-  let tps = useNative ? (n as NativeStreamResult).tokensPerSecond : 0;
-  if (!tps) {
-    const genMs = Math.max(0, raw.elapsedMs - ttft);
-    tps = genMs > 0 ? outputTokens / (genMs / 1000) : 0;
-  }
-  return {
-    inputTokens: useNative ? (n as NativeStreamResult).inputTokens : 0,
-    outputTokens,
-    timeToFirstTokenMs: ttft,
-    tokensPerSecond: tps,
-    requestId,
-    model,
-  };
+/** What the `llm` namespace needs on top of {@link TextDeps}. */
+export interface LlmDeps extends TextDeps {
+  /**
+   * Bring a language model into residency. Supplied by the facade because the
+   * lifecycle load belongs to the `models` namespace, which owns downloading,
+   * registry rows, and the residency policy.
+   */
+  loadModel(id: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -362,8 +140,11 @@ export interface LlmNamespace {
   readonly tools: ToolsNamespace;
 }
 
-/** Build the `llm` namespace over a backend. */
-export function createLlmNamespace(deps: TextDeps): LlmNamespace {
+/** Build the `llm` namespace over the commons LLM proto ABI. */
+export function createLlmNamespace(deps: LlmDeps): LlmNamespace {
+  const llm = new LlmAbi(deps.backend);
+  const toolLoop = new ToolAbi(deps.backend);
+  const models = new ModelAbi(deps.backend);
   const registry = new Map<string, RegisteredTool>();
 
   const tools: ToolsNamespace = {
@@ -381,6 +162,9 @@ export function createLlmNamespace(deps: TextDeps): LlmNamespace {
     },
     list() {
       return [...registry.values()].map((t) => ({ ...t.definition }));
+    },
+    clear() {
+      registry.clear();
     },
   };
 
@@ -403,212 +187,255 @@ export function createLlmNamespace(deps: TextDeps): LlmNamespace {
     return [...registry.values()];
   };
 
-  const generateRaw = (
-    prompt: string,
-    options: LlmOptions,
-    shaped: ShapedPrompt,
-    grammar: string | undefined,
-    onToken: (t: string) => void
-  ): Promise<NativeStreamResult> =>
-    deps.backend.llmGenerate(
-      prompt,
-      toNativeGenerateOptions(
-        { ...options, systemPrompt: options.systemPrompt ?? shaped.systemPrompt },
-        { grammar, history: shaped.history }
-      ),
-      onToken
-    );
-
-  // Pick a tool (grammar-constrained), run it, and fold the result into the prompt.
-  // Returns the calls made and the prompt the final answer should be built from.
-  async function runToolLoop(
-    shaped: ShapedPrompt,
-    options: LlmOptions,
+  /**
+   * Run one call commons decided on. Validation already happened there unless
+   * the caller turned it off, so an unknown name here means the executor set
+   * is the authority and it does not know this tool.
+   */
+  async function invokeTool(
     available: RegisteredTool[],
-    onToolCall: (call: ToolCall) => void
-  ): Promise<string> {
-    const choice = options.toolChoice ?? LLM_DEFAULTS.toolChoice;
-    if (choice === 'NONE' || !available.length) return shaped.prompt;
-    const forced = typeof choice === 'object' ? choice.forced : undefined;
-    const candidates = forced
-      ? available.filter((t) => t.definition.name === forced)
-      : available;
-    if (forced && !candidates.length) {
-      throw SDKException.validationFailed({
-        fieldPath: 'options.toolChoice',
-        message: `forced tool '${forced}' is not registered`,
-      });
-    }
-    const allowNone = choice === 'AUTO';
-    const maxCalls = options.maxToolCalls ?? LLM_DEFAULTS.maxToolCalls;
-    const definitions = candidates.map((c) => c.definition);
-    let prompt = shaped.prompt;
-    // The selection round emits a JSON object, not an answer, so it gets its own
-    // budget: a caller asking for 24 answer tokens would otherwise have the tool
-    // call truncated mid-object and nothing would parse.
-    const selectionOptions: LlmOptions = {
-      ...options,
-      tools: [],
-      toolChoice: 'NONE',
-      maxOutputTokens: Math.max(TOOL_SELECTION_TOKENS, options.maxOutputTokens ?? 0),
-    };
-
-    for (let round = 0; round < maxCalls; round++) {
-      const grammar = toolPickerGrammar(definitions, allowNone && round > 0 ? true : allowNone);
-      let json = '';
-      await generateRaw(
-        toolPickerPrompt(prompt, definitions, allowNone),
-        selectionOptions,
-        { ...shaped, prompt },
-        grammar,
-        (t) => {
-          json += t;
-        }
-      );
-      let picked: { name?: string; arguments?: Record<string, unknown> };
-      try {
-        picked = JSON.parse(json.trim());
-      } catch {
-        // A malformed pick is fatal when the caller demanded a tool. Under AUTO the
-        // model was free to call nothing, so fall back to answering the prompt
-        // rather than failing a request that never needed a tool.
-        if (choice !== 'AUTO') {
-          throw SDKException.generationFailed(
-            `tool selection did not return valid JSON: ${json.trim()}`
-          );
-        }
-        return prompt;
-      }
-      if (!picked.name || picked.name === NO_TOOL) return prompt;
-      const tool = candidates.find((t) => t.definition.name === picked.name);
-      if (!tool) return prompt;
-      const args = picked.arguments ?? {};
-      const call: ToolCall = { id: newRequestId('call'), name: tool.definition.name, arguments: args };
-      const result = await tool.executor(args);
-      call.result = result;
-      onToolCall(call);
-      prompt = `${prompt}\n\nTool ${call.name}(${JSON.stringify(args)}) returned ${JSON.stringify(result)}.`;
-      // A forced or required choice is satisfied by one call; AUTO may chain.
-      if (choice !== 'AUTO') return prompt;
-    }
-    return prompt;
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const tool = available.find((t) => t.definition.name === name);
+    if (!tool) throw SDKException.validationFailed({
+      fieldPath: `tools.${name}`,
+      message: `no executor registered for tool '${name}'`,
+    });
+    return tool.executor(args);
   }
 
-  const structuredGrammar = (options: LlmOptions): string | undefined => {
-    const so = options.structuredOutput;
-    if (!so || so.strict === false) return undefined;
-    return jsonSchemaToGrammar(so.schema);
-  };
+  /**
+   * The model this request runs against. Commons owns residency, so "what is
+   * loaded" is a lifecycle question rather than a slot lookup.
+   */
+  async function resolveModel(requested: string | undefined): Promise<string> {
+    const current = await models.current({ includeModelMetadata: false });
+    if (!requested) {
+      if (current.found && current.modelId) return current.modelId;
+      throw SDKException.validationFailed({
+        fieldPath: 'options.model',
+        message: 'no language model is loaded — pass options.model or call models.load() first',
+      });
+    }
+    if (current.found && current.modelId === requested) return requested;
+    await deps.loadModel(requested);
+    return requested;
+  }
+
+  /**
+   * The run loop takes the turn being answered as `prompt` and everything
+   * before it as history, so a conversation splits at its last user turn.
+   */
+  function splitForToolLoop(messages: ProtoChatMessage[]): {
+    prompt: string;
+    history: string[];
+  } {
+    let turn = messages.length - 1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === MessageRole.MESSAGE_ROLE_USER) {
+        turn = i;
+        break;
+      }
+    }
+    return {
+      prompt: messages[turn]?.content ?? '',
+      history: messages.slice(0, Math.max(0, turn)).map((m) => m.content),
+    };
+  }
+
+  /** The tool policy for one request, as one `ToolCallingOptions`. */
+  function toolOptionsFor(
+    options: LlmOptions,
+    available: RegisteredTool[]
+  ): ToolCallingOptions {
+    const choice = toProtoToolChoice(options.toolChoice ?? LLM_DEFAULTS.toolChoice);
+    if (choice.forcedToolName && !available.some((t) => t.definition.name === choice.forcedToolName)) {
+      throw SDKException.validationFailed({
+        fieldPath: 'options.toolChoice',
+        message: `forced tool '${choice.forcedToolName}' is not registered`,
+      });
+    }
+    return ToolCallingOptions.fromPartial({
+      tools: available.map((t) => toProtoTool(t.definition)),
+      autoExecute: true,
+      systemPrompt: options.systemPrompt,
+      toolChoice: choice.mode,
+      forcedToolName: choice.forcedToolName,
+      maxToolCalls: options.maxToolCalls,
+      parallelToolCalls: options.parallelToolCalls ?? false,
+      validateCalls: options.validateCalls,
+      // Left at the proto default (false), matching Swift: after a call is
+      // executed the next turn is synthesis. Keeping tools live lets a small
+      // model call the same tool until it trips max_tool_calls, which commons
+      // reports as a failed run rather than an answer.
+      topP: options.topP,
+      disableThinking: options.reasoning?.mode === ReasoningMode.OFF,
+    });
+  }
+
+  /**
+   * Start the loop in commons. `onRun` hands the caller the cancel handle
+   * before the first generation, which is what lets a streaming caller stop a
+   * loop that is several tool rounds deep.
+   */
+  async function generateWithTools(
+    input: string | ChatMessage[],
+    options: LlmOptions,
+    available: RegisteredTool[],
+    requestId: string,
+    onToolCall?: (call: ToolCall) => void,
+    onRun?: (run: ToolRun) => void
+  ): Promise<GenerationResult> {
+    const model = await resolveModel(options.model);
+    const { prompt, history } = splitForToolLoop(toProtoMessages(input));
+    const run = toolLoop.start(
+      ToolCallingSessionCreateRequest.fromPartial({
+        prompt,
+        history: toHistoryTurns(history),
+        options: toolOptionsFor(options, available),
+      }),
+      (name, args) => invokeTool(available, name, args),
+      onToolCall
+    );
+    onRun?.(run);
+    const result = await run.result;
+    const calls = toPublicCalls(result);
+    return {
+      text: result.text,
+      thinkingText: result.thinkingContent || undefined,
+      toolCalls: calls,
+      finishReason: calls.length ? FinishReason.TOOL_CALLS : FinishReason.STOP,
+      inputTokens: result.usage?.inputTokens ?? 0,
+      outputTokens: result.usage?.outputTokens ?? 0,
+      timeToFirstTokenMs: result.usage?.ttftMs ?? 0,
+      tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
+      requestId,
+      model,
+    };
+  }
+
+  /** One plain generation, as commons reported it. */
+  async function generateRaw(
+    input: string | ChatMessage[],
+    options: LlmOptions
+  ): Promise<{ result: LLMGenerationResult; requestId: string; model: string }> {
+    const model = await resolveModel(options.model);
+    const requestId = newRequestId();
+    const result = await llm.generate({
+      requestId,
+      modelId: model,
+      conversationId: '',
+      options: toProtoOptions(options),
+      messages: toProtoMessages(input),
+    });
+    return { result, requestId, model };
+  }
+
+  function toGenerationResult(
+    result: LLMGenerationResult,
+    requestId: string,
+    model: string
+  ): GenerationResult {
+    return {
+      text: result.text,
+      thinkingText: result.thinkingContent || undefined,
+      toolCalls: [],
+      finishReason: toPublicFinishReason(result.finishReason),
+      ...toPublicMetrics(result, requestId, model),
+    };
+  }
+
+  /** Whether this request should go through the commons tool loop at all. */
+  function toolsFor(options: LlmOptions): RegisteredTool[] {
+    if ((options.toolChoice ?? LLM_DEFAULTS.toolChoice) === 'NONE') return [];
+    return activeTools(options);
+  }
 
   async function generate(
     input: string | ChatMessage[],
     options: LlmOptions = {}
   ): Promise<GenerationResult> {
     deps.requireReady();
-    const model = await resolveModelFor(deps, 'llm', ModelCategory.LANGUAGE, options.model);
-    const shaped = shapePrompt(input);
-    const requestId = newRequestId();
-    const toolCalls: ToolCall[] = [];
-    const available = activeTools(options);
-    const prompt = available.length
-      ? await runToolLoop(shaped, options, available, (c) => toolCalls.push(c))
-      : shaped.prompt;
-    const raw = await runOnce((onToken) =>
-      generateRaw(prompt, options, { ...shaped, prompt }, structuredGrammar(options), onToken)
-    );
-    const includeThoughts = options.reasoning?.includeInOutput ?? false;
-    return {
-      text: raw.text,
-      thinkingText: includeThoughts || raw.thinkingText ? raw.thinkingText : undefined,
-      toolCalls,
-      finishReason: finishReasonFor(
-        raw.native,
-        options.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-        toolCalls
-      ),
-      ...metricsFrom(raw, requestId, model),
-    };
+    const available = toolsFor(options);
+    if (available.length) {
+      return generateWithTools(input, options, available, newRequestId());
+    }
+    const raw = await generateRaw(input, options);
+    return toGenerationResult(raw.result, raw.requestId, raw.model);
   }
 
+  /**
+   * A tool-enabled turn does not stream tokens. Commons runs its generations
+   * with `streaming_enabled = RAC_FALSE` inside the run loop
+   * (tool_calling_generation_internal.h), so the honest events are the tool
+   * calls as they execute and then one completed result. Plain turns stream
+   * token by token as before.
+   */
   function generateStream(
     input: string | ChatMessage[],
     options: LlmOptions = {}
   ): AsyncIterableIterator<GenerationEvent> {
     deps.requireReady();
     const requestId = newRequestId();
+    const available = toolsFor(options);
+    if (available.length) {
+      let run: ToolRun | null = null;
+      return bridgeStream<GenerationEvent>(
+        async (sink) => {
+          sink.push({ type: 'started', requestId });
+          const result = await generateWithTools(
+            input,
+            options,
+            available,
+            requestId,
+            (call) => sink.push({ type: 'toolCall', toolCall: call }),
+            (started) => {
+              run = started;
+            }
+          );
+          sink.push({ type: 'completed', result });
+        },
+        () => run?.cancel() ?? Promise.resolve()
+      );
+    }
     return bridgeStream<GenerationEvent>(
       async (sink) => {
-        const model = await resolveModelFor(deps, 'llm', ModelCategory.LANGUAGE, options.model);
-        const shaped = shapePrompt(input);
+        const model = await resolveModel(options.model);
         sink.push({ type: 'started', requestId });
-        const toolCalls: ToolCall[] = [];
-        const available = activeTools(options);
-        const prompt = available.length
-          ? await runToolLoop(shaped, options, available, (call) => {
-              toolCalls.push(call);
-              sink.push({ type: 'toolCall', toolCall: call });
-            })
-          : shaped.prompt;
-
-        const splitter = new ThinkingSplitter();
-        const includeThoughts = options.reasoning?.includeInOutput ?? false;
-        let answer = '';
-        let thoughts = '';
-        const startedAt = Date.now();
-        let firstAt = -1;
-        let tokenCount = 0;
-        const native = await generateRaw(
-          prompt,
-          options,
-          { ...shaped, prompt },
-          structuredGrammar(options),
-          (token) => {
-            if (firstAt < 0) firstAt = Date.now();
-            tokenCount += 1;
-            for (const part of splitter.push(token)) {
-              if (part.kind === TokenKind.THOUGHT) {
-                thoughts += part.text;
-                if (includeThoughts) sink.push({ type: 'token', text: part.text, kind: part.kind });
-              } else {
-                answer += part.text;
-                sink.push({ type: 'token', text: part.text, kind: part.kind });
+        for await (const event of llm.generateStream({
+          requestId,
+          modelId: model,
+          conversationId: '',
+          options: toProtoOptions(options),
+          messages: toProtoMessages(input),
+        })) {
+          switch (event.eventKind) {
+            case LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN:
+              sink.push({ type: 'token', text: event.token, kind: TokenKind.TEXT });
+              break;
+            // Commons emits these only when reasoning.includeInOutput is set, so
+            // there is no second gate here.
+            case LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING:
+              sink.push({ type: 'token', text: event.token, kind: TokenKind.THOUGHT });
+              break;
+            case LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED:
+              if (event.result) {
+                sink.push({
+                  type: 'completed',
+                  result: toGenerationResult(event.result, requestId, model),
+                });
               }
-            }
-          }
-        );
-        for (const part of splitter.flush()) {
-          if (part.kind === TokenKind.THOUGHT) {
-            thoughts += part.text;
-            if (includeThoughts) sink.push({ type: 'token', text: part.text, kind: part.kind });
-          } else {
-            answer += part.text;
-            sink.push({ type: 'token', text: part.text, kind: part.kind });
+              break;
+            case LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR:
+              if (event.error) throw SDKException.fromProto(event.error);
+              break;
+            default:
+              break;
           }
         }
-        const raw: RawGeneration = {
-          text: answer,
-          thinkingText: thoughts || undefined,
-          native,
-          fallbackTtftMs: firstAt < 0 ? 0 : firstAt - startedAt,
-          fallbackTokens: tokenCount,
-          elapsedMs: Date.now() - startedAt,
-        };
-        sink.push({
-          type: 'completed',
-          result: {
-            text: answer,
-            thinkingText: thoughts || undefined,
-            toolCalls,
-            finishReason: finishReasonFor(
-              native,
-              options.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-              toolCalls
-            ),
-            ...metricsFrom(raw, requestId, model),
-          },
-        });
       },
-      () => deps.backend.llmCancel()
+      () => llm.cancel()
     );
   }
 
@@ -617,28 +444,38 @@ export function createLlmNamespace(deps: TextDeps): LlmNamespace {
     schema: JsonSchema,
     options: LlmOptions = {}
   ): Promise<StructuredResult<T>> {
-    const merged: LlmOptions = { ...options, structuredOutput: { schema, strict: true } };
-    const result = await generate(prompt, merged);
-    const raw = result.text.trim();
+    deps.requireReady();
+    const raw = await generateRaw(prompt, {
+      ...options,
+      structuredOutput: { schema, strict: options.structuredOutput?.strict ?? true },
+    });
+    // Commons extracts the document during generation; the parse call is the
+    // fallback for a backend that answered without populating json_output.
+    let json = raw.result.jsonOutput ?? '';
+    let valid = raw.result.structuredOutputValidation?.isValid ?? false;
+    if (!json) {
+      const parsed = await llm.parseStructured({
+        requestId: raw.requestId,
+        text: raw.result.text,
+        options: { schema: JSON.stringify(schema) },
+        metadata: {},
+      });
+      json = parsed.json;
+      valid = parsed.validation?.isValid ?? false;
+    }
     let value: T;
-    let valid = true;
     try {
-      value = JSON.parse(raw) as T;
+      value = JSON.parse(json) as T;
     } catch {
       value = undefined as unknown as T;
       valid = false;
     }
     return {
       value,
-      raw,
+      raw: json,
       valid,
-      finishReason: result.finishReason,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      timeToFirstTokenMs: result.timeToFirstTokenMs,
-      tokensPerSecond: result.tokensPerSecond,
-      requestId: result.requestId,
-      model: result.model,
+      finishReason: toPublicFinishReason(raw.result.finishReason),
+      ...toPublicMetrics(raw.result, raw.requestId, raw.model),
     };
   }
 
@@ -672,46 +509,75 @@ export interface VlmNamespace {
   ): AsyncIterableIterator<GenerationEvent>;
 }
 
-// The addon takes a path, base64, or raw RGB; encoded bytes go across as base64
-// because rac_vlm_image_t has no "encoded buffer" variant.
-function toNativeImage(input: ImageInput): {
-  path?: string;
-  base64?: string;
-  rgb?: Uint8Array;
-  width?: number;
-  height?: number;
-} {
-  requireOneOf(input, ['path', 'bytes', 'rgb'], 'image');
-  if (input.path) return { path: input.path };
-  if (input.rgb) return { rgb: input.rgb, width: input.width, height: input.height };
-  return { base64: Buffer.from(input.bytes as Uint8Array).toString('base64') };
+/** What the `vlm` namespace needs on top of {@link TextDeps}. */
+export interface VlmDeps extends TextDeps {
+  /** Bring a vision model into residency; owned by the `models` namespace. */
+  loadModel(id: string): Promise<void>;
 }
 
-/** Build the `vlm` namespace over a backend. */
-export function createVlmNamespace(deps: TextDeps): VlmNamespace {
+/** Build the `vlm` namespace over the commons VLM proto ABI. */
+export function createVlmNamespace(deps: VlmDeps): VlmNamespace {
+  const vlm = new VlmAbi(deps.backend);
+  const models = new ModelAbi(deps.backend);
+
+  /** The vision model this request runs against, from the lifecycle store. */
+  async function resolveModel(requested: string | undefined): Promise<string> {
+    const current = await models.current({
+      category: ProtoModelCategory.MODEL_CATEGORY_VISION,
+      includeModelMetadata: false,
+    });
+    if (!requested) {
+      if (current.found && current.modelId) return current.modelId;
+      throw SDKException.validationFailed({
+        fieldPath: 'options.model',
+        message: 'no vision model is loaded — pass options.model or call models.load() first',
+      });
+    }
+    if (current.found && current.modelId === requested) return requested;
+    await deps.loadModel(requested);
+    return requested;
+  }
+
+  function requestFor(
+    input: ImageInput,
+    prompt: string,
+    options: LlmOptions,
+    requestId: string,
+    model: string
+  ): { request: VLMGenerationRequest; release(): void } {
+    const materialized = materializeImage(input);
+    return {
+      release: materialized.release,
+      request: VLMGenerationRequest.fromPartial({
+        requestId,
+        modelId: model,
+        images: [materialized.image],
+        prompt,
+        options: toProtoOptions(options),
+      }),
+    };
+  }
+
   async function generate(
     input: ImageInput,
     prompt: string,
     options: LlmOptions = {}
   ): Promise<GenerationResult> {
     deps.requireReady();
-    const model = await resolveModelFor(deps, 'vlm', ModelCategory.VISION, options.model);
+    const model = await resolveModel(options.model);
     const requestId = newRequestId();
-    const img = toNativeImage(input);
-    const raw = await runOnce((onToken) =>
-      deps.backend.vlmGenerate(img, prompt, toNativeGenerateOptions(options), onToken)
-    );
-    return {
-      text: raw.text,
-      thinkingText: raw.thinkingText,
-      toolCalls: [],
-      finishReason: finishReasonFor(
-        raw.native,
-        options.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-        []
-      ),
-      ...metricsFrom(raw, requestId, model),
-    };
+    const { request, release } = requestFor(input, prompt, options, requestId, model);
+    try {
+      const result = await vlm.generate(request);
+      return {
+        text: result.text,
+        toolCalls: [],
+        finishReason: FinishReason[toPublicVlmFinishReason(result.finishReason)],
+        ...toPublicVlmMetrics(result, requestId, model),
+      };
+    } finally {
+      release();
+    }
   }
 
   function generateStream(
@@ -723,46 +589,45 @@ export function createVlmNamespace(deps: TextDeps): VlmNamespace {
     const requestId = newRequestId();
     return bridgeStream<GenerationEvent>(
       async (sink) => {
-        const model = await resolveModelFor(deps, 'vlm', ModelCategory.VISION, options.model);
-        const img = toNativeImage(input);
-        sink.push({ type: 'started', requestId });
-        const startedAt = Date.now();
-        let firstAt = -1;
-        let tokenCount = 0;
-        let text = '';
-        const native = await deps.backend.vlmGenerate(
-          img,
-          prompt,
-          toNativeGenerateOptions(options),
-          (token) => {
-            if (firstAt < 0) firstAt = Date.now();
-            tokenCount += 1;
-            text += token;
-            sink.push({ type: 'token', text: token, kind: TokenKind.TEXT });
+        const model = await resolveModel(options.model);
+        const { request, release } = requestFor(input, prompt, options, requestId, model);
+        try {
+          for await (const event of vlm.generateStream(request)) {
+          switch (event.kind) {
+            case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_STARTED:
+              sink.push({ type: 'started', requestId });
+              break;
+            case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
+              sink.push({ type: 'token', text: event.token, kind: TokenKind.TEXT });
+              break;
+            case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED:
+              if (event.result) {
+                sink.push({
+                  type: 'completed',
+                  result: {
+                    text: event.result.text,
+                    toolCalls: [],
+                    finishReason: FinishReason[toPublicVlmFinishReason(event.result.finishReason)],
+                    ...toPublicVlmMetrics(event.result, requestId, model),
+                  },
+                });
+              }
+              break;
+            case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
+              if (event.error) throw SDKException.fromProto(event.error);
+              break;
+            // IMAGE_ENCODED marks the encode/decode boundary. There is no
+            // public event for it yet, and inventing one here would put a
+            // vision-only shape into the shared GenerationEvent union.
+              default:
+                break;
+            }
           }
-        );
-        const raw: RawGeneration = {
-          text,
-          native,
-          fallbackTtftMs: firstAt < 0 ? 0 : firstAt - startedAt,
-          fallbackTokens: tokenCount,
-          elapsedMs: Date.now() - startedAt,
-        };
-        sink.push({
-          type: 'completed',
-          result: {
-            text,
-            toolCalls: [],
-            finishReason: finishReasonFor(
-              native,
-              options.maxOutputTokens ?? LLM_DEFAULTS.maxOutputTokens,
-              []
-            ),
-            ...metricsFrom(raw, requestId, model),
-          },
-        });
+        } finally {
+          release();
+        }
       },
-      () => deps.backend.vlmCancel()
+      () => vlm.cancel()
     );
   }
 

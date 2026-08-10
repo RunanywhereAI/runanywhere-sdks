@@ -395,10 +395,15 @@ _rac_registry_unload_plugin
 _rac_bundle_policy_register
 _rac_bundle_policy_unregister
 
-# Desktop host bootstrap used by the standalone CLI.
+# Desktop host bootstrap, shared by rcli and the Electron addon. Registering the
+# HTTP transport also installs the internal desktop provider into the ordinary
+# rac_device_manager callback surface; no second desktop-device API is exposed.
 _rac_desktop_adapter_init
 _rac_desktop_default_base_dir
+_rac_desktop_device_model
 _rac_desktop_http_transport_register
+_rac_desktop_os_version
+_rac_desktop_platform_name
 
 # Runtime registry — L1 runtime plugin lifecycle (CPU, Metal, CoreML, ONNX,
 # CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.

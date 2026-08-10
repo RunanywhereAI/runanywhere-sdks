@@ -6,10 +6,21 @@
 // the real addon + model resolver into it and manages the parent port.
 import { NativeBackend } from '../api/native-backend';
 import { addon } from '../bridge';
-import { isCatalogId } from '../catalog';
+import { isCatalogId, registerCatalog } from '../catalog';
 import { resolveModel, isRemoteSource, assertRemoteSupported, ModelKind, modelStatus, pathExists } from '../download';
-import { dispatch } from './dispatch';
-import { RpcRequest } from './rpc';
+import { dispatch, DuplexCalls } from './dispatch';
+import { isCallReply, RpcRequest } from './rpc';
+
+// Catalog registration is per process, and this is the process that resolves and
+// downloads models. RunAnywhereMain passes the app's catalog module through
+// RUNANYWHERE_CATALOG_PATH; without it a catalog id reaching the host is just an
+// unknown string.
+const catalogPath = process.env.RUNANYWHERE_CATALOG_PATH;
+if (catalogPath) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const staged = require(catalogPath) as { CATALOG?: Record<string, unknown> };
+  if (staged?.CATALOG) registerCatalog(staged.CATALOG as never);
+}
 
 // Map each load method to its model kind so the shared remote-source guard
 // (assertRemoteSupported) rejects a URL/HF STT/TTS/embedder consistently with the
@@ -95,10 +106,15 @@ const api = new Proxy(addonMap, {
   },
 }) as Record<string, (...a: unknown[]) => unknown>;
 
+// One per host: duplex replies are correlated by request id, and every port
+// this process serves dispatches through the same registry.
+const duplex = new DuplexCalls();
+
 const deps = {
   api,
   getVersion: () => addon.version,
   resolveLoadArgs,
+  duplex,
 };
 
 parentPort.on('message', (e) => {
@@ -108,7 +124,14 @@ parentPort.on('message', (e) => {
   // in-flight work isn't posted into the void and the port can be released
   // (avoids a per-reload port leak in the utility process).
   let alive = true;
-  port.on('message', (ev) => { if (alive) dispatch(port, ev.data as RpcRequest, deps); });
+  port.on('message', (ev) => {
+    if (!alive) return;
+    if (isCallReply(ev.data)) {
+      duplex.settle(ev.data);
+      return;
+    }
+    dispatch(port, ev.data as RpcRequest, deps);
+  });
   port.on('close', () => { alive = false; });
   port.start();
   parentPort.postMessage({ ready: true });

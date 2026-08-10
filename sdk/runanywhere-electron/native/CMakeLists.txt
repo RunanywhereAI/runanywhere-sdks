@@ -50,7 +50,15 @@ if(RAC_BUILD_ELECTRON_ADDON)
         # build resolves these via cmake-js (CMAKE_JS_INC / CMAKE_JS_LIB) instead.
         set(RAC_NODE_DEV_DIR "$ENV{LOCALAPPDATA}/node-gyp/Cache/24.15.0"
             CACHE PATH "node-gyp dev files dir (contains include/node + <arch>/node.lib)")
-        set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/x64/node.lib"
+        # node-gyp keys the import library by target arch, so an ARM64 addon must
+        # link arm64/node.lib — x64/node.lib fails the link with LNK1112.
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$" OR
+           CMAKE_GENERATOR_PLATFORM MATCHES "^([Aa][Rr][Mm]64)$")
+            set(_ra_node_arch "arm64")
+        else()
+            set(_ra_node_arch "x64")
+        endif()
+        set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/${_ra_node_arch}/node.lib"
             CACHE FILEPATH "Windows node import library (node.lib)")
         if(NOT EXISTS "${RAC_NODE_LIB}")
             message(FATAL_ERROR
@@ -67,7 +75,9 @@ if(RAC_BUILD_ELECTRON_ADDON)
         set(_ra_addon_platform_srcs posix_platform_adapter.cpp)
     endif()
 
-    add_library(runanywhere_native SHARED addon.cpp ${_ra_addon_platform_srcs})
+    add_library(runanywhere_native SHARED
+        addon.cpp proto_bridge.cpp model_bridge.cpp llm_bridge.cpp tool_bridge.cpp vlm_bridge.cpp speech_bridge.cpp voice_bridge.cpp data_bridge.cpp lora_bridge.cpp download_bridge.cpp
+        ${_ra_addon_platform_srcs})
     set_target_properties(runanywhere_native PROPERTIES PREFIX "" SUFFIX ".node")
 
     target_include_directories(runanywhere_native PRIVATE
@@ -97,8 +107,11 @@ if(RAC_BUILD_ELECTRON_ADDON)
     # are present via RAC_HAVE_BACKEND_<X>. Default CPU build provides llamacpp +
     # onnx + sherpa. QHexRT / MLX / CoreML / cloud self-link when their upstream
     # RAC_BACKEND_* flag builds the target — no wrapper source change required.
-    # Do NOT claim Windows NPU readiness: qhexrt may link as a shell, but Snapdragon
-    # Windows packaging is a separate gate.
+    # RAC_HAVE_BACKEND_QHEXRT only says the target exists: on Windows x64 (and any
+    # non-ARM64 host) qhexrt links as the not-routable shell, and even on ARM64 it
+    # is routable only with a win-arm64 prebuilt staged. Actually RUNNING a model
+    # additionally needs the QAIRT DLLs + the v81 skel and its .cat staged flat
+    # beside the addon — see engines/qhexrt/CMakeLists.txt.
     set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
     set(_ra_linked_backends "")
     foreach(_ra_b IN LISTS _ra_backends)
@@ -110,6 +123,15 @@ if(RAC_BUILD_ELECTRON_ADDON)
         endif()
     endforeach()
     message(STATUS "runanywhere-electron: engine backends -> ${_ra_linked_backends}")
+
+    # RAG. Commons only defines the rac_rag_*_proto C ABI when RAC_BACKEND_RAG is
+    # on, so without this the addon would fail to LINK (not merely lose a feature)
+    # on any preset that turns RAG off — which windows-arm64-release does.
+    if(RAC_BACKEND_RAG)
+        target_compile_definitions(runanywhere_native PRIVATE RAC_ELECTRON_HAVE_RAG)
+    else()
+        message(STATUS "runanywhere-electron: RAG OFF — the rag* exports report FEATURE_NOT_AVAILABLE")
+    endif()
 
     # Desktop control plane (telemetry + auth). When the desktop adapter is built
     # into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport

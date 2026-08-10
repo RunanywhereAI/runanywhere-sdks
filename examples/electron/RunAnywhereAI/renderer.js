@@ -2,8 +2,9 @@
 // persistence, markdown chat with per-message metrics (generateStream), a Models
 // panel (grouped catalog + add-any-model + download + load/unload + storage), a
 // Settings panel (system prompt / temperature / max-tokens / encrypted API key),
-// and workbenches for structured output, tools, vision, embeddings, voice, and
-// VAD. Feature helpers are shared with the headless self-test.
+// and workbenches for structured output, tools, vision, embeddings, voice, VAD,
+// speaker diarization, and semantic segmentation. Feature helpers are shared
+// with the headless self-test.
 const ra = window.runanywhere;
 const store = window.appStore;
 const $ = (id) => document.getElementById(id);
@@ -14,43 +15,120 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB');
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
-// Tools the model can call. `execute` actually RUNS locally — a tool call that is
-// only parsed and never executed looks broken. get_weather has no offline data
-// source, so it returns an openly-labelled sample instead of pretending.
+// Arithmetic for the `calculate` tool — a hand-written recursive descent over
+// `+ - * / % ( )`, precedence and all.
+//
+// The obvious one-liner is `Function("return (" + src + ")")`, and that is what
+// this used to be. It cannot work HERE: index.html sets `script-src 'self'`, so
+// the Function constructor is refused by the page's own CSP and every call threw
+// EvalError — the tool reported "could not evaluate" for input as ordinary as
+// `(37 + 5) * 3`, and the model then apologised for a failure that was the app's.
+// Nothing was caught earlier because the failure needs a model that actually
+// emits a tool call to appear at all.
+function evalArithmetic(src) {
+  let i = 0;
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  const eat = (ch) => { ws(); if (src[i] === ch) { i++; return true; } return false; };
+  const expr = () => {
+    let value = term();
+    for (;;) {
+      if (eat('+')) value += term();
+      else if (eat('-')) value -= term();
+      else return value;
+    }
+  };
+  const term = () => {
+    let value = unary();
+    for (;;) {
+      if (eat('*')) value *= unary();
+      else if (eat('/')) value /= unary();
+      else if (eat('%')) value %= unary();
+      else return value;
+    }
+  };
+  const unary = () => {
+    if (eat('-')) return -unary();
+    if (eat('+')) return unary();
+    return atom();
+  };
+  const atom = () => {
+    ws();
+    if (eat('(')) {
+      const value = expr();
+      if (!eat(')')) throw new Error('missing )');
+      return value;
+    }
+    const start = i;
+    while (i < src.length && /[\d.]/.test(src[i])) i++;
+    if (i === start) throw new Error('expected a number at ' + start);
+    const value = Number(src.slice(start, i));
+    if (!Number.isFinite(value)) throw new Error('not a number: ' + src.slice(start, i));
+    return value;
+  };
+  const result = expr();
+  ws();
+  if (i !== src.length) throw new Error('unexpected input at ' + i);
+  if (!Number.isFinite(result)) throw new Error('result is not finite');
+  return result;
+}
+
+// Built-in tools the model can call. Every one answers from something this
+// machine actually knows — the clock, the runtime, the battery, arithmetic — so
+// a tool call that succeeds is never a fabricated answer dressed as a lookup.
+// `execute` runs locally; commons drives the loop and calls back into here.
 const TOOLS = [
   {
     name: 'get_current_time',
-    description: "Get the user's current date and time",
-    parameters: { type: 'object', properties: { timezone: { type: 'string' } }, required: [] },
-    execute: () => new Date().toLocaleString(),
+    description: 'Returns the current date, time and timezone on the device.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    execute: () => {
+      const now = new Date();
+      return {
+        datetime: now.toLocaleString(),
+        iso8601: now.toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+    },
+  },
+  {
+    name: 'get_device_info',
+    description: 'Returns details about the device: platform, browser engine and CPU cores.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    execute: () => ({
+      platform: navigator.platform,
+      user_agent: navigator.userAgent,
+      language: navigator.language,
+      cpu_cores: navigator.hardwareConcurrency,
+    }),
+  },
+  {
+    name: 'get_battery_level',
+    description: 'Returns the current battery charge level as a percentage.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    execute: async () => {
+      try {
+        const b = await navigator.getBattery();
+        return { battery_percent: Math.round(b.level * 100) + '%', charging: b.charging };
+      } catch {
+        return { battery_percent: 'unknown' };
+      }
+    },
   },
   {
     name: 'calculate',
-    description: 'Evaluate a basic arithmetic expression, e.g. "12 * (3 + 4)"',
-    parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] },
+    description: "Evaluates a math expression with + - * / and parentheses, e.g. '(3 + 4) * 2'.",
+    parameters: {
+      type: 'object',
+      properties: { expression: { type: 'string', description: "The expression to evaluate, e.g. '(3 + 4) * 2'." } },
+      required: ['expression'],
+    },
     execute: ({ expression }) => {
-      // Arithmetic only — never eval() model output.
       const src = String(expression || '');
-      if (!/^[\d\s+\-*/().%]+$/.test(src)) return 'unsupported expression (digits and + - * / ( ) only)';
-      try { return String(Function(`"use strict";return (${src})`)()); } catch { return 'could not evaluate'; }
+      // Arithmetic only — never eval() model output.
+      if (!/^[\d\s+\-*/().%]+$/.test(src)) return { error: 'unsupported expression (digits and + - * / ( ) only)' };
+      try { return { result: String(evalArithmetic(src)) }; }
+      catch (e) { return { error: `could not evaluate '${src}': ${e.message}` }; }
     },
-  },
-  {
-    name: 'set_timer',
-    description: 'Start a countdown timer',
-    parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds'] },
-    execute: ({ seconds, label }) => {
-      const secs = Math.max(1, Math.min(3600, Number(seconds) || 0));
-      setTimeout(() => flashToast(`Timer finished${label ? ': ' + label : ''}`), secs * 1000);
-      return `timer started for ${secs}s${label ? ` (${label})` : ''}`;
-    },
-  },
-  {
-    name: 'get_weather',
-    description: 'Get the current weather for a city',
-    parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city'] },
-    execute: ({ city, unit }) =>
-      `(sample data — this build has no weather source) 18°${unit === 'fahrenheit' ? 'F' : 'C'}, clear in ${city}`,
   },
 ];
 
@@ -64,130 +142,80 @@ const DEFAULT_SYSTEM_PROMPT =
   'When asked about their name, age or preferences, answer using what the user said earlier, ' +
   'in the second person ("Your name is ..."). Never claim the user\'s details as your own. ' +
   'Answer in one or two short sentences unless asked for more.';
-let settings = { systemPrompt: DEFAULT_SYSTEM_PROMPT, temperature: 0.3, maxTokens: 512, reasoning: false };
+// The composer pills are `reasoning` and `tools`, both persisted: a turn toggle
+// the user has to re-arm after every restart reads as a bug. `reasoning` is the
+// same switch the Settings panel owns, surfaced where it is used.
+let settings = { systemPrompt: DEFAULT_SYSTEM_PROMPT, temperature: 0.3, maxTokens: 1024, reasoning: false, tools: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
 let customModels = []; // [{ id, source, type, label, downloaded }]
 
-// ---- lazily-loaded model handles ----
-const handles = {};
-const ensure = (k, fn) => (handles[k] ??= fn());
 // 2B rather than 0.8B: at 0.8B the model absorbs the user's facts but
 // re-attributes them to itself ("I am 21 years old"). Measured 1/3 vs 3/3 on a
 // multi-fact recall probe. 1.2GB is still a small download.
 const DEFAULT_LLM = 'qwen3.5-2b';
-// The chat's active LLM. Loading another LLM from the Models tab replaces it (the
-// backend keeps one loaded at a time), so we track it in loadedById/loadedType too
-// to keep the Models badges coherent — exactly one LLM ever shows "loaded".
-const llm = () => acquire('llm');
-const embedder = () => acquire('embedder');
-const vlm = () => acquire('vlm');
-const stt = () => acquire('stt');
-const tts = () => acquire('tts');
 
 // ---- per-tab model selection -------------------------------------------------
-// The backend keeps ONE slot PER MODALITY, so each tab can hold its own model and
-// tabs of different modalities never fight. `settings.models` is the user's choice
-// per modality (persisted); `acquire()` is the single place that turns a choice
-// into a loaded handle — download-if-needed, then load, memoized per modality.
-const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'qwen3.5-0.8b-vl', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac' };
-const MODALITY_LABEL = { llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text', tts: 'Text-to-speech' };
+// `settings.models` is the user's choice per modality, persisted by id. Residency
+// is the SDK's: ra.models.load makes a model resident and releases others itself
+// when the machine is short of memory. The app used to decide that (model-policy.js,
+// deleted) by unloading whatever the current screen did not name, which evicted
+// models even on a machine with memory to spare.
+const DEFAULT_MODELS = {
+  llm: DEFAULT_LLM, vlm: 'qwen3.5-0.8b-vl', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac',
+  diarization: 'sortformer', segmentation: 'segformer-b0-ade-512',
+};
+const MODALITY_LABEL = {
+  llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text',
+  tts: 'Text-to-speech', diarization: 'Diarization model', segmentation: 'Segmentation model',
+};
+// The app groups models by modality; commons keys them by category.
+const MODALITY_CATEGORY = {
+  llm: 'LANGUAGE', vlm: 'VISION', embedder: 'EMBEDDING', stt: 'SPEECH_TO_TEXT',
+  tts: 'TEXT_TO_SPEECH', diarization: 'DIARIZATION', segmentation: 'SEGMENTATION',
+};
+// Which model chips a tab offers. Presentational only.
+const TAB_MODALITIES = {
+  chat: ['llm'],
+  vision: ['vlm'],
+  embeddings: ['embedder'],
+  voice: ['stt', 'llm', 'tts'],
+  rag: ['embedder', 'llm'],
+  structured: ['llm'],
+  tools: ['llm'],
+  vad: [],
+  diarization: ['diarization'],
+  segmentation: ['segmentation'],
+};
 const selectedModel = (m) => (settings.models && settings.models[m]) || DEFAULT_MODELS[m];
 
-// Unload a modality's model and forget its badges. Safe to call for a slot that
-// holds nothing.
-async function release(modality) {
-  const h = handles[modality];
-  delete handles[modality];
-  delete handles[`${modality}:id`];
-  if (h) {
-    try { await unloaders[modality](await h); } catch { /* already gone */ }
-  }
-  for (const k of Object.keys(loadedById)) if (loadedType[k] === modality) forgetLoaded(k);
-}
-
-/** Free every model the current screen does not need. */
-async function releaseUnneeded(acquiring) {
-  const loaded = Object.keys(loaders).filter((m) => handles[m]);
-  const drop = modalitiesToRelease(currentTab, acquiring, loaded);
-  for (const m of drop) {
-    setStatus(`releasing ${m}…`);
-    await release(m);
-  }
-  if (drop.length) renderModelChips();
-  return drop;
-}
-
-// A model is identified EVERYWHERE by its id (a catalog id, or the id of a custom
-// entry). Only the loader needs the underlying source — an HF repo, URL or file
-// path — so the mapping lives here and nowhere else. Persisting the source instead
-// would mean the Models tab and the chip picker stored different things for the
-// same model, and the saved choice would not resolve on restart.
-function modelSource(id) {
-  const custom = customModels.find((m) => m.id === id);
-  return custom ? custom.source : id;
-}
-
-async function acquire(modality) {
-  const id = selectedModel(modality);
-  // Re-loading is only needed when the choice changed or nothing is loaded yet.
-  if (handles[modality] && handles[`${modality}:id`] === id) return handles[modality];
-  handles[`${modality}:id`] = id;
-  const p = (async () => {
-    // Nothing evicts anything automatically — the backend keeps a slot per
-    // modality — so without this the app accumulates every model it has used
-    // (chat's LLM + a VLM + STT + TTS) until it exhausts memory.
-    await releaseUnneeded(modality);
-    setStatus(`loading ${id}…`);
-    try {
-      const h = await loaders[modality](modelSource(id));
-      loadedById[id] = h; loadedType[id] = modality;
-      return h;
-    } finally { setStatus('ready'); }
-  })();
-  // Don't memoize a rejection — one failed download would poison the modality
-  // for the rest of the session. Clear the slot ONLY if it still holds this
-  // attempt: a slow failing load can reject long after selectModel() + a fresh
-  // acquire() installed a healthy handle, and dropping that one would silently
-  // reload the model on next use.
-  const memo = p.catch((e) => {
-    if (handles[modality] === memo) { delete handles[modality]; delete handles[`${modality}:id`]; }
-    throw e;
-  });
-  handles[modality] = memo;
-  return memo;
-}
-
-// Switch a modality to another model: drop the old handle so the next acquire()
-// loads the new one. Persisted so the choice survives a restart.
+// Switch a modality to another model. Persisted so the choice survives a restart;
+// nothing loads until a screen asks for it, and commons swaps the resident model
+// of that category when it does.
 async function selectModel(modality, id) {
   settings.models = { ...(settings.models || {}), [modality]: id };
   try { await store.saveSettings(settings); } catch { /* optional */ }
-  await release(modality);
   renderModelChips();
   if (currentTab === 'models') renderModels();
 }
 
-// The backend keeps one slot PER MODALITY (verified on device: loading a VLM does
-// NOT disturb the LLM, but loading a second LLM evicts the first). So the memoized
-// handle above goes stale whenever another LLM is loaded, and every later call
-// fails with "No model loaded". A host respawn invalidates it too. EVERY LLM caller
-// must go through withLlm so the recovery lives in one place instead of only chat.
-// Anchored on the specific "your handle is gone" messages the host emits. A loose
-// /model.*load/ also matched real failures like "model failed to load: not enough
-// memory", so an OOM would immediately retry the same multi-GB load instead of
-// surfacing the error.
-const STALE_MODEL_RE = /no model loaded|model not loaded|no model is loaded|invalid handle|unknown handle|host exited|host is not running/i;
-async function withLlm(fn) {
-  try {
-    return await fn(await llm());
-  } catch (e) {
-    if (!STALE_MODEL_RE.test(e.message || '')) throw e;
-    delete handles.llm; delete handles['llm:id'];
-    for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale badges
-    return fn(await llm());
-  }
+// Make the selected model of a modality resident. Chat, vision, structured output
+// and tools do not need this — they pass `model:` and the SDK loads — but
+// embeddings, diarization and segmentation have no per-request model, and the
+// Models tab loads on demand. `ra.models.load` downloads first when the files are
+// not there yet, so this is also the download path for those three.
+async function loadSelected(modality, options) {
+  const id = selectedModel(modality);
+  // A custom entry that named its engine names it again on the load, so the
+  // router pins that engine instead of inferring one from the artifact.
+  const custom = customModels.find((m) => m.id === id);
+  const opts = custom && custom.engine ? { framework: custom.engine, ...options } : options;
+  setStatus(`loading ${id}…`);
+  let loaded;
+  try { loaded = await ra.models.load(id, opts); } finally { setStatus('ready'); }
+  applyEngineUi(loaded && loaded.actualBackend);
+  return id;
 }
 
 // ---- minimal, XSS-safe markdown (escape first, then format) ----
@@ -218,10 +246,10 @@ function md(text) {
 
 // Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
 // above the rendered answer. `streaming` keeps reasoning open + shows a
-// placeholder while the answer is still empty. Use the SDK's splitThinking so
-// the demo stays in lockstep with commons (newline join when both sides exist).
-function assistantHtml(raw, streaming) {
-  const { response, thinking } = ra.splitThinking(raw || '');
+// placeholder while the answer is still empty. Answer and reasoning arrive
+// already separated (commons classifies each streamed token), so nothing here
+// re-parses the text looking for tags.
+function assistantHtml(response, thinking, streaming) {
   let out = '';
   if (thinking) {
     const open = streaming && !response ? ' open' : '';
@@ -256,7 +284,8 @@ function renderSidebar() {
   }
 }
 function bubbleHtml(m) {
-  const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
+  const body =
+    m.role === 'assistant' ? assistantHtml(m.content || '…', m.thinking) : escapeHtml(m.content);
   // No emoji: ⚡ is rendered by Segoe UI Emoji in its OWN colours, so it was the
   // one bitmap glyph in an all-SVG interface. The .metrics flex gap separates.
   const metrics = m.metrics ? `<div class="metrics"><span>${m.metrics.tokens} tokens</span><span>${m.metrics.tps.toFixed(1)} tok/s</span><span>TTFT ${Math.round(m.metrics.ttft)}ms</span></div>` : '';
@@ -313,35 +342,10 @@ function renderChat() {
   }
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
 }
-async function buildPrompt(priorMessages, userText) {
-  let sys = settings.systemPrompt;
-  // Reasoning mode: ask the model to think in <think></think> first. The SDK's
-  // splitThinking (mirrored by assistantHtml) peels that back out for display.
-  if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
-  const turns = [{ role: 'system', content: sys }];
-  for (const m of priorMessages) turns.push({ role: m.role, content: m.content });
-  turns.push({ role: 'user', content: userText });
-  // formatChat renders the turn markup THIS model was trained on, and strips old
-  // <think> blocks so stale reasoning is never replayed as context.
-  return ra.formatChat(turns, await activeChatTemplate(), { suppressThinking: !settings.reasoning });
-}
-
-// The turn markup the ACTIVE model expects. Getting this wrong is why a chat
-// appears to lose its memory: llama.cpp wraps an unrecognised prompt as a SINGLE
-// user message, so the whole transcript collapses into one turn and the model
-// answers as if every message were the first.
-async function activeChatTemplate() {
-  // Awaited, not read from the possibly-empty cache: a message sent before
-  // wireUi()'s catalog fetch resolves would otherwise format a Llama-3 or Gemma
-  // model's prompt as ChatML — which is exactly the memory bug described above.
-  await ensureCatalog();
-  const entry = catalogEntry(selectedModel('llm'));
-  return (entry && entry.chatTemplate) || 'chatml';
-}
 let generating = false;
 async function sendChat() {
-  // One generation at a time: a second Enter while streaming would run a
-  // concurrent generate() on the SAME shared llm() handle.
+  // One generation at a time: a second Enter while streaming would start a
+  // concurrent generation against the same resident model.
   if (generating) return;
   const text = $('chatinput').value.trim();
   if (!text) return;
@@ -351,7 +355,7 @@ async function sendChat() {
   const conv = activeConv() || newConversation();
   const prior = conv.messages.slice();
   conv.messages.push({ role: 'user', content: text });
-  const asst = { role: 'assistant', content: '' };
+  const asst = { role: 'assistant', content: '', thinking: '' };
   conv.messages.push(asst);
   if (!conv.title) { conv.title = text.slice(0, 40); renderSidebar(); }
   renderChat();
@@ -359,18 +363,48 @@ async function sendChat() {
   bubble.classList.add('streaming');
   setStatus('generating…');
   try {
+    // The whole conversation goes across as messages. Commons renders it with
+    // the model's own chat template, which is what stops a multi-turn chat from
+    // collapsing into a single user turn.
+    const messages = [{ role: 'system', content: settings.systemPrompt }];
+    for (const m of prior) messages.push({ role: m.role, content: m.content });
+    messages.push({ role: 'user', content: text });
+
     let result = null;
-    const promptText = await buildPrompt(prior, text);
-    // withLlm re-loads once if the handle was evicted by another model.
-    await withLlm((h) => {
-      asst.content = '';
-      return ra.generateStream(h, promptText, { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
-        if (e.isFinal) { result = e.result; }
-        else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
-      });
-    });
-    asst.content = asst.content.trim();
-    if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
+    for await (const event of ra.llm.generateStream(messages, {
+      model: selectedModel('llm'),
+      temperature: settings.temperature,
+      maxOutputTokens: settings.maxTokens,
+      // Only sent when the user asked to see reasoning. `mode: 'OFF'` is not
+      // "the toggle is off" — it makes commons prepend the Qwen "/no_think"
+      // control token to the prompt for every non-QHexRT engine
+      // (llm_thinking_directive_internal.h). A model outside that family reads
+      // it as literal text: LFM2.5-230M answers "\n\n" and stops, which is a
+      // one-token empty reply. Leaving it unset asks for nothing and the model
+      // behaves normally.
+      ...(settings.reasoning ? { reasoning: { mode: 'ON', includeInOutput: true } } : {}),
+      // An empty tool list means "no tools this turn"; commons only runs its
+      // tool loop when the request actually carries some.
+      ...(settings.tools ? {} : { tools: [], toolChoice: 'NONE' }),
+    })) {
+      if (event.type === 'token') {
+        if (event.kind === 'THOUGHT') asst.thinking += event.text;
+        else asst.content += event.text;
+        bubble.innerHTML = assistantHtml(asst.content, asst.thinking, true);
+        $('chatlog').scrollTop = $('chatlog').scrollHeight;
+      } else if (event.type === 'completed') {
+        result = event.result;
+      }
+    }
+    asst.content = (result ? result.text : asst.content).trim();
+    asst.thinking = (result && result.thinkingText) || asst.thinking;
+    if (result) {
+      asst.metrics = {
+        tokens: result.outputTokens,
+        tps: result.tokensPerSecond,
+        ttft: result.timeToFirstTokenMs,
+      };
+    }
     bubble.classList.remove('streaming');
     renderChat();
     persist();
@@ -379,11 +413,9 @@ async function sendChat() {
 }
 
 // ---- models panel ----
-const loaders = { llm: (id) => ra.loadLLM(id), vlm: (id) => ra.loadVLM(id), embedder: (id) => ra.loadEmbedder(id), stt: (id) => ra.loadSTT(id), tts: (id) => ra.loadTTS(id) };
-const unloaders = { llm: (h) => ra.unloadLLM(h), vlm: (h) => ra.unloadVLM(h), embedder: (h) => ra.unloadEmbedder(h), stt: (h) => ra.unloadSTT(h), tts: (h) => ra.unloadTTS(h) };
-const loadedById = {};
-const loadedType = {}; // key -> model type, so we can enforce one-LLM-at-a-time
-function forgetLoaded(key) { delete loadedById[key]; delete loadedType[key]; }
+// Everything here reads commons through ra.models: `list()` is the registry,
+// `state().loaded` is what is resident right now, and download / load / unload /
+// unregister are one call each. The app keeps no handle table any more.
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const TYPE_ICON = {
   llm: svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
@@ -391,16 +423,26 @@ const TYPE_ICON = {
   embedder: svg('<circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8M18 9l-5 7"/>'),
   stt: svg('<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/>'),
   tts: svg('<path d="M11 5 6 9H2v6h4l5 4zM19 9a5 5 0 0 1 0 6"/>'),
+  diarization: svg('<circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a5 5 0 0 1 7-3"/>'),
+  segmentation: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/>'),
 };
-const TYPE_LABEL = { llm: 'Language model', vlm: 'Vision-language', embedder: 'Embeddings', stt: 'Speech-to-text', tts: 'Text-to-speech' };
-const GROUP_ORDER = [['llm', 'Language models'], ['vlm', 'Vision-language'], ['stt', 'Speech-to-text'], ['tts', 'Text-to-speech'], ['embedder', 'Embeddings']];
+const TYPE_LABEL = {
+  llm: 'Language model', vlm: 'Vision-language', embedder: 'Embeddings', stt: 'Speech-to-text',
+  tts: 'Text-to-speech', diarization: 'Diarization', segmentation: 'Segmentation',
+};
+const GROUP_ORDER = [
+  ['llm', 'Language models'], ['vlm', 'Vision-language'], ['stt', 'Speech-to-text'],
+  ['tts', 'Text-to-speech'], ['embedder', 'Embeddings'], ['diarization', 'Diarization'],
+  ['segmentation', 'Segmentation'],
+];
 function mkbtn(label, fn) { const b = document.createElement('button'); b.className = 'btn ghost'; b.textContent = label; b.onclick = fn; return b; }
 function persistCustom() { try { store.saveCustomModels(customModels); } catch { /* optional */ } }
 
-// Build one model card. `source` is what we hand to download/load (a catalog id,
-// a HuggingFace repo, a URL, or a path); `key` identifies the card + load handle.
+// Build one model card. `key` is the model id every ra.models verb takes; the
+// underlying source (an HF repo, a URL, a path) is commons' business once the
+// entry is registered.
 function buildCard(o) {
-  const loaded = loadedById[o.key];
+  const loaded = o.loaded;
   const div = document.createElement('div'); div.className = 'model';
   div.innerHTML =
     '<div class="hd">' +
@@ -415,33 +457,30 @@ function buildCard(o) {
     const dl = mkbtn('Download', async () => {
       dl.disabled = true; dl.textContent = 'Downloading…';
       const bar = div.querySelector('.bar'); bar.style.display = 'block';
-      let resolved;
-      try { resolved = await ra.downloadModel(o.source, (p) => { bar.firstElementChild.style.width = (p.percent || 0) + '%'; }); }
-      catch (e) { dl.textContent = 'Failed'; dl.disabled = false; console.error(e); return; }
-      // Persist the resolved primary path so downloaded state is later recomputed
-      // from disk (via ra.exists), not trusted from a stale flag.
-      if (o.custom) { const c = customModels.find((m) => m.id === o.key); if (c) { c.primary = resolved && resolved.primary; persistCustom(); } }
+      try {
+        for await (const event of ra.models.download(o.key)) {
+          if (event.type === 'progress') bar.firstElementChild.style.width = (event.percent || 0) + '%';
+          else if (event.type === 'extracting') dl.textContent = 'Extracting…';
+        }
+      } catch (e) { dl.textContent = 'Failed'; dl.disabled = false; console.error(e); return; }
       renderModels();
     });
     actions.appendChild(dl);
   } else {
     const b = mkbtn(loaded ? 'Unload' : 'Load', async () => {
       // Disable the whole row: Remove during an in-flight Load would drop the card
-      // before loadedById[key] is set, leaking the (multi-GB) native handle.
+      // while commons is still bringing a multi-GB model into residency.
       const btns = actions.querySelectorAll('button');
       btns.forEach((x) => (x.disabled = true));
       b.textContent = loaded ? 'Unloading…' : 'Loading…';
       try {
         if (loaded) {
-          await unloaders[o.type](loaded); forgetLoaded(o.key);
-          delete handles[o.type]; delete handles[`${o.type}:id`];
+          await ra.models.unload(o.key);
         } else {
           // Loading from here IS selecting: route through the same choke point the
           // per-tab chips use, so the Models tab and the chips can't disagree.
-          // Select by id, exactly as the chip picker does — acquire() maps the
-          // id to its source. Storing o.source here made the two disagree.
           await selectModel(o.type, o.key);
-          await acquire(o.type);
+          await loadSelected(o.type);
         }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
@@ -450,11 +489,14 @@ function buildCard(o) {
   }
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
-      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); delete handles[o.type]; delete handles[`${o.type}:id`]; }
+      // Release it and drop its registry row; the files stay (ra.models.delete is
+      // what frees disk, and Remove has never meant that here).
+      try { await ra.models.unload(o.key); } catch { /* not resident */ }
+      try { await ra.models.unregister(o.key); } catch { /* never registered */ }
       customModels = customModels.filter((m) => m.id !== o.key);
       persistCustom();
       // The choice is persisted by id, so a removed model would otherwise leave a
-      // dangling id in settings that modelSource() cannot resolve — every later
+      // dangling id in settings that no longer has a registry row — every later
       // load would fail, across restarts, with no way to recover from the UI.
       if (settings.models && settings.models[o.type] === o.key) {
         const models = { ...settings.models };
@@ -469,9 +511,21 @@ function buildCard(o) {
   return div;
 }
 
+// Registry state keyed by id, plus the ids commons currently holds resident.
+// `list()` is the registry (downloaded flag, size on disk) and `state().loaded`
+// is residency; the catalog supplies only the display metadata commons has no
+// field for — label, licence, parameter count, the "heavy" warning.
+async function modelState() {
+  const [rows, state] = await Promise.all([ra.models.list(), ra.models.state()]);
+  return {
+    byId: new Map(rows.map((r) => [r.id, r])),
+    loaded: new Set(Object.values(state.loaded).map((m) => m.id)),
+  };
+}
+
 async function renderModels() {
-  const cat = await ra.catalog();
-  const status = await ra.modelStatus();
+  const cat = await ensureCatalog();
+  const { byId, loaded } = await modelState();
   const el = $('modellist'); el.innerHTML = '';
   const byType = {};
   for (const [id, entry] of Object.entries(cat)) (byType[entry.type] ??= []).push([id, entry]);
@@ -480,7 +534,7 @@ async function renderModels() {
     if (!items || !items.length) continue;
     const h = document.createElement('div'); h.className = 'mgroup'; h.textContent = title; el.appendChild(h);
     for (const [id, entry] of items) {
-      const st = status[id] || { downloaded: false, sizeBytes: 0 };
+      const st = byId.get(id) || { downloaded: false, sizeBytes: 0 };
       const bits = [TYPE_LABEL[entry.type] || entry.type];
       if (entry.params) bits.push(entry.params);
       if (st.downloaded) bits.push(fmtSize(st.sizeBytes));
@@ -493,18 +547,45 @@ async function renderModels() {
           ? ` · <a href="${escapeHtml(entry.licenseUrl)}" title="Model licence">${escapeHtml(entry.license)}</a>`
           : ` · ${escapeHtml(entry.license)}`;
       }
-      el.appendChild(buildCard({ key: id, type: entry.type, label: entry.label || id, sub, source: id, downloaded: st.downloaded, custom: false }));
+      el.appendChild(buildCard({ key: id, type: entry.type, label: entry.label || id, sub, downloaded: st.downloaded, loaded: loaded.has(id), custom: false }));
     }
   }
   if (customModels.length) {
-    // Recompute each custom model's downloaded state from disk (its primary may
-    // have been deleted since it was fetched), rather than trusting a stale flag.
-    const onDisk = await Promise.all(customModels.map((m) => (m.primary ? ra.exists(m.primary) : Promise.resolve(false))));
     const h = document.createElement('div'); h.className = 'mgroup'; h.textContent = 'Your models'; el.appendChild(h);
-    customModels.forEach((m, i) => {
-      const sub = `${TYPE_LABEL[m.type] || m.type} · <span class="muted">${escapeHtml(m.source)}</span>`;
-      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, source: m.source, downloaded: onDisk[i], custom: true }));
-    });
+    for (const m of customModels) {
+      // Downloaded state comes off the registry row, which commons reconciles
+      // against the store — not from a flag the app persisted and could not
+      // notice going stale when the files were deleted underneath it. A model
+      // added by LOCAL PATH is the exception: its bytes were never downloaded
+      // into the store, so the row says `downloaded: false` forever, and the
+      // card would offer a Download that commons then refuses to plan ("failed
+      // to compute model storage path") — with no way to reach Load at all.
+      const st = byId.get(m.id) || { downloaded: false, sizeBytes: 0 };
+      const present = st.downloaded || !looksRemote(m.source);
+      const bits = [TYPE_LABEL[m.type] || m.type];
+      if (m.engine === 'QHEXRT') bits.push('Hexagon NPU');
+      if (st.downloaded && st.sizeBytes) bits.push(fmtSize(st.sizeBytes));
+      const sub = `${bits.join(' · ')} · <span class="muted">${escapeHtml(m.source)}</span>`;
+      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, downloaded: present, loaded: loaded.has(m.id), custom: true }));
+    }
+  }
+}
+
+// Stage every custom entry in commons' registry, so a custom model answers to the
+// same ra.models verbs a catalog id does. Best effort per entry: a bad row must
+// not stop the rest of the list from working.
+async function registerCustomModels() {
+  for (const m of customModels) {
+    const remote = looksRemote(m.source);
+    try {
+      await ra.models.register({
+        id: m.id,
+        name: m.label || m.id,
+        category: MODALITY_CATEGORY[m.type],
+        ...(m.engine ? { framework: m.engine } : {}),
+        ...(remote ? { url: m.source } : { path: m.source }),
+      });
+    } catch (e) { console.error('could not register', m.id, e); }
   }
 }
 
@@ -527,23 +608,48 @@ function looksRemote(source) {
 // Reflect the actual compute device (passed by main.js from the addon path).
 function applyDeviceUi() {
   const device = new URLSearchParams(location.search).get('device') || 'cpu';
-  if (device !== 'gpu') return;
+  const isGpu = device === 'gpu';
   const label = $('devicelabel');
-  if (label) label.textContent = 'GPU · CUDA';
+  if (label) label.textContent = isGpu ? 'GPU · CUDA' : 'CPU';
   const pill = $('devicepill');
-  if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
+  if (pill) pill.title = isGpu
+    ? 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.'
+    : 'Which compute device this build runs on.';
   const note = $('devicenote');
-  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.';
+  if (note) note.innerHTML = isGpu
+    ? 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.'
+    : 'Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>RunAnywhere AI (GPU).cmd</code>.';
+}
+// The header pill above is a BUILD-time claim — which prebuild main.js resolved.
+// Which engine actually ran a model is a LOAD-time fact and can differ: on a
+// Snapdragon, a Hexagon bundle routes to the NPU while the very same build still
+// serves GGUF on the CPU. Correct the pill from what commons reports it routed
+// to, so the header can never say CPU while decode is happening on the NPU.
+function applyEngineUi(engine) {
+  if (engine !== 'QHEXRT') {
+    applyDeviceUi();
+    return;
+  }
+  const label = $('devicelabel');
+  if (label) label.textContent = 'NPU · Hexagon';
+  const pill = $('devicepill');
+  if (pill) pill.title = 'Inference runs on the Qualcomm Hexagon NPU (QHexRT).';
+  const note = $('devicenote');
+  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">Qualcomm Hexagon NPU</b> — QHexRT executes the prebuilt QNN context binaries on the DSP.';
 }
 function wireModels() {
   const hintEl = $('addhint');
   const hintHtml = hintEl.innerHTML;
   const flash = (msg) => { hintEl.textContent = msg; hintEl.style.color = 'var(--accent-lift)'; setTimeout(() => { hintEl.innerHTML = hintHtml; hintEl.style.color = ''; }, 2800); };
-  const add = () => {
+  const add = async () => {
     const raw = $('addsrc').value.trim();
     if (!raw) return flash('Enter a HuggingFace repo, URL, or file path.');
     const source = raw.replace(/[\\/]+$/, ''); // normalize so owner/repo and owner/repo/ don't double
     const type = $('addtype').value;
+    // '' = Auto: let commons infer the engine from the artifact, which works for
+    // anything with a telling file extension. A Hexagon NPU bundle is a folder of
+    // QNN context binaries — there is nothing to sniff — so the engine is named.
+    const engine = $('addengine') ? $('addengine').value : '';
     // The remote resolver is GGUF/single-file-only; speech/embedding models need a
     // directory or ONNX+vocab, so the SDK rejects remote STT/TTS/embedder. Block it
     // here too instead of letting the user download bytes that won't load.
@@ -552,13 +658,23 @@ function wireModels() {
     }
     const id = 'custom:' + source;
     if (customModels.some((m) => m.id === id)) return flash('That model is already in your list.');
-    customModels.unshift({ id, source, type, label: deriveLabel(source), downloaded: false });
+    const entry = { id, source, type, label: deriveLabel(source), ...(engine ? { engine } : {}) };
+    try {
+      await ra.models.register({
+        id,
+        name: entry.label,
+        category: MODALITY_CATEGORY[type],
+        ...(engine ? { framework: engine } : {}),
+        ...(looksRemote(source) ? { url: source } : { path: source }),
+      });
+    } catch (e) { return flash('Could not add that model: ' + e.message); }
+    customModels.unshift(entry);
     persistCustom();
     $('addsrc').value = '';
     renderModels();
     flash('Added to “Your models” — hit Download to fetch it.');
   };
-  $('addgo').addEventListener('click', add);
+  $('addgo').addEventListener('click', () => { add(); });
   $('addsrc').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
 }
 
@@ -567,6 +683,14 @@ function applySettingsToUi() {
   $('setsystem').value = settings.systemPrompt;
   $('settemp').value = settings.temperature; $('settempval').textContent = settings.temperature;
   $('setmax').value = settings.maxTokens;
+  syncChatToggles();
+}
+// Reflect reasoning/tools on the composer pills and on the Settings checkbox,
+// which is the same reasoning switch seen from the other side.
+function syncChatToggles() {
+  const rt = $('reasontoggle'), tt = $('toolstoggle');
+  if (rt) rt.classList.toggle('on', !!settings.reasoning);
+  if (tt) tt.classList.toggle('on', !!settings.tools);
   if ($('setreason')) $('setreason').checked = !!settings.reasoning;
 }
 async function saveSettings() {
@@ -579,33 +703,67 @@ async function saveSettings() {
     maxTokens: parseInt($('setmax').value, 10) || 256,
     reasoning: !!($('setreason') && $('setreason').checked),
   };
+  syncChatToggles();
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
 
 // ---- shared feature helpers (used by UI + self-test) ----
 async function runStructured(text) {
-  return withLlm((h) => ra.generateStructured(h, `Extract the person as JSON. Text: "${text}"`, {
-    type: 'object',
-    properties: { name: { type: 'string' }, age: { type: 'integer' }, interests: { type: 'array', items: { type: 'string' }, maxItems: 5 } },
-    required: ['name', 'age', 'interests'],
-  }));
+  // Commons constrains decoding to the schema and extracts the document, so the
+  // app neither compiles a grammar nor parses JSON out of prose.
+  const result = await ra.llm.generateStructured(
+    `Extract the person as JSON. Text: "${text}"`,
+    {
+      type: 'object',
+      properties: { name: { type: 'string' }, age: { type: 'integer' }, interests: { type: 'array', items: { type: 'string' }, maxItems: 5 } },
+      required: ['name', 'age', 'interests'],
+    },
+    { model: selectedModel('llm'), temperature: settings.temperature, maxOutputTokens: settings.maxTokens }
+  );
+  return result.value;
 }
-async function runTools(text) {
-  // Honour the user's Settings — the native default is only 100 tokens, which can
-  // truncate a longer tool call mid-JSON.
-  const call = await withLlm((h) => ra.generateToolCall(h, text, TOOLS.map(({ execute, ...t }) => t), {
-    temperature: settings.temperature, maxTokens: settings.maxTokens,
-  }));
-  // A tool call that is never executed is just a parse. Run it locally.
-  const tool = TOOLS.find((t) => t.name === call.name);
-  let result;
-  try { result = tool && tool.execute ? await tool.execute(call.arguments || {}) : '(no local handler)'; }
-  catch (e) { result = 'tool failed: ' + (e.message || e); }
-  return { ...call, result };
+// The registry lives in the SDK, so registration happens once rather than the
+// tool list being re-sent on every request.
+let toolsRegistered = false;
+function registerTools() {
+  if (toolsRegistered) return;
+  for (const { execute, ...definition } of TOOLS) {
+    ra.llm.tools.register(definition, (args) => execute(args || {}));
+  }
+  toolsRegistered = true;
 }
 
-// Small transient toast (used by set_timer when it fires).
+// A tool call's arguments, with empty keys and values dropped so a no-argument
+// tool reads as `name()` rather than `name({"":""})`.
+function fmtArgs(args) {
+  const entries = Object.entries(args || {}).filter(([k, v]) => k !== '' && v !== '' && v != null);
+  return entries.length ? JSON.stringify(Object.fromEntries(entries)) : '';
+}
+
+async function runTools(text) {
+  registerTools();
+  // Commons runs the whole loop: it picks the tool, calls the executor
+  // registered above, feeds the result back, and generates the answer. The app
+  // no longer parses a call or dispatches it.
+  const result = await ra.llm.generate(text, {
+    model: selectedModel('llm'),
+    temperature: settings.temperature,
+    maxOutputTokens: settings.maxTokens,
+    toolChoice: 'REQUIRED',
+  });
+  const call = result.toolCalls[0];
+  if (!call) return { name: '(none)', arguments: {}, result: result.text };
+  return {
+    name: call.name,
+    arguments: call.arguments,
+    // Executors return an object, which commons carries back on the call.
+    result: call.result ?? '(no result)',
+    answer: result.text,
+  };
+}
+
+// Small transient toast, used by the unhandled-rejection net below.
 function flashToast(msg) {
   const el = document.createElement('div');
   el.textContent = msg;
@@ -614,10 +772,14 @@ function flashToast(msg) {
   setTimeout(() => el.remove(), 4000);
 }
 async function runEmbeddings(a, b) {
-  const h = await embedder();
-  const [ea, eb] = await Promise.all([ra.embed(h, a), ra.embed(h, b)]);
+  // embed() has no per-request model — commons reads whichever embedding model is
+  // resident — so the screen makes its choice resident first. One batch call, and
+  // the vectors come back in input order with commons' own index on each.
+  await loadSelected('embedder');
+  const [ea, eb] = await ra.embeddings.embed([a, b]);
+  const va = ea.vector, vb = eb.vector;
   let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < ea.length; i++) { dot += ea[i] * eb[i]; na += ea[i] * ea[i]; nb += eb[i] * eb[i]; }
+  for (let i = 0; i < va.length; i++) { dot += va[i] * vb[i]; na += va[i] * va[i]; nb += vb[i] * vb[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 // ---- RAG (Knowledge tab) ----
@@ -630,11 +792,13 @@ async function ragEnsureSession() {
   if (ragSessionPromise) return ragSessionPromise;
   ragSessionPromise = (async () => {
     setStatus('preparing knowledge base…');
-    // Single SDK entry point — owns download + registry enums + session create.
-    ragSession = await ra.ragCreateSessionFromCatalog({
-      embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
-      topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
-    });
+    // Single SDK entry point — rag.open owns downloading both models,
+    // registering them, and creating the native session.
+    ragSession = await ra.rag.open(
+      { id: 'minilm' },
+      { id: selectedModel('llm') || DEFAULT_LLM },
+      { topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024 }
+    );
     return ragSession;
   })().catch((e) => {
     ragSessionPromise = null; // allow retry after failure
@@ -644,34 +808,45 @@ async function ragEnsureSession() {
 }
 function ragStatsText(s) {
   // Never render nothing — an empty slot beside the buttons reads as a failed load.
-  if (!s || !s.indexedDocuments) return 'No documents yet';
-  return `${s.indexedDocuments} document${s.indexedDocuments === 1 ? '' : 's'} · ${s.indexedChunks} chunk${s.indexedChunks === 1 ? '' : 's'} indexed`;
+  if (!s || !s.documentCount) return 'No documents yet';
+  return `${s.documentCount} document${s.documentCount === 1 ? '' : 's'} · ${s.chunkCount} chunk${s.chunkCount === 1 ? '' : 's'} indexed`;
 }
 function renderRagSources(chunks) {
   const el = $('ragsources');
   if (!chunks || !chunks.length) { el.innerHTML = ''; return; }
   el.innerHTML = '<div class="label" style="margin-top:16px">Sources</div>' + chunks.map((c) => {
-    const src = c.sourceDocument ? escapeHtml(c.sourceDocument) : 'document';
-    const score = typeof c.similarityScore === 'number' ? c.similarityScore.toFixed(3) : '';
+    // A v3 Match carries its provenance in metadata; the source document is
+    // the one key commons always sets when the chunk came from a named doc.
+    const src = c.metadata?.sourceDocument ? escapeHtml(c.metadata.sourceDocument) : 'document';
+    const score = typeof c.score === 'number' ? c.score.toFixed(3) : '';
     return `<div class="ragchunk"><div class="meta"><span>${src}</span><span class="ragscore">${score}</span></div><div class="txt">${escapeHtml(c.text || '')}</div></div>`;
   }).join('');
 }
 
 async function runVision(imagePath, onToken) {
+  // Commons loads the vision model into its lifecycle store and reads it back
+  // from there, so there is no handle to hold and no mmproj to pass: the
+  // projector rides on the model's registry row.
   let caption = '';
-  await ra.generateVlm(await vlm(), imagePath, 'Describe this image in one sentence.', (t) => { caption += t; onToken?.(t); });
+  for await (const event of ra.vlm.generateStream(
+    { path: imagePath },
+    'Describe this image in one sentence.',
+    { model: selectedModel('vlm'), maxOutputTokens: settings.maxTokens, temperature: settings.temperature }
+  )) {
+    if (event.type === 'token') { caption += event.text; onToken?.(event.text); }
+    else if (event.type === 'completed') caption = event.result.text;
+  }
   return caption.trim();
 }
-async function runSecure(key, value) { await ra.secureSet(key, value); const got = await ra.secureGet(key); await ra.secureDelete(key); return got; }
+async function runSecure(key, value) { await ra.secure.set(key, value); const got = await ra.secure.get(key); await ra.secure.delete(key); return got; }
 async function runVad() {
-  const handle = await ra.createVad();
-  const silence = () => new Float32Array(1600);
-  const loud = () => { const f = new Float32Array(1600); for (let i = 0; i < 1600; i++) f[i] = 0.5 * Math.sin((2 * Math.PI * 300 * i) / 16000); return f; };
-  for (let i = 0; i < 24; i++) await ra.vadProcess(handle, silence());
-  let detected = false;
-  for (let i = 0; i < 8; i++) if (await ra.vadProcess(handle, loud())) detected = true;
-  await ra.unloadVad(handle);
-  return detected;
+  // One buffer in, one verdict out: commons frames it, runs the detector and
+  // reports the speech segments it found.
+  const n = 16000;
+  const tone = new Float32Array(n);
+  for (let i = 0; i < n; i++) tone[i] = 0.5 * Math.sin((2 * Math.PI * 300 * i) / 16000);
+  const result = await ra.vad.detect(ra.audio.float32(tone, 16000));
+  return result.isSpeech;
 }
 
 // ---- tabs ----
@@ -688,15 +863,17 @@ function showTab(name) {
     if (grp) grp.open = true;
   }
   closePicker();
-  if (name !== 'voice' && voiceCleanup) voiceCleanup(); // release the mic on tab change
+  // Close the mic (and, for voice, the whole pipeline) on the way out of a tab
+  // that opened it — a recording that keeps running off-screen is a live mic
+  // the user cannot see.
+  if (name !== 'voice' && voiceCleanup) voiceCleanup();
+  if (name !== 'diarization' && diarCleanup) diarCleanup();
   renderModelChips();
   if (name === 'models') renderModels();
 }
 
 // ---- model chip + picker ------------------------------------------------------
-// Which modalities each tab lets you choose. Slots are per-modality, so a tab only
-// ever shows the models it actually uses.
-// TAB_MODALITIES + modalitiesToRelease come from model-policy.js (unit-tested).
+// A tab only offers the modalities it actually uses (TAB_MODALITIES, above).
 const CHIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m8 12 3 3 5-6"/></svg>';
 
 let openPicker = null;
@@ -760,8 +937,7 @@ async function togglePicker(anchor, modality) {
   box.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - 352))}px`;
   openPicker = box;
 
-  const [cat, status] = await Promise.all([ra.catalog(), ra.modelStatus()]);
-  catalogCache = cat;
+  const [cat, { byId }] = await Promise.all([ensureCatalog(), modelState()]);
   if (openPicker !== box) return; // closed while loading
   const items = Object.entries(cat).filter(([, e]) => e.type === modality)
     .concat(customModels.filter((m) => m.type === modality).map((m) => [m.id, { label: m.label, type: m.type, custom: true }]));
@@ -769,7 +945,7 @@ async function togglePicker(anchor, modality) {
 
   box.innerHTML = `<div class="phead">${escapeHtml(MODALITY_LABEL[modality])}</div>`;
   for (const [id, entry] of items) {
-    const st = status[id] || {};
+    const st = byId.get(id) || {};
     const isActive = id === active;
     const stateCls = isActive ? 'active' : st.downloaded ? 'ready' : 'get';
     const stateTxt = isActive ? 'Active' : st.downloaded ? 'Ready' : 'Download';
@@ -790,11 +966,13 @@ async function togglePicker(anchor, modality) {
         bar.className = 'bar'; bar.innerHTML = '<div></div>';
         row.after(bar);
         try {
-          await ra.downloadModel(id, (p) => {
-            const pct = Math.round(p.percent || 0);
+          for await (const event of ra.models.download(id)) {
+            if (event.type === 'extracting') { stateEl.textContent = 'Extracting'; continue; }
+            if (event.type !== 'progress') continue;
+            const pct = Math.round(event.percent || 0);
             stateEl.textContent = pct + '%';
             bar.firstElementChild.style.width = pct + '%';
-          });
+          }
         } catch (err) { stateEl.textContent = 'Failed'; console.error(err); return; }
         bar.remove();
       }
@@ -844,11 +1022,29 @@ function wireUi() {
   $('chatsend').addEventListener('click', sendChat);
   $('chatinput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
 
+  // Composer pills. Reasoning is the same setting the Settings panel owns, so
+  // flipping it here persists and the two views never disagree.
+  const saveQuiet = () => { Promise.resolve(store.saveSettings(settings)).catch(() => {}); };
+  $('reasontoggle').addEventListener('click', () => {
+    settings.reasoning = !settings.reasoning;
+    syncChatToggles();
+    saveQuiet();
+  });
+  $('toolstoggle').addEventListener('click', () => {
+    settings.tools = !settings.tools;
+    // Registration is idempotent and cheap; doing it on enable keeps the
+    // registry empty for anyone who never turns tools on.
+    if (settings.tools) registerTools();
+    syncChatToggles();
+    saveQuiet();
+  });
+  syncChatToggles();
+
   $('settemp').addEventListener('input', () => ($('settempval').textContent = $('settemp').value));
   $('setsave').addEventListener('click', saveSettings);
   $('setapisave').addEventListener('click', async () => {
     const v = $('setapikey').value.trim(); if (!v) return;
-    try { await ra.secureSet('api-key', v); $('setstatus').textContent = 'API key stored (encrypted)'; $('setapikey').value = ''; }
+    try { await ra.secure.set('api-key', v); $('setstatus').textContent = 'API key stored (encrypted)'; $('setapikey').value = ''; }
     catch (e) { $('setstatus').textContent = 'error: ' + e.message; }
   });
 
@@ -856,8 +1052,9 @@ function wireUi() {
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
   $('toolsgo').addEventListener('click', out('toolsout', async () => {
     const c = await runTools($('toolstext').value);
-    return `${c.name}(${JSON.stringify(c.arguments)})
-→ ${c.result}`;
+    const shown = typeof c.result === 'string' ? c.result : JSON.stringify(c.result, null, 2);
+    return `${c.name}(${fmtArgs(c.arguments)})
+→ ${shown}${c.answer ? `\n\n${c.answer}` : ''}`;
   }));
   $('embgo').addEventListener('click', async () => {
     const a = $('emba').value || $('emba').placeholder;
@@ -879,16 +1076,21 @@ function wireUi() {
     if (!text) return;
     $('ragadd').disabled = true;
     try {
-      const h = await ragEnsureSession();
-      const stats = await ra.ragIngest(h, { text });
-      $('ragstats').textContent = ragStatsText(stats);
+      const session = await ragEnsureSession();
+      await session.ingest({ text });
+      $('ragstats').textContent = ragStatsText(await session.stats());
       $('ragdoc').value = '';
     } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
     finally { $('ragadd').disabled = false; setStatus('ready'); }
   });
   $('ragclear').addEventListener('click', async () => {
     if (ragSession == null) { $('ragstats').textContent = ''; return; }
-    try { const s = await ra.ragClear(ragSession); $('ragstats').textContent = ragStatsText(s); $('ragout').textContent = ''; renderRagSources([]); } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
+    try {
+      await ragSession.clear();
+      $('ragstats').textContent = ragStatsText(await ragSession.stats());
+      $('ragout').textContent = '';
+      renderRagSources([]);
+    } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
   });
   let ragQuerying = false;
   const askRag = async () => {
@@ -899,16 +1101,19 @@ function wireUi() {
     $('ragask').disabled = true; $('ragq').value = ''; $('ragout').innerHTML = '…'; renderRagSources([]);
     setStatus('retrieving + answering…');
     try {
-      const h = await ragEnsureSession();
-      const res = await ra.ragQuery(h, { question: q, maxTokens: settings.maxTokens, temperature: settings.temperature });
-      // Render reasoning + answer SEPARATELY (commons already split thinkingContent
-      // out) — do NOT re-wrap in <think> tags, or a literal </think> in retrieved
-      // document text would mis-split the answer into the reasoning drawer.
-      const reason = res.thinkingContent
-        ? `<details class="reason"><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(res.thinkingContent)}</div></details>`
+      const session = await ragEnsureSession();
+      const res = await session.query(q, {
+        maxOutputTokens: settings.maxTokens,
+        temperature: settings.temperature,
+      });
+      // Render reasoning + answer SEPARATELY (commons already split the
+      // thinking out) — do NOT re-wrap in <think> tags, or a literal </think>
+      // in retrieved document text would mis-split the answer into the drawer.
+      const reason = res.thinkingText
+        ? `<details class="reason"><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(res.thinkingText)}</div></details>`
         : '';
       $('ragout').innerHTML = reason + md(res.answer || '');
-      renderRagSources(res.retrievedChunks);
+      renderRagSources(res.sources);
     } catch (e) { $('ragout').textContent = 'error: ' + e.message; }
     finally { ragQuerying = false; $('ragask').disabled = false; setStatus('ready'); }
   };
@@ -934,8 +1139,14 @@ function wireUi() {
     setStatus('ready');
   });
 
+  // The registry is per process, so a persisted "Tools on" has to re-register on
+  // every start or the first turn goes out with an empty tool list.
+  if (settings.tools) registerTools();
+
   wireVoice();
   wireVad();
+  wireDiarization();
+  wireSegmentation();
 }
 
 // ---- voice (inline Web Audio) ----
@@ -974,17 +1185,13 @@ function captureController() {
     },
   };
 }
-// Mic float samples -> 16 kHz PCM16 bytes for STT. Uses the SDK's block-averaging
-// downsample, not a nearest-neighbour pick: at 48k->16k, dropping samples folds
-// everything above 8 kHz back into the band Whisper reads.
-function toPcm16At16k(samples, rate) {
-  return ra.pcm16Bytes(rate === 16000 ? samples : ra.downsample(samples, rate, 16000));
-}
-
 // ---- voice: a 4-state machine (idle | listening | thinking | speaking) --------
-// Tap to start, tap to stop (or let it end itself on silence); tap while it is
-// speaking to barge in. All visual state is driven by data-state on the root, so
-// this code only sets state, a --level, and the transcript text.
+// Tap to talk, tap again while it is speaking to interrupt. Commons owns the turn:
+// ra.voice.createSession brings up speech-to-text, the language model and the
+// voice, opens the microphone, segments speech, decides when a turn has ended, and
+// plays the reply. The app sets data-state from the events it gets back and renders
+// the transcript. There is no turn loop here any more, and no turn guard: a
+// superseded turn is cancelled in commons rather than ignored on arrival.
 function wireVoice() {
   const root = $('voiceroot');
   const orb = $('voiceorb');
@@ -992,34 +1199,14 @@ function wireVoice() {
   const hintEl = $('voicehint');
   const errEl = $('voiceerror');
   const transcript = $('voicetranscript');
-  const cc = captureController();
 
-  // One long-lived output context so a reply can be interrupted (barge-in).
-  let playCtx = null;
-  let playing = null;
+  let session = null;
+  let opening = null;
   let state = 'idle';
-  let busy = false;          // a turn is in flight; ignore re-entrant taps
-  // Each turn takes a number so a cancelled-but-still-running turn can tell it is
-  // no longer current and must not touch shared state. See turn-guard.js for why
-  // a single `abandoned` boolean was not enough.
-  const turns = createTurnGuard();
-  let levelRaf = 0;
-  let level = 0;             // smoothed mic RMS, 0..1
-
-  let watchdog = 0;
-  // Replace the hint line with what the turn is actually doing, and start a
-  // watchdog so an unusually long step offers a way out instead of just sitting.
-  function phase(text) {
-    hintEl.textContent = text;
-    clearTimeout(watchdog);
-    watchdog = setTimeout(() => {
-      hintEl.textContent = text + ' (taking longer than usual — tap the orb to cancel)';
-    }, 20000);
-  }
 
   const COPY = {
     idle: ['Tap to talk', 'Speech, reasoning and speech-synthesis all run on this device.'],
-    listening: ['Listening…', 'Tap again when you are done — or just stop speaking.'],
+    listening: ['Listening…', 'Just speak — the turn ends on its own after a short silence.'],
     thinking: ['Thinking…', 'Transcribing and composing a reply on-device.'],
     speaking: ['Speaking…', 'Tap to interrupt.'],
   };
@@ -1033,193 +1220,284 @@ function wireVoice() {
   }
   const showError = (msg) => { errEl.hidden = false; errEl.textContent = msg; };
   const clearError = () => { errEl.hidden = true; errEl.textContent = ''; };
+  const ORB_STATE = { LISTENING: 'listening', THINKING: 'thinking', SPEAKING: 'speaking' };
 
-  function stopPlayback() {
-    if (playing) { try { playing.onended = null; playing.stop(); } catch { /* already ended */ } playing = null; }
-  }
-
-  // Level meter: painted from ONE rAF loop. Never write the DOM from the audio
-  // callback — that runs on the audio thread's cadence and thrashes layout.
-  function startLevelLoop() {
-    cancelAnimationFrame(levelRaf);
-    const tick = () => {
-      root.style.setProperty('--level', level.toFixed(3));
-      if (state === 'listening') levelRaf = requestAnimationFrame(tick);
-      else root.style.setProperty('--level', '0');
-    };
-    levelRaf = requestAnimationFrame(tick);
-  }
-
-  async function beginListening() {
-    clearError();
-    transcript.hidden = true;
-    try {
-      await cc.start();
-    } catch (e) {
-      showError('Could not open the microphone: ' + (e.message || e));
-      setVoiceState('idle');
-      return;
-    }
-    setVoiceState('listening');
-    startLevelLoop();
-
-    // Endpointing: learn the room's noise floor for ~400ms, then commit the turn
-    // after a stretch of silence. Self-contained (no calibration state to poison)
-    // and always overridable by tapping.
-    let noiseFloor = 1, heardSpeech = false, silentFor = 0, elapsed = 0;
-    const autoStop = $('voicevad');
-    cc.onFrame((frame, rate) => {
-      const r = ra.rms(frame);
-      level = Math.min(1, Math.max(level * 0.72, r * 9)); // smooth + scale for display
-      const ms = (frame.length / rate) * 1000;
-      elapsed += ms;
-      if (elapsed < 400) { noiseFloor = Math.min(noiseFloor, r); return; }
-      const gate = Math.max(noiseFloor * 3, 0.012);
-      if (r > gate) { heardSpeech = true; silentFor = 0; } else if (heardSpeech) silentFor += ms;
-      const done = (autoStop && autoStop.checked && heardSpeech && silentFor > 800) || elapsed > 30000;
-      if (done && state === 'listening') finishTurn();
-    });
-  }
-
-  async function finishTurn() {
-    if (busy) return;
-    busy = true;
-    const turn = turns.begin();
-    const mine = turn.current;               // false once this turn is superseded
-    // EVERYTHING from here on is inside try/finally: a throw before the guarded
-    // region used to leave busy=true forever, and the mic button simply stopped
-    // responding with no error anywhere.
-    try {
-      const rec = cc.stop();
-      level = 0;
-      if (!rec || !rec.samples.length) { setVoiceState('idle'); return; }
-      setVoiceState('thinking');
-      phase('Transcribing what you said…');
-      const heard = (await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate)) || '').trim();
-      if (!mine()) return;
-      if (!heard) { showError('I did not catch that — try again a little closer to the mic.'); setVoiceState('idle'); return; }
-      transcript.hidden = false;
-      $('voiceheard').textContent = heard;
-      $('voicereply').textContent = '';
-      let reply = '';
-      phase('Composing a reply…');
-      // Ask for speech, not a document — a spoken answer should have no markdown
-      // in it at all.
-      const spokenStyle = settings.systemPrompt +
-        ' You are answering out loud. Reply in one or two short spoken sentences, in plain words.' +
-        ' Never use markdown, asterisks, bullet points, headings or mathematical notation.';
-      // Same templating as chat — a raw "User:/Assistant:" string would be
-      // wrapped as one turn and answered generically.
-      // A spoken reply must never wait on visible deliberation.
-      const voicePrompt = ra.formatChat(
-        [{ role: 'system', content: spokenStyle }, { role: 'user', content: heard }],
-        await activeChatTemplate(),
-        { suppressThinking: true }
-      );
-      await withLlm((h) => ra.generate(h, voicePrompt, {
-        temperature: settings.temperature, maxTokens: settings.maxTokens,
-      }, (t) => {
-        reply += t;
-        if (mine()) $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response);
-      }));
-      if (!mine()) return;
-      // The prompt is a request, not a guarantee: a small model still emits
-      // "**Paris**", and the TTS voice pronounces that as "asterisk asterisk
-      // Paris". speakableText is what actually makes the audio clean — it also
-      // says "20 degrees Celsius" and "5 times 3" instead of spelling symbols.
-      reply = ra.speakableText(ra.splitThinking(reply).response);
-      $('voicereply').textContent = reply;
-      if (!reply) { setVoiceState('idle'); return; }
-
-      phase('Generating speech…');
-      const audio = await ra.synthesize(await tts(), reply);
-      // Synthesis is slow enough that the user can cancel during it — never speak
-      // over, or steal the orb from, whatever turn is current now.
-      if (!mine()) return;
-      if (!audio || !audio.samples || !audio.samples.length) { setVoiceState('idle'); return; } // createBuffer(0) throws
-      setVoiceState('speaking');
-      playCtx = playCtx || new AudioContext();
-      if (playCtx.state === 'suspended') await playCtx.resume();
-      const buf = playCtx.createBuffer(1, audio.samples.length, audio.sampleRate);
-      buf.getChannelData(0).set(audio.samples);
-      const src = playCtx.createBufferSource();
-      src.buffer = buf; src.connect(playCtx.destination);
-      playing = src;
-      await new Promise((r) => { src.onended = r; src.start(); });
-      playing = null;
-    } catch (e) {
-      if (mine()) showError(e.message || String(e));
-    } finally {
-      // A superseded turn owns none of this — the turn that replaced it does.
-      if (mine()) {
-        clearTimeout(watchdog);
-        busy = false;
-        if (state !== 'listening') setVoiceState('idle');
+  // The event stream is the only thing that moves the orb. `speechStarted` and
+  // `speechEnded` describe the USER's voice, not the agent's, so they are left to
+  // the transcript rather than the state machine.
+  async function consume(active) {
+    for await (const event of active.events) {
+      if (session !== active) return;
+      if (event.type === 'agentStateChanged') {
+        const next = ORB_STATE[event.state];
+        if (next) setVoiceState(next);
+      } else if (event.type === 'userTranscribed') {
+        transcript.hidden = false;
+        $('voiceheard').textContent = event.text;
+        if (event.isFinal) $('voicereply').textContent = '';
+      } else if (event.type === 'agentResponse') {
+        transcript.hidden = false;
+        $('voicereply').textContent = event.text;
+      } else if (event.type === 'error') {
+        showError(event.message);
+        if (!event.recoverable) await stopSession();
       }
     }
   }
 
-  // One tap does the right thing for the current state.
-  // The orb must ALWAYS do something. Any state that cannot proceed is reset and
-  // a fresh turn starts, so a stale flag can never leave a dead button — the
-  // failure mode was a mic that silently stopped responding until app restart.
-  orb.addEventListener('click', () => {
-    if (state === 'listening') { finishTurn(); return; }
-    if (state === 'speaking') { stopPlayback(); setVoiceState('idle'); return; } // barge-in
-    if (state === 'thinking') {
-      // There is no cancel in the inference stack, so the work keeps running —
-      // but the user is never trapped. Abandon the turn; the result is discarded
-      // when it lands.
-      turns.cancel();         // the in-flight turn is no longer current
-      busy = false;
-      clearTimeout(watchdog);
-      showError('Turn cancelled.');
+  async function startSession() {
+    if (opening) return opening;
+    clearError();
+    transcript.hidden = true;
+    setVoiceState('thinking');
+    hintEl.textContent = 'Preparing the on-device voice pipeline…';
+    opening = (async () => {
+      // One entry point. The session downloads and loads all three models, keeps
+      // them resident together, and opens the microphone in start().
+      const active = await ra.voice.createSession({
+        stt: { id: selectedModel('stt') },
+        llm: { id: selectedModel('llm') },
+        tts: { id: selectedModel('tts') },
+      });
+      session = active;
+      consume(active).catch((e) => { if (session === active) showError(e.message || String(e)); });
+      await active.start();
+    })();
+    try {
+      await opening;
+    } catch (e) {
+      showError('Could not start the voice pipeline: ' + (e.message || e));
+      session = null;
       setVoiceState('idle');
-      return;
+    } finally {
+      opening = null;
     }
-    // idle, or any state we did not anticipate: self-heal and listen.
-    if (busy) { busy = false; turns.cancel(); }
-    stopPlayback();
-    beginListening();
+  }
+
+  async function stopSession() {
+    const active = session;
+    session = null;
+    setVoiceState('idle');
+    if (active) {
+      try { await active.close(); } catch { /* already closed */ }
+    }
+  }
+
+  // One tap does the right thing for the current state, and every state can act:
+  // the failure mode this screen used to have was a mic button that silently
+  // stopped responding because a stale flag was never cleared.
+  orb.addEventListener('click', async () => {
+    try {
+      if (!session) { await startSession(); return; }
+      if (state === 'speaking') {
+        // Barge-in is cooperative rather than detected: the pipeline gates the
+        // microphone for the duration of a turn, so this stops local playout and
+        // cancels the turn in commons.
+        await session.interrupt();
+        setVoiceState('listening');
+        return;
+      }
+      await stopSession();
+    } catch (e) { showError(e.message || String(e)); }
   });
   orb.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); orb.click(); } });
 
-  // Leaving the tab must release the mic — otherwise the OS keeps showing the
-  // recording indicator and the capture keeps running in the background.
-  voiceCleanup = () => {
-    if (state === 'listening') { cc.stop(); level = 0; }
-    stopPlayback();
-    // Leaving the tab must also abandon a turn that is still transcribing or
-    // generating. Nothing in the inference stack cancels, so that turn keeps
-    // running; without this it would later write into the Voice DOM and start
-    // speaking out loud while the user is on another tab. Superseding it makes
-    // every one of its remaining guards fail closed.
-    turns.cancel();
-    clearTimeout(watchdog);
-    busy = false;
-    if (state !== 'idle') setVoiceState('idle');
-  };
+  // Leaving the tab closes the microphone and releases the pipeline; the session
+  // cancels whatever turn was in flight on the way out.
+  voiceCleanup = () => { stopSession(); };
   setVoiceState('idle');
 }
 let voiceCleanup = null;
+// The workbench hands commons a rolling window of microphone audio and renders
+// the verdict. ra.vad.detect takes a whole buffer and does its own framing,
+// endpointing and threshold arming, so there is no handle to hold, no per-frame
+// call and no separate setThreshold: the slider is just an option on the next
+// window. (vad.openStream would be the live shape, but the VadStream it returns
+// carries its events on an AsyncQueue whose Symbol.asyncIterator lives on the
+// prototype, which contextBridge does not carry into the page.)
+const VAD_WINDOW_MS = 300;
 function wireVad() {
-  const btn = $('vadbtn'); const cc = captureController(); let vadHandle = null; let frames = 0, speech = 0;
-  $('vadth').addEventListener('input', async () => { $('vadthval').textContent = $('vadth').value; if (vadHandle != null) await ra.vadSetThreshold(vadHandle, parseFloat($('vadth').value)); });
-  const begin = async () => {
-    setStatus('listening…'); frames = 0; speech = 0; $('vadout').textContent = 'calibrating…';
-    vadHandle = await ra.createVad(parseFloat($('vadth').value));
-    await cc.start();
-    cc.onFrame(async (f, rate) => {
-      if (vadHandle == null) return;
-      const ratio = rate / 16000, outLen = Math.floor(f.length / ratio), frame = new Float32Array(outLen);
-      for (let i = 0; i < outLen; i++) frame[i] = f[Math.floor(i * ratio)];
-      const isSpeech = await ra.vadProcess(vadHandle, frame);
-      frames++; if (isSpeech) speech++;
-      $('vadout').textContent = (frames < 20 ? 'calibrating… ' : (isSpeech ? '🎤 SPEECH ' : '· silence ')) + `(${speech}/${frames} speech frames)`;
-    });
+  const btn = $('vadbtn'); const cc = captureController();
+  let pending = []; let listening = false; let inFlight = false; let timer = 0;
+  let windows = 0, speech = 0;
+  $('vadth').addEventListener('input', () => { $('vadthval').textContent = $('vadth').value; });
+  const takeWindow = () => {
+    if (!pending.length) return null;
+    let n = 0;
+    for (const c of pending) n += c.length;
+    const merged = new Float32Array(n);
+    let o = 0;
+    for (const c of pending) { merged.set(c, o); o += c.length; }
+    pending = [];
+    return merged;
   };
-  const end = async () => { cc.stop(); if (vadHandle != null) { await ra.unloadVad(vadHandle); vadHandle = null; } setStatus('ready'); };
-  btn.addEventListener('mousedown', begin); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  const poll = async () => {
+    // One window at a time: detect() arms the detector for the call, so two
+    // overlapping calls would reconfigure it underneath each other.
+    if (inFlight) return;
+    const window = takeWindow();
+    if (!window || window.length < 1600) return;
+    inFlight = true;
+    try {
+      const result = await ra.vad.detect(ra.audio.float32(window, 16000), {
+        activationThreshold: parseFloat($('vadth').value),
+      });
+      if (!listening) return;
+      windows++; if (result.isSpeech) speech++;
+      $('vadout').textContent =
+        (result.isSpeech ? '🎤 SPEECH ' : '· silence ') +
+        `(${speech}/${windows} windows, p=${result.probability.toFixed(2)})`;
+    } catch (e) { $('vadout').textContent = 'error: ' + e.message; }
+    finally { inFlight = false; }
+  };
+  const begin = async () => {
+    if (listening) return;
+    listening = true; windows = 0; speech = 0; pending = [];
+    setStatus('listening…'); $('vadout').textContent = 'listening…';
+    await cc.start();
+    cc.onFrame((f, rate) => { pending.push(rate === 16000 ? f : ra.downsample(f, rate, 16000)); });
+    timer = setInterval(poll, VAD_WINDOW_MS);
+  };
+  const end = () => {
+    if (!listening) return;
+    listening = false;
+    clearInterval(timer);
+    cc.stop();
+    setStatus('ready');
+  };
+  btn.addEventListener('mousedown', () => { begin(); }); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+}
+
+// ---- diarization (who spoke when) ----
+// Record, Stop, then hand the whole buffer to commons. `diarize` has no
+// per-request model — commons reads whichever diarization model is resident —
+// so the screen makes its choice resident first, which is also what downloads
+// it on the first run.
+const fmtSecs = (ms) => (ms / 1000).toFixed(1) + 's';
+let diarCleanup = null;
+function wireDiarization() {
+  const btn = $('diargo'); const label = $('diarlabel'); const cc = captureController();
+  let recording = false;
+  const setLabel = (t) => { if (label) label.textContent = t; };
+  const stopRecording = () => {
+    recording = false;
+    setLabel('Record');
+    btn.classList.remove('rec');
+  };
+  // Leaving the tab mid-recording must close the microphone, not leave it open
+  // behind a screen the user can no longer see.
+  diarCleanup = () => {
+    if (!recording) return;
+    try { cc.stop(); } catch { /* graph already torn down */ }
+    stopRecording();
+    setStatus('ready');
+  };
+  btn.addEventListener('click', async () => {
+    if (!recording) {
+      try { await cc.start(); } catch (e) { $('diarout').textContent = 'could not open the microphone: ' + (e.message || e); return; }
+      recording = true; setLabel('Stop'); btn.classList.add('rec');
+      $('diarout').textContent = 'recording… tap Stop when done';
+      setStatus('recording…');
+      return;
+    }
+    const rec = cc.stop();
+    stopRecording();
+    if (!rec || !rec.samples.length) { $('diarout').textContent = 'no audio captured'; setStatus('ready'); return; }
+    btn.disabled = true; $('diarout').textContent = 'preparing…';
+    try {
+      // ONNX is the only backend carrying diarization_ops; pin it so a bare
+      // .onnx cannot be routed to llama.cpp by a registry rescan.
+      await loadSelected('diarization', { framework: 'ONNX' });
+      setStatus('diarizing…'); $('diarout').textContent = 'diarizing…';
+      const samples = rec.rate === 16000 ? rec.samples : ra.downsample(rec.samples, rec.rate, 16000);
+      const result = await ra.diarization.diarize(ra.audio.float32(samples, 16000));
+      const segments = result.segments || [];
+      const speakers = [...new Set(segments.map((s) => s.speakerId))];
+      $('diarout').innerHTML = segments.length
+        ? `<div class="figcap">${result.speakerCount} speaker${result.speakerCount === 1 ? '' : 's'} · ${fmtSecs((samples.length / 16000) * 1000)} recorded</div>` +
+          segments.map((s) => {
+            const n = speakers.indexOf(s.speakerId) + 1;
+            return `<div class="ragchunk"><div class="meta"><span>Speaker ${n}</span><span class="ragscore">${fmtSecs(s.startMs)} – ${fmtSecs(s.endMs)}</span></div></div>`;
+          }).join('')
+        : `No speech segments detected (${result.speakerCount} speaker${result.speakerCount === 1 ? '' : 's'}).`;
+    } catch (e) { $('diarout').textContent = 'error: ' + e.message; }
+    finally { btn.disabled = false; setStatus('ready'); }
+  });
+}
+
+// ---- semantic segmentation ----
+// A distinct colour per class id, spaced by the golden angle so neighbouring
+// ids never come out as neighbouring hues.
+function classRgb(id) {
+  const h = ((id * 137.508) % 360) / 60;
+  const c = 0.62, x = c * (1 - Math.abs((h % 2) - 1)), m = 0.24;
+  const [r, g, b] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x]
+    : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+// Commons has no image decoder: rac_segmentation_image_t takes decoded pixels,
+// so the chosen file is decoded here and handed over as raw RGB. Capped at
+// 512px on the long edge, which is what SegFormer B0 was trained at.
+async function decodeRawRgb(file, maxEdge = 512) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const off = document.createElement('canvas');
+  off.width = width; off.height = height;
+  off.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const rgba = off.getContext('2d').getImageData(0, 0, width, height).data;
+  const rgb = new Uint8Array(width * height * 3);
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+    rgb[j] = rgba[i]; rgb[j + 1] = rgba[i + 1]; rgb[j + 2] = rgba[i + 2];
+  }
+  return { rgb, width, height };
+}
+function paintClassMask(canvas, result) {
+  const { classMask, width, height } = result;
+  if (!classMask || classMask.length < width * height) { canvas.style.display = 'none'; return; }
+  const px = new Uint8ClampedArray(width * height * 4);
+  const palette = new Map();
+  for (let i = 0; i < width * height; i++) {
+    const id = classMask[i];
+    let rgb = palette.get(id);
+    if (!rgb) { rgb = classRgb(id); palette.set(id, rgb); }
+    px[i * 4] = rgb[0]; px[i * 4 + 1] = rgb[1]; px[i * 4 + 2] = rgb[2]; px[i * 4 + 3] = 255;
+  }
+  canvas.width = width; canvas.height = height; canvas.style.display = 'block';
+  canvas.getContext('2d').putImageData(new ImageData(px, width, height), 0, 0);
+}
+function wireSegmentation() {
+  const picker = $('segfile');
+  const canvas = $('segcanvas');
+  picker.addEventListener('change', () => {
+    $('seggo').disabled = !picker.files.length;
+    $('segfname').textContent = picker.files[0] ? picker.files[0].name : 'No image selected';
+  });
+  $('seggo').addEventListener('click', async () => {
+    const file = picker.files[0];
+    if (!file) return;
+    $('seggo').disabled = true; $('segout').textContent = 'preparing…';
+    try {
+      await loadSelected('segmentation', { framework: 'ONNX' });
+      setStatus('segmenting…'); $('segout').textContent = 'segmenting…';
+      const { rgb, width, height } = await decodeRawRgb(file);
+      const result = await ra.segmentation.segment(ra.image.rawRgb(rgb, width, height));
+      paintClassMask(canvas, result);
+      const classes = (result.classes || []).slice().sort((a, b) => b.fraction - a.fraction).slice(0, 12);
+      $('segout').innerHTML = classes.length
+        ? classes.map((c) => {
+          const [r, g, b] = classRgb(c.classId);
+          const name = c.label || 'class ' + c.classId;
+          return '<div class="ragchunk"><div class="meta">' +
+            `<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;background:rgb(${r},${g},${b})"></span>${escapeHtml(name)}</span>` +
+            `<span class="ragscore">${(c.fraction * 100).toFixed(1)}%</span></div></div>`;
+        }).join('')
+        : 'No classes detected.';
+    } catch (e) { $('segout').textContent = 'error: ' + e.message; canvas.style.display = 'none'; }
+    finally { $('seggo').disabled = false; setStatus('ready'); }
+  });
 }
 
 // ---- headless self-test ----
@@ -1231,8 +1509,15 @@ async function selfTest() {
     conv.messages.push({ role: 'assistant', content: '' }); // exercise chat plumbing minimally
     conv.messages.pop();
     let reply = '';
-    const hello = await buildPrompt([], 'Say hello in one short sentence.');
-    await withLlm((h) => ra.generateStream(h, hello, { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; }));
+    for await (const event of ra.llm.generateStream(
+      [
+        { role: 'system', content: settings.systemPrompt },
+        { role: 'user', content: 'Say hello in one short sentence.' },
+      ],
+      { model: selectedModel('llm'), maxOutputTokens: 24 }
+    )) {
+      if (event.type === 'token' && event.kind === 'TEXT') reply += event.text;
+    }
     if (!reply.trim()) throw new Error('empty chat reply');
     log('[selftest] chat OK: ' + JSON.stringify(reply.trim().slice(0, 70)));
 
@@ -1250,10 +1535,15 @@ async function selfTest() {
     if (!(close > far)) throw new Error('embedding ordering wrong');
     log(`[selftest] embeddings OK: close=${close.toFixed(3)} far=${far.toFixed(3)}`);
 
-    const cat = await ra.catalog();
+    const cat = await ensureCatalog();
     if (!cat['qwen3.5-0.8b']) throw new Error('catalog missing');
-    const status = await ra.modelStatus();
-    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen3.5-0.8b'].downloaded);
+    // The catalog is the app's table; the registry is what commons resolves ids
+    // against. A staged entry that never became a row is the failure worth
+    // catching here, so read it back through ra.models.
+    const { byId } = await modelState();
+    const row = byId.get('qwen3.5-0.8b');
+    if (!row) throw new Error('catalog entry never reached the registry');
+    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, ' + byId.size + ' registry rows, qwen downloaded=' + row.downloaded);
 
     const image = new URLSearchParams(location.search).get('image');
     if (image) { const c = await runVision(image); if (!c || c.length < 3) throw new Error('empty caption'); log('[selftest] vision OK: ' + JSON.stringify(c.slice(0, 70))); }
@@ -1290,6 +1580,10 @@ const IS_SELFTEST = new URLSearchParams(location.search).get('selftest') === '1'
     } catch { /* ignore */ }
     try { const c = await store.loadConversations(); if (c && Array.isArray(c.conversations)) { conversations = c.conversations; nextConvId = c.nextConvId || conversations.length + 1; activeId = conversations[0] ? conversations[0].id : null; } } catch { /* ignore */ }
     try { const cm = await store.loadCustomModels(); if (Array.isArray(cm)) customModels = cm; } catch { /* ignore */ }
+    // Commons' registry is per process, so a custom entry has to be re-staged on
+    // every start the same way the catalog is — otherwise its id resolves to
+    // nothing and every later ra.models call on it fails.
+    await registerCustomModels();
   }
   setStatus('ready');
   if (IS_SELFTEST) { setStatus('self-test…'); await selfTest(); } else { wireUi(); }

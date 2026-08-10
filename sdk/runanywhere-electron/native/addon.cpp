@@ -16,6 +16,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -33,45 +34,58 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_neurt.h"
 #endif
+#include "llm_bridge.h"
+#include "model_bridge.h"
+#include "tool_bridge.h"
+#include "data_bridge.h"
+#include "download_bridge.h"
+#include "lora_bridge.h"
+#include "speech_bridge.h"
+#include "voice_bridge.h"
+#include "vlm_bridge.h"
+#include "proto_bridge.h"
+
 #include "rac/core/rac_types.h"
-#include "rac/features/llm/rac_llm_component.h"
-#include "rac/features/vlm/rac_vlm_component.h"
-#include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/diarization/rac_diarization_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
+#include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/rag/rac_rag.h"
+#include "rac/features/rerank/rac_rerank_service.h"
+#include "rac/features/rerank/rac_rerank_types.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
+#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/rerank/rac_rerank_service.h"
-#include "rac/features/rerank/rac_rerank_types.h"
-#include "rac/features/diarization/rac_diarization_service.h"
-#include "rac/features/diarization/rac_diarization_types.h"
-#include "rac/features/segmentation/rac_segmentation_service.h"
-#include "rac/features/segmentation/rac_segmentation_types.h"
+#include "rac/features/vlm/rac_vlm_component.h"
+#include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/features/rag/rac_rag.h"
-#include "rac/foundation/rac_proto_buffer.h"
 // Desktop control plane (telemetry + auth). Compiled only when the desktop
 // adapter — which carries the libcurl HTTP transport — is linked into commons
 // (RAC_ELECTRON_HAVE_DESKTOP, set by native/CMakeLists.txt when RAC_DESKTOP_ADAPTER=ON).
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
-#include "rac/infrastructure/network/rac_dev_config.h"
-#include "rac/infrastructure/network/rac_environment.h"
-#include "rac/infrastructure/network/rac_client_info.h"
-#include "rac/infrastructure/network/rac_auth_manager.h"
-#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_client_info.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
-#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/lifecycle/rac_sdk_init.h"
 #endif
 
@@ -103,11 +117,14 @@ rac_result_t rac_backend_cloud_register(void);
 // static-links rac_commons, so the symbol resolves at link time.
 namespace rac {
 namespace embeddings {
-rac_result_t create_service(const char* model_id, const char* config_json, rac_handle_t* out_handle);
+rac_result_t create_service(const char* model_id, const char* config_json,
+                            rac_handle_t* out_handle);
 }  // namespace embeddings
 }  // namespace rac
 
 namespace {
+
+using rac_electron::RunNativeCall;
 
 // The adapter struct is caller-owned and must outlive rac_shutdown().
 rac_platform_adapter_t g_adapter;
@@ -157,10 +174,17 @@ rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, in
 std::condition_variable g_inflight_cv;
 std::unordered_map<int32_t, int> g_inflight;  // handle id -> active blocking-op count
 
+// A component is not re-entrant. While every blocking op ran on the JS thread the
+// event loop serialised them for free; now that they run on the libuv pool, two
+// awaited-in-parallel calls could reach one engine at once, so each handle carries
+// a gate the worker holds for the duration of its rac_* call.
+std::unordered_map<int32_t, std::shared_ptr<std::mutex>> g_op_gates;
+
 rac_handle_t begin_op(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
     auto it = map.find(id);
-    if (it == map.end()) return nullptr;
+    if (it == map.end())
+        return nullptr;
     ++g_inflight[id];
     return it->second;
 }
@@ -169,9 +193,29 @@ void end_op(int32_t id) {
     {
         std::lock_guard<std::mutex> lock(g_handles_mutex);
         auto it = g_inflight.find(id);
-        if (it != g_inflight.end() && --it->second <= 0) g_inflight.erase(it);
+        if (it != g_inflight.end() && --it->second <= 0) {
+            g_inflight.erase(it);
+            g_op_gates.erase(id);
+        }
     }
     g_inflight_cv.notify_all();
+}
+
+// Take the in-flight lease (so unload waits) and the gate that serialises this
+// handle. False means the id is unknown; the caller reports an invalid handle.
+bool begin_worker_op(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id,
+                     rac_handle_t* out_handle, std::shared_ptr<std::mutex>* out_gate) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    auto it = map.find(id);
+    if (it == map.end())
+        return false;
+    ++g_inflight[id];
+    auto& gate = g_op_gates[id];
+    if (!gate)
+        gate = std::make_shared<std::mutex>();
+    *out_handle = it->second;
+    *out_gate = gate;
+    return true;
 }
 
 struct OpScope {
@@ -192,9 +236,11 @@ rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& ma
         auto it = g_inflight.find(id);
         return it == g_inflight.end() || it->second == 0;
     });
-    if (!idle) return nullptr;
+    if (!idle)
+        return nullptr;
     auto it = map.find(id);
-    if (it == map.end()) return nullptr;
+    if (it == map.end())
+        return nullptr;
     rac_handle_t h = it->second;
     map.erase(it);
     return h;
@@ -228,7 +274,6 @@ void throw_rac_error(Napi::Env env, rac_result_t code, const std::string& contex
 // =============================================================================
 Napi::Value Initialize(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (g_initialized.load()) return env.Undefined();
     if (info.Length() < 1 || !info[0].IsString()) {
         Napi::TypeError::New(env, "initialize(secureDir[, baseDir]) expects a string")
             .ThrowAsJavaScriptException();
@@ -238,64 +283,103 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
     std::string base =
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : secure;
 
+    return RunNativeCall(env, "rac_init", [secure, base]() -> rac_result_t {
+        if (g_initialized.load())
+            return RAC_SUCCESS;
+
 #ifdef _WIN32
-    rac_electron_fill_win32_adapter(&g_adapter, secure.c_str());
+        rac_electron_fill_win32_adapter(&g_adapter, secure.c_str());
 #else
-    rac_electron_fill_posix_adapter(&g_adapter, secure.c_str());
+        rac_electron_fill_posix_adapter(&g_adapter, secure.c_str());
 #endif
 
-    rac_config_t cfg;
-    std::memset(&cfg, 0, sizeof(cfg));
-    cfg.platform_adapter = &g_adapter;
-    cfg.log_level = RAC_LOG_WARNING;
-    cfg.log_tag = "electron";
+        rac_config_t cfg;
+        std::memset(&cfg, 0, sizeof(cfg));
+        cfg.platform_adapter = &g_adapter;
+        cfg.log_level = RAC_LOG_WARNING;
+        cfg.log_tag = "electron";
 
-    rac_model_paths_set_base_dir(base.c_str());
+        rac_model_paths_set_base_dir(base.c_str());
 
-    rac_result_t rc = rac_init(&cfg);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "rac_init");
-        return env.Undefined();
-    }
-    // Backend/plugin registration is process-global and persists across
-    // rac_shutdown(), so register exactly once — re-registering after a
-    // shutdown+re-init would fail (RAC already-registered), which is why
-    // initialize() must be safe to call again after shutdown().
-    // Each call is gated by RAC_HAVE_BACKEND_<X> from native/CMakeLists.txt.
-    static bool backends_registered = false;
-    if (!backends_registered) {
-#ifdef RAC_HAVE_BACKEND_LLAMACPP
-        rc = rac_backend_llamacpp_register();
+        rac_result_t rc = rac_init(&cfg);
+        if (rc != RAC_SUCCESS)
+            return rc;
+
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+        // The download orchestrator refuses to start without a registered HTTP
+        // transport, and downloading a model has nothing to do with having
+        // control-plane credentials — so the libcurl transport goes up here
+        // rather than only inside configureControlPlane().
+        rc = rac_desktop_http_transport_register();
         if (rc != RAC_SUCCESS) {
             rac_shutdown();
-            throw_rac_error(env, rc, "rac_backend_llamacpp_register");
-            return env.Undefined();
+            return rc;
         }
 #endif
+
+        // Backend/plugin registration is process-global and persists across
+        // rac_shutdown(), so register exactly once — re-registering after a
+        // shutdown+re-init would fail (RAC already-registered), which is why
+        // initialize() must be safe to call again after shutdown().
+        // Each call is gated by RAC_HAVE_BACKEND_<X> from native/CMakeLists.txt.
+        static bool backends_registered = false;
+        if (!backends_registered) {
+#ifdef RAC_HAVE_BACKEND_LLAMACPP
+            rc = rac_backend_llamacpp_register();
+            if (rc != RAC_SUCCESS) {
+                rac_shutdown();
+                return rc;
+            }
+#endif
 #ifdef RAC_HAVE_BACKEND_ONNX
-        rac_backend_onnx_register();  // embeddings (optional)
+            rac_backend_onnx_register();  // embeddings (optional)
 #endif
 #ifdef RAC_HAVE_BACKEND_SHERPA
-        rac_backend_sherpa_register();  // STT / TTS (optional)
+            rac_backend_sherpa_register();  // STT / TTS (optional)
 #endif
 #ifdef RAC_HAVE_BACKEND_QHEXRT
-        rac_backend_qhexrt_register();  // Hexagon NPU when linked (not claimed for Win NPU yet)
+            // Hexagon NPU. Routable on Snapdragon Android and Windows on ARM64 when a
+            // matching prebuilt is linked; the not-routable shell otherwise, which
+            // registers and then declines every primitive.
+            rac_backend_qhexrt_register();
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
-        rac_backend_mlx_register();
+            rac_backend_mlx_register();
 #endif
 #ifdef RAC_HAVE_BACKEND_NEURT
-        // The neurt engine has no bespoke rac_backend_*_register() fn; register
-        // its plugin entry directly, like rcli's bootstrap does.
-        rac_plugin_register(rac_plugin_entry_neurt());
+            // The neurt engine has no bespoke rac_backend_*_register() fn; register
+            // its plugin entry directly, like rcli's bootstrap does.
+            rac_plugin_register(rac_plugin_entry_neurt());
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
-        rac_backend_cloud_register();
+            rac_backend_cloud_register();
 #endif
-        backends_registered = true;
+            backends_registered = true;
+        }
+        g_initialized.store(true);
+        return RAC_SUCCESS;
+    });
+}
+
+// memoryInfo() -> { totalBytes, availableBytes, usedBytes } straight from the
+// platform adapter commons itself reads. Stays synchronous: it is a sysctl /
+// GlobalMemoryStatusEx probe, and the residency policy asks for it on the path
+// into a load, where an extra tick of latency would be pure overhead.
+Napi::Value MemoryInfo(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    Napi::Object out = Napi::Object::New(env);
+    rac_memory_info_t mem;
+    std::memset(&mem, 0, sizeof(mem));
+    if (g_adapter.get_memory_info == nullptr ||
+        g_adapter.get_memory_info(&mem, g_adapter.user_data) != RAC_SUCCESS) {
+        // Unknown is 0 across the board — the same convention commons uses, and
+        // what rac_model_check_compatibility reads as "requirement satisfied".
+        std::memset(&mem, 0, sizeof(mem));
     }
-    g_initialized.store(true);
-    return env.Undefined();
+    out.Set("totalBytes", Napi::Number::New(env, static_cast<double>(mem.total_bytes)));
+    out.Set("availableBytes", Napi::Number::New(env, static_cast<double>(mem.available_bytes)));
+    out.Set("usedBytes", Napi::Number::New(env, static_cast<double>(mem.used_bytes)));
+    return out;
 }
 
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
@@ -321,15 +405,17 @@ void electron_telemetry_http_callback(void* user_data, const char* endpoint, con
     const char* base_url = rac_state_get_base_url();
     if (base_url == nullptr || base_url[0] == '\0' ||
         rac_http_transport_is_registered() != RAC_TRUE) {
-        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
-                                                         "telemetry transport unavailable");
+        if (manager)
+            rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                "telemetry transport unavailable");
         return;
     }
 
     char url[2048] = {};
     if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
-        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
-                                                         "telemetry URL build failed");
+        if (manager)
+            rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                "telemetry URL build failed");
         return;
     }
 
@@ -350,8 +436,9 @@ void electron_telemetry_http_callback(void* user_data, const char* endpoint, con
 
     rac_http_client_t* client = nullptr;
     if (rac_http_client_create(&client) != RAC_SUCCESS) {
-        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
-                                                         "telemetry client create failed");
+        if (manager)
+            rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                "telemetry client create failed");
         return;
     }
 
@@ -382,12 +469,106 @@ void electron_telemetry_http_callback(void* user_data, const char* endpoint, con
     rac_http_response_free(&response);
 }
 
+// The auth manager's persistence vtable, backed by the same secure store the
+// public `secure` namespace uses (DPAPI on Windows, owner-only files elsewhere).
+// Without it rac_auth_save_tokens is a no-op, every process start re-authenticates
+// from scratch, and the refresh token is unusable — which is what Electron did
+// before this. The slots follow rac_secure_storage_t's own return convention,
+// which is NOT rac_result_t: 0/length for success, RAC_ERROR_FILE_NOT_FOUND for a
+// clean miss, negative for a real failure.
+int auth_storage_store(const char* key, const char* value, void*) {
+    if (!key || !value || !g_adapter.secure_set)
+        return -1;
+    return g_adapter.secure_set(key, value, g_adapter.user_data) == RAC_SUCCESS ? 0 : -1;
+}
+
+int auth_storage_retrieve(const char* key, char* out_value, size_t buffer_size, void*) {
+    if (!key || !out_value || buffer_size == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!g_adapter.secure_get)
+        return RAC_ERROR_FILE_NOT_FOUND;
+    char* stored = nullptr;
+    const rac_result_t rc = g_adapter.secure_get(key, &stored, g_adapter.user_data);
+    if (rc != RAC_SUCCESS || !stored) {
+        if (stored)
+            rac_free(stored);
+        return rc == RAC_ERROR_FILE_NOT_FOUND ? RAC_ERROR_FILE_NOT_FOUND
+                                              : RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    const size_t len = std::strlen(stored);
+    if (len == 0) {
+        rac_free(stored);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;  // an empty value is a corrupt one
+    }
+    if (len + 1 > buffer_size) {
+        rac_free(stored);
+        return RAC_ERROR_BUFFER_TOO_SMALL;
+    }
+    std::memcpy(out_value, stored, len + 1);
+    rac_free(stored);
+    return static_cast<int>(len);
+}
+
+int auth_storage_delete(const char* key, void*) {
+    if (!key || !g_adapter.secure_delete)
+        return -1;
+    return g_adapter.secure_delete(key, g_adapter.user_data) == RAC_SUCCESS ? 0 : -1;
+}
+
+// Commons flushes on batch size and on a five-second timeout, but that timeout is
+// only evaluated when the next event arrives — a queue that goes quiet holds its
+// events until shutdown, and a crash loses them. This thread is the wall clock
+// commons does not have.
+constexpr std::chrono::seconds kTelemetryFlushInterval{30};
+std::thread g_telemetry_flush_thread;
+std::condition_variable g_telemetry_flush_cv;
+std::mutex g_telemetry_flush_mutex;
+bool g_telemetry_flush_stop = false;
+
+void telemetry_flush_thread_start() {
+    if (g_telemetry_flush_thread.joinable())
+        return;
+    {
+        std::lock_guard<std::mutex> lock(g_telemetry_flush_mutex);
+        g_telemetry_flush_stop = false;
+    }
+    g_telemetry_flush_thread = std::thread([]() {
+        for (;;) {
+            std::unique_lock<std::mutex> lock(g_telemetry_flush_mutex);
+            if (g_telemetry_flush_cv.wait_for(lock, kTelemetryFlushInterval,
+                                              [] { return g_telemetry_flush_stop; })) {
+                return;
+            }
+            lock.unlock();
+            rac_telemetry_manager_t* manager = nullptr;
+            {
+                std::lock_guard<std::mutex> handles(g_handles_mutex);
+                manager = g_telemetry_manager;
+            }
+            if (manager)
+                rac_telemetry_manager_flush(manager);
+        }
+    });
+}
+
+void telemetry_flush_thread_stop() {
+    if (!g_telemetry_flush_thread.joinable())
+        return;
+    {
+        std::lock_guard<std::mutex> lock(g_telemetry_flush_mutex);
+        g_telemetry_flush_stop = true;
+    }
+    g_telemetry_flush_cv.notify_all();
+    g_telemetry_flush_thread.join();
+}
+
 // Detach + destroy the telemetry manager. Flush first (while the transport is up)
 // so the last batch is delivered; then detach the sink so no shutdown-time event
 // routes to a torn-down transport.
 void telemetry_teardown_flush() {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
-    if (g_telemetry_manager) rac_events_flush_telemetry_sink();
+    if (g_telemetry_manager)
+        rac_events_flush_telemetry_sink();
 }
 void telemetry_teardown_destroy() {
     rac_telemetry_manager_t* mgr = nullptr;
@@ -416,19 +597,20 @@ Napi::Value DevicePersistentId(const Napi::CallbackInfo& info) {
 Napi::Value DevStagingBaseUrl(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     const char* baked = rac_dev_config_get_staging_base_url();
-    if (baked && rac_dev_config_is_usable_http_url(baked)) return Napi::String::New(env, baked);
+    if (baked && rac_dev_config_is_usable_http_url(baked))
+        return Napi::String::New(env, baked);
     return Napi::String::New(env, "");
 }
 
 // Runs transport-register + state seed + telemetry sink + two-phase init off the
 // JS thread; resolves with the serialized SdkInitResult bytes.
 class ControlPlaneWorker : public Napi::AsyncWorker {
- public:
+   public:
     ControlPlaneWorker(Napi::Env env, int32_t environment, std::string api_key,
                        std::string base_url, std::string device_id, std::string platform,
-                       std::string sdk_version,
-                       std::string sdk_binding, std::string app_identifier, std::string app_name,
-                       std::string app_version, std::vector<uint8_t> phase1, std::vector<uint8_t> phase2)
+                       std::string sdk_version, std::string sdk_binding, std::string app_identifier,
+                       std::string app_name, std::string app_version, std::vector<uint8_t> phase1,
+                       std::vector<uint8_t> phase2)
         : Napi::AsyncWorker(env),
           deferred_(Napi::Promise::Deferred::New(env)),
           env_(environment),
@@ -448,7 +630,12 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
 
     void Execute() override {
         const auto env = static_cast<rac_environment_t>(env_);
-        rac_desktop_http_transport_register();
+        const rac_result_t transport_rc = rac_desktop_http_transport_register();
+        if (transport_rc != RAC_SUCCESS) {
+            code_ = transport_rc;
+            err_ = "desktop HTTP/device bootstrap failed: " + std::to_string(transport_rc);
+            return;
+        }
 
         // Runtime state first (auth/device/telemetry read env + creds from it),
         // then the copied SDK configuration + client info.
@@ -467,27 +654,41 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         cfg.client_info.app_version = app_version_.c_str();
         rac_sdk_init(&cfg);
 
-        rac_auth_init(nullptr);  // per-run auth; tokens not persisted across runs
+        // Auth persistence must be installed before phase 1: phase 1 writes the
+        // API key and base URL through this same vtable.
+        static const rac_secure_storage_t auth_storage = {auth_storage_store,
+                                                          auth_storage_retrieve,
+                                                          auth_storage_delete, nullptr};
+        rac_auth_init(&auth_storage);
+        // Restore tokens from the previous run. A miss is first launch; anything
+        // else is a real storage failure worth reporting, but not worth refusing
+        // to start over — the handshake below just re-authenticates.
+        const int load_rc = rac_auth_load_stored_tokens();
+        if (load_rc != RAC_SUCCESS && load_rc != RAC_ERROR_FILE_NOT_FOUND) {
+            RAC_LOG_WARNING("Electron", "stored auth tokens unreadable (%d); re-authenticating",
+                            load_rc);
+        }
 
         {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             if (!g_telemetry_manager) {
-                g_telemetry_manager = rac_telemetry_manager_create(env, device_id_.c_str(),
-                                                                   platform_.c_str(),
-                                                                   sdk_version_.c_str());
+                g_telemetry_manager = rac_telemetry_manager_create(
+                    env, device_id_.c_str(), platform_.c_str(), sdk_version_.c_str());
                 if (g_telemetry_manager) {
-                    rac_telemetry_manager_set_http_callback(g_telemetry_manager,
-                                                            electron_telemetry_http_callback,
-                                                            g_telemetry_manager);
+                    rac_telemetry_manager_set_device_info(g_telemetry_manager,
+                                                          rac_desktop_device_model(),
+                                                          rac_desktop_os_version());
+                    rac_telemetry_manager_set_http_callback(
+                        g_telemetry_manager, electron_telemetry_http_callback, g_telemetry_manager);
                     rac_events_set_telemetry_sink(g_telemetry_manager);
                 }
             }
         }
+        telemetry_flush_thread_start();
 
         rac_proto_buffer_t p1out;
         rac_proto_buffer_init(&p1out);
-        rac_result_t rc =
-            rac_sdk_init_phase1_proto(phase1_.data(), phase1_.size(), &p1out);
+        rac_result_t rc = rac_sdk_init_phase1_proto(phase1_.data(), phase1_.size(), &p1out);
         rac_proto_buffer_free(&p1out);
         if (rc != RAC_SUCCESS) {
             code_ = rc;
@@ -525,7 +726,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         deferred_.Reject(e.Value());
     }
 
- private:
+   private:
     Napi::Promise::Deferred deferred_;
     int32_t env_;
     std::string api_key_, base_url_, device_id_, platform_, sdk_version_, sdk_binding_;
@@ -547,9 +748,10 @@ Napi::Value ConfigureControlPlane(const Napi::CallbackInfo& info) {
     }
     if (info.Length() < 12 || !info[0].IsNumber() || !info[10].IsTypedArray() ||
         !info[11].IsTypedArray()) {
-        Napi::TypeError::New(env, "configureControlPlane(env, apiKey, baseUrl, deviceId, platform, "
-                                  "sdkVersion, sdkBinding, appIdentifier, appName, appVersion, "
-                                  "phase1Bytes, phase2Bytes) bad args")
+        Napi::TypeError::New(env,
+                             "configureControlPlane(env, apiKey, baseUrl, deviceId, platform, "
+                             "sdkVersion, sdkBinding, appIdentifier, appName, appVersion, "
+                             "phase1Bytes, phase2Bytes) bad args")
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -561,12 +763,73 @@ Napi::Value ConfigureControlPlane(const Napi::CallbackInfo& info) {
     std::vector<uint8_t> phase1(p1.Data(), p1.Data() + p1.ByteLength());
     std::vector<uint8_t> phase2(p2.Data(), p2.Data() + p2.ByteLength());
 
-    auto* worker = new ControlPlaneWorker(
-        env, info[0].As<Napi::Number>().Int32Value(), str(1), str(2), str(3), str(4), str(5),
-        str(6), str(7), str(8), str(9), std::move(phase1), std::move(phase2));
+    auto* worker = new ControlPlaneWorker(env, info[0].As<Napi::Number>().Int32Value(), str(1),
+                                          str(2), str(3), str(4), str(5), str(6), str(7), str(8),
+                                          str(9), std::move(phase1), std::move(phase2));
     Napi::Promise promise = worker->Promise();
     worker->Queue();
     return promise;
+}
+
+// retryControlPlane() -> Promise<Buffer> (serialized SdkInitResult).
+//
+// The recovery path for a run that started offline: commons re-runs the auth
+// handshake using the api key and base URL it already cached, then flushes the
+// telemetry queued during the offline window. Idempotent — an authenticated
+// process gets the fast path with no network round-trip.
+Napi::Value RetryControlPlane(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return rac_electron::RunProtoCall(env, "sdk_retry_http", [](rac_proto_buffer_t* out) {
+        return rac_sdk_retry_http_proto(out);
+    });
+}
+
+// telemetryFlush() -> Promise<void>. Drains the queue through the same HTTP
+// callback the periodic thread uses; commons keeps a failed batch in its retry
+// queue rather than dropping it.
+Napi::Value TelemetryFlush(const Napi::CallbackInfo& info) {
+    return RunNativeCall(info.Env(), "telemetry_flush", []() -> rac_result_t {
+        rac_telemetry_manager_t* manager = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            manager = g_telemetry_manager;
+        }
+        if (!manager)
+            return RAC_SUCCESS;  // no control plane configured; nothing queued
+        rac_telemetry_manager_flush(manager);
+        return RAC_SUCCESS;
+    });
+}
+
+// authState() -> { authenticated, needsRefresh, expiresAtUnixSec, userId,
+//   organizationId, deviceRegistered }. Every field is read straight out of the
+// auth manager and rac_state, so an app can tell an authenticated run from an
+// offline one instead of guessing. Synchronous: these are in-memory reads.
+Napi::Value AuthState(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    Napi::Object out = Napi::Object::New(env);
+    auto text = [&](const char* value) {
+        return Napi::String::New(env, value ? value : "");
+    };
+    out.Set("authenticated", Napi::Boolean::New(env, rac_auth_is_authenticated()));
+    out.Set("needsRefresh", Napi::Boolean::New(env, rac_auth_needs_refresh()));
+    out.Set("expiresAtUnixSec",
+            Napi::Number::New(env, static_cast<double>(rac_auth_get_token_expires_at())));
+    out.Set("userId", text(rac_auth_get_user_id()));
+    out.Set("organizationId", text(rac_auth_get_organization_id()));
+    out.Set("deviceRegistered",
+            Napi::Boolean::New(env, rac_device_manager_is_registered() == RAC_TRUE));
+    return out;
+}
+
+// clearAuth() -> Promise<void>. Drops the tokens in memory and in the secure
+// store, so the next initialize() authenticates from scratch.
+Napi::Value ClearAuth(const Napi::CallbackInfo& info) {
+    return RunNativeCall(info.Env(), "auth_clear", []() { return rac_auth_clear(); });
 }
 #endif  // RAC_ELECTRON_HAVE_DESKTOP
 
@@ -595,8 +858,9 @@ struct StreamCtx {
     rac_result_t result = RAC_SUCCESS;
     std::string error_msg;
     std::function<rac_result_t(StreamCtx*)> run;  // performs the rac streaming call
-    int32_t lease_id = 0;  // begin_op id; end_op when the worker finishes
+    int32_t lease_id = 0;                         // begin_op id; end_op when the worker finishes
     bool leased = false;
+    std::shared_ptr<std::mutex> gate;  // held for the whole stream (see g_op_gates)
     StreamMetrics metrics;
     explicit StreamCtx(Napi::Env env) : deferred(Napi::Promise::Deferred::New(env)) {}
 };
@@ -643,7 +907,8 @@ void stream_error_cb(rac_result_t code, const char* msg, void* ud) {
 void stream_llm_complete_cb(const rac_llm_result_t* r, void* ud) {
     auto* ctx = static_cast<StreamCtx*>(ud);
     ctx->result = RAC_SUCCESS;
-    if (!r) return;
+    if (!r)
+        return;
     ctx->metrics.present = true;
     ctx->metrics.prompt_tokens = r->prompt_tokens;
     ctx->metrics.completion_tokens = r->completion_tokens;
@@ -656,7 +921,8 @@ void stream_llm_complete_cb(const rac_llm_result_t* r, void* ud) {
 void stream_vlm_complete_cb(const rac_vlm_result_t* r, void* ud) {
     auto* ctx = static_cast<StreamCtx*>(ud);
     ctx->result = RAC_SUCCESS;
-    if (!r) return;
+    if (!r)
+        return;
     ctx->metrics.present = true;
     ctx->metrics.prompt_tokens = r->prompt_tokens;
     ctx->metrics.completion_tokens = r->completion_tokens;
@@ -668,19 +934,23 @@ void stream_vlm_complete_cb(const rac_vlm_result_t* r, void* ud) {
 
 // Create the TSFN + worker thread; resolve/reject the returned Promise in the
 // finalizer (JS loop, after the producer thread Release()d).
-// When lease_id != 0, the caller already called begin_op; we end_op when the
-// worker finishes (covers unload-during-generate).
+// When lease_id != 0, the caller already took the in-flight lease; we end_op when
+// the worker finishes (covers unload-during-generate). `gate` is that handle's
+// serialisation mutex and is held for the whole stream.
 Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
-                           std::function<rac_result_t(StreamCtx*)> run, int32_t lease_id = 0) {
+                           std::function<rac_result_t(StreamCtx*)> run, int32_t lease_id = 0,
+                           std::shared_ptr<std::mutex> gate = nullptr) {
     auto* ctx = new StreamCtx(env);
     ctx->run = std::move(run);
     ctx->lease_id = lease_id;
     ctx->leased = lease_id != 0;
+    ctx->gate = std::move(gate);
     try {
         ctx->tsfn = Napi::ThreadSafeFunction::New(
             env, on_token, "ra-stream", /*maxQueueSize*/ 256, /*initialThreadCount*/ 1, ctx,
             [](Napi::Env env, void* /*data*/, StreamCtx* c) {
-                if (c->worker.joinable()) c->worker.join();
+                if (c->worker.joinable())
+                    c->worker.join();
                 // Safety net if the worker aborted before releasing the lease.
                 if (c->leased) {
                     end_op(c->lease_id);
@@ -703,8 +973,15 @@ Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
             static_cast<void*>(nullptr));
 
         ctx->worker = std::thread([ctx]() {
-            rac_result_t rc = ctx->run(ctx);
-            if (rc != RAC_SUCCESS && ctx->result == RAC_SUCCESS) ctx->result = rc;
+            rac_result_t rc = RAC_SUCCESS;
+            if (ctx->gate) {
+                std::lock_guard<std::mutex> serialize(*ctx->gate);
+                rc = ctx->run(ctx);
+            } else {
+                rc = ctx->run(ctx);
+            }
+            if (rc != RAC_SUCCESS && ctx->result == RAC_SUCCESS)
+                ctx->result = rc;
             if (ctx->leased) {
                 end_op(ctx->lease_id);
                 ctx->leased = false;
@@ -712,7 +989,8 @@ Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
             ctx->tsfn.Release();  // last TSFN call from this thread -> finalizer on JS loop
         });
     } catch (...) {
-        if (ctx->leased) end_op(ctx->lease_id);
+        if (ctx->leased)
+            end_op(ctx->lease_id);
         delete ctx;
         throw;
     }
@@ -738,46 +1016,59 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
     std::string name =
         (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
 
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_llm_component_create(&h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "llm_component_create");
-        return env.Undefined();
-    }
     // Optional load-time placement: rac_llm_config_t is the only pre-load knob the
     // component layer exposes (thread count and GPU offload live on the
     // llamacpp-direct API, which bypasses the plugin registry, so they are not
-    // settable here).
+    // settable here). Read here, on the JS thread; applied on the worker.
+    bool has_framework = false;
+    int32_t framework = 0;
+    bool has_context = false;
+    int32_t context_length = 0;
     if (info.Length() > 3 && info[3].IsObject()) {
         Napi::Object cfg_obj = info[3].As<Napi::Object>();
-        rac_llm_config_t cfg = RAC_LLM_CONFIG_DEFAULT;
-        cfg.model_id = id.c_str();
         if (cfg_obj.Has("framework") && cfg_obj.Get("framework").IsNumber()) {
-            cfg.preferred_framework = cfg_obj.Get("framework").As<Napi::Number>().Int32Value();
+            framework = cfg_obj.Get("framework").As<Napi::Number>().Int32Value();
+            has_framework = true;
         }
         if (cfg_obj.Has("contextLength") && cfg_obj.Get("contextLength").IsNumber()) {
-            cfg.context_length = cfg_obj.Get("contextLength").As<Napi::Number>().Int32Value();
-        }
-        rc = rac_llm_component_configure(h, &cfg);
-        if (rc != RAC_SUCCESS) {
-            rac_llm_component_destroy(h);
-            throw_rac_error(env, rc, "llm_component_configure");
-            return env.Undefined();
+            context_length = cfg_obj.Get("contextLength").As<Napi::Number>().Int32Value();
+            has_context = true;
         }
     }
-    rc = rac_llm_component_load_model(h, path.c_str(), id.c_str(), name.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_llm_component_destroy(h);
-        throw_rac_error(env, rc, "load_model");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_llm_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "load_model",
+        [path, id, name, has_framework, framework, has_context, context_length,
+         slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_llm_component_create(&h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            if (has_framework || has_context) {
+                rac_llm_config_t cfg = RAC_LLM_CONFIG_DEFAULT;
+                cfg.model_id = id.c_str();
+                if (has_framework)
+                    cfg.preferred_framework = framework;
+                if (has_context)
+                    cfg.context_length = context_length;
+                rc = rac_llm_component_configure(h, &cfg);
+                if (rc != RAC_SUCCESS) {
+                    rac_llm_component_destroy(h);
+                    return rc;
+                }
+            }
+            rc = rac_llm_component_load_model(h, path.c_str(), id.c_str(), name.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_llm_component_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_llm_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
 // Optional per-request generation options (from a JS object). Strings and string
@@ -818,61 +1109,115 @@ struct GenOpts {
 
 std::vector<std::string> parse_string_array(const Napi::Object& obj, const char* key) {
     std::vector<std::string> out;
-    if (!obj.Has(key)) return out;
+    if (!obj.Has(key))
+        return out;
     Napi::Value v = obj.Get(key);
-    if (!v.IsArray()) return out;
+    if (!v.IsArray())
+        return out;
     Napi::Array arr = v.As<Napi::Array>();
     for (uint32_t i = 0; i < arr.Length(); ++i) {
         Napi::Value item = arr.Get(i);
-        if (item.IsString()) out.push_back(item.As<Napi::String>().Utf8Value());
+        if (item.IsString())
+            out.push_back(item.As<Napi::String>().Utf8Value());
     }
     return out;
 }
 
 GenOpts parse_gen_opts(const Napi::Value& v) {
     GenOpts o;
-    if (!v.IsObject()) return o;
+    if (!v.IsObject())
+        return o;
     Napi::Object obj = v.As<Napi::Object>();
-    if (obj.Has("maxTokens")) { o.max_tokens = obj.Get("maxTokens").ToNumber().Int32Value(); o.has_max = true; }
-    if (obj.Has("temperature")) { o.temperature = obj.Get("temperature").ToNumber().FloatValue(); o.has_temp = true; }
-    if (obj.Has("topP")) { o.top_p = obj.Get("topP").ToNumber().FloatValue(); o.has_top_p = true; }
-    if (obj.Has("topK")) { o.top_k = obj.Get("topK").ToNumber().Int32Value(); o.has_top_k = true; }
-    if (obj.Has("minP")) { o.min_p = obj.Get("minP").ToNumber().FloatValue(); o.has_min_p = true; }
-    if (obj.Has("frequencyPenalty")) { o.frequency_penalty = obj.Get("frequencyPenalty").ToNumber().FloatValue(); o.has_frequency_penalty = true; }
-    if (obj.Has("presencePenalty")) { o.presence_penalty = obj.Get("presencePenalty").ToNumber().FloatValue(); o.has_presence_penalty = true; }
-    if (obj.Has("repetitionPenalty")) { o.repetition_penalty = obj.Get("repetitionPenalty").ToNumber().FloatValue(); o.has_repetition_penalty = true; }
-    if (obj.Has("seed")) { o.seed = static_cast<int64_t>(obj.Get("seed").ToNumber().Int64Value()); o.has_seed = true; }
-    if (obj.Has("nThreads")) { o.n_threads = obj.Get("nThreads").ToNumber().Int32Value(); o.has_threads = true; }
-    if (obj.Has("disableThinking")) { o.disable_thinking = obj.Get("disableThinking").ToBoolean().Value(); o.has_disable_thinking = true; }
-    if (obj.Has("systemPrompt")) o.system_prompt = obj.Get("systemPrompt").ToString().Utf8Value();
-    if (obj.Has("grammar")) o.grammar = obj.Get("grammar").ToString().Utf8Value();
+    if (obj.Has("maxTokens")) {
+        o.max_tokens = obj.Get("maxTokens").ToNumber().Int32Value();
+        o.has_max = true;
+    }
+    if (obj.Has("temperature")) {
+        o.temperature = obj.Get("temperature").ToNumber().FloatValue();
+        o.has_temp = true;
+    }
+    if (obj.Has("topP")) {
+        o.top_p = obj.Get("topP").ToNumber().FloatValue();
+        o.has_top_p = true;
+    }
+    if (obj.Has("topK")) {
+        o.top_k = obj.Get("topK").ToNumber().Int32Value();
+        o.has_top_k = true;
+    }
+    if (obj.Has("minP")) {
+        o.min_p = obj.Get("minP").ToNumber().FloatValue();
+        o.has_min_p = true;
+    }
+    if (obj.Has("frequencyPenalty")) {
+        o.frequency_penalty = obj.Get("frequencyPenalty").ToNumber().FloatValue();
+        o.has_frequency_penalty = true;
+    }
+    if (obj.Has("presencePenalty")) {
+        o.presence_penalty = obj.Get("presencePenalty").ToNumber().FloatValue();
+        o.has_presence_penalty = true;
+    }
+    if (obj.Has("repetitionPenalty")) {
+        o.repetition_penalty = obj.Get("repetitionPenalty").ToNumber().FloatValue();
+        o.has_repetition_penalty = true;
+    }
+    if (obj.Has("seed")) {
+        o.seed = static_cast<int64_t>(obj.Get("seed").ToNumber().Int64Value());
+        o.has_seed = true;
+    }
+    if (obj.Has("nThreads")) {
+        o.n_threads = obj.Get("nThreads").ToNumber().Int32Value();
+        o.has_threads = true;
+    }
+    if (obj.Has("disableThinking")) {
+        o.disable_thinking = obj.Get("disableThinking").ToBoolean().Value();
+        o.has_disable_thinking = true;
+    }
+    if (obj.Has("systemPrompt"))
+        o.system_prompt = obj.Get("systemPrompt").ToString().Utf8Value();
+    if (obj.Has("grammar"))
+        o.grammar = obj.Get("grammar").ToString().Utf8Value();
     o.stop_sequences = parse_string_array(obj, "stopSequences");
     o.history = parse_string_array(obj, "history");
     return o;
 }
 
 void apply_gen_opts(rac_llm_options_t& opts, GenOpts& o) {
-    if (o.has_max) opts.max_tokens = o.max_tokens;
-    if (o.has_temp) opts.temperature = o.temperature;
-    if (o.has_top_p) opts.top_p = o.top_p;
-    if (o.has_top_k) opts.top_k = o.top_k;
-    if (o.has_min_p) opts.min_p = o.min_p;
-    if (o.has_frequency_penalty) opts.frequency_penalty = o.frequency_penalty;
-    if (o.has_presence_penalty) opts.presence_penalty = o.presence_penalty;
-    if (o.has_repetition_penalty) opts.repetition_penalty = o.repetition_penalty;
-    if (o.has_seed) opts.seed = o.seed;
-    if (o.has_threads) opts.n_threads = o.n_threads;
-    if (o.has_disable_thinking) opts.disable_thinking = o.disable_thinking ? RAC_TRUE : RAC_FALSE;
-    if (!o.system_prompt.empty()) opts.system_prompt = o.system_prompt.c_str();
-    if (!o.grammar.empty()) opts.grammar = o.grammar.c_str();
+    if (o.has_max)
+        opts.max_tokens = o.max_tokens;
+    if (o.has_temp)
+        opts.temperature = o.temperature;
+    if (o.has_top_p)
+        opts.top_p = o.top_p;
+    if (o.has_top_k)
+        opts.top_k = o.top_k;
+    if (o.has_min_p)
+        opts.min_p = o.min_p;
+    if (o.has_frequency_penalty)
+        opts.frequency_penalty = o.frequency_penalty;
+    if (o.has_presence_penalty)
+        opts.presence_penalty = o.presence_penalty;
+    if (o.has_repetition_penalty)
+        opts.repetition_penalty = o.repetition_penalty;
+    if (o.has_seed)
+        opts.seed = o.seed;
+    if (o.has_threads)
+        opts.n_threads = o.n_threads;
+    if (o.has_disable_thinking)
+        opts.disable_thinking = o.disable_thinking ? RAC_TRUE : RAC_FALSE;
+    if (!o.system_prompt.empty())
+        opts.system_prompt = o.system_prompt.c_str();
+    if (!o.grammar.empty())
+        opts.grammar = o.grammar.c_str();
     o.stop_ptrs.clear();
-    for (const std::string& s : o.stop_sequences) o.stop_ptrs.push_back(s.c_str());
+    for (const std::string& s : o.stop_sequences)
+        o.stop_ptrs.push_back(s.c_str());
     if (!o.stop_ptrs.empty()) {
         opts.stop_sequences = o.stop_ptrs.data();
         opts.num_stop_sequences = o.stop_ptrs.size();
     }
     o.history_ptrs.clear();
-    for (const std::string& s : o.history) o.history_ptrs.push_back(s.c_str());
+    for (const std::string& s : o.history)
+        o.history_ptrs.push_back(s.c_str());
     if (!o.history_ptrs.empty()) {
         opts.history = o.history_ptrs.data();
         opts.n_history = static_cast<int32_t>(o.history_ptrs.size());
@@ -882,17 +1227,27 @@ void apply_gen_opts(rac_llm_options_t& opts, GenOpts& o) {
 // The VLM sampler shares most knobs with the LLM one but has no grammar,
 // frequency/presence penalty, or thinking toggle (see rac_vlm_options_t).
 void apply_vlm_opts(rac_vlm_options_t& opts, GenOpts& o) {
-    if (o.has_max) opts.max_tokens = o.max_tokens;
-    if (o.has_temp) opts.temperature = o.temperature;
-    if (o.has_top_p) opts.top_p = o.top_p;
-    if (o.has_top_k) opts.top_k = o.top_k;
-    if (o.has_min_p) opts.min_p = o.min_p;
-    if (o.has_repetition_penalty) opts.repetition_penalty = o.repetition_penalty;
-    if (o.has_seed) opts.seed = o.seed;
-    if (o.has_threads) opts.n_threads = o.n_threads;
-    if (!o.system_prompt.empty()) opts.system_prompt = o.system_prompt.c_str();
+    if (o.has_max)
+        opts.max_tokens = o.max_tokens;
+    if (o.has_temp)
+        opts.temperature = o.temperature;
+    if (o.has_top_p)
+        opts.top_p = o.top_p;
+    if (o.has_top_k)
+        opts.top_k = o.top_k;
+    if (o.has_min_p)
+        opts.min_p = o.min_p;
+    if (o.has_repetition_penalty)
+        opts.repetition_penalty = o.repetition_penalty;
+    if (o.has_seed)
+        opts.seed = o.seed;
+    if (o.has_threads)
+        opts.n_threads = o.n_threads;
+    if (!o.system_prompt.empty())
+        opts.system_prompt = o.system_prompt.c_str();
     o.stop_ptrs.clear();
-    for (const std::string& s : o.stop_sequences) o.stop_ptrs.push_back(s.c_str());
+    for (const std::string& s : o.stop_sequences)
+        o.stop_ptrs.push_back(s.c_str());
     if (!o.stop_ptrs.empty()) {
         opts.stop_sequences = o.stop_ptrs.data();
         opts.num_stop_sequences = o.stop_ptrs.size();
@@ -908,8 +1263,9 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_llm_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_llm_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -923,7 +1279,8 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
         o = parse_gen_opts(info[2]);
         if (info.Length() < 4 || !info[3].IsFunction()) {
             end_op(hid);
-            Napi::TypeError::New(env, "generate: onToken callback required").ThrowAsJavaScriptException();
+            Napi::TypeError::New(env, "generate: onToken callback required")
+                .ThrowAsJavaScriptException();
             return env.Undefined();
         }
         on_token = info[3].As<Napi::Function>();
@@ -936,9 +1293,10 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
                 rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
                 apply_gen_opts(opts, o);
                 return rac_llm_component_generate_stream(h, prompt.c_str(), &opts, stream_token_cb,
-                                                         stream_llm_complete_cb, stream_error_cb, c);
+                                                         stream_llm_complete_cb, stream_error_cb,
+                                                         c);
             },
-            hid);
+            hid, gate);
     } catch (...) {
         end_op(hid);
         throw;
@@ -950,23 +1308,31 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
 // engine polls, so it takes handle_for (no idle wait) rather than a lease.
 Napi::Value CancelGenerate(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_llm_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_llm_component_cancel(h);
+    if (h)
+        rac_llm_component_cancel(h);
     return env.Undefined();
 }
 
+// Unload runs on a worker because take_handle_when_idle() waits for in-flight
+// generation to finish — up to kTakeHandleIdleTimeout. Every unload below is
+// async for the same reason.
 Napi::Value UnloadModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "unload_model", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = take_handle_when_idle(g_llm_handles, hid);
-    if (h) rac_llm_component_destroy(h);
-    {
+    return RunNativeCall(env, "unload_model", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_llm_handles, hid);
+        if (h)
+            rac_llm_component_destroy(h);
         std::lock_guard<std::mutex> lock(g_handles_mutex);
         g_lora_applied.erase(hid);
-    }
-    return env.Undefined();
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -981,33 +1347,34 @@ Napi::Value LoraApply(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_llm_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_llm_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     std::string path = info[1].As<Napi::String>().Utf8Value();
-    float scale = (info.Length() > 2 && info[2].IsNumber())
-                      ? info[2].As<Napi::Number>().FloatValue()
-                      : 1.0f;
-    rac_result_t rc = rac_llm_component_load_lora(h, path.c_str(), scale);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "lora apply");
-        return env.Undefined();
-    }
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto& applied = g_lora_applied[hid];
-        for (auto& entry : applied) {
-            if (entry.first == path) {
-                entry.second = scale;
-                return env.Undefined();
+    float scale =
+        (info.Length() > 2 && info[2].IsNumber()) ? info[2].As<Napi::Number>().FloatValue() : 1.0f;
+    return RunNativeCall(
+        env, "lora apply",
+        [h, gate, hid, path, scale]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            rac_result_t rc = rac_llm_component_load_lora(h, path.c_str(), scale);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            auto& applied = g_lora_applied[hid];
+            for (auto& entry : applied) {
+                if (entry.first == path) {
+                    entry.second = scale;
+                    return RAC_SUCCESS;
+                }
             }
-        }
-        applied.emplace_back(path, scale);
-    }
-    return env.Undefined();
+            applied.emplace_back(path, scale);
+            return RAC_SUCCESS;
+        },
+        nullptr, [hid]() { end_op(hid); });
 }
 
 Napi::Value LoraRemove(const Napi::CallbackInfo& info) {
@@ -1018,25 +1385,27 @@ Napi::Value LoraRemove(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_llm_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_llm_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     const bool all = info.Length() < 2 || !info[1].IsString();
     std::string path = all ? std::string() : info[1].As<Napi::String>().Utf8Value();
-    rac_result_t rc = all ? rac_llm_component_clear_lora(h)
-                          : rac_llm_component_remove_lora(h, path.c_str());
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "lora remove");
-        return env.Undefined();
-    }
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        if (all) {
-            g_lora_applied.erase(hid);
-        } else {
+    return RunNativeCall(
+        env, "lora remove",
+        [h, gate, hid, all, path]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            rac_result_t rc = all ? rac_llm_component_clear_lora(h)
+                                  : rac_llm_component_remove_lora(h, path.c_str());
+            if (rc != RAC_SUCCESS)
+                return rc;
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            if (all) {
+                g_lora_applied.erase(hid);
+                return RAC_SUCCESS;
+            }
             auto& applied = g_lora_applied[hid];
             for (auto it = applied.begin(); it != applied.end(); ++it) {
                 if (it->first == path) {
@@ -1044,9 +1413,9 @@ Napi::Value LoraRemove(const Napi::CallbackInfo& info) {
                     break;
                 }
             }
-        }
-    }
-    return env.Undefined();
+            return RAC_SUCCESS;
+        },
+        nullptr, [hid]() { end_op(hid); });
 }
 
 // loraList(handleId) -> [{ id, scale }] for the adapters applied to that handle.
@@ -1056,7 +1425,8 @@ Napi::Value LoraList(const Napi::CallbackInfo& info) {
     if (info.Length() >= 1 && info[0].IsNumber()) {
         std::lock_guard<std::mutex> lock(g_handles_mutex);
         auto it = g_lora_applied.find(info[0].As<Napi::Number>().Int32Value());
-        if (it != g_lora_applied.end()) applied = it->second;
+        if (it != g_lora_applied.end())
+            applied = it->second;
     }
     Napi::Array out = Napi::Array::New(env, applied.size());
     for (size_t i = 0; i < applied.size(); ++i) {
@@ -1089,25 +1459,26 @@ Napi::Value LoadVlmModel(const Napi::CallbackInfo& info) {
     std::string name =
         (info.Length() > 3 && info[3].IsString()) ? info[3].As<Napi::String>().Utf8Value() : id;
 
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_vlm_component_create(&h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "vlm_component_create");
-        return env.Undefined();
-    }
-    rc = rac_vlm_component_load_model(h, model.c_str(), mmproj.c_str(), id.c_str(), name.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_vlm_component_destroy(h);
-        throw_rac_error(env, rc, "vlm load_model");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_vlm_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "vlm load_model",
+        [model, mmproj, id, name, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_vlm_component_create(&h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_vlm_component_load_model(h, model.c_str(), mmproj.c_str(), id.c_str(),
+                                              name.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_vlm_component_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_vlm_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
 // One image, owned by value so it survives on the worker thread. Mirrors the three
@@ -1130,7 +1501,8 @@ bool parse_vlm_image(Napi::Env env, const Napi::Value& v, VlmImage* out) {
         return true;
     }
     if (!v.IsObject()) {
-        Napi::TypeError::New(env, "vlm image must be a path, { path }, { base64 }, or { rgb, width, height }")
+        Napi::TypeError::New(
+            env, "vlm image must be a path, { path }, { base64 }, or { rgb, width, height }")
             .ThrowAsJavaScriptException();
         return false;
     }
@@ -1179,12 +1551,14 @@ bool parse_vlm_image(Napi::Env env, const Napi::Value& v, VlmImage* out) {
 Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 4 || !info[0].IsNumber() || !info[2].IsString()) {
-        Napi::TypeError::New(env, "generateVlm(handleId, image, prompt[, options], onToken) bad args")
+        Napi::TypeError::New(env,
+                             "generateVlm(handleId, image, prompt[, options], onToken) bad args")
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     VlmImage image;
-    if (!parse_vlm_image(env, info[1], &image)) return env.Undefined();
+    if (!parse_vlm_image(env, info[1], &image))
+        return env.Undefined();
 
     GenOpts o;
     Napi::Function on_token;
@@ -1201,8 +1575,9 @@ Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
     }
 
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_vlm_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_vlm_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid vlm handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -1232,10 +1607,11 @@ Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
                 // (top_k / seed / ...) reading uninitialized memory, which can crash.
                 rac_vlm_options_t opts = RAC_VLM_OPTIONS_DEFAULT;
                 apply_vlm_opts(opts, o);
-                return rac_vlm_component_process_stream(h, &img, prompt.c_str(), &opts, stream_token_cb,
-                                                        stream_vlm_complete_cb, stream_error_cb, c);
+                return rac_vlm_component_process_stream(h, &img, prompt.c_str(), &opts,
+                                                        stream_token_cb, stream_vlm_complete_cb,
+                                                        stream_error_cb, c);
             },
-            hid);
+            hid, gate);
     } catch (...) {
         end_op(hid);
         throw;
@@ -1244,19 +1620,26 @@ Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
 
 Napi::Value CancelVlm(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_vlm_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_vlm_component_cancel(h);
+    if (h)
+        rac_vlm_component_cancel(h);
     return env.Undefined();
 }
 
 Napi::Value UnloadVlmModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "vlm unload", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = take_handle_when_idle(g_vlm_handles, hid);
-    if (h) rac_vlm_component_destroy(h);
-    return env.Undefined();
+    return RunNativeCall(env, "vlm unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_vlm_handles, hid);
+        if (h)
+            rac_vlm_component_destroy(h);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -1277,70 +1660,101 @@ Napi::Value LoadEmbeddingModel(const Napi::CallbackInfo& info) {
     std::string config = (info.Length() > 1 && info[1].IsString())
                              ? info[1].As<Napi::String>().Utf8Value()
                              : std::string();
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac::embeddings::create_service(
-        model.c_str(), config.empty() ? nullptr : config.c_str(), &h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "embeddings create_service");
-        return env.Undefined();
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "embeddings create_service",
+        [model, config, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac::embeddings::create_service(
+                model.c_str(), config.empty() ? nullptr : config.c_str(), &h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_embed_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
+}
+
+// Owns a rac_embeddings_result_t across the worker/JS-thread boundary: the work
+// fills it, the result builder reads it, and the destructor frees it whichever
+// side the call ended on.
+struct EmbeddingsResultBox {
+    rac_embeddings_result_t value;
+    bool filled = false;
+
+    EmbeddingsResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~EmbeddingsResultBox() {
+        if (filled)
+            rac_embeddings_result_free(&value);
     }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_embed_handles[hid] = h;
+    EmbeddingsResultBox(const EmbeddingsResultBox&) = delete;
+    EmbeddingsResultBox& operator=(const EmbeddingsResultBox&) = delete;
+};
+
+Napi::Float32Array embedding_to_js(Napi::Env env, const rac_embedding_vector_t& embedding) {
+    Napi::Float32Array arr = Napi::Float32Array::New(env, embedding.dimension);
+    if (embedding.data && embedding.dimension) {
+        std::memcpy(arr.Data(), embedding.data, embedding.dimension * sizeof(float));
     }
-    return Napi::Number::New(env, hid);
+    return arr;
 }
 
 // normalize / pooling arrive as the rac_embeddings_{normalize,pooling}_t ints; -1
 // means "leave the model config's own default in place".
 rac_embeddings_options_t parse_embed_opts(const Napi::Value& v) {
     rac_embeddings_options_t opts = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    if (!v.IsObject()) return opts;
+    if (!v.IsObject())
+        return opts;
     Napi::Object obj = v.As<Napi::Object>();
-    if (obj.Has("normalize")) opts.normalize = obj.Get("normalize").ToNumber().Int32Value();
-    if (obj.Has("pooling")) opts.pooling = obj.Get("pooling").ToNumber().Int32Value();
-    if (obj.Has("nThreads")) opts.n_threads = obj.Get("nThreads").ToNumber().Int32Value();
-    if (obj.Has("truncate")) opts.truncate = obj.Get("truncate").ToNumber().Int32Value();
-    if (obj.Has("batchSize")) opts.batch_size = obj.Get("batchSize").ToNumber().Int32Value();
+    if (obj.Has("normalize"))
+        opts.normalize = obj.Get("normalize").ToNumber().Int32Value();
+    if (obj.Has("pooling"))
+        opts.pooling = obj.Get("pooling").ToNumber().Int32Value();
+    if (obj.Has("nThreads"))
+        opts.n_threads = obj.Get("nThreads").ToNumber().Int32Value();
+    if (obj.Has("truncate"))
+        opts.truncate = obj.Get("truncate").ToNumber().Int32Value();
+    if (obj.Has("batchSize"))
+        opts.batch_size = obj.Get("batchSize").ToNumber().Int32Value();
     return opts;
 }
 
 Napi::Value Embed(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsString()) {
-        Napi::TypeError::New(env, "embed(handleId, text[, options]) bad args").ThrowAsJavaScriptException();
+        Napi::TypeError::New(env, "embed(handleId, text[, options]) bad args")
+            .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_embed_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_embed_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid embedding handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     std::string text = info[1].As<Napi::String>().Utf8Value();
-    rac_embeddings_options_t opts =
-        parse_embed_opts(info.Length() > 2 ? info[2] : env.Undefined());
-    rac_embeddings_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc = rac_embeddings_embed(h, text.c_str(), &opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "embed");
-        return env.Undefined();
-    }
-    if (result.num_embeddings == 0 || result.embeddings == nullptr ||
-        result.embeddings[0].data == nullptr) {
-        rac_embeddings_result_free(&result);
-        Napi::Error::New(env, "no embedding produced").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    size_t dim = result.embeddings[0].dimension;
-    Napi::Float32Array arr = Napi::Float32Array::New(env, dim);
-    std::memcpy(arr.Data(), result.embeddings[0].data, dim * sizeof(float));
-    rac_embeddings_result_free(&result);
-    return arr;
+    rac_embeddings_options_t opts = parse_embed_opts(info.Length() > 2 ? info[2] : env.Undefined());
+    auto box = std::make_shared<EmbeddingsResultBox>();
+    return RunNativeCall(
+        env, "embed",
+        [h, gate, text, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            rac_embeddings_options_t local = opts;
+            const rac_result_t rc = rac_embeddings_embed(h, text.c_str(), &local, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            if (rc != RAC_SUCCESS)
+                return rc;
+            if (box->value.num_embeddings == 0 || box->value.embeddings == nullptr ||
+                box->value.embeddings[0].data == nullptr) {
+                return RAC_ERROR_INFERENCE_FAILED;
+            }
+            return RAC_SUCCESS;
+        },
+        [box](Napi::Env e) { return embedding_to_js(e, box->value.embeddings[0]); },
+        [hid]() { end_op(hid); });
 }
 
 // embedBatch(handleId, texts[], options?) -> Float32Array[] in input order.
@@ -1353,48 +1767,56 @@ Napi::Value EmbedBatch(const Napi::CallbackInfo& info) {
     }
     Napi::Array in = info[1].As<Napi::Array>();
     std::vector<std::string> texts;
-    for (uint32_t i = 0; i < in.Length(); ++i) texts.push_back(in.Get(i).ToString().Utf8Value());
-    if (texts.empty()) return Napi::Array::New(env, 0);
+    for (uint32_t i = 0; i < in.Length(); ++i)
+        texts.push_back(in.Get(i).ToString().Utf8Value());
+    if (texts.empty())
+        return Napi::Array::New(env, 0);
 
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_embed_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_embed_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid embedding handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
-    std::vector<const char*> ptrs;
-    ptrs.reserve(texts.size());
-    for (const std::string& t : texts) ptrs.push_back(t.c_str());
-    rac_embeddings_options_t opts =
-        parse_embed_opts(info.Length() > 2 ? info[2] : env.Undefined());
-    rac_embeddings_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), &opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "embed batch");
-        return env.Undefined();
-    }
-    Napi::Array out = Napi::Array::New(env, result.num_embeddings);
-    for (size_t i = 0; i < result.num_embeddings; ++i) {
-        size_t dim = result.embeddings[i].dimension;
-        Napi::Float32Array arr = Napi::Float32Array::New(env, dim);
-        if (result.embeddings[i].data && dim) {
-            std::memcpy(arr.Data(), result.embeddings[i].data, dim * sizeof(float));
-        }
-        out.Set(static_cast<uint32_t>(i), arr);
-    }
-    rac_embeddings_result_free(&result);
-    return out;
+    rac_embeddings_options_t opts = parse_embed_opts(info.Length() > 2 ? info[2] : env.Undefined());
+    auto box = std::make_shared<EmbeddingsResultBox>();
+    return RunNativeCall(
+        env, "embed batch",
+        [h, gate, texts, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            std::vector<const char*> ptrs;
+            ptrs.reserve(texts.size());
+            for (const std::string& t : texts)
+                ptrs.push_back(t.c_str());
+            rac_embeddings_options_t local = opts;
+            const rac_result_t rc =
+                rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), &local, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) {
+            Napi::Array out = Napi::Array::New(e, box->value.num_embeddings);
+            for (size_t i = 0; i < box->value.num_embeddings; ++i) {
+                out.Set(static_cast<uint32_t>(i), embedding_to_js(e, box->value.embeddings[i]));
+            }
+            return out;
+        },
+        [hid]() { end_op(hid); });
 }
 
 Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "embeddings unload", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = take_handle_when_idle(g_embed_handles, hid);
-    if (h) rac_embeddings_destroy(h);
-    return env.Undefined();
+    return RunNativeCall(env, "embeddings unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_embed_handles, hid);
+        if (h)
+            rac_embeddings_destroy(h);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -1416,25 +1838,25 @@ Napi::Value LoadSttModel(const Napi::CallbackInfo& info) {
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : dir;
     std::string name =
         (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_stt_component_create(&h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "stt_component_create");
-        return env.Undefined();
-    }
-    rc = rac_stt_component_load_model(h, dir.c_str(), id.c_str(), name.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_stt_component_destroy(h);
-        throw_rac_error(env, rc, "stt load_model");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_stt_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "stt load_model",
+        [dir, id, name, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_stt_component_create(&h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_stt_component_load_model(h, dir.c_str(), id.c_str(), name.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_stt_component_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_stt_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
 // Borrow the bytes of a Buffer or any TypedArray without copying.
@@ -1462,26 +1884,33 @@ struct SttOpts {
 
 SttOpts parse_stt_opts(const Napi::Value& v) {
     SttOpts s;
-    if (!v.IsObject()) return s;
+    if (!v.IsObject())
+        return s;
     Napi::Object obj = v.As<Napi::Object>();
     if (obj.Has("language") && obj.Get("language").IsString()) {
         s.language = obj.Get("language").As<Napi::String>().Utf8Value();
         s.opts.language = s.language.c_str();
         s.opts.detect_language = RAC_FALSE;
     } else if (obj.Has("detectLanguage")) {
-        s.opts.detect_language = obj.Get("detectLanguage").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
+        s.opts.detect_language =
+            obj.Get("detectLanguage").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
     }
     if (obj.Has("punctuation")) {
-        s.opts.enable_punctuation = obj.Get("punctuation").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
+        s.opts.enable_punctuation =
+            obj.Get("punctuation").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
     }
     if (obj.Has("wordTimestamps")) {
-        s.opts.enable_timestamps = obj.Get("wordTimestamps").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
+        s.opts.enable_timestamps =
+            obj.Get("wordTimestamps").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
     }
     if (obj.Has("diarization")) {
-        s.opts.enable_diarization = obj.Get("diarization").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
+        s.opts.enable_diarization =
+            obj.Get("diarization").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
     }
-    if (obj.Has("maxSpeakers")) s.opts.max_speakers = obj.Get("maxSpeakers").ToNumber().Int32Value();
-    if (obj.Has("sampleRate")) s.opts.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
+    if (obj.Has("maxSpeakers"))
+        s.opts.max_speakers = obj.Get("maxSpeakers").ToNumber().Int32Value();
+    if (obj.Has("sampleRate"))
+        s.opts.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
     return s;
 }
 
@@ -1492,7 +1921,8 @@ Napi::Object stt_result_to_js(Napi::Env env, const rac_stt_result_t& result) {
         out.Set("language", Napi::String::New(env, result.detected_language));
     }
     out.Set("confidence", Napi::Number::New(env, result.confidence));
-    out.Set("processingTimeMs", Napi::Number::New(env, static_cast<double>(result.processing_time_ms)));
+    out.Set("processingTimeMs",
+            Napi::Number::New(env, static_cast<double>(result.processing_time_ms)));
     Napi::Array words = Napi::Array::New(env, result.num_words);
     for (size_t i = 0; i < result.num_words; ++i) {
         const rac_stt_word_t& w = result.words[i];
@@ -1507,9 +1937,23 @@ Napi::Object stt_result_to_js(Napi::Env env, const rac_stt_result_t& result) {
     return out;
 }
 
+struct SttResultBox {
+    rac_stt_result_t value;
+    bool filled = false;
+
+    SttResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~SttResultBox() {
+        if (filled)
+            rac_stt_result_free(&value);
+    }
+    SttResultBox(const SttResultBox&) = delete;
+    SttResultBox& operator=(const SttResultBox&) = delete;
+};
+
 // transcribe(handleId, pcm16Bytes[, options]) -> { text, language?, confidence, words[] }.
-// Audio = mono PCM16 bytes at options.sampleRate (16 kHz default). Synchronous
-// (blocks the JS thread for the decode); the utility process keeps it off the UI.
+// Audio = mono PCM16 bytes at options.sampleRate (16 kHz default). The decode runs
+// on a worker; the audio is copied because the JS-owned bytes may be collected or
+// resized before the worker reads them.
 Napi::Value Transcribe(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     const uint8_t* pcm_data = nullptr;
@@ -1522,24 +1966,29 @@ Napi::Value Transcribe(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_stt_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_stt_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid stt handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
-    SttOpts s = parse_stt_opts(info.Length() > 2 ? info[2] : env.Undefined());
-    rac_stt_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc =
-        rac_stt_component_transcribe(h, pcm_data, pcm_len, &s.opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "transcribe");
-        return env.Undefined();
-    }
-    Napi::Object out = stt_result_to_js(env, result);
-    rac_stt_result_free(&result);
-    return out;
+    auto audio = std::make_shared<std::vector<uint8_t>>(pcm_data, pcm_data + pcm_len);
+    auto opts =
+        std::make_shared<SttOpts>(parse_stt_opts(info.Length() > 2 ? info[2] : env.Undefined()));
+    // parse_stt_opts holds `language` by value; re-point after the struct copy.
+    if (!opts->language.empty())
+        opts->opts.language = opts->language.c_str();
+    auto box = std::make_shared<SttResultBox>();
+    return RunNativeCall(
+        env, "transcribe",
+        [h, gate, audio, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            const rac_result_t rc = rac_stt_component_transcribe(h, audio->data(), audio->size(),
+                                                                 &opts->opts, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) { return stt_result_to_js(e, box->value); }, [hid]() { end_op(hid); });
 }
 
 // transcribeStream(handleId, pcm16Bytes, options, onPartial) -> Promise<void>.
@@ -1552,6 +2001,7 @@ struct SttStreamCtx {
     rac_result_t result = RAC_SUCCESS;
     int32_t lease_id = 0;
     bool leased = false;
+    std::shared_ptr<std::mutex> gate;
     rac_handle_t handle = nullptr;
     std::vector<uint8_t> audio;
     SttOpts opts;
@@ -1576,13 +2026,15 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
     size_t pcm_len = 0;
     if (info.Length() < 4 || !info[0].IsNumber() || !byte_view(info[1], &pcm_data, &pcm_len) ||
         !info[3].IsFunction()) {
-        Napi::TypeError::New(env, "transcribeStream(handleId, pcm16Bytes, options, onPartial) bad args")
+        Napi::TypeError::New(env,
+                             "transcribeStream(handleId, pcm16Bytes, options, onPartial) bad args")
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_stt_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_stt_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid stt handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -1590,15 +2042,18 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
     ctx->handle = h;
     ctx->lease_id = hid;
     ctx->leased = true;
+    ctx->gate = gate;
     ctx->audio.assign(pcm_data, pcm_data + pcm_len);
     ctx->opts = parse_stt_opts(info[2]);
     // parse_stt_opts holds `language` by value; re-point after the struct copy.
-    if (!ctx->opts.language.empty()) ctx->opts.opts.language = ctx->opts.language.c_str();
+    if (!ctx->opts.language.empty())
+        ctx->opts.opts.language = ctx->opts.language.c_str();
     try {
         ctx->tsfn = Napi::ThreadSafeFunction::New(
             env, info[3].As<Napi::Function>(), "ra-stt-stream", 256, 1, ctx,
             [](Napi::Env env, void*, SttStreamCtx* c) {
-                if (c->worker.joinable()) c->worker.join();
+                if (c->worker.joinable())
+                    c->worker.join();
                 if (c->leased) {
                     end_op(c->lease_id);
                     c->leased = false;
@@ -1615,9 +2070,12 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
             },
             static_cast<void*>(nullptr));
         ctx->worker = std::thread([ctx]() {
-            ctx->result = rac_stt_component_transcribe_stream(
-                ctx->handle, ctx->audio.data(), ctx->audio.size(), &ctx->opts.opts, stt_stream_cb,
-                ctx);
+            {
+                std::lock_guard<std::mutex> serialize(*ctx->gate);
+                ctx->result = rac_stt_component_transcribe_stream(
+                    ctx->handle, ctx->audio.data(), ctx->audio.size(), &ctx->opts.opts,
+                    stt_stream_cb, ctx);
+            }
             if (ctx->leased) {
                 end_op(ctx->lease_id);
                 ctx->leased = false;
@@ -1625,7 +2083,8 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
             ctx->tsfn.Release();
         });
     } catch (...) {
-        if (ctx->leased) end_op(hid);
+        if (ctx->leased)
+            end_op(hid);
         delete ctx;
         throw;
     }
@@ -1647,7 +2106,8 @@ Napi::Value SttInfo(const Napi::CallbackInfo& info) {
     }
     out.Set("isReady", Napi::Boolean::New(env, rac_stt_component_is_loaded(h) == RAC_TRUE));
     const char* model_id = rac_stt_component_get_model_id(h);
-    if (model_id && model_id[0]) out.Set("modelId", Napi::String::New(env, model_id));
+    if (model_id && model_id[0])
+        out.Set("modelId", Napi::String::New(env, model_id));
     out.Set("supportsStreaming",
             Napi::Boolean::New(env, rac_stt_component_supports_streaming(h) == RAC_TRUE));
     // Commons returns the supported-language list as a JSON array string; hand it
@@ -1662,11 +2122,16 @@ Napi::Value SttInfo(const Napi::CallbackInfo& info) {
 
 Napi::Value UnloadSttModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "stt unload", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = take_handle_when_idle(g_stt_handles, hid);
-    if (h) rac_stt_component_destroy(h);
-    return env.Undefined();
+    return RunNativeCall(env, "stt unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_stt_handles, hid);
+        if (h)
+            rac_stt_component_destroy(h);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -1688,25 +2153,25 @@ Napi::Value LoadTtsVoice(const Napi::CallbackInfo& info) {
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : dir;
     std::string name =
         (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_tts_component_create(&h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "tts_component_create");
-        return env.Undefined();
-    }
-    rc = rac_tts_component_load_voice(h, dir.c_str(), id.c_str(), name.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_tts_component_destroy(h);
-        throw_rac_error(env, rc, "tts load_voice");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_tts_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "tts load_voice",
+        [dir, id, name, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_tts_component_create(&h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_tts_component_load_voice(h, dir.c_str(), id.c_str(), name.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_tts_component_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_tts_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
 // Held by value so voice/language outlive the JS call frame.
@@ -1718,7 +2183,8 @@ struct TtsOpts {
 
 TtsOpts parse_tts_opts(const Napi::Value& v) {
     TtsOpts t;
-    if (!v.IsObject()) return t;
+    if (!v.IsObject())
+        return t;
     Napi::Object obj = v.As<Napi::Object>();
     if (obj.Has("voice") && obj.Get("voice").IsString()) {
         t.voice = obj.Get("voice").As<Napi::String>().Utf8Value();
@@ -1729,16 +2195,33 @@ TtsOpts parse_tts_opts(const Napi::Value& v) {
         t.opts.language = t.language.c_str();
     }
     // The spec calls it `speed`; rac_tts_options_t calls the same knob `rate`.
-    if (obj.Has("speed")) t.opts.rate = obj.Get("speed").ToNumber().FloatValue();
-    if (obj.Has("pitch")) t.opts.pitch = obj.Get("pitch").ToNumber().FloatValue();
-    if (obj.Has("volume")) t.opts.volume = obj.Get("volume").ToNumber().FloatValue();
+    if (obj.Has("speed"))
+        t.opts.rate = obj.Get("speed").ToNumber().FloatValue();
+    if (obj.Has("pitch"))
+        t.opts.pitch = obj.Get("pitch").ToNumber().FloatValue();
+    if (obj.Has("volume"))
+        t.opts.volume = obj.Get("volume").ToNumber().FloatValue();
     if (obj.Has("audioFormat")) {
         t.opts.audio_format =
             static_cast<rac_audio_format_enum_t>(obj.Get("audioFormat").ToNumber().Int32Value());
     }
-    if (obj.Has("sampleRate")) t.opts.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
+    if (obj.Has("sampleRate"))
+        t.opts.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
     return t;
 }
+
+struct TtsResultBox {
+    rac_tts_result_t value;
+    bool filled = false;
+
+    TtsResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~TtsResultBox() {
+        if (filled)
+            rac_tts_result_free(&value);
+    }
+    TtsResultBox(const TtsResultBox&) = delete;
+    TtsResultBox& operator=(const TtsResultBox&) = delete;
+};
 
 // synthesize(handleId, text[, options]) ->
 //   { sampleRate, samples: Float32Array, audioFormat, durationMs }.
@@ -1750,31 +2233,44 @@ Napi::Value Synthesize(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_tts_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_tts_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid tts handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     std::string text = info[1].As<Napi::String>().Utf8Value();
-    TtsOpts t = parse_tts_opts(info.Length() > 2 ? info[2] : env.Undefined());
-    rac_tts_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc = rac_tts_component_synthesize(h, text.c_str(), &t.opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "synthesize");
-        return env.Undefined();
-    }
-    size_t n = result.audio_size / sizeof(float);  // audio_data is float32 PCM
-    Napi::Float32Array samples = Napi::Float32Array::New(env, n);
-    if (result.audio_data && n) std::memcpy(samples.Data(), result.audio_data, n * sizeof(float));
-    Napi::Object out = Napi::Object::New(env);
-    out.Set("sampleRate", Napi::Number::New(env, result.sample_rate));
-    out.Set("samples", samples);
-    out.Set("audioFormat", Napi::Number::New(env, static_cast<int32_t>(result.audio_format)));
-    out.Set("durationMs", Napi::Number::New(env, static_cast<double>(result.duration_ms)));
-    rac_tts_result_free(&result);
-    return out;
+    auto opts =
+        std::make_shared<TtsOpts>(parse_tts_opts(info.Length() > 2 ? info[2] : env.Undefined()));
+    if (!opts->voice.empty())
+        opts->opts.voice = opts->voice.c_str();
+    if (!opts->language.empty())
+        opts->opts.language = opts->language.c_str();
+    auto box = std::make_shared<TtsResultBox>();
+    return RunNativeCall(
+        env, "synthesize",
+        [h, gate, text, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            const rac_result_t rc =
+                rac_tts_component_synthesize(h, text.c_str(), &opts->opts, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) {
+            const rac_tts_result_t& result = box->value;
+            const size_t n = result.audio_size / sizeof(float);  // audio_data is float32 PCM
+            Napi::Float32Array samples = Napi::Float32Array::New(e, n);
+            if (result.audio_data && n) {
+                std::memcpy(samples.Data(), result.audio_data, n * sizeof(float));
+            }
+            Napi::Object out = Napi::Object::New(e);
+            out.Set("sampleRate", Napi::Number::New(e, result.sample_rate));
+            out.Set("samples", samples);
+            out.Set("audioFormat", Napi::Number::New(e, static_cast<int32_t>(result.audio_format)));
+            out.Set("durationMs", Napi::Number::New(e, static_cast<double>(result.duration_ms)));
+            return out;
+        },
+        [hid]() { end_op(hid); });
 }
 
 // synthesizeStream(handleId, text, options, onChunk) -> Promise<void>. onChunk
@@ -1786,6 +2282,7 @@ struct TtsStreamCtx {
     rac_result_t result = RAC_SUCCESS;
     int32_t lease_id = 0;
     bool leased = false;
+    std::shared_ptr<std::mutex> gate;
     rac_handle_t handle = nullptr;
     std::string text;
     TtsOpts opts;
@@ -1796,10 +2293,12 @@ void tts_stream_cb(const void* audio, size_t bytes, void* ud) {
     auto* ctx = static_cast<TtsStreamCtx*>(ud);
     // Copy out: the engine's buffer is only valid for this callback.
     std::vector<float> chunk(bytes / sizeof(float));
-    if (audio && !chunk.empty()) std::memcpy(chunk.data(), audio, chunk.size() * sizeof(float));
+    if (audio && !chunk.empty())
+        std::memcpy(chunk.data(), audio, chunk.size() * sizeof(float));
     ctx->tsfn.BlockingCall([chunk](Napi::Env env, Napi::Function cb) {
         Napi::Float32Array arr = Napi::Float32Array::New(env, chunk.size());
-        if (!chunk.empty()) std::memcpy(arr.Data(), chunk.data(), chunk.size() * sizeof(float));
+        if (!chunk.empty())
+            std::memcpy(arr.Data(), chunk.data(), chunk.size() * sizeof(float));
         Napi::Object ev = Napi::Object::New(env);
         ev.Set("samples", arr);
         cb.Call({ev});
@@ -1814,8 +2313,9 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_tts_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_tts_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid tts handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -1823,15 +2323,19 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
     ctx->handle = h;
     ctx->lease_id = hid;
     ctx->leased = true;
+    ctx->gate = gate;
     ctx->text = info[1].As<Napi::String>().Utf8Value();
     ctx->opts = parse_tts_opts(info[2]);
-    if (!ctx->opts.voice.empty()) ctx->opts.opts.voice = ctx->opts.voice.c_str();
-    if (!ctx->opts.language.empty()) ctx->opts.opts.language = ctx->opts.language.c_str();
+    if (!ctx->opts.voice.empty())
+        ctx->opts.opts.voice = ctx->opts.voice.c_str();
+    if (!ctx->opts.language.empty())
+        ctx->opts.opts.language = ctx->opts.language.c_str();
     try {
         ctx->tsfn = Napi::ThreadSafeFunction::New(
             env, info[3].As<Napi::Function>(), "ra-tts-stream", 256, 1, ctx,
             [](Napi::Env env, void*, TtsStreamCtx* c) {
-                if (c->worker.joinable()) c->worker.join();
+                if (c->worker.joinable())
+                    c->worker.join();
                 if (c->leased) {
                     end_op(c->lease_id);
                     c->leased = false;
@@ -1848,8 +2352,11 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
             },
             static_cast<void*>(nullptr));
         ctx->worker = std::thread([ctx]() {
-            ctx->result = rac_tts_component_synthesize_stream(ctx->handle, ctx->text.c_str(),
-                                                              &ctx->opts.opts, tts_stream_cb, ctx);
+            {
+                std::lock_guard<std::mutex> serialize(*ctx->gate);
+                ctx->result = rac_tts_component_synthesize_stream(
+                    ctx->handle, ctx->text.c_str(), &ctx->opts.opts, tts_stream_cb, ctx);
+            }
             if (ctx->leased) {
                 end_op(ctx->lease_id);
                 ctx->leased = false;
@@ -1857,7 +2364,8 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
             ctx->tsfn.Release();
         });
     } catch (...) {
-        if (ctx->leased) end_op(hid);
+        if (ctx->leased)
+            end_op(hid);
         delete ctx;
         throw;
     }
@@ -1867,9 +2375,11 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
 // ttsStop(handleId) — stops playback and any in-flight synthesis.
 Napi::Value TtsStop(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_tts_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_tts_component_stop(h);
+    if (h)
+        rac_tts_component_stop(h);
     return env.Undefined();
 }
 
@@ -1880,9 +2390,11 @@ Napi::Value TtsInfo(const Napi::CallbackInfo& info) {
     rac_handle_t h = (info.Length() >= 1 && info[0].IsNumber())
                          ? handle_for(g_tts_handles, info[0].As<Napi::Number>().Int32Value())
                          : nullptr;
-    if (!h) return out;
+    if (!h)
+        return out;
     const char* voice = rac_tts_component_get_voice_id(h);
-    if (voice && voice[0]) out.Set("voiceId", Napi::String::New(env, voice));
+    if (voice && voice[0])
+        out.Set("voiceId", Napi::String::New(env, voice));
     char* langs = nullptr;
     if (rac_tts_component_get_supported_languages(h, &langs) == RAC_SUCCESS && langs) {
         out.Set("languagesJson", Napi::String::New(env, langs));
@@ -1893,76 +2405,103 @@ Napi::Value TtsInfo(const Napi::CallbackInfo& info) {
 
 Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "tts unload", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = take_handle_when_idle(g_tts_handles, hid);
-    if (h) rac_tts_component_destroy(h);
-    return env.Undefined();
+    return RunNativeCall(env, "tts unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_tts_handles, hid);
+        if (h)
+            rac_tts_component_destroy(h);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
 // shutdown()
 // =============================================================================
 Napi::Value Shutdown(const Napi::CallbackInfo& info) {
-    if (g_initialized.exchange(false)) {
-        // Destroy every still-loaded component and clear the handle maps so no id
-        // outlives the runtime — a later unload/use can't touch freed native
-        // state, and a re-init starts from a clean slate.
-        {
-            // Wait for every in-flight blocking op to drain before freeing its
-            // component — otherwise destroy / rac_shutdown() could race a live
-            // rac_* call on a worker thread (use-after-free).
-            std::unique_lock<std::mutex> lock(g_handles_mutex);
-            g_inflight_cv.wait(lock, [] {
-                for (auto& kv : g_inflight) {
-                    if (kv.second > 0) return false;
+    return RunNativeCall(info.Env(), "rac_shutdown", []() -> rac_result_t {
+        if (g_initialized.exchange(false)) {
+            // Drop the download progress callback and the storage analyzer before
+            // anything else: commons must not hold a pointer into this addon once
+            // the runtime starts tearing down.
+            rac_electron::ShutdownDownloadBridge();
+            // Destroy every still-loaded component and clear the handle maps so no id
+            // outlives the runtime — a later unload/use can't touch freed native
+            // state, and a re-init starts from a clean slate.
+            {
+                // Wait for every in-flight blocking op to drain before freeing its
+                // component — otherwise destroy / rac_shutdown() could race a live
+                // rac_* call on a worker thread (use-after-free).
+                std::unique_lock<std::mutex> lock(g_handles_mutex);
+                g_inflight_cv.wait(lock, [] {
+                    for (auto& kv : g_inflight) {
+                        if (kv.second > 0)
+                            return false;
+                    }
+                    return true;
+                });
+#ifdef RAC_ELECTRON_HAVE_RAG
+                // Without the RAG pipeline no session can ever have been created,
+                // so the map is empty and there is nothing to destroy — but the
+                // destroy symbol itself would not exist to link against.
+                for (auto& kv : g_rag_handles)
+                    rac_rag_session_destroy_proto(kv.second);
+#endif
+                for (auto& kv : g_llm_handles)
+                    rac_llm_component_destroy(kv.second);
+                for (auto& kv : g_vlm_handles)
+                    rac_vlm_component_destroy(kv.second);
+                for (auto& kv : g_embed_handles)
+                    rac_embeddings_destroy(kv.second);
+                for (auto& kv : g_stt_handles)
+                    rac_stt_component_destroy(kv.second);
+                for (auto& kv : g_tts_handles)
+                    rac_tts_component_destroy(kv.second);
+                for (auto& kv : g_vad_handles)
+                    rac_vad_component_destroy(kv.second);
+                for (auto& kv : g_rerank_handles) {
+                    rac_rerank_cleanup(kv.second);
+                    rac_rerank_destroy(kv.second);
                 }
-                return true;
-            });
-            for (auto& kv : g_rag_handles) rac_rag_session_destroy_proto(kv.second);
-            for (auto& kv : g_llm_handles) rac_llm_component_destroy(kv.second);
-            for (auto& kv : g_vlm_handles) rac_vlm_component_destroy(kv.second);
-            for (auto& kv : g_embed_handles) rac_embeddings_destroy(kv.second);
-            for (auto& kv : g_stt_handles) rac_stt_component_destroy(kv.second);
-            for (auto& kv : g_tts_handles) rac_tts_component_destroy(kv.second);
-            for (auto& kv : g_vad_handles) rac_vad_component_destroy(kv.second);
-            for (auto& kv : g_rerank_handles) {
-                rac_rerank_cleanup(kv.second);
-                rac_rerank_destroy(kv.second);
+                for (auto& kv : g_diar_handles) {
+                    rac_diarization_cleanup(kv.second);
+                    rac_diarization_destroy(kv.second);
+                }
+                for (auto& kv : g_seg_handles) {
+                    rac_segmentation_cleanup(kv.second);
+                    rac_segmentation_destroy(kv.second);
+                }
+                g_rerank_handles.clear();
+                g_diar_handles.clear();
+                g_seg_handles.clear();
+                g_lora_applied.clear();
+                g_llm_handles.clear();
+                g_vlm_handles.clear();
+                g_embed_handles.clear();
+                g_stt_handles.clear();
+                g_tts_handles.clear();
+                g_vad_handles.clear();
+                g_rag_handles.clear();
+                g_inflight.clear();
             }
-            for (auto& kv : g_diar_handles) {
-                rac_diarization_cleanup(kv.second);
-                rac_diarization_destroy(kv.second);
-            }
-            for (auto& kv : g_seg_handles) {
-                rac_segmentation_cleanup(kv.second);
-                rac_segmentation_destroy(kv.second);
-            }
-            g_rerank_handles.clear();
-            g_diar_handles.clear();
-            g_seg_handles.clear();
-            g_lora_applied.clear();
-            g_llm_handles.clear();
-            g_vlm_handles.clear();
-            g_embed_handles.clear();
-            g_stt_handles.clear();
-            g_tts_handles.clear();
-            g_vad_handles.clear();
-            g_rag_handles.clear();
-            g_inflight.clear();
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+            // Join the periodic flusher before the final flush so no batch is
+            // in flight when the manager is destroyed below.
+            telemetry_flush_thread_stop();
+            // Flush queued telemetry while the HTTP transport is still registered
+            // (rac_shutdown() tears it down first, which would drop the last batch).
+            telemetry_teardown_flush();
+#endif
+            rac_shutdown();
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+            // Detach + destroy the telemetry manager after the runtime is down.
+            telemetry_teardown_destroy();
+#endif
         }
-#ifdef RAC_ELECTRON_HAVE_DESKTOP
-        // Flush queued telemetry while the HTTP transport is still registered
-        // (rac_shutdown() tears it down first, which would drop the last batch).
-        telemetry_teardown_flush();
-#endif
-        rac_shutdown();
-#ifdef RAC_ELECTRON_HAVE_DESKTOP
-        // Detach + destroy the telemetry manager after the runtime is down.
-        telemetry_teardown_destroy();
-#endif
-    }
-    return info.Env().Undefined();
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -1976,7 +2515,8 @@ Napi::Value SecureSet(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
-        Napi::TypeError::New(env, "secureSet(key, value) expects strings").ThrowAsJavaScriptException();
+        Napi::TypeError::New(env, "secureSet(key, value) expects strings")
+            .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     if (!g_adapter.secure_set) {
@@ -1985,11 +2525,11 @@ Napi::Value SecureSet(const Napi::CallbackInfo& info) {
     }
     std::string key = info[0].As<Napi::String>().Utf8Value();
     std::string value = info[1].As<Napi::String>().Utf8Value();
-    rac_result_t rc = g_adapter.secure_set(key.c_str(), value.c_str(), g_adapter.user_data);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "secure_set");
-    }
-    return env.Undefined();
+    // Keychain and DPAPI are both syscalls that can block on user interaction or
+    // disk, so the store runs off the loop like everything else.
+    return RunNativeCall(env, "secure_set", [key, value]() {
+        return g_adapter.secure_set(key.c_str(), value.c_str(), g_adapter.user_data);
+    });
 }
 
 Napi::Value SecureGet(const Napi::CallbackInfo& info) {
@@ -2002,17 +2542,31 @@ Napi::Value SecureGet(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "secureGet(key) expects a string").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    if (!g_adapter.secure_get) return env.Null();
+    if (!g_adapter.secure_get)
+        return env.Null();
     std::string key = info[0].As<Napi::String>().Utf8Value();
-    char* out = nullptr;
-    rac_result_t rc = g_adapter.secure_get(key.c_str(), &out, g_adapter.user_data);
-    if (rc != RAC_SUCCESS || !out) {
-        if (out) rac_free(out);
-        return env.Null();  // clean miss
-    }
-    std::string val(out);
-    rac_free(out);
-    return Napi::String::New(env, val);
+    // A miss is not a failure: resolve null rather than reject, which is what the
+    // synchronous version returned and what every caller still expects.
+    auto value = std::make_shared<std::string>();
+    auto found = std::make_shared<bool>(false);
+    return RunNativeCall(
+        env, "secure_get",
+        [key, value, found]() {
+            char* out = nullptr;
+            const rac_result_t rc = g_adapter.secure_get(key.c_str(), &out, g_adapter.user_data);
+            if (rc == RAC_SUCCESS && out) {
+                value->assign(out);
+                *found = true;
+            }
+            if (out)
+                rac_free(out);
+            return RAC_SUCCESS;
+        },
+        [value, found](Napi::Env e) -> Napi::Value {
+            if (!*found)
+                return e.Null();
+            return Napi::String::New(e, *value);
+        });
 }
 
 Napi::Value SecureDelete(const Napi::CallbackInfo& info) {
@@ -2021,10 +2575,14 @@ Napi::Value SecureDelete(const Napi::CallbackInfo& info) {
         Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    if (info.Length() < 1 || !info[0].IsString()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsString() || !g_adapter.secure_delete) {
+        return RunNativeCall(env, "secure_delete", []() { return RAC_SUCCESS; });
+    }
     std::string key = info[0].As<Napi::String>().Utf8Value();
-    if (g_adapter.secure_delete) g_adapter.secure_delete(key.c_str(), g_adapter.user_data);
-    return env.Undefined();
+    return RunNativeCall(env, "secure_delete", [key]() {
+        g_adapter.secure_delete(key.c_str(), g_adapter.user_data);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -2034,11 +2592,6 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (!g_initialized.load()) {
         Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    rac_handle_t h = nullptr;
-    if (rac_vad_component_create(&h) != RAC_SUCCESS || !h) {
-        Napi::Error::New(env, "vad create failed").ThrowAsJavaScriptException();
         return env.Undefined();
     }
     // Accepts a bare threshold number (the historical shape) or a config object
@@ -2053,8 +2606,10 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
         if (obj.Has("activationThreshold") && obj.Get("activationThreshold").IsNumber()) {
             cfg.energy_threshold = obj.Get("activationThreshold").ToNumber().FloatValue();
         }
-        if (obj.Has("sampleRate")) cfg.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
-        if (obj.Has("frameLength")) cfg.frame_length = obj.Get("frameLength").ToNumber().FloatValue();
+        if (obj.Has("sampleRate"))
+            cfg.sample_rate = obj.Get("sampleRate").ToNumber().Int32Value();
+        if (obj.Has("frameLength"))
+            cfg.frame_length = obj.Get("frameLength").ToNumber().FloatValue();
         if (obj.Has("autoCalibration")) {
             cfg.enable_auto_calibration =
                 obj.Get("autoCalibration").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
@@ -2066,32 +2621,46 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
             model_path = obj.Get("modelPath").As<Napi::String>().Utf8Value();
         }
     }
-    if (!model_path.empty()) {
-        // A model-backed VAD (e.g. Silero) must be loaded before initialize().
-        rac_result_t lrc = rac_vad_component_load_model(h, model_path.c_str(), model_path.c_str(),
-                                                       model_path.c_str());
-        if (lrc != RAC_SUCCESS) {
-            rac_vad_component_destroy(h);
-            throw_rac_error(env, lrc, "vad load_model");
-            return env.Undefined();
-        }
-    }
-    if (rac_vad_component_configure(h, &cfg) != RAC_SUCCESS ||
-        rac_vad_component_initialize(h) != RAC_SUCCESS) {
-        rac_vad_component_destroy(h);
-        Napi::Error::New(env, "vad configure/initialize failed").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_vad_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "vad create",
+        [cfg, model_path, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_vad_component_create(&h);
+            if (rc != RAC_SUCCESS || !h)
+                return rc == RAC_SUCCESS ? RAC_ERROR_UNKNOWN : rc;
+            if (!model_path.empty()) {
+                // A model-backed VAD (e.g. Silero) must be loaded before initialize().
+                rc = rac_vad_component_load_model(h, model_path.c_str(), model_path.c_str(),
+                                                  model_path.c_str());
+                if (rc != RAC_SUCCESS) {
+                    rac_vad_component_destroy(h);
+                    return rc;
+                }
+            }
+            rac_vad_config_t local = cfg;
+            rc = rac_vad_component_configure(h, &local);
+            if (rc == RAC_SUCCESS)
+                rc = rac_vad_component_initialize(h);
+            if (rc != RAC_SUCCESS) {
+                rac_vad_component_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_vad_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
 // vadProcess(handleId, Float32Array) -> bool (speech in this frame).
+//
+// Deliberately still synchronous. A VAD call is one 10-30 ms frame fed to a
+// stateful detector, and frames must be seen in order: dispatching them onto the
+// libuv pool would let two frames race and answer out of order, which is a worse
+// failure than the microseconds of loop time an energy frame costs. Everything
+// else in this file that blocks now runs on a worker.
 Napi::Value VadProcess(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
@@ -2124,25 +2693,31 @@ Napi::Value VadProcess(const Napi::CallbackInfo& info) {
 
 Napi::Value VadIsActive(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return Napi::Boolean::New(env, false);
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return Napi::Boolean::New(env, false);
     rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
-    if (!h) return Napi::Boolean::New(env, false);
+    if (!h)
+        return Napi::Boolean::New(env, false);
     return Napi::Boolean::New(env, rac_vad_component_is_speech_active(h) == RAC_TRUE);
 }
 
 Napi::Value VadSetThreshold(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) return env.Undefined();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_vad_component_set_energy_threshold(h, info[1].As<Napi::Number>().FloatValue());
+    if (h)
+        rac_vad_component_set_energy_threshold(h, info[1].As<Napi::Number>().FloatValue());
     return env.Undefined();
 }
 
 Napi::Value VadReset(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_vad_component_reset(h);
+    if (h)
+        rac_vad_component_reset(h);
     return env.Undefined();
 }
 
@@ -2153,7 +2728,8 @@ Napi::Value VadStatistics(const Napi::CallbackInfo& info) {
     rac_handle_t h = (info.Length() >= 1 && info[0].IsNumber())
                          ? handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value())
                          : nullptr;
-    if (!h) return out;
+    if (!h)
+        return out;
     float ambient = 0.0f;
     float recent_avg = 0.0f;
     float recent_max = 0.0f;
@@ -2167,13 +2743,16 @@ Napi::Value VadStatistics(const Napi::CallbackInfo& info) {
 
 Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "vad unload", []() { return RAC_SUCCESS; });
+    }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    // VAD process is sync on the JS thread (no lease); still wait in case a
-    // future async path adds one.
-    rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
-    if (h) rac_vad_component_destroy(h);
-    return env.Undefined();
+    return RunNativeCall(env, "vad unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
+        if (h)
+            rac_vad_component_destroy(h);
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -2194,26 +2773,39 @@ Napi::Value LoadRerankModel(const Napi::CallbackInfo& info) {
     std::string path = info[0].As<Napi::String>().Utf8Value();
     std::string id =
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : path;
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_rerank_create(id.c_str(), &h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "rerank create");
-        return env.Undefined();
-    }
-    rc = rac_rerank_initialize(h, path.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_rerank_destroy(h);
-        throw_rac_error(env, rc, "rerank initialize");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_rerank_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "rerank initialize",
+        [path, id, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_rerank_create(id.c_str(), &h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_rerank_initialize(h, path.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_rerank_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_rerank_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
+
+struct RerankResultBox {
+    rac_rerank_result_t value;
+    bool filled = false;
+
+    RerankResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~RerankResultBox() {
+        if (filled)
+            rac_rerank_result_free(&value);
+    }
+    RerankResultBox(const RerankResultBox&) = delete;
+    RerankResultBox& operator=(const RerankResultBox&) = delete;
+};
 
 // rerank(handleId, query, documents[], topN?) -> [{ index, score, rank }].
 Napi::Value Rerank(const Napi::CallbackInfo& info) {
@@ -2231,51 +2823,62 @@ Napi::Value Rerank(const Napi::CallbackInfo& info) {
         ids.push_back(std::to_string(i));
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_rerank_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_rerank_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid rerank handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     std::string query = info[1].As<Napi::String>().Utf8Value();
-    std::vector<rac_rerank_candidate_t> candidates(texts.size());
-    for (size_t i = 0; i < texts.size(); ++i) {
-        candidates[i].id = ids[i].c_str();
-        candidates[i].text = texts[i].c_str();
-    }
     rac_rerank_options_t opts = RAC_RERANK_OPTIONS_DEFAULT;
     if (info.Length() > 3 && info[3].IsNumber()) {
         opts.top_n = static_cast<uint32_t>(info[3].As<Napi::Number>().Int32Value());
     }
-    rac_rerank_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc = rac_rerank_rerank(h, query.c_str(), candidates.data(), candidates.size(),
-                                        &opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "rerank");
-        return env.Undefined();
-    }
-    Napi::Array out = Napi::Array::New(env, result.item_count);
-    for (size_t i = 0; i < result.item_count; ++i) {
-        Napi::Object item = Napi::Object::New(env);
-        item.Set("index", Napi::Number::New(env, result.items[i].original_index));
-        item.Set("score", Napi::Number::New(env, result.items[i].score));
-        item.Set("rank", Napi::Number::New(env, result.items[i].rank));
-        out.Set(static_cast<uint32_t>(i), item);
-    }
-    rac_rerank_result_free(&result);
-    return out;
+    auto box = std::make_shared<RerankResultBox>();
+    return RunNativeCall(
+        env, "rerank",
+        [h, gate, query, texts, ids, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            std::vector<rac_rerank_candidate_t> candidates(texts.size());
+            for (size_t i = 0; i < texts.size(); ++i) {
+                candidates[i].id = ids[i].c_str();
+                candidates[i].text = texts[i].c_str();
+            }
+            rac_rerank_options_t local = opts;
+            const rac_result_t rc = rac_rerank_rerank(h, query.c_str(), candidates.data(),
+                                                      candidates.size(), &local, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) {
+            const rac_rerank_result_t& result = box->value;
+            Napi::Array out = Napi::Array::New(e, result.item_count);
+            for (size_t i = 0; i < result.item_count; ++i) {
+                Napi::Object item = Napi::Object::New(e);
+                item.Set("index", Napi::Number::New(e, result.items[i].original_index));
+                item.Set("score", Napi::Number::New(e, result.items[i].score));
+                item.Set("rank", Napi::Number::New(e, result.items[i].rank));
+                out.Set(static_cast<uint32_t>(i), item);
+            }
+            return out;
+        },
+        [hid]() { end_op(hid); });
 }
 
 Napi::Value UnloadRerankModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
-    rac_handle_t h = take_handle_when_idle(g_rerank_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) {
-        rac_rerank_cleanup(h);
-        rac_rerank_destroy(h);
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "rerank unload", []() { return RAC_SUCCESS; });
     }
-    return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    return RunNativeCall(env, "rerank unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_rerank_handles, hid);
+        if (h) {
+            rac_rerank_cleanup(h);
+            rac_rerank_destroy(h);
+        }
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -2295,26 +2898,39 @@ Napi::Value LoadDiarizationModel(const Napi::CallbackInfo& info) {
     std::string path = info[0].As<Napi::String>().Utf8Value();
     std::string id =
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : path;
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_diarization_create(id.c_str(), &h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "diarization create");
-        return env.Undefined();
-    }
-    rc = rac_diarization_initialize(h, path.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_diarization_destroy(h);
-        throw_rac_error(env, rc, "diarization initialize");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_diar_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "diarization initialize",
+        [path, id, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_diarization_create(id.c_str(), &h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_diarization_initialize(h, path.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_diarization_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_diar_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
+
+struct DiarizationResultBox {
+    rac_diarization_result_t value;
+    bool filled = false;
+
+    DiarizationResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~DiarizationResultBox() {
+        if (filled)
+            rac_diarization_result_free(&value);
+    }
+    DiarizationResultBox(const DiarizationResultBox&) = delete;
+    DiarizationResultBox& operator=(const DiarizationResultBox&) = delete;
+};
 
 // diarize(handleId, Float32Array, options?) ->
 //   { segments: [{ speakerId, speakerIndex, startMs, endMs }], speakerCount, durationMs }.
@@ -2332,60 +2948,82 @@ Napi::Value Diarize(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_diar_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_diar_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid diarization handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     rac_diarization_options_t opts = RAC_DIARIZATION_OPTIONS_DEFAULT;
     if (info.Length() > 2 && info[2].IsObject()) {
         Napi::Object obj = info[2].As<Napi::Object>();
-        if (obj.Has("threshold")) opts.threshold = obj.Get("threshold").ToNumber().FloatValue();
+        if (obj.Has("threshold"))
+            opts.threshold = obj.Get("threshold").ToNumber().FloatValue();
         if (obj.Has("minimumDurationMs")) {
             opts.minimum_duration_ms = obj.Get("minimumDurationMs").ToNumber().Int64Value();
         }
-        if (obj.Has("mergeGapMs")) opts.merge_gap_ms = obj.Get("mergeGapMs").ToNumber().Int64Value();
-        if (obj.Has("sampleRate")) opts.sample_rate_hz = obj.Get("sampleRate").ToNumber().Int32Value();
-        if (obj.Has("channels")) opts.channel_count = obj.Get("channels").ToNumber().Int32Value();
+        if (obj.Has("mergeGapMs"))
+            opts.merge_gap_ms = obj.Get("mergeGapMs").ToNumber().Int64Value();
+        if (obj.Has("sampleRate"))
+            opts.sample_rate_hz = obj.Get("sampleRate").ToNumber().Int32Value();
+        if (obj.Has("channels"))
+            opts.channel_count = obj.Get("channels").ToNumber().Int32Value();
     }
     Napi::Float32Array arr = ta.As<Napi::Float32Array>();
-    rac_diarization_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc =
-        rac_diarization_diarize(h, arr.Data(), arr.ElementLength(), &opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "diarize");
-        return env.Undefined();
-    }
-    Napi::Array segments = Napi::Array::New(env, result.segment_count);
-    for (size_t i = 0; i < result.segment_count; ++i) {
-        Napi::Object seg = Napi::Object::New(env);
-        seg.Set("speakerId", Napi::String::New(env, result.segments[i].speaker_id
-                                                        ? result.segments[i].speaker_id
-                                                        : std::to_string(result.segments[i].speaker_index)));
-        seg.Set("speakerIndex", Napi::Number::New(env, result.segments[i].speaker_index));
-        seg.Set("startMs", Napi::Number::New(env, static_cast<double>(result.segments[i].start_ms)));
-        seg.Set("endMs", Napi::Number::New(env, static_cast<double>(result.segments[i].end_ms)));
-        segments.Set(static_cast<uint32_t>(i), seg);
-    }
-    Napi::Object out = Napi::Object::New(env);
-    out.Set("segments", segments);
-    out.Set("speakerCount", Napi::Number::New(env, result.speaker_count));
-    out.Set("durationMs", Napi::Number::New(env, static_cast<double>(result.audio_duration_ms)));
-    rac_diarization_result_free(&result);
-    return out;
+    auto samples =
+        std::make_shared<std::vector<float>>(arr.Data(), arr.Data() + arr.ElementLength());
+    auto box = std::make_shared<DiarizationResultBox>();
+    return RunNativeCall(
+        env, "diarize",
+        [h, gate, samples, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            rac_diarization_options_t local = opts;
+            const rac_result_t rc =
+                rac_diarization_diarize(h, samples->data(), samples->size(), &local, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) {
+            const rac_diarization_result_t& result = box->value;
+            Napi::Array segments = Napi::Array::New(e, result.segment_count);
+            for (size_t i = 0; i < result.segment_count; ++i) {
+                Napi::Object seg = Napi::Object::New(e);
+                seg.Set(
+                    "speakerId",
+                    Napi::String::New(e, result.segments[i].speaker_id
+                                             ? result.segments[i].speaker_id
+                                             : std::to_string(result.segments[i].speaker_index)));
+                seg.Set("speakerIndex", Napi::Number::New(e, result.segments[i].speaker_index));
+                seg.Set("startMs",
+                        Napi::Number::New(e, static_cast<double>(result.segments[i].start_ms)));
+                seg.Set("endMs",
+                        Napi::Number::New(e, static_cast<double>(result.segments[i].end_ms)));
+                segments.Set(static_cast<uint32_t>(i), seg);
+            }
+            Napi::Object out = Napi::Object::New(e);
+            out.Set("segments", segments);
+            out.Set("speakerCount", Napi::Number::New(e, result.speaker_count));
+            out.Set("durationMs",
+                    Napi::Number::New(e, static_cast<double>(result.audio_duration_ms)));
+            return out;
+        },
+        [hid]() { end_op(hid); });
 }
 
 Napi::Value UnloadDiarizationModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
-    rac_handle_t h = take_handle_when_idle(g_diar_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) {
-        rac_diarization_cleanup(h);
-        rac_diarization_destroy(h);
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "diarization unload", []() { return RAC_SUCCESS; });
     }
-    return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    return RunNativeCall(env, "diarization unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_diar_handles, hid);
+        if (h) {
+            rac_diarization_cleanup(h);
+            rac_diarization_destroy(h);
+        }
+        return RAC_SUCCESS;
+    });
 }
 
 // =============================================================================
@@ -2405,26 +3043,39 @@ Napi::Value LoadSegmentationModel(const Napi::CallbackInfo& info) {
     std::string path = info[0].As<Napi::String>().Utf8Value();
     std::string id =
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : path;
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_segmentation_create(id.c_str(), &h);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "segmentation create");
-        return env.Undefined();
-    }
-    rc = rac_segmentation_initialize(h, path.c_str());
-    if (rc != RAC_SUCCESS) {
-        rac_segmentation_destroy(h);
-        throw_rac_error(env, rc, "segmentation initialize");
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_seg_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    auto slot = std::make_shared<int32_t>(0);
+    return RunNativeCall(
+        env, "segmentation initialize",
+        [path, id, slot]() -> rac_result_t {
+            rac_handle_t h = nullptr;
+            rac_result_t rc = rac_segmentation_create(id.c_str(), &h);
+            if (rc != RAC_SUCCESS)
+                return rc;
+            rc = rac_segmentation_initialize(h, path.c_str());
+            if (rc != RAC_SUCCESS) {
+                rac_segmentation_destroy(h);
+                return rc;
+            }
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            *slot = g_next_handle_id++;
+            g_seg_handles[*slot] = h;
+            return RAC_SUCCESS;
+        },
+        [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
+
+struct SegmentationResultBox {
+    rac_segmentation_result_t value;
+    bool filled = false;
+
+    SegmentationResultBox() { std::memset(&value, 0, sizeof(value)); }
+    ~SegmentationResultBox() {
+        if (filled)
+            rac_segmentation_result_free(&value);
+    }
+    SegmentationResultBox(const SegmentationResultBox&) = delete;
+    SegmentationResultBox& operator=(const SegmentationResultBox&) = delete;
+};
 
 // segment(handleId, { data, width, height, pixelFormat, strideBytes }, options?) ->
 //   { width, height, classMask: Uint16Array, classes, diagnosticRgba? }.
@@ -2442,27 +3093,23 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "segment image needs `data` bytes").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_segmentation_image_t image;
-    std::memset(&image, 0, sizeof(image));
-    image.data = data;
-    image.data_size = data_size;
-    image.width = static_cast<uint32_t>(img.Get("width").ToNumber().Int32Value());
-    image.height = static_cast<uint32_t>(img.Get("height").ToNumber().Int32Value());
-    image.pixel_format = img.Has("pixelFormat")
-                             ? static_cast<rac_segmentation_pixel_format_t>(
-                                   img.Get("pixelFormat").ToNumber().Int32Value())
-                             : RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
-    image.stride_bytes = img.Has("strideBytes")
-                             ? static_cast<size_t>(img.Get("strideBytes").ToNumber().Int64Value())
-                             : 0;
+    const uint32_t width = static_cast<uint32_t>(img.Get("width").ToNumber().Int32Value());
+    const uint32_t height = static_cast<uint32_t>(img.Get("height").ToNumber().Int32Value());
+    const rac_segmentation_pixel_format_t pixel_format =
+        img.Has("pixelFormat") ? static_cast<rac_segmentation_pixel_format_t>(
+                                     img.Get("pixelFormat").ToNumber().Int32Value())
+                               : RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
+    const size_t stride_bytes =
+        img.Has("strideBytes") ? static_cast<size_t>(img.Get("strideBytes").ToNumber().Int64Value())
+                               : 0;
 
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = begin_op(g_seg_handles, hid);
-    if (!h) {
+    rac_handle_t h = nullptr;
+    std::shared_ptr<std::mutex> gate;
+    if (!begin_worker_op(g_seg_handles, hid, &h, &gate)) {
         Napi::Error::New(env, "invalid segmentation handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    OpScope op(hid);
     rac_segmentation_options_t opts = RAC_SEGMENTATION_OPTIONS_DEFAULT;
     if (info.Length() > 2 && info[2].IsObject()) {
         Napi::Object o = info[2].As<Napi::Object>();
@@ -2471,51 +3118,73 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
                 o.Get("includeDiagnosticImage").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
         }
     }
-    rac_segmentation_result_t result;
-    std::memset(&result, 0, sizeof(result));
-    rac_result_t rc = rac_segmentation_segment(h, &image, &opts, &result);
-    if (rc != RAC_SUCCESS) {
-        throw_rac_error(env, rc, "segment");
-        return env.Undefined();
-    }
-    Napi::Object out = Napi::Object::New(env);
-    out.Set("width", Napi::Number::New(env, result.width));
-    out.Set("height", Napi::Number::New(env, result.height));
-    Napi::Uint16Array mask = Napi::Uint16Array::New(env, result.class_mask_count);
-    if (result.class_mask && result.class_mask_count) {
-        std::memcpy(mask.Data(), result.class_mask, result.class_mask_count * sizeof(uint16_t));
-    }
-    out.Set("classMask", mask);
-    Napi::Array classes = Napi::Array::New(env, result.class_summary_count);
-    for (size_t i = 0; i < result.class_summary_count; ++i) {
-        Napi::Object c = Napi::Object::New(env);
-        c.Set("classId", Napi::Number::New(env, result.class_summaries[i].class_id));
-        c.Set("pixelCount",
-              Napi::Number::New(env, static_cast<double>(result.class_summaries[i].pixel_count)));
-        c.Set("fraction", Napi::Number::New(env, result.class_summaries[i].fraction));
-        if (result.class_summaries[i].label) {
-            c.Set("label", Napi::String::New(env, result.class_summaries[i].label));
-        }
-        classes.Set(static_cast<uint32_t>(i), c);
-    }
-    out.Set("classes", classes);
-    if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
-        out.Set("diagnosticRgba", Napi::Buffer<uint8_t>::Copy(env, result.diagnostic_rgba,
-                                                              result.diagnostic_rgba_size));
-    }
-    rac_segmentation_result_free(&result);
-    return out;
+    auto pixels = std::make_shared<std::vector<uint8_t>>(data, data + data_size);
+    auto box = std::make_shared<SegmentationResultBox>();
+    return RunNativeCall(
+        env, "segment",
+        [h, gate, pixels, width, height, pixel_format, stride_bytes, opts, box]() {
+            std::lock_guard<std::mutex> serialize(*gate);
+            rac_segmentation_image_t image;
+            std::memset(&image, 0, sizeof(image));
+            image.data = pixels->data();
+            image.data_size = pixels->size();
+            image.width = width;
+            image.height = height;
+            image.pixel_format = pixel_format;
+            image.stride_bytes = stride_bytes;
+            rac_segmentation_options_t local = opts;
+            const rac_result_t rc = rac_segmentation_segment(h, &image, &local, &box->value);
+            box->filled = rc == RAC_SUCCESS;
+            return rc;
+        },
+        [box](Napi::Env e) {
+            const rac_segmentation_result_t& result = box->value;
+            Napi::Object out = Napi::Object::New(e);
+            out.Set("width", Napi::Number::New(e, result.width));
+            out.Set("height", Napi::Number::New(e, result.height));
+            Napi::Uint16Array mask = Napi::Uint16Array::New(e, result.class_mask_count);
+            if (result.class_mask && result.class_mask_count) {
+                std::memcpy(mask.Data(), result.class_mask,
+                            result.class_mask_count * sizeof(uint16_t));
+            }
+            out.Set("classMask", mask);
+            Napi::Array classes = Napi::Array::New(e, result.class_summary_count);
+            for (size_t i = 0; i < result.class_summary_count; ++i) {
+                Napi::Object c = Napi::Object::New(e);
+                c.Set("classId", Napi::Number::New(e, result.class_summaries[i].class_id));
+                c.Set("pixelCount",
+                      Napi::Number::New(
+                          e, static_cast<double>(result.class_summaries[i].pixel_count)));
+                c.Set("fraction", Napi::Number::New(e, result.class_summaries[i].fraction));
+                if (result.class_summaries[i].label) {
+                    c.Set("label", Napi::String::New(e, result.class_summaries[i].label));
+                }
+                classes.Set(static_cast<uint32_t>(i), c);
+            }
+            out.Set("classes", classes);
+            if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
+                out.Set("diagnosticRgba", Napi::Buffer<uint8_t>::Copy(e, result.diagnostic_rgba,
+                                                                      result.diagnostic_rgba_size));
+            }
+            return out;
+        },
+        [hid]() { end_op(hid); });
 }
 
 Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
-    rac_handle_t h = take_handle_when_idle(g_seg_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) {
-        rac_segmentation_cleanup(h);
-        rac_segmentation_destroy(h);
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        return RunNativeCall(env, "segmentation unload", []() { return RAC_SUCCESS; });
     }
-    return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    return RunNativeCall(env, "segmentation unload", [hid]() {
+        rac_handle_t h = take_handle_when_idle(g_seg_handles, hid);
+        if (h) {
+            rac_segmentation_cleanup(h);
+            rac_segmentation_destroy(h);
+        }
+        return RAC_SUCCESS;
+    });
 }
 
 // ---- RAG (retrieval-augmented generation) -------------------------------
@@ -2529,7 +3198,11 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
 static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const char* what) {
     if (buf->status != RAC_SUCCESS || buf->data == nullptr) {
         std::string msg = std::string(what) + " failed: " + std::to_string(buf->status);
-        if (buf->error_message) { msg += " ("; msg += buf->error_message; msg += ")"; }
+        if (buf->error_message) {
+            msg += " (";
+            msg += buf->error_message;
+            msg += ")";
+        }
         rac_proto_buffer_free(buf);
         make_rac_error(env, buf->status, msg).ThrowAsJavaScriptException();
         return env.Undefined();
@@ -2539,6 +3212,21 @@ static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const c
     return out;
 }
 
+// =============================================================================
+// RAG. Optional, exactly like the desktop control plane above: commons only
+// defines the `rac_rag_*_proto` C ABI when it is built with RAC_BACKEND_RAG,
+// so a build without it (Windows on ARM64 today — the preset turns RAG off
+// because its dependency chain cannot configure there) would fail to LINK on
+// these symbols rather than merely lose a feature. The JNI host already treats
+// this symbol set as optional at RUNTIME (optionalNativeSymbol); a statically
+// linked addon expresses the same thing at compile time.
+//
+// The export names stay present either way, so the RPC allowlist and the TS
+// `NativeAddon` surface do not change shape between builds — calling one just
+// reports FEATURE_NOT_AVAILABLE instead of vanishing as an undefined method.
+// =============================================================================
+#ifdef RAC_ELECTRON_HAVE_RAG
+
 // rac_rag_ingest_proto / rac_rag_query_proto run a full embedding / LLM
 // generation and can take seconds, so run them on a worker thread and resolve a
 // Promise (parity with generate()). A synchronous call would block the entire
@@ -2547,7 +3235,7 @@ static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const c
 using RagProtoOp = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
 
 class RagProtoWorker : public Napi::AsyncWorker {
- public:
+   public:
     RagProtoWorker(Napi::Env env, rac_handle_t session, int32_t handle_id,
                    std::vector<uint8_t> input, RagProtoOp op, const char* what)
         : Napi::AsyncWorker(env),
@@ -2577,14 +3265,19 @@ class RagProtoWorker : public Napi::AsyncWorker {
         rac_proto_buffer_t out;
         rac_proto_buffer_init(&out);
         rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
+            out.status = rc;
         if (out.status == RAC_SUCCESS && out.data != nullptr) {
             result_.assign(out.data, out.data + out.size);
             ok_ = true;
         } else {
             code_ = out.status;
             err_ = std::string(what_) + " failed: " + std::to_string(out.status);
-            if (out.error_message) { err_ += " ("; err_ += out.error_message; err_ += ")"; }
+            if (out.error_message) {
+                err_ += " (";
+                err_ += out.error_message;
+                err_ += ")";
+            }
         }
         rac_proto_buffer_free(&out);
     }
@@ -2608,10 +3301,11 @@ class RagProtoWorker : public Napi::AsyncWorker {
     }
 
     ~RagProtoWorker() override {
-        if (leased_) end_op(handle_id_);
+        if (leased_)
+            end_op(handle_id_);
     }
 
- private:
+   private:
     Napi::Promise::Deferred deferred_;
     rac_handle_t session_;
     int32_t handle_id_;
@@ -2629,12 +3323,16 @@ class RagProtoWorker : public Napi::AsyncWorker {
 static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, const char* what) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
-        Napi::TypeError::New(env, std::string(what) + "(handleId, protoBytes) bad args").ThrowAsJavaScriptException();
+        Napi::TypeError::New(env, std::string(what) + "(handleId, protoBytes) bad args")
+            .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = begin_op(g_rag_handles, hid);
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    if (!h) {
+        Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
     Napi::Uint8Array bytes = info[1].As<Napi::Uint8Array>();
     std::vector<uint8_t> copy(bytes.Data(), bytes.Data() + bytes.ByteLength());
     auto* worker = new RagProtoWorker(env, h, hid, std::move(copy), op, what);
@@ -2649,20 +3347,26 @@ static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, c
     return promise;
 }
 
+#endif  // RAC_ELECTRON_HAVE_RAG
+
 // Register a downloaded model in commons' global registry (id -> local_path) so
-// RAG session-create can resolve embedding/LLM model ids to on-disk paths. The
+// session-create can resolve embedding/LLM model ids to on-disk paths. The
 // Electron SDK otherwise loads models by explicit path and never populates the
-// registry, so RAG needs this bridge. rac_register_model deep-copies the struct.
+// registry. rac_register_model deep-copies the struct. Outside the RAG guard
+// above: RAG was the first caller, but `models.register` is the general path and
+// a build without RAG still needs it.
 static char* rag_dup_cstr(const std::string& s) {
     char* p = static_cast<char*>(std::malloc(s.size() + 1));
-    if (p) std::memcpy(p, s.c_str(), s.size() + 1);
+    if (p)
+        std::memcpy(p, s.c_str(), s.size() + 1);
     return p;
 }
 
 Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
-        Napi::TypeError::New(env, "registerModel(id, path, category?, framework?) bad args").ThrowAsJavaScriptException();
+        Napi::TypeError::New(env, "registerModel(id, path, category?, framework?) bad args")
+            .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     std::string id = info[0].As<Napi::String>().Utf8Value();
@@ -2691,11 +3395,13 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
+#ifdef RAC_ELECTRON_HAVE_RAG
+
 // Async (worker-thread) — session create resolves model ids and loads embedding
 // (+ optional LLM) services, which can take seconds. A sync call would block the
 // utility-host event loop the same way ingest/query used to.
 class RagCreateSessionWorker : public Napi::AsyncWorker {
- public:
+   public:
     RagCreateSessionWorker(Napi::Env env, std::vector<uint8_t> config)
         : Napi::AsyncWorker(env),
           deferred_(Napi::Promise::Deferred::New(env)),
@@ -2729,9 +3435,8 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
             if (!g_initialized.load()) {
                 rac_rag_session_destroy_proto(session_);
                 session_ = nullptr;
-                deferred_.Reject(make_rac_error(
-                                     Env(), RAC_ERROR_NOT_INITIALIZED,
-                                     "rag session create aborted: SDK shut down")
+                deferred_.Reject(make_rac_error(Env(), RAC_ERROR_NOT_INITIALIZED,
+                                                "rag session create aborted: SDK shut down")
                                      .Value());
                 return;
             }
@@ -2752,10 +3457,11 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     }
 
     ~RagCreateSessionWorker() override {
-        if (session_) rac_rag_session_destroy_proto(session_);
+        if (session_)
+            rac_rag_session_destroy_proto(session_);
     }
 
- private:
+   private:
     Napi::Promise::Deferred deferred_;
     std::vector<uint8_t> config_;
     rac_handle_t session_ = nullptr;
@@ -2769,7 +3475,8 @@ Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
     // Proto bytes arrive as a Uint8Array (Buffers degrade to Uint8Array crossing
     // the utility-host MessagePort), so accept any typed array, not just Buffer.
     if (info.Length() < 1 || !info[0].IsTypedArray()) {
-        Napi::TypeError::New(env, "ragCreateSession(configProtoBytes) bad args").ThrowAsJavaScriptException();
+        Napi::TypeError::New(env, "ragCreateSession(configProtoBytes) bad args")
+            .ThrowAsJavaScriptException();
         return env.Undefined();
     }
     Napi::Uint8Array cfg = info[0].As<Napi::Uint8Array>();
@@ -2843,14 +3550,14 @@ Napi::Value RagQueryStream(const Napi::CallbackInfo& info) {
         ctx->tsfn = Napi::ThreadSafeFunction::New(
             env, info[2].As<Napi::Function>(), "ra-rag-stream", 256, 1, ctx,
             [](Napi::Env env, void*, RagStreamCtx* c) {
-                if (c->worker.joinable()) c->worker.join();
+                if (c->worker.joinable())
+                    c->worker.join();
                 if (c->leased) {
                     end_op(c->lease_id);
                     c->leased = false;
                 }
                 if (c->result == RAC_SUCCESS || is_cancellation(c->result)) {
-                    c->deferred.Resolve(
-                        Napi::Boolean::New(env, is_cancellation(c->result)));
+                    c->deferred.Resolve(Napi::Boolean::New(env, is_cancellation(c->result)));
                 } else {
                     c->deferred.Reject(
                         make_rac_error(env, c->result,
@@ -2870,7 +3577,8 @@ Napi::Value RagQueryStream(const Napi::CallbackInfo& info) {
             ctx->tsfn.Release();
         });
     } catch (...) {
-        if (ctx->leased) end_op(hid);
+        if (ctx->leased)
+            end_op(hid);
         delete ctx;
         throw;
     }
@@ -2879,9 +3587,11 @@ Napi::Value RagQueryStream(const Napi::CallbackInfo& info) {
 
 Napi::Value RagCancel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
-    if (h) rac_rag_cancel_proto(h);
+    if (h)
+        rac_rag_cancel_proto(h);
     return env.Undefined();
 }
 
@@ -2893,12 +3603,16 @@ Napi::Value RagClear(const Napi::CallbackInfo& info) {
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = begin_op(g_rag_handles, hid);
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    if (!h) {
+        Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
     OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_rag_clear_proto(h, &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
+        out.status = rc;
     return rag_out_to_js(env, &out, "rag clear");
 }
 
@@ -2910,26 +3624,56 @@ Napi::Value RagStats(const Napi::CallbackInfo& info) {
     }
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = begin_op(g_rag_handles, hid);
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    if (!h) {
+        Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
     OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_rag_stats_proto(h, &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
+        out.status = rc;
     return rag_out_to_js(env, &out, "rag stats");
 }
 
 Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    if (info.Length() < 1 || !info[0].IsNumber())
+        return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = take_handle_when_idle(g_rag_handles, hid);
-    if (h) rac_rag_session_destroy_proto(h);
+    if (h)
+        rac_rag_session_destroy_proto(h);
     return env.Undefined();
 }
 
+#else  // !RAC_ELECTRON_HAVE_RAG
+
+// One handler behind every rag* export. Typed, so the TS layer recovers an
+// SDKException with a real ErrorCode instead of parsing a string (and instead of
+// a bare TypeError from calling an undefined method).
+Napi::Value RagUnavailable(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    throw_rac_error(env, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                    "rag (this build has no RAG pipeline)");
+    return env.Undefined();
+}
+
+#endif  // RAC_ELECTRON_HAVE_RAG
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    rac_electron::RegisterModelBridge(env, exports);
+    rac_electron::RegisterLlmBridge(env, exports);
+    rac_electron::RegisterToolBridge(env, exports);
+    rac_electron::RegisterVlmBridge(env, exports);
+    rac_electron::RegisterSpeechBridge(env, exports);
+    rac_electron::RegisterVoiceBridge(env, exports);
+    rac_electron::RegisterDataBridge(env, exports);
+    rac_electron::RegisterDownloadBridge(env, exports);
+    rac_electron::RegisterLoraBridge(env, exports);
     exports.Set("initialize", Napi::Function::New(env, Initialize));
+    exports.Set("memoryInfo", Napi::Function::New(env, MemoryInfo));
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
     // Desktop control plane (telemetry + auth). Present only when the desktop
     // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
@@ -2937,6 +3681,10 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("devicePersistentId", Napi::Function::New(env, DevicePersistentId));
     exports.Set("devStagingBaseUrl", Napi::Function::New(env, DevStagingBaseUrl));
     exports.Set("configureControlPlane", Napi::Function::New(env, ConfigureControlPlane));
+    exports.Set("retryControlPlane", Napi::Function::New(env, RetryControlPlane));
+    exports.Set("telemetryFlush", Napi::Function::New(env, TelemetryFlush));
+    exports.Set("authState", Napi::Function::New(env, AuthState));
+    exports.Set("clearAuth", Napi::Function::New(env, ClearAuth));
 #else
     exports.Set("hasControlPlane", Napi::Boolean::New(env, false));
 #endif
@@ -2986,6 +3734,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("segment", Napi::Function::New(env, Segment));
     exports.Set("unloadSegmentationModel", Napi::Function::New(env, UnloadSegmentationModel));
     exports.Set("registerModel", Napi::Function::New(env, RegisterModel));
+#ifdef RAC_ELECTRON_HAVE_RAG
     exports.Set("ragCreateSession", Napi::Function::New(env, RagCreateSession));
     exports.Set("ragIngest", Napi::Function::New(env, RagIngest));
     exports.Set("ragQuery", Napi::Function::New(env, RagQuery));
@@ -2995,6 +3744,13 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("ragClear", Napi::Function::New(env, RagClear));
     exports.Set("ragStats", Napi::Function::New(env, RagStats));
     exports.Set("ragDestroySession", Napi::Function::New(env, RagDestroySession));
+#else
+    for (const char* name : {"ragCreateSession", "ragIngest", "ragQuery", "ragSearch",
+                             "ragQueryStream", "ragCancel", "ragClear", "ragStats",
+                             "ragDestroySession"}) {
+        exports.Set(name, Napi::Function::New(env, RagUnavailable));
+    }
+#endif
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;

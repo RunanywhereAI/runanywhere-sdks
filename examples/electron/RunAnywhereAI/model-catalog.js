@@ -144,6 +144,30 @@ const CATALOG = {
   'piper-lessac': piper('lessac', 'Piper · Lessac', 64),
   'piper-amy': piper('amy', 'Piper · Amy', 64),
   'piper-ryan': piper('ryan', 'Piper · Ryan', 64),
+
+  // ---- Speaker diarization (NVIDIA Sortformer, ONNX) ----
+  sortformer: {
+    type: 'diarization',
+    files: [{ url: `${HF}/cgus/diar_streaming_sortformer_4spk-v2.1-onnx/resolve/main/diar_streaming_sortformer_4spk-v2.1.onnx`, as: 'model.onnx' }],
+    primary: 'model.onnx',
+    label: 'Sortformer 4-speaker',
+    params: '4 spk',
+    sizeMB: 492,
+    license: LICENSES.nvidiaOpen.name,
+    licenseUrl: LICENSES.nvidiaOpen.url,
+  },
+
+  // ---- Semantic segmentation (SegFormer B0, ADE20K classes) ----
+  // Revision-pinned: the repo's `main` has been re-exported with different
+  // opset/IO names before, and commons reads the graph's output names.
+  'segformer-b0-ade-512': {
+    type: 'segmentation',
+    files: [{ url: `${HF}/Xenova/segformer-b0-finetuned-ade-512-512/resolve/d3e5499fa8701ff0453ca940a8dfeae39b2f1504/onnx/model.onnx`, as: 'model.onnx' }],
+    primary: 'model.onnx',
+    label: 'SegFormer B0 · ADE20K',
+    params: 'B0',
+    sizeMB: 15,
+  },
 };
 
 module.exports = { CATALOG, LICENSES };

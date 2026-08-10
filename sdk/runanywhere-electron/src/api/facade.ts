@@ -5,8 +5,12 @@
 // object shape, which is why `RunAnywhere.llm.generate` and
 // `window.runanywhere.llm.generate` are the same function written once.
 
-import { SDKException } from '../errors';
-import { bus } from '../events';
+import * as path from 'path';
+
+import { catalogEntries, catalogModelInfo } from '../catalog';
+import { modelsRoot } from '../download';
+import { ErrorCategory, SDKException, asSDKException } from '../errors';
+import { ModelAbi } from './model-abi';
 import {
   IMAGES_GAP,
   createImagesNamespace,
@@ -15,7 +19,7 @@ import {
   createSegmentationNamespace,
 } from './assets';
 import type { ImagesNamespace, LoraNamespace, ModelsNamespace, SegmentationNamespace } from './assets';
-import type { RaBackend } from './backend';
+import type { AuthState, RaBackend } from './backend';
 import {
   createEmbeddingsNamespace,
   createRagNamespace,
@@ -40,11 +44,12 @@ import type {
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
 import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
-import { SDKEnvironment } from '../proto/model_types';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import {
   SdkInitPhase1Request,
   SdkInitPhase2Request,
-} from '../proto/sdk_init';
+  SdkInitResult,
+} from '@runanywhere/proto-ts/sdk_init';
 import type { SDKCapabilities, SdkEvent, UnavailableCapability } from './types';
 
 /** Everything {@link RunAnywhereApi.initialize} accepts. */
@@ -62,6 +67,53 @@ export interface InitializeOptions {
   baseDir?: string;
   /** Secure-store directory. Defaults to `<baseDir>/secure`. */
   secureDir?: string;
+  /**
+   * Development-mode device registration token. Commons passes it on the
+   * registration payload only when `environment` is development, and ignores it
+   * otherwise. Nothing in the SDK can mint one — a build that has no token
+   * leaves this unset rather than sending an empty string.
+   */
+  buildToken?: string;
+}
+
+/**
+ * How the control plane ended up, for an app that wants to say so in its UI.
+ *
+ * - `disabled` — this build has no control plane, or no credentials were given.
+ *   Local inference is fully usable; there is nothing to retry.
+ * - `authenticated` — the handshake completed and the token is live.
+ * - `offline` — the handshake ran and could not reach the backend. Tokens from a
+ *   previous run may still be valid; {@link AuthNamespace.retry} is the fix.
+ * - `rejected` — the backend answered and refused. Usually a bad API key, and
+ *   retrying with the same credentials will fail the same way.
+ */
+export type AuthStatus = 'disabled' | 'authenticated' | 'offline' | 'rejected';
+
+/** {@link AuthState} plus how initialization went. */
+export interface AuthInfo extends AuthState {
+  status: AuthStatus;
+  /** Commons' warning or error text; empty when there is nothing to say. */
+  message: string;
+}
+
+/**
+ * Control-plane authentication. An Electron platform extra, like
+ * {@link SecureStore} — the cross-SDK spec has no auth namespace, but a desktop
+ * app has to be able to tell an offline run from a rejected key.
+ */
+export interface AuthNamespace {
+  /** Current token, expiry, and device registration. */
+  state(): Promise<AuthInfo>;
+  /** Re-run the HTTP setup an offline start skipped, then report the new state. */
+  retry(): Promise<AuthInfo>;
+  /** Forget the stored tokens; the next `initialize` authenticates from scratch. */
+  clear(): Promise<void>;
+}
+
+/** Telemetry control. Batches also flush on a timer and at shutdown. */
+export interface TelemetryNamespace {
+  /** Send what is queued now — useful before the app quits on its own terms. */
+  flush(): Promise<void>;
 }
 
 /**
@@ -123,6 +175,10 @@ export interface RunAnywhereApi {
   readonly lora: LoraNamespace;
   /** Electron platform extra; see {@link SecureStore}. */
   readonly secure: SecureStore;
+  /** Electron platform extra; see {@link AuthNamespace}. */
+  readonly auth: AuthNamespace;
+  /** Electron platform extra; see {@link TelemetryNamespace}. */
+  readonly telemetry: TelemetryNamespace;
 
   // The input constructors also hang off the facade. A renderer cannot `require`
   // the package, so carrying them here is what lets page code build the same
@@ -203,31 +259,70 @@ function osPlatform(): string {
   return 'linux';
 }
 
-/** Run the desktop two-phase init (telemetry + auth) when creds allow. Best-effort:
- * HTTP/auth failures are non-fatal (the SDK stays usable offline). Returns the
- * persistent device id when the control plane ran, else null. */
+/** What the control plane did during `initialize`, kept so `auth.state()` can
+ * explain a run that never reached the backend. */
+interface ControlPlaneOutcome {
+  status: AuthStatus;
+  message: string;
+  deviceId: string | null;
+}
+
+const CONTROL_PLANE_DISABLED: ControlPlaneOutcome = {
+  status: 'disabled',
+  message: '',
+  deviceId: null,
+};
+
+/** Read an SdkInitResult the way commons means it: `httpApplicable` says whether
+ * a control plane was reachable in principle, `hasCompletedHttpSetup` whether the
+ * handshake actually landed, and a populated `error` means the backend refused. */
+function outcomeOf(resultBytes: Uint8Array, deviceId: string): ControlPlaneOutcome {
+  const result = SdkInitResult.decode(resultBytes);
+  if (result.error) {
+    const failure = SDKException.fromProto(result.error);
+    return {
+      status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+      message: failure.message,
+      deviceId: deviceId || null,
+    };
+  }
+  if (!result.httpApplicable) {
+    return { status: 'disabled', message: result.warning, deviceId: deviceId || null };
+  }
+  return {
+    status: result.hasCompletedHttpSetup ? 'authenticated' : 'offline',
+    message: result.warning,
+    deviceId: deviceId || null,
+  };
+}
+
+/** Run the desktop two-phase init (telemetry + auth) when creds allow. Never
+ * throws: the SDK stays fully usable offline, and the outcome is reported through
+ * `auth.state()` rather than swallowed. */
 async function runControlPlane(
   backend: RaBackend,
   options: InitializeOptions,
   environment: Environment,
   version: string
-): Promise<string | null> {
+): Promise<ControlPlaneOutcome> {
   if (!(await backend.hasControlPlane())) {
-    if (options.apiKey || options.baseUrl) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'RunAnywhere.initialize: apiKey/baseUrl supplied but this build has no desktop ' +
-          'control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry'
-      );
-    }
-    return null;
+    return {
+      ...CONTROL_PLANE_DISABLED,
+      message:
+        options.apiKey || options.baseUrl
+          ? 'apiKey/baseUrl supplied but this build has no desktop control plane ' +
+            '(RAC_DESKTOP_ADAPTER=OFF): no auth or telemetry'
+          : '',
+    };
   }
   const isProd = environment === Environment.PRODUCTION;
   let baseUrl = (options.baseUrl ?? '').trim();
   if (!baseUrl && !isProd) baseUrl = await backend.devStagingBaseUrl();
   const apiKey = (options.apiKey ?? '').trim();
-  if (!baseUrl) return null;
-  if (isProd && !apiKey) return null;
+  if (!baseUrl) return { ...CONTROL_PLANE_DISABLED, message: 'no control-plane base URL' };
+  if (isProd && !apiKey) {
+    return { ...CONTROL_PLANE_DISABLED, message: 'production needs an apiKey' };
+  }
 
   const deviceId = await backend.devicePersistentId();
   const platform = osPlatform();
@@ -242,48 +337,86 @@ async function runControlPlane(
     platform,
     sdkVersion: version,
   }).finish();
+  // Commons only forwards the build token in development; elsewhere it sends
+  // nothing rather than an empty credential.
   const phase2 = SdkInitPhase2Request.encode({
-    buildToken: '',
+    buildToken: options.buildToken ?? '',
   }).finish();
-  await backend.configureControlPlane({
-    environment: isProd ? 2 : 0,
-    apiKey,
-    baseUrl,
-    deviceId,
-    platform,
-    sdkVersion: version,
-    sdkBinding: 'electron',
-    appIdentifier: 'ai.runanywhere.electron',
-    appName: 'RunAnywhere Electron',
-    appVersion: version,
-    phase1Bytes: phase1,
-    phase2Bytes: phase2,
-  });
-  return deviceId || null;
+  try {
+    const resultBytes = await backend.configureControlPlane({
+      environment: isProd ? 2 : 0,
+      apiKey,
+      baseUrl,
+      deviceId,
+      platform,
+      sdkVersion: version,
+      sdkBinding: 'electron',
+      appIdentifier: 'ai.runanywhere.electron',
+      appName: 'RunAnywhere Electron',
+      appVersion: version,
+      phase1Bytes: phase1,
+      phase2Bytes: phase2,
+    });
+    return outcomeOf(resultBytes, deviceId);
+  } catch (error) {
+    const failure = asSDKException(error);
+    return {
+      status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+      message: failure.message,
+      deviceId: deviceId || null,
+    };
+  }
+}
+
+/**
+ * Push every staged catalog entry into the commons model registry.
+ *
+ * Best-effort per entry: one malformed row must not stop the SDK from coming up,
+ * and a row that fails to register simply will not list.
+ */
+async function seedCatalog(backend: RaBackend, baseDir?: string): Promise<void> {
+  const entries = Object.entries(catalogEntries());
+  if (!entries.length) return;
+  const root = baseDir ? path.join(baseDir, 'models') : modelsRoot();
+  const abi = new ModelAbi(backend);
+  for (const [id, entry] of entries) {
+    try {
+      await abi.register(catalogModelInfo(id, entry, root));
+    } catch {
+      // A rejected row is visible through models.list() being short, which is a
+      // better failure than refusing to initialize.
+    }
+  }
 }
 
 /** Build the public surface over `backend`. */
 export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
   const hub = new SdkEventHub();
-  // Mirror into the pre-v3 EventBus so existing `RunAnywhere.legacyEvents`
-  // listeners keep firing while the deprecated surface lives.
-  hub.mirror((event) => {
-    if (event.type === 'ready') bus.emit({ type: 'servicesReady' });
-  });
 
   let ready = false;
   let version = '';
   let deviceId = '';
   let environment: Environment = Environment.PRODUCTION;
   let initializing: Promise<void> | null = null;
+  let controlPlane: ControlPlaneOutcome = CONTROL_PLANE_DISABLED;
+  let baseDir: string | undefined;
 
   const requireReady = (): void => {
     if (!ready) throw SDKException.notInitialized('RunAnywhere');
   };
 
-  const deps = { backend, hub, requireReady };
-  const llm = createLlmNamespace(deps);
-  const vlm = createVlmNamespace(deps);
+  // baseDir is read through a function because the namespaces are built before
+  // `initialize` has been told where the store is.
+  const deps = { backend, hub, requireReady, baseDir: () => baseDir };
+  // `models` comes first because the llm namespace loads through it: commons
+  // reads the language model out of its lifecycle store, and putting it there is
+  // the models namespace's job.
+  const models = createModelsNamespace(deps);
+  const loadModel = async (id: string): Promise<void> => {
+    await models.load(id);
+  };
+  const llm = createLlmNamespace({ ...deps, loadModel });
+  const vlm = createVlmNamespace({ ...deps, loadModel });
   const stt = createSttNamespace(deps);
   const tts = createTtsNamespace(deps);
   const vad = createVadNamespace(deps);
@@ -293,24 +426,28 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
   const diarization = createDiarizationNamespace(deps);
   const segmentation = createSegmentationNamespace(deps);
   const rag = createRagNamespace(deps);
-  const models = createModelsNamespace(deps);
   const lora = createLoraNamespace(deps);
   const voice = createVoiceNamespace({
     ...deps,
     stt,
     tts,
     generate: (prompt, options) => llm.generateStream(prompt, options),
-    llmCancel: () => backend.llmCancel(),
+    llmCancel: () => backend.llmCancelProto().then(() => undefined),
   });
 
   async function initialize(options: InitializeOptions = {}): Promise<void> {
     if (ready) return;
     if (initializing) return initializing;
     environment = options.environment ?? Environment.PRODUCTION;
+    baseDir = options.baseDir;
     initializing = (async () => {
       await backend.initialize({ baseDir: options.baseDir, secureDir: options.secureDir });
       version = await backend.version();
       ready = true;
+      // The app's staged catalog becomes registry rows here, before anything can
+      // list or load. Commons' registry is in-memory per process, so this runs on
+      // every start — the same reseed Swift does in ModelCatalogBootstrap.
+      await seedCatalog(backend, options.baseDir);
       // A stable install identifier, minted locally. With no control plane there is
       // nothing to register it with; it exists so logs and telemetry have a key.
       try {
@@ -327,15 +464,18 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       }
       // Desktop control plane: telemetry + auth via the two-phase init. Prefer the
       // persistent device id commons mints (what the backend keys on) over the
-      // locally-minted fallback above. Best-effort — never blocks local inference.
-      try {
-        const persistentId = await runControlPlane(backend, options, environment, version);
-        if (persistentId) deviceId = persistentId;
-      } catch {
-        // telemetry/auth failure must not block local inference
+      // locally-minted fallback above. Never blocks local inference — a failure
+      // lands in `auth.state()` instead of being swallowed.
+      controlPlane = await runControlPlane(backend, options, environment, version);
+      if (controlPlane.deviceId) deviceId = controlPlane.deviceId;
+      if (controlPlane.status === 'offline' || controlPlane.status === 'rejected') {
+        hub.emit({
+          type: 'authFailed',
+          status: controlPlane.status,
+          message: controlPlane.message,
+        });
       }
       hub.emit({ type: 'ready' });
-      bus.emit({ type: 'initialized' });
     })();
     try {
       await initializing;
@@ -351,14 +491,49 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     ready = false;
     version = '';
     deviceId = '';
+    controlPlane = CONTROL_PLANE_DISABLED;
     hub.clear();
-    bus.emit({ type: 'shutdown' });
   }
 
   const secure: SecureStore = {
     set: (key, value) => backend.secureSet(key, value),
     get: (key) => backend.secureGet(key),
     delete: (key) => backend.secureDelete(key),
+  };
+
+  /** Commons' live token state wins over whatever initialize saw: a token loaded
+   * from the previous run is real even when this run never reached the network. */
+  async function authInfo(): Promise<AuthInfo> {
+    const state: AuthState = await backend.authState();
+    const status: AuthStatus = state.authenticated ? 'authenticated' : controlPlane.status;
+    return { ...state, status, message: state.authenticated ? '' : controlPlane.message };
+  }
+
+  const auth: AuthNamespace = {
+    state: authInfo,
+    async retry() {
+      requireReady();
+      if (controlPlane.status === 'disabled') return authInfo();
+      try {
+        controlPlane = outcomeOf(await backend.retryControlPlane(), deviceId);
+      } catch (error) {
+        const failure = asSDKException(error);
+        controlPlane = {
+          status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+          message: failure.message,
+          deviceId: deviceId || null,
+        };
+      }
+      return authInfo();
+    },
+    async clear() {
+      requireReady();
+      await backend.clearAuth();
+    },
+  };
+
+  const telemetry: TelemetryNamespace = {
+    flush: () => backend.telemetryFlush(),
   };
 
   return {
@@ -395,6 +570,8 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     models,
     lora,
     secure,
+    auth,
+    telemetry,
     audio,
     image,
     ragDocument,

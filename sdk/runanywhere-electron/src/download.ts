@@ -1,8 +1,20 @@
-// download.ts — model download + resolution (Node-side; Node owns desktop I/O).
-// Streams HTTP(S) downloads with progress + timeouts + completeness checks,
-// extracts .tar.bz2 via the system tar (bsdtar ships with Windows 10+), and
-// resolves a catalog id, a direct URL, a HuggingFace repo id, or a local path to
-// concrete on-disk file paths, downloading if missing.
+// download.ts — model SOURCE RESOLUTION plus the two pieces of desktop I/O the
+// download feature needs on top of commons: a task table that outlives the
+// process and an OS notification.
+//
+// The public download verb (`models.download`) no longer lives here. F18 moved
+// it onto the commons orchestrator (`src/api/download-abi.ts`), which plans,
+// fetches over the registered HTTP transport, extracts, verifies checksums, and
+// updates the registry.
+//
+// What is still here, and why: commons has no HuggingFace repo resolver. There
+// is nothing in `rac_download_orchestrator.h` that enumerates a repo tree, picks
+// a quantization, collects a split-GGUF shard set, or finds the matching mmproj,
+// and `DownloadPlanRequest` starts from a `ModelInfo` that already names its
+// files. So `resolveModel` — the resolver behind `backend.ensure` and the
+// utility host's `resolveLoadArgs` — keeps its own HTTP path for a URL or a
+// `owner/repo` source. Folding that into commons is the prerequisite for
+// deleting the rest of this file.
 import { spawnSync } from 'child_process';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -611,4 +623,110 @@ export async function resolveModel(
     primary: path.join(dir, entry.primary),
     mmproj: entry.mmproj ? path.join(dir, entry.mmproj) : undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Persisted download tasks
+// ---------------------------------------------------------------------------
+
+/**
+ * One download the SDK started, recorded so it survives a host restart.
+ *
+ * commons keeps its task map in process memory, so a crash or a quit loses
+ * every task id. The partial bytes stay on disk, and a fresh
+ * `rac_download_start_proto` for the same model id resumes from them, but only
+ * if something remembers which models were mid-flight. That is what this table
+ * is: the desktop equivalent of what `BackgroundDownloadCoordinator` gets for
+ * free from NSURLSession on iOS.
+ */
+export interface DownloadTaskRecord {
+  modelId: string;
+  /** commons' task id for the run that recorded this. Stale after a restart. */
+  taskId: string;
+  /** True when the SDK cancelled the transfer but kept the partial bytes. */
+  paused: boolean;
+  bytesDownloaded: number;
+  totalBytes: number;
+  updatedAtUnixMs: number;
+}
+
+function taskTablePath(baseDir?: string): string {
+  return path.join(baseDir ?? path.dirname(modelsRoot()), 'downloads.json');
+}
+
+/** Every unfinished download this machine knows about, newest write wins. */
+export function readDownloadTasks(baseDir?: string): DownloadTaskRecord[] {
+  try {
+    const raw = fs.readFileSync(taskTablePath(baseDir), 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is DownloadTaskRecord =>
+        !!e && typeof (e as DownloadTaskRecord).modelId === 'string'
+    );
+  } catch {
+    return []; // no table yet, or an unreadable one: nothing to resume
+  }
+}
+
+function writeDownloadTasks(records: DownloadTaskRecord[], baseDir?: string): void {
+  const file = taskTablePath(baseDir);
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    // Write-then-rename so a crash mid-write cannot leave a truncated table
+    // that would lose every in-flight download rather than one.
+    const tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(records), 'utf8');
+    fs.renameSync(tmp, file);
+  } catch {
+    /* an unwritable table degrades resume; it must not fail the download */
+  }
+}
+
+/** Record or update one model's task. */
+export function putDownloadTask(record: DownloadTaskRecord, baseDir?: string): void {
+  const rest = readDownloadTasks(baseDir).filter((e) => e.modelId !== record.modelId);
+  rest.push(record);
+  writeDownloadTasks(rest, baseDir);
+}
+
+/** Forget one model's task (it completed, failed for good, or was cancelled). */
+export function dropDownloadTask(modelId: string, baseDir?: string): void {
+  const rest = readDownloadTasks(baseDir).filter((e) => e.modelId !== modelId);
+  writeDownloadTasks(rest, baseDir);
+}
+
+// ---------------------------------------------------------------------------
+// OS notifications
+// ---------------------------------------------------------------------------
+
+interface ElectronNotification {
+  new (options: { title: string; body: string; silent?: boolean }): { show(): void };
+  isSupported(): boolean;
+}
+
+// Electron's Notification is a main-process API. The SDK also runs inside the
+// utility host, where `require('electron')` resolves but exposes no Notification,
+// so this is a no-op there rather than a crash — and plain Node has no electron
+// module at all.
+function electronNotification(): ElectronNotification | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const electron = require('electron') as { Notification?: ElectronNotification };
+    const ctor = electron?.Notification;
+    return ctor && typeof ctor.isSupported === 'function' && ctor.isSupported() ? ctor : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Post a desktop notification when the host can show one. */
+export function notify(title: string, body: string): void {
+  const Ctor = electronNotification();
+  if (!Ctor) return;
+  try {
+    new Ctor({ title, body, silent: true }).show();
+  } catch {
+    /* a notification that cannot be shown must not fail the download */
+  }
 }

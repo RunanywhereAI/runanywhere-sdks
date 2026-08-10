@@ -514,8 +514,21 @@ std::string build_followup_prompt(const ToolCallingSession& session, bool keep_t
 bool parse_tool_call_from_output(const ToolCallingSession& session, const std::string& llm_output,
                                  std::string* out_clean_text,
                                  runanywhere::v1::ToolCall* out_tool_call) {
+    // Strip a leading thinking block before the bare-Pythonic detector, which is
+    // anchored at the first non-space character (deliberately, so prose and
+    // markdown links can never look like a call). A reasoning model always emits
+    // its thinking first, so without this its perfectly-formed call is invisible
+    // and is returned to the user as the answer instead of being executed. Same
+    // reasoning, same fix, as the run-loop path.
+    std::string body = llm_output;
+    if (session.grammar_backend) {
+        std::string thinking;
+        rac::llm::tool_calling::split_display_text_and_thinking(llm_output, &body, &thinking,
+                                                                session.generation);
+    }
+
     runanywhere::v1::ToolParseRequest request;
-    request.set_text(llm_output);
+    request.set_text(body);
     auto* options = request.mutable_options();
     *options = build_options_snapshot(session);
     // Grammar backends emit bare `[name(args)]` (no format tag) — drop the format hint so
@@ -546,8 +559,13 @@ bool parse_tool_call_from_output(const ToolCallingSession& session, const std::s
     }
     rac_proto_buffer_free(&out);
 
+    // No call: the RAW output, unchanged, so the display split downstream still
+    // sees the thinking block. A call: the decision turn's pre-call text is
+    // superseded by the synthesis turn, so the parser's remainder is enough.
     if (out_clean_text) {
-        *out_clean_text = result.remaining_text();
+        *out_clean_text = (result.has_tool_call() && result.tool_calls_size() > 0)
+                              ? result.remaining_text()
+                              : llm_output;
     }
     if (result.has_tool_call() && result.tool_calls_size() > 0) {
         if (out_tool_call) {

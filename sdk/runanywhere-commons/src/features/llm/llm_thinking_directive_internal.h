@@ -49,8 +49,19 @@ inline bool engine_handles_disable_thinking_natively(const char* framework_name)
  */
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking,
-                                            const char* framework_name) {
+                                            const char* framework_name,
+                                            bool model_supports_thinking) {
     if (disable_thinking == RAC_FALSE) {
+        return prompt;
+    }
+    // A model that does not reason has nothing to suppress, and "/no_think" is
+    // a Qwen control token rather than a universal one: a model outside that
+    // family reads it as prompt text. Measured on LFM2.5-230M, which answers
+    // the injected directive with "\n\n" and stops, so a caller that merely
+    // asked not to see reasoning got a one-token empty reply. Swift never had
+    // this problem because its MLX runtime passes enable_thinking=false as
+    // chat-template context (MLX.swift:1371) instead of editing the prompt.
+    if (!model_supports_thinking) {
         return prompt;
     }
     if (engine_handles_disable_thinking_natively(framework_name)) {
@@ -66,9 +77,21 @@ inline std::string apply_no_think_directive(const std::string& prompt,
  * thinking natively — is harmlessly stripped, whereas a MISSING one on
  * llama.cpp/onnx would leave thinking on despite disable_thinking).
  */
+/**
+ * Framework known, model capability not. Assumes the model reasons, which keeps
+ * the pre-existing behaviour for call sites that cannot see the registry row.
+ */
+inline std::string apply_no_think_directive(const std::string& prompt,
+                                            rac_bool_t disable_thinking,
+                                            const char* framework_name) {
+    return apply_no_think_directive(prompt, disable_thinking, framework_name, true);
+}
+
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking) {
-    return apply_no_think_directive(prompt, disable_thinking, nullptr);
+    // Neither framework nor model identity in scope, so assume it reasons and
+    // keep the historical behaviour; the lifecycle paths pass the real flag.
+    return apply_no_think_directive(prompt, disable_thinking, nullptr, true);
 }
 
 }  // namespace rac::llm

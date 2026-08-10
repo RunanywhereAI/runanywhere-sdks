@@ -138,6 +138,8 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     const ra = new RunAnywhereMain({
       hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),
       nativePath: NATIVE_PATH,
+      // The host downloads and resolves, so it needs this app's catalog too.
+      catalogPath: path.join(__dirname, 'model-catalog.js'),
       // On a host crash the preload has already failed the in-flight calls;
       // re-fork + reconnect so the app recovers on the next action.
       onExit: (c) => {

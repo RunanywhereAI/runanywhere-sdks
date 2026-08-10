@@ -47,7 +47,8 @@ endif()
 # consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
 # a not-routable shell when the archive is absent (public repo builds clean),
 # and a routable LLM (GENERATE_TEXT) engine when -DRAC_BACKEND_QHEXRT=ON and the
-# archive is present on an Android build.
+# archive is present on a Snapdragon host build — Android arm64-v8a, or Windows
+# on ARM64 (Snapdragon X / X2 Elite), which runs the same v81 bundles.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/qhexrt/CMakeLists.txt")
     add_subdirectory(qhexrt)
 endif()

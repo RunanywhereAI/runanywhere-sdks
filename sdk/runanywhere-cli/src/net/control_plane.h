@@ -3,11 +3,11 @@
  * @brief Control-plane network wiring for rcli (auth, device, telemetry HTTP).
  *
  * rcli is the 6th consumer of runanywhere-commons and plays the same role the
- * Swift/Kotlin/Flutter/RN/Web bridges play for the control plane: it supplies
- * the platform-side callbacks (device info, persistent device id, HTTP POST)
- * and drives the canonical commons entry points
- * (rac_auth_* + rac_sdk_init_phase2_proto). All handshake sequencing, JSON
- * request building, and response parsing stay in commons.
+ * Swift/Kotlin/Flutter/RN/Web bridges play for the control plane. This module
+ * drives the canonical commons entry points (rac_auth_* +
+ * rac_sdk_init_phase2_proto); bootstrap.cpp installs platform callbacks through
+ * the ordinary device manager. All handshake sequencing, JSON request building,
+ * and response parsing stay in commons.
  *
  * Requires bootstrap() (rac_init + curl transport + rac_state) to have run.
  */
@@ -30,15 +30,6 @@ const std::string& device_model();
 
 /** Best-effort OS version string (kernel release); empty when unknown. */
 const std::string& os_version_string();
-
-/**
- * Install the CLI's rac_device_callbacks_t: device info gathered from the
- * desktop platform adapter, the rac_state persistent device id, an in-process
- * registration flag, and an HTTP POST that routes through the registered curl
- * transport (Bearer token attached when the request requires auth).
- * Idempotent; called from bootstrap().
- */
-void register_device_callbacks();
 
 /** One buffered control-plane HTTP exchange. */
 struct HttpResult {

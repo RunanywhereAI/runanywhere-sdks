@@ -34,7 +34,7 @@ setlocal enabledelayedexpansion
 ::   build-windows.bat --test             Build all + run tests
 ::
 :: Prerequisites:
-::   - CMake 3.22+
+::   - CMake 3.24+
 ::   - Visual Studio 2022 (or Build Tools) with C++ workload
 :: =============================================================================
 
@@ -129,7 +129,7 @@ echo [CHECK] Checking prerequisites...
 
 where cmake >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] cmake not found. Install CMake 3.22+ and add to PATH.
+    echo [ERROR] cmake not found. Install CMake %MIN_CMAKE_VERSION%+ and add to PATH.
     exit /b 1
 )
 for /f "tokens=3" %%v in ('cmake --version 2^>^&1 ^| findstr /i "version"') do (

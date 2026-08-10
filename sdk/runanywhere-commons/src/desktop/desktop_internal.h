@@ -33,6 +33,11 @@ std::string default_config_dir();
 /** XDG data directory on POSIX, LocalAppData on Windows (no trailing slash). */
 std::string default_data_dir();
 
+// --- rac_device_manager_desktop.cpp -----------------------------------------
+
+/** Install the desktop provider into the ordinary device manager. */
+rac_result_t install_device_manager_provider();
+
 }  // namespace rac::desktop
 
 #endif  // RAC_DESKTOP_INTERNAL_H

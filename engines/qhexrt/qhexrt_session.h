@@ -15,6 +15,7 @@
 #include "qhexrt_request_cancellation.h"
 
 #include <atomic>
+#include <cstddef>
 #include <mutex>
 #include <string>
 
@@ -53,6 +54,18 @@ Session* session_open(const char* manifest_path);
 
 // Free the session + model and release the process runtime. NULL-safe.
 void session_close(Session* s);
+
+// Copy the Hexagon architecture QNN itself reports ("v68".."v81") into `out`.
+// Brings the process runtime up if it is not already, then releases it.
+//
+// This is the only capability source on hosts with no SoC system property to
+// read (Windows on ARM64). Deliberately keyed on the arch string and NOT on the
+// SoC model: Windows-on-ARM reports socModel = QNN_SOC_MODEL_DYNAMIC_SDM
+// (INT_MAX), never a concrete id.
+//
+// Returns false when the runtime cannot come up (QNN libraries absent) or the
+// arch is empty; `out` is always NUL-terminated when out_size > 0.
+bool device_arch(char* out, size_t out_size);
 
 }  // namespace qhexrt_engine
 

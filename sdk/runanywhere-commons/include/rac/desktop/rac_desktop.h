@@ -83,10 +83,13 @@ RAC_API rac_result_t rac_desktop_adapter_init(const rac_desktop_adapter_config_t
  * Implements request_send (buffered), request_stream (chunk callback;
  * returning RAC_FALSE cancels with RAC_ERROR_CANCELLED) and request_resume
  * (Range: bytes=N-). Call once after rac_init(); replaces any previously
- * registered transport per the rac_http_transport_register contract.
+ * registered transport per the rac_http_transport_register contract. A
+ * successful registration also installs the desktop provider into the normal
+ * rac_device_manager callback surface, so hosts do not need a second device
+ * bootstrap API before phase 2.
  *
- * @return RAC_SUCCESS, or the error surfaced by rac_http_transport_register
- *         (e.g. curl global init failure).
+ * @return RAC_SUCCESS, or the error surfaced by HTTP transport or device
+ *         callback registration.
  */
 RAC_API rac_result_t rac_desktop_http_transport_register(void);
 
@@ -105,6 +108,15 @@ RAC_API rac_result_t rac_desktop_http_transport_register(void);
  *         RAC_ERROR_NOT_INITIALIZED when $HOME cannot be resolved.
  */
 RAC_API rac_result_t rac_desktop_default_base_dir(char* out_path, size_t path_size);
+
+/** "macos" / "linux" / "windows" — the X-Platform header and payload value. */
+RAC_API const char* rac_desktop_platform_name(void);
+
+/** Hardware model ("Mac16,8", "Windows PC", "Linux x86_64"); never NULL. */
+RAC_API const char* rac_desktop_device_model(void);
+
+/** OS version (kernel release, capped at the backend's 20-char column); "" when unknown. */
+RAC_API const char* rac_desktop_os_version(void);
 
 #ifdef __cplusplus
 }

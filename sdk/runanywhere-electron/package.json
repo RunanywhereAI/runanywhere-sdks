@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.1.0",
-  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
+  "description": "RunAnywhere Electron SDK \u2014 on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "commonjs",
@@ -36,8 +36,9 @@
     "README.md"
   ],
   "os": [
-    "win32",
-    "linux"
+    "darwin",
+    "linux",
+    "win32"
   ],
   "cpu": [
     "x64",
@@ -52,11 +53,13 @@
     "pretest": "tsc -p tsconfig.json",
     "test": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
-    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
-    "prepack": "npm run build && npm run bundle:native"
+    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\" \"test/feature/**/*.test.js\"",
+    "prepack": "npm run build && npm run bundle:native",
+    "test:feature": "node --test \"test/feature/**/*.test.js\""
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.1"
+    "@bufbuild/protobuf": "^2.12.1",
+    "@runanywhere/proto-ts": "file:../shared/proto-ts"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

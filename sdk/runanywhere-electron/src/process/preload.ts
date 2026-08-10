@@ -1,39 +1,17 @@
 // preload.ts — runs in the RENDERER's isolated preload context. Receives the
 // MessagePort brokered by RunAnywhereMain, speaks the RPC protocol to the utility
 // host, and exposes a safe `window.runanywhere` API via contextBridge (no direct
-// port access leaks into the page). Streaming methods take a callback that
-// contextBridge proxies back to the page. Runs with sandbox:false (it requires
-// SDK modules); a local event bus mirrors the facade's lifecycle/telemetry events
-// so a renderer can subscribe without the Node facade.
+// port access leaks into the page). Runs with sandbox:false (it requires SDK
+// modules). What it publishes is the v3 facade built over `RpcBackend`, plus the
+// renderer-side DSP helpers and the app's staged catalog; SDK lifecycle events
+// reach the page through `runanywhere.models`/`llm` streams rather than a second
+// event bus.
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { jsonSchemaToGrammar } from '../grammar';
-import { splitThinking } from '../thinking';
-import { speakableText } from '../speech';
-import { formatChat } from '../chat-template';
-import type { ChatTemplate, ChatTurn, FormatOptions } from '../chat-template';
 import { downsample, pcm16Bytes, rms } from '../audio';
-import {
-  RAGConfiguration,
-  RAGDocument,
-  RAGQueryOptions,
-  RAGResult,
-  RAGStatistics,
-} from '../proto/rag';
-import { SDKEnvironment } from '../proto/model_types';
-import {
-  SdkInitPhase1Request,
-  SdkInitPhase2Request,
-} from '../proto/sdk_init';
-import { createRagSessionFromCatalog } from '../rag';
-import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
-import type { JsonSchema } from '../grammar';
-import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
-import type { ToolSpec } from '../structured';
-import { toAsyncIterable, streamWithMetrics } from '../stream';
-import type { LLMStreamEvent } from '../stream';
-import { bus } from '../events';
-import type { EventListener, Modality } from '../events';
+import { createRunAnywhere } from '../api/facade';
+import { Environment } from '../api/types';
+import { RpcBackend } from '../api/rpc-backend';
 import { catalogEntries } from '../catalog';
 import { SDKException, asSDKException } from '../errors';
 import type { RpcMessage } from './rpc';
@@ -41,7 +19,7 @@ import type { RpcMessage } from './rpc';
 type Pending = {
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
-  onToken?: (t: unknown) => void;
+  onToken?: (t: unknown) => unknown;
 };
 
 let port: MessagePort | null = null;
@@ -84,6 +62,22 @@ ipcRenderer.on('runanywhere-port', (event) => {
       p.onToken?.(m.token);
       return;
     }
+    // A duplex call: the host is parked inside native code until this answers,
+    // so both outcomes have to post something back.
+    if ('call' in m) {
+      const { seq, event } = m.call;
+      Promise.resolve(p.onToken?.(event))
+        .then((result) => port?.postMessage({ id: m.id, seq, ok: true, result }))
+        .catch((e: unknown) =>
+          port?.postMessage({
+            id: m.id,
+            seq,
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          })
+        );
+      return;
+    }
     pending.delete(m.id);
     if ('done' in m) p.resolve((m as { result?: unknown }).result);
     else if (m.ok) p.resolve(m.result);
@@ -101,8 +95,10 @@ ipcRenderer.on('runanywhere-port', (event) => {
       pending.set(id, { resolve: () => resolve(), reject });
       port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
     })
-      .then(() => runControlPlane(cp)) // re-run auth + telemetry on the fresh host
-      .then(() => bus.emit({ type: 'initialized' }))
+      // The fresh host has no tokens, so re-run the HTTP setup on it. The v3
+      // facade is already `ready`, which is why this is a retry rather than a
+      // second initialize.
+      .then(() => (cp ? v3.auth.retry().then(() => undefined) : undefined))
       .catch(() => { /* surfaced by the caller's next request */ })
       .finally(() => markReady());
     return;
@@ -122,7 +118,7 @@ ipcRenderer.on('runanywhere-host-exited', (_e, code?: number) => {
   );
 });
 
-function send(method: string, args: unknown[], onToken?: (t: unknown) => void): Promise<unknown> {
+function send(method: string, args: unknown[], onToken?: (t: unknown) => unknown): Promise<unknown> {
   return ready.then(
     () =>
       new Promise((resolve, reject) => {
@@ -133,99 +129,68 @@ function send(method: string, args: unknown[], onToken?: (t: unknown) => void): 
   );
 }
 
-// Emit a lifecycle event after `p` resolves (fire-and-forget), then pass through.
-function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
-  return p.then((v) => {
-    event();
-    return v;
-  });
-}
-
 /** Control-plane credentials for {@link initialize}. */
 type ControlPlaneOptions = { apiKey?: string; baseUrl?: string; environment?: string };
 
-/** The host OS as the backend's platform enum (macos/linux/windows) — the binding
- * ("electron") is reported separately as sdk_binding. */
-function osPlatform(): string {
-  if (process.platform === 'darwin') return 'macos';
-  if (process.platform === 'win32') return 'windows';
-  return 'linux';
-}
-
-/** Run the desktop two-phase init (telemetry + auth) over the host's v3 RPCs.
- * Best-effort: HTTP/auth failures are non-fatal and never block local inference. */
-async function runControlPlane(cp?: ControlPlaneOptions): Promise<void> {
-  if (!cp) return;
-  const apiKey = (cp.apiKey ?? '').trim();
-  let baseUrl = (cp.baseUrl ?? '').trim();
-  if (!apiKey && !baseUrl) return;
-  const isProd = (cp.environment ?? 'production') === 'production';
-  try {
-    const has = (await send('v3.hasControlPlane', [])) as boolean;
-    if (!has) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'RunAnywhere.initialize: apiKey/baseUrl supplied but this build has no desktop ' +
-          'control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry'
-      );
-      return;
-    }
-    if (!baseUrl && !isProd) baseUrl = (await send('v3.devStagingBaseUrl', [])) as string;
-    if (!baseUrl || (isProd && !apiKey)) return;
-    const deviceId = (await send('v3.devicePersistentId', [])) as string;
-    const version = (await send('version', [])) as string;
-    const platform = osPlatform();
-    const protoEnv = isProd
-      ? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-      : SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    const phase1Bytes = SdkInitPhase1Request.encode({
-      environment: protoEnv,
-      apiKey,
-      baseUrl,
-      deviceId,
-      platform,
-      sdkVersion: version,
-    }).finish();
-    const phase2Bytes = SdkInitPhase2Request.encode({
-      buildToken: '',
-    }).finish();
-    await send('v3.configureControlPlane', [
-      {
-        environment: isProd ? 2 : 0,
-        apiKey,
-        baseUrl,
-        deviceId,
-        platform,
-        sdkVersion: version,
-        sdkBinding: 'electron',
-        appIdentifier: 'ai.runanywhere.electron',
-        appName: 'RunAnywhere Electron',
-        appVersion: version,
-        phase1Bytes,
-        phase2Bytes,
-      },
-    ]);
-  } catch {
-    // telemetry/auth failure must not block local inference
-  }
-}
+// The v3 surface, built over the same utility host the verbs below talk to.
+// `RpcBackend` forwards each call as `v3.<op>`, so the renderer gets the exact
+// namespaces the main process has without a second implementation. Everything
+// it returns is contextBridge-safe (see iter.ts's bridgeStream).
+const v3 = createRunAnywhere(new RpcBackend((method, args, onChunk) => send(method, args, onChunk)));
 
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
+
+  // ---- v3 namespaces ----
+  // The same fourteen the main process gets, from the same `createRunAnywhere`,
+  // so page code and Node code are written once against one shape.
+  llm: v3.llm,
+  vlm: v3.vlm,
+  stt: v3.stt,
+  tts: v3.tts,
+  vad: v3.vad,
+  embeddings: v3.embeddings,
+  rerank: v3.rerank,
+  images: v3.images,
+  diarization: v3.diarization,
+  segmentation: v3.segmentation,
+  voice: v3.voice,
+  rag: v3.rag,
+  models: v3.models,
+  lora: v3.lora,
+  // Electron platform extras.
+  secure: v3.secure,
+  auth: v3.auth,
+  telemetry: v3.telemetry,
+  // Input constructors: a renderer cannot `require` the package, so carrying
+  // these is what lets page code build the same AudioInput / ImageInput /
+  // RagDocument values main-process code builds.
+  audio: v3.audio,
+  image: v3.image,
+  ragDocument: v3.ragDocument,
+
+  capabilities: () => v3.capabilities(),
+  reset: () => v3.reset(),
+  // A function rather than the facade's `version` getter: contextBridge clones
+  // what it publishes, and a getter would be read once at expose time — before
+  // initialize() has anything to report.
   version: () => send('version', []),
   initialize: (secureDir?: string, baseDir?: string, controlPlane?: ControlPlaneOptions) =>
-    emitAfter(
-      // Base bring-up first, then the desktop control plane (auth + telemetry).
-      send('initialize', [secureDir, baseDir]).then(() => runControlPlane(controlPlane)),
-      () => {
+    v3
+      .initialize({
+        secureDir,
+        baseDir,
+        apiKey: controlPlane?.apiKey,
+        baseUrl: controlPlane?.baseUrl,
+        environment:
+          (controlPlane?.environment ?? 'production') === 'production'
+            ? Environment.PRODUCTION
+            : Environment.DEVELOPMENT,
+      })
+      .then(() => {
         // Remembered so a re-forked host is initialised automatically (see above).
         initArgs = { secureDir, baseDir, cp: controlPlane };
-        bus.emit({ type: 'initialized' });
-      }
-    ),
-
-  // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
-  onEvent: (listener: EventListener) => bus.on(listener),
+      }),
 
   // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
   // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
@@ -234,198 +199,11 @@ contextBridge.exposeInMainWorld('runanywhere', {
   pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
   rms: (samples: Float32Array) => rms(samples),
 
-  // ---- reasoning ----
-  // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
-  splitThinking: (text: string) => splitThinking(text),
-  // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
-  speakableText: (text: string) => speakableText(text),
-  // Render a conversation in the markup the model was trained on. Without this a
-  // multi-turn chat collapses into a single user turn and the model "forgets".
-  formatChat: (turns: ChatTurn[], template?: ChatTemplate, opts?: FormatOptions) => formatChat(turns, template, opts),
-
-  // ---- model catalog + storage ----
+  // The app's own staged table, read back for the display metadata commons has
+  // no field for: a friendly label, a licence link, a parameter count, and the
+  // "heavy" warning. Everything about a model's STATE — downloaded, size on
+  // disk, resident — comes from `models` above.
   catalog: () => catalogEntries(),
-  // modelStatus/exists run their fs work in the utility host (off the renderer
-  // thread), so both are async RPCs.
-  modelStatus: () => send('modelStatus', []),
-  exists: (p: string) => send('exists', [p]),
-  // Download a catalog model (runs in the utility host so the renderer stays
-  // responsive); onProgress receives { file, received, total, percent }.
-  downloadModel: (idOrPath: string, onProgress?: (p: unknown) => void) =>
-    send('downloadModel', [idOrPath], onProgress),
-
-  loadLLM: (modelPath: string) =>
-    emitAfter(send('loadModel', [modelPath]), () => bus.emit({ type: 'modelLoaded', modality: 'llm', id: modelPath })),
-  generate: (
-    handle: number,
-    prompt: string,
-    optionsOrOnToken: Record<string, unknown> | ((t: string) => void),
-    onToken?: (t: string) => void
-  ) =>
-    typeof optionsOrOnToken === 'function'
-      ? send('generate', [handle, prompt], optionsOrOnToken as (t: unknown) => void)
-      : send('generate', [handle, prompt, optionsOrOnToken], onToken as (t: unknown) => void),
-  // Stream generation as events with metrics (token per event; final event
-  // carries the aggregated result and fires a 'generation' telemetry event).
-  generateStream: async (
-    handle: number,
-    prompt: string,
-    options: Record<string, unknown>,
-    onEvent: (e: LLMStreamEvent) => void
-  ): Promise<void> => {
-    const source = toAsyncIterable((onToken) =>
-      send('generate', [handle, prompt, options], onToken as (t: unknown) => void) as Promise<void>
-    );
-    for await (const event of streamWithMetrics(source)) {
-      if (event.isFinal && event.result) bus.emit({ type: 'generation', result: event.result });
-      onEvent(event);
-    }
-  },
-  generateStructured: async (
-    handle: number,
-    prompt: string,
-    schema: JsonSchema,
-    options: Record<string, unknown> = {}
-  ): Promise<unknown> => {
-    const grammar = jsonSchemaToGrammar(schema);
-    let out = '';
-    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
-      out += t as string;
-    });
-    return parseStructured(out, 'generateStructured');
-  },
-  /** @deprecated Use generateStructured. */
-  generateObject: async (
-    handle: number,
-    prompt: string,
-    schema: JsonSchema,
-    options: Record<string, unknown> = {}
-  ): Promise<unknown> => {
-    const grammar = jsonSchemaToGrammar(schema);
-    let out = '';
-    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
-      out += t as string;
-    });
-    return parseStructured(out, 'generateStructured');
-  },
-  generateToolCall: async (
-    handle: number,
-    prompt: string,
-    tools: ToolSpec[],
-    options: Record<string, unknown> = {}
-  ): Promise<unknown> => {
-    if (!tools || !tools.length) {
-      throw SDKException.validationFailed({
-        fieldPath: 'tools',
-        message: 'at least one tool is required',
-      });
-    }
-    const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
-    let out = '';
-    await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
-      out += t as string;
-    });
-    return parseStructured(out, 'generateToolCall');
-  },
-  unloadLLM: (handle: number) =>
-    emitAfter(send('unloadModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'llm' })),
-
-  loadVLM: (modelPath: string, mmprojPath: string) =>
-    emitAfter(send('loadVlmModel', [modelPath, mmprojPath]), () => bus.emit({ type: 'modelLoaded', modality: 'vlm', id: modelPath })),
-  generateVlm: (handle: number, imagePath: string, prompt: string, onToken: (t: string) => void) =>
-    send('generateVlm', [handle, imagePath, prompt], onToken as (t: unknown) => void),
-  unloadVLM: (handle: number) =>
-    emitAfter(send('unloadVlmModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'vlm' })),
-
-  loadEmbedder: (modelPath: string) =>
-    emitAfter(send('loadEmbeddingModel', [modelPath]), () => bus.emit({ type: 'modelLoaded', modality: 'embedder', id: modelPath })),
-  embed: (handle: number, text: string) => send('embed', [handle, text]),
-  unloadEmbedder: (handle: number) =>
-    emitAfter(send('unloadEmbeddingModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'embedder' })),
-
-  loadSTT: (modelDir: string) =>
-    emitAfter(send('loadSttModel', [modelDir]), () => bus.emit({ type: 'modelLoaded', modality: 'stt', id: modelDir })),
-  transcribe: (handle: number, pcm16: Uint8Array) => send('transcribe', [handle, pcm16]),
-  unloadSTT: (handle: number) =>
-    emitAfter(send('unloadSttModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'stt' })),
-
-  loadTTS: (voiceDir: string) =>
-    emitAfter(send('loadTtsVoice', [voiceDir]), () => bus.emit({ type: 'modelLoaded', modality: 'tts', id: voiceDir })),
-  synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
-  unloadTTS: (handle: number) =>
-    emitAfter(send('unloadTtsVoice', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'tts' as Modality })),
-
-  // Register a downloaded model (id -> local path) in commons' global registry so
-  // RAG can resolve embedding/LLM ids. Prefer ragCreateSessionFromCatalog from
-  // apps — it owns category/framework selection. Low-level escape hatch only.
-  registerModel: (id: string, localPath: string, category?: number, framework?: number) =>
-    send('registerModel', [id, localPath, category, framework]),
-
-  // ---- RAG (retrieval-augmented generation) ----
-  // Object-in / object-out: we encode the runanywhere.v1 proto messages here and
-  // pass raw bytes over the RPC; commons returns serialized RAGResult/RAGStatistics
-  // which we decode back. The addon (utility host) is a generic proto-byte pass-through.
-  ragCreateSession: (config: RagConfig): Promise<number> =>
-    send('ragCreateSession', [RAGConfiguration.encode(RAGConfiguration.fromPartial(config)).finish()]) as Promise<number>,
-  // Download catalog models, register them, and open a session — single entry
-  // point for apps (no raw registry enum ints / multi-step bootstrap in the UI).
-  ragCreateSessionFromCatalog: (config: RagConfig): Promise<number> =>
-    createRagSessionFromCatalog(
-      {
-        downloadModel: (idOrPath) =>
-          send('downloadModel', [idOrPath]) as Promise<{ id: string; primary: string }>,
-        registerModel: (id, localPath, category, framework) =>
-          send('registerModel', [id, localPath, category, framework]),
-        ragCreateSession: (cfg) =>
-          send('ragCreateSession', [
-            RAGConfiguration.encode(RAGConfiguration.fromPartial(cfg)).finish(),
-          ]) as Promise<number>,
-      },
-      config,
-    ),
-  ragIngest: async (handle: number, doc: RagDoc): Promise<RagStats> => {
-    const bytes = RAGDocument.encode(RAGDocument.fromPartial(doc)).finish();
-    // send() already resolves a Uint8Array (a Buffer degrades to one across the
-    // MessagePort) and decode() accepts it directly — no re-wrap/copy needed.
-    return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
-  },
-  ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
-    const bytes = RAGQueryOptions.encode(
-      RAGQueryOptions.fromPartial({
-        query: query.query,
-        generation: query.generation,
-        retrieval: {
-          topK: query.retrievalTopK,
-          scoreThreshold: query.scoreThreshold,
-        },
-      })
-    ).finish();
-    const raw = RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array);
-    // RAGResult dropped total_time_ms (deleted from idl/rag.proto); derive it —
-    // retrieval + generation is the whole of what the pipeline measures per-call.
-    return {
-      ...raw,
-      totalTimeMs: raw.retrievalTimeMs + raw.generationTimeMs,
-    } as RagResult;
-  },
-  ragStats: async (handle: number): Promise<RagStats> =>
-    RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,
-  ragClear: async (handle: number): Promise<RagStats> =>
-    RAGStatistics.decode((await send('ragClear', [handle])) as Uint8Array) as RagStats,
-  ragDestroySession: (handle: number): Promise<void> => send('ragDestroySession', [handle]) as Promise<void>,
-
-  secureSet: (key: string, value: string) => send('secureSet', [key, value]),
-  secureGet: (key: string) => send('secureGet', [key]),
-  secureDelete: (key: string) => send('secureDelete', [key]),
-
-  createVad: (threshold?: number) => send('createVad', [threshold]),
-  vadProcess: (handle: number, samples: Float32Array) => send('vadProcess', [handle, samples]),
-  vadIsActive: (handle: number) => send('vadIsActive', [handle]),
-  vadSetThreshold: (handle: number, threshold: number) => send('vadSetThreshold', [handle, threshold]),
-  vadReset: (handle: number) => send('vadReset', [handle]),
-  unloadVad: (handle: number) => send('unloadVad', [handle]),
-
-  shutdown: () => send('shutdown', []),
 });
 
 // Test-only hook (kept off the SDK surface) so the example app can signal the
