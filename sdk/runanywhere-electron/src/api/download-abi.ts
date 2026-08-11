@@ -41,10 +41,14 @@ export function isTerminalState(state: DownloadState): boolean {
  * Canonical 0..100 via `rac_download_progress_percent` (overall preferred when
  * finite and in [0,1]; else bytes ratio; else 0). Never re-derive locally.
  */
-export function percentOf(
+export async function percentOf(
   progress: DownloadProgress,
-  percentFn: (overall: number, downloaded: number, total: number) => number,
-): number {
+  percentFn: (
+    overall: number,
+    downloaded: number,
+    total: number,
+  ) => number | Promise<number>,
+): Promise<number> {
   return percentFn(
     progress.overallProgress,
     Number(progress.bytesDownloaded),
@@ -56,8 +60,8 @@ export function percentOf(
 export class DownloadAbi {
   constructor(private readonly backend: RaBackend) {}
 
-  /** Sync percent helper bound to this backend's commons ABI. */
-  percent(progress: DownloadProgress): number {
+  /** Percent helper bound to this backend's commons ABI (sync or RPC). */
+  percent(progress: DownloadProgress): Promise<number> {
     return percentOf(progress, (o, d, t) => this.backend.downloadProgressPercent(o, d, t));
   }
 

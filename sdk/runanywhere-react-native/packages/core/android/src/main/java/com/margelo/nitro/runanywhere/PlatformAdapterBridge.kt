@@ -427,6 +427,43 @@ object PlatformAdapterBridge {
     }
 
     /**
+     * SoC manufacturer (API 31+), empty when unavailable.
+     * Matches Kotlin `CppBridgeHardware.defaultGpuFamily` inputs.
+     */
+    @JvmStatic
+    fun getSocManufacturer(): String {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            try {
+                val value = android.os.Build.SOC_MANUFACTURER
+                if (!value.isNullOrBlank() && !value.equals("unknown", ignoreCase = true)) {
+                    return value
+                }
+            } catch (_: Exception) {
+                // Fall through
+            }
+        }
+        return ""
+    }
+
+    /**
+     * SoC model (API 31+), empty when unavailable.
+     */
+    @JvmStatic
+    fun getSocModel(): String {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            try {
+                val value = android.os.Build.SOC_MODEL
+                if (!value.isNullOrBlank() && !value.equals("unknown", ignoreCase = true)) {
+                    return value
+                }
+            } catch (_: Exception) {
+                // Fall through
+            }
+        }
+        return ""
+    }
+
+    /**
      * Get total memory in bytes
      */
     @JvmStatic

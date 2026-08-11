@@ -248,14 +248,14 @@ export interface RaBackend {
   downloadCleanup(): Promise<number>;
   /**
    * Sync `rac_download_progress_percent`. NativeBackend calls the C ABI;
-   * RpcBackend prefers overall_progress when valid and never invents a
-   * bytes-first percent (renderer has no sync commons FFI).
+   * RpcBackend forwards to the utility host (Promise) so bytes-ratio policy
+   * is never re-derived in the renderer.
    */
   downloadProgressPercent(
     overallProgress: number,
     bytesDownloaded: number,
     totalBytes: number,
-  ): number;
+  ): number | Promise<number>;
   downloadWatch(onProgress: (progressBytes: Uint8Array) => void): Promise<void>;
   downloadUnwatch(): Promise<void>;
 
@@ -501,6 +501,7 @@ export const BACKEND_METHODS: readonly string[] = [
   'downloadCancel',
   'downloadProgress',
   'downloadCleanup',
+  'downloadProgressPercent',
   'downloadWatch',
   'downloadUnwatch',
   'storageInfoProto',

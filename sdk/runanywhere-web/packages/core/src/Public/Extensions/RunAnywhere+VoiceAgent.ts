@@ -870,7 +870,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         return {
           isSpeech: result.isSpeech,
           probability: result.probability,
-          durationMs: result.durationMs || durationMs,
+          // Commons owns VADResult.duration_ms; coalesce absent to display 0.
+          durationMs: result.durationMs || 0,
           noiseFloorDb: amplitudeToDb(result.energy),
         };
       } catch (error) {

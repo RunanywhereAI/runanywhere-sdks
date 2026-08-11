@@ -82,7 +82,10 @@ interface LoRA {
                         RALoRAAdapterConfig(
                             adapter_path = adapterPath,
                             adapter_id = entry.id,
-                            scale = scale ?: entry.default_scale?.takeIf { it > 0f } ?: 1f,
+                            // Leave unset when caller omits scale so commons
+                            // resolve_effective_lora_scale owns catalog/1.0 fallback
+                            // (including honoring explicit catalog 0.0).
+                            scale = scale,
                         ),
                     ),
                 // Wire polarity was inverted (LoraApplyRequest.replace_existing ->

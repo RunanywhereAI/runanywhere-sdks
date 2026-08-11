@@ -74,7 +74,7 @@ class LoraViewModel : ViewModel() {
         }
     }
 
-    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale?.takeIf { it > 0f } ?: 1f) {
+    fun apply(entry: LoraAdapterCatalogEntry, scale: Float? = null) {
         val path = adapterLocalPath(entry)
         if (path.isNullOrBlank()) {
             state = state.copy(error = "Adapter not downloaded yet")
@@ -83,6 +83,8 @@ class LoraViewModel : ViewModel() {
         viewModelScope.launch {
             state = state.copy(busyId = entry.id, error = null)
             try {
+                // Pass unset through so commons resolve_effective_lora_scale owns
+                // catalog/1.0 fallback (including honoring explicit catalog 0.0).
                 RunAnywhere.lora.apply(entry.id, scale)
                 GlobalState.lora.set(entry.id)
                 state = state.copy(busyId = null, activeId = entry.id)

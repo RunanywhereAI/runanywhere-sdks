@@ -9,6 +9,8 @@
     public static java.lang.String getDeviceModel();
     public static java.lang.String getOSVersion();
     public static java.lang.String getChipName();
+    public static java.lang.String getSocManufacturer();
+    public static java.lang.String getSocModel();
     public static long getTotalMemory();
     public static long getAvailableMemory();
     public static int getCoreCount();

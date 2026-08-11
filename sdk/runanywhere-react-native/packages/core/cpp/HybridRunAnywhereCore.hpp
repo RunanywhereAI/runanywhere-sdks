@@ -157,6 +157,8 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   downloadProgressPollProto(
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  double downloadProgressPercent(double overallProgress, double bytesDownloaded,
+                                 double totalBytes) override;
   std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
           &onProgressBytes) override;

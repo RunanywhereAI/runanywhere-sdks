@@ -55,6 +55,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("downloadCancelProto", &HybridRunAnywhereCoreSpec::downloadCancelProto);
       prototype.registerHybridMethod("downloadResumeProto", &HybridRunAnywhereCoreSpec::downloadResumeProto);
       prototype.registerHybridMethod("downloadProgressPollProto", &HybridRunAnywhereCoreSpec::downloadProgressPollProto);
+      prototype.registerHybridMethod("downloadProgressPercent", &HybridRunAnywhereCoreSpec::downloadProgressPercent);
       prototype.registerHybridMethod("setDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::setDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::clearDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearCache", &HybridRunAnywhereCoreSpec::clearCache);

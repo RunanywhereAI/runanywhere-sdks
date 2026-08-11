@@ -181,10 +181,11 @@ public extension RunAnywhere {
         } else if !thinkingResponse.isEmpty {
             result.thinkingContent = thinkingResponse
         }
-        result.usage.inputTokens = final.map { $0.usage.inputTokens } ?? Int32(max(1, prompt.count / 4))
-        result.usage.outputTokens = final.map { $0.usage.outputTokens } ?? Int32(stream.tokenCount)
-        result.responseTokens = final.map { $0.usage.outputTokens } ?? Int32(stream.tokenCount)
-        result.usage.totalTokens = final.map { $0.usage.totalTokens }
+        // TokenUsage / engine counts only — never invent chars/4 input estimates.
+        result.usage.inputTokens = final?.usage.inputTokens ?? 0
+        result.usage.outputTokens = final?.usage.outputTokens ?? Int32(stream.tokenCount)
+        result.responseTokens = final?.usage.outputTokens ?? Int32(stream.tokenCount)
+        result.usage.totalTokens = final?.usage.totalTokens
             ?? (result.usage.inputTokens + result.usage.outputTokens)
         result.modelUsed = modelID
         // totalTimeMs was deleted outright; generationTimeMs (already a

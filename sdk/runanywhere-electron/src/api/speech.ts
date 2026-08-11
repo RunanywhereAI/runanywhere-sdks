@@ -229,7 +229,7 @@ export interface SttNamespace {
 }
 
 /** Shape an `STTOutput` into the public grammar. */
-function buildTranscription(native: STTOutput, durationMs: number): Transcription {
+function buildTranscription(native: STTOutput): Transcription {
   return {
     text: native.text,
     language: native.language,
@@ -242,9 +242,8 @@ function buildTranscription(native: STTOutput, durationMs: number): Transcriptio
         confidence: w.confidence,
       })
     ),
-    // Commons measures the audio it actually decoded; the caller's byte count
-    // is the fallback for a backend that reports none.
-    durationMs: native.durationMs || durationMs,
+    // Commons owns STTOutput.duration_ms; coalesce absent/0 to display 0.
+    durationMs: native.durationMs || 0,
   };
 }
 
@@ -322,7 +321,7 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
             type: 'transcriptFinal',
             requestId,
             sequence,
-            segment: buildTranscription(event.finalOutput, durationMsOf(merged.length)),
+            segment: buildTranscription(event.finalOutput),
           });
         } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
           if (event.error) throw SDKException.fromProto(event.error);
@@ -339,8 +338,7 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
           requestId,
           sequence,
           segment: buildTranscription(
-            await stt.transcribe(toSttRequest(pcm, options, requestId)),
-            durationMsOf(merged.length)
+            await stt.transcribe(toSttRequest(pcm, options, requestId))
           ),
         });
       }
@@ -417,10 +415,7 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
     }
     await requireLifecycle(deps, ModelCategory.SPEECH_TO_TEXT);
     const pcm = toPcm16At16k(input);
-    return buildTranscription(
-      await stt.transcribe(toSttRequest(pcm, options)),
-      durationMsOf(pcm.byteLength / 2)
-    );
+    return buildTranscription(await stt.transcribe(toSttRequest(pcm, options)));
   }
 
   async function openStream(format: AudioFormatSpec, options: SttOptions = {}): Promise<SttStream> {
@@ -587,7 +582,8 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
       data: samples,
       sampleRate: native.sampleRate,
       format: audioFormatFromOrdinal(native.audioFormat),
-      durationMs: native.durationMs || durationMsOf(samples.length, native.sampleRate),
+      // Commons owns TTSOutput.duration_ms; coalesce absent to display 0.
+      durationMs: native.durationMs || 0,
     };
   }
 

@@ -163,6 +163,15 @@ HybridRunAnywhereCore::downloadProgressPollProto(const std::shared_ptr<ArrayBuff
     });
 }
 
+double HybridRunAnywhereCore::downloadProgressPercent(double overallProgress,
+                                                      double bytesDownloaded,
+                                                      double totalBytes) {
+    return static_cast<double>(rac_download_progress_percent(
+        static_cast<float>(overallProgress),
+        static_cast<int64_t>(bytesDownloaded),
+        static_cast<int64_t>(totalBytes)));
+}
+
 std::shared_ptr<Promise<bool>>
 HybridRunAnywhereCore::setDownloadProgressCallbackProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onProgressBytes) {

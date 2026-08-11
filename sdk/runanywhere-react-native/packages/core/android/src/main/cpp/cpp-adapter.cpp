@@ -28,6 +28,8 @@ jmethodID g_isLowPowerModeMethod = nullptr;
 jmethodID g_hasNPUMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
+jmethodID g_getSocManufacturerMethod = nullptr;
+jmethodID g_getSocModelMethod = nullptr;
 jmethodID g_getTotalMemoryMethod = nullptr;
 jmethodID g_getAvailableMemoryMethod = nullptr;
 jmethodID g_getCoreCountMethod = nullptr;
@@ -75,6 +77,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_hasNPUMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "hasNPU", "()Z");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
+      g_getSocManufacturerMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getSocManufacturer", "()Ljava/lang/String;");
+      g_getSocModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getSocModel", "()Ljava/lang/String;");
       g_getTotalMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getTotalMemory", "()J");
       g_getAvailableMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAvailableMemory", "()J");
       g_getCoreCountMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getCoreCount", "()I");
@@ -102,6 +106,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
           g_getDeviceNameMethod && g_getBatteryLevelMethod &&
           g_getBatteryStateMethod && g_isLowPowerModeMethod && g_hasNPUMethod &&
           g_getOSVersionMethod && g_getChipNameMethod &&
+          g_getSocManufacturerMethod && g_getSocModelMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod &&
           g_getCoreCountMethod && g_getArchitectureMethod &&
           g_getGPUFamilyMethod && g_isTabletMethod &&

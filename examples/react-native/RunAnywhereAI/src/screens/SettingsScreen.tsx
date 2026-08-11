@@ -906,13 +906,15 @@ export const SettingsScreen: React.FC = () => {
         while (!dlResult.done) {
           const event = dlResult.value;
           if (event.type === 'progress') {
-            console.warn(
-              `[Settings] Download progress for ${model.id}: ${event.percent.toFixed(1)}%`
-            );
-            setDownloadingModels((prev) => ({
-              ...prev,
-              [model.id]: event.percent / 100,
-            }));
+            if (typeof event.percent === 'number') {
+              console.warn(
+                `[Settings] Download progress for ${model.id}: ${event.percent.toFixed(1)}%`
+              );
+              setDownloadingModels((prev) => ({
+                ...prev,
+                [model.id]: event.percent! / 100,
+              }));
+            }
           }
           dlResult = await dlIter.next();
         }

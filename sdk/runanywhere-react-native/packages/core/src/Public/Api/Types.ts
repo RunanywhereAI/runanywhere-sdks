@@ -688,7 +688,7 @@ export type ImageEvent =
 /** Byte progress, optional extraction, then a terminal `completed`/`failed`/`cancelled`. */
 export type DownloadEvent =
   | { type: 'started'; operationId: string; sequence: number }
-  | { type: 'progress'; operationId: string; sequence: number; bytesDone: number; bytesTotal: number; percent: number; file?: string }
+  | { type: 'progress'; operationId: string; sequence: number; bytesDone: number; bytesTotal: number; percent?: number; file?: string }
   | { type: 'verifying'; operationId: string; sequence: number }
   | { type: 'extracting'; operationId: string; sequence: number; percent?: number }
   | { type: 'completed'; operationId: string; sequence: number; model: ModelInfo }

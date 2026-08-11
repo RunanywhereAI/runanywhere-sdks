@@ -131,7 +131,9 @@ private fun LoraRow(
 ) {
     val dimens = LocalDimens.current
     var scale by rememberSaveable(entry.id) {
-        mutableFloatStateOf(entry.default_scale?.takeIf { it > 0f } ?: 1f)
+        // Slider needs a visible start; explicit Apply still sends the chosen value.
+        // Do not coerce catalog 0.0 away — only fill when the catalog omits a default.
+        mutableFloatStateOf(entry.default_scale ?: 1f)
     }
     Box(
         modifier = Modifier

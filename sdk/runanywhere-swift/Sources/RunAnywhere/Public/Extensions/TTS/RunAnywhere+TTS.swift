@@ -23,7 +23,32 @@ public extension RunAnywhere {
         _ text: String,
         options: RATTSOptions = .defaults()
     ) -> AsyncStream<RATTSOutput> {
-        tts.synthesizeStream(text, options: options)
+        // Keep the legacy RATTSOptions / AsyncStream<RATTSOutput> surface.
+        // `tts.synthesizeStream` is the v3 API (`TtsOptions` →
+        // `AsyncThrowingStream<AudioChunk, Error>`); do not forward into it.
+        AsyncStream { continuation in
+            let task = Task {
+                do {
+                    let snapshot = try requireTTSVoice()
+                    try await ensureServicesReady()
+                    var request = RATTSSynthesisRequest()
+                    request.text = text
+                    request.options = options
+                    let outputs = try await CppBridge.TTS.shared.synthesizeSessionStream(
+                        request,
+                        loadedModel: snapshot
+                    )
+                    for await output in outputs {
+                        if Task.isCancelled { break }
+                        continuation.yield(output)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish()
+                }
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
     }
 
     /// Stop current TTS synthesis.

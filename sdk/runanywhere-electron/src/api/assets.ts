@@ -242,20 +242,23 @@ function toLifecycleLoadedModel(
  * `rac_download_progress_poll_proto` on a timer.
  */
 class DownloadWatcher {
-  private readonly followers = new Map<string, (progress: DownloadProgress) => void>();
+  private readonly followers = new Map<
+    string,
+    (progress: DownloadProgress) => void | Promise<void>
+  >();
   private open: Promise<void> | null = null;
 
   constructor(private readonly backend: RaBackend) {}
 
   follow(
     modelId: string,
-    onProgress: (progress: DownloadProgress) => void,
+    onProgress: (progress: DownloadProgress) => void | Promise<void>,
     poll: () => Promise<DownloadProgress>
   ): Promise<void> {
     if (!this.open) {
       this.open = this.backend.downloadWatch((bytes) => {
         const progress = DownloadProgress.decode(bytes);
-        this.followers.get(progress.modelId)?.(progress);
+        void this.followers.get(progress.modelId)?.(progress);
       });
       this.open.catch(() => undefined);
     }
@@ -272,16 +275,17 @@ class DownloadWatcher {
         }
         resolve();
       };
-      const handle = (progress: DownloadProgress): void => {
+      const handle = (progress: DownloadProgress): void | Promise<void> => {
         if (settled) return;
-        onProgress(progress);
-        if (isTerminalState(progress.state)) finish();
+        return Promise.resolve(onProgress(progress)).then(() => {
+          if (isTerminalState(progress.state)) finish();
+        });
       };
       this.followers.set(modelId, handle);
       const timer = setInterval(() => {
         poll().then(
           (progress) => {
-            if (!settled && isTerminalState(progress.state)) handle(progress);
+            if (!settled && isTerminalState(progress.state)) void handle(progress);
           },
           () => undefined
         );
@@ -483,7 +487,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
           downloads.poll(
             DownloadSubscribeRequest.fromPartial({ modelId: id, taskId: started.taskId })
           );
-        await watcher.follow(id, (progress) => {
+        await watcher.follow(id, async (progress) => {
           last = progress;
           // Only a live transfer belongs in the table. A terminal state's
           // bookkeeping is owned by whoever caused it — pause keeps the row,
@@ -514,7 +518,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
             type: 'progress',
             bytesDone: Number(progress.bytesDownloaded),
             bytesTotal: Number(progress.totalBytes),
-            percent: downloads.percent(progress),
+            percent: await downloads.percent(progress),
           });
         }, poll);
         const terminal = last as DownloadProgress | null;
@@ -932,9 +936,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
             options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
         })
       );
-      // Commons guarantees the pixel counts sum to width * height before it
-      // encodes a result, so the coverage share is an exact division here.
-      const pixels = native.width * native.height;
+      // Commons owns SegmentationClassSummary.fraction (tag 5).
       return {
         classMask: toClassMask(native),
         width: native.width,
@@ -943,7 +945,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           classId: c.classId,
           label: c.label,
           pixelCount: c.pixelCount,
-          fraction: pixels ? c.pixelCount / pixels : 0,
+          fraction: c.fraction ?? 0,
         })),
       };
     },

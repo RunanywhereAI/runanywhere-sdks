@@ -92,6 +92,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadCancelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadResumeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadProgressPollProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual double downloadProgressPercent(double overallProgress, double bytesDownloaded, double totalBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;

@@ -316,6 +316,16 @@ export interface RunAnywhereCore extends HybridObject<{
   downloadProgressPollProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
+   * Canonical 0..100 download percent via sync `rac_download_progress_percent`
+   * (overall preferred when in [0,1]; else bytes ratio; else 0).
+   */
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number
+  ): number;
+
+  /**
    * Register a process-wide native DownloadProgress proto callback.
    */
   setDownloadProgressCallbackProto(

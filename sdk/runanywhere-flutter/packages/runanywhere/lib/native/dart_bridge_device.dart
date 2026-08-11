@@ -868,7 +868,7 @@ class _DeviceRegistrationInfoSnapshot {
 
   factory _DeviceRegistrationInfoSnapshot.defaults({String? deviceId}) {
     final coreCount = Platform.numberOfProcessors;
-    final coreSplit = _coreDistribution(coreCount, '');
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId ?? '',
       deviceModel: 'unknown',
@@ -953,9 +953,9 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final info = await plugin.androidInfo;
     final model = _joinDistinct([info.manufacturer, info.model]);
     final coreCount = Platform.numberOfProcessors;
-    // No sysfs max-freq probe on this path → UNKNOWN split (never invent).
-    const coreSplit = (0, 0);
     final chipName = _nonEmpty(info.hardware) ?? 'unknown';
+    // Probe sysfs max-freq → commons P/E split (parity with CppBridgeHardware).
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
       deviceModel: model,
@@ -989,7 +989,8 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final coreCount = Platform.numberOfProcessors;
     final machine = _nonEmpty(info.utsname.machine) ?? 'unknown';
     final chipName = _appleChipName(machine);
-    final coreSplit = _coreDistribution(coreCount, model, chip: chipName);
+    // No sysfs freqs on Apple → commons returns UNKNOWN (0,0); never invent.
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     final hasNeuralEngine =
         info.isPhysicalDevice &&
         (machine.startsWith('iPhone') || machine.startsWith('iPad'));
@@ -1027,7 +1028,7 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final chipName = hasNeuralEngine
         ? _appleChipName(_nonEmpty(info.model) ?? 'unknown')
         : _nonEmpty(info.model) ?? 'unknown';
-    final coreSplit = _coreDistribution(info.activeCPUs, model, chip: chipName);
+    final coreSplit = _commonsSplitPerformanceCores(info.activeCPUs);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
       deviceModel: model,
@@ -1139,28 +1140,67 @@ int _memoryBytes(int bytes) {
   return bytes > 0 ? bytes : 0;
 }
 
-(int, int) _coreDistribution(int coreCount, String model, {String chip = ''}) {
-  if (coreCount <= 0) return (0, 0);
-  int performance;
-  if (RegExp(r'^A\d').hasMatch(chip)) {
-    // A-series (A11-A19): 2 performance cores; A12X/A12Z: 4.
-    performance = chip.startsWith('A12X') || chip.startsWith('A12Z') ? 4 : 2;
-  } else if (RegExp(r'^M\d').hasMatch(chip)) {
-    // M-series: 4 efficiency cores on base/Pro/Max variants.
-    performance = coreCount - 4;
-    if (performance < 2) performance = coreCount ~/ 2;
-  } else {
-    final lowerModel = model.toLowerCase();
-    if (lowerModel.startsWith('iphone')) {
-      performance = 2;
-    } else if (lowerModel.startsWith('ipad') || lowerModel.startsWith('mac')) {
-      performance = (coreCount * 2 ~/ 5).clamp(2, coreCount).toInt();
-    } else {
-      performance = (coreCount ~/ 3).clamp(1, coreCount).toInt();
+/// Probe Android sysfs `cpuinfo_max_freq` samples (same inputs as Kotlin
+/// `CppBridgeHardware.defaultCoreSplit`). Incomplete/missing → empty list so
+/// commons returns UNKNOWN (0,0).
+List<int>? _probeAndroidMaxFreqs(int coreCount) {
+  if (!Platform.isAndroid || coreCount <= 0) return null;
+  final freqs = <int>[];
+  for (var cpu = 0; cpu < coreCount; cpu++) {
+    try {
+      final raw = File(
+        '/sys/devices/system/cpu/cpu$cpu/cpufreq/cpuinfo_max_freq',
+      ).readAsStringSync().trim();
+      freqs.add(int.tryParse(raw) ?? 0);
+    } catch (_) {
+      freqs.add(0);
     }
   }
-  performance = performance.clamp(0, coreCount).toInt();
-  return (performance, coreCount - performance);
+  return freqs;
+}
+
+/// P/E core split via `rac_device_split_performance_cores`.
+///
+/// Platforms gather per-core max frequencies; commons owns the split policy
+/// (UNKNOWN = 0/0 when samples are incomplete). Never invents a half/half split.
+(int, int) _commonsSplitPerformanceCores(int coreCount) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(
+        Pointer<Int64>,
+        IntPtr,
+        Pointer<Int32>,
+        Pointer<Int32>,
+      ),
+      int Function(
+        Pointer<Int64>,
+        int,
+        Pointer<Int32>,
+        Pointer<Int32>,
+      )>('rac_device_split_performance_cores');
+
+  final outPerf = calloc<Int32>();
+  final outEff = calloc<Int32>();
+  Pointer<Int64> freqsPtr = nullptr;
+  var count = 0;
+  final probed = _probeAndroidMaxFreqs(coreCount);
+  if (probed != null && probed.isNotEmpty) {
+    count = probed.length;
+    freqsPtr = calloc<Int64>(count);
+    for (var i = 0; i < count; i++) {
+      freqsPtr[i] = probed[i];
+    }
+  }
+  try {
+    fn(freqsPtr, count, outPerf, outEff);
+    return (outPerf.value, outEff.value);
+  } finally {
+    if (freqsPtr != nullptr) {
+      calloc.free(freqsPtr);
+    }
+    calloc.free(outPerf);
+    calloc.free(outEff);
+  }
 }
 
 const Map<String, String> _appleExactChipById = {

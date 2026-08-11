@@ -604,11 +604,8 @@ class SegmentationResult {
 
   /// Build from the generated segmentation result.
   ///
-  /// `SegmentationClassSummary.fraction` was deleted outright
-  /// (idl/segmentation.proto) — [ClassInfo.fraction] is derived here from
-  /// `pixelCount / (width * height)` instead of trusting a wire value.
+  /// Commons owns `SegmentationClassSummary.fraction` (tag 5).
   factory SegmentationResult.fromProto(seg_pb.SegmentationResult proto) {
-    final totalPixels = proto.width * proto.height;
     return SegmentationResult(
       classMask: Uint16List.sublistView(
         Uint8List.fromList(proto.classMaskU16Le),
@@ -621,7 +618,7 @@ class SegmentationResult {
             classId: c.classId,
             label: c.label,
             pixelCount: c.pixelCount.toInt(),
-            fraction: totalPixels > 0 ? c.pixelCount.toInt() / totalPixels : 0,
+            fraction: c.fraction,
           ),
         ),
       ),

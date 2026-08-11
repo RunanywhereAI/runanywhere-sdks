@@ -37,6 +37,7 @@ import {
 import { deleteModel } from '../Extensions/Storage/RunAnywhere+Storage';
 import { getStorageInfo } from '../Extensions/Storage/RunAnywhere+Storage';
 import { mapStream } from './Stream';
+import { isNativeModuleAvailable, requireNativeModule } from '../../native';
 import type {
   DownloadEvent,
   LoadedModel,
@@ -143,21 +144,35 @@ function toDownloadEventInput(
   if (progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING) {
     return { type: 'extracting', operationId, sequence: sequence() };
   }
-    const bytesTotal = Number(progress.totalBytes);
+  const bytesTotal = Number(progress.totalBytes);
   const bytesDone = Number(progress.bytesDownloaded);
   const overall = progress.overallProgress;
-  // Consume overall_progress when commons stamps a usable 0..1; never invent a
-  // bytes-first percent (rac_download_progress_percent owns that policy — RN
-  // Nitro sync bind pending).
-  const percent =
-    Number.isFinite(overall) && overall >= 0 && overall <= 1 ? overall * 100 : 0;
+  // Commons owns percent policy via rac_download_progress_percent. When the
+  // Nitro bind is unavailable, surface indeterminate (omit percent) — never
+  // invent overall*100-else-0 that discards a usable bytes ratio.
+  let percent: number | undefined;
+  if (isNativeModuleAvailable()) {
+    percent = requireNativeModule().downloadProgressPercent(
+      Number.isFinite(overall) ? overall : -1,
+      bytesDone,
+      bytesTotal
+    );
+    // Match Swift: treat ABI 0 as indeterminate when both inputs are unusable.
+    if (
+      percent === 0 &&
+      !(Number.isFinite(overall) && overall >= 0 && overall <= 1) &&
+      !(bytesTotal > 0 && bytesDone >= 0)
+    ) {
+      percent = undefined;
+    }
+  }
   return {
     type: 'progress',
     operationId,
     sequence: sequence(),
     bytesDone,
     bytesTotal,
-    percent,
+    ...(percent !== undefined ? { percent } : {}),
   };
 }
 
