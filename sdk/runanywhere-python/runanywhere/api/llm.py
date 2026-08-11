@@ -200,6 +200,9 @@ class Llm:
     # -- internals -----------------------------------------------------------
     def _plain(self, text: str, opts: LlmOptions) -> Iterator[GenerationEvent]:
         kwargs = llm_kwargs(opts)
+        kwargs["include_thoughts"] = wants_thoughts(opts)
+        if opts.stop_sequences:
+            kwargs["stop_sequences"] = list(opts.stop_sequences)
         model = runtime.llm(opts.model)
         model_id = _model_id()
         return _generation.run(
@@ -208,11 +211,13 @@ class Llm:
             request_id=runtime.new_request_id(),
             include_thoughts=wants_thoughts(opts),
             stop_sequences=opts.stop_sequences,
-            max_output_tokens=opts.max_output_tokens,
         )
 
     async def _aplain(self, text: str, opts: LlmOptions) -> AsyncIterator[GenerationEvent]:
         kwargs = llm_kwargs(opts)
+        kwargs["include_thoughts"] = wants_thoughts(opts)
+        if opts.stop_sequences:
+            kwargs["stop_sequences"] = list(opts.stop_sequences)
         model = runtime.llm(opts.model)
         model_id = _model_id()
         inner = _generation.arun(
@@ -221,7 +226,6 @@ class Llm:
             request_id=runtime.new_request_id(),
             include_thoughts=wants_thoughts(opts),
             stop_sequences=opts.stop_sequences,
-            max_output_tokens=opts.max_output_tokens,
         )
         try:
             async for event in inner:

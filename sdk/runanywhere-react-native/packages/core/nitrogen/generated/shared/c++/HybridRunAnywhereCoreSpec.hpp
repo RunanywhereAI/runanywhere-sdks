@@ -92,6 +92,12 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadCancelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadResumeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadProgressPollProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual double downloadProgressPercent(double overallProgress, double bytesDownloaded, double totalBytes) = 0;
+      virtual std::shared_ptr<ArrayBuffer> audioFloat32ToWav(const std::shared_ptr<ArrayBuffer>& pcmBytes, double sampleRate) = 0;
+      virtual std::shared_ptr<ArrayBuffer> audioPcm16ToFloat32(const std::shared_ptr<ArrayBuffer>& pcm16Bytes) = 0;
+      virtual std::shared_ptr<ArrayBuffer> audioInt16ToWav(const std::shared_ptr<ArrayBuffer>& pcm16Bytes, double sampleRate) = 0;
+      virtual double embeddingsNorm(const std::shared_ptr<ArrayBuffer>& vectorBytes) = 0;
+      virtual double embeddingsSimilarity(const std::shared_ptr<ArrayBuffer>& lhsBytes, const std::shared_ptr<ArrayBuffer>& rhsBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;

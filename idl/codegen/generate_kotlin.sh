@@ -90,6 +90,12 @@ if command -v wire-compiler >/dev/null 2>&1; then
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*Client.kt" -delete
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "Grpc*Client.kt" -delete
 
+    # Wire may emit trailing spaces in multiline EnumAdapter constructor
+    # arguments. Normalize generated Kotlin so codegen output passes the
+    # repository's whitespace gate deterministically on macOS and Linux.
+    find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*.kt" -type f \
+        -exec perl -pi -e 's/[ \t]+$//' {} +
+
     echo "✓ Kotlin proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
 
     # Note: protoc-gen-grpckt (grpc-kotlin official plugin) emits

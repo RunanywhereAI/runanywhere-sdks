@@ -55,6 +55,7 @@ struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 struct rac_diarization_service_ops; /* rac/features/diarization/rac_diarization_service.h */
 struct rac_segmentation_service_ops; /* reserved for semantic segmentation service */
+struct rac_rerank_service_ops;       /* rac/features/rerank/rac_rerank_service.h */
 
 /**
  * @brief Plugin metadata carried in every vtable.
@@ -145,7 +146,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (9 active) ─────────── */
+    /* ─────────── Primitive slot groups (10 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -174,7 +175,12 @@ typedef struct rac_engine_vtable {
     /** Semantic image segmentation (`RAC_PRIMITIVE_SEGMENT`). */
     const struct rac_segmentation_service_ops* segmentation_ops;
 
-    /* ─────────── Reserved slot pool (8 slots) ─────────── */
+    /** Cross-encoder relevance reranking (`RAC_PRIMITIVE_RERANK`). Promoted from
+     *  reserved_slot_2 in ABI v8 — occupies the same binary offset, so the
+     *  struct layout stayed stable across the promotion. */
+    const struct rac_rerank_service_ops* rerank_ops;
+
+    /* ─────────── Reserved slot pool (7 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -185,7 +191,6 @@ typedef struct rac_engine_vtable {
      *   3. Bumping RAC_PLUGIN_API_VERSION.
      * Old binaries will fail ABI version check and be rejected safely.
      */
-    const void* reserved_slot_2;
     const void* reserved_slot_3;
     const void* reserved_slot_4;
     const void* reserved_slot_5;
@@ -210,8 +215,10 @@ typedef struct rac_engine_vtable {
  * C switch/if bodies (no template metaprogramming) and expands to nothing in
  * the struct itself.
  *
- * Wire value 6 (formerly RERANK) is retired — no backend implemented it and it
- * was never routable. It has no vtable slot and no table row.
+ * Wire value 6 (the ORIGINAL rerank slot) stays retired — it has no vtable slot
+ * and no table row. The revived reranking primitive uses wire value 11
+ * (`RAC_PRIMITIVE_RERANK` / `rerank_ops`, promoted from reserved_slot_2 in ABI
+ * v8); do not confuse the two.
  *
  * Adding a modality is now THREE edits (down from ~8 scattered sites):
  *   1. Add one X(...) row here (and the matching `const struct ..._ops*` slot
@@ -229,7 +236,8 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_VLM, vlm_ops, "vlm")                     \
     X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")   \
     X(RAC_PRIMITIVE_DIARIZE, diarization_ops, "diarize")     \
-    X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")
+    X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")    \
+    X(RAC_PRIMITIVE_RERANK, rerank_ops, "rerank")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by

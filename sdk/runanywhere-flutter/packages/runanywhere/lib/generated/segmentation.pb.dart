@@ -275,17 +275,19 @@ class SegmentationRequest extends $pb.GeneratedMessage {
 /// SegmentationResult.height). Commons rejects any result whose pixel_counts
 /// do not sum to that product before encoding it into a SegmentationResult, so
 /// within this message the summaries partition the image and the division is
-/// exact.
+/// exact. `fraction` is that share, computed once by commons (tag 5).
 class SegmentationClassSummary extends $pb.GeneratedMessage {
   factory SegmentationClassSummary({
     $core.int? classId,
     $fixnum.Int64? pixelCount,
     $core.String? label,
+    $core.double? fraction,
   }) {
     final result = create();
     if (classId != null) result.classId = classId;
     if (pixelCount != null) result.pixelCount = pixelCount;
     if (label != null) result.label = label;
+    if (fraction != null) result.fraction = fraction;
     return result;
   }
 
@@ -307,6 +309,7 @@ class SegmentationClassSummary extends $pb.GeneratedMessage {
         2, _omitFieldNames ? '' : 'pixelCount', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOS(3, _omitFieldNames ? '' : 'label')
+    ..aD(5, _omitFieldNames ? '' : 'fraction', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -355,6 +358,17 @@ class SegmentationClassSummary extends $pb.GeneratedMessage {
   $core.bool hasLabel() => $_has(2);
   @$pb.TagNumber(3)
   void clearLabel() => $_clearField(3);
+
+  /// Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+  /// Zero when width or height is zero (rejected upstream before encode).
+  @$pb.TagNumber(5)
+  $core.double get fraction => $_getN(3);
+  @$pb.TagNumber(5)
+  set fraction($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFraction() => $_has(3);
+  @$pb.TagNumber(5)
+  void clearFraction() => $_clearField(5);
 }
 
 class SegmentationResult extends $pb.GeneratedMessage {

@@ -58,6 +58,9 @@ struct StreamTokenTiming {
     int64_t completed_ms = 0;
     /** Engine deltas seen, reasoning and content together. */
     int32_t total_tokens = 0;
+    /** Engine-reported prefill / prompt-eval duration in ms. 0 = unobserved.
+     *  Distinct from TTFT; never synthesize one from the other. */
+    int64_t engine_prefill_ms = 0;
 };
 
 struct StreamTimingMetrics {
@@ -126,7 +129,10 @@ inline StreamTimingMetrics compute_stream_timing(const StreamTokenTiming& t) {
     }
 
     m.ttft_ms = std::max<int64_t>(0, t.first_token_ms - t.started_ms);
-    m.prefill_ms = m.ttft_ms;
+    // Prefill is an engine-measured phase, not a synonym for TTFT. When the
+    // engine has not reported it, leave 0 (unobserved) rather than aliasing
+    // TTFT — two independently named metrics must not be one number.
+    m.prefill_ms = t.engine_prefill_ms > 0 ? t.engine_prefill_ms : 0;
     // A stream that never left reasoning has no content token; the honest
     // answer is "no content was ever delivered", not a silent fallback to the
     // any-kind figure.
@@ -135,26 +141,23 @@ inline StreamTimingMetrics compute_stream_timing(const StreamTokenTiming& t) {
                                      : 0;
     m.decode_ms = t.last_token_ms > t.first_token_ms ? (t.last_token_ms - t.first_token_ms) : 0;
 
-    // A backend that hands over every delta at once collapses the decode
-    // window to near zero while having spent the whole wall clock decoding.
-    // Rates taken over that window are meaningless, so fall back to wall clock,
-    // which errs LOW — the safe direction for anything used as a floor.
-    m.batch_buffered = m.decode_ms < std::max<int64_t>(50, m.wall_ms / 20);
+    // Informational: the backend likely buffered and flushed. Reported so
+    // consumers can caveat the decode window; it must NOT flip the rate
+    // formula (that produced a 17.4× step across a 1 ms threshold).
+    m.batch_buffered = m.decode_ms > 0 && m.decode_ms < std::max<int64_t>(50, m.wall_ms / 20);
 
-    const double decode_numerator = static_cast<double>(t.total_tokens - 1);
-    if (m.batch_buffered || m.decode_ms <= 0) {
-        m.decode_tokens_per_second = tokens_per_second(static_cast<double>(t.total_tokens),
-                                                       m.wall_ms);
+    // Window selects the numerator: N-1 over a real decode window (token 1
+    // opens the window), N over wall when there is no decode window. The
+    // batch_buffered flag does not participate — continuous in decode_ms.
+    if (m.decode_ms > 0 && t.total_tokens > 1) {
+        m.decode_tokens_per_second =
+            tokens_per_second(static_cast<double>(t.total_tokens - 1), m.decode_ms);
     } else {
-        m.decode_tokens_per_second = tokens_per_second(decode_numerator, m.decode_ms);
+        m.decode_tokens_per_second =
+            tokens_per_second(static_cast<double>(t.total_tokens), m.wall_ms);
     }
-
-    if (t.first_content_token_ms > 0 && t.last_token_ms > t.first_content_token_ms) {
-        // Content deltas are not counted separately by the caller (the split is
-        // apportioned by character ratio, matching the unary splitter), so this
-        // rate is left to the caller to fill when it knows the content count.
-        m.content_tokens_per_second = 0.0;
-    }
+    // content_tokens_per_second is filled by set_content_rate once the caller
+    // knows the content-side count — leave 0 here.
     return m;
 }
 

@@ -122,7 +122,7 @@ fun VoiceScreen() {
     val allVoiceModels = sttVm.state.models + llmVm.state.models + ttsVm.state.models + vadVm.state.models
     val pipeline = remember(allVoiceModels, device) {
         ModelRecommendation.recommendVoicePipeline(
-            tier = device?.tier ?: HardwareTier.MID_RANGE,
+            tier = device?.tier ?: HardwareTier.UNKNOWN,
             hasNpu = device?.hasNpu ?: false,
             models = allVoiceModels,
         )

@@ -4,6 +4,7 @@
 #include <fbjni/fbjni.h>
 #include "runanywherecoreOnLoad.hpp"
 #include "PlatformDownloadBridge.h"
+#include "AudioCaptureLevel.hpp"
 
 #define LOG_TAG "RunAnywhereJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -28,6 +29,8 @@ jmethodID g_isLowPowerModeMethod = nullptr;
 jmethodID g_hasNPUMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
+jmethodID g_getSocManufacturerMethod = nullptr;
+jmethodID g_getSocModelMethod = nullptr;
 jmethodID g_getTotalMemoryMethod = nullptr;
 jmethodID g_getAvailableMemoryMethod = nullptr;
 jmethodID g_getCoreCountMethod = nullptr;
@@ -75,6 +78,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_hasNPUMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "hasNPU", "()Z");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
+      g_getSocManufacturerMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getSocManufacturer", "()Ljava/lang/String;");
+      g_getSocModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getSocModel", "()Ljava/lang/String;");
       g_getTotalMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getTotalMemory", "()J");
       g_getAvailableMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAvailableMemory", "()J");
       g_getCoreCountMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getCoreCount", "()I");
@@ -102,6 +107,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
           g_getDeviceNameMethod && g_getBatteryLevelMethod &&
           g_getBatteryStateMethod && g_isLowPowerModeMethod && g_hasNPUMethod &&
           g_getOSVersionMethod && g_getChipNameMethod &&
+          g_getSocManufacturerMethod && g_getSocModelMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod &&
           g_getCoreCountMethod && g_getArchitectureMethod &&
           g_getGPUFamilyMethod && g_isTabletMethod &&
@@ -170,4 +176,28 @@ Java_com_margelo_nitro_runanywhere_PlatformAdapterBridge_nativeHttpDownloadRepor
     return RunAnywhereHttpDownloadReportComplete(task.c_str(),
                                                  static_cast<int>(result),
                                                  path.c_str());
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_margelo_nitro_runanywhere_HybridAudioCapture_nativeComputeLevelNormalized(
+    JNIEnv *env, jclass /*clazz*/, jbyteArray pcm16le) {
+  if (pcm16le == nullptr) {
+    return 0.0;
+  }
+  const jsize byteCount = env->GetArrayLength(pcm16le);
+  if (byteCount < 2) {
+    return 0.0;
+  }
+  const size_t even = static_cast<size_t>(byteCount) - (static_cast<size_t>(byteCount) % 2);
+  if (even < 2) {
+    return 0.0;
+  }
+  jbyte *bytes = env->GetByteArrayElements(pcm16le, nullptr);
+  if (bytes == nullptr) {
+    return 0.0;
+  }
+  const double level = ra_audio_capture_level_normalized_pcm16(
+      reinterpret_cast<const int16_t *>(bytes), even / sizeof(int16_t));
+  env->ReleaseByteArrayElements(pcm16le, bytes, JNI_ABORT);
+  return level;
 }

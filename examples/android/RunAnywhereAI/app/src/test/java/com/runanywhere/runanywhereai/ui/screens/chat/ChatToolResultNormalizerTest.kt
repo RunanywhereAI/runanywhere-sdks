@@ -3,40 +3,29 @@ package com.runanywhere.runanywhereai.ui.screens.chat
 import ai.runanywhere.proto.v1.ToolCallingResult
 import ai.runanywhere.proto.v1.ToolResult
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChatToolResultNormalizerTest {
     @Test
-    fun `complete thinking block is split from the visible answer`() {
+    fun `commons-split text and thinking_content are presented as-is`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            ToolCallingResult(text = "<think>private calculation</think>\nThe answer is 396."),
+            ToolCallingResult(
+                text = "The answer is 396.",
+                thinking_content = "private calculation",
+            ),
         )
 
         assertEquals("The answer is 396.", normalized.text)
         assertEquals("private calculation", normalized.thinking)
-        assertNoThinkingTags(normalized)
     }
 
     @Test
-    fun `malformed and mismatched tags never reach visible or thinking text`() {
+    fun `blank text falls back to a successful calculation payload`() {
         val normalized = ChatToolResultNormalizer.normalize(
             ToolCallingResult(
-                text = "</think><think data-bad='1'>private plan</thinking>Visible answer.</think>",
-            ),
-        )
-
-        assertEquals("Visible answer.", normalized.text)
-        assertEquals("private plan", normalized.thinking)
-        assertNoThinkingTags(normalized)
-    }
-
-    @Test
-    fun `unclosed reasoning-only result falls back to successful calculation`() {
-        val normalized = ChatToolResultNormalizer.normalize(
-            ToolCallingResult(
-                text = "<think>\nThinking Process: calculate returned successfully but the token cap ended here",
+                text = "",
+                thinking_content = "Thinking Process: calculate returned successfully",
                 tool_results = listOf(
                     ToolResult(
                         name = "calculate",
@@ -47,18 +36,15 @@ class ChatToolResultNormalizerTest {
         )
 
         assertEquals("Result: 396", normalized.text)
-        assertTrue(normalized.thinking.orEmpty().startsWith("Thinking Process:"))
-        assertNoThinkingTags(normalized)
+        assertEquals("Thinking Process: calculate returned successfully", normalized.thinking)
     }
 
     @Test
-    fun `unclosed reasoning-only text is recovered without displaying reasoning`() {
-        // ToolCallingResult.raw_text was deleted outright; `text` is the sole
-        // final-response field now, so this exercises the same unclosed-tag
-        // recovery path through it directly.
+    fun `blank text falls back to a sourced search_web payload`() {
         val normalized = ChatToolResultNormalizer.normalize(
             ToolCallingResult(
-                text = "<think>still reasoning",
+                text = "",
+                thinking_content = "still reasoning",
                 tool_results = listOf(
                     ToolResult(
                         name = "search_web",
@@ -70,26 +56,26 @@ class ChatToolResultNormalizerTest {
 
         assertEquals("A concise sourced answer.\nSource: https://example.com", normalized.text)
         assertEquals("still reasoning", normalized.thinking)
-        assertNoThinkingTags(normalized)
     }
 
     @Test
-    fun `typed thinking is authoritative and sanitized`() {
+    fun `typed thinking_content is authoritative when text is already answer-only`() {
         val normalized = ChatToolResultNormalizer.normalize(
             ToolCallingResult(
-                text = "<think>raw reasoning</think>Visible answer.",
-                thinking_content = "<thinking>typed reasoning</thinking>",
+                text = "Visible answer.",
+                thinking_content = "typed reasoning",
             ),
         )
 
         assertEquals("Visible answer.", normalized.text)
         assertEquals("typed reasoning", normalized.thinking)
-        assertNoThinkingTags(normalized)
     }
 
-    private fun assertNoThinkingTags(result: NormalizedChatToolResult) {
-        val all = result.text + result.thinking.orEmpty()
-        assertFalse(all.contains("<think", ignoreCase = true))
-        assertFalse(all.contains("</think", ignoreCase = true))
+    @Test
+    fun `blank everything surfaces the empty-answer message`() {
+        val normalized = ChatToolResultNormalizer.normalize(ToolCallingResult(text = ""))
+
+        assertEquals("The model did not produce a visible answer.", normalized.text)
+        assertNull(normalized.thinking)
     }
 }

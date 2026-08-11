@@ -39,30 +39,48 @@ export function isTerminalState(state: DownloadState): boolean {
 }
 
 /**
+ * Canonical 0..100 via `rac_download_progress_percent` (overall preferred when
+ * finite and in [0,1]; else bytes ratio; else 0). Never re-derive locally.
+ */
+export async function percentOf(
+  progress: DownloadProgress,
+  percentFn: (
+    overall: number,
+    downloaded: number,
+    total: number
+  ) => number | Promise<number>
+): Promise<number> {
+  return percentFn(
+    progress.overallProgress,
+    Number(progress.bytesDownloaded),
+    Number(progress.totalBytes)
+  );
+}
+
+/**
  * One `DownloadProgress` as the public snapshot, carrying every field commons
- * measured.
+ * measured. `percent` / `fraction` come from {@link percentOf} (commons), not a
+ * local bytes-ratio multiply.
  *
- * The normalizations are all "absent means unknown": commons writes 0 into
- * `bytes_per_second` before it has a sample, leaves `eta_seconds` unset (or
- * negative) when it cannot project one, and reports `overall_progress` of 0
- * both for "nothing done yet" and "not tracked". Mapping those to absent is
- * what lets a caller show nothing instead of "0 B/s · 0% · 0s left" while the
+ * The normalizations for throughput / ETA are all "absent means unknown":
+ * commons writes 0 into `bytes_per_second` before it has a sample and leaves
+ * `eta_seconds` unset (or negative) when it cannot project one. Mapping those
+ * to absent lets a caller show nothing instead of "0 B/s · 0s left" while the
  * connection is still opening.
  */
-export function toProgressSnapshot(
+export async function toProgressSnapshot(
   progress: DownloadProgress,
   operationId: string,
-  sequence: number
-): DownloadProgressSnapshot {
-  const overall = progress.overallProgress > 0 ? progress.overallProgress : undefined;
-  const byteRatio =
-    progress.totalBytes > 0
-      ? Math.min(Math.max(progress.bytesDownloaded / progress.totalBytes, 0), 1)
-      : undefined;
-  // Commons' own figure across the whole plan wins over the byte ratio, which
-  // is per-file: the end of file one of three is 100% of those bytes but a
-  // third of the download.
-  const fraction = overall ?? byteRatio;
+  sequence: number,
+  percentFn: (
+    overall: number,
+    downloaded: number,
+    total: number
+  ) => number | Promise<number>
+): Promise<DownloadProgressSnapshot> {
+  const percent = await percentOf(progress, percentFn);
+  const sizeKnown = progress.totalBytes > 0 || progress.overallProgress > 0;
+  const fraction = sizeKnown || percent > 0 ? Math.min(Math.max(percent / 100, 0), 1) : undefined;
   return {
     operationId,
     sequence,
@@ -78,7 +96,7 @@ export function toProgressSnapshot(
     currentFileIndex: progress.currentFileIndex,
     totalFiles: Math.max(progress.totalFiles, 1),
     fraction,
-    percent: fraction === undefined ? undefined : fraction * 100,
+    percent: fraction === undefined ? undefined : percent,
     isIndeterminate: fraction === undefined,
   };
 }
@@ -86,6 +104,22 @@ export function toProgressSnapshot(
 /** The commons download workflow: plan, start, cancel, poll, and purge. */
 export class DownloadAbi {
   constructor(private readonly backend: RaBackend) {}
+
+  /** Percent helper bound to this backend's commons ABI (sync or RPC). */
+  percent(progress: DownloadProgress): Promise<number> {
+    return percentOf(progress, (o, d, t) => this.backend.downloadProgressPercent(o, d, t));
+  }
+
+  /** Public progress snapshot with commons-owned percent. */
+  snapshot(
+    progress: DownloadProgress,
+    operationId: string,
+    sequence: number
+  ): Promise<DownloadProgressSnapshot> {
+    return toProgressSnapshot(progress, operationId, sequence, (o, d, t) =>
+      this.backend.downloadProgressPercent(o, d, t)
+    );
+  }
 
   plan(request: DownloadPlanRequest): Promise<DownloadPlanResult> {
     return invokeProto(

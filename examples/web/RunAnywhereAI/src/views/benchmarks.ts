@@ -419,8 +419,6 @@ async function runBenchmark(scenario: string, maxTokens: number): Promise<void> 
   renderBenchmarks();
 
   const startedAt = performance.now();
-  let firstTokenAt: number | null = null;
-  let tokenCount = 0;
 
   try {
     let completed: GenerationResult | null = null;
@@ -428,27 +426,22 @@ async function runBenchmark(scenario: string, maxTokens: number): Promise<void> 
       maxOutputTokens: maxTokens,
       temperature: 0,
     })) {
-      if (event.type === 'textDelta') {
-        if (firstTokenAt == null) firstTokenAt = performance.now();
-        tokenCount += 1;
-      } else if (event.type === 'completed') {
+      if (event.type === 'completed') {
         completed = event.result;
       }
     }
-    const wallMs = performance.now() - startedAt;
-
-    // Every generation result carries the same metrics block, so the wall-clock
-    // fallbacks below only apply when a backend reports zeros.
-    const totalTimeMs = wallMs;
+    // Harness wall for e2e only. TTFT / tok/s / token counts come from commons
+    // via GenerationResult — never substitute a local stopwatch or chunk count.
+    const totalTimeMs = performance.now() - startedAt;
     const ttftMs = completed && completed.timeToFirstTokenMs > 0
       ? completed.timeToFirstTokenMs
-      : firstTokenAt != null ? firstTokenAt - startedAt : null;
+      : null;
     const outputTokens = completed && completed.outputTokens > 0
       ? completed.outputTokens
-      : tokenCount;
+      : null;
     const tokensPerSecond = completed && completed.tokensPerSecond > 0
       ? completed.tokensPerSecond
-      : totalTimeMs > 0 ? outputTokens / (totalTimeMs / 1000) : null;
+      : null;
 
     history.unshift({
       scenario,

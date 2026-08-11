@@ -63,9 +63,6 @@
 // LoggingConfiguration (logging.proto)
 #define RAC_DEFAULT_LOGGING_CONFIGURATION_ENABLE_LOCAL_LOGGING RAC_TRUE
 
-// LoraAdapterConfig (lora_options.proto)
-#define RAC_DEFAULT_LORA_ADAPTER_CONFIG_SCALE 1.0f
-
 // LoraAdapterCatalogEntry (lora_options.proto)
 #define RAC_DEFAULT_LORA_ADAPTER_CATALOG_ENTRY_DEFAULT_SCALE 1.0f
 
@@ -161,5 +158,5 @@
 #define RAC_DEFAULT_TTS_OPTIONS_VOLUME        1.0f
 #define RAC_DEFAULT_TTS_OPTIONS_SAMPLE_RATE   0
 
-// 86 defaults across 31 messages.
+// 85 defaults across 30 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

@@ -45,7 +45,7 @@ Future<LLMGenerationResult> generateRequest(LLMGenerateRequest request);        
 Stream<LLMStreamEvent> generateStream(String prompt, [LLMGenerationOptions? options]);
 Stream<LLMStreamEvent> generateStreamRequest(LLMGenerateRequest request);           // [DIVERGE] Swift generateStream(request) overload
 void cancelGeneration();
-Future<LLMGenerationResult> aggregateStream({required String prompt, required Stream<LLMStreamEvent> events, Future<void> Function(String)? onToken});
+// Collect RunAnywhere.llm.generateStream and read GenerationEvent.Completed — aggregateStream deleted (D3)
 // llm.chat(String)  // [FLUTTER-ONLY]
 
 // --- Structured output ---

@@ -1,6 +1,25 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * How commons applies StructuredOutputOptions on the ordinary LLM generate
+ * path. Platform SDKs must not invent a second policy.
+ */
+export declare enum StructuredOutputMode {
+    STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
+    /** STRUCTURED_OUTPUT_MODE_CONSTRAINED - Compile schema→GBNF (or honor grammar/regex) and constrain decoding. */
+    STRUCTURED_OUTPUT_MODE_CONSTRAINED = 1,
+    /** STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY - Do not constrain decoding; validate the free-text result against schema. */
+    STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY = 2,
+    /**
+     * STRUCTURED_OUTPUT_MODE_REPAIR - Constrained (when a decoder arm is present), then one repair retry if
+     * the first answer fails schema validation.
+     */
+    STRUCTURED_OUTPUT_MODE_REPAIR = 3,
+    UNRECOGNIZED = -1
+}
+export declare function structuredOutputModeFromJSON(object: any): StructuredOutputMode;
+export declare function structuredOutputModeToJSON(object: StructuredOutputMode): string;
 export interface StructuredOutputOptions {
     /**
      * Also render the schema into the system prompt, not just constrain
@@ -8,12 +27,17 @@ export interface StructuredOutputOptions {
      * Default true (matches Apple FoundationModels includeSchemaInPrompt).
      */
     includeSchemaInPrompt?: boolean | undefined;
-    /** A JSON Schema document, verbatim. Unsupported keywords are rejected. */
+    /**
+     * A JSON Schema document, verbatim. Unsupported keywords are rejected.
+     * Commons compiles this to GBNF on the generate path (mode permitting).
+     */
     schema?: string | undefined;
     /** GBNF/EBNF grammar text. On-device only. */
     grammar?: string | undefined;
     /** Regular expression the whole output must match. On-device only. */
     regex?: string | undefined;
+    /** Unset = CONSTRAINED when a constraint arm is present, else free text. */
+    mode?: StructuredOutputMode | undefined;
 }
 export interface StructuredOutputValidation {
     isValid: boolean;
@@ -23,6 +47,10 @@ export interface StructuredOutputValidation {
     validationErrors: string[];
     validationTimeMs: number;
     error?: SDKError | undefined;
+    /** True when commons issued the single repair retry (mode=REPAIR). */
+    repairAttempted: boolean;
+    /** 0 = first pass only; 1 = repair pass produced the reported verdict. */
+    repairAttempts: number;
 }
 export interface StructuredOutputResult {
     /** The extracted JSON document, as UTF-8 text. Parse it client-side. */

@@ -37,8 +37,8 @@ public enum class AcceleratorPolicy(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AcceleratorPolicy> = object : EnumAdapter<AcceleratorPolicy>(
-      AcceleratorPolicy::class, 
-      PROTO_3, 
+      AcceleratorPolicy::class,
+      PROTO_3,
       AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): AcceleratorPolicy? = AcceleratorPolicy.fromValue(`value`)

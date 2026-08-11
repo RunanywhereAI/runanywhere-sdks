@@ -1,19 +1,13 @@
 """The ``lora`` namespace: apply adapters to the resident model.
 
-Binds ``native/module.cpp``'s ``lora_apply`` / ``lora_remove`` / ``lora_remove_all`` — thin
-wrappers over ``rac_llm_component_load_lora`` / ``remove_lora`` / ``clear_lora`` (the same
-write-only LoRA-on-LLM C ABI the ``runanywhere-electron`` addon already exposes as
-``loraApply`` / ``loraRemove`` / ``loraList``). Only the LlamaCPP backend implements these
-ops today; applying a LoRA adapter while a non-LlamaCPP model is resident surfaces a native
-``RAC_ERROR_NOT_SUPPORTED``.
+Binds ``native/module.cpp``'s ``lora_apply_proto`` / ``lora_remove_proto`` /
+``lora_list_proto`` — thin wrappers over ``rac_lora_*_proto``. Commons owns
+optional scale resolution (explicit → catalog including 0.0 → 1.0); this
+namespace never coerces an unset scale to 1.0.
 
-The C ABI has no read-back (apply/remove/clear are write-only), so :meth:`Lora.list` reports
-the set mirrored client-side on the resident :class:`~runanywhere._handles.LLMModel` handle —
-exactly like the Electron addon's ``g_lora_applied`` map.
-
-``adapter_id`` is a local filesystem path to a LoRA adapter GGUF file: this SDK has no
-catalog/download plumbing for adapters yet (only for base models), so there is no id -> path
-resolution step here — pass the path directly.
+``adapter_id`` is a local filesystem path to a LoRA adapter GGUF file: this SDK
+has no catalog/download plumbing for adapters yet (only for base models), so
+there is no id → path resolution step here — pass the path directly.
 """
 
 from __future__ import annotations
@@ -34,11 +28,12 @@ class Lora:
 
         Args:
             adapter_id: path to the LoRA adapter GGUF file.
-            scale: adapter scale factor (0.0-1.0); the native default is 1.0 when omitted.
+            scale: optional adapter scale. Unset leaves resolution to commons
+                (``resolve_effective_lora_scale``). An explicit ``0.0`` is honoured.
 
         Raises:
-            SDKException: no LLM is resident, this native build predates the LoRA bindings,
-                or the backend rejects the adapter (e.g. a non-LlamaCPP model, a bad file).
+            SDKException: no LLM is resident, this native build predates the LoRA
+                bindings, or the backend rejects the adapter.
         """
         model = runtime.llm(verb="applying a LoRA adapter")
         model.lora_apply(adapter_id, scale)
@@ -50,8 +45,8 @@ class Lora:
             adapter_id: the same path passed to :meth:`apply`.
 
         Raises:
-            SDKException: no LLM is resident, this native build predates the LoRA bindings,
-                or the adapter is not currently applied.
+            SDKException: no LLM is resident, this native build predates the LoRA
+                bindings, or the adapter is not currently applied.
         """
         model = runtime.llm(verb="removing a LoRA adapter")
         model.lora_remove(adapter_id)
@@ -69,9 +64,8 @@ class Lora:
     def list(self) -> LoraState:
         """The LoRA adapters currently applied to the resident LLM.
 
-        Returns an empty :class:`LoraState` (rather than raising) when no LLM is resident —
-        the same "nothing applied" answer the Electron addon's ``loraList`` gives for an
-        unknown handle.
+        Returns an empty :class:`LoraState` (rather than raising) when no LLM is
+        resident.
         """
         model = runtime.llm_if_resident()
         if model is None:

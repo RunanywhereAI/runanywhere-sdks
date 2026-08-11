@@ -274,9 +274,6 @@ extension RunAnywhere {
                 var sawStart = false
                 var accumulatedText = ""
                 var accumulatedThinking = ""
-                var tokenCount = 0
-                let startedAt = Date()
-                var firstTokenAt: Date?
                 var requestId = ""
                 var sawTerminal = false
                 var toolCallIndex = 0
@@ -287,8 +284,6 @@ extension RunAnywhere {
 
                 func emitToken(_ event: RALLMStreamEvent, sequence: Int64) {
                     guard !event.token.isEmpty else { return }
-                    if firstTokenAt == nil { firstTokenAt = Date() }
-                    tokenCount += 1
                     // RALLMStreamEvent's discriminator is event-level
                     // (eventKind: RALLMStreamEventKind — started/token/
                     // thinking/toolCall/progress/completed/error), not a
@@ -352,25 +347,14 @@ extension RunAnywhere {
                     // with event_kind == COMPLETED (result set) — there is
                     // no separate isFinal flag anymore.
                     if event.eventKind == .completed {
-                        let result: GenerationResult
-                        if event.hasResult {
-                            result = GenerationResult(
-                                proto: event.result,
-                                requestId: requestId,
-                                model: model
-                            )
-                        } else {
-                            result = RunAnywhere.synthesizeResult(
-                                text: accumulatedText,
-                                thinking: accumulatedThinking,
-                                tokenCount: tokenCount,
-                                startedAt: startedAt,
-                                firstTokenAt: firstTokenAt,
-                                finishReason: event.finishReason,
-                                requestId: requestId,
-                                model: model
-                            )
-                        }
+                        let result = RunAnywhere.generationResultFromStreamTerminal(
+                            proto: event.hasResult ? event.result : nil,
+                            accumulatedText: accumulatedText,
+                            accumulatedThinking: accumulatedThinking,
+                            finishReason: event.finishReason,
+                            requestId: requestId,
+                            model: model
+                        )
                         continuation.yield(.completed(requestId: requestId, result: result))
                         sawTerminal = true
                         break
@@ -417,33 +401,44 @@ extension RunAnywhere {
     }
     // swiftlint:enable function_body_length
 
-    /// Wall-clock metrics for backends that end a stream without a terminal
-    /// aggregate result.
-    internal static func synthesizeResult(
-        text: String,
-        thinking: String,
-        tokenCount: Int,
-        startedAt: Date,
-        firstTokenAt: Date?,
+    /// Prefer commons terminal metrics; keep streamed text/thinking only when
+    /// the terminal payload is empty or weaker. Never invent wall-clock rates.
+    internal static func generationResultFromStreamTerminal(
+        proto: RALLMGenerationResult?,
+        accumulatedText: String,
+        accumulatedThinking: String,
         finishReason: RAFinishReason,
         requestId: String,
         model: String
     ) -> GenerationResult {
-        let totalSeconds = Date().timeIntervalSince(startedAt)
-        let ttft = firstTokenAt.map { Int64(($0.timeIntervalSince(startedAt) * 1000).rounded()) } ?? 0
-        let throughput = totalSeconds > 0 ? Float(Double(tokenCount) / totalSeconds) : 0
+        if var terminal = proto {
+            if preferStreamedContent(accumulatedText, over: terminal.text) {
+                terminal.text = accumulatedText
+            }
+            let terminalThinking = terminal.hasThinkingContent ? terminal.thinkingContent : ""
+            if preferStreamedContent(accumulatedThinking, over: terminalThinking) {
+                terminal.thinkingContent = accumulatedThinking
+            }
+            return GenerationResult(proto: terminal, requestId: requestId, model: model)
+        }
         return GenerationResult(
-            text: text,
-            thinkingText: thinking.isEmpty ? nil : thinking,
+            text: accumulatedText,
+            thinkingText: accumulatedThinking.isEmpty ? nil : accumulatedThinking,
             toolCalls: [],
             finishReason: FinishReason(proto: finishReason),
             inputTokens: 0,
-            outputTokens: tokenCount,
-            timeToFirstTokenMs: ttft,
-            tokensPerSecond: throughput,
+            outputTokens: 0,
+            timeToFirstTokenMs: 0,
+            tokensPerSecond: 0,
             requestId: requestId,
             model: model
         )
+    }
+
+    /// Transport-integrity fallback: keep the longer non-empty stream transcript
+    /// when the terminal text is missing or truncated.
+    private static func preferStreamedContent(_ streamed: String, over terminal: String) -> Bool {
+        !streamed.isEmpty && (terminal.isEmpty || streamed.count > terminal.count)
     }
 
     internal static func parseStructuredOutput(

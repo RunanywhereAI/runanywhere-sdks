@@ -4,6 +4,7 @@
 
 #include "rerank_service_internal.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "../common/rac_service_factory_internal.h"
@@ -16,6 +17,20 @@ constexpr const char* kLogCategory = "Rerank.Service";
 
 const rac_rerank_service_ops_t* rerank_ops(const rac_engine_vtable_t* vt) {
     return vt ? vt->rerank_ops : nullptr;
+}
+
+/** Enforce RerankResult / rac_rerank_result_t contract: score-descending order. */
+void enforce_score_descending_order(rac_rerank_result_t* result) {
+    if (!result || !result->items || result->item_count == 0) {
+        return;
+    }
+    std::stable_sort(result->items, result->items + result->item_count,
+                     [](const rac_rerank_scored_item_t& a, const rac_rerank_scored_item_t& b) {
+                         return a.score > b.score;
+                     });
+    for (size_t i = 0; i < result->item_count; ++i) {
+        result->items[i].rank = static_cast<uint32_t>(i);
+    }
 }
 
 }  // namespace
@@ -87,8 +102,12 @@ rac_result_t rac_rerank_rerank(rac_handle_t handle, const char* query,
     }
     *out_result = {};
     const rac_rerank_options_t defaults = RAC_RERANK_OPTIONS_DEFAULT;
-    return service->ops->rerank(service->impl, query, candidates, candidate_count,
-                                options ? options : &defaults, out_result);
+    const rac_result_t rc = service->ops->rerank(service->impl, query, candidates, candidate_count,
+                                                 options ? options : &defaults, out_result);
+    if (rc == RAC_SUCCESS) {
+        enforce_score_descending_order(out_result);
+    }
+    return rc;
 }
 
 rac_result_t rac_rerank_cleanup(rac_handle_t handle) {

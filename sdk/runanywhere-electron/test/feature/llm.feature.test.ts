@@ -69,6 +69,35 @@ test('generate: text, engine metrics, and a token ceiling that is honoured',
       assert.ok(result.inputTokens > 0, 'the prompt was tokenized');
       assert.ok(result.outputTokens > 0, 'the engine counted output tokens');
       assert.ok(result.tokensPerSecond > 0, 'the engine reported decode throughput');
+      assert.equal(result.usage.inputTokens, result.inputTokens, 'flat input mirrors usage');
+      assert.equal(result.usage.outputTokens, result.outputTokens, 'flat output mirrors usage');
+      assert.equal(
+        result.usage.decodeTokensPerSecond,
+        result.tokensPerSecond,
+        'flat decode TPS mirrors usage'
+      );
+      assert.equal(result.usage.ttftMs, result.timeToFirstTokenMs, 'flat TTFT mirrors usage');
+      assert.equal(
+        typeof result.usage.prefillMs,
+        'number',
+        'commons prefill is preserved on usage'
+      );
+      assert.equal(
+        typeof result.usage.timeToFirstContentTokenMs,
+        'number',
+        'commons first-content latency is preserved'
+      );
+      assert.equal(
+        typeof result.usage.contentTokensPerSecond,
+        'number',
+        'commons content TPS is preserved'
+      );
+      assert.equal(typeof result.usage.batchBuffered, 'boolean', 'batchBuffered flag is preserved');
+      assert.equal(
+        typeof result.usage.countsEstimated,
+        'boolean',
+        'countsEstimated flag is preserved'
+      );
 
       // The pre-F4 component path ignored maxOutputTokens: a request for 8
       // produced 38. The proto path stops on the budget and says why.
@@ -92,6 +121,8 @@ test('generateStream: token by token, then one completed event carrying the resu
       const deltaTypes: string[] = [];
       const pieces: string[] = [];
       let started = 0;
+      let usageEvent: { usage: Awaited<ReturnType<typeof sdk.llm.generate>>['usage'] } | null =
+        null;
       let completed: Awaited<ReturnType<typeof sdk.llm.generate>> | null = null;
       for await (const event of sdk.llm.generateStream('Name three colours.', {
         maxOutputTokens: 32,
@@ -102,15 +133,22 @@ test('generateStream: token by token, then one completed event carrying the resu
           pieces.push(event.text);
         }
         if (event.type === 'reasoningDelta') deltaTypes.push(event.type);
+        if (event.type === 'usage') usageEvent = event;
         if (event.type === 'completed') completed = event.result;
       }
 
       assert.equal(started, 1, 'exactly one started event');
       assert.ok(pieces.length > 1, 'the answer arrived in pieces rather than all at once');
       assert.ok(completed, 'the stream terminated with a completed event');
+      assert.ok(usageEvent, 'the stream emitted a usage event before completed');
       assert.equal(completed.text, pieces.join(''), 'the pieces reassemble into the answer');
       assert.ok(completed.outputTokens > 0, 'the terminal result carries engine metrics');
       assert.ok(completed.timeToFirstTokenMs > 0, 'and a measured time to first token');
+      assert.deepEqual(
+        usageEvent.usage,
+        completed.usage,
+        'usage event copies completed.result.usage verbatim'
+      );
       assert.deepEqual(
         [...new Set(deltaTypes)],
         ['textDelta'],

@@ -590,7 +590,8 @@ rac_result_t rac_model_registry_update_last_used(rac_model_registry_handle_t han
     }
 
     rac_model_info_t* model = it->second;
-    model->last_used = rac_get_current_time_ms() / 1000;  // Convert to seconds
+    // Proto ModelInfo.last_used_at_unix_ms — milliseconds, not seconds.
+    model->last_used = rac_get_current_time_ms();
     model->usage_count++;
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -693,7 +694,8 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
 
     // Set new local path
     model->local_path = rac_strdup(local_path);
-    model->updated_at = rac_get_current_time_ms() / 1000;
+    // Proto ModelInfo.updated_at_unix_ms — milliseconds, not seconds.
+    model->updated_at = rac_get_current_time_ms();
 
 #ifdef RAC_HAVE_PROTOBUF
     const rac_result_t snapshot_rc =

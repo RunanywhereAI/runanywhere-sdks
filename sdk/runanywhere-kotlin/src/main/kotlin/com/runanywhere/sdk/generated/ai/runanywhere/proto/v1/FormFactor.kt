@@ -38,8 +38,8 @@ public enum class FormFactor(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<FormFactor> = object : EnumAdapter<FormFactor>(
-      FormFactor::class, 
-      PROTO_3, 
+      FormFactor::class,
+      PROTO_3,
       FormFactor.FORM_FACTOR_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): FormFactor? = FormFactor.fromValue(`value`)

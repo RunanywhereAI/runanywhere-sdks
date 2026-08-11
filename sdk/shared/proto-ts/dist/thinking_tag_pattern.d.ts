@@ -25,6 +25,13 @@ export interface ThinkingTagPattern {
     openTag: string;
     /** Empty defaults to "</think>". */
     closeTag: string;
+    /**
+     * When true, the model's generation template already emits the open tag
+     * (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+     * starts inside reasoning and commons must not arm the bounded hold.
+     * optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+     */
+    templatePrefillsOpenTag?: boolean | undefined;
 }
 export interface ReasoningOptions {
     mode: ReasoningMode;

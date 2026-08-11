@@ -475,6 +475,12 @@ object RunAnywhereBridge {
     ): Int
 
     @JvmStatic
+    external fun racVadUnsetStreamProtoCallback(handle: Long): Int
+
+    @JvmStatic
+    external fun racVadProtoQuiesce()
+
+    @JvmStatic
     external fun racVadStreamStartProto(handle: Long, optionsProto: ByteArray?): Long
 
     @JvmStatic
@@ -569,10 +575,11 @@ object RunAnywhereBridge {
     // Download + non-proto model-registry thunks removed. All of
     // `racDownloadStart` /
     // `racDownloadCancel` / `racDownloadGetProgress` /
-    // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove,UpdateDownloadStatus}`
+    // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove}`
     // had zero Kotlin callers; the proto-backed siblings below
-    // (`racDownloadStartProto`, `racModelRegistry*Proto`) are the canonical
-    // surface.
+    // (`racDownloadStartProto`, `racModelRegistry*Proto`) plus the commons
+    // mutators (`racModelRegistryUpdateDownloadStatus` /
+    // `racModelRegistryUpdateLastUsed`) are the canonical surface.
 
     // MODEL REGISTRY - Direct C++ registry access (mirrors Swift CppBridge+ModelRegistry)
 
@@ -629,6 +636,24 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryRemoveProto(modelId: String): Int
+
+    /**
+     * Update download status (local path) via the commons registry mutator.
+     *
+     * Forwards to `rac_model_registry_update_download_status`, which stamps
+     * `updated_at_unix_ms` in commons. Pass null [localPath] to clear.
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
+
+    /**
+     * Touch last-used via the commons registry mutator.
+     *
+     * Forwards to `rac_model_registry_update_last_used`, which stamps
+     * `last_used_at_unix_ms` in commons.
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateLastUsed(modelId: String): Int
 
     /**
      * Refresh the C++ model registry using serialized runanywhere.v1.ModelRegistryRefreshRequest bytes.
@@ -726,6 +751,67 @@ object RunAnywhereBridge {
     // UTILITY — used from JNI helpers but not directly from Kotlin
     @JvmStatic
     external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
+
+    /** Int16 PCM → Float32 samples via `rac_audio_pcm16_to_float32`. */
+    @JvmStatic
+    external fun racAudioPcm16ToFloat32(pcm16: ByteArray): FloatArray?
+
+    /** Float32 samples → Int16 PCM bytes via `rac_audio_float32_to_pcm16`. */
+    @JvmStatic
+    external fun racAudioFloat32ToPcm16(samples: FloatArray): ByteArray?
+
+    /**
+     * Normalized meter level in [0, 1] via `rac_audio_compute_level_normalized`.
+     * Pass [floorDb] = −60 for the historical platform meter window
+     * (`RAC_AUDIO_LEVEL_FLOOR_DB`). Returns 0 on empty input or commons failure.
+     */
+    @JvmStatic
+    external fun racAudioComputeLevelNormalized(
+        samples: FloatArray,
+        floorDb: Float,
+    ): Float
+
+    /** Canonical 0..100 download percent via `rac_download_progress_percent`. */
+    @JvmStatic
+    external fun racDownloadProgressPercent(
+        overallProgress: Float,
+        bytesDownloaded: Long,
+        totalBytes: Long,
+    ): Int
+
+    /** Chip-name resolution via `rac_device_resolve_chip_name`. */
+    @JvmStatic
+    external fun racDeviceResolveChipName(
+        socManufacturer: String?,
+        socModel: String?,
+        buildHardware: String?,
+        cpuinfoHardware: String?,
+        architectureFallback: String?,
+    ): String
+
+    /** GPU family token via `rac_device_classify_gpu_family`. */
+    @JvmStatic
+    external fun racDeviceClassifyGpuFamily(
+        socManufacturer: String?,
+        socModel: String?,
+        chipName: String?,
+    ): String
+
+    /** NPU presence heuristic via `rac_device_heuristic_has_npu`. */
+    @JvmStatic
+    external fun racDeviceHeuristicHasNpu(
+        socManufacturer: String?,
+        socModel: String?,
+        chipName: String?,
+    ): Boolean
+
+    /** P/E core split via `rac_device_split_performance_cores` → `[perf, eff]`. */
+    @JvmStatic
+    external fun racDeviceSplitPerformanceCores(maxFreqs: LongArray?): IntArray
+
+    /** Available-memory coalesce via `rac_device_coalesce_available_memory`. */
+    @JvmStatic
+    external fun racDeviceCoalesceAvailableMemory(probedAvailableBytes: Long): Long
 
     // DEVICE MANAGER (rac_device_manager.h)
     // Mirrors Swift SDK's CppBridge+Device.swift
@@ -1360,6 +1446,15 @@ object RunAnywhereBridge {
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racEmbeddingsEmbedBatchLifecycleProto(requestProto: ByteArray): ByteArray?
+
+    /** L2 norm via `rac_embeddings_norm`. Empty vector → 0. */
+    @JvmStatic external fun racEmbeddingsNorm(vector: FloatArray): Float
+
+    /**
+     * Cosine similarity via `rac_embeddings_similarity`. Returns 0 for empty
+     * vectors, mismatched dimensions, or zero norms.
+     */
+    @JvmStatic external fun racEmbeddingsSimilarity(lhs: FloatArray, rhs: FloatArray): Float
 
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
 

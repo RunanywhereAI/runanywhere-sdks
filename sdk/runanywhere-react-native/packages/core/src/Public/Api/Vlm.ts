@@ -17,7 +17,7 @@ import { toVlmImage } from './Inputs';
 import { ensureModelLoaded } from './Models';
 import { toVlmOptions } from './Options';
 import {
-  emptyGenerationResult,
+  generationResultFromAccumulated,
   toGenerationResultFromVlm,
 } from './Results';
 import { pushStream } from './Stream';
@@ -106,6 +106,7 @@ export const vlm = {
         };
         controller.push({ type: 'started', requestId });
 
+        let accumulatedText = '';
         void native
           .vlmProcessStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
             const event = decodeEvent(eventBytes, VLMStreamEvent);
@@ -114,6 +115,7 @@ export const vlm = {
               return;
             }
             if (event.token.length > 0) {
+              accumulatedText += event.token;
               controller.push({
                 type: 'token',
                 text: event.token,
@@ -121,15 +123,18 @@ export const vlm = {
               });
             }
             const isTerminal =
-              event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
-              event.result !== undefined;
+              event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED;
             if (isTerminal) {
               controller.push({
                 type: 'completed',
                 requestId,
                 result: event.result
                   ? toGenerationResultFromVlm(event.result, requestId, model)
-                  : emptyGenerationResult(requestId, model),
+                  : generationResultFromAccumulated(
+                      requestId,
+                      model,
+                      accumulatedText
+                    ),
               });
               controller.finish();
             }

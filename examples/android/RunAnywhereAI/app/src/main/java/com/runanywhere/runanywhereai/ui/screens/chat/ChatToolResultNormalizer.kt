@@ -18,17 +18,6 @@ internal data class NormalizedChatToolResult(
 internal object ChatToolResultNormalizer {
     private val json = Json { ignoreUnknownKeys = true }
 
-    // Matches the two tag pairs recognized by commons' thinking policy. Accepting
-    // mismatched close names and malformed attributes keeps raw model markup out of UI.
-    private val thinkingTag = Regex(
-        pattern = "<\\s*(/?)\\s*(?:think|thinking)\\b[^>]*>",
-        option = RegexOption.IGNORE_CASE,
-    )
-    // Also catches a stream stopped mid-tag ("answer <thi"): a trailing `<`, an
-    // optional `/`, then any strict prefix of think/thinking with no closing `>`.
-    // The full-word alternation keeps the prior behavior of trimming an unclosed
-    // `<think ...` that carries attributes. A lone trailing `<` stays untouched so
-    // a legitimate less-than at the end of an answer is preserved.
     // LFM2 `<|tool_call_start|>…<|tool_call_end|>` and the DEFAULT `<tool_call>…</tool_call>` form.
     private val strayToolCall = Regex(
         """<\|tool_call_start\|>(.*?)<\|tool_call_end\|>|<tool_call>(.*?)</tool_call>""",
@@ -36,29 +25,19 @@ internal object ChatToolResultNormalizer {
     )
     private val firstStringLiteral = Regex("\"([^\"]+)\"")
 
-    private val incompleteThinkingTag = Regex(
-        pattern = "<\\s*/?\\s*(?:(?:think|thinking)\\b[^>]*|t(?:h(?:i(?:n(?:k(?:i(?:n(?:g)?)?)?)?)?)?)?)$",
-        options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-    )
-
     fun normalize(result: ToolCallingResult): NormalizedChatToolResult {
-        // ToolCallingResult.raw_text was deleted outright (idl/tool_calling.proto) —
-        // `text` is now the sole final-response field, so it is the only source here.
-        val split = splitThinking(result.text)
-        val typedThinking = result.thinking_content
-            ?.let(::sanitizeTypedThinking)
-            ?.takeIf { it.isNotBlank() }
-        val thinking = typedThinking ?: split.thinking.takeIf { it.isNotBlank() }
-
-        val text = split.visibleText.ifBlank {
+        // Commons owns the reasoning/content split: ToolCallingResult.text is
+        // answer-only and thinking_content is already de-tagged.
+        val thinking = result.thinking_content?.takeIf { it.isNotBlank() }
+        val text = result.text.trim().ifBlank {
             successfulToolFallback(result.tool_results)
                 ?: result.error_message
                     ?.takeIf { it.isNotBlank() }
-                    ?.let { "Error: ${visibleOnly(it)}" }
+                    ?.let { "Error: ${it.trim()}" }
                 ?: "The model did not produce a visible answer."
         }
         return NormalizedChatToolResult(
-            text = visibleOnly(text).ifBlank { "The model did not produce a visible answer." },
+            text = text.ifBlank { "The model did not produce a visible answer." },
             thinking = thinking,
         )
     }
@@ -90,65 +69,6 @@ internal object ChatToolResultNormalizer {
         return if (remaining.isNotEmpty()) remaining else salvaged?.trim().orEmpty()
     }
 
-    internal fun splitThinking(raw: String): ThinkingSplit {
-        if (raw.isBlank()) return ThinkingSplit("", "")
-
-        val visibleChunks = mutableListOf<String>()
-        val thinkingChunks = mutableListOf<String>()
-        var cursor = 0
-        var insideThinking = false
-        thinkingTag.findAll(raw).forEach { match ->
-            addChunk(
-                value = raw.substring(cursor, match.range.first),
-                thinking = insideThinking,
-                visibleChunks = visibleChunks,
-                thinkingChunks = thinkingChunks,
-            )
-            insideThinking = match.groupValues[1].isEmpty()
-            cursor = match.range.last + 1
-        }
-        addChunk(
-            value = raw.substring(cursor),
-            thinking = insideThinking,
-            visibleChunks = visibleChunks,
-            thinkingChunks = thinkingChunks,
-        )
-
-        // Commons' strip policy drops a trailing unclosed opening tag. Do the
-        // same even when the model emitted an incomplete marker without `>`.
-        val visible = visibleChunks.joinToString("\n")
-        val incompleteOpen = incompleteThinkingTag.find(visible)
-        val safeVisible = if (incompleteOpen != null && !incompleteOpen.value.trimStart().startsWith("</")) {
-            visible.substring(0, incompleteOpen.range.first)
-        } else {
-            incompleteThinkingTag.replace(visible, "")
-        }
-        return ThinkingSplit(
-            visibleText = safeVisible.trim(),
-            thinking = thinkingChunks.joinToString("\n").let(::removeThinkingMarkup).trim(),
-        )
-    }
-
-    private fun addChunk(
-        value: String,
-        thinking: Boolean,
-        visibleChunks: MutableList<String>,
-        thinkingChunks: MutableList<String>,
-    ) {
-        val trimmed = value.trim()
-        if (trimmed.isEmpty()) return
-        if (thinking) thinkingChunks += trimmed else visibleChunks += trimmed
-    }
-
-    private fun sanitizeTypedThinking(value: String): String {
-        val split = splitThinking(value)
-        return listOf(split.thinking, split.visibleText)
-            .filter { it.isNotBlank() }
-            .joinToString("\n")
-            .let(::removeThinkingMarkup)
-            .trim()
-    }
-
     private fun successfulToolFallback(results: List<ToolResult>): String? =
         results.asReversed().firstNotNullOfOrNull { result ->
             // Wire polarity: `success` -> `is_error` (inverted).
@@ -173,7 +93,6 @@ internal object ChatToolResultNormalizer {
                 ?: result.result_json.takeIf { it.isNotBlank() }
         }
         return summary
-            ?.let(::visibleOnly)
             ?.replace(Regex("[\\t ]+"), " ")
             ?.trim()
             ?.take(500)
@@ -196,14 +115,4 @@ internal object ChatToolResultNormalizer {
         is JsonObject -> firstUsefulValue()
         is JsonArray -> firstNotNullOfOrNull { it.firstPrimitiveValue() }
     }
-
-    private fun visibleOnly(value: String): String = splitThinking(value).visibleText
-
-    private fun removeThinkingMarkup(value: String): String =
-        incompleteThinkingTag.replace(thinkingTag.replace(value, ""), "")
-
-    internal data class ThinkingSplit(
-        val visibleText: String,
-        val thinking: String,
-    )
 }

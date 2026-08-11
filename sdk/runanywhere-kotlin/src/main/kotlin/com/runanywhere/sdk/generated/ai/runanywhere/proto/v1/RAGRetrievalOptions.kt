@@ -146,11 +146,11 @@ public class RAGRetrievalOptions(
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGRetrievalOptions> =
         object : ProtoAdapter<RAGRetrievalOptions>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      RAGRetrievalOptions::class, 
-      "type.googleapis.com/runanywhere.v1.RAGRetrievalOptions", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      RAGRetrievalOptions::class,
+      "type.googleapis.com/runanywhere.v1.RAGRetrievalOptions",
+      PROTO_3,
+      null,
       "rag.proto"
     ) {
       override fun encodedSize(`value`: RAGRetrievalOptions): Int {

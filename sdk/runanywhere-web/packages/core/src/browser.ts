@@ -31,7 +31,7 @@ export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader.js'
 export { VideoCapture } from './Infrastructure/VideoCapture.js';
 export type { CapturedFrame, VideoCaptureConfig } from './Infrastructure/VideoCapture.js';
 
-export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities.js';
+export { detectCapabilities } from './Infrastructure/DeviceCapabilities.js';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities.js';
 
 export {

@@ -49,13 +49,11 @@ class TTSBenchmarkProvider implements BenchmarkScenarioProvider {
       final result = await sdk.RunAnywhere.tts.synthesize(text);
       metrics.endToEndLatencyMs = benchStopwatch.elapsedMicroseconds / 1000.0;
 
+      // Commons owns audio duration (TTSOutput.duration_ms). Never derive from
+      // PCM byte length / sample rate.
       final durationMs = result.durationMs;
       if (durationMs > 0) {
         metrics.audioDurationSeconds = durationMs / 1000.0;
-      } else if (result.sampleRate > 0 && result.data.isNotEmpty) {
-        // Fallback: Float32 PCM — 4 bytes per sample.
-        metrics.audioDurationSeconds =
-            (result.data.length / 4) / result.sampleRate;
       }
       metrics.charactersProcessed = text.length;
 

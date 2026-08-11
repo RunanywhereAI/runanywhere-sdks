@@ -9,31 +9,44 @@
 //  idl/codegen/generate_swift_convenience.py from the rac_default /
 //  rac_required / rac_min annotations in idl/embeddings_options.proto.
 //
+//  Vector math (L2 norm / cosine similarity) is owned by commons
+//  (`rac_embeddings_norm` / `rac_embeddings_similarity`) via CRACommons.
+//
 
+import CRACommons
 import Foundation
 
 // MARK: - RAEmbeddingVector
 
 extension RAEmbeddingVector {
-    /// `EmbeddingVector.norm` was deleted outright (idl/embeddings_options.proto)
-    /// with no replacement — there is no cached norm to read, so this always
-    /// computes it fresh (cheap, `O(dimension)`).
+    /// Cosine similarity via `rac_embeddings_similarity`.
+    ///
+    /// Commons returns 0 for empty vectors, mismatched dimensions, or when
+    /// either vector has zero L2 norm. There is no cached `norm` field on the
+    /// proto — the C ABI always computes fresh.
     public func cosineSimilarity(with other: RAEmbeddingVector) -> Float {
-        guard values.count == other.values.count, !values.isEmpty else { return 0 }
-        var dot: Float = 0
-        for i in 0..<values.count { dot += values[i] * other.values[i] }
-        let aNorm = Self.l2(values)
-        let bNorm = Self.l2(other.values)
-        guard aNorm > 0 && bNorm > 0 else { return 0 }
-        return dot / (aNorm * bNorm)
+        values.withUnsafeBufferPointer { lhs in
+            other.values.withUnsafeBufferPointer { rhs in
+                var similarity: Float = 0
+                let rc = rac_embeddings_similarity(
+                    lhs.baseAddress,
+                    lhs.count,
+                    rhs.baseAddress,
+                    rhs.count,
+                    &similarity
+                )
+                return rc == RAC_SUCCESS ? similarity : 0
+            }
+        }
     }
 
-    public func computeNorm() -> Float { Self.l2(values) }
-
-    private static func l2(_ values: [Float]) -> Float {
-        var sumSquares: Float = 0
-        for value in values { sumSquares += value * value }
-        return sumSquares.squareRoot()
+    /// L2 norm via `rac_embeddings_norm`. Empty vectors have norm 0.
+    public func computeNorm() -> Float {
+        values.withUnsafeBufferPointer { buffer in
+            var norm: Float = 0
+            let rc = rac_embeddings_norm(buffer.baseAddress, buffer.count, &norm)
+            return rc == RAC_SUCCESS ? norm : 0
+        }
     }
 }
 

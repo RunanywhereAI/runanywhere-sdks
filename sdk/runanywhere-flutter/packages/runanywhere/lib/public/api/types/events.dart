@@ -467,13 +467,14 @@ final class DownloadStarted extends DownloadEvent {
 
 /// Bytes are arriving.
 final class DownloadProgressEvent extends DownloadEvent {
-  /// Carry transfer counters.
+  /// Carry transfer counters and commons-owned overall progress.
   const DownloadProgressEvent({
     required this.operationId,
     required this.bytesDone,
     required this.bytesTotal,
     this.sequence = 0,
     this.file,
+    this.overallProgress,
   });
 
   /// Correlation id for this download.
@@ -491,10 +492,11 @@ final class DownloadProgressEvent extends DownloadEvent {
   /// File currently being fetched, for multi-file downloads.
   final String? file;
 
-  /// Deprecated v3 convenience: overall completion in `[0.0, 1.0]`, derived
-  /// from [bytesDone]/[bytesTotal]. Zero when the total is unknown.
-  @Deprecated('Compute from bytesDone / bytesTotal directly')
-  double get percent => bytesTotal > 0 ? bytesDone / bytesTotal : 0;
+  /// Fraction of the whole download that is done, `0.0..1.0`, as reported by
+  /// commons (`DownloadProgress.overall_progress`). Null when commons has not
+  /// yet reported a positive value — never re-derived from [bytesDone]/
+  /// [bytesTotal] (multi-file plans make that a per-file figure).
+  final double? overallProgress;
 }
 
 /// Downloaded bytes are being checksummed/validated.

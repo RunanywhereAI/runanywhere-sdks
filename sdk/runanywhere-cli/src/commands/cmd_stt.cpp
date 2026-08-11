@@ -10,7 +10,6 @@
 
 #include "commands/commands.h"
 
-#include <chrono>
 #include <memory>
 #include <string>
 
@@ -90,13 +89,9 @@ int run_stt(const GlobalOptions& options, const SttParams& params) {
     stt_options.max_speakers = params.max_speakers;
     stt_options.sample_rate = kSttSampleRate;
 
-    const auto started = std::chrono::steady_clock::now();
     rac_stt_result_t result = {};
     rc = rac_stt_component_transcribe(stt, pcm16.data(), pcm16.size() * sizeof(int16_t),
                                       &stt_options, &result);
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             std::chrono::steady_clock::now() - started)
-                             .count();
 
     int exit_code = 0;
     if (rc != RAC_SUCCESS) {
@@ -111,7 +106,7 @@ int run_stt(const GlobalOptions& options, const SttParams& params) {
                 .field("text", text)
                 .field("language", result.detected_language ? result.detected_language : "")
                 .field("confidence", static_cast<double>(result.confidence))
-                .field("total_ms", static_cast<int64_t>(elapsed));
+                .field("total_ms", result.processing_time_ms);
             json.begin_array("words");
             for (size_t i = 0; i < result.num_words; ++i) {
                 const rac_stt_word_t& word = result.words[i];
@@ -127,7 +122,7 @@ int run_stt(const GlobalOptions& options, const SttParams& params) {
         } else {
             out::result_line(text);
             if (options.verbose) {
-                out::status_line("(" + std::to_string(elapsed) + " ms)");
+                out::status_line("(" + std::to_string(result.processing_time_ms) + " ms)");
             }
         }
         rac_stt_result_free(&result);

@@ -16,6 +16,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'finish_reason.pbenum.dart' as $1;
 import 'token_usage.pb.dart' as $0;
 import 'tool_calling.pbenum.dart';
 
@@ -970,6 +971,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     $core.int? errorCode,
     $core.String? thinkingContent,
     $0.TokenUsage? usage,
+    $1.FinishReason? finishReason,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -981,6 +983,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     if (errorCode != null) result.errorCode = errorCode;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
     if (usage != null) result.usage = usage;
+    if (finishReason != null) result.finishReason = finishReason;
     return result;
   }
 
@@ -1009,6 +1012,8 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     ..aOS(8, _omitFieldNames ? '' : 'thinkingContent')
     ..aOM<$0.TokenUsage>(9, _omitFieldNames ? '' : 'usage',
         subBuilder: $0.TokenUsage.create)
+    ..aE<$1.FinishReason>(10, _omitFieldNames ? '' : 'finishReason',
+        enumValues: $1.FinishReason.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1109,6 +1114,17 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   void clearUsage() => $_clearField(9);
   @$pb.TagNumber(9)
   $0.TokenUsage ensureUsage() => $_ensure(8);
+
+  /// Terminal reason for the last model turn the loop observed. Never inferred
+  /// from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+  @$pb.TagNumber(10)
+  $1.FinishReason get finishReason => $_getN(9);
+  @$pb.TagNumber(10)
+  set finishReason($1.FinishReason value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasFinishReason() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearFinishReason() => $_clearField(10);
 }
 
 class ToolParseRequest extends $pb.GeneratedMessage {

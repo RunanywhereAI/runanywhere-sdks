@@ -11,7 +11,7 @@ import {
   DownloadState,
   DownloadSubscribeRequest,
 } from '@runanywhere/proto-ts/download_service';
-import { DownloadAbi, isTerminalState, toProgressSnapshot } from './download-abi';
+import { DownloadAbi, isTerminalState } from './download-abi';
 import type { LoadSlot, RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
@@ -342,20 +342,23 @@ function toLifecycleLoadedModel(
  * `rac_download_progress_poll_proto` on a timer.
  */
 class DownloadWatcher {
-  private readonly followers = new Map<string, (progress: DownloadProgress) => void>();
+  private readonly followers = new Map<
+    string,
+    (progress: DownloadProgress) => void | Promise<void>
+  >();
   private open: Promise<void> | null = null;
 
   constructor(private readonly backend: RaBackend) {}
 
   follow(
     modelId: string,
-    onProgress: (progress: DownloadProgress) => void,
+    onProgress: (progress: DownloadProgress) => void | Promise<void>,
     poll: () => Promise<DownloadProgress>
   ): Promise<void> {
     if (!this.open) {
       this.open = this.backend.downloadWatch((bytes) => {
         const progress = DownloadProgress.decode(bytes);
-        this.followers.get(progress.modelId)?.(progress);
+        void this.followers.get(progress.modelId)?.(progress);
       });
       this.open.catch(() => undefined);
     }
@@ -372,16 +375,17 @@ class DownloadWatcher {
         }
         resolve();
       };
-      const handle = (progress: DownloadProgress): void => {
+      const handle = (progress: DownloadProgress): void | Promise<void> => {
         if (settled) return;
-        onProgress(progress);
-        if (isTerminalState(progress.state)) finish();
+        return Promise.resolve(onProgress(progress)).then(() => {
+          if (isTerminalState(progress.state)) finish();
+        });
       };
       this.followers.set(modelId, handle);
       const timer = setInterval(() => {
         poll().then(
           (progress) => {
-            if (!settled && isTerminalState(progress.state)) handle(progress);
+            if (!settled && isTerminalState(progress.state)) void handle(progress);
           },
           () => undefined
         );
@@ -605,7 +609,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
           downloads.poll(
             DownloadSubscribeRequest.fromPartial({ modelId: id, taskId: started.taskId })
           );
-        await watcher.follow(id, (progress) => {
+        await watcher.follow(id, async (progress) => {
           last = progress;
           if (progress.taskId) operationId = progress.taskId;
           if (!announced) {
@@ -660,9 +664,10 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
             default:
               // Everything else — pending, downloading, retrying, paused,
               // resuming — is a transfer still in motion and reads as progress.
+              // Percent / fraction come from commons (`rac_download_progress_percent`).
               sink.push({
                 type: 'progress',
-                snapshot: toProgressSnapshot(progress, operationId, next()),
+                snapshot: await downloads.snapshot(progress, operationId, next()),
               });
               return;
           }
@@ -1404,9 +1409,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
             options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
         })
       );
-      // Commons guarantees the pixel counts sum to width * height before it
-      // encodes a result, so the coverage share is an exact division here.
-      const pixels = native.width * native.height;
+      // Commons owns SegmentationClassSummary.fraction (tag 5).
       return {
         classMask: toClassMask(native),
         width: native.width,
@@ -1415,7 +1418,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           classId: c.classId,
           label: c.label,
           pixelCount: c.pixelCount,
-          fraction: pixels ? c.pixelCount / pixels : 0,
+          fraction: c.fraction ?? 0,
         })),
       };
     },

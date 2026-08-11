@@ -206,6 +206,7 @@ export async function answerImageAttachment(
   const image = RunAnywhere.ImageInput.rawRgb(frame.rgbPixels, frame.width, frame.height);
 
   let content = '';
+  let thinking = '';
   onProgress({ content });
   const events = RunAnywhere.vlm.generateStream(image, prompt, {
     maxOutputTokens: Math.min(settings.maxTokens, MAX_ATTACHMENT_OUTPUT_TOKENS),
@@ -222,6 +223,11 @@ export async function answerImageAttachment(
       if (event.type === 'textDelta') {
         content += event.text;
         onProgress({ content });
+      } else if (event.type === 'completed') {
+        // Commons-owned channels only. VLMResult has no thinking_content today,
+        // so do not parse <think> tags in the app — leave text as returned.
+        content = event.result.text || content;
+        thinking = event.result.thinkingText || '';
       } else if (event.type === 'failed') {
         // A mid-stream failure arrives as an event, not a throw. Swallowing it
         // — which this loop used to do — reported a broken vision pipeline as an
@@ -236,13 +242,9 @@ export async function answerImageAttachment(
   const cancelled = imageAnswerCancelled;
   imageAnswerCancelled = false;
 
-  // A vision model with a thinking phase emits its reasoning as literal
-  // `<think>` tags in the same channel as the answer; without splitting them the
-  // markup landed in the bubble as prose.
-  const split = splitThinking(content);
   return {
-    content: split.content || (cancelled ? '' : content),
-    thinking: split.thinking || undefined,
+    content: content || (cancelled ? '' : content),
+    thinking: thinking || undefined,
     cancelled,
   };
 }
@@ -307,6 +309,7 @@ export async function answerDocumentAttachment(
     const iterator = events[Symbol.asyncIterator]();
     activeDocumentStream = iterator;
     let answer = '';
+    let thinking = '';
     let sources: ChatAttachmentSource[] = [];
     try {
       for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
@@ -315,9 +318,11 @@ export async function answerDocumentAttachment(
           sources = event.matches.map(sourceFromMatch);
         } else if (event.type === 'textDelta') {
           answer += event.text;
-          onProgress({ content: splitThinking(answer).content || answer });
+          onProgress({ content: answer });
         } else if (event.type === 'completed') {
+          // RagResult.thinkingText is commons-split (RAGResult.thinking_content).
           answer = event.result.answer || answer;
+          thinking = event.result.thinkingText || thinking;
           if (event.result.sources.length > 0) sources = event.result.sources.map(sourceFromMatch);
         } else if (event.type === 'failed') {
           throw new Error(event.error.message || 'The document answer failed.');
@@ -328,10 +333,9 @@ export async function answerDocumentAttachment(
     }
 
     const cancelled = cancellation.signal.aborted;
-    const split = splitThinking(answer);
     return {
-      content: split.content || (cancelled ? '' : answer),
-      thinking: split.thinking || undefined,
+      content: answer || (cancelled ? '' : answer),
+      thinking: thinking || undefined,
       sources: sources.length > 0 ? sources : undefined,
       cancelled,
     };
@@ -427,21 +431,6 @@ function createDocumentId(): string {
     return crypto.randomUUID();
   }
   return Math.random().toString(36).slice(2);
-}
-
-function splitThinking(raw: string): { content: string; thinking: string } {
-  const thinkingParts: string[] = [];
-  const content = raw.replace(
-    /<(think|thinking)>([\s\S]*?)(<\/\1>|$)/gi,
-    (_match, _tag: string, inner: string) => {
-      if (inner.trim().length > 0) thinkingParts.push(inner.trim());
-      return '';
-    },
-  );
-  return {
-    content: content.trim(),
-    thinking: thinkingParts.join('\n\n').trim(),
-  };
 }
 
 function formatBytes(bytes: number): string {

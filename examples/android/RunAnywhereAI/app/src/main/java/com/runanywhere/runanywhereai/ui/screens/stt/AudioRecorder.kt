@@ -4,8 +4,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import kotlin.math.log10
-import kotlin.math.sqrt
+import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 
 class AudioRecorder {
 
@@ -47,7 +46,12 @@ class AudioRecorder {
             while (recording) {
                 val read = rec.read(buffer, 0, buffer.size)
                 if (read > 0) {
-                    onChunk(buffer.copyOf(read), level(buffer, read))
+                    // Level comes from the SDK helper (same formula as capture
+                    // manager / commons rac_audio_compute_level_normalized).
+                    onChunk(
+                        buffer.copyOf(read),
+                        AudioCaptureManager.normalizedLevelFromPcm16Le(buffer, read),
+                    )
                 } else {
                     // Any non-positive read is terminal: a graceful stop() (which
                     // flips recording=false and calls rec.stop() to unblock this
@@ -88,21 +92,6 @@ class AudioRecorder {
             w.join(JOIN_TIMEOUT_MS)
             if (!w.isAlive) worker = null
         }
-    }
-
-    private fun level(bytes: ByteArray, length: Int): Float {
-        val samples = length / 2
-        if (samples == 0) return 0f
-        var sum = 0.0
-        for (i in 0 until samples) {
-            val lo = bytes[2 * i].toInt() and 0xff
-            val hi = bytes[2 * i + 1].toInt()
-            val sample = (hi shl 8) or lo
-            sum += sample.toDouble() * sample
-        }
-        val rms = sqrt(sum / samples)
-        val db = 20 * log10((rms / 32768.0).coerceAtLeast(1e-6))
-        return (((db + 60) / 60).coerceIn(0.0, 1.0)).toFloat()
     }
 
     companion object {

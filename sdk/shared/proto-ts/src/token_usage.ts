@@ -31,17 +31,52 @@ export interface TokenUsage {
    */
   prefillMs: number;
   /**
-   * Request start to first output token. The canonical spelling for every
-   * result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
-   * report TTFT here and nowhere else. SDKEvent's own telemetry fields
-   * (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
-   * their separate event-stream spelling.
+   * Request start to first output token of any kind (reasoning or content).
+   * The canonical spelling for every result type: LLMGenerationResult and
+   * VLMResult report TTFT here and nowhere else. SDKEvent's own telemetry
+   * fields (GenerationEvent.time_to_first_token_ms, first_token_latency_ms)
+   * keep their separate event-stream spelling.
    */
   ttftMs: number;
+  /**
+   * Request start to the first CONTENT delta — what the user actually waits
+   * for when the model reasons first. 0 when no content token was ever
+   * delivered. Distinct from ttft_ms; do not alias the two.
+   */
+  timeToFirstContentTokenMs: number;
+  /**
+   * Content-only throughput over first-content-delta → last delta. Excludes
+   * reasoning tokens the accelerator also decoded. 0 when content count or
+   * window is unavailable.
+   */
+  contentTokensPerSecond: number;
+  /**
+   * True when the backend buffered the whole generation and flushed deltas
+   * at once, so the decode window is an artifact of the flush. Platforms
+   * must not re-derive this heuristic.
+   */
+  batchBuffered: boolean;
+  /**
+   * True when input_tokens / output_tokens were estimated (e.g. chars/4)
+   * rather than reported by the engine. Absence of the flag (false) means
+   * the counts are engine-measured.
+   */
+  countsEstimated: boolean;
 }
 
 function createBaseTokenUsage(): TokenUsage {
-  return { inputTokens: 0, outputTokens: 0, totalTokens: 0, decodeTokensPerSecond: 0, prefillMs: 0, ttftMs: 0 };
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    decodeTokensPerSecond: 0,
+    prefillMs: 0,
+    ttftMs: 0,
+    timeToFirstContentTokenMs: 0,
+    contentTokensPerSecond: 0,
+    batchBuffered: false,
+    countsEstimated: false,
+  };
 }
 
 export const TokenUsage: MessageFns<TokenUsage> = {
@@ -63,6 +98,18 @@ export const TokenUsage: MessageFns<TokenUsage> = {
     }
     if (message.ttftMs !== 0) {
       writer.uint32(48).int64(message.ttftMs);
+    }
+    if (message.timeToFirstContentTokenMs !== 0) {
+      writer.uint32(56).int64(message.timeToFirstContentTokenMs);
+    }
+    if (message.contentTokensPerSecond !== 0) {
+      writer.uint32(65).double(message.contentTokensPerSecond);
+    }
+    if (message.batchBuffered !== false) {
+      writer.uint32(72).bool(message.batchBuffered);
+    }
+    if (message.countsEstimated !== false) {
+      writer.uint32(80).bool(message.countsEstimated);
     }
     return writer;
   },
@@ -122,6 +169,38 @@ export const TokenUsage: MessageFns<TokenUsage> = {
           message.ttftMs = longToNumber(reader.int64());
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.timeToFirstContentTokenMs = longToNumber(reader.int64());
+          continue;
+        }
+        case 8: {
+          if (tag !== 65) {
+            break;
+          }
+
+          message.contentTokensPerSecond = reader.double();
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.batchBuffered = reader.bool();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.countsEstimated = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -163,6 +242,26 @@ export const TokenUsage: MessageFns<TokenUsage> = {
         : isSet(object.ttft_ms)
         ? globalThis.Number(object.ttft_ms)
         : 0,
+      timeToFirstContentTokenMs: isSet(object.timeToFirstContentTokenMs)
+        ? globalThis.Number(object.timeToFirstContentTokenMs)
+        : isSet(object.time_to_first_content_token_ms)
+        ? globalThis.Number(object.time_to_first_content_token_ms)
+        : 0,
+      contentTokensPerSecond: isSet(object.contentTokensPerSecond)
+        ? globalThis.Number(object.contentTokensPerSecond)
+        : isSet(object.content_tokens_per_second)
+        ? globalThis.Number(object.content_tokens_per_second)
+        : 0,
+      batchBuffered: isSet(object.batchBuffered)
+        ? globalThis.Boolean(object.batchBuffered)
+        : isSet(object.batch_buffered)
+        ? globalThis.Boolean(object.batch_buffered)
+        : false,
+      countsEstimated: isSet(object.countsEstimated)
+        ? globalThis.Boolean(object.countsEstimated)
+        : isSet(object.counts_estimated)
+        ? globalThis.Boolean(object.counts_estimated)
+        : false,
     };
   },
 
@@ -186,6 +285,18 @@ export const TokenUsage: MessageFns<TokenUsage> = {
     if (message.ttftMs !== 0) {
       obj.ttftMs = Math.round(message.ttftMs);
     }
+    if (message.timeToFirstContentTokenMs !== 0) {
+      obj.timeToFirstContentTokenMs = Math.round(message.timeToFirstContentTokenMs);
+    }
+    if (message.contentTokensPerSecond !== 0) {
+      obj.contentTokensPerSecond = message.contentTokensPerSecond;
+    }
+    if (message.batchBuffered !== false) {
+      obj.batchBuffered = message.batchBuffered;
+    }
+    if (message.countsEstimated !== false) {
+      obj.countsEstimated = message.countsEstimated;
+    }
     return obj;
   },
 
@@ -200,6 +311,10 @@ export const TokenUsage: MessageFns<TokenUsage> = {
     message.decodeTokensPerSecond = object.decodeTokensPerSecond ?? 0;
     message.prefillMs = object.prefillMs ?? 0;
     message.ttftMs = object.ttftMs ?? 0;
+    message.timeToFirstContentTokenMs = object.timeToFirstContentTokenMs ?? 0;
+    message.contentTokensPerSecond = object.contentTokensPerSecond ?? 0;
+    message.batchBuffered = object.batchBuffered ?? false;
+    message.countsEstimated = object.countsEstimated ?? false;
     return message;
   },
 };

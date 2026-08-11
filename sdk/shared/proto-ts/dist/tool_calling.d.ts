@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { FinishReason } from "./finish_reason";
 import { TokenUsage } from "./token_usage";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -265,6 +266,11 @@ export interface ToolCallingResult {
      * through the tool loop report the same usage a non-tool generate would.
      */
     usage?: TokenUsage | undefined;
+    /**
+     * Terminal reason for the last model turn the loop observed. Never inferred
+     * from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+     */
+    finishReason: FinishReason;
 }
 export interface ToolParseRequest {
     text: string;

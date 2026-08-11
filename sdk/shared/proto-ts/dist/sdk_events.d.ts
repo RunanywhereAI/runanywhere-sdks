@@ -556,9 +556,6 @@ export interface GenerationEvent {
     error: string;
     /** For MODEL_LOADED / MODEL_UNLOADED — bound model. */
     modelId: string;
-    /** For COST_CALCULATED — Dart SDKGenerationCostCalculated. */
-    costAmount: number;
-    costSavedAmount: number;
     /** For ROUTING_DECISION. */
     routingTarget: string;
     routingReason: string;

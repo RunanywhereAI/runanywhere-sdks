@@ -60,7 +60,8 @@ const BAR_COUNT = 12;
 
 interface LogEntry {
   type: 'started' | 'ended';
-  timestampMs: number;
+  /** Commons SPEECH_ACTIVITY timestamp when the SDK provides it; omit otherwise. */
+  timestampMs?: number;
 }
 
 export const VADScreen: React.FC = () => {
@@ -72,14 +73,13 @@ export const VADScreen: React.FC = () => {
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [latestResult, setLatestResult] = useState<VadResult | null>(null);
-  const [frameCount, setFrameCount] = useState(0);
+  const [speechDetected, setSpeechDetected] = useState(false);
   const [activityLog, setActivityLog] = useState<LogEntry[]>([]);
 
   const captureRef = useRef<AudioCaptureManager | null>(null);
   const streamRef = useRef<PushableAudioStream | null>(null);
   const taskRef = useRef<Promise<void> | null>(null);
   const isListeningRef = useRef(false);
-  const prevSpeechRef = useRef<boolean>(false);
 
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -105,23 +105,7 @@ export const VADScreen: React.FC = () => {
     };
   }, [refreshLoadedModel]);
 
-  const speechDetected = latestResult?.isSpeech ?? false;
   const audioLevel = Math.min(1, latestResult?.probability ?? 0);
-
-  useEffect(() => {
-    if (speechDetected && !prevSpeechRef.current) {
-      setActivityLog((prev) => [
-        { type: 'started', timestampMs: Date.now() },
-        ...prev,
-      ]);
-    } else if (!speechDetected && prevSpeechRef.current) {
-      setActivityLog((prev) => [
-        { type: 'ended', timestampMs: Date.now() },
-        ...prev,
-      ]);
-    }
-    prevSpeechRef.current = speechDetected;
-  }, [speechDetected]);
 
   useEffect(() => {
     if (speechDetected) {
@@ -161,18 +145,39 @@ export const VADScreen: React.FC = () => {
     }
   };
 
+  const appendLog = (type: LogEntry['type'], timestampMs?: number) => {
+    setActivityLog((prev) => [
+      {
+        type,
+        ...(timestampMs != null && timestampMs > 0 ? { timestampMs } : {}),
+      },
+      ...prev,
+    ]);
+  };
+
+  /**
+   * Consume SDK VAD stream events. Onset/offset come from SPEECH_ACTIVITY
+   * (`speechStarted` / `speechEnded`) — never edge-detect `isSpeech` in the UI.
+   */
   const consumeVAD = async (events: AsyncIterable<VadEvent>) => {
     const iterator = events[Symbol.asyncIterator]();
     try {
       let step = await iterator.next();
       while (!step.done && isListeningRef.current) {
-        if (step.value.type === 'activity') {
+        const event = step.value;
+        if (event.type === 'speechStarted') {
+          setSpeechDetected(true);
+          appendLog('started', event.timestampMs);
+        } else if (event.type === 'speechEnded') {
+          setSpeechDetected(false);
+          appendLog('ended', event.timestampMs);
+        } else if (event.type === 'activity') {
+          setSpeechDetected(event.isSpeech);
           setLatestResult({
-            isSpeech: step.value.isSpeech,
-            probability: step.value.probability,
+            isSpeech: event.isSpeech,
+            probability: event.probability,
             segments: [],
           });
-          setFrameCount((count) => count + 1);
         }
         step = await iterator.next();
       }
@@ -196,7 +201,7 @@ export const VADScreen: React.FC = () => {
     streamRef.current = stream;
     isListeningRef.current = true;
     setLatestResult(null);
-    setFrameCount(0);
+    setSpeechDetected(false);
     taskRef.current = consumeVAD(
       RunAnywhere.vad.detectStream(pcmAudioInputs(stream.iterable))
     );
@@ -422,7 +427,10 @@ export const VADScreen: React.FC = () => {
             <View style={[styles.logCard, { backgroundColor: colors.surfaceContainerHigh }]}>
               {activityLog.slice(0, 20).map((entry, i) => {
                 const started = entry.type === 'started';
-                const time = new Date(entry.timestampMs).toLocaleTimeString();
+                const time =
+                  entry.timestampMs != null && entry.timestampMs > 0
+                    ? new Date(entry.timestampMs).toLocaleTimeString()
+                    : '—';
                 return (
                   <View
                     key={i}

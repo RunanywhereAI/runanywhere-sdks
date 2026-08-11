@@ -96,12 +96,17 @@ export interface SegmentationRequest {
  * SegmentationResult.height). Commons rejects any result whose pixel_counts
  * do not sum to that product before encoding it into a SegmentationResult, so
  * within this message the summaries partition the image and the division is
- * exact.
+ * exact. `fraction` is that share, computed once by commons (tag 5).
  */
 export interface SegmentationClassSummary {
   classId: number;
   pixelCount: number;
   label: string;
+  /**
+   * Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+   * Zero when width or height is zero (rejected upstream before encode).
+   */
+  fraction: number;
 }
 
 export interface SegmentationResult {
@@ -422,7 +427,7 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
 };
 
 function createBaseSegmentationClassSummary(): SegmentationClassSummary {
-  return { classId: 0, pixelCount: 0, label: "" };
+  return { classId: 0, pixelCount: 0, label: "", fraction: 0 };
 }
 
 export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
@@ -435,6 +440,9 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     }
     if (message.label !== "") {
       writer.uint32(26).string(message.label);
+    }
+    if (message.fraction !== 0) {
+      writer.uint32(45).float(message.fraction);
     }
     return writer;
   },
@@ -470,6 +478,14 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
           message.label = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 45) {
+            break;
+          }
+
+          message.fraction = reader.float();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -492,6 +508,7 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
         ? globalThis.Number(object.pixel_count)
         : 0,
       label: isSet(object.label) ? globalThis.String(object.label) : "",
+      fraction: isSet(object.fraction) ? globalThis.Number(object.fraction) : 0,
     };
   },
 
@@ -506,6 +523,9 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     if (message.label !== "") {
       obj.label = message.label;
     }
+    if (message.fraction !== 0) {
+      obj.fraction = message.fraction;
+    }
     return obj;
   },
 
@@ -517,6 +537,7 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     message.classId = object.classId ?? 0;
     message.pixelCount = object.pixelCount ?? 0;
     message.label = object.label ?? "";
+    message.fraction = object.fraction ?? 0;
     return message;
   },
 };

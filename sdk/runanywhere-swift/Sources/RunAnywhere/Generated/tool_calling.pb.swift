@@ -575,66 +575,89 @@ public nonisolated struct RAToolCallingOptions: Sendable {
 /// ---------------------------------------------------------------------------
 /// Result of a tool-enabled generation.
 /// ---------------------------------------------------------------------------
-public nonisolated struct RAToolCallingResult: Sendable {
+public nonisolated struct RAToolCallingResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Final text response from the assistant.
-  public var text: String = String()
+  public var text: String {
+    get {_storage._text}
+    set {_uniqueStorage()._text = newValue}
+  }
 
   /// Tool calls the LLM made.
-  public var toolCalls: [RAToolCall] = []
+  public var toolCalls: [RAToolCall] {
+    get {_storage._toolCalls}
+    set {_uniqueStorage()._toolCalls = newValue}
+  }
 
   /// Results of executed tools (only populated when auto_execute was true).
-  public var toolResults: [RAToolResult] = []
+  public var toolResults: [RAToolResult] {
+    get {_storage._toolResults}
+    set {_uniqueStorage()._toolResults = newValue}
+  }
 
   /// Whether the response is complete or waiting for more tool results.
-  public var isComplete: Bool = false
+  public var isComplete: Bool {
+    get {_storage._isComplete}
+    set {_uniqueStorage()._isComplete = newValue}
+  }
 
   /// Number of LLM generation turns used, including the final synthesis turn.
-  public var iterationsUsed: Int32 = 0
+  public var iterationsUsed: Int32 {
+    get {_storage._iterationsUsed}
+    set {_uniqueStorage()._iterationsUsed = newValue}
+  }
 
   public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
   }
   /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
   /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
 
-  public var errorCode: Int32 = 0
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
 
   /// Optional thinking/reasoning content extracted from the final response.
   public var thinkingContent: String {
-    get {_thinkingContent ?? String()}
-    set {_thinkingContent = newValue}
+    get {_storage._thinkingContent ?? String()}
+    set {_uniqueStorage()._thinkingContent = newValue}
   }
   /// Returns true if `thinkingContent` has been explicitly set.
-  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  public var hasThinkingContent: Bool {_storage._thinkingContent != nil}
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
-  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+  public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
 
   /// Token usage aggregated across every LLM generation turn in the loop
   /// (including the final synthesis turn). Lets a plain generate() that routed
   /// through the tool loop report the same usage a non-tool generate would.
   public var usage: RATokenUsage {
-    get {_usage ?? RATokenUsage()}
-    set {_usage = newValue}
+    get {_storage._usage ?? RATokenUsage()}
+    set {_uniqueStorage()._usage = newValue}
   }
   /// Returns true if `usage` has been explicitly set.
-  public var hasUsage: Bool {self._usage != nil}
+  public var hasUsage: Bool {_storage._usage != nil}
   /// Clears the value of `usage`. Subsequent reads from it will return its default value.
-  public mutating func clearUsage() {self._usage = nil}
+  public mutating func clearUsage() {_uniqueStorage()._usage = nil}
+
+  /// Terminal reason for the last model turn the loop observed. Never inferred
+  /// from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+  public var finishReason: RAFinishReason {
+    get {_storage._finishReason}
+    set {_uniqueStorage()._finishReason = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _errorMessage: String? = nil
-  fileprivate var _thinkingContent: String? = nil
-  fileprivate var _usage: RATokenUsage? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct RAToolParseRequest: Sendable {
@@ -1452,73 +1475,132 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}thinking_content\0\u{1}usage\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}thinking_content\0\u{1}usage\0\u{3}finish_reason\0")
+
+  fileprivate class _StorageClass {
+    var _text: String = String()
+    var _toolCalls: [RAToolCall] = []
+    var _toolResults: [RAToolResult] = []
+    var _isComplete: Bool = false
+    var _iterationsUsed: Int32 = 0
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+    var _thinkingContent: String? = nil
+    var _usage: RATokenUsage? = nil
+    var _finishReason: RAFinishReason = .unspecified
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _text = source._text
+      _toolCalls = source._toolCalls
+      _toolResults = source._toolResults
+      _isComplete = source._isComplete
+      _iterationsUsed = source._iterationsUsed
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+      _thinkingContent = source._thinkingContent
+      _usage = source._usage
+      _finishReason = source._finishReason
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
-      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.toolResults) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.isComplete) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.iterationsUsed) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._usage) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._text) }()
+        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
+        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isComplete) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._iterationsUsed) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
+        case 10: try { try decoder.decodeSingularEnumField(value: &_storage._finishReason) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._text.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._text, fieldNumber: 1)
+      }
+      if !_storage._toolCalls.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolCalls, fieldNumber: 2)
+      }
+      if !_storage._toolResults.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolResults, fieldNumber: 3)
+      }
+      if _storage._isComplete != false {
+        try visitor.visitSingularBoolField(value: _storage._isComplete, fieldNumber: 4)
+      }
+      if _storage._iterationsUsed != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._iterationsUsed, fieldNumber: 5)
+      }
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 7)
+      }
+      try { if let v = _storage._thinkingContent {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._usage {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      if _storage._finishReason != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._finishReason, fieldNumber: 10)
+      }
     }
-    if !self.toolCalls.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.toolCalls, fieldNumber: 2)
-    }
-    if !self.toolResults.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.toolResults, fieldNumber: 3)
-    }
-    if self.isComplete != false {
-      try visitor.visitSingularBoolField(value: self.isComplete, fieldNumber: 4)
-    }
-    if self.iterationsUsed != 0 {
-      try visitor.visitSingularInt32Field(value: self.iterationsUsed, fieldNumber: 5)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 7)
-    }
-    try { if let v = self._thinkingContent {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._usage {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAToolCallingResult, rhs: RAToolCallingResult) -> Bool {
-    if lhs.text != rhs.text {return false}
-    if lhs.toolCalls != rhs.toolCalls {return false}
-    if lhs.toolResults != rhs.toolResults {return false}
-    if lhs.isComplete != rhs.isComplete {return false}
-    if lhs.iterationsUsed != rhs.iterationsUsed {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs._thinkingContent != rhs._thinkingContent {return false}
-    if lhs._usage != rhs._usage {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._text != rhs_storage._text {return false}
+        if _storage._toolCalls != rhs_storage._toolCalls {return false}
+        if _storage._toolResults != rhs_storage._toolResults {return false}
+        if _storage._isComplete != rhs_storage._isComplete {return false}
+        if _storage._iterationsUsed != rhs_storage._iterationsUsed {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
+        if _storage._usage != rhs_storage._usage {return false}
+        if _storage._finishReason != rhs_storage._finishReason {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -582,6 +582,9 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     }
 
     runanywhere::v1::ToolCallingResult final_result;
+    // Last producer/commons terminal reason. Never inferred from tool_calls.size().
+    runanywhere::v1::FinishReason last_finish_reason =
+        runanywhere::v1::FINISH_REASON_UNSPECIFIED;
     std::string current_prompt = format_prompt_proto(ctx, /*tool_results=*/{});
     if (current_prompt.empty()) {
         current_prompt = ctx.user_prompt;
@@ -598,6 +601,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         final_result.set_iterations_used(static_cast<int32_t>(iteration));
         final_result.set_error_code(RAC_ERROR_CANCELLED);
         final_result.set_error_message("LLM generation cancelled");
+        final_result.set_finish_reason(runanywhere::v1::FINISH_REASON_CANCELLED);
         std::vector<uint8_t> bytes;
         serialize(final_result, &bytes);
         rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
@@ -657,7 +661,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
             &cancel_state->cancel_requested, &cancel_state->generation_started};
         if (!rac::llm::tool_calling::run_generate_once(step_generation, cancel_binding,
                                                        current_prompt, &response, &rc,
-                                                       &loop_telemetry.agg)) {
+                                                       &loop_telemetry.agg, &last_finish_reason)) {
             // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as
@@ -670,6 +674,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                                                                   ctx.generation);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
+            final_result.set_finish_reason(cancelled ? runanywhere::v1::FINISH_REASON_CANCELLED
+                                                     : runanywhere::v1::FINISH_REASON_ERROR);
             final_result.set_error_code(static_cast<int32_t>(report_rc));
             final_result.set_error_message(msg);
             std::vector<uint8_t> bytes;
@@ -891,6 +897,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     rac::llm::tool_calling::ensure_web_search_attribution(&final_result);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
+    final_result.set_finish_reason(last_finish_reason);
     rac::llm::tool_calling::set_tool_result_usage(&final_result, loop_telemetry.agg);
 
     std::vector<uint8_t> bytes;

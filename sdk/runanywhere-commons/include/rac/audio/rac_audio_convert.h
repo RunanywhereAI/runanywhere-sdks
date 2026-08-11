@@ -1,17 +1,13 @@
 /**
  * @file rac_audio_convert.h
- * @brief Shared inline audio-conversion helpers for engine backends.
+ * @brief Compatibility wrapper for engine backends that convert Int16 ↔ Float32.
  *
- * STT backends previously hand-rolled identical Int16 -> Float32 PCM
- * conversion routines inside their `vtable_transcribe` trampolines. This
- * header centralizes that conversion so every STT backend can normalize Int16
- * PCM to Float32 in [-1.0, 1.0] without duplication.
+ * Prefer the C ABI in rac/core/rac_audio_utils.h
+ * (`rac_audio_pcm16_to_float32` / `rac_audio_float32_to_pcm16`).
+ * This header keeps the historical `rac::audio::` inline name so sherpa and
+ * other in-tree backends compile unchanged while sharing one implementation.
  *
- * Scope:
- *   - sherpa consumes this header today.
- *     Any STT engine that resamples Int16 mic PCM to Float32 for its
- *     transcription entry point should call this helper rather than
- *     repeating the 1.0f/32768.0f scaling loop.
+ * Canonical scale: RAC_AUDIO_PCM16_SCALE (32768.0f) — see rac_audio_utils.h.
  */
 
 #ifndef RAC_AUDIO_CONVERT_H
@@ -20,24 +16,28 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "rac/core/rac_audio_utils.h"
+
 namespace rac {
 namespace audio {
 
 /**
  * @brief Convert a block of Int16 PCM samples to Float32 in [-1.0, 1.0].
  *
- * Dividing by 32768.0f matches the historical behavior used across every
- * in-tree backend. The caller owns both buffers; `out` MUST hold at least
- * `n_samples` floats.
- *
- * If `in` is NULL or `n_samples` is zero the call is a no-op.
+ * Forwards to the C ABI. The caller owns both buffers; `out` MUST hold at least
+ * `n_samples` floats. NULL inputs or a zero sample count are a no-op.
  */
 inline void rac_audio_pcm16_to_float32(const int16_t* in, size_t n_samples, float* out) {
-    if (in == nullptr || out == nullptr || n_samples == 0)
-        return;
-    for (size_t i = 0; i < n_samples; ++i) {
-        out[i] = static_cast<float>(in[i]) / 32768.0f;
-    }
+    (void)::rac_audio_pcm16_to_float32(in, n_samples, out);
+}
+
+/**
+ * @brief Quantize Float32 samples in [-1.0, 1.0] to Int16 PCM.
+ *
+ * Forwards to the C ABI (`RAC_AUDIO_PCM16_SCALE` round + saturate).
+ */
+inline void rac_audio_float32_to_pcm16(const float* in, size_t n_samples, int16_t* out) {
+    (void)::rac_audio_float32_to_pcm16(in, n_samples, out);
 }
 
 }  // namespace audio

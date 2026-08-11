@@ -71,6 +71,7 @@ import {
   recommendModels,
   type RecommendedSelection,
 } from '../services/model-recommendation';
+import { canRunByModelID } from '../services/model-compatibility-lookup';
 import { openModal, showToast } from './dialogs';
 import { icon } from './icons';
 import { runEngineRetry } from './engine-notice';
@@ -121,9 +122,9 @@ type RowState =
       /** Absent until the first progress event reports a total. */
       bytesDone?: number;
       bytesTotal?: number;
-      /** Bytes/second, smoothed. Absent until two samples exist. */
+      /** SDK throughput. Absent until commons measures one. */
       bytesPerSecond?: number;
-      /** Seconds remaining, derived from the smoothed rate. Absent until then. */
+      /** SDK ETA in seconds. Absent until commons projects one. */
       etaSeconds?: number;
     }
   /**
@@ -207,9 +208,10 @@ let activeSheetOptions: OpenSheetOptions = {};
 let toolbarSheetOptions: OpenSheetOptions = {};
 let overlayLoadedCategories: readonly ModelCategory[] | undefined;
 
-// Hardware detection is async and stable for a session, so we probe once and
-// cache. The recommendation set is derived purely from the tier + catalog.
+// Hardware banner facts + commons can_run are probed once per session.
+// Recommendation fit uses can_run (when known); never a local memory budget.
 let capabilitiesCache: DeviceCapabilities | null = null;
+let canRunCache: Record<string, boolean> = {};
 let recommendationCache: RecommendedSelection | null = null;
 let searchQuery = '';
 
@@ -658,18 +660,18 @@ function renderSheet(): void {
   renderRows();
 }
 
-/** Detect + cache hardware capabilities and the derived recommendation set. */
+/** Detect banner facts + batch can_run; derive recommendations without budgets. */
 async function ensureCapabilities(): Promise<void> {
   if (capabilitiesCache) return;
   try {
     capabilitiesCache = await detectDeviceCapabilities();
-    recommendationCache = recommendModels(
-      capabilitiesCache.tier,
-      capabilitiesCache.memoryBudgetBytes,
-      getCatalog(),
-    );
+    const catalog = getCatalog();
+    canRunCache = await canRunByModelID(catalog.map((entry) => entry.id));
+    recommendationCache = recommendModels(catalog, canRunCache);
   } catch (err) {
     appLogger.warning('[model-selection] capability probe failed', err);
+    // Unknown fit — recommend engine-compatible catalog entries with no budget.
+    recommendationCache = recommendModels(getCatalog(), {});
   }
 }
 
@@ -1214,20 +1216,20 @@ function pickRepresentative(entries: CatalogEntry[]): CatalogEntry {
 }
 
 /**
- * Auto-select the best variant for the device: the largest entry that still
- * fits the tier memory budget (smarter is better when it fits), falling back to
- * the smallest entry when none fit. Pure w.r.t. the cached capabilities.
+ * Auto-select the best variant for the device: prefer commons `can_run` when
+ * the map has verdicts; otherwise the first catalog variant (no local budget).
+ * Size sort among runnable entries is presentation ordering only.
  */
 function bestVariantForDevice(entries: CatalogEntry[]): CatalogEntry | undefined {
   if (entries.length === 0) return undefined;
-  const budget = capabilitiesCache?.memoryBudgetBytes ?? Number.POSITIVE_INFINITY;
-  const fitting = entries.filter((entry) => entry.memoryRequiredBytes <= budget);
-  if (fitting.length > 0) {
-    // Largest that still fits — smarter is better when it comfortably fits.
-    return [...fitting].sort((a, b) => modelDisplaySizeBytes(b) - modelDisplaySizeBytes(a))[0];
+  const probed = Object.keys(canRunCache).length > 0;
+  if (probed) {
+    const runnable = entries.filter((entry) => canRunCache[entry.id] === true);
+    if (runnable.length > 0) {
+      return [...runnable].sort((a, b) => modelDisplaySizeBytes(b) - modelDisplaySizeBytes(a))[0];
+    }
   }
-  // Nothing fits the budget: fall back to the smallest so it's at least usable.
-  return [...entries].sort((a, b) => modelDisplaySizeBytes(a) - modelDisplaySizeBytes(b))[0];
+  return entries[0];
 }
 
 /** Read-through row state accessor with a sensible default. */
@@ -1330,7 +1332,7 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
  */
 function compatibilityFor(entry: CatalogEntry): WebModelCompatibility {
   const size = webModelCompatibility(entry, {
-    hasWebGPU: capabilitiesCache?.hasWebGPU,
+    hasWebGPU: capabilitiesCache?.hasWebGPU === true,
   });
   if (!size.supported) return size;
   return engineCompatibility(entry);
@@ -1614,20 +1616,6 @@ async function startDownload(modelId: string): Promise<void> {
     );
   }
 
-  // Rate samples for the speed readout. `performance.now()` rather than
-  // Date.now() so a clock adjustment mid-download cannot produce a negative
-  // interval and a nonsense speed.
-  //
-  // Measured here only because the Web `DownloadEvent.progress` carries just the
-  // two byte counts. Swift and Kotlin receive `bytesPerSecond`/`etaSeconds`
-  // straight from the C++ orchestrator, which knows the whole transfer's
-  // history, and both apps say in writing that re-deriving a rate from two UI
-  // samples disagrees with it. The honest fix is to widen the Web event to carry
-  // the same fields; until then this is the closest approximation available.
-  let lastAt = performance.now();
-  let lastBytes = 0;
-  let smoothed: number | undefined;
-
   // Iterated explicitly rather than with `for await` so Cancel has a handle to
   // break out of; that break *is* the SDK's cancellation signal.
   const events = RunAnywhere.models.download(modelId);
@@ -1639,32 +1627,19 @@ async function startDownload(modelId: string): Promise<void> {
       const event = step.value;
       switch (event.type) {
         case 'progress': {
-          const now = performance.now();
-          const elapsed = (now - lastAt) / 1000;
-          // Sampled over at least 400ms: a per-event rate computed across a few
-          // milliseconds swings wildly and renders as an unreadable flicker.
-          if (elapsed >= 0.4 && event.bytesDone > lastBytes) {
-            const instant = (event.bytesDone - lastBytes) / elapsed;
-            // Exponential smoothing, weighted toward history, so the number is
-            // steady enough to read while still tracking a real slowdown.
-            smoothed = smoothed === undefined ? instant : smoothed * 0.7 + instant * 0.3;
-            lastAt = now;
-            lastBytes = event.bytesDone;
-          }
+          // Rate, ETA, and overall fraction come from commons via the SDK —
+          // never re-derived from successive byte counts here (same contract as
+          // iOS / Android).
           const bytesTotal = event.bytesTotal > 0 ? event.bytesTotal : undefined;
           setRow(modelId, {
             status: 'downloading',
             phase: 'transferring',
-            progress: bytesTotal ? event.bytesDone / bytesTotal : 0,
-            // No Content-Length means no position to plot. An honest sweep beats
-            // a bar pinned at zero while bytes are visibly arriving.
-            measured: bytesTotal !== undefined,
+            progress: event.overallProgress ?? 0,
+            measured: event.overallProgress !== undefined,
             bytesDone: event.bytesDone,
             bytesTotal,
-            bytesPerSecond: smoothed,
-            etaSeconds: smoothed && bytesTotal
-              ? Math.max(0, bytesTotal - event.bytesDone) / smoothed
-              : undefined,
+            bytesPerSecond: event.bytesPerSecond,
+            etaSeconds: event.etaSeconds,
           });
           break;
         }

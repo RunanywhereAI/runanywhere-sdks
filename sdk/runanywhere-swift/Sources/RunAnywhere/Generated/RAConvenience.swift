@@ -614,15 +614,6 @@ extension RALoggingConfiguration {
 }
 
 extension RALoraAdapterConfig {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RALoraAdapterConfig {
-        var r = RALoraAdapterConfig()
-        r.scale = 1.0
-        return r
-    }
-}
-
-extension RALoraAdapterConfig {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if adapterID.isEmpty {

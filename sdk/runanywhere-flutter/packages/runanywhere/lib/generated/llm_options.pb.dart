@@ -16,6 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'errors.pb.dart' as $4;
+import 'finish_reason.pbenum.dart' as $6;
 import 'llm_options.pbenum.dart';
 import 'model_types.pbenum.dart' as $5;
 import 'structured_output.pb.dart' as $1;
@@ -329,7 +330,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.Iterable<$2.ToolResult>? toolResults,
     $3.TokenUsage? usage,
     $4.SDKError? error,
-    FinishReason? finishReason,
+    $6.FinishReason? finishReason,
     $core.String? stopSequence,
   }) {
     final result = create();
@@ -397,8 +398,8 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
         subBuilder: $3.TokenUsage.create)
     ..aOM<$4.SDKError>(26, _omitFieldNames ? '' : 'error',
         subBuilder: $4.SDKError.create)
-    ..aE<FinishReason>(27, _omitFieldNames ? '' : 'finishReason',
-        enumValues: FinishReason.values)
+    ..aE<$6.FinishReason>(27, _omitFieldNames ? '' : 'finishReason',
+        enumValues: $6.FinishReason.values)
     ..aOS(28, _omitFieldNames ? '' : 'stopSequence')
     ..hasRequiredFields = false;
 
@@ -583,9 +584,9 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   $4.SDKError ensureError() => $_ensure(17);
 
   @$pb.TagNumber(27)
-  FinishReason get finishReason => $_getN(18);
+  $6.FinishReason get finishReason => $_getN(18);
   @$pb.TagNumber(27)
-  set finishReason(FinishReason value) => $_setField(27, value);
+  set finishReason($6.FinishReason value) => $_setField(27, value);
   @$pb.TagNumber(27)
   $core.bool hasFinishReason() => $_has(18);
   @$pb.TagNumber(27)

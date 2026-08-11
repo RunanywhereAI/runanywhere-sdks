@@ -371,9 +371,7 @@ message GenerationEvent {
     // For MODEL_LOADED / MODEL_UNLOADED — bound model.
     string              model_id         = 9;
 
-    // For COST_CALCULATED — Dart SDKGenerationCostCalculated.
-    double              cost_amount      = 10;
-    double              cost_saved_amount = 11;
+    reserved 10, 11;  // were unused cost_amount / cost_saved_amount
 
     // For ROUTING_DECISION.
     string              routing_target   = 12;

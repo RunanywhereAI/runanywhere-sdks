@@ -17,11 +17,11 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/diarization.pb.dart' as diar_pb;
 import 'package:runanywhere/generated/diffusion_options.pb.dart' as diff_pb;
 import 'package:runanywhere/generated/embeddings_options.pb.dart' as embed_pb;
-import 'package:runanywhere/generated/llm_options.pb.dart'
-    show LLMGenerationResult;
-import 'package:runanywhere/generated/llm_options.pbenum.dart'
+import 'package:runanywhere/generated/finish_reason.pbenum.dart'
     as llm_enum
     show FinishReason;
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationResult;
 import 'package:runanywhere/generated/lora_options.pb.dart' as lora_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -34,7 +34,7 @@ import 'package:runanywhere/generated/structured_output.pb.dart'
     show StructuredOutputResult;
 import 'package:runanywhere/generated/stt_options.pb.dart' as stt_pb;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
-    show ToolCall, ToolResult;
+    show ToolCall, ToolCallingResult, ToolResult;
 import 'package:runanywhere/generated/tts_options.pb.dart' as tts_pb;
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/generated/vlm_options.pb.dart' as vlm_pb;
@@ -43,6 +43,9 @@ import 'package:runanywhere/public/api/types/options.dart'
 
 /// Why a generation stopped.
 enum FinishReason {
+  /// Commons sent no terminal reason (`FINISH_REASON_UNSPECIFIED`).
+  unspecified,
+
   /// The model emitted a stop token or stop sequence.
   stop,
 
@@ -56,15 +59,10 @@ enum FinishReason {
   cancelled,
 }
 
-/// Maps the generated `FinishReason` enum (llm_options.proto) onto the
-/// public v3 [FinishReason]. [hasToolCalls] backstops the UNSPECIFIED /
-/// STOP wire values the way the string-based converter used to (a model
-/// that made tool calls but whose backend never set the enum still reports
-/// `toolCalls`).
-FinishReason _finishReason(
-  llm_enum.FinishReason wire, {
-  bool hasToolCalls = false,
-}) {
+/// Maps the generated `FinishReason` enum onto the public v3 [FinishReason].
+/// Never invents a reason from tool-call presence or token counts — commons
+/// owns the enum; `UNSPECIFIED` stays [FinishReason.unspecified].
+FinishReason _finishReason(llm_enum.FinishReason wire) {
   switch (wire) {
     case llm_enum.FinishReason.FINISH_REASON_LENGTH:
     case llm_enum.FinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
@@ -75,18 +73,22 @@ FinishReason _finishReason(
       return FinishReason.toolCalls;
     case llm_enum.FinishReason.FINISH_REASON_STOP:
     case llm_enum.FinishReason.FINISH_REASON_STOP_SEQUENCE:
+      return FinishReason.stop;
     case llm_enum.FinishReason.FINISH_REASON_ERROR:
+      // Public surface has no distinct error case; keep the wire terminal as
+      // stop without inventing toolCalls from local state.
+      return FinishReason.stop;
     case llm_enum.FinishReason.FINISH_REASON_UNSPECIFIED:
     default:
-      return hasToolCalls ? FinishReason.toolCalls : FinishReason.stop;
+      return FinishReason.unspecified;
   }
 }
 
 /// `VLMResult.finishReason` (vlm_options.proto) is still a raw wire string
-/// (VLM never migrated to the shared `FinishReason` enum) — parse it the
-/// same way the pre-migration string converter did.
-FinishReason _finishReasonFromString(String wire, {bool hasToolCalls = false}) {
-  switch (wire.toLowerCase()) {
+/// (VLM never migrated to the shared `FinishReason` enum).
+FinishReason _finishReasonFromString(String wire) {
+  final value = wire.toLowerCase();
+  switch (value) {
     case 'length':
     case 'max_tokens':
       return FinishReason.length;
@@ -95,8 +97,17 @@ FinishReason _finishReasonFromString(String wire, {bool hasToolCalls = false}) {
       return FinishReason.cancelled;
     case 'tool_calls':
       return FinishReason.toolCalls;
+    case 'stop':
+    case 'stop_sequence':
+    case 'eos':
+      return FinishReason.stop;
+    case '':
+    case 'unspecified':
+      return FinishReason.unspecified;
     default:
-      return hasToolCalls ? FinishReason.toolCalls : FinishReason.stop;
+      // Free-form VLM strings with no known label stay unspecified rather than
+      // inventing stop/toolCalls from local tool or token state.
+      return FinishReason.unspecified;
   }
 }
 
@@ -128,10 +139,7 @@ class GenerationResult {
         : null,
     toolCalls: List<ToolCall>.unmodifiable(proto.toolCalls),
     toolResults: List<ToolResult>.unmodifiable(proto.toolResults),
-    finishReason: _finishReason(
-      proto.finishReason,
-      hasToolCalls: proto.toolCalls.isNotEmpty,
-    ),
+    finishReason: _finishReason(proto.finishReason),
     inputTokens: proto.usage.inputTokens,
     outputTokens: proto.usage.outputTokens,
     timeToFirstTokenMs: proto.usage.hasTtftMs()
@@ -140,6 +148,29 @@ class GenerationResult {
     tokensPerSecond: proto.usage.decodeTokensPerSecond,
     requestId: requestId,
     model: proto.modelUsed,
+  );
+
+  /// Build from the generated tool-calling loop result.
+  factory GenerationResult.fromToolCalling(
+    ToolCallingResult proto, {
+    String requestId = '',
+    String model = '',
+  }) => GenerationResult(
+    text: proto.text,
+    thinkingText: proto.hasThinkingContent() && proto.thinkingContent.isNotEmpty
+        ? proto.thinkingContent
+        : null,
+    toolCalls: List<ToolCall>.unmodifiable(proto.toolCalls),
+    toolResults: List<ToolResult>.unmodifiable(proto.toolResults),
+    finishReason: _finishReason(proto.finishReason),
+    inputTokens: proto.usage.inputTokens,
+    outputTokens: proto.usage.outputTokens,
+    timeToFirstTokenMs: proto.usage.hasTtftMs()
+        ? proto.usage.ttftMs.toInt()
+        : 0,
+    tokensPerSecond: proto.usage.decodeTokensPerSecond,
+    requestId: requestId,
+    model: model,
   );
 
   // `GenerationResult.fromStreamFinal` is deleted: `LLMStreamFinalResult` was
@@ -604,11 +635,8 @@ class SegmentationResult {
 
   /// Build from the generated segmentation result.
   ///
-  /// `SegmentationClassSummary.fraction` was deleted outright
-  /// (idl/segmentation.proto) — [ClassInfo.fraction] is derived here from
-  /// `pixelCount / (width * height)` instead of trusting a wire value.
+  /// Commons owns `SegmentationClassSummary.fraction` (tag 5).
   factory SegmentationResult.fromProto(seg_pb.SegmentationResult proto) {
-    final totalPixels = proto.width * proto.height;
     return SegmentationResult(
       classMask: Uint16List.sublistView(
         Uint8List.fromList(proto.classMaskU16Le),
@@ -621,7 +649,7 @@ class SegmentationResult {
             classId: c.classId,
             label: c.label,
             pixelCount: c.pixelCount.toInt(),
-            fraction: totalPixels > 0 ? c.pixelCount.toInt() / totalPixels : 0,
+            fraction: c.fraction,
           ),
         ),
       ),
@@ -693,10 +721,12 @@ class RagResult {
       thinkingText: proto.hasThinkingContent() ? proto.thinkingContent : null,
       inputTokens: proto.usage.inputTokens,
       outputTokens: proto.usage.outputTokens,
-      tokensPerSecond: proto.generationTimeMs.toInt() > 0
-          ? proto.usage.outputTokens /
-                (proto.generationTimeMs.toInt() / 1000.0)
+      // Never recompute tok/s from generation_time_ms / output_tokens — commons
+      // owns decode_tokens_per_second. Never map retrieval into TTFT.
+      timeToFirstTokenMs: proto.usage.hasTtftMs()
+          ? proto.usage.ttftMs.toInt()
           : 0,
+      tokensPerSecond: proto.usage.decodeTokensPerSecond,
       requestId: proto.requestId,
     ),
   );

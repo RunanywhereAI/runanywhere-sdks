@@ -1,7 +1,8 @@
 /**
  * Embeddings — cosine similarity between two texts.
  *
- * SDK: `models.load` (embedder) + `embeddings.embed`. Cosine stays in the app.
+ * SDK: `models.load` (embedder) + `embeddings.embed` +
+ * `embeddings.cosineSimilarity` (commons `rac_embeddings_similarity`).
  */
 import { cosineSimilarity } from '../services/cosine';
 import { loadAppSettings, selectedModel } from '../services/settings';
@@ -52,7 +53,7 @@ export const createEmbeddingsView: ViewFactory = ({ root }) => {
         const ea = vectors.at(0);
         const eb = vectors.at(1);
         if (ea === undefined || eb === undefined) throw new Error('Missing embedding vectors');
-        const score = cosineSimilarity(ea.vector, eb.vector);
+        const score = await cosineSimilarity(ea, eb);
         const pct = Math.max(0, Math.min(100, Math.round(((score + 1) / 2) * 100)));
         out.innerHTML =
           `<div class="ra-stat">${score.toFixed(3)}</div>` +

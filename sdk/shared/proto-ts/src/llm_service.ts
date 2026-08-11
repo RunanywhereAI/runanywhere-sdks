@@ -8,13 +8,8 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import {
-  FinishReason,
-  finishReasonFromJSON,
-  finishReasonToJSON,
-  LLMGenerationOptions,
-  LLMGenerationResult,
-} from "./llm_options";
+import { FinishReason, finishReasonFromJSON, finishReasonToJSON } from "./finish_reason";
+import { LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
 import { ToolCall } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";

@@ -13,6 +13,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <memory>
 #include <vector>
 
@@ -35,6 +36,8 @@
 struct rac_llm_llamacpp_handle_impl {
     std::unique_ptr<runanywhere::LlamaCppBackend> backend;
     runanywhere::LlamaCppTextGeneration* text_gen;  // Owned by backend
+    int32_t last_stream_prompt_tokens = 0;
+    int32_t last_stream_completion_tokens = 0;
 
     rac_llm_llamacpp_handle_impl() : backend(nullptr), text_gen(nullptr) {}
 };
@@ -363,6 +366,9 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         return RAC_ERROR_INVALID_HANDLE;
     }
 
+    h->last_stream_prompt_tokens = 0;
+    h->last_stream_completion_tokens = 0;
+
     runanywhere::TextGenerationRequest request;
     request.prompt = prompt;
     if (options != nullptr) {
@@ -402,13 +408,55 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     // engines/llamacpp/rac_vlm_llamacpp.cpp: emit only bytes that cannot still
     // form part of a pending stop match, halt as soon as a stop is matched, and
     // never leak the stop prefix through.
+    //
+    // tokens_in_delta tracks how many backend tokens each emission represents.
+    // Coalesced stop-window flushes may be >1; a token split across two flushes
+    // is counted once (on first emission of any of its bytes).
     const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
     const size_t user_stop_max_len = max_stop_length(user_stops);
     std::string stop_window;
+    struct PendingPiece {
+        std::string text;
+        bool counted = false;
+    };
+    std::deque<PendingPiece> pending;
     if (user_stop_max_len > 0) {
         stop_window.reserve(user_stop_max_len * 2);
     }
     bool stop_hit = false;
+    int32_t completion_tokens = 0;
+
+    auto emit_bytes = [&](size_t nbytes) -> rac_bool_t {
+        if (nbytes == 0) {
+            return RAC_TRUE;
+        }
+        std::string out;
+        out.reserve(nbytes);
+        int32_t tokens_in_delta = 0;
+        size_t remain = nbytes;
+        while (remain > 0 && !pending.empty()) {
+            PendingPiece& piece = pending.front();
+            if (piece.text.size() <= remain) {
+                out += piece.text;
+                remain -= piece.text.size();
+                if (!piece.counted) {
+                    ++tokens_in_delta;
+                }
+                pending.pop_front();
+            } else {
+                out.append(piece.text, 0, remain);
+                piece.text.erase(0, remain);
+                remain = 0;
+                if (!piece.counted) {
+                    ++tokens_in_delta;
+                    piece.counted = true;
+                }
+            }
+        }
+        stop_window.erase(0, nbytes);
+        completion_tokens += tokens_in_delta;
+        return callback(out.c_str(), RAC_FALSE, tokens_in_delta, user_data);
+    };
 
     // Mirrors the terminal_emitted guard in
     // engines/llamacpp/rac_vlm_llamacpp.cpp: the documented streaming
@@ -419,49 +467,60 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     // wedge the per-stream synthesizer (Swift AsyncStream, Kotlin Flow, Dart
     // StreamController, TS AsyncIterable) that the SDKs build on top.
     bool terminal_emitted = false;
+    auto emit_terminal = [&]() {
+        if (!terminal_emitted) {
+            callback("", RAC_TRUE, /*tokens_in_delta*/ 0, user_data);
+            terminal_emitted = true;
+        }
+    };
 
+    int prompt_tokens = 0;
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
-            request, [&](const std::string& token) -> bool {
+            request,
+            [&](const std::string& token) -> bool {
                 if (user_stops.empty()) {
-                    return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                    completion_tokens += 1;
+                    return callback(token.c_str(), RAC_FALSE, /*tokens_in_delta*/ 1, user_data) ==
+                           RAC_TRUE;
                 }
                 stop_window.append(token);
+                pending.push_back(PendingPiece{token, false});
                 const size_t found_pos = find_first_stop_sequence(stop_window, user_stops);
                 if (found_pos != std::string::npos) {
                     if (found_pos > 0) {
-                        const std::string prefix = stop_window.substr(0, found_pos);
-                        callback(prefix.c_str(), RAC_FALSE, user_data);
+                        (void)emit_bytes(found_pos);
                     }
                     stop_window.clear();
+                    pending.clear();
                     stop_hit = true;
                     return false;  // Cancels the backend generation loop.
                 }
                 if (stop_window.size() > user_stop_max_len) {
                     const size_t safe_len = stop_window.size() - user_stop_max_len;
-                    const std::string safe_chunk = stop_window.substr(0, safe_len);
-                    stop_window.erase(0, safe_len);
-                    return callback(safe_chunk.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                    return emit_bytes(safe_len) == RAC_TRUE;
                 }
                 return true;
-            });
+            },
+            &prompt_tokens);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("LLM.LlamaCpp.C-API", "generate_stream exception: %s", e.what());
         rac_error_set_details(e.what());
-        if (!terminal_emitted) {
-            callback("", RAC_TRUE, user_data);
-            terminal_emitted = true;
-        }
+        h->last_stream_prompt_tokens = prompt_tokens;
+        h->last_stream_completion_tokens = completion_tokens;
+        emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
         rac_error_set_details("Unknown C++ exception during streaming LLM generation");
-        if (!terminal_emitted) {
-            callback("", RAC_TRUE, user_data);
-            terminal_emitted = true;
-        }
+        h->last_stream_prompt_tokens = prompt_tokens;
+        h->last_stream_completion_tokens = completion_tokens;
+        emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     }
+
+    h->last_stream_prompt_tokens = prompt_tokens;
+    h->last_stream_completion_tokens = completion_tokens;
 
     // Treat a caller-stop hit as a successful terminal exit so the final marker
     // is still emitted to the caller's accumulator. Without this, an early
@@ -470,11 +529,10 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     if (stop_hit || success) {
         if (!stop_hit && !stop_window.empty()) {
             // Flush any tail bytes held back as potential stop prefix.
-            callback(stop_window.c_str(), RAC_FALSE, user_data);
-            stop_window.clear();
+            (void)emit_bytes(stop_window.size());
+            h->last_stream_completion_tokens = completion_tokens;
         }
-        callback("", RAC_TRUE, user_data);  // Final token
-        terminal_emitted = true;
+        emit_terminal();
         return RAC_SUCCESS;
     }
 
@@ -483,11 +541,19 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     // LlamaCppTextGeneration::generate_stream / run_decode_loop). Emit the
     // terminal marker so direct C-API consumers can close their iterators
     // before we surface the inference error.
-    if (!terminal_emitted) {
-        callback("", RAC_TRUE, user_data);
-        terminal_emitted = true;
-    }
+    emit_terminal();
     return RAC_ERROR_INFERENCE_FAILED;
+}
+
+rac_result_t rac_llm_llamacpp_get_stream_token_counts(rac_handle_t handle,
+                                                      rac_llm_token_counts_t* out) {
+    if (handle == nullptr || out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    out->prompt_tokens = h->last_stream_prompt_tokens;
+    out->completion_tokens = h->last_stream_completion_tokens;
+    return RAC_SUCCESS;
 }
 
 void rac_llm_llamacpp_cancel(rac_handle_t handle) {

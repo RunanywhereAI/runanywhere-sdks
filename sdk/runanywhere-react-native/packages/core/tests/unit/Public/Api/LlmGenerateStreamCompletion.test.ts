@@ -48,7 +48,7 @@ import {
   type LLMStreamEvent as LLMStreamEventMessage,
   type DeepPartial,
 } from '@runanywhere/proto-ts/llm_service';
-import { FinishReason } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import {
   RunAnywhere,
   completeServicesInitialization,

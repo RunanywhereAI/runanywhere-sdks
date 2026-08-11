@@ -223,11 +223,11 @@ public class CuaAction(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<CuaAction> = object : ProtoAdapter<CuaAction>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      CuaAction::class, 
-      "type.googleapis.com/runanywhere.v1.CuaAction", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      CuaAction::class,
+      "type.googleapis.com/runanywhere.v1.CuaAction",
+      PROTO_3,
+      null,
       "cua.proto"
     ) {
       override fun encodedSize(`value`: CuaAction): Int {

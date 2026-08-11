@@ -135,11 +135,8 @@ class ModelListViewModel extends ChangeNotifier {
 
       await for (final event in sdk.RunAnywhere.models.download(model.id)) {
         switch (event) {
-          case sdk.DownloadProgressEvent(
-            :final bytesDone,
-            :final bytesTotal,
-          ):
-            final percent = bytesTotal > 0 ? bytesDone / bytesTotal : 0.0;
+          case sdk.DownloadProgressEvent(:final overallProgress):
+            final percent = overallProgress ?? 0.0;
             _downloadProgress[model.id] = percent;
             progressHandler(percent);
             notifyListeners();

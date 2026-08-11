@@ -8,14 +8,17 @@ and hold these handles through :mod:`runanywhere._runtime`. Each class is a thin
 from __future__ import annotations
 
 import asyncio
+import queue
 import threading
-from typing import Any, AsyncIterator, Callable, Dict, Iterator, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, List, Optional, TypeVar
 
 import numpy as np
 
+from ._generation import StreamDelta
 from ._streaming import aiter_tokens, iter_tokens
 from .errors import SDKException
-from .results import AppliedAdapter, Synthesis
+from .results import AppliedAdapter, FinishReason, Synthesis
 
 __all__ = [
     "DiarizationModel",
@@ -31,7 +34,7 @@ __all__ = [
 ]
 
 # Gap message shared by the LoRA and diarization handle methods below: both bindings are
-# new (native/module.cpp's lora_apply/... and load_diarization_model/diarize/...), so a
+# new (native/module.cpp's lora_apply_proto/... and load_diarization_model/diarize/...), so a
 # native _core built before this change simply lacks the attribute — fail with a clear,
 # actionable message instead of an opaque AttributeError.
 def _rebuild_gap(name: str, symbols: str) -> SDKException:
@@ -44,6 +47,8 @@ def _rebuild_gap(name: str, symbols: str) -> SDKException:
 
 # on_token callback type: called per token; returning False stops the native loop.
 _OnToken = Callable[[str], "bool | None"]
+
+_T = TypeVar("_T")
 
 
 class _GenerationGuard:
@@ -68,7 +73,7 @@ class _GenerationGuard:
             pass
 
 
-def _guarded_iter(guard: _GenerationGuard, source: Iterator[str]) -> Iterator[str]:
+def _guarded_iter(guard: _GenerationGuard, source: Iterator[_T]) -> Iterator[_T]:
     """Yield from ``source`` while holding ``guard`` for the whole stream lifetime."""
     guard.acquire()
     try:
@@ -77,13 +82,8 @@ def _guarded_iter(guard: _GenerationGuard, source: Iterator[str]) -> Iterator[st
         guard.release()
 
 
-async def _aguarded_iter(guard: _GenerationGuard, source: AsyncIterator[str]) -> AsyncIterator[str]:
-    """Async twin of :func:`_guarded_iter`.
-
-    ``async for`` does not close ``source`` when this generator is ``aclose``d, so we close it
-    explicitly before releasing the guard — that runs ``aiter_tokens``'s cleanup (stop the
-    native loop, drain, join the worker) while the model is still reserved.
-    """
+async def _aguarded_iter(guard: _GenerationGuard, source: AsyncIterator[_T]) -> AsyncIterator[_T]:
+    """Async twin of :func:`_guarded_iter`."""
     guard.acquire()
     try:
         async for token in source:
@@ -96,46 +96,210 @@ async def _aguarded_iter(guard: _GenerationGuard, source: AsyncIterator[str]) ->
 
 
 class LLMModel:
-    """A loaded LLM handle; ``generate`` streams tokens straight off the native decode loop."""
+    """A loaded LLM handle; ``generate`` yields commons-typed stream deltas."""
 
     def __init__(self, core: Any, handle: int) -> None:
         self._core = core
         self._handle = handle
         self._guard = _GenerationGuard()
         self._unloaded = False
-        # rac_llm_component_{load,remove,clear}_lora are write-only (no read-back), so the
-        # applied set is mirrored here — same shape as the Electron addon's g_lora_applied.
-        self._lora_applied: Dict[str, float] = {}
+        self._lora_applied: Dict[str, Optional[float]] = {}
 
     def _ensure_loaded(self) -> None:
         if self._unloaded:
             raise SDKException.invalid_state("model has been unloaded")
 
-    def _native_call(self, prompt: str, kwargs: dict) -> Callable[[_OnToken], None]:
-        self._ensure_loaded()
-        core = self._core
-        handle = self._handle
-
-        def call(on_token: _OnToken) -> None:
-            core.generate(handle, prompt, on_token, **kwargs)
-
-        return call
-
     def cancel(self) -> None:
         """Request cancellation of an in-flight generate (safe from another thread)."""
+        if hasattr(self._core, "llm_cancel_proto"):
+            try:
+                self._core.llm_cancel_proto()
+            except Exception:  # noqa: BLE001
+                pass
         self._core.cancel_generate(self._handle)
 
-    def generate(self, prompt: str, kwargs: dict) -> Iterator[str]:
-        """Stream the completion token-by-token."""
+    def generate(self, prompt: str, kwargs: dict) -> Iterator[StreamDelta]:
+        """Stream commons-typed deltas (answer vs thinking), then a terminal marker."""
         self._ensure_loaded()
-        source = iter_tokens(self._native_call(prompt, kwargs), on_stop=self.cancel)
+        has_proto = hasattr(self._core, "llm_generate_stream_proto")
+        prefer_legacy = bool(getattr(self._core, "prefer_legacy_generate", False))
+        needs_proto = bool(kwargs.get("structured_schema"))
+        if needs_proto and not prefer_legacy:
+            if not has_proto:
+                raise SDKException.not_implemented(
+                    "structured_output requires llm_generate_stream_proto "
+                    "(commons owns schema→GBNF); this native/_core build has no proto stream"
+                )
+            source = self._iter_proto(prompt, kwargs)
+        elif has_proto and not prefer_legacy:
+            source = self._iter_proto(prompt, kwargs)
+        else:
+            source = self._iter_legacy(prompt, kwargs)
         return _guarded_iter(self._guard, source)
 
-    def agenerate(self, prompt: str, kwargs: dict) -> AsyncIterator[str]:
+    def agenerate(self, prompt: str, kwargs: dict) -> AsyncIterator[StreamDelta]:
         """Async twin of :meth:`generate`."""
         self._ensure_loaded()
-        source = aiter_tokens(self._native_call(prompt, kwargs), on_stop=self.cancel)
-        return _aguarded_iter(self._guard, source)
+
+        async def _agen() -> AsyncIterator[StreamDelta]:
+            # Drive the sync generator off-loop so cancel still reaches the native call.
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+            _DONE = object()
+            _ERR = object()
+            error: list = []
+
+            def worker() -> None:
+                try:
+                    for delta in self.generate(prompt, kwargs):
+                        loop.call_soon_threadsafe(queue.put_nowait, delta)
+                    loop.call_soon_threadsafe(queue.put_nowait, _DONE)
+                except BaseException as exc:  # noqa: BLE001
+                    error.append(exc)
+                    loop.call_soon_threadsafe(queue.put_nowait, _ERR)
+
+            thread = threading.Thread(target=worker, name="ra-llm-agen", daemon=True)
+            thread.start()
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is _DONE:
+                        break
+                    if item is _ERR:
+                        raise error[0]
+                    yield item  # type: ignore[misc]
+            finally:
+                self.cancel()
+                await asyncio.shield(loop.run_in_executor(None, thread.join))
+
+        return _agen()
+
+    def _iter_proto(self, prompt: str, kwargs: dict) -> Iterator[StreamDelta]:
+        from ._llm_stream import build_llm_generate_request, decode_llm_stream_event
+
+        request = build_llm_generate_request(
+            prompt,
+            max_tokens=kwargs.get("max_tokens"),
+            temperature=kwargs.get("temperature"),
+            top_p=kwargs.get("top_p"),
+            top_k=kwargs.get("top_k"),
+            system_prompt=kwargs.get("system_prompt"),
+            grammar=kwargs.get("grammar"),
+            structured_schema=kwargs.get("structured_schema"),
+            disable_thinking=kwargs.get("disable_thinking"),
+            include_thoughts=bool(kwargs.get("include_thoughts")),
+            stop_sequences=kwargs.get("stop_sequences"),
+        )
+        q: queue.Queue = queue.Queue()
+        _DONE = object()
+        _ERR = object()
+        error: list = []
+
+        def on_event(raw: bytes) -> bool:
+            try:
+                deltas, terminal = decode_llm_stream_event(bytes(raw))
+                for delta in deltas:
+                    q.put(delta)
+                if terminal is not None:
+                    q.put(
+                        StreamDelta(
+                            is_terminal=True,
+                            finish_reason=terminal.finish_reason,
+                            usage=dict(terminal.usage) if terminal.usage else None,
+                            final_text=terminal.text,
+                            final_thinking=terminal.thinking_text,
+                        )
+                    )
+            except BaseException as exc:  # noqa: BLE001
+                error.append(exc)
+                q.put(_ERR)
+                return False
+            return True
+
+        def worker() -> None:
+            try:
+                self._core.llm_generate_stream_proto(request, on_event)
+                q.put(_DONE)
+            except BaseException as exc:  # noqa: BLE001
+                error.append(exc)
+                q.put(_ERR)
+
+        thread = threading.Thread(target=worker, name="ra-llm-proto", daemon=True)
+        thread.start()
+        try:
+            while True:
+                item = q.get()
+                if item is _DONE:
+                    break
+                if item is _ERR:
+                    raise error[0]
+                yield item  # type: ignore[misc]
+        finally:
+            self.cancel()
+            thread.join()
+
+    def _iter_legacy(self, prompt: str, kwargs: dict) -> Iterator[StreamDelta]:
+        bridge_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            in (
+                "max_tokens",
+                "temperature",
+                "top_p",
+                "top_k",
+                "system_prompt",
+                "disable_thinking",
+                "structured_schema",
+            )
+        }
+        q: queue.Queue = queue.Queue()
+        _DONE = object()
+        _ERR = object()
+        error: list = []
+
+        def on_delta(text: str, is_thinking: bool = False) -> bool:
+            q.put(StreamDelta(text=text, is_thinking=bool(is_thinking)))
+            return True
+
+        def on_token(token: str) -> bool:
+            return on_delta(token, False)
+
+        def worker() -> None:
+            try:
+                if hasattr(self._core, "generate_typed"):
+                    self._core.generate_typed(self._handle, prompt, on_delta, **bridge_kwargs)
+                else:
+                    self._core.generate(self._handle, prompt, on_token, **bridge_kwargs)
+                q.put(
+                    StreamDelta(
+                        is_terminal=True,
+                        finish_reason=FinishReason(
+                            int(getattr(self._core, "finish_reason", FinishReason.UNSPECIFIED))
+                        ),
+                        usage=getattr(self._core, "usage", None),
+                        final_text=getattr(self._core, "final_text", None),
+                        final_thinking=getattr(self._core, "final_thinking", None),
+                    )
+                )
+                q.put(_DONE)
+            except BaseException as exc:  # noqa: BLE001
+                error.append(exc)
+                q.put(_ERR)
+
+        thread = threading.Thread(target=worker, name="ra-llm-legacy", daemon=True)
+        thread.start()
+        try:
+            while True:
+                item = q.get()
+                if item is _DONE:
+                    break
+                if item is _ERR:
+                    raise error[0]
+                yield item  # type: ignore[misc]
+        finally:
+            self.cancel()
+            thread.join()
 
     def unload(self) -> None:
         """Release the model. Idempotent."""
@@ -144,34 +308,81 @@ class LLMModel:
         self._unloaded = True
         self._core.unload_model(self._handle)
 
-    # -- LoRA (LlamaCPP backend only) ----------------------------------------
+    # -- LoRA (lifecycle proto ABI — commons owns optional scale resolution) -
     def lora_apply(self, adapter_path: str, scale: Optional[float]) -> None:
-        """Load and apply a LoRA adapter (recreates the context, clears the KV cache)."""
+        """Load and apply a LoRA adapter; unset ``scale`` is left unset for commons."""
         self._ensure_loaded()
-        if not hasattr(self._core, "lora_apply"):
-            raise _rebuild_gap("lora.apply", "lora_apply")
-        self._core.lora_apply(self._handle, adapter_path, scale)
-        self._lora_applied[adapter_path] = scale if scale is not None else 1.0
+        if not hasattr(self._core, "lora_apply_proto"):
+            raise _rebuild_gap("lora.apply", "lora_apply_proto")
+        from ._proto import lora_options_pb2 as lora_pb
+
+        req = lora_pb.LoraApplyRequest()
+        req.keep_existing = True
+        adapter = req.adapters.add()
+        # Path-only SDK: use the filesystem path as both id and path.
+        adapter.adapter_id = adapter_path
+        adapter.adapter_path = adapter_path
+        if scale is not None:
+            adapter.scale = float(scale)
+        raw = self._core.lora_apply_proto(req.SerializeToString())
+        result = lora_pb.LoraApplyResult()
+        result.ParseFromString(bytes(raw))
+        if result.HasField("error"):
+            raise SDKException.generation_failed(
+                result.error.message or "lora apply failed"
+            )
+        # Mirror commons-resolved scales from the apply result (never invent 1.0).
+        for info in result.adapters:
+            key = info.adapter_id or info.adapter_path or adapter_path
+            self._lora_applied[key] = float(info.scale)
 
     def lora_remove(self, adapter_path: str) -> None:
         """Remove one adapter by the path used in :meth:`lora_apply`."""
         self._ensure_loaded()
-        if not hasattr(self._core, "lora_remove"):
-            raise _rebuild_gap("lora.remove", "lora_remove")
-        self._core.lora_remove(self._handle, adapter_path)
+        if not hasattr(self._core, "lora_remove_proto"):
+            raise _rebuild_gap("lora.remove", "lora_remove_proto")
+        from ._proto import lora_options_pb2 as lora_pb
+
+        req = lora_pb.LoraRemoveRequest()
+        req.adapter_ids.append(adapter_path)
+        self._core.lora_remove_proto(req.SerializeToString())
         self._lora_applied.pop(adapter_path, None)
 
     def lora_remove_all(self) -> None:
         """Remove every adapter currently applied."""
         self._ensure_loaded()
-        if not hasattr(self._core, "lora_remove_all"):
-            raise _rebuild_gap("lora.remove_all", "lora_remove_all")
-        self._core.lora_remove_all(self._handle)
+        if not hasattr(self._core, "lora_remove_proto"):
+            raise _rebuild_gap("lora.remove_all", "lora_remove_proto")
+        from ._proto import lora_options_pb2 as lora_pb
+
+        req = lora_pb.LoraRemoveRequest()
+        req.clear_all = True
+        self._core.lora_remove_proto(req.SerializeToString())
         self._lora_applied.clear()
 
     def lora_list(self) -> List[AppliedAdapter]:
-        """The adapters applied via :meth:`lora_apply`, mirrored client-side (no read-back)."""
-        return [AppliedAdapter(id=path, scale=scale) for path, scale in self._lora_applied.items()]
+        """Adapters currently applied — prefers commons ``lora_list_proto`` when bound."""
+        if hasattr(self._core, "lora_list_proto"):
+            from ._proto import lora_options_pb2 as lora_pb
+
+            raw = self._core.lora_list_proto(b"")
+            state = lora_pb.LoraState()
+            state.ParseFromString(bytes(raw))
+            out: List[AppliedAdapter] = []
+            for info in state.loaded_adapters:
+                if not info.applied:
+                    continue
+                out.append(
+                    AppliedAdapter(
+                        id=info.adapter_id or info.adapter_path,
+                        scale=float(info.scale),
+                    )
+                )
+            return out
+        return [
+            AppliedAdapter(id=path, scale=float(scale if scale is not None else 0.0))
+            for path, scale in self._lora_applied.items()
+        ]
 
 
 class VLMModel:
@@ -276,8 +487,14 @@ class TTSVoice:
 
     def synthesize(self, text: str) -> Synthesis:
         """Synthesize ``text`` to float32 PCM at the voice's native sample rate."""
-        samples, sample_rate = self._core.synthesize(self._handle, text)
-        return Synthesis(samples=samples, sample_rate=sample_rate)
+        out = self._core.synthesize(self._handle, text)
+        # Newer bridges return (samples, sample_rate, duration_ms); older builds
+        # return the 2-tuple and leave commons duration unsourced (0).
+        if len(out) >= 3:
+            samples, sample_rate, duration_ms = out[0], out[1], int(out[2])
+        else:
+            samples, sample_rate, duration_ms = out[0], out[1], 0
+        return Synthesis(samples=samples, sample_rate=sample_rate, duration_ms=duration_ms)
 
     async def asynthesize(self, text: str) -> Synthesis:
         """Async twin of :meth:`synthesize` (runs on the loop's default executor)."""

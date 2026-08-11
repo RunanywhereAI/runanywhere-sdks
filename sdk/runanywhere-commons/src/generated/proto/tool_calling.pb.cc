@@ -2091,11 +2091,11 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
     {
       PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_),
       0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
+      10, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294966272,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      10,  // num_field_entries
       3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -2142,7 +2142,10 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
       {::_pbi::TcParser::FastMtS1,
        {74, 5, 2,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.usage_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.FinishReason finish_reason = 10;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.finish_reason_), 9>(),
+       {80, 9, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.finish_reason_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -2169,6 +2172,8 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // .runanywhere.v1.TokenUsage usage = 9;
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.usage_), _Internal::kHasBitsOffset + 5, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.FinishReason finish_reason = 10;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.finish_reason_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2224,7 +2229,8 @@ inline constexpr ToolCallingResult::Impl_::Impl_(
         usage_{nullptr},
         is_complete_{false},
         iterations_used_{0},
-        error_code_{0} {}
+        error_code_{0},
+        finish_reason_{static_cast< ::runanywhere::v1::FinishReason >(0)} {}
 
 template <typename>
 constexpr ToolCallingResult::ToolCallingResult(::_pbi::ConstantInitialized,
@@ -3709,7 +3715,7 @@ const ::uint32_t
         13,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_._has_bits_),
-        12, // hasbit index offset
+        13, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_results_),
@@ -3719,6 +3725,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.thinking_content_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.usage_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.finish_reason_),
         2,
         0,
         1,
@@ -3728,6 +3735,7 @@ const ::uint32_t
         8,
         4,
         5,
+        9,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseRequest, _impl_._has_bits_),
         5, // hasbit index offset
@@ -3846,16 +3854,16 @@ static const ::_pbi::MigrationSchema
         {55, sizeof(::runanywhere::v1::ToolResult)},
         {72, sizeof(::runanywhere::v1::ToolCallingOptions)},
         {103, sizeof(::runanywhere::v1::ToolCallingResult)},
-        {124, sizeof(::runanywhere::v1::ToolParseRequest)},
-        {131, sizeof(::runanywhere::v1::ToolParseResult)},
-        {144, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
-        {153, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
-        {164, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
-        {171, sizeof(::runanywhere::v1::ToolCallValidationResult)},
-        {186, sizeof(::runanywhere::v1::ToolCallingHistoryTurn)},
-        {193, sizeof(::runanywhere::v1::ToolCallingSessionCreateRequest)},
-        {202, sizeof(::runanywhere::v1::ToolCallingSessionEvent)},
-        {217, sizeof(::runanywhere::v1::ToolCallingSessionStepWithResultRequest)},
+        {126, sizeof(::runanywhere::v1::ToolParseRequest)},
+        {133, sizeof(::runanywhere::v1::ToolParseResult)},
+        {146, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
+        {155, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
+        {166, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
+        {173, sizeof(::runanywhere::v1::ToolCallValidationResult)},
+        {188, sizeof(::runanywhere::v1::ToolCallingHistoryTurn)},
+        {195, sizeof(::runanywhere::v1::ToolCallingSessionCreateRequest)},
+        {204, sizeof(::runanywhere::v1::ToolCallingSessionEvent)},
+        {219, sizeof(::runanywhere::v1::ToolCallingSessionStepWithResultRequest)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3882,122 +3890,125 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_tool_5fcalling_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\022tool_calling.proto\022\016runanywhere.v1\032\021ra"
-    "c_options.proto\032\021token_usage.proto\"\337\001\n\tT"
-    "oolValue\022\026\n\014string_value\030\001 \001(\tH\000\022\026\n\014numb"
-    "er_value\030\002 \001(\001H\000\022\024\n\nbool_value\030\003 \001(\010H\000\0225"
-    "\n\013array_value\030\004 \001(\0132\036.runanywhere.v1.Too"
-    "lValueArrayH\000\0227\n\014object_value\030\005 \001(\0132\037.ru"
-    "nanywhere.v1.ToolValueObjectH\000\022\024\n\nnull_v"
-    "alue\030\006 \001(\010H\000B\006\n\004kind\";\n\016ToolValueArray\022)"
-    "\n\006values\030\001 \003(\0132\031.runanywhere.v1.ToolValu"
-    "e\"\230\001\n\017ToolValueObject\022;\n\006fields\030\001 \003(\0132+."
-    "runanywhere.v1.ToolValueObject.FieldsEnt"
-    "ry\032H\n\013FieldsEntry\022\013\n\003key\030\001 \001(\t\022(\n\005value\030"
-    "\002 \001(\0132\031.runanywhere.v1.ToolValue:\0028\001\"\035\n\r"
-    "ToolValueJSON\022\014\n\004json\030\001 \001(\t\"k\n\016ToolDefin"
-    "ition\022\014\n\004name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t"
-    "\022\022\n\nparameters\030\003 \001(\t\022\025\n\010category\030\004 \001(\tH\000"
-    "\210\001\001B\013\n\t_category\"w\n\010ToolCall\022\n\n\002id\030\001 \001(\t"
-    "\022\014\n\004name\030\002 \001(\t\022\026\n\016arguments_json\030\003 \001(\t\022\025"
-    "\n\rcreated_at_ms\030\004 \001(\003\022\025\n\010raw_text\030\005 \001(\tH"
-    "\000\210\001\001B\013\n\t_raw_text\"\245\001\n\nToolResult\022\024\n\014tool"
-    "_call_id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\023\n\013result_j"
-    "son\030\003 \001(\t\022\022\n\005error\030\004 \001(\tH\000\210\001\001\022\020\n\010is_erro"
-    "r\030\005 \001(\010\022\025\n\rstarted_at_ms\030\006 \001(\003\022\027\n\017comple"
-    "ted_at_ms\030\007 \001(\003B\010\n\006_error\"\277\005\n\022ToolCallin"
-    "gOptions\022-\n\005tools\030\001 \003(\0132\036.runanywhere.v1"
-    ".ToolDefinition\022\031\n\014auto_execute\030\003 \001(\010H\000\210"
-    "\001\001\022\032\n\rsystem_prompt\030\006 \001(\tH\001\210\001\001\022\035\n\025replac"
-    "e_system_prompt\030\007 \001(\010\022\034\n\024keep_tools_avai"
-    "lable\030\010 \001(\010\0227\n\006format\030\n \001(\0162\".runanywher"
-    "e.v1.ToolCallFormatNameH\002\210\001\001\022\033\n\023parallel"
-    "_tool_calls\030\017 \001(\010\022&\n\016max_tool_calls\030\014 \001("
-    "\005B\t\212\265\030\0015\240\265\030\001H\003\210\001\001\0223\n\013tool_choice\030\r \001(\0162\036"
-    ".runanywhere.v1.ToolChoiceMode\022\035\n\020forced"
-    "_tool_name\030\016 \001(\tH\004\210\001\001\022\036\n\026require_json_ar"
-    "guments\030\020 \001(\010\022\035\n\020disable_thinking\030\021 \001(\010H"
-    "\005\210\001\001\022\022\n\005top_p\030\022 \001(\002H\006\210\001\001\022\033\n\016validate_cal"
-    "ls\030\023 \001(\010H\007\210\001\001B\017\n\r_auto_executeB\020\n\016_syste"
-    "m_promptB\t\n\007_formatB\021\n\017_max_tool_callsB\023"
-    "\n\021_forced_tool_nameB\023\n\021_disable_thinking"
-    "B\010\n\006_top_pB\021\n\017_validate_callsJ\004\010\002\020\003J\004\010\t\020"
-    "\nJ\004\010\013\020\014J\004\010\004\020\005J\004\010\005\020\006R\013temperatureR\021max_ou"
-    "tput_tokens\"\320\002\n\021ToolCallingResult\022\014\n\004tex"
-    "t\030\001 \001(\t\022,\n\ntool_calls\030\002 \003(\0132\030.runanywher"
-    "e.v1.ToolCall\0220\n\014tool_results\030\003 \003(\0132\032.ru"
-    "nanywhere.v1.ToolResult\022\023\n\013is_complete\030\004"
-    " \001(\010\022\027\n\017iterations_used\030\005 \001(\005\022\032\n\rerror_m"
-    "essage\030\006 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\007 \001(\005\022\035\n"
-    "\020thinking_content\030\010 \001(\tH\001\210\001\001\022)\n\005usage\030\t "
-    "\001(\0132\032.runanywhere.v1.TokenUsageB\020\n\016_erro"
-    "r_messageB\023\n\021_thinking_content\"f\n\020ToolPa"
-    "rseRequest\022\014\n\004text\030\001 \001(\t\0228\n\007options\030\002 \001("
-    "\0132\".runanywhere.v1.ToolCallingOptionsH\000\210"
-    "\001\001B\n\n\010_options\"\260\001\n\017ToolParseResult\022\025\n\rha"
-    "s_tool_call\030\001 \001(\010\022,\n\ntool_calls\030\002 \003(\0132\030."
-    "runanywhere.v1.ToolCall\022\026\n\016remaining_tex"
-    "t\030\003 \001(\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\ne"
-    "rror_code\030\005 \001(\005B\020\n\016_error_message\"\246\001\n\027To"
-    "olPromptFormatRequest\022\023\n\013user_prompt\030\001 \001"
-    "(\t\0228\n\007options\030\002 \001(\0132\".runanywhere.v1.Too"
-    "lCallingOptionsH\000\210\001\001\0220\n\014tool_results\030\003 \003"
-    "(\0132\032.runanywhere.v1.ToolResultB\n\n\010_optio"
-    "ns\"\256\001\n\026ToolPromptFormatResult\022\030\n\020formatt"
-    "ed_prompt\030\001 \001(\t\0222\n\006format\030\002 \001(\0162\".runany"
-    "where.v1.ToolCallFormatName\022\032\n\rerror_mes"
-    "sage\030\004 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_"
-    "error_messageJ\004\010\003\020\004\"\216\001\n\031ToolCallValidati"
-    "onRequest\022+\n\ttool_call\030\001 \001(\0132\030.runanywhe"
-    "re.v1.ToolCall\0228\n\007options\030\002 \001(\0132\".runany"
-    "where.v1.ToolCallingOptionsH\000\210\001\001B\n\n\010_opt"
-    "ions\"\370\001\n\030ToolCallValidationResult\022\020\n\010is_"
-    "valid\030\001 \001(\010\022\031\n\021validation_errors\030\002 \003(\t\0229"
-    "\n\014matched_tool\030\003 \001(\0132\036.runanywhere.v1.To"
-    "olDefinitionH\000\210\001\001\022!\n\031normalized_argument"
-    "s_json\030\004 \001(\t\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001"
-    "\022\022\n\nerror_code\030\006 \001(\005B\017\n\r_matched_toolB\020\n"
-    "\016_error_message\"X\n\026ToolCallingHistoryTur"
-    "n\022-\n\004role\030\001 \001(\0162\037.runanywhere.v1.ToolCal"
-    "lingRole\022\017\n\007content\030\002 \001(\t\"\237\001\n\037ToolCallin"
-    "gSessionCreateRequest\022\016\n\006prompt\030\001 \001(\t\0227\n"
-    "\007history\030\002 \003(\0132&.runanywhere.v1.ToolCall"
-    "ingHistoryTurn\0223\n\007options\030\003 \001(\0132\".runany"
-    "where.v1.ToolCallingOptions\"\321\001\n\027ToolCall"
-    "ingSessionEvent\022 \n\026llm_stream_event_byte"
-    "s\030\001 \001(\014H\000\022-\n\ttool_call\030\002 \001(\0132\030.runanywhe"
-    "re.v1.ToolCallH\000\0229\n\014final_result\030\003 \001(\0132!"
-    ".runanywhere.v1.ToolCallingResultH\000\022\025\n\013e"
-    "rror_bytes\030\004 \001(\014H\000\022\013\n\003seq\030\005 \001(\004B\006\n\004kind\""
-    "\212\001\n\'ToolCallingSessionStepWithResultRequ"
-    "est\022\026\n\016session_handle\030\001 \001(\004\022\024\n\014tool_call"
-    "_id\030\002 \001(\t\022\023\n\013result_json\030\003 \001(\t\022\022\n\005error\030"
-    "\004 \001(\tH\000\210\001\001B\010\n\006_error*\201\001\n\022ToolCallFormatN"
-    "ame\022%\n!TOOL_CALL_FORMAT_NAME_UNSPECIFIED"
-    "\020\000\022\036\n\032TOOL_CALL_FORMAT_NAME_JSON\020\001\022\036\n\032TO"
-    "OL_CALL_FORMAT_NAME_LFM2\020\007\"\004\010\002\020\006*\246\001\n\016Too"
-    "lChoiceMode\022 \n\034TOOL_CHOICE_MODE_UNSPECIF"
-    "IED\020\000\022\031\n\025TOOL_CHOICE_MODE_AUTO\020\001\022\031\n\025TOOL"
-    "_CHOICE_MODE_NONE\020\002\022\035\n\031TOOL_CHOICE_MODE_"
-    "REQUIRED\020\003\022\035\n\031TOOL_CHOICE_MODE_SPECIFIC\020"
-    "\004*\217\001\n\017ToolCallingRole\022!\n\035TOOL_CALLING_RO"
-    "LE_UNSPECIFIED\020\000\022\032\n\026TOOL_CALLING_ROLE_US"
-    "ER\020\001\022\037\n\033TOOL_CALLING_ROLE_ASSISTANT\020\002\022\034\n"
-    "\030TOOL_CALLING_ROLE_SYSTEM\020\0032\237\002\n\013ToolCall"
-    "ing\022J\n\005Parse\022 .runanywhere.v1.ToolParseR"
-    "equest\032\037.runanywhere.v1.ToolParseResult\022"
-    "_\n\014FormatPrompt\022\'.runanywhere.v1.ToolPro"
-    "mptFormatRequest\032&.runanywhere.v1.ToolPr"
-    "omptFormatResult\022c\n\014ValidateCall\022).runan"
-    "ywhere.v1.ToolCallValidationRequest\032(.ru"
-    "nanywhere.v1.ToolCallValidationResultB\213\001"
-    "\n\027ai.runanywhere.proto.v1B\020ToolCallingPr"
-    "otoP\001Z<github.com/runanywhere/runanywher"
-    "e-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016"
-    "Runanywhere.V1\272\002\002RAb\006proto3"
+    "\n\022tool_calling.proto\022\016runanywhere.v1\032\023fi"
+    "nish_reason.proto\032\021rac_options.proto\032\021to"
+    "ken_usage.proto\"\337\001\n\tToolValue\022\026\n\014string_"
+    "value\030\001 \001(\tH\000\022\026\n\014number_value\030\002 \001(\001H\000\022\024\n"
+    "\nbool_value\030\003 \001(\010H\000\0225\n\013array_value\030\004 \001(\013"
+    "2\036.runanywhere.v1.ToolValueArrayH\000\0227\n\014ob"
+    "ject_value\030\005 \001(\0132\037.runanywhere.v1.ToolVa"
+    "lueObjectH\000\022\024\n\nnull_value\030\006 \001(\010H\000B\006\n\004kin"
+    "d\";\n\016ToolValueArray\022)\n\006values\030\001 \003(\0132\031.ru"
+    "nanywhere.v1.ToolValue\"\230\001\n\017ToolValueObje"
+    "ct\022;\n\006fields\030\001 \003(\0132+.runanywhere.v1.Tool"
+    "ValueObject.FieldsEntry\032H\n\013FieldsEntry\022\013"
+    "\n\003key\030\001 \001(\t\022(\n\005value\030\002 \001(\0132\031.runanywhere"
+    ".v1.ToolValue:\0028\001\"\035\n\rToolValueJSON\022\014\n\004js"
+    "on\030\001 \001(\t\"k\n\016ToolDefinition\022\014\n\004name\030\001 \001(\t"
+    "\022\023\n\013description\030\002 \001(\t\022\022\n\nparameters\030\003 \001("
+    "\t\022\025\n\010category\030\004 \001(\tH\000\210\001\001B\013\n\t_category\"w\n"
+    "\010ToolCall\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\026\n\016a"
+    "rguments_json\030\003 \001(\t\022\025\n\rcreated_at_ms\030\004 \001"
+    "(\003\022\025\n\010raw_text\030\005 \001(\tH\000\210\001\001B\013\n\t_raw_text\"\245"
+    "\001\n\nToolResult\022\024\n\014tool_call_id\030\001 \001(\t\022\014\n\004n"
+    "ame\030\002 \001(\t\022\023\n\013result_json\030\003 \001(\t\022\022\n\005error\030"
+    "\004 \001(\tH\000\210\001\001\022\020\n\010is_error\030\005 \001(\010\022\025\n\rstarted_"
+    "at_ms\030\006 \001(\003\022\027\n\017completed_at_ms\030\007 \001(\003B\010\n\006"
+    "_error\"\277\005\n\022ToolCallingOptions\022-\n\005tools\030\001"
+    " \003(\0132\036.runanywhere.v1.ToolDefinition\022\031\n\014"
+    "auto_execute\030\003 \001(\010H\000\210\001\001\022\032\n\rsystem_prompt"
+    "\030\006 \001(\tH\001\210\001\001\022\035\n\025replace_system_prompt\030\007 \001"
+    "(\010\022\034\n\024keep_tools_available\030\010 \001(\010\0227\n\006form"
+    "at\030\n \001(\0162\".runanywhere.v1.ToolCallFormat"
+    "NameH\002\210\001\001\022\033\n\023parallel_tool_calls\030\017 \001(\010\022&"
+    "\n\016max_tool_calls\030\014 \001(\005B\t\212\265\030\0015\240\265\030\001H\003\210\001\001\0223"
+    "\n\013tool_choice\030\r \001(\0162\036.runanywhere.v1.Too"
+    "lChoiceMode\022\035\n\020forced_tool_name\030\016 \001(\tH\004\210"
+    "\001\001\022\036\n\026require_json_arguments\030\020 \001(\010\022\035\n\020di"
+    "sable_thinking\030\021 \001(\010H\005\210\001\001\022\022\n\005top_p\030\022 \001(\002"
+    "H\006\210\001\001\022\033\n\016validate_calls\030\023 \001(\010H\007\210\001\001B\017\n\r_a"
+    "uto_executeB\020\n\016_system_promptB\t\n\007_format"
+    "B\021\n\017_max_tool_callsB\023\n\021_forced_tool_name"
+    "B\023\n\021_disable_thinkingB\010\n\006_top_pB\021\n\017_vali"
+    "date_callsJ\004\010\002\020\003J\004\010\t\020\nJ\004\010\013\020\014J\004\010\004\020\005J\004\010\005\020\006"
+    "R\013temperatureR\021max_output_tokens\"\205\003\n\021Too"
+    "lCallingResult\022\014\n\004text\030\001 \001(\t\022,\n\ntool_cal"
+    "ls\030\002 \003(\0132\030.runanywhere.v1.ToolCall\0220\n\014to"
+    "ol_results\030\003 \003(\0132\032.runanywhere.v1.ToolRe"
+    "sult\022\023\n\013is_complete\030\004 \001(\010\022\027\n\017iterations_"
+    "used\030\005 \001(\005\022\032\n\rerror_message\030\006 \001(\tH\000\210\001\001\022\022"
+    "\n\nerror_code\030\007 \001(\005\022\035\n\020thinking_content\030\010"
+    " \001(\tH\001\210\001\001\022)\n\005usage\030\t \001(\0132\032.runanywhere.v"
+    "1.TokenUsage\0223\n\rfinish_reason\030\n \001(\0162\034.ru"
+    "nanywhere.v1.FinishReasonB\020\n\016_error_mess"
+    "ageB\023\n\021_thinking_content\"f\n\020ToolParseReq"
+    "uest\022\014\n\004text\030\001 \001(\t\0228\n\007options\030\002 \001(\0132\".ru"
+    "nanywhere.v1.ToolCallingOptionsH\000\210\001\001B\n\n\010"
+    "_options\"\260\001\n\017ToolParseResult\022\025\n\rhas_tool"
+    "_call\030\001 \001(\010\022,\n\ntool_calls\030\002 \003(\0132\030.runany"
+    "where.v1.ToolCall\022\026\n\016remaining_text\030\003 \001("
+    "\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\nerror_c"
+    "ode\030\005 \001(\005B\020\n\016_error_message\"\246\001\n\027ToolProm"
+    "ptFormatRequest\022\023\n\013user_prompt\030\001 \001(\t\0228\n\007"
+    "options\030\002 \001(\0132\".runanywhere.v1.ToolCalli"
+    "ngOptionsH\000\210\001\001\0220\n\014tool_results\030\003 \003(\0132\032.r"
+    "unanywhere.v1.ToolResultB\n\n\010_options\"\256\001\n"
+    "\026ToolPromptFormatResult\022\030\n\020formatted_pro"
+    "mpt\030\001 \001(\t\0222\n\006format\030\002 \001(\0162\".runanywhere."
+    "v1.ToolCallFormatName\022\032\n\rerror_message\030\004"
+    " \001(\tH\000\210\001\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_"
+    "messageJ\004\010\003\020\004\"\216\001\n\031ToolCallValidationRequ"
+    "est\022+\n\ttool_call\030\001 \001(\0132\030.runanywhere.v1."
+    "ToolCall\0228\n\007options\030\002 \001(\0132\".runanywhere."
+    "v1.ToolCallingOptionsH\000\210\001\001B\n\n\010_options\"\370"
+    "\001\n\030ToolCallValidationResult\022\020\n\010is_valid\030"
+    "\001 \001(\010\022\031\n\021validation_errors\030\002 \003(\t\0229\n\014matc"
+    "hed_tool\030\003 \001(\0132\036.runanywhere.v1.ToolDefi"
+    "nitionH\000\210\001\001\022!\n\031normalized_arguments_json"
+    "\030\004 \001(\t\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001\022\022\n\ner"
+    "ror_code\030\006 \001(\005B\017\n\r_matched_toolB\020\n\016_erro"
+    "r_message\"X\n\026ToolCallingHistoryTurn\022-\n\004r"
+    "ole\030\001 \001(\0162\037.runanywhere.v1.ToolCallingRo"
+    "le\022\017\n\007content\030\002 \001(\t\"\237\001\n\037ToolCallingSessi"
+    "onCreateRequest\022\016\n\006prompt\030\001 \001(\t\0227\n\007histo"
+    "ry\030\002 \003(\0132&.runanywhere.v1.ToolCallingHis"
+    "toryTurn\0223\n\007options\030\003 \001(\0132\".runanywhere."
+    "v1.ToolCallingOptions\"\321\001\n\027ToolCallingSes"
+    "sionEvent\022 \n\026llm_stream_event_bytes\030\001 \001("
+    "\014H\000\022-\n\ttool_call\030\002 \001(\0132\030.runanywhere.v1."
+    "ToolCallH\000\0229\n\014final_result\030\003 \001(\0132!.runan"
+    "ywhere.v1.ToolCallingResultH\000\022\025\n\013error_b"
+    "ytes\030\004 \001(\014H\000\022\013\n\003seq\030\005 \001(\004B\006\n\004kind\"\212\001\n\'To"
+    "olCallingSessionStepWithResultRequest\022\026\n"
+    "\016session_handle\030\001 \001(\004\022\024\n\014tool_call_id\030\002 "
+    "\001(\t\022\023\n\013result_json\030\003 \001(\t\022\022\n\005error\030\004 \001(\tH"
+    "\000\210\001\001B\010\n\006_error*\201\001\n\022ToolCallFormatName\022%\n"
+    "!TOOL_CALL_FORMAT_NAME_UNSPECIFIED\020\000\022\036\n\032"
+    "TOOL_CALL_FORMAT_NAME_JSON\020\001\022\036\n\032TOOL_CAL"
+    "L_FORMAT_NAME_LFM2\020\007\"\004\010\002\020\006*\246\001\n\016ToolChoic"
+    "eMode\022 \n\034TOOL_CHOICE_MODE_UNSPECIFIED\020\000\022"
+    "\031\n\025TOOL_CHOICE_MODE_AUTO\020\001\022\031\n\025TOOL_CHOIC"
+    "E_MODE_NONE\020\002\022\035\n\031TOOL_CHOICE_MODE_REQUIR"
+    "ED\020\003\022\035\n\031TOOL_CHOICE_MODE_SPECIFIC\020\004*\217\001\n\017"
+    "ToolCallingRole\022!\n\035TOOL_CALLING_ROLE_UNS"
+    "PECIFIED\020\000\022\032\n\026TOOL_CALLING_ROLE_USER\020\001\022\037"
+    "\n\033TOOL_CALLING_ROLE_ASSISTANT\020\002\022\034\n\030TOOL_"
+    "CALLING_ROLE_SYSTEM\020\0032\237\002\n\013ToolCalling\022J\n"
+    "\005Parse\022 .runanywhere.v1.ToolParseRequest"
+    "\032\037.runanywhere.v1.ToolParseResult\022_\n\014For"
+    "matPrompt\022\'.runanywhere.v1.ToolPromptFor"
+    "matRequest\032&.runanywhere.v1.ToolPromptFo"
+    "rmatResult\022c\n\014ValidateCall\022).runanywhere"
+    ".v1.ToolCallValidationRequest\032(.runanywh"
+    "ere.v1.ToolCallValidationResultB\213\001\n\027ai.r"
+    "unanywhere.proto.v1B\020ToolCallingProtoP\001Z"
+    "<github.com/runanywhere/runanywhere-sdks"
+    "/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_tool_5fcalling_2eproto_deps[2] = {
+    descriptor_table_tool_5fcalling_2eproto_deps[3] = {
+        &::descriptor_table_finish_5freason_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
         &::descriptor_table_token_5fusage_2eproto,
 };
@@ -4005,12 +4016,12 @@ static ::absl::once_flag descriptor_table_tool_5fcalling_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_tool_5fcalling_2eproto = {
     false,
     false,
-    4507,
+    4581,
     descriptor_table_protodef_tool_5fcalling_2eproto,
     "tool_calling.proto",
     &descriptor_table_tool_5fcalling_2eproto_once,
     descriptor_table_tool_5fcalling_2eproto_deps,
-    2,
+    3,
     20,
     schemas,
     file_message_globals,
@@ -6733,9 +6744,9 @@ ToolCallingResult::ToolCallingResult(
                offsetof(Impl_, is_complete_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_complete_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, finish_reason_) -
                offsetof(Impl_, is_complete_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::finish_reason_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolCallingResult)
 }
@@ -6762,9 +6773,9 @@ inline void ToolCallingResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena)
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, usage_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, finish_reason_) -
                offsetof(Impl_, usage_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::finish_reason_));
 }
 ToolCallingResult::~ToolCallingResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolCallingResult)
@@ -6844,7 +6855,11 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
         reinterpret_cast<char*>(&_impl_.iterations_used_) -
         reinterpret_cast<char*>(&_impl_.is_complete_)) + sizeof(_impl_.iterations_used_));
   }
-  _impl_.error_code_ = 0;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    ::memset(&_impl_.error_code_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.finish_reason_) -
+        reinterpret_cast<char*>(&_impl_.error_code_)) + sizeof(_impl_.finish_reason_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -6954,6 +6969,15 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
         stream);
   }
 
+  // .runanywhere.v1.FinishReason finish_reason = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_finish_reason() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          10, this_._internal_finish_reason(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -7030,12 +7054,19 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
       }
     }
   }
-   {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
     // int32 error_code = 7;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_error_code() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_error_code());
+      }
+    }
+    // .runanywhere.v1.FinishReason finish_reason = 10;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_finish_reason() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_finish_reason());
       }
     }
   }
@@ -7102,9 +7133,16 @@ void ToolCallingResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
   }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_error_code() != 0) {
-      _this->_impl_.error_code_ = from._impl_.error_code_;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (from._internal_finish_reason() != 0) {
+        _this->_impl_.finish_reason_ = from._impl_.finish_reason_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -7132,8 +7170,8 @@ void ToolCallingResult::InternalSwap(ToolCallingResult* PROTOBUF_RESTRICT PROTOB
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.thinking_content_, &other->_impl_.thinking_content_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_)
-      + sizeof(ToolCallingResult::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.finish_reason_)
+      + sizeof(ToolCallingResult::_impl_.finish_reason_)
       - PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.usage_)>(
           reinterpret_cast<char*>(&_impl_.usage_),
           reinterpret_cast<char*>(&other->_impl_.usage_));

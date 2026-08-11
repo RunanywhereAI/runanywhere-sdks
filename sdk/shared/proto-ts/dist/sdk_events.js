@@ -3340,8 +3340,6 @@ function createBaseGenerationEvent() {
         response: "",
         error: "",
         modelId: "",
-        costAmount: 0,
-        costSavedAmount: 0,
         routingTarget: "",
         routingReason: "",
         cancelReason: "",
@@ -3392,12 +3390,6 @@ exports.GenerationEvent = {
         }
         if (message.modelId !== "") {
             writer.uint32(74).string(message.modelId);
-        }
-        if (message.costAmount !== 0) {
-            writer.uint32(81).double(message.costAmount);
-        }
-        if (message.costSavedAmount !== 0) {
-            writer.uint32(89).double(message.costSavedAmount);
         }
         if (message.routingTarget !== "") {
             writer.uint32(98).string(message.routingTarget);
@@ -3529,20 +3521,6 @@ exports.GenerationEvent = {
                         break;
                     }
                     message.modelId = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 81) {
-                        break;
-                    }
-                    message.costAmount = reader.double();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 89) {
-                        break;
-                    }
-                    message.costSavedAmount = reader.double();
                     continue;
                 }
                 case 12: {
@@ -3720,16 +3698,6 @@ exports.GenerationEvent = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            costAmount: isSet(object.costAmount)
-                ? globalThis.Number(object.costAmount)
-                : isSet(object.cost_amount)
-                    ? globalThis.Number(object.cost_amount)
-                    : 0,
-            costSavedAmount: isSet(object.costSavedAmount)
-                ? globalThis.Number(object.costSavedAmount)
-                : isSet(object.cost_saved_amount)
-                    ? globalThis.Number(object.cost_saved_amount)
-                    : 0,
             routingTarget: isSet(object.routingTarget)
                 ? globalThis.String(object.routingTarget)
                 : isSet(object.routing_target)
@@ -3853,12 +3821,6 @@ exports.GenerationEvent = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.costAmount !== 0) {
-            obj.costAmount = message.costAmount;
-        }
-        if (message.costSavedAmount !== 0) {
-            obj.costSavedAmount = message.costSavedAmount;
-        }
         if (message.routingTarget !== "") {
             obj.routingTarget = message.routingTarget;
         }
@@ -3935,8 +3897,6 @@ exports.GenerationEvent = {
         message.response = object.response ?? "";
         message.error = object.error ?? "";
         message.modelId = object.modelId ?? "";
-        message.costAmount = object.costAmount ?? 0;
-        message.costSavedAmount = object.costSavedAmount ?? 0;
         message.routingTarget = object.routingTarget ?? "";
         message.routingReason = object.routingReason ?? "";
         message.cancelReason = object.cancelReason ?? "";

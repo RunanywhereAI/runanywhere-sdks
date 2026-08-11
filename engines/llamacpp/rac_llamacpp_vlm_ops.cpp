@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
+#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/backends/rac_vlm_llamacpp.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -157,7 +158,8 @@ rac_result_t llamacpp_vlm_create_impl(const char* model_id, const char* config_j
 
 // Exposed with external linkage so rac_plugin_entry_llamacpp.cpp can extern-
 // reference it when filling the unified engine vtable's `vlm_ops` slot.
-extern "C" const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
+// RAC_LLAMACPP_API: export from rac_backend_llamacpp.dll for Windows thin carriers.
+extern "C" RAC_LLAMACPP_API const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .initialize = llamacpp_vlm_vtable_initialize,
     .process = llamacpp_vlm_vtable_process,
     .process_stream = llamacpp_vlm_vtable_process_stream,

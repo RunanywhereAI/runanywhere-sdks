@@ -1098,8 +1098,6 @@ class GenerationEvent extends $pb.GeneratedMessage {
     $core.String? response,
     $core.String? error,
     $core.String? modelId,
-    $core.double? costAmount,
-    $core.double? costSavedAmount,
     $core.String? routingTarget,
     $core.String? routingReason,
     $core.String? cancelReason,
@@ -1131,8 +1129,6 @@ class GenerationEvent extends $pb.GeneratedMessage {
     if (response != null) result.response = response;
     if (error != null) result.error = error;
     if (modelId != null) result.modelId = modelId;
-    if (costAmount != null) result.costAmount = costAmount;
-    if (costSavedAmount != null) result.costSavedAmount = costSavedAmount;
     if (routingTarget != null) result.routingTarget = routingTarget;
     if (routingReason != null) result.routingReason = routingReason;
     if (cancelReason != null) result.cancelReason = cancelReason;
@@ -1182,8 +1178,6 @@ class GenerationEvent extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'response')
     ..aOS(8, _omitFieldNames ? '' : 'error')
     ..aOS(9, _omitFieldNames ? '' : 'modelId')
-    ..aD(10, _omitFieldNames ? '' : 'costAmount')
-    ..aD(11, _omitFieldNames ? '' : 'costSavedAmount')
     ..aOS(12, _omitFieldNames ? '' : 'routingTarget')
     ..aOS(13, _omitFieldNames ? '' : 'routingReason')
     ..aOS(14, _omitFieldNames ? '' : 'cancelReason')
@@ -1316,115 +1310,96 @@ class GenerationEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearModelId() => $_clearField(9);
 
-  /// For COST_CALCULATED — Dart SDKGenerationCostCalculated.
-  @$pb.TagNumber(10)
-  $core.double get costAmount => $_getN(9);
-  @$pb.TagNumber(10)
-  set costAmount($core.double value) => $_setDouble(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasCostAmount() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearCostAmount() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.double get costSavedAmount => $_getN(10);
-  @$pb.TagNumber(11)
-  set costSavedAmount($core.double value) => $_setDouble(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasCostSavedAmount() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearCostSavedAmount() => $_clearField(11);
-
   /// For ROUTING_DECISION.
   @$pb.TagNumber(12)
-  $core.String get routingTarget => $_getSZ(11);
+  $core.String get routingTarget => $_getSZ(9);
   @$pb.TagNumber(12)
-  set routingTarget($core.String value) => $_setString(11, value);
+  set routingTarget($core.String value) => $_setString(9, value);
   @$pb.TagNumber(12)
-  $core.bool hasRoutingTarget() => $_has(11);
+  $core.bool hasRoutingTarget() => $_has(9);
   @$pb.TagNumber(12)
   void clearRoutingTarget() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get routingReason => $_getSZ(12);
+  $core.String get routingReason => $_getSZ(10);
   @$pb.TagNumber(13)
-  set routingReason($core.String value) => $_setString(12, value);
+  set routingReason($core.String value) => $_setString(10, value);
   @$pb.TagNumber(13)
-  $core.bool hasRoutingReason() => $_has(12);
+  $core.bool hasRoutingReason() => $_has(10);
   @$pb.TagNumber(13)
   void clearRoutingReason() => $_clearField(13);
 
   /// For cancellation / tool / structured-output / thinking events.
   @$pb.TagNumber(14)
-  $core.String get cancelReason => $_getSZ(13);
+  $core.String get cancelReason => $_getSZ(11);
   @$pb.TagNumber(14)
-  set cancelReason($core.String value) => $_setString(13, value);
+  set cancelReason($core.String value) => $_setString(11, value);
   @$pb.TagNumber(14)
-  $core.bool hasCancelReason() => $_has(13);
+  $core.bool hasCancelReason() => $_has(11);
   @$pb.TagNumber(14)
   void clearCancelReason() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.String get toolCallId => $_getSZ(14);
+  $core.String get toolCallId => $_getSZ(12);
   @$pb.TagNumber(15)
-  set toolCallId($core.String value) => $_setString(14, value);
+  set toolCallId($core.String value) => $_setString(12, value);
   @$pb.TagNumber(15)
-  $core.bool hasToolCallId() => $_has(14);
+  $core.bool hasToolCallId() => $_has(12);
   @$pb.TagNumber(15)
   void clearToolCallId() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.String get toolName => $_getSZ(15);
+  $core.String get toolName => $_getSZ(13);
   @$pb.TagNumber(16)
-  set toolName($core.String value) => $_setString(15, value);
+  set toolName($core.String value) => $_setString(13, value);
   @$pb.TagNumber(16)
-  $core.bool hasToolName() => $_has(15);
+  $core.bool hasToolName() => $_has(13);
   @$pb.TagNumber(16)
   void clearToolName() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $core.String get toolPayloadJson => $_getSZ(16);
+  $core.String get toolPayloadJson => $_getSZ(14);
   @$pb.TagNumber(17)
-  set toolPayloadJson($core.String value) => $_setString(16, value);
+  set toolPayloadJson($core.String value) => $_setString(14, value);
   @$pb.TagNumber(17)
-  $core.bool hasToolPayloadJson() => $_has(16);
+  $core.bool hasToolPayloadJson() => $_has(14);
   @$pb.TagNumber(17)
   void clearToolPayloadJson() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $core.String get structuredSchemaJson => $_getSZ(17);
+  $core.String get structuredSchemaJson => $_getSZ(15);
   @$pb.TagNumber(18)
-  set structuredSchemaJson($core.String value) => $_setString(17, value);
+  set structuredSchemaJson($core.String value) => $_setString(15, value);
   @$pb.TagNumber(18)
-  $core.bool hasStructuredSchemaJson() => $_has(17);
+  $core.bool hasStructuredSchemaJson() => $_has(15);
   @$pb.TagNumber(18)
   void clearStructuredSchemaJson() => $_clearField(18);
 
   @$pb.TagNumber(19)
-  $core.String get structuredOutputJson => $_getSZ(18);
+  $core.String get structuredOutputJson => $_getSZ(16);
   @$pb.TagNumber(19)
-  set structuredOutputJson($core.String value) => $_setString(18, value);
+  set structuredOutputJson($core.String value) => $_setString(16, value);
   @$pb.TagNumber(19)
-  $core.bool hasStructuredOutputJson() => $_has(18);
+  $core.bool hasStructuredOutputJson() => $_has(16);
   @$pb.TagNumber(19)
   void clearStructuredOutputJson() => $_clearField(19);
 
   @$pb.TagNumber(20)
-  $core.String get thinkingText => $_getSZ(19);
+  $core.String get thinkingText => $_getSZ(17);
   @$pb.TagNumber(20)
-  set thinkingText($core.String value) => $_setString(19, value);
+  set thinkingText($core.String value) => $_setString(17, value);
   @$pb.TagNumber(20)
-  $core.bool hasThinkingText() => $_has(19);
+  $core.bool hasThinkingText() => $_has(17);
   @$pb.TagNumber(20)
   void clearThinkingText() => $_clearField(20);
 
   /// Prompt-token count on COMPLETED. Total = input_tokens + output_tokens.
   @$pb.TagNumber(21)
-  $core.int get inputTokens => $_getIZ(20);
+  $core.int get inputTokens => $_getIZ(18);
   @$pb.TagNumber(21)
-  set inputTokens($core.int value) => $_setSignedInt32(20, value);
+  set inputTokens($core.int value) => $_setSignedInt32(18, value);
   @$pb.TagNumber(21)
-  $core.bool hasInputTokens() => $_has(20);
+  $core.bool hasInputTokens() => $_has(18);
   @$pb.TagNumber(21)
   void clearInputTokens() => $_clearField(21);
 
@@ -1432,95 +1407,95 @@ class GenerationEvent extends $pb.GeneratedMessage {
   /// destination router can derive the full telemetry payload from the
   /// proto SDKEvent alone (no parallel struct path).
   @$pb.TagNumber(22)
-  $core.double get tokensPerSecond => $_getN(21);
+  $core.double get tokensPerSecond => $_getN(19);
   @$pb.TagNumber(22)
-  set tokensPerSecond($core.double value) => $_setDouble(21, value);
+  set tokensPerSecond($core.double value) => $_setDouble(19, value);
   @$pb.TagNumber(22)
-  $core.bool hasTokensPerSecond() => $_has(21);
+  $core.bool hasTokensPerSecond() => $_has(19);
   @$pb.TagNumber(22)
   void clearTokensPerSecond() => $_clearField(22);
 
   /// Time to first token, whichever kind reports it.
   @$pb.TagNumber(23)
-  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(22);
+  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(20);
   @$pb.TagNumber(23)
-  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(22, value);
+  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(20, value);
   @$pb.TagNumber(23)
-  $core.bool hasTimeToFirstTokenMs() => $_has(22);
+  $core.bool hasTimeToFirstTokenMs() => $_has(20);
   @$pb.TagNumber(23)
   void clearTimeToFirstTokenMs() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  $core.bool get isStreaming => $_getBF(23);
+  $core.bool get isStreaming => $_getBF(21);
   @$pb.TagNumber(24)
-  set isStreaming($core.bool value) => $_setBool(23, value);
+  set isStreaming($core.bool value) => $_setBool(21, value);
   @$pb.TagNumber(24)
-  $core.bool hasIsStreaming() => $_has(23);
+  $core.bool hasIsStreaming() => $_has(21);
   @$pb.TagNumber(24)
   void clearIsStreaming() => $_clearField(24);
 
   @$pb.TagNumber(25)
-  $core.double get temperature => $_getN(24);
+  $core.double get temperature => $_getN(22);
   @$pb.TagNumber(25)
-  set temperature($core.double value) => $_setFloat(24, value);
+  set temperature($core.double value) => $_setFloat(22, value);
   @$pb.TagNumber(25)
-  $core.bool hasTemperature() => $_has(24);
+  $core.bool hasTemperature() => $_has(22);
   @$pb.TagNumber(25)
   void clearTemperature() => $_clearField(25);
 
   @$pb.TagNumber(26)
-  $core.int get maxTokens => $_getIZ(25);
+  $core.int get maxTokens => $_getIZ(23);
   @$pb.TagNumber(26)
-  set maxTokens($core.int value) => $_setSignedInt32(25, value);
+  set maxTokens($core.int value) => $_setSignedInt32(23, value);
   @$pb.TagNumber(26)
-  $core.bool hasMaxTokens() => $_has(25);
+  $core.bool hasMaxTokens() => $_has(23);
   @$pb.TagNumber(26)
   void clearMaxTokens() => $_clearField(26);
 
   @$pb.TagNumber(27)
-  $core.int get contextLength => $_getIZ(26);
+  $core.int get contextLength => $_getIZ(24);
   @$pb.TagNumber(27)
-  set contextLength($core.int value) => $_setSignedInt32(26, value);
+  set contextLength($core.int value) => $_setSignedInt32(24, value);
   @$pb.TagNumber(27)
-  $core.bool hasContextLength() => $_has(26);
+  $core.bool hasContextLength() => $_has(24);
   @$pb.TagNumber(27)
   void clearContextLength() => $_clearField(27);
 
   @$pb.TagNumber(28)
-  $core.String get modelName => $_getSZ(27);
+  $core.String get modelName => $_getSZ(25);
   @$pb.TagNumber(28)
-  set modelName($core.String value) => $_setString(27, value);
+  set modelName($core.String value) => $_setString(25, value);
   @$pb.TagNumber(28)
-  $core.bool hasModelName() => $_has(27);
+  $core.bool hasModelName() => $_has(25);
   @$pb.TagNumber(28)
   void clearModelName() => $_clearField(28);
 
   /// Whole-generation wall clock.
   @$pb.TagNumber(29)
-  $fixnum.Int64 get totalDurationMs => $_getI64(28);
+  $fixnum.Int64 get totalDurationMs => $_getI64(26);
   @$pb.TagNumber(29)
-  set totalDurationMs($fixnum.Int64 value) => $_setInt64(28, value);
+  set totalDurationMs($fixnum.Int64 value) => $_setInt64(26, value);
   @$pb.TagNumber(29)
-  $core.bool hasTotalDurationMs() => $_has(28);
+  $core.bool hasTotalDurationMs() => $_has(26);
   @$pb.TagNumber(29)
   void clearTotalDurationMs() => $_clearField(29);
 
   @$pb.TagNumber(30)
-  $0.InferenceFramework get framework => $_getN(29);
+  $0.InferenceFramework get framework => $_getN(27);
   @$pb.TagNumber(30)
   set framework($0.InferenceFramework value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasFramework() => $_has(29);
+  $core.bool hasFramework() => $_has(27);
   @$pb.TagNumber(30)
   void clearFramework() => $_clearField(30);
 
   /// Prefill (prompt eval) wall clock.
   @$pb.TagNumber(31)
-  $fixnum.Int64 get prefillDurationMs => $_getI64(30);
+  $fixnum.Int64 get prefillDurationMs => $_getI64(28);
   @$pb.TagNumber(31)
-  set prefillDurationMs($fixnum.Int64 value) => $_setInt64(30, value);
+  set prefillDurationMs($fixnum.Int64 value) => $_setInt64(28, value);
   @$pb.TagNumber(31)
-  $core.bool hasPrefillDurationMs() => $_has(30);
+  $core.bool hasPrefillDurationMs() => $_has(28);
   @$pb.TagNumber(31)
   void clearPrefillDurationMs() => $_clearField(31);
 }

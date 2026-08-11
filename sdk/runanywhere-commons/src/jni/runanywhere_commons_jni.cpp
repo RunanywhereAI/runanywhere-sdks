@@ -95,6 +95,7 @@
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
@@ -2292,6 +2293,65 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRemoveP
     return static_cast<jint>(result);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateDownloadStatus(
+    JNIEnv* env, jclass clazz, jstring modelId, jstring localPath) {
+    if (!modelId) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryUpdateDownloadStatus: model registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    const char* path_str = nullptr;
+    if (localPath) {
+        path_str = env->GetStringUTFChars(localPath, nullptr);
+        if (!path_str) {
+            env->ReleaseStringUTFChars(modelId, id_str);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    rac_result_t result = rac_model_registry_update_download_status(registry, id_str, path_str);
+
+    if (path_str) {
+        env->ReleaseStringUTFChars(localPath, path_str);
+    }
+    env->ReleaseStringUTFChars(modelId, id_str);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateLastUsed(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    if (!modelId) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryUpdateLastUsed: model registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    rac_result_t result = rac_model_registry_update_last_used(registry, id_str);
+    env->ReleaseStringUTFChars(modelId, id_str);
+    return static_cast<jint>(result);
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefreshProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
@@ -2512,6 +2572,226 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioWavHeaderSize(JNIEnv* env,
                                                                                jclass clazz) {
     return static_cast<jint>(rac_audio_wav_header_size());
+}
+
+JNIEXPORT jfloatArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioPcm16ToFloat32(JNIEnv* env,
+                                                                                jclass /*clazz*/,
+                                                                                jbyteArray pcm16) {
+    if (pcm16 == nullptr) {
+        return nullptr;
+    }
+    const jsize byte_count = env->GetArrayLength(pcm16);
+    const size_t n_samples = static_cast<size_t>(byte_count) / sizeof(int16_t);
+    if (n_samples == 0) {
+        return env->NewFloatArray(0);
+    }
+    jbyte* bytes = env->GetByteArrayElements(pcm16, nullptr);
+    if (bytes == nullptr) {
+        return nullptr;
+    }
+    jfloatArray out = env->NewFloatArray(static_cast<jsize>(n_samples));
+    if (out == nullptr) {
+        env->ReleaseByteArrayElements(pcm16, bytes, JNI_ABORT);
+        return nullptr;
+    }
+    jfloat* out_elems = env->GetFloatArrayElements(out, nullptr);
+    if (out_elems == nullptr) {
+        env->ReleaseByteArrayElements(pcm16, bytes, JNI_ABORT);
+        return nullptr;
+    }
+    const rac_result_t rc = rac_audio_pcm16_to_float32(
+        reinterpret_cast<const int16_t*>(bytes), n_samples, out_elems);
+    env->ReleaseFloatArrayElements(out, out_elems, 0);
+    env->ReleaseByteArrayElements(pcm16, bytes, JNI_ABORT);
+    if (rc != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return out;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioFloat32ToPcm16(JNIEnv* env,
+                                                                                jclass /*clazz*/,
+                                                                                jfloatArray samples) {
+    if (samples == nullptr) {
+        return nullptr;
+    }
+    const jsize n_samples = env->GetArrayLength(samples);
+    if (n_samples == 0) {
+        return env->NewByteArray(0);
+    }
+    jfloat* in = env->GetFloatArrayElements(samples, nullptr);
+    if (in == nullptr) {
+        return nullptr;
+    }
+    std::vector<int16_t> pcm(static_cast<size_t>(n_samples));
+    const rac_result_t rc =
+        rac_audio_float32_to_pcm16(in, static_cast<size_t>(n_samples), pcm.data());
+    env->ReleaseFloatArrayElements(samples, in, JNI_ABORT);
+    if (rc != RAC_SUCCESS) {
+        return nullptr;
+    }
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(pcm.size() * sizeof(int16_t)));
+    if (out == nullptr) {
+        return nullptr;
+    }
+    env->SetByteArrayRegion(out, 0, static_cast<jsize>(pcm.size() * sizeof(int16_t)),
+                            reinterpret_cast<const jbyte*>(pcm.data()));
+    return out;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioComputeLevelNormalized(
+    JNIEnv* env, jclass /*clazz*/, jfloatArray samples, jfloat floorDb) {
+    if (samples == nullptr) {
+        return 0.0f;
+    }
+    const jsize n_samples = env->GetArrayLength(samples);
+    if (n_samples == 0) {
+        return 0.0f;
+    }
+    jfloat* in = env->GetFloatArrayElements(samples, nullptr);
+    if (in == nullptr) {
+        return 0.0f;
+    }
+    float out = 0.0f;
+    const rac_result_t rc = rac_audio_compute_level_normalized(
+        in, static_cast<size_t>(n_samples), floorDb, &out);
+    env->ReleaseFloatArrayElements(samples, in, JNI_ABORT);
+    if (rc != RAC_SUCCESS) {
+        return 0.0f;
+    }
+    return out;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPercent(
+    JNIEnv* /*env*/, jclass /*clazz*/, jfloat overallProgress, jlong bytesDownloaded,
+    jlong totalBytes) {
+    return rac_download_progress_percent(overallProgress, static_cast<int64_t>(bytesDownloaded),
+                                         static_cast<int64_t>(totalBytes));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceResolveChipName(
+    JNIEnv* env, jclass /*clazz*/, jstring socManufacturer, jstring socModel,
+    jstring buildHardware, jstring cpuinfoHardware, jstring architectureFallback) {
+    auto jstr = [env](jstring s) -> std::string {
+        if (s == nullptr) {
+            return {};
+        }
+        const char* chars = env->GetStringUTFChars(s, nullptr);
+        if (chars == nullptr) {
+            return {};
+        }
+        std::string out(chars);
+        env->ReleaseStringUTFChars(s, chars);
+        return out;
+    };
+    const std::string mfr = jstr(socManufacturer);
+    const std::string model = jstr(socModel);
+    const std::string hw = jstr(buildHardware);
+    const std::string cpu = jstr(cpuinfoHardware);
+    const std::string arch = jstr(architectureFallback);
+    char out[256];
+    const rac_result_t rc = rac_device_resolve_chip_name(
+        mfr.empty() ? nullptr : mfr.c_str(), model.empty() ? nullptr : model.c_str(),
+        hw.empty() ? nullptr : hw.c_str(), cpu.empty() ? nullptr : cpu.c_str(),
+        arch.empty() ? nullptr : arch.c_str(), out, sizeof(out));
+    if (rc != RAC_SUCCESS) {
+        return env->NewStringUTF(arch.empty() ? "unknown" : arch.c_str());
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceClassifyGpuFamily(
+    JNIEnv* env, jclass /*clazz*/, jstring socManufacturer, jstring socModel, jstring chipName) {
+    auto jstr = [env](jstring s) -> std::string {
+        if (s == nullptr) {
+            return {};
+        }
+        const char* chars = env->GetStringUTFChars(s, nullptr);
+        if (chars == nullptr) {
+            return {};
+        }
+        std::string out(chars);
+        env->ReleaseStringUTFChars(s, chars);
+        return out;
+    };
+    const std::string mfr = jstr(socManufacturer);
+    const std::string model = jstr(socModel);
+    const std::string chip = jstr(chipName);
+    char out[64];
+    const rac_result_t rc = rac_device_classify_gpu_family(
+        mfr.empty() ? nullptr : mfr.c_str(), model.empty() ? nullptr : model.c_str(),
+        chip.empty() ? nullptr : chip.c_str(), out, sizeof(out));
+    if (rc != RAC_SUCCESS) {
+        return env->NewStringUTF("unknown");
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceHeuristicHasNpu(
+    JNIEnv* env, jclass /*clazz*/, jstring socManufacturer, jstring socModel, jstring chipName) {
+    auto jstr = [env](jstring s) -> std::string {
+        if (s == nullptr) {
+            return {};
+        }
+        const char* chars = env->GetStringUTFChars(s, nullptr);
+        if (chars == nullptr) {
+            return {};
+        }
+        std::string out(chars);
+        env->ReleaseStringUTFChars(s, chars);
+        return out;
+    };
+    const std::string mfr = jstr(socManufacturer);
+    const std::string model = jstr(socModel);
+    const std::string chip = jstr(chipName);
+    return rac_device_heuristic_has_npu(mfr.empty() ? nullptr : mfr.c_str(),
+                                        model.empty() ? nullptr : model.c_str(),
+                                        chip.empty() ? nullptr : chip.c_str()) == RAC_TRUE
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceSplitPerformanceCores(
+    JNIEnv* env, jclass /*clazz*/, jlongArray maxFreqs) {
+    jintArray out = env->NewIntArray(2);
+    if (out == nullptr) {
+        return nullptr;
+    }
+    int32_t pe[2] = {0, 0};
+    if (maxFreqs != nullptr) {
+        const jsize count = env->GetArrayLength(maxFreqs);
+        if (count > 0) {
+            jlong* elems = env->GetLongArrayElements(maxFreqs, nullptr);
+            if (elems != nullptr) {
+                std::vector<int64_t> freqs(static_cast<size_t>(count));
+                for (jsize i = 0; i < count; ++i) {
+                    freqs[static_cast<size_t>(i)] = static_cast<int64_t>(elems[i]);
+                }
+                env->ReleaseLongArrayElements(maxFreqs, elems, JNI_ABORT);
+                (void)rac_device_split_performance_cores(freqs.data(), freqs.size(), &pe[0],
+                                                          &pe[1]);
+            }
+        }
+    } else {
+        (void)rac_device_split_performance_cores(nullptr, 0, &pe[0], &pe[1]);
+    }
+    env->SetIntArrayRegion(out, 0, 2, pe);
+    return out;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceCoalesceAvailableMemory(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong probedAvailableBytes) {
+    return static_cast<jlong>(
+        rac_device_coalesce_available_memory(static_cast<int64_t>(probedAvailableBytes)));
 }
 
 // =============================================================================
@@ -5462,11 +5742,36 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCal
     uintptr_t key = static_cast<uintptr_t>(handle);
     RAC_JNI_TRY {
         vadStreamListeners().set(env, key, listener);
-        return static_cast<jint>(rac_vad_set_stream_proto_callback(
+        rac_result_t rc = rac_vad_set_stream_proto_callback(
             handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
-            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr);
+        if (RAC_FAILED(rc)) {
+            vadStreamListeners().erase(env, key);
+        }
+        return static_cast<jint>(rc);
     }
     RAC_JNI_CATCH_INT()
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadUnsetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L)
+        return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    rac_result_t rc = rac_vad_unset_stream_proto_callback(handleFromJLong(handle));
+    rac_vad_proto_quiesce();
+    vadStreamListeners().erase(env, key);
+    return static_cast<jint>(rc);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadProtoQuiesce(JNIEnv* env,
+                                                                           jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_vad_proto_quiesce();
 }
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -5672,6 +5977,56 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatch
     rac_result_t rc =
         rac_embeddings_embed_batch_lifecycle_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchLifecycleProto");
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsNorm(JNIEnv* env,
+                                                                           jclass /*clazz*/,
+                                                                           jfloatArray vector) {
+    float norm = 0.0f;
+    if (vector == nullptr) {
+        (void)rac_embeddings_norm(nullptr, 0, &norm);
+        return norm;
+    }
+    const jsize n = env->GetArrayLength(vector);
+    if (n == 0) {
+        (void)rac_embeddings_norm(nullptr, 0, &norm);
+        return norm;
+    }
+    jfloat* elems = env->GetFloatArrayElements(vector, nullptr);
+    if (elems == nullptr) {
+        return 0.0f;
+    }
+    const rac_result_t rc = rac_embeddings_norm(elems, static_cast<size_t>(n), &norm);
+    env->ReleaseFloatArrayElements(vector, elems, JNI_ABORT);
+    return rc == RAC_SUCCESS ? norm : 0.0f;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsSimilarity(
+    JNIEnv* env, jclass /*clazz*/, jfloatArray lhs, jfloatArray rhs) {
+    float similarity = 0.0f;
+    const jsize lhs_n = lhs != nullptr ? env->GetArrayLength(lhs) : 0;
+    const jsize rhs_n = rhs != nullptr ? env->GetArrayLength(rhs) : 0;
+    if (lhs_n == 0 || rhs_n == 0) {
+        (void)rac_embeddings_similarity(nullptr, 0, nullptr, 0, &similarity);
+        return similarity;
+    }
+    jfloat* lhs_elems = env->GetFloatArrayElements(lhs, nullptr);
+    if (lhs_elems == nullptr) {
+        return 0.0f;
+    }
+    jfloat* rhs_elems = env->GetFloatArrayElements(rhs, nullptr);
+    if (rhs_elems == nullptr) {
+        env->ReleaseFloatArrayElements(lhs, lhs_elems, JNI_ABORT);
+        return 0.0f;
+    }
+    const rac_result_t rc =
+        rac_embeddings_similarity(lhs_elems, static_cast<size_t>(lhs_n), rhs_elems,
+                                  static_cast<size_t>(rhs_n), &similarity);
+    env->ReleaseFloatArrayElements(rhs, rhs_elems, JNI_ABORT);
+    env->ReleaseFloatArrayElements(lhs, lhs_elems, JNI_ABORT);
+    return rc == RAC_SUCCESS ? similarity : 0.0f;
 }
 
 JNIEXPORT void JNICALL

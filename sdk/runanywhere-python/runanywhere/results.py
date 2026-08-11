@@ -62,14 +62,16 @@ __all__ = [
 
 
 class FinishReason(IntEnum):
-    """Why generation stopped."""
+    """Why generation stopped — mirrors ``runanywhere.v1.FinishReason``."""
 
-    STOP = 0
-    LENGTH = 1
-    TOOL_CALLS = 2
-    CANCELLED = 3
-    CONTENT_FILTER = 4
-    UNKNOWN = 5
+    UNSPECIFIED = 0
+    STOP = 1
+    LENGTH = 2
+    STOP_SEQUENCE = 3
+    TOOL_CALLS = 4
+    CANCELLED = 5
+    CONTEXT_OVERFLOW = 6
+    ERROR = 7
 
 
 class TokenKind(IntEnum):
@@ -95,7 +97,7 @@ class GenerationResult:
     text: str = ""
     thinking_text: Optional[str] = None
     tool_calls: List[ToolCall] = field(default_factory=list)
-    finish_reason: FinishReason = FinishReason.STOP
+    finish_reason: FinishReason = FinishReason.UNSPECIFIED
     #: Backend-native finish-reason string, before normalization into ``finish_reason``.
     raw_finish_reason: Optional[str] = None
     input_tokens: int = 0
@@ -598,7 +600,13 @@ class ModelStatus:
 
 @dataclass
 class Synthesis:
-    """Raw synthesis output from the bridge: float32 samples plus their sample rate."""
+    """Raw synthesis output from the bridge: float32 samples plus their sample rate.
+
+    ``duration_ms`` is commons-owned (``rac_tts_result_t.duration_ms``) when the
+    native bridge surfaces it; otherwise it stays 0 and callers must not recompute
+    it from ``len(samples) / sample_rate``.
+    """
 
     samples: np.ndarray
     sample_rate: int
+    duration_ms: int = 0

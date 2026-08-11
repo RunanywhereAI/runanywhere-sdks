@@ -112,11 +112,11 @@ public class HybridSttTranscribeResponse(
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridSttTranscribeResponse> =
         object : ProtoAdapter<HybridSttTranscribeResponse>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      HybridSttTranscribeResponse::class, 
-      "type.googleapis.com/runanywhere.v1.HybridSttTranscribeResponse", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      HybridSttTranscribeResponse::class,
+      "type.googleapis.com/runanywhere.v1.HybridSttTranscribeResponse",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridSttTranscribeResponse): Int {

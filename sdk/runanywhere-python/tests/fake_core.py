@@ -20,14 +20,19 @@ class FakeCore:
         tokens: Optional[Sequence[str]] = None,
         *,
         transcript: str = "hello there",
-        synthesis: Optional[Tuple[np.ndarray, int]] = None,
+        synthesis: Optional[Tuple[np.ndarray, int, int]] = None,
         vad_decisions: Optional[Sequence[bool]] = None,
         dimension: int = 4,
     ) -> None:
         self.calls: List[Tuple[str, tuple]] = []
         self.tokens = list(tokens or ["Par", "is"])
         self.transcript = transcript
-        self.synthesis = synthesis or (np.zeros(2048, dtype=np.float32), 22050)
+        # (samples, sample_rate, duration_ms) — duration_ms mirrors commons TTS output.
+        self.synthesis = synthesis or (
+            np.zeros(2048, dtype=np.float32),
+            22050,
+            int(round(2048 / 22050 * 1000)),
+        )
         self.vad_decisions = list(vad_decisions or [])
         self.dimension = dimension
         self.last_kwargs: Optional[dict] = None
@@ -36,6 +41,25 @@ class FakeCore:
         self._next_handle = 1
         self._vad_index = 0
         self._registry: dict = {}
+        # Prefer the legacy generate path in hermetic tests (typed via generate_typed).
+        self.prefer_legacy_generate = True
+        self.stream_deltas: Optional[List[tuple]] = None  # [(text, is_thinking), ...]
+        self.finish_reason = 0  # FinishReason.UNSPECIFIED
+        self.usage: Optional[dict] = None
+        self.final_text: Optional[str] = None
+        self.final_thinking: Optional[str] = None
+        self._vad_cb = None
+        self._vad_session = 0
+        self._vad_options_bytes: bytes = b""
+        self._vad_speech_ms = 0
+        self._vad_silence_ms = 0
+        self._vad_in_speech = False
+        self._vad_start_ms = 0
+        self._vad_at_ms = 0
+        self._vad_prefix_ms = 0
+        self._vad_min_speech = 100
+        self._vad_min_silence = 300
+        self._audio_calls: List[tuple] = []
 
     # -- bookkeeping ---------------------------------------------------------
     def _record(self, method: str, *args: object) -> None:
@@ -73,8 +97,26 @@ class FakeCore:
     def generate(self, handle: int, prompt: str, on_token: Callable, **kwargs) -> None:
         self._record("generate", handle, prompt)
         self.last_kwargs = kwargs
-        for token in self.tokens:
-            keep = on_token(token)
+        self.stopped = False
+        pieces = self.stream_deltas or [(token, False) for token in self.tokens]
+        for text, _is_thinking in pieces:
+            if self.stopped:
+                return
+            keep = on_token(text)
+            self.emitted += 1
+            if keep is False:
+                self.stopped = True
+                return
+
+    def generate_typed(self, handle: int, prompt: str, on_delta: Callable, **kwargs) -> None:
+        self._record("generate_typed", handle, prompt)
+        self.last_kwargs = kwargs
+        self.stopped = False
+        pieces = self.stream_deltas or [(token, False) for token in self.tokens]
+        for text, is_thinking in pieces:
+            if self.stopped:
+                return
+            keep = on_delta(text, bool(is_thinking))
             self.emitted += 1
             if keep is False:
                 self.stopped = True
@@ -82,19 +124,88 @@ class FakeCore:
 
     def cancel_generate(self, handle: int) -> None:
         self._record("cancel_generate", handle)
+        self.stopped = True
 
     def unload_model(self, handle: int) -> None:
         self._record("unload_model", handle)
 
-    # -- LoRA (rac_llm_component_{load,remove,clear}_lora) --------------------
-    def lora_apply(self, handle: int, adapter_path: str, scale: object = None) -> None:
-        self._record("lora_apply", handle, adapter_path, scale)
+    # -- LoRA (rac_lora_*_proto — optional scale presence preserved) ---------
+    def __init_lora_state(self) -> None:
+        if not hasattr(self, "_lora_state"):
+            self._lora_state: list = []
 
-    def lora_remove(self, handle: int, adapter_path: str) -> None:
-        self._record("lora_remove", handle, adapter_path)
+    def lora_apply_proto(self, request_bytes: bytes) -> bytes:
+        from runanywhere._proto import lora_options_pb2 as lora_pb
 
-    def lora_remove_all(self, handle: int) -> None:
-        self._record("lora_remove_all", handle)
+        self.__init_lora_state()
+        req = lora_pb.LoraApplyRequest()
+        req.ParseFromString(bytes(request_bytes))
+        recorded = []
+        for adapter in req.adapters:
+            recorded.append(
+                (
+                    adapter.adapter_id,
+                    adapter.adapter_path,
+                    adapter.HasField("scale"),
+                    float(adapter.scale) if adapter.HasField("scale") else None,
+                )
+            )
+        self._record("lora_apply_proto", len(bytes(request_bytes)), tuple(recorded), req.keep_existing)
+        if not req.keep_existing:
+            self._lora_state = []
+        result = lora_pb.LoraApplyResult()
+        result.request_id = req.request_id
+        for adapter in req.adapters:
+            # Simulate commons resolve_effective_lora_scale for list/read-back only.
+            resolved = float(adapter.scale) if adapter.HasField("scale") else 1.0
+            info = result.adapters.add()
+            info.adapter_id = adapter.adapter_id
+            info.adapter_path = adapter.adapter_path
+            info.scale = resolved
+            info.applied = True
+            self._lora_state = [
+                s for s in self._lora_state if s[0] != (adapter.adapter_id or adapter.adapter_path)
+            ]
+            self._lora_state.append((adapter.adapter_id or adapter.adapter_path, resolved))
+        return result.SerializeToString()
+
+    def lora_remove_proto(self, request_bytes: bytes) -> bytes:
+        from runanywhere._proto import lora_options_pb2 as lora_pb
+
+        self.__init_lora_state()
+        req = lora_pb.LoraRemoveRequest()
+        req.ParseFromString(bytes(request_bytes))
+        self._record("lora_remove_proto", len(bytes(request_bytes)), list(req.adapter_ids), req.clear_all)
+        if req.clear_all:
+            self._lora_state = []
+        else:
+            remove = set(req.adapter_ids)
+            self._lora_state = [s for s in self._lora_state if s[0] not in remove]
+        state = lora_pb.LoraState()
+        for adapter_id, scale in self._lora_state:
+            info = state.loaded_adapters.add()
+            info.adapter_id = adapter_id
+            info.adapter_path = adapter_id
+            info.scale = float(scale)
+            info.applied = True
+        return state.SerializeToString()
+
+    def lora_list_proto(self, state_bytes: bytes) -> bytes:
+        from runanywhere._proto import lora_options_pb2 as lora_pb
+
+        self.__init_lora_state()
+        self._record("lora_list_proto", len(bytes(state_bytes)))
+        state = lora_pb.LoraState()
+        for adapter_id, scale in self._lora_state:
+            info = state.loaded_adapters.add()
+            info.adapter_id = adapter_id
+            info.adapter_path = adapter_id
+            info.scale = float(scale)
+            info.applied = True
+        return state.SerializeToString()
+
+    def lora_state_proto(self, state_bytes: bytes) -> bytes:
+        return self.lora_list_proto(state_bytes)
 
     # -- VLM -----------------------------------------------------------------
     def load_vlm_model(
@@ -185,6 +296,165 @@ class FakeCore:
 
     def unload_vad(self, handle: int) -> None:
         self._record("unload_vad", handle)
+
+    def vad_set_stream_callback(self, handle: int, on_event: Callable) -> None:
+        self._record("vad_set_stream_callback", handle)
+        self._vad_cb = on_event
+
+    def vad_unset_stream_callback(self, handle: int) -> None:
+        self._record("vad_unset_stream_callback", handle)
+        self._vad_cb = None
+
+    def vad_stream_start(self, handle: int, options_bytes: bytes) -> int:
+        self._record("vad_stream_start", handle, len(bytes(options_bytes)))
+        self._vad_options_bytes = bytes(options_bytes)
+        self._vad_session += 1
+        self._vad_index = 0
+        self._vad_at_ms = 0
+        self._vad_speech_ms = 0
+        self._vad_silence_ms = 0
+        self._vad_in_speech = False
+        self._vad_start_ms = 0
+        # Parse timing options so hermetic tests can assert commons receives them.
+        try:
+            from runanywhere._proto import vad_options_pb2 as vad_pb
+
+            opts = vad_pb.VADOptions()
+            opts.ParseFromString(self._vad_options_bytes)
+            self._vad_min_speech = int(opts.min_speech_duration_ms) or 100
+            self._vad_min_silence = int(opts.min_silence_duration_ms) or 300
+            self._vad_prefix_ms = int(opts.prefix_padding_ms)
+        except Exception:  # noqa: BLE001
+            self._vad_min_speech = 100
+            self._vad_min_silence = 300
+            self._vad_prefix_ms = 0
+        return self._vad_session
+
+    def _emit_activity(self, kind: int, start_ms: int, end_ms: int = 0) -> None:
+        if self._vad_cb is None:
+            return
+        from runanywhere._proto import vad_options_pb2 as vad_pb
+
+        event = vad_pb.VADStreamEvent()
+        event.kind = vad_pb.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
+        event.activity.event_type = kind
+        event.activity.audio_start_ms = start_ms
+        event.activity.audio_end_ms = end_ms
+        self._vad_cb(event.SerializeToString())
+
+    def vad_stream_feed(self, session_id: int, audio_bytes: bytes) -> None:
+        self._record("vad_stream_feed", session_id, len(bytes(audio_bytes)))
+        # 512 float samples @ 16 kHz = 32 ms; PCM16 is 2 bytes/sample.
+        frame_samples = 512
+        frame_ms = 32
+        raw = bytes(audio_bytes)
+        n_frames = max(1, len(raw) // (frame_samples * 2)) if raw else 0
+        from runanywhere._proto import vad_options_pb2 as vad_pb
+
+        for _ in range(n_frames):
+            speech = False
+            if self.vad_decisions:
+                speech = bool(
+                    self.vad_decisions[min(self._vad_index, len(self.vad_decisions) - 1)]
+                )
+                self._vad_index += 1
+            if speech:
+                self._vad_silence_ms = 0
+                if not self._vad_in_speech:
+                    self._vad_in_speech = True
+                    self._vad_speech_ms = 0
+                    self._vad_start_ms = max(0, self._vad_at_ms - self._vad_prefix_ms)
+                prev = self._vad_speech_ms
+                self._vad_speech_ms += frame_ms
+                # Emit STARTED once speech clears min_speech (simulates commons policy).
+                if prev < self._vad_min_speech <= self._vad_speech_ms:
+                    self._emit_activity(
+                        vad_pb.SPEECH_ACTIVITY_KIND_SPEECH_STARTED, self._vad_start_ms
+                    )
+            elif self._vad_in_speech:
+                self._vad_silence_ms += frame_ms
+                if self._vad_silence_ms >= self._vad_min_silence:
+                    if self._vad_speech_ms >= self._vad_min_speech:
+                        end_ms = self._vad_at_ms - self._vad_silence_ms + frame_ms
+                        self._emit_activity(
+                            vad_pb.SPEECH_ACTIVITY_KIND_SPEECH_ENDED,
+                            self._vad_start_ms,
+                            max(end_ms, self._vad_start_ms),
+                        )
+                    self._vad_in_speech = False
+            self._vad_at_ms += frame_ms
+
+    def vad_stream_stop(self, session_id: int) -> None:
+        self._record("vad_stream_stop", session_id)
+        from runanywhere._proto import vad_options_pb2 as vad_pb
+
+        if self._vad_in_speech and self._vad_speech_ms >= self._vad_min_speech:
+            self._emit_activity(
+                vad_pb.SPEECH_ACTIVITY_KIND_SPEECH_ENDED,
+                self._vad_start_ms,
+                max(self._vad_at_ms, self._vad_start_ms),
+            )
+        self._vad_in_speech = False
+
+    def vad_stream_cancel(self, session_id: int) -> None:
+        self._record("vad_stream_cancel", session_id)
+        self._vad_in_speech = False
+
+    # -- audio DSP (record + identity-ish forwards for hermetic tests) -------
+    def audio_float32_to_pcm16(self, samples: np.ndarray) -> np.ndarray:
+        self._audio_calls.append(("float32_to_pcm16", len(samples)))
+        a = np.asarray(samples, dtype=np.float32)
+        scaled = np.clip(np.rint(np.clip(a, -1.0, 1.0) * 32768.0), -32768, 32767)
+        return scaled.astype(np.int16)
+
+    def audio_pcm16_to_float32(self, samples: np.ndarray) -> np.ndarray:
+        self._audio_calls.append(("pcm16_to_float32", len(samples)))
+        return (np.asarray(samples, dtype=np.int16).astype(np.float32) / 32768.0).astype(np.float32)
+
+    def audio_resample_f32(self, samples: np.ndarray, in_rate: int, out_rate: int) -> np.ndarray:
+        self._audio_calls.append(("resample", len(samples), in_rate, out_rate))
+        a = np.asarray(samples, dtype=np.float32)
+        if in_rate == out_rate or a.size == 0:
+            return a.copy()
+        out_len = max(1, int(round(a.size * out_rate / in_rate)))
+        x_old = np.linspace(0.0, 1.0, a.size, dtype=np.float64)
+        x_new = np.linspace(0.0, 1.0, out_len, dtype=np.float64)
+        return np.interp(x_new, x_old, a.astype(np.float64)).astype(np.float32)
+
+    def audio_compute_rms(self, samples: np.ndarray) -> float:
+        self._audio_calls.append(("rms", len(samples)))
+        a = np.asarray(samples, dtype=np.float32)
+        if a.size == 0:
+            return 0.0
+        return float(np.sqrt(np.mean(a.astype(np.float64) ** 2)))
+
+    def audio_float32_to_wav(self, samples: np.ndarray, sample_rate: int) -> bytes:
+        self._audio_calls.append(("encode_wav", len(samples), sample_rate))
+        pcm = self.audio_float32_to_pcm16(samples).astype("<i2").tobytes()
+        header = bytearray(44)
+        header[0:4] = b"RIFF"
+        header[4:8] = (36 + len(pcm)).to_bytes(4, "little")
+        header[8:12] = b"WAVE"
+        header[12:16] = b"fmt "
+        header[16:20] = (16).to_bytes(4, "little")
+        header[20:22] = (1).to_bytes(2, "little")
+        header[22:24] = (1).to_bytes(2, "little")
+        header[24:28] = int(sample_rate).to_bytes(4, "little")
+        header[28:32] = (int(sample_rate) * 2).to_bytes(4, "little")
+        header[32:34] = (2).to_bytes(2, "little")
+        header[34:36] = (16).to_bytes(2, "little")
+        header[36:40] = b"data"
+        header[40:44] = len(pcm).to_bytes(4, "little")
+        return bytes(header) + pcm
+
+    def audio_wav_to_float32(self, data: bytes) -> tuple:
+        self._audio_calls.append(("decode_wav", len(bytes(data))))
+        b = bytes(data)
+        if len(b) < 44:
+            raise RuntimeError("truncated wav")
+        sample_rate = int.from_bytes(b[24:28], "little")
+        pcm = np.frombuffer(b[44:], dtype="<i2")
+        return sample_rate, self.audio_pcm16_to_float32(pcm)
 
     # -- diarization (rac_diarization_create/initialize/diarize) -------------
     def load_diarization_model(self, model_path: str, model_id: object = None) -> int:

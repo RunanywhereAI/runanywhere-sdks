@@ -3,7 +3,7 @@ package com.runanywhere.runanywhereai.ui.screens.voice
 /**
  * Pure text→speech chunking for Talk mode. Kept out of the ViewModel so it is unit-testable (mirrors
  * the *Policy pattern used across chat/rag). It turns streamed LLM text into short, clean, speakable
- * chunks: split on sentence boundaries, drop `<think>` reasoning, strip markdown, and hard-cap each
+ * chunks: split on sentence boundaries, strip markdown, and hard-cap each
  * chunk so an over-long phoneme run never makes an NPU TTS fail — MeloTTS on v79 rejects a sequence
  * past its 512-phoneme cap with rc=-130.
  */
@@ -15,15 +15,14 @@ internal object VoiceTtsChunkPolicy {
     private val sentenceSplit = Regex("(?<=[.!?])\\s+")
 
     /**
-     * Pull complete, speakable sentences out of [buf] (mutating it), dropping `<think>` reasoning so it
-     * is never read aloud. With [flush] the trailing partial is returned too and the buffer is drained;
-     * otherwise the trailing partial (plus any still-open `<think>`) is kept in [buf] for the next call.
+     * Pull complete, speakable sentences out of [buf] (mutating it). With [flush] the trailing
+     * partial is returned too and the buffer is drained; otherwise the trailing partial is kept
+     * in [buf] for the next call.
      */
     fun drainSentences(buf: StringBuilder, flush: Boolean): List<String> {
-        val stripped = buf.toString().replace(Regex("(?s)<think>.*?</think>"), "")
-        val open = stripped.indexOf("<think>") // an unclosed reasoning block, if any
-        val held = if (open >= 0) stripped.substring(open) else ""
-        val speakable = if (open >= 0) stripped.substring(0, open) else stripped
+        // Reasoning is already channel-split upstream (THINKING events are not
+        // dispatched into this buffer). Only sentence-split here.
+        val speakable = buf.toString()
         val parts = sentenceSplit.split(speakable)
         val complete = if (flush) parts.size else parts.size - 1
         val out = ArrayList<String>(maxOf(complete, 0))
@@ -32,7 +31,7 @@ internal object VoiceTtsChunkPolicy {
             if (clean.isNotEmpty()) out.add(clean)
         }
         buf.setLength(0)
-        if (!flush) buf.append(parts.lastOrNull() ?: "").append(held)
+        if (!flush) buf.append(parts.lastOrNull() ?: "")
         return out
     }
 

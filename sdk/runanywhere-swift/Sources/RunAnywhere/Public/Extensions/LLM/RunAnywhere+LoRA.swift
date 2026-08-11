@@ -68,7 +68,12 @@ public extension RunAnywhere {
 
             var config = RALoraAdapterConfig()
             config.adapterPath = adapterPath
-            config.scale = scale ?? (entry.defaultScale > 0 ? entry.defaultScale : 1.0)
+            // Leave scale unset when the caller omits it so commons
+            // resolve_effective_lora_scale owns catalog/1.0 fallback
+            // (including honoring explicit catalog 0.0).
+            if let scale {
+                config.scale = scale
+            }
             if !entry.id.isEmpty {
                 config.adapterID = entry.id
             }

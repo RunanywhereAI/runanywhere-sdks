@@ -284,10 +284,12 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         while (!step.done) {
           const event = step.value;
           if (event.type === 'progress') {
-            setDownloading((prev) => ({
-              ...prev,
-              [model.id]: event.percent / 100,
-            }));
+            if (typeof event.percent === 'number') {
+              setDownloading((prev) => ({
+                ...prev,
+                [model.id]: event.percent! / 100,
+              }));
+            }
           }
           step = await iter.next();
         }
@@ -569,7 +571,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 ]}
               >
                 {formatBytes(storage?.totalModelsBytes ?? 0)} in models ·{' '}
-                {onDeviceModels.length} on device
+                {storage?.models.length ?? 0} on device
               </Text>
             </View>
 

@@ -46,12 +46,17 @@ export interface SegmentationRequest {
  * SegmentationResult.height). Commons rejects any result whose pixel_counts
  * do not sum to that product before encoding it into a SegmentationResult, so
  * within this message the summaries partition the image and the division is
- * exact.
+ * exact. `fraction` is that share, computed once by commons (tag 5).
  */
 export interface SegmentationClassSummary {
     classId: number;
     pixelCount: number;
     label: string;
+    /**
+     * Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+     * Zero when width or height is zero (rejected upstream before encode).
+     */
+    fraction: number;
 }
 export interface SegmentationResult {
     /**

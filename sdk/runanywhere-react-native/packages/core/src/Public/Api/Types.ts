@@ -357,6 +357,7 @@ export type FinishReason =
   | 'toolCalls'
   | 'cancelled'
   | 'contentFilter'
+  | 'error'
   | 'unknown';
 
 /** Generated text plus the metrics every generation reports. */
@@ -709,7 +710,11 @@ export type DownloadEvent = WithJsErrorOnFailed<
     {
       bytesDone: number;
       bytesTotal: number;
-      percent: number;
+      /**
+       * Commons-owned percent via `rac_download_progress_percent`. Omit when
+       * indeterminate — never invent a local 0 standing in for unknown.
+       */
+      percent?: number;
       file?: string;
     }
   >

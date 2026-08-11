@@ -81,8 +81,8 @@ class RagCore(FakeCore):
             return result.SerializeToString()
         result.answer = "Paris"
         result.usage.output_tokens = 2
-        result.generation_time_ms = 10
-        result.retrieval_time_ms = 3
+        result.usage.ttft_ms = 3
+        result.usage.decode_tokens_per_second = 200.0
         result.retrieved_chunks.add(
             chunk_id="c0",
             text=(self.docs[0].text if self.docs else ""),
@@ -216,7 +216,8 @@ def test_query_returns_answer_sources_and_metrics(rag_core) -> None:
     assert isinstance(result, RagResult) and result.answer == "Paris"
     assert result.sources and isinstance(result.sources[0], Match)
     assert result.sources[0].score == pytest.approx(0.9)
-    assert result.output_tokens == 2 and result.tokens_per_second > 0
+    assert result.output_tokens == 2 and result.tokens_per_second == pytest.approx(200.0)
+    assert result.time_to_first_token_ms == pytest.approx(3.0)
     query = rag_core.last_query
     assert query.query == "Capital of France?"
     assert query.generation.max_output_tokens == 64 and query.generation.top_k == 4

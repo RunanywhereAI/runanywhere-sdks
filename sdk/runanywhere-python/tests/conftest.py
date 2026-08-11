@@ -115,11 +115,13 @@ def fake_core(monkeypatch: pytest.MonkeyPatch):
     from fake_core import FakeCore
 
     import runanywhere._native as _native
+    from runanywhere.audio import set_audio_native_for_tests
     from runanywhere._runtime import runtime
     from runanywhere.events import bus
 
     core = FakeCore()
     monkeypatch.setattr(_native, "get_core", lambda: core)
+    set_audio_native_for_tests(core)
     runtime._resident.clear()
     runtime._core = None
     runtime._device_id = None
@@ -127,23 +129,61 @@ def fake_core(monkeypatch: pytest.MonkeyPatch):
     try:
         yield core
     finally:
+        set_audio_native_for_tests(None)
         runtime._resident.clear()
         runtime._core = None
         runtime._device_id = None
         bus.remove_all()
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_audio_native(request):
+    """Inject FakeCore audio bindings when the compiled ``_core`` lacks ``rac_audio_*``.
+
+    Hermetic tests (CLI / server / options) call ``encode_wav`` / ``pcm16_to_float32``
+    without going through the ``sdk`` fixture. Live smoke keeps real native audio when present.
+    """
+    if "test_smoke" in getattr(request.node, "nodeid", ""):
+        yield
+        return
+    from fake_core import FakeCore
+    from runanywhere.audio import set_audio_native_for_tests
+
+    needs_inject = True
+    try:
+        from runanywhere._native import get_core
+
+        core = get_core()
+        if hasattr(core, "audio_float32_to_wav") and hasattr(core, "audio_pcm16_to_float32"):
+            needs_inject = False
+    except Exception:
+        needs_inject = True
+    if not needs_inject:
+        yield
+        return
+    # Prefer an already-installed FakeCore from the fake_core fixture when present.
+    injected = FakeCore()
+    set_audio_native_for_tests(injected)
+    try:
+        yield
+    finally:
+        set_audio_native_for_tests(None)
+
+
 @pytest.fixture()
 def sdk(fake_core, monkeypatch: pytest.MonkeyPatch, tmp_path):
     """An initialized SDK over the fake core, with its home directory inside ``tmp_path``."""
     import runanywhere
+    from runanywhere.audio import set_audio_native_for_tests
 
     monkeypatch.setenv("RUNANYWHERE_HOME", str(tmp_path / "home"))
+    set_audio_native_for_tests(fake_core)
     runanywhere.initialize()
     try:
         yield fake_core
     finally:
         runanywhere.reset()
+        set_audio_native_for_tests(fake_core)  # fake_core fixture tear-down clears this
 
 
 @pytest.fixture()

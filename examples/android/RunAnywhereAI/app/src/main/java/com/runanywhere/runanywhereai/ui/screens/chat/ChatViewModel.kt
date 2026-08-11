@@ -52,12 +52,10 @@ import com.runanywhere.sdk.public.connect.ConnectStatus
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
-import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.defaults
 import com.runanywhere.sdk.public.extensions.generate
-import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.generateWithTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
@@ -65,13 +63,25 @@ import com.runanywhere.sdk.public.extensions.ragClearDocuments
 import com.runanywhere.sdk.public.extensions.ragGetStatistics
 import com.runanywhere.sdk.public.extensions.ragIngest
 import com.runanywhere.sdk.public.extensions.ragQuery
+import com.runanywhere.sdk.public.api.ChatMessage as SdkChatMessage
+import com.runanywhere.sdk.public.api.ChatRole
+import com.runanywhere.sdk.public.api.GenerationEvent
+import com.runanywhere.sdk.public.api.GenerationResult
 import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ReasoningMode as SdkReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningOptions as SdkReasoningOptions
+import com.runanywhere.sdk.public.api.llm
 import com.runanywhere.sdk.public.api.vlm
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAToolDefinition
+import ai.runanywhere.proto.v1.LLMStreamEventKind
+import ai.runanywhere.proto.v1.MessageRole
+import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -678,27 +688,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 activeGenerationTTFTMs = generation.time_to_first_token_ms
             }
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
-                val outputTokens = generation.output_tokens
-                val durationMs = generation.total_duration_ms
-                val rawTtft = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs
-                val decodeWindow = if (rawTtft != null && rawTtft > 0) durationMs - rawTtft else durationMs
-                // Batch backends (Maple) emit first stream token only after the
-                // full generate — raw TTFT ≈ wall clock and must not be shown.
-                val batchBuffered =
-                    rawTtft != null && rawTtft > 0 &&
-                        decodeWindow < maxOf(50.0, durationMs * 0.05)
-                val ttftMs = if (batchBuffered) null else rawTtft
-                val tps = if (durationMs > 0 && outputTokens > 0) {
-                    outputTokens * 1000.0 / durationMs
-                } else {
-                    0.0
-                }
+                // Only token counts are read from sdkMetrics (when the result
+                // proto reports 0). Duration / tok/s / TTFT were write-only and
+                // duplicated GenerationEvent.tokens_per_second / result usage.
                 activeGenerationMetrics = SdkGenerationMetrics(
                     inputTokens = generation.input_tokens,
-                    outputTokens = outputTokens,
-                    durationMs = durationMs,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = ttftMs,
+                    outputTokens = generation.output_tokens,
                 )
                 if (firstTokenLatencies.size > MAX_TRACKED_GENERATIONS) firstTokenLatencies.clear()
             }
@@ -771,24 +766,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         tokens: Int,
         reportedTps: Double?,
         reportedTtftMs: Long?,
+        batchBuffered: Boolean,
         totalMs: Long,
         inputTokens: Int,
         modelName: String,
         framework: String?,
         mode: GenerationMode,
     ): GenerationStats {
-        val wallTps = if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
-        val tps = reportedTps?.takeIf { it > 0.0 } ?: wallTps
-        // Maple/Bonsai dump the full completion after DSP generate — stream
-        // intervals invent five-digit tok/s and a TTFT equal to wall clock.
-        val batchBuffered =
-            (reportedTtftMs != null && reportedTtftMs > 0 &&
-                totalMs - reportedTtftMs < maxOf(50L, (totalMs * 0.05).toLong())) ||
-                (tps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
-                (reportedTtftMs != null && totalMs > 0 && reportedTtftMs >= (totalMs * 0.95).toLong())
+        // TokenUsage owns decode rate + TTFT + batch_buffered. Do not invent
+        // wall tok/s or re-derive the flush heuristic — AnalyticsFooter must
+        // match BenchmarkRunner / commons for the same turn.
         return GenerationStats(
             tokens = tokens,
-            tokensPerSecond = if (batchBuffered) wallTps else tps,
+            tokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: 0.0,
             timeToFirstTokenMs = if (batchBuffered) null else reportedTtftMs?.takeIf { it > 0 },
             totalTimeMs = totalMs,
             inputTokens = inputTokens,
@@ -808,32 +798,63 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         hostedToken: Long,
     ) {
         val events = session.generateStream(llmRequest)
-        val prompt = llmRequest.messages.lastOrNull()?.content.orEmpty()
-        val result = RunAnywhere.aggregateStream(prompt, events) { accumulated ->
-            if (hostedToken != hostedConversationToken) return@aggregateStream
-            if (streamUpdates) updateReply(request, index) { it.copy(text = accumulated) }
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
+        var terminal: RALLMGenerationResult? = null
+        var terminalErrorMessage: String? = null
+
+        events.collect { event ->
+            if (hostedToken != hostedConversationToken) return@collect
+            if (event.token.isNotEmpty() &&
+                event.event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOOL_CALL
+            ) {
+                if (event.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
+                    thinking.append(event.token)
+                    if (streamUpdates) {
+                        updateReply(request, index) { it.copy(thinking = thinking.toString()) }
+                    }
+                } else if (event.event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR) {
+                    answer.append(event.token)
+                    if (streamUpdates) {
+                        updateReply(request, index) { it.copy(text = answer.toString()) }
+                    }
+                }
+            }
+            when (event.event_kind) {
+                LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED -> {
+                    terminal = event.result
+                }
+                LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR -> {
+                    terminalErrorMessage = event.error?.message
+                }
+                else -> Unit
+            }
         }
 
         if (hostedToken != hostedConversationToken) return
         ensureOwns(request)
-        if (!result.error?.message.isNullOrBlank()) {
+        if (!terminalErrorMessage.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
+                it.copy(text = errorReplyText(terminalErrorMessage), thinking = null, isError = true)
             }
             return
         }
-        val totalMs = result.generation_time_ms.toLong()
-        val tokens = result.usage?.output_tokens ?: 0
+        val finalText = preferStreamedContent(answer.toString(), terminal?.text.orEmpty())
+        val finalThinking = preferStreamedContent(thinking.toString(), terminal?.thinking_content.orEmpty())
+            .takeIf { it.isNotBlank() }
+        val usage = terminal?.usage
         updateReply(request, index) { reply ->
             reply.copy(
-                text = result.text,
-                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+                text = finalText,
+                thinking = finalThinking,
                 stats = generationStats(
-                    tokens = tokens,
-                    reportedTps = result.usage?.decode_tokens_per_second,
-                    reportedTtftMs = result.usage?.ttft_ms,
-                    totalMs = totalMs,
-                    inputTokens = result.usage?.input_tokens ?: 0,
+                    tokens = usage?.output_tokens ?: 0,
+                    reportedTps = usage?.decode_tokens_per_second,
+                    reportedTtftMs = usage?.ttft_ms,
+                    batchBuffered = usage?.batch_buffered == true,
+                    // generation_time_ms is commons-owned; zero when absent.
+                    totalMs = terminal?.generation_time_ms?.toLong() ?: 0L,
+                    inputTokens = usage?.input_tokens ?: 0,
                     modelName = model.displayName,
                     framework = model.framework,
                     mode = if (streamUpdates) GenerationMode.STREAMING else GenerationMode.NON_STREAMING,
@@ -864,7 +885,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             return
         }
-        val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val outputTokens = result.usage?.output_tokens ?: 0
         updateReply(request, index) { reply ->
@@ -875,8 +895,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     tokens = outputTokens,
                     reportedTps = result.usage?.decode_tokens_per_second,
                     reportedTtftMs = result.usage?.ttft_ms,
+                    batchBuffered = result.usage?.batch_buffered == true,
                     totalMs = totalMs,
-                    inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
+                    inputTokens = result.usage?.input_tokens ?: 0,
                     modelName = activeModel.model.name,
                     framework = result.framework?.takeIf { it.isNotBlank() }
                         ?: activeModel.framework.analyticsKey,
@@ -892,50 +913,64 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
-        if (llmRequest.options?.reasoning?.include_in_output == true) {
+        val options = llmRequest.options.toLlmOptions()
+        if (options.reasoning?.includeInOutput == true) {
             updateReply(request, index) { it.copy(thinking = "") }
         }
-        val events = RunAnywhere.generateStream(llmRequest)
-        val result =
-            RunAnywhere.aggregateStream(
-                prompt = llmRequest.messages.lastOrNull()?.content.orEmpty(),
-                events = events,
-                onThinking = { accumulated ->
-                    updateReply(request, index) { it.copy(thinking = accumulated) }
-                },
-                onToken = { accumulated ->
-                    // Tool-trained models emit call syntax unprompted even with no tools registered; on the
-                    // standard route those markers are noise, so never let them reach the bubble.
+        val messages = llmRequest.messages.toSdkChatMessages()
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
+        var completed: GenerationResult? = null
+        var failureMessage: String? = null
+
+        RunAnywhere.llm.generateStream(messages, options).collect { event ->
+            when (event) {
+                is GenerationEvent.ReasoningDelta -> {
+                    thinking.append(event.text)
+                    updateReply(request, index) { it.copy(thinking = thinking.toString()) }
+                }
+                is GenerationEvent.TextDelta -> {
+                    answer.append(event.text)
                     updateReply(request, index) {
-                        it.copy(text = ChatToolResultNormalizer.stripStrayToolCall(accumulated))
+                        it.copy(text = ChatToolResultNormalizer.stripStrayToolCall(answer.toString()))
                     }
-                },
-            )
+                }
+                is GenerationEvent.Completed -> completed = event.result
+                is GenerationEvent.Failed -> failureMessage = event.error.message
+                is GenerationEvent.Cancelled -> failureMessage = "Generation cancelled"
+                else -> Unit
+            }
+        }
 
         ensureOwns(request)
-        if (!result.error?.message.isNullOrBlank()) {
+        if (!failureMessage.isNullOrBlank()) {
             updateReply(request, index) {
-                it.copy(text = errorReplyText(result.error?.message), thinking = null, isError = true)
+                it.copy(text = errorReplyText(failureMessage), thinking = null, isError = true)
             }
             return
         }
-
-        val sdkMetrics = activeGenerationMetrics
-        val totalMs = result.generation_time_ms.toLong()
-        val tokens = result.usage?.output_tokens?.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
+        val result = completed
+        val finalText = preferStreamedContent(
+            ChatToolResultNormalizer.stripStrayToolCall(answer.toString()),
+            result?.text.orEmpty(),
+        )
+        val finalThinking = preferStreamedContent(thinking.toString(), result?.thinkingText.orEmpty())
+            .takeIf { it.isNotBlank() }
         updateReply(request, index) { reply ->
             reply.copy(
-                text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
-                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+                text = ChatToolResultNormalizer.stripStrayToolCall(finalText),
+                thinking = finalThinking,
                 stats = generationStats(
-                    tokens = tokens,
-                    reportedTps = result.usage?.decode_tokens_per_second,
-                    reportedTtftMs = result.usage?.ttft_ms,
-                    totalMs = totalMs,
-                    inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
+                    // Public GenerationResult exposes commons TokenUsage fields only;
+                    // generation_time_ms / batch_buffered are absent → zero/false.
+                    tokens = result?.outputTokens ?: 0,
+                    reportedTps = result?.tokensPerSecond?.toDouble(),
+                    reportedTtftMs = result?.timeToFirstTokenMs,
+                    batchBuffered = false,
+                    totalMs = 0L,
+                    inputTokens = result?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
-                    framework = result.framework?.takeIf { it.isNotBlank() }
-                        ?: activeModel.framework.analyticsKey,
+                    framework = activeModel.framework.analyticsKey,
                     mode = GenerationMode.STREAMING,
                 ),
             )
@@ -1441,13 +1476,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-// Completion metrics decoded from the SDK event bus (iOS GenerationMetricsFromSDK).
+// Token counts from the SDK event bus when the result proto omits them.
 private data class SdkGenerationMetrics(
     val inputTokens: Int,
     val outputTokens: Int,
-    val durationMs: Long,
-    val tokensPerSecond: Double,
-    val timeToFirstTokenMs: Long?,
 )
 
 private fun ChatMessage.toStored() = StoredMessage(
@@ -1566,3 +1598,49 @@ private fun prettyJson(raw: String): String = runCatching {
         else -> org.json.JSONObject(trimmed).toString(2)
     }
 }.getOrDefault(raw)
+
+/** Keep the longer non-empty stream transcript when terminal text is missing/truncated. */
+private fun preferStreamedContent(streamed: String, over: String): String =
+    if (streamed.isNotEmpty() && (over.isEmpty() || streamed.length > over.length)) streamed else over
+
+private fun RALLMGenerationOptions?.toLlmOptions(): LlmOptions {
+    val opts = this
+    return LlmOptions(
+        maxOutputTokens = opts?.max_output_tokens ?: LlmOptions.DEFAULT_MAX_OUTPUT_TOKENS,
+        temperature = opts?.temperature ?: LlmOptions.DEFAULT_TEMPERATURE,
+        topP = opts?.top_p ?: LlmOptions.DEFAULT_TOP_P,
+        systemPrompt = opts?.system_prompt,
+        reasoning = opts?.reasoning?.toSdkReasoningOptions(),
+    )
+}
+
+private fun ai.runanywhere.proto.v1.ReasoningOptions.toSdkReasoningOptions(): SdkReasoningOptions {
+    val tag =
+        pattern
+            ?.open_tag
+            ?.removePrefix("<")
+            ?.substringBefore('>')
+            ?.takeIf { it.isNotBlank() }
+    return SdkReasoningOptions(
+        mode =
+            if (mode == ReasoningMode.REASONING_MODE_OFF) {
+                SdkReasoningMode.OFF
+            } else {
+                SdkReasoningMode.ON
+            },
+        includeInOutput = include_in_output == true,
+        pattern = tag,
+    )
+}
+
+private fun List<ProtoChatMessage>.toSdkChatMessages(): List<SdkChatMessage> =
+    mapNotNull { message ->
+        val role =
+            when (message.role) {
+                MessageRole.MESSAGE_ROLE_USER -> ChatRole.USER
+                MessageRole.MESSAGE_ROLE_ASSISTANT -> ChatRole.ASSISTANT
+                MessageRole.MESSAGE_ROLE_SYSTEM -> ChatRole.SYSTEM
+                else -> return@mapNotNull null
+            }
+        SdkChatMessage(role = role, content = message.content)
+    }

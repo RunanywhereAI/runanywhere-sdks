@@ -1072,11 +1072,11 @@ async function generateWithToolCalling(
       : { kind: 'auto' },
   });
 
-  const split = splitThinking(result.text);
-  assistantMsg.content = split.content || (result.toolCalls.length > 0
+  // Commons already splits ToolCalling / generate results into text + thinkingText.
+  assistantMsg.content = result.text.trim() || (result.toolCalls.length > 0
     ? 'The tool completed, but the model did not provide a final answer.'
     : 'The model did not produce a tool call or answer. Please try again.');
-  assistantMsg.thinking = result.thinkingText || split.thinking || undefined;
+  assistantMsg.thinking = result.thinkingText?.trim() || undefined;
   if (result.toolCalls.length > 0) {
     assistantMsg.toolCalls = result.toolCalls.map((call) => ({
       name: call.name,
@@ -1539,22 +1539,6 @@ function isModelLoaded(): boolean {
 function loadedModelSupportsThinking(): boolean {
   return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)
     ?.supportsThinking ?? false;
-}
-
-/**
- * Split built-in thinking sections out of a non-streaming tool-call result.
- * Streaming chat consumes the SDK's canonical typed thinking events instead.
- */
-function splitThinking(raw: string): { content: string; thinking: string } {
-  const thinkingParts: string[] = [];
-  const content = raw.replace(
-    /<(think|thinking)>([\s\S]*?)(<\/\1>|$)/gi,
-    (_match, _tag: string, inner: string) => {
-      if (inner.trim().length > 0) thinkingParts.push(inner.trim());
-      return '';
-    },
-  );
-  return { content: content.trim(), thinking: thinkingParts.join('\n\n') };
 }
 
 // ---------------------------------------------------------------------------

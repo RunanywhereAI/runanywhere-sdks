@@ -30,20 +30,23 @@
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/backends/rac_llm_llamacpp.h"
 
 extern "C" {
 
-/* Defined in rac_backend_llamacpp_register.cpp. */
-extern const rac_llm_service_ops_t g_llamacpp_ops;
+/* Defined in rac_backend_llamacpp.dll (rac_backend_llamacpp_register.cpp).
+ * RAC_LLAMACPP_API → dllimport on Windows shared consumers so MSVC resolves
+ * these DATA/function symbols via the import library (LNK2001 otherwise). */
+extern RAC_LLAMACPP_API const rac_llm_service_ops_t g_llamacpp_ops;
 /* Defined in rac_embeddings_llamacpp.cpp. */
-extern const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops;
+extern RAC_LLAMACPP_API const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops;
 /* Defined in rac_llamacpp_vlm_ops.cpp. */
-extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
+extern RAC_LLAMACPP_API const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
 /* Defined in rac_rerank_llamacpp.cpp. */
-extern const rac_rerank_service_ops_t g_llamacpp_rerank_ops;
+extern RAC_LLAMACPP_API const rac_rerank_service_ops_t g_llamacpp_rerank_ops;
 
-rac_result_t rac_llamacpp_cpu_runtime_register(void);
-void rac_llamacpp_cpu_runtime_unregister(void);
+RAC_LLAMACPP_API rac_result_t rac_llamacpp_cpu_runtime_register(void);
+RAC_LLAMACPP_API void rac_llamacpp_cpu_runtime_unregister(void);
 
 }  // extern "C"
 

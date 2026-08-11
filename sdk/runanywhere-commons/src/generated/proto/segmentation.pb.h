@@ -767,6 +767,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
     kLabelFieldNumber = 3,
     kPixelCountFieldNumber = 2,
     kClassIdFieldNumber = 1,
+    kFractionFieldNumber = 5,
   };
   // string label = 3;
   void clear_label() ;
@@ -803,11 +804,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
   void _internal_set_class_id(::uint32_t value);
 
   public:
+  // float fraction = 5;
+  void clear_fraction() ;
+  [[nodiscard]] float fraction() const;
+  void set_fraction(float value);
+
+  private:
+  float _internal_fraction() const;
+  void _internal_set_fraction(float value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SegmentationClassSummary)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
+      ::google::protobuf::internal::TcParseTable<3, 4,
                           0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -839,6 +850,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationClassSummary final : pu
     ::google::protobuf::internal::ArenaStringPtr label_;
     ::uint64_t pixel_count_;
     ::uint32_t class_id_;
+    float fraction_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1995,6 +2007,30 @@ inline void SegmentationClassSummary::set_allocated_label(::std::string* PROTOBU
     _impl_.label_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationClassSummary.label)
+}
+
+// float fraction = 5;
+inline void SegmentationClassSummary::clear_fraction() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.fraction_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline float SegmentationClassSummary::fraction() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationClassSummary.fraction)
+  return _internal_fraction();
+}
+inline void SegmentationClassSummary::set_fraction(float value) {
+  _internal_set_fraction(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationClassSummary.fraction)
+}
+inline float SegmentationClassSummary::_internal_fraction() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.fraction_;
+}
+inline void SegmentationClassSummary::_internal_set_fraction(float value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.fraction_ = value;
 }
 
 // -------------------------------------------------------------------

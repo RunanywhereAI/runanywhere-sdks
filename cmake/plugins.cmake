@@ -175,6 +175,16 @@ function(rac_add_engine_plugin name)
         # from rac_commons. See RAC_PLUGIN_API in rac_types.h.
         if(_kind STREQUAL "SHARED_LIBRARY")
             target_compile_definitions(${P_TARGET_NAME} PRIVATE RAC_BUILDING_PLUGIN=1)
+            # MSVC has no ELF/Mach-O default-visibility export. SHARED_ONLY
+            # engines keep "default visibility" on Unix so thin carriers
+            # (runanywhere_*) can resolve op-vtable globals + register helpers;
+            # WINDOWS_EXPORT_ALL_SYMBOLS is the Windows peer (same rationale as
+            # rac_commons). Without it, linking runanywhere_llamacpp.dll fails
+            # with LNK2001/LNK2019 for g_*_ops / rac_*_runtime_register.
+            if(WIN32 AND P_SHARED_ONLY)
+                set_target_properties(${P_TARGET_NAME} PROPERTIES
+                    WINDOWS_EXPORT_ALL_SYMBOLS ON)
+            endif()
         endif()
         target_include_directories(${P_TARGET_NAME} PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}

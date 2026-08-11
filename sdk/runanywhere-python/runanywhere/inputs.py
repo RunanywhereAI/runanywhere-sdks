@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from ._generated_defaults import AudioCaptureDefaults
-from .audio import decode_wav, downsample, float32_to_pcm16, pcm16_bytes
+from .audio import decode_wav, downsample, pcm16_bytes, pcm16_to_float32
 from .errors import SDKException
 
 __all__ = [
@@ -114,24 +114,14 @@ class AudioInput:
             samples = np.frombuffer(self.data, dtype=np.float32)
         else:
             rate = self.format.sample_rate
-            raw = np.frombuffer(self.data, dtype="<i2").astype(np.float32) / 32768.0
-            samples = raw
+            samples = pcm16_to_float32(np.frombuffer(self.data, dtype="<i2"))
         if self.format.encoding != AudioEncoding.WAV and self.format.channels > 1:
             samples = samples.reshape(-1, self.format.channels).mean(axis=1)
         if not rate:
             raise SDKException.invalid_input("audio input has no sample rate")
         samples = np.asarray(samples, dtype=np.float32)
-        if rate > sample_rate:
+        if rate != sample_rate:
             samples = downsample(samples, rate, sample_rate)
-        elif rate < sample_rate and samples.size:
-            # audio.downsample only decimates, so interpolate when the input is slower than
-            # the target — passing it through at the wrong rate would garble transcription.
-            count = int(round(samples.size * sample_rate / rate))
-            samples = np.interp(
-                np.linspace(0.0, samples.size - 1, count),
-                np.arange(samples.size),
-                samples,
-            ).astype(np.float32)
         return np.ascontiguousarray(samples, dtype=np.float32)
 
     def to_pcm16(self, sample_rate: int = STT_SAMPLE_RATE) -> bytes:
@@ -139,7 +129,12 @@ class AudioInput:
         return pcm16_bytes(self.samples(sample_rate))
 
     def duration_ms(self, sample_rate: int = STT_SAMPLE_RATE) -> int:
-        """Length of the audio in milliseconds."""
+        """Length of this *input* audio in milliseconds (request formatting).
+
+        This is not a model-output metric. ``Transcription.duration_ms`` /
+        ``Audio.duration_ms`` must come from commons result fields when the
+        bridge surfaces them — never by copying this value into a result.
+        """
         return int(round(len(self.samples(sample_rate)) / sample_rate * 1000))
 
 

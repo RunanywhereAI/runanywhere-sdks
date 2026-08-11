@@ -15,6 +15,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
+#include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -70,6 +71,8 @@ extern jmethodID g_isLowPowerModeMethod;
 extern jmethodID g_hasNPUMethod;
 extern jmethodID g_getOSVersionMethod;
 extern jmethodID g_getChipNameMethod;
+extern jmethodID g_getSocManufacturerMethod;
+extern jmethodID g_getSocModelMethod;
 extern jmethodID g_getTotalMemoryMethod;
 extern jmethodID g_getAvailableMemoryMethod;
 extern jmethodID g_getCoreCountMethod;
@@ -344,6 +347,38 @@ namespace AndroidBridge {
         env->DeleteLocalRef(result);
 
         return chipName;
+    }
+
+    std::string getSocManufacturer() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "";
+        if (!g_platformAdapterBridgeClass || !g_getSocManufacturerMethod) {
+            return "";
+        }
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass,
+                                                              g_getSocManufacturerMethod);
+        if (!result) return "";
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string value = str ? str : "";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        return value;
+    }
+
+    std::string getSocModel() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "";
+        if (!g_platformAdapterBridgeClass || !g_getSocModelMethod) {
+            return "";
+        }
+        jstring result =
+            (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getSocModelMethod);
+        if (!result) return "";
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string value = str ? str : "";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        return value;
     }
 
     uint64_t getTotalMemory() {
@@ -2176,7 +2211,16 @@ std::string InitBridge::getGPUFamily() {
     }
     return "apple"; // Default GPU family for iOS/macOS
 #elif defined(ANDROID) || defined(__ANDROID__)
-    return AndroidBridge::getGPUFamily();
+    // Match Kotlin CppBridgeHardware.defaultGpuFamily: pass SOC_MANUFACTURER +
+    // SOC_MODEL (API 31+) into commons, not nullptr/nullptr + raw chip only.
+    const std::string mfr = AndroidBridge::getSocManufacturer();
+    const std::string model = AndroidBridge::getSocModel();
+    const std::string chip = AndroidBridge::getChipName();
+    char out[64];
+    (void)rac_device_classify_gpu_family(mfr.empty() ? nullptr : mfr.c_str(),
+                                        model.empty() ? nullptr : model.c_str(),
+                                        chip.c_str(), out, sizeof(out));
+    return std::string(out);
 #else
     return "unknown";
 #endif

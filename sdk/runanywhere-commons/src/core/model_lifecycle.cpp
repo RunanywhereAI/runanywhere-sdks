@@ -35,6 +35,8 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "features/llm/qhexrt_thinking_prefill_internal.h"
+#include "rac/core/rac_core.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -1064,6 +1066,22 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->segmentation_ops = vt->segmentation_ops;
     }
     loaded->impl = impl;
+    // QHexRT reasoning templates may prefill `<think>` into the prompt
+    // (`chat.assistant.gen_prefill`). Stamp that onto ModelInfo so the stream
+    // splitter can call start_inside_reasoning() instead of the ambiguous hold.
+    // Caller-declared template_prefills_open_tag is never overwritten.
+    if (effective_framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT &&
+        primitive == RAC_PRIMITIVE_GENERATE_TEXT &&
+        rac::llm::enrich_thinking_prefill_from_qhexrt_manifest(&model, resolved_path)) {
+        rac_model_registry_handle_t registry = rac_get_model_registry();
+        if (registry != nullptr) {
+            std::string bytes;
+            if (model.SerializeToString(&bytes)) {
+                (void)rac_model_registry_update_proto(
+                    registry, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+            }
+        }
+    }
     loaded->model.CopyFrom(model);
     loaded->loaded_at_ms = loaded_at_ms;
     loaded->updated_at_ms = loaded->loaded_at_ms;

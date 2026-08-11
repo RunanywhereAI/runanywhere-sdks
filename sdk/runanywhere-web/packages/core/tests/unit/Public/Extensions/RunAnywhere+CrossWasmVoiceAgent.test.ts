@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   sttAvailable: true,
   ttsAvailable: true,
   llmAvailable: true,
+  pcm16ToWav: vi.fn((bytes: Uint8Array) => bytes),
+  float32ToWav: vi.fn((samples: Float32Array) => new Uint8Array(samples.length * 2)),
+  pcm16ToFloat32: vi.fn((bytes: Uint8Array) => new Float32Array(bytes.length / 2)),
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+STT', () => ({
@@ -37,6 +40,12 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+VAD', () => ({
     supportsLifecycleProtoVAD: () => mocks.vadLifecycleAvailable,
     detectVoice: mocks.detectVoice,
   },
+}));
+
+vi.mock('../../../../src/Public/Extensions/RunAnywhere+AudioConvert.js', () => ({
+  pcm16ToWav: mocks.pcm16ToWav,
+  float32ToWav: mocks.float32ToWav,
+  pcm16ToFloat32: mocks.pcm16ToFloat32,
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle', () => ({
@@ -93,7 +102,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
     mocks.llmAvailable = true;
     mocks.detectVoice.mockReset().mockResolvedValue({
       isSpeech: true,
-      confidence: 0.99,
+      probability: 0.99,
       durationMs: 1_000,
       energy: 0.2,
     });
@@ -134,6 +143,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
   });
 
   it('applies the spoken system prompt and bounded conversational history', async () => {
+    mocks.vadLifecycleAvailable = true;
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
     await provider.initializeVoiceAgent({
       vadConfig: {
@@ -165,6 +175,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
   });
 
   it('cancels an old turn at the next async boundary after cleanup/restart', async () => {
+    mocks.vadLifecycleAvailable = true;
     const pending = deferred<typeof transcript>();
     mocks.transcribe.mockReturnValueOnce(pending.promise);
     const provider = __testing__.createCrossWasmVoiceAgentProvider();

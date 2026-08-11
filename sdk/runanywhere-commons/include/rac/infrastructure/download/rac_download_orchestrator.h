@@ -188,6 +188,21 @@ RAC_API rac_result_t rac_download_compute_destination(
  */
 RAC_API rac_bool_t rac_download_requires_extraction(const char* download_url);
 
+/**
+ * @brief Canonical download completion percent for UI / SDK events.
+ *
+ * Prefer DownloadProgress.overall_progress (0.0..1.0) whenever it is finite
+ * and in range — commons already accounts for multi-file plans. Fall back to
+ * the byte ratio only when overall_progress is unusable (NaN / out of range).
+ * Never invent a percent when both inputs are unknown; returns 0.
+ *
+ * Result is clamped to [0, 100]. Platforms must not re-derive this with an
+ * inverted preference (bytes-first) or a local bytes_downloaded/total_bytes
+ * division when overall_progress is present.
+ */
+RAC_API int32_t rac_download_progress_percent(float overall_progress, int64_t bytes_downloaded,
+                                              int64_t total_bytes);
+
 #ifdef __cplusplus
 }
 #endif

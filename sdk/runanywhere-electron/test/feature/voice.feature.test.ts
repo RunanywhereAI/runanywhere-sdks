@@ -136,7 +136,7 @@ async function spokenPcm16(sdk: RunAnywhereApi, text: string): Promise<Uint8Arra
   const at16k =
     spoken.sampleRate === SAMPLE_RATE
       ? spoken.data
-      : downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
+      : await downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
   return pcm16Bytes(at16k);
 }
 
@@ -231,7 +231,7 @@ test('turn: one utterance in, a transcript, a reply, and speakable audio out',
         // without tracking the engine's rate and encoding.
         assert.ok(result.synthesizedAudio && result.synthesizedAudio.byteLength > 44,
           'the reply came back as audio');
-        const decoded = decodeWav(result.synthesizedAudio);
+        const decoded = await decodeWav(result.synthesizedAudio);
         assert.ok(decoded.sampleRate > 0 && decoded.samples.length > 0,
           `and it decodes: ${decoded.samples.length} samples at ${decoded.sampleRate} Hz`);
         assert.equal(result.finalState?.ready, true, 'with every component still ready');

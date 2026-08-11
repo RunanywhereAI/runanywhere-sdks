@@ -190,13 +190,10 @@ bool valid_fixture_result(const runanywhere::v1::SegmentationResult& result, uin
             return false;
         }
     }
-    // SegmentationClassSummary.fraction was deleted -- derivable as
-    // pixel_count / (width * height); commons no longer wires a setter.
+    // Coverage share is commons-owned on the wire (SegmentationClassSummary.fraction).
     const auto& summary = result.class_summaries(0);
-    const float derived_fraction = static_cast<float>(summary.pixel_count()) /
-                                   static_cast<float>(pixels);
     return summary.class_id() == 149 && summary.pixel_count() == pixels &&
-           derived_fraction == 1.0f && summary.label() == "class_149";
+           summary.fraction() == 1.0f && summary.label() == "class_149";
 }
 
 struct OperationGate {

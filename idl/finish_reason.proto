@@ -1,0 +1,36 @@
+// RunAnywhere IDL — shared finish-reason vocabulary for every LLM generation
+// surface (unary result, stream event, tool-calling result).
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "FinishReasonProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// One declared vocabulary, used in every place a finish reason is reported
+// on the LLM generation path (LLMGenerationResult, LLMStreamEvent,
+// ToolCallingResult).
+enum FinishReason {
+    FINISH_REASON_UNSPECIFIED = 0;
+    // End-of-turn token. OpenAI "stop" / Anthropic "end_turn".
+    FINISH_REASON_STOP = 1;
+    // Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens".
+    FINISH_REASON_LENGTH = 2;
+    // One of options.stop_sequences fired; see `stop_sequence`.
+    FINISH_REASON_STOP_SEQUENCE = 3;
+    // Model wants a tool run before it can continue.
+    FINISH_REASON_TOOL_CALLS = 4;
+    // Caller cancelled. No cloud analogue.
+    FINISH_REASON_CANCELLED = 5;
+    // Conversation exceeded the allocated context window.
+    FINISH_REASON_CONTEXT_OVERFLOW = 6;
+    // Generation failed; see `error`.
+    FINISH_REASON_ERROR = 7;
+}

@@ -23,7 +23,11 @@ import {
   EventCategory,
 } from '@runanywhere/proto-ts/component_types';
 import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
-import { pcm16ToWav } from './RunAnywhere+AudioConvert.js';
+import {
+  float32ToWav,
+  pcm16ToFloat32,
+  pcm16ToWav,
+} from './RunAnywhere+AudioConvert.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { STT, transcribe } from './RunAnywhere+STT.js';
 import { TTS, synthesize } from './RunAnywhere+TTS.js';
@@ -40,6 +44,7 @@ import type {
   VoiceAgentTurnRequest,
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
+import { VoiceAgentAudioFrame } from '@runanywhere/proto-ts/voice_agent_service';
 import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   PipelineState,
@@ -54,7 +59,7 @@ import {
   MessageRole,
   type ChatMessage,
 } from '@runanywhere/proto-ts/chat';
-import { finishReasonToJSON } from '@runanywhere/proto-ts/llm_options';
+import { finishReasonToJSON } from '@runanywhere/proto-ts/finish_reason';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
@@ -83,7 +88,6 @@ const VOICE_SYSTEM_PROMPT =
 const VOICE_MAX_TOKENS = voiceAgentDefaults.maxTokens;
 const VOICE_TEMPERATURE = voiceAgentDefaults.temperature;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
-const DEFAULT_VAD_ENERGY_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
 
 function voiceReasoning(thinkingModeEnabled: boolean): ReasoningOptions {
@@ -129,6 +133,15 @@ export interface VoiceAgentProvider {
   isVoiceAgentReady(): Promise<boolean> | boolean;
   getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> | VoiceAgentComponentStates;
   processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult>;
+  /**
+   * Continuous mic ingress. Implementations that own a native voice-agent
+   * handle on one WASM heap call `rac_voice_agent_feed_audio_proto`. Returns
+   * `null` while the utterance is still open. Providers without a feedable
+   * handle must throw — never reimplement segmentation in TypeScript.
+   */
+  feedAudio?(pcm16LeMono: Uint8Array): Promise<VoiceAgentResult | null>;
+  /** True when {@link feedAudio} is backed by commons on this provider. */
+  supportsFeedAudio?(): boolean;
   voiceAgentTranscribe(audio: Float32Array | Uint8Array): Promise<string>;
   voiceAgentGenerateResponse(prompt: string): Promise<string>;
   voiceAgentSynthesizeSpeech(text: string): Promise<Float32Array>;
@@ -390,14 +403,14 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
     });
     if (!result || result.error) {
       logger.warning(
-        `Default VAD '${targetID}' auto-load failed: ${result?.error?.message ?? 'unknown error'} — voice agent will use energy fallback`,
+        `Default VAD '${targetID}' auto-load failed: ${result?.error?.message ?? 'unknown error'}`,
       );
       return false;
     }
     return true;
   } catch (err) {
     logger.warning(
-      `Default VAD '${targetID}' auto-load threw: ${err instanceof Error ? err.message : String(err)} — voice agent will use energy fallback`,
+      `Default VAD '${targetID}' auto-load threw: ${err instanceof Error ? err.message : String(err)}`,
     );
     return false;
   }
@@ -479,6 +492,43 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
         'processVoiceTurn',
         'Native voice-agent processVoiceTurn returned no result.',
       );
+    }
+    return result;
+  }
+
+  supportsFeedAudio(): boolean {
+    return typeof (this.module as ModalityProtoModule)._rac_voice_agent_feed_audio_proto
+      === 'function';
+  }
+
+  async feedAudio(pcm16LeMono: Uint8Array): Promise<VoiceAgentResult | null> {
+    if (!this.supportsFeedAudio()) {
+      throw SDKException.backendNotAvailable(
+        'feedAudio',
+        'WASM module missing _rac_voice_agent_feed_audio_proto. Rebuild with the '
+        + 'voice-agent feed export enabled.',
+      );
+    }
+    const frameBytes = VoiceAgentAudioFrame.encode(
+      VoiceAgentAudioFrame.fromPartial({
+        audioData: pcm16LeMono,
+        sampleRateHz: audioCaptureDefaults.micSampleRateHz,
+        channels: 1,
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+        isFinal: false,
+      }),
+    ).finish();
+    const result = this.adapter.feedAudio(this.handle, frameBytes);
+    if (result == null) {
+      throw SDKException.backendNotAvailable(
+        'feedAudio',
+        'rac_voice_agent_feed_audio_proto returned no result.',
+      );
+    }
+    // Empty synthesized audio means the utterance is still open (or the
+    // recognizer heard no speech) — same contract as Swift/RN.
+    if (!result.synthesizedAudio || result.synthesizedAudio.byteLength === 0) {
+      return null;
     }
     return result;
   }
@@ -586,18 +636,18 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     const sttReady = Boolean(loadedModelID(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION));
     const llmReady = Boolean(loadedModelID(ModelCategory.MODEL_CATEGORY_LANGUAGE));
     const ttsReady = Boolean(loadedModelID(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS));
-    // A model-backed VAD is preferred; energy detection remains a deliberate
-    // fallback when the optional Silero model could not be initialized.
-    const vadReady = this.initialized;
-    return {
-      sttState: sttReady ? ready : notLoaded,
-      llmState: llmReady ? ready : notLoaded,
-      ttsState: ttsReady ? ready : notLoaded,
-      vadState: vadReady ? ready : notLoaded,
-      ready: this.initialized && sttReady && llmReady && ttsReady,
-      anyLoading: false,
-      wakewordState: notLoaded,
-    };
+  // A model-backed VAD is required for CrossWasm processVoiceTurn; energy
+  // detection is not a permitted host fallback.
+  const vadReady = Boolean(loadedModelID(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION));
+  return {
+    sttState: sttReady ? ready : notLoaded,
+    llmState: llmReady ? ready : notLoaded,
+    ttsState: ttsReady ? ready : notLoaded,
+    vadState: vadReady ? ready : notLoaded,
+    ready: this.initialized && sttReady && llmReady && ttsReady,
+    anyLoading: false,
+    wakewordState: notLoaded,
+  };
   }
 
   async processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult> {
@@ -625,7 +675,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
             isSpeech: true,
             speechDurationMs: vad.durationMs,
             silenceDurationMs: 0,
-            noiseFloorDb: vad.noiseFloorDb,
+            // VADResult has no typed noise-floor field — omit (protobuf default 0).
+            noiseFloorDb: 0,
           },
         }));
       }
@@ -673,7 +724,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
             isSpeech: false,
             speechDurationMs: vad.durationMs,
             silenceDurationMs: 0,
-            noiseFloorDb: vad.noiseFloorDb,
+            // VADResult has no typed noise-floor field — omit (protobuf default 0).
+            noiseFloorDb: 0,
           },
         }));
       }
@@ -799,6 +851,25 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     }
   }
 
+  supportsFeedAudio(): boolean {
+    return false;
+  }
+
+  async feedAudio(_pcm16LeMono: Uint8Array): Promise<VoiceAgentResult | null> {
+    // Cross-WASM intentionally has no voice-agent handle: STT/TTS live in the
+    // ONNX worker heap and LLM in the llama worker heap. Feeding into either
+    // would share a raw handle across heaps or silently reimplement commons
+    // segmentation in TypeScript — both are forbidden. Mic sessions must use
+    // a wasm-handle provider with co-located models.
+    throw SDKException.backendNotAvailable(
+      'feedAudio',
+      'Cross-WASM voice agent cannot feed mic frames: STT/LLM/TTS are split '
+      + 'across WASM heaps, so there is no single commons instance owning '
+      + 'rac_voice_agent_feed_audio_proto. Co-locate modalities on one '
+      + 'wasm-handle provider, or do not open a continuous mic session.',
+    );
+  }
+
   async voiceAgentTranscribe(audio: Float32Array | Uint8Array): Promise<string> {
     return (await transcribe(audio)).text;
   }
@@ -842,51 +913,43 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     audio: Float32Array | Uint8Array,
   ): Promise<TurnVADVerdict> {
     const samples = toFloat32Audio(audio);
-    const durationMs = (samples.length / (this.config.vadConfig?.sampleRate || 16_000)) * 1000;
-    const energyThreshold =
-      this.config.vadConfig?.activationThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
     const currentVAD = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: false,
     });
-    if (currentVAD?.modelId && VAD.supportsLifecycleProtoVAD()) {
-      try {
-        const result = await VAD.detectVoice(samples, {
-          modelId: currentVAD.modelId,
-          minSpeechDurationMs: 100,
-          minSilenceDurationMs: this.config.turnDetection?.silenceDurationMs || 800,
-          maxSpeechDurationMs: 0,
-          config: {
-            sampleRate: this.config.vadConfig?.sampleRate || 16_000,
-            frameLengthMs: this.config.vadConfig?.frameLengthMs || 100,
-            // The compose config's activation threshold is an RMS amplitude
-            // threshold for the fallback detector. Model-backed Silero expects
-            // a posterior probability instead; forwarding 0.005 makes Sherpa
-            // reject its configuration because model thresholds must be at
-            // least 0.01.
-            activationThreshold: MODEL_VAD_PROBABILITY_THRESHOLD,
-          },
-        });
-        return {
-          isSpeech: result.isSpeech,
-          probability: result.probability,
-          durationMs: result.durationMs || durationMs,
-          noiseFloorDb: amplitudeToDb(result.energy),
-        };
-      } catch (error) {
-        logger.warning(
-          `Model-backed VAD turn check failed; using energy fallback: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+    if (!currentVAD?.modelId || !VAD.supportsLifecycleProtoVAD()) {
+      throw SDKException.backendNotAvailable(
+        'processVoiceTurn',
+        'Cross-WASM processVoiceTurn requires a loaded commons VAD model. '
+        + 'Host-side energy VAD is not a permitted fallback — call '
+        + 'ensureDefaultVAD() or open a wasm-handle mic feed session.',
+      );
     }
-
-    const energy = rmsAudio(samples);
-    return {
-      isSpeech: energy >= energyThreshold,
-      probability: Math.min(1, energy / energyThreshold),
-      durationMs,
-      noiseFloorDb: amplitudeToDb(energy),
-    };
+    try {
+      const result = await VAD.detectVoice(samples, {
+        modelId: currentVAD.modelId,
+        minSpeechDurationMs: 100,
+        minSilenceDurationMs: this.config.turnDetection?.silenceDurationMs || 800,
+        maxSpeechDurationMs: 0,
+        config: {
+          sampleRate: this.config.vadConfig?.sampleRate || 16_000,
+          frameLengthMs: this.config.vadConfig?.frameLengthMs || 100,
+          activationThreshold: MODEL_VAD_PROBABILITY_THRESHOLD,
+        },
+      });
+      return {
+        isSpeech: result.isSpeech,
+        probability: result.probability,
+        durationMs: result.durationMs || 0,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw SDKException.backendNotAvailable(
+        'processVoiceTurn',
+        `Model-backed VAD turn check failed: ${message}. `
+        + 'Host-side energy VAD is not a permitted fallback.',
+      );
+    }
   }
 
   private assertCurrent(lifecycleVersion: number): void {
@@ -963,7 +1026,6 @@ interface TurnVADVerdict {
   isSpeech: boolean;
   probability: number;
   durationMs: number;
-  noiseFloorDb: number;
 }
 
 class VoiceTurnCancelledError extends Error {
@@ -975,27 +1037,7 @@ class VoiceTurnCancelledError extends Error {
 
 function toFloat32Audio(audio: Float32Array | Uint8Array): Float32Array {
   if (audio instanceof Float32Array) return audio;
-  const count = Math.floor(audio.byteLength / 2);
-  const view = new DataView(audio.buffer, audio.byteOffset, count * 2);
-  const samples = new Float32Array(count);
-  for (let index = 0; index < count; index += 1) {
-    samples[index] = view.getInt16(index * 2, true) / 0x8000;
-  }
-  return samples;
-}
-
-function rmsAudio(samples: Float32Array): number {
-  if (samples.length === 0) return 0;
-  let sum = 0;
-  for (let index = 0; index < samples.length; index += 1) {
-    const sample = samples[index] ?? 0;
-    sum += sample * sample;
-  }
-  return Math.sqrt(sum / samples.length);
-}
-
-function amplitudeToDb(amplitude: number): number {
-  return 20 * Math.log10(Math.max(amplitude, 1e-8));
+  return pcm16ToFloat32(audio);
 }
 
 function voiceHistoryMessages(
@@ -1074,18 +1116,11 @@ function ttsAudioToSelfDescribing(
   const rate = sampleRate > 0 ? sampleRate : audioCaptureDefaults.ttsSampleRateHz;
   if (format === AudioFormat.AUDIO_FORMAT_PCM_S16LE) {
     // Copy out of the (possibly shared) WASM heap into a plain ArrayBuffer.
-    const pcm = new Uint8Array(bytes.byteLength);
-    pcm.set(bytes);
-    return pcm16ToWav(pcm.buffer, rate);
+    return pcm16ToWav(bytes, rate);
   }
-  // Float32 PCM: quantise to the Int16 the WAV header declares.
+  // Float32 PCM: commons rac_audio_float32_to_wav owns quantize + RIFF.
   const samples = ttsAudioToFloat32(bytes, format);
-  const int16 = new Int16Array(samples.length);
-  for (let i = 0; i < samples.length; i += 1) {
-    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0));
-    int16[i] = Math.round(clamped * (clamped < 0 ? 0x8000 : 0x7fff));
-  }
-  return pcm16ToWav(int16.buffer, rate);
+  return float32ToWav(samples, rate);
 }
 
 function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array {
@@ -1097,11 +1132,7 @@ function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array
     return samples;
   }
   if (format === AudioFormat.AUDIO_FORMAT_PCM_S16LE) {
-    const count = Math.floor(bytes.byteLength / 2);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, count * 2);
-    const samples = new Float32Array(count);
-    for (let i = 0; i < count; i += 1) samples[i] = view.getInt16(i * 2, true) / 0x8000;
-    return samples;
+    return pcm16ToFloat32(bytes);
   }
   throw SDKException.backendNotAvailable(
     'voiceAgentSynthesizeSpeech',
@@ -1169,7 +1200,7 @@ function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeC
       ...vADConfigurationDefaults(),
       sampleRate: audioCaptureDefaults.micSampleRateHz,
       frameLengthMs: 100,
-      activationThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
+      activationThreshold: voiceAgentDefaults.speechRmsThreshold,
     },
     ...(ttsVoiceID ? { ttsVoiceId: ttsVoiceID } : {}),
   };
@@ -1216,11 +1247,10 @@ export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Pro
  *
  * When `ensureVAD` is `true` (default), the SDK guarantees that a VAD model is
  * loaded into the canonical lifecycle before initialization runs via
- * `ensureDefaultVAD(...)`. Without this the session would silently fall back to
- * the energy-based detector and the C++ voice agent's speech-start / speech-end
- * lifecycle events would not fire. Set to `false` only if the caller has
- * already loaded an explicit VAD model (or knows the energy fallback is
- * acceptable for the deployment).
+ * `ensureDefaultVAD(...)`. Without this CrossWasm `processVoiceTurn` fails
+ * explicitly (no host energy fallback), and the C++ voice agent's speech-start /
+ * speech-end lifecycle events would not fire on the wasm-handle path. Set to
+ * `false` only if the caller has already loaded an explicit VAD model.
  *
  * @param ttsVoiceID Optional voice id within the loaded TTS model. For
  *   multi-voice TTS engines (e.g., Sherpa-ONNX-TTS with Piper multi-speaker
@@ -1280,6 +1310,39 @@ export async function processVoiceTurn(
     throw SDKException.notInitialized('Voice agent not ready');
   }
   return provider.processVoiceTurn(audio);
+}
+
+/**
+ * True when the active provider can push mic frames into
+ * `rac_voice_agent_feed_audio_proto` on the owning WASM heap.
+ */
+export function supportsVoiceAgentFeedAudio(): boolean {
+  const provider = activeProvider();
+  if (!provider) return false;
+  if (typeof provider.supportsFeedAudio === 'function') {
+    return provider.supportsFeedAudio();
+  }
+  return typeof provider.feedAudio === 'function';
+}
+
+/**
+ * Continuous mic ingress into commons (`rac_voice_agent_feed_audio_proto`).
+ * `pcm16LeMono` must be 16-bit little-endian mono PCM at the capture rate.
+ * Returns `null` while the utterance is still open. Throws when the active
+ * provider cannot feed (missing export or cross-WASM split).
+ */
+export async function feedVoiceAgentAudio(
+  pcm16LeMono: Uint8Array,
+): Promise<VoiceAgentResult | null> {
+  const provider = requireProvider('feedVoiceAgentAudio');
+  if (typeof provider.feedAudio !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'feedVoiceAgentAudio',
+      'Active voice-agent provider does not implement feedAudio '
+      + '(rac_voice_agent_feed_audio_proto).',
+    );
+  }
+  return provider.feedAudio(pcm16LeMono);
 }
 
 export async function voiceAgentTranscribe(

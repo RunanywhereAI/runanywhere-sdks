@@ -9,18 +9,16 @@
  * (see tests/test_voice_agent.cpp fixture synthesis); converted to int16 WAV.
  */
 
-#include "commands/commands.h"
-
 #include <chrono>
 #include <memory>
 #include <string>
 
-#include "rac/features/tts/rac_tts_component.h"
-#include "rac/features/tts/rac_tts_types.h"
-
+#include "commands/commands.h"
 #include "commands/model_setup.h"
 #include "io/output.h"
 #include "io/wav_io.h"
+#include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_types.h"
 
 namespace rcli::commands {
 
@@ -46,8 +44,7 @@ int run_tts(const GlobalOptions& options, const TtsParams& params) {
         return 1;
     }
 
-    const std::string& text = params.positional_text.empty() ? params.text
-                                                            : params.positional_text;
+    const std::string& text = params.positional_text.empty() ? params.text : params.positional_text;
     if (text.empty()) {
         out::error_line("text to speak is required (positional or --text)");
         return 2;
@@ -69,9 +66,8 @@ int run_tts(const GlobalOptions& options, const TtsParams& params) {
         out::error_line("failed to create TTS component");
         return 1;
     }
-    rac_result_t rc = rac_tts_component_load_voice(tts, voice.primary_path.c_str(),
-                                                   voice.model_id.c_str(),
-                                                   voice.display_name.c_str());
+    rac_result_t rc = rac_tts_component_load_voice(
+        tts, voice.primary_path.c_str(), voice.model_id.c_str(), voice.display_name.c_str());
     if (rc != RAC_SUCCESS) {
         out::error_line("failed to load voice: " + out::describe_result(rc));
         rac_tts_component_destroy(tts);
@@ -101,14 +97,13 @@ int run_tts(const GlobalOptions& options, const TtsParams& params) {
         out::error_line("synthesis failed: " + out::describe_result(rc));
         exit_code = 1;
     } else {
-        // Engine emits float PCM at the voice's native rate.
+        // Engine emits float PCM at the voice's native rate; commons builds the WAV.
         const auto* float_samples = static_cast<const float*>(result.audio_data);
         const size_t sample_count = result.audio_size / sizeof(float);
-        const std::vector<int16_t> pcm16 = wav::to_int16(float_samples, sample_count);
 
         std::string error;
-        if (!wav::write_wav(params.output, pcm16.data(), pcm16.size(), result.sample_rate,
-                            &error)) {
+        if (!wav::write_wav_f32(params.output, float_samples, sample_count, result.sample_rate,
+                                &error)) {
             out::error_line(error);
             exit_code = 1;
         } else if (options.json) {
@@ -117,9 +112,7 @@ int run_tts(const GlobalOptions& options, const TtsParams& params) {
                 .field("voice", voice.model_id)
                 .field("path", params.output)
                 .field("sample_rate", static_cast<int64_t>(result.sample_rate))
-                .field("duration_ms",
-                       static_cast<int64_t>(sample_count * 1000 /
-                                            static_cast<size_t>(result.sample_rate)))
+                .field("duration_ms", static_cast<int64_t>(result.duration_ms))
                 .field("total_ms", static_cast<int64_t>(elapsed))
                 .end_object();
             out::result_line(json.str());

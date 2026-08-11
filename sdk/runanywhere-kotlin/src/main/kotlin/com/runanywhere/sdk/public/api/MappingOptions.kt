@@ -155,12 +155,15 @@ internal fun TtsOptions.toProto(): TTSOptions =
 
 internal fun VadOptions?.orDefault(): VadOptions = this ?: VadOptions()
 
-internal fun VadOptions.toProto(): VADOptions =
+internal fun VadOptions.toProto(
+    sampleRate: Int = AudioFormatSpec.DEFAULT_SAMPLE_RATE,
+): VADOptions =
     VADOptions(
         activation_threshold = activationThreshold ?: 0f,
         min_speech_duration_ms = minSpeechMs,
         min_silence_duration_ms = minSilenceMs,
         prefix_padding_ms = prefixPaddingMs,
+        sample_rate = sampleRate,
     )
 
 internal fun EmbedOptions?.orDefault(): EmbedOptions = this ?: EmbedOptions()

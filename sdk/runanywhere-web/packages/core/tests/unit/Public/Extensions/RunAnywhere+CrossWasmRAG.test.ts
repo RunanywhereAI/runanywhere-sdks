@@ -4,7 +4,8 @@ import type {
   EmbeddingsResult,
   EmbeddingVector,
 } from '@runanywhere/proto-ts/embeddings_options';
-import { FinishReason, type LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   InferenceFramework,
@@ -25,10 +26,17 @@ import {
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
+import {
+  clearRunanywhereModule,
+  registerWasmModule,
+  type EmscriptenRunanywhereModule,
+} from '../../../../src/runtime/EmscriptenModule';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule';
 
 afterEach(() => {
   __testing__.clearPersistentRAGStore();
   __testing__.resetFacadeState();
+  clearRunanywhereModule();
   vi.restoreAllMocks();
 });
 
@@ -337,6 +345,9 @@ describe('CrossWasmRAGProvider', () => {
 });
 
 function installBackendSpies() {
+  // Cross-WASM RAG ranks chunks via commons `rac_embeddings_similarity`.
+  // Register a math-only WASM stub so retrieval never fabricates cosine in TS.
+  registerWasmModule(['embedding'], makeEmbeddingsMathModule());
   vi.spyOn(EmbeddingsProtoAdapter, 'tryDefault').mockReturnValue({
     supportsProtoEmbeddings: () => true,
     supportsLifecycleProtoEmbeddings: () => true,
@@ -359,6 +370,70 @@ function installBackendSpies() {
     }),
   );
   return { loadModel, supportsLLM };
+}
+
+/**
+ * Minimal WASM stub exporting commons embeddings math. Mirrors
+ * `rac_embeddings_similarity` / `rac_embeddings_norm` contracts used by
+ * `embeddingCosineSimilarity` after D3 moved vector math out of TypeScript.
+ */
+function makeEmbeddingsMathModule(): EmscriptenRunanywhereModule {
+  const heap = new ArrayBuffer(64 * 1024);
+  const heapU8 = new Uint8Array(heap);
+  const view = new DataView(heap);
+  let nextPtr = 256;
+
+  const readF32 = (ptr: number, index: number): number =>
+    view.getFloat32(ptr + index * 4, true);
+
+  return installCurrentModelRegistryExports({
+    HEAPU8: heapU8,
+    _malloc(size: number): number {
+      const aligned = Math.max(4, (size + 3) & ~3);
+      const ptr = nextPtr;
+      nextPtr += aligned;
+      return ptr;
+    },
+    _free: () => undefined,
+    getValue(ptr: number, type: string): number {
+      if (type === 'float') return view.getFloat32(ptr, true);
+      return view.getInt32(ptr, true);
+    },
+    _rac_embeddings_norm(vectorPtr: number, dimension: number, outNormPtr: number): number {
+      let sumSquares = 0;
+      for (let i = 0; i < dimension; i += 1) {
+        const value = readF32(vectorPtr, i);
+        sumSquares += value * value;
+      }
+      view.setFloat32(outNormPtr, Math.sqrt(sumSquares), true);
+      return 0;
+    },
+    _rac_embeddings_similarity(
+      lhsPtr: number,
+      lhsDimension: number,
+      rhsPtr: number,
+      rhsDimension: number,
+      outSimilarityPtr: number,
+    ): number {
+      view.setFloat32(outSimilarityPtr, 0, true);
+      if (lhsDimension === 0 || lhsDimension !== rhsDimension) return 0;
+      let dot = 0;
+      let lhsNormSq = 0;
+      let rhsNormSq = 0;
+      for (let i = 0; i < lhsDimension; i += 1) {
+        const lhs = readF32(lhsPtr, i);
+        const rhs = readF32(rhsPtr, i);
+        dot += lhs * rhs;
+        lhsNormSq += lhs * lhs;
+        rhsNormSq += rhs * rhs;
+      }
+      const denom = Math.sqrt(lhsNormSq) * Math.sqrt(rhsNormSq);
+      if (denom !== 0) {
+        view.setFloat32(outSimilarityPtr, dot / denom, true);
+      }
+      return 0;
+    },
+  }) as unknown as EmscriptenRunanywhereModule;
 }
 
 // `EmbeddingVector.norm`/`.dimension` and `.text` were deleted outright

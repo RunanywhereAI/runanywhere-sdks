@@ -35,12 +35,17 @@ class Stt:
         """
         check_stt_options(options)
         model = runtime.stt(options.model if options else None)
+        # Input formatting (PCM16 @ 16 kHz) is distinct from model-output metrics.
+        # AudioInput.duration_ms is the caller's input length for request prep only —
+        # never present it as Transcription.duration_ms (commons STTOutput.duration_ms).
         pcm16 = audio.to_pcm16(_SAMPLE_RATE)
         text = model.transcribe(pcm16)
         return Transcription(
             text=text,
             language=options.language if options else None,
-            duration_ms=audio.duration_ms(_SAMPLE_RATE),
+            # The text-only bridge does not carry STTOutput.duration_ms; leave 0
+            # rather than falling back to input-audio length.
+            duration_ms=0,
         )
 
     async def atranscribe(
@@ -54,7 +59,7 @@ class Stt:
         return Transcription(
             text=text,
             language=options.language if options else None,
-            duration_ms=audio.duration_ms(_SAMPLE_RATE),
+            duration_ms=0,
         )
 
     def transcribe_stream(

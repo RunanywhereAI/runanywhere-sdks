@@ -105,11 +105,11 @@ public class STTPartialResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTPartialResult> = object : ProtoAdapter<STTPartialResult>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      STTPartialResult::class, 
-      "type.googleapis.com/runanywhere.v1.STTPartialResult", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      STTPartialResult::class,
+      "type.googleapis.com/runanywhere.v1.STTPartialResult",
+      PROTO_3,
+      null,
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTPartialResult): Int {

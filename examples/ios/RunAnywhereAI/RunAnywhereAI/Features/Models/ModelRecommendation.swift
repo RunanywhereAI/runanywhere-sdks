@@ -2,10 +2,9 @@
 //  ModelRecommendation.swift
 //  RunAnywhereAI
 //
-//  Hardware-aware, pure recommendation engine. Given a hardware tier and the
-//  live catalog of registered models, it selects a consumer-friendly default
-//  chat model plus a curated spread of LLM / ASR / TTS / VLM / embedding picks
-//  that fit the device's memory budget.
+//  Curated catalog picks for the Models / Voice screens. Model-fit decisions
+//  consume SDK/commons `RAModelCompatibilityResult.canRun` when supplied; the
+//  app never invents a per-tier memory budget.
 //
 
 import Foundation
@@ -57,13 +56,11 @@ struct VoicePipeline {
     }
 }
 
-/// Pure engine that maps `HardwareTier` + available models to a curated
-/// `RecommendedSelection`. Prefers real registered ids from
-/// `ModelCatalogBootstrap`, with graceful category-based fallbacks so the UI is
-/// never empty when a preferred id is missing.
+/// Pure engine that maps curated preference ids + optional commons
+/// compatibility verdicts to a `RecommendedSelection`.
 struct ModelRecommendationEngine {
     /// Preferred LLM ids per tier, ordered light → smart. The engine keeps the
-    /// first few that are both present in the catalog and fit the memory budget.
+    /// first few that are both present in the catalog and allowed by can_run.
     fileprivate struct TierPreferences {
         let llmIDs: [String]
         let asrIDs: [String]
@@ -75,7 +72,8 @@ struct ModelRecommendationEngine {
     func recommend(
         tier: HardwareTier,
         appleFoundationAvailable: Bool,
-        from models: [RAModelInfo]
+        from models: [RAModelInfo],
+        canRunByModelID: [String: Bool] = [:]
     ) -> RecommendedSelection {
         let byID = Dictionary(models.map { ($0.id, $0) }) { first, _ in first }
         let prefs = preferences(for: tier)
@@ -83,7 +81,7 @@ struct ModelRecommendationEngine {
         let recommendedLLMs = pickModels(
             ids: prefs.llmIDs,
             from: byID,
-            tier: tier,
+            canRunByModelID: canRunByModelID,
             limit: tier == .highEnd ? 5 : 4
         )
 
@@ -96,10 +94,10 @@ struct ModelRecommendationEngine {
         return RecommendedSelection(
             defaultChatModel: defaultChat,
             recommendedLLMs: recommendedLLMs,
-            recommendedASR: pickFirst(ids: prefs.asrIDs, from: byID, tier: tier),
-            recommendedTTS: pickFirst(ids: prefs.ttsIDs, from: byID, tier: tier),
-            recommendedVLM: pickFirst(ids: prefs.vlmIDs, from: byID, tier: tier),
-            recommendedEmbedding: pickFirst(ids: prefs.embeddingIDs, from: byID, tier: tier)
+            recommendedASR: pickFirst(ids: prefs.asrIDs, from: byID, canRunByModelID: canRunByModelID),
+            recommendedTTS: pickFirst(ids: prefs.ttsIDs, from: byID, canRunByModelID: canRunByModelID),
+            recommendedVLM: pickFirst(ids: prefs.vlmIDs, from: byID, canRunByModelID: canRunByModelID),
+            recommendedEmbedding: pickFirst(ids: prefs.embeddingIDs, from: byID, canRunByModelID: canRunByModelID)
         )
     }
 
@@ -109,7 +107,8 @@ struct ModelRecommendationEngine {
     func recommendVoicePipeline(
         tier: HardwareTier,
         appleFoundationAvailable: Bool,
-        from models: [RAModelInfo]
+        from models: [RAModelInfo],
+        canRunByModelID: [String: Bool] = [:]
     ) -> VoicePipeline {
         let byID = Dictionary(models.map { ($0.id, $0) }) { first, _ in first }
         let prefs = preferences(for: tier)
@@ -118,12 +117,12 @@ struct ModelRecommendationEngine {
             ? models.first { $0.isAppleFoundationModel && $0.category == .language }
             : nil
         let llm = appleFoundation
-            ?? pickFirst(ids: prefs.llmIDs, from: byID, tier: tier)
+            ?? pickFirst(ids: prefs.llmIDs, from: byID, canRunByModelID: canRunByModelID)
 
         return VoicePipeline(
-            stt: pickFirst(ids: prefs.asrIDs, from: byID, tier: tier),
+            stt: pickFirst(ids: prefs.asrIDs, from: byID, canRunByModelID: canRunByModelID),
             llm: llm,
-            tts: pickFirst(ids: prefs.ttsIDs, from: byID, tier: tier),
+            tts: pickFirst(ids: prefs.ttsIDs, from: byID, canRunByModelID: canRunByModelID),
             vad: byID[Self.vadModelID]
         )
     }
@@ -133,52 +132,51 @@ struct ModelRecommendationEngine {
 
     // MARK: - Selection helpers
 
-    /// Keep the ordered ids that exist in the catalog and fit the tier budget,
-    /// up to `limit`. Preserves the curated order (light → smart).
+    /// Keep the ordered ids that exist in the catalog and pass can_run (when
+    /// known), up to `limit`. Preserves the curated order (light → smart).
     private func pickModels(
         ids: [String],
         from byID: [String: RAModelInfo],
-        tier: HardwareTier,
+        canRunByModelID: [String: Bool],
         limit: Int
     ) -> [RAModelInfo] {
         var picked: [RAModelInfo] = []
         for id in ids {
             guard picked.count < limit else { break }
-            if let model = byID[id], fits(model, tier: tier) {
+            if let model = byID[id], isRunnable(model, canRunByModelID: canRunByModelID) {
                 picked.append(model)
             }
         }
         return picked
     }
 
-    /// First catalog model from the ordered ids that fits the tier budget.
+    /// First catalog model from the ordered ids that passes can_run when known.
     private func pickFirst(
         ids: [String],
         from byID: [String: RAModelInfo],
-        tier: HardwareTier
+        canRunByModelID: [String: Bool]
     ) -> RAModelInfo? {
         for id in ids {
-            if let model = byID[id], fits(model, tier: tier) {
+            if let model = byID[id], isRunnable(model, canRunByModelID: canRunByModelID) {
                 return model
             }
         }
         return nil
     }
 
-    /// A model fits when its required footprint is within the tier's budget.
-    /// Unknown-size models are allowed through (the SDK still guards download).
-    private func fits(_ model: RAModelInfo, tier: HardwareTier) -> Bool {
-        let bytes = model.consumerSizeBytes
-        guard bytes > 0 else { return true }
-        return bytes <= tier.memoryBudgetBytes
+    /// Prefer commons `can_run`. When the SDK has not returned a verdict for
+    /// this id, allow the catalog entry through — never invent a local byte
+    /// budget in place of typed compatibility.
+    private func isRunnable(_ model: RAModelInfo, canRunByModelID: [String: Bool]) -> Bool {
+        canRunByModelID[model.id] ?? true
     }
 
     // MARK: - Curated per-tier preferences (real registered ids)
 
     private func preferences(for tier: HardwareTier) -> TierPreferences {
         switch tier {
+        case .unknown, .midRange: return .midRange
         case .lowEnd: return .lowEnd
-        case .midRange: return .midRange
         case .highEnd: return .highEnd
         }
     }

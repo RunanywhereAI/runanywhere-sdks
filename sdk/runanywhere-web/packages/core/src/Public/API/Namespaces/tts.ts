@@ -12,6 +12,7 @@ import {
   sharedTTSPlayback,
   stopTTSPlayback,
 } from '../../Extensions/RunAnywhere+TTS.js';
+import { pcm16ToFloat32 } from '../../Extensions/RunAnywhere+AudioConvert.js';
 import type { TtsOptions } from '../Options.js';
 import type { Audio, AudioChunk, SpeechHandle, Voice } from '../Results.js';
 import { toAudio, toProtoTtsOptions, toVoice } from '../Mapping.js';
@@ -41,11 +42,7 @@ function toPlaybackSamples(audio: Audio): Float32Array | null {
     return out;
   }
   if (audio.format === 'pcm16') {
-    const count = Math.floor(audio.data.byteLength / 2);
-    const view = new DataView(audio.data.buffer, audio.data.byteOffset, count * 2);
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i += 1) out[i] = view.getInt16(i * 2, true) / 0x8000;
-    return out;
+    return pcm16ToFloat32(audio.data);
   }
   // Containerized audio needs a decoder the SDK does not ship.
   return null;

@@ -128,7 +128,6 @@ class ChatViewModel extends ChangeNotifier {
 
   Conversation? _currentConversation;
   DateTime? _generationStartTime;
-  double? _timeToFirstToken;
   StreamSubscription<sdk.SdkEvent>? _lifecycleSubscription;
   bool _initialized = false;
 
@@ -223,7 +222,6 @@ class ChatViewModel extends ChangeNotifier {
     _isGenerating = true;
     _errorMessage = null;
     _generationStartTime = DateTime.now();
-    _timeToFirstToken = null;
     notifyListeners();
 
     try {
@@ -453,13 +451,6 @@ class ChatViewModel extends ChangeNotifier {
       )) {
         switch (event) {
           case sdk.GenerationTextDelta(:final text):
-            if (_timeToFirstToken == null && _generationStartTime != null) {
-              _timeToFirstToken =
-                  DateTime.now()
-                      .difference(_generationStartTime!)
-                      .inMilliseconds /
-                  1000.0;
-            }
             answer.write(text);
             _messages[messageIndex] = _messages[messageIndex].copyWith(
               content: answer.toString(),
@@ -467,13 +458,6 @@ class ChatViewModel extends ChangeNotifier {
             );
             notifyListeners();
           case sdk.GenerationReasoningDelta(:final text):
-            if (_timeToFirstToken == null && _generationStartTime != null) {
-              _timeToFirstToken =
-                  DateTime.now()
-                      .difference(_generationStartTime!)
-                      .inMilliseconds /
-                  1000.0;
-            }
             thoughts.write(text);
             _messages[messageIndex] = _messages[messageIndex].copyWith(
               content: answer.toString(),
@@ -500,7 +484,9 @@ class ChatViewModel extends ChangeNotifier {
       final analytics = MessageAnalytics(
         messageId: assistantMessage.id,
         modelName: modelName,
-        timeToFirstToken: _timeToFirstToken,
+        timeToFirstToken: result != null && result.timeToFirstTokenMs > 0
+            ? result.timeToFirstTokenMs / 1000.0
+            : null,
         totalGenerationTime: _elapsedGenerationSeconds(),
         outputTokens: result?.outputTokens ?? 0,
         tokensPerSecond: result?.tokensPerSecond ?? 0,
@@ -538,6 +524,9 @@ class ChatViewModel extends ChangeNotifier {
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelName: modelName,
+        timeToFirstToken: result.timeToFirstTokenMs > 0
+            ? result.timeToFirstTokenMs / 1000.0
+            : null,
         totalGenerationTime: _elapsedGenerationSeconds(),
         outputTokens: result.outputTokens,
         tokensPerSecond: result.tokensPerSecond,

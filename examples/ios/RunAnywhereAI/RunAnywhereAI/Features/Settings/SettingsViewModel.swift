@@ -515,13 +515,6 @@ class SettingsViewModel: ObservableObject {
     var hasStorageData: Bool {
         totalStorageSize > 0
     }
-
-    /// Get storage usage percentage
-    var storageUsagePercentage: Double {
-        guard availableSpace > 0 else { return 0 }
-        let totalDevice = totalStorageSize + availableSpace
-        return Double(totalStorageSize) / Double(totalDevice)
-    }
 }
 
 // MARK: - Supporting Types

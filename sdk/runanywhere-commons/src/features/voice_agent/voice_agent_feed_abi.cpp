@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -229,19 +230,20 @@ constexpr int64_t kReplyTailGuardMs = 250;
 // turns reaches it.
 constexpr int64_t kSilentInputWarnMs = 8000;
 
-// Normalized RMS of one PCM16 frame (matches the SDK drivers: divide by
-// Int16.max so the threshold constants carry over unchanged).
+// Normalized RMS of one PCM16 frame (canonical RAC_AUDIO_PCM16_SCALE decode,
+// then rac_audio_compute_rms — same units the threshold constants expect).
 float frame_rms(const uint8_t* data, size_t bytes) {
     const size_t samples = bytes / kBytesPerSample;
     if (samples == 0)
         return 0.0f;
     const int16_t* pcm = reinterpret_cast<const int16_t*>(data);
-    double sum = 0.0;
-    for (size_t i = 0; i < samples; ++i) {
-        const double sample = static_cast<double>(pcm[i]);
-        sum += sample * sample;
-    }
-    return static_cast<float>(std::sqrt(sum / static_cast<double>(samples)) / 32767.0);
+    std::vector<float> normalized(samples);
+    if (rac_audio_pcm16_to_float32(pcm, samples, normalized.data()) != RAC_SUCCESS)
+        return 0.0f;
+    float rms = 0.0f;
+    if (rac_audio_compute_rms(normalized.data(), samples, &rms) != RAC_SUCCESS)
+        return 0.0f;
+    return rms;
 }
 
 // How loud the reply itself is at the moment it is being heard, in the same
@@ -684,16 +686,20 @@ void build_reply_envelope(const std::string& wav, std::vector<float>* out) {
 
     const auto* pcm = reinterpret_cast<const int16_t*>(bytes + kHeaderBytes);
     out->reserve(total_frames / frames_per_window + 1);
+    std::vector<float> window;
+    window.reserve(frames_per_window);
     for (size_t start = 0; start < total_frames; start += frames_per_window) {
         const size_t count = std::min(frames_per_window, total_frames - start);
-        double sum = 0.0;
+        window.resize(count);
         for (size_t i = 0; i < count; ++i) {
             // Channel 0 only. A reply is mono in practice, and where it is not,
             // one channel still carries the envelope this is measuring.
-            const double sample = static_cast<double>(pcm[(start + i) * channels]);
-            sum += sample * sample;
+            window[i] = static_cast<float>(pcm[(start + i) * channels]) / RAC_AUDIO_PCM16_SCALE;
         }
-        out->push_back(static_cast<float>(std::sqrt(sum / static_cast<double>(count)) / 32767.0));
+        float rms = 0.0f;
+        if (rac_audio_compute_rms(window.data(), count, &rms) != RAC_SUCCESS)
+            rms = 0.0f;
+        out->push_back(rms);
     }
 }
 

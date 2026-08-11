@@ -35,6 +35,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports.js';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import { float32ToPcm16 } from './RunAnywhere+AudioConvert.js';
 
 export type { STTOptions, STTOutput, STTPartialResult, STTServiceState };
 
@@ -85,19 +86,11 @@ function defaultSTTOptions(overrides?: Partial<STTOptions>): STTOptions {
 }
 
 /**
- * Encode a Float32Array of audio samples to little-endian Int16 PCM bytes,
- * which is the canonical input format for `_rac_stt_component_transcribe_proto`.
+ * Encode a Float32Array of audio samples to little-endian Int16 PCM bytes
+ * via commons `rac_audio_float32_to_pcm16`.
  */
 function encodeAudioToPcm16(samples: Float32Array): Uint8Array {
-  const out = new Uint8Array(samples.length * 2);
-  const view = new DataView(out.buffer);
-  for (let i = 0; i < samples.length; i += 1) {
-    let s = samples[i] ?? 0;
-    if (s > 1) s = 1;
-    if (s < -1) s = -1;
-    view.setInt16(i * 2, Math.round(s * 0x7fff), true);
-  }
-  return out;
+  return float32ToPcm16(samples);
 }
 
 function coerceAudio(audio: Uint8Array | Float32Array): Uint8Array {

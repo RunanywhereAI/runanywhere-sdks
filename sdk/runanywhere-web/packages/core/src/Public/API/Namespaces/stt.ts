@@ -12,6 +12,7 @@ import { spokenTranscript } from '../../../Foundation/TranscriptText.js';
 import { STTProtoAdapter } from '../../../Adapters/ModalityProtoAdapter.js';
 import { sttState } from '../../Extensions/RunAnywhere+STT.js';
 import { audioInputToPcm16, type AudioFormatSpec, type AudioFrame, type AudioInput } from '../Inputs.js';
+import { float32ToPcm16 } from '../../Extensions/RunAnywhere+AudioConvert.js';
 import type { SttOptions } from '../Options.js';
 import type { TranscriptionEvent } from '../Events.js';
 import type { SttState, SttStream, Transcription } from '../Results.js';
@@ -45,13 +46,11 @@ function concatChunks(chunks: readonly Uint8Array[]): Uint8Array {
 function float32BytesToPcm16(bytes: Uint8Array): Uint8Array {
   const count = Math.floor(bytes.byteLength / 4);
   const view = new DataView(bytes.buffer, bytes.byteOffset, count * 4);
-  const out = new Uint8Array(count * 2);
-  const outView = new DataView(out.buffer);
+  const samples = new Float32Array(count);
   for (let i = 0; i < count; i += 1) {
-    const clamped = Math.max(-1, Math.min(1, view.getFloat32(i * 4, true)));
-    outView.setInt16(i * 2, Math.round(clamped * 0x7fff), true);
+    samples[i] = view.getFloat32(i * 4, true);
   }
-  return out;
+  return float32ToPcm16(samples);
 }
 
 let requestSequence = 0;

@@ -149,6 +149,19 @@ export class RpcBackend implements RaBackend {
   downloadCleanup(): Promise<number> {
     return this.call('downloadCleanup', []);
   }
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): Promise<number> {
+    // Forward to NativeBackend on the utility host — same commons ABI, never
+    // re-derive overall*100-else-0 in the renderer.
+    return this.call('downloadProgressPercent', [
+      overallProgress,
+      bytesDownloaded,
+      totalBytes,
+    ]);
+  }
   downloadWatch(onProgress: (progressBytes: Uint8Array) => void): Promise<void> {
     return this.call('downloadWatch', [], onProgress as (c: unknown) => void);
   }
@@ -392,6 +405,24 @@ export class RpcBackend implements RaBackend {
   vadClose(): Promise<void> {
     return this.call('vadClose', []);
   }
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): Promise<void> {
+    return this.call('vadSetStreamCallback', [], onEvent as (c: unknown) => void);
+  }
+  vadUnsetStreamCallback(): Promise<void> {
+    return this.call('vadUnsetStreamCallback', []);
+  }
+  vadStreamStart(optionsBytes: Uint8Array): Promise<number> {
+    return this.call('vadStreamStart', [optionsBytes]);
+  }
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void> {
+    return this.call('vadStreamFeed', [sessionId, audioBytes]);
+  }
+  vadStreamStop(sessionId: number): Promise<void> {
+    return this.call('vadStreamStop', [sessionId]);
+  }
+  vadStreamCancel(sessionId: number): Promise<void> {
+    return this.call('vadStreamCancel', [sessionId]);
+  }
 
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
   embedBatchProto(requestBytes: Uint8Array): Promise<Uint8Array> {
@@ -413,6 +444,44 @@ export class RpcBackend implements RaBackend {
   }
   rerank(query: string, documents: string[], topN?: number): Promise<NativeRanked[]> {
     return this.call('rerank', [query, documents, topN]);
+  }
+  embeddingsNorm(vector: Float32Array): Promise<number> {
+    return this.call('embeddingsNorm', [vector]);
+  }
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): Promise<number> {
+    return this.call('embeddingsSimilarity', [lhs, rhs]);
+  }
+
+  // ---- audio DSP (commons `rac_audio_*` via the utility host) ----
+  audioFloat32ToPcm16(samples: Float32Array): Promise<Int16Array> {
+    return this.call('audioFloat32ToPcm16', [samples]);
+  }
+  audioPcm16ToFloat32(samples: Int16Array): Promise<Float32Array> {
+    return this.call('audioPcm16ToFloat32', [samples]);
+  }
+  audioResampleF32(
+    samples: Float32Array,
+    inRate: number,
+    outRate: number
+  ): Promise<Float32Array> {
+    return this.call('audioResampleF32', [samples, inRate, outRate]);
+  }
+  audioComputeRms(samples: Float32Array): Promise<number> {
+    return this.call('audioComputeRms', [samples]);
+  }
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array> {
+    return this.call('audioFloat32ToWav', [samples, sampleRate]);
+  }
+  audioWavToFloat32(
+    bytes: Uint8Array
+  ): Promise<{ sampleRate: number; samples: Float32Array }> {
+    return this.call('audioWavToFloat32', [bytes]);
+  }
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): Promise<number> {
+    return this.call('audioPcmBytesToMs', [byteCount, format]);
   }
 
   // ---- diarization and segmentation ----

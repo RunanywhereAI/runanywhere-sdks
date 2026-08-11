@@ -231,7 +231,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
     kDecodeTokensPerSecondFieldNumber = 4,
     kPrefillMsFieldNumber = 5,
     kTtftMsFieldNumber = 6,
+    kTimeToFirstContentTokenMsFieldNumber = 7,
     kTotalTokensFieldNumber = 3,
+    kBatchBufferedFieldNumber = 9,
+    kCountsEstimatedFieldNumber = 10,
+    kContentTokensPerSecondFieldNumber = 8,
   };
   // int32 input_tokens = 1;
   void clear_input_tokens() ;
@@ -283,6 +287,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
   void _internal_set_ttft_ms(::int64_t value);
 
   public:
+  // int64 time_to_first_content_token_ms = 7;
+  void clear_time_to_first_content_token_ms() ;
+  [[nodiscard]] ::int64_t time_to_first_content_token_ms() const;
+  void set_time_to_first_content_token_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_time_to_first_content_token_ms() const;
+  void _internal_set_time_to_first_content_token_ms(::int64_t value);
+
+  public:
   // int32 total_tokens = 3;
   void clear_total_tokens() ;
   [[nodiscard]] ::int32_t total_tokens() const;
@@ -293,11 +307,41 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
   void _internal_set_total_tokens(::int32_t value);
 
   public:
+  // bool batch_buffered = 9;
+  void clear_batch_buffered() ;
+  [[nodiscard]] bool batch_buffered() const;
+  void set_batch_buffered(bool value);
+
+  private:
+  bool _internal_batch_buffered() const;
+  void _internal_set_batch_buffered(bool value);
+
+  public:
+  // bool counts_estimated = 10;
+  void clear_counts_estimated() ;
+  [[nodiscard]] bool counts_estimated() const;
+  void set_counts_estimated(bool value);
+
+  private:
+  bool _internal_counts_estimated() const;
+  void _internal_set_counts_estimated(bool value);
+
+  public:
+  // double content_tokens_per_second = 8;
+  void clear_content_tokens_per_second() ;
+  [[nodiscard]] double content_tokens_per_second() const;
+  void set_content_tokens_per_second(double value);
+
+  private:
+  double _internal_content_tokens_per_second() const;
+  void _internal_set_content_tokens_per_second(double value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TokenUsage)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<4, 10,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -331,7 +375,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
     double decode_tokens_per_second_;
     ::int64_t prefill_ms_;
     ::int64_t ttft_ms_;
+    ::int64_t time_to_first_content_token_ms_;
     ::int32_t total_tokens_;
+    bool batch_buffered_;
+    bool counts_estimated_;
+    double content_tokens_per_second_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -406,7 +454,7 @@ inline void TokenUsage::_internal_set_output_tokens(::int32_t value) {
 inline void TokenUsage::clear_total_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::int32_t TokenUsage::total_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.total_tokens)
@@ -414,7 +462,7 @@ inline ::int32_t TokenUsage::total_tokens() const {
 }
 inline void TokenUsage::set_total_tokens(::int32_t value) {
   _internal_set_total_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.total_tokens)
 }
 inline ::int32_t TokenUsage::_internal_total_tokens() const {
@@ -496,6 +544,102 @@ inline ::int64_t TokenUsage::_internal_ttft_ms() const {
 inline void TokenUsage::_internal_set_ttft_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.ttft_ms_ = value;
+}
+
+// int64 time_to_first_content_token_ms = 7;
+inline void TokenUsage::clear_time_to_first_content_token_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.time_to_first_content_token_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline ::int64_t TokenUsage::time_to_first_content_token_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.time_to_first_content_token_ms)
+  return _internal_time_to_first_content_token_ms();
+}
+inline void TokenUsage::set_time_to_first_content_token_ms(::int64_t value) {
+  _internal_set_time_to_first_content_token_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.time_to_first_content_token_ms)
+}
+inline ::int64_t TokenUsage::_internal_time_to_first_content_token_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.time_to_first_content_token_ms_;
+}
+inline void TokenUsage::_internal_set_time_to_first_content_token_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.time_to_first_content_token_ms_ = value;
+}
+
+// double content_tokens_per_second = 8;
+inline void TokenUsage::clear_content_tokens_per_second() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.content_tokens_per_second_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline double TokenUsage::content_tokens_per_second() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.content_tokens_per_second)
+  return _internal_content_tokens_per_second();
+}
+inline void TokenUsage::set_content_tokens_per_second(double value) {
+  _internal_set_content_tokens_per_second(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.content_tokens_per_second)
+}
+inline double TokenUsage::_internal_content_tokens_per_second() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.content_tokens_per_second_;
+}
+inline void TokenUsage::_internal_set_content_tokens_per_second(double value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.content_tokens_per_second_ = value;
+}
+
+// bool batch_buffered = 9;
+inline void TokenUsage::clear_batch_buffered() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.batch_buffered_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline bool TokenUsage::batch_buffered() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.batch_buffered)
+  return _internal_batch_buffered();
+}
+inline void TokenUsage::set_batch_buffered(bool value) {
+  _internal_set_batch_buffered(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.batch_buffered)
+}
+inline bool TokenUsage::_internal_batch_buffered() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.batch_buffered_;
+}
+inline void TokenUsage::_internal_set_batch_buffered(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.batch_buffered_ = value;
+}
+
+// bool counts_estimated = 10;
+inline void TokenUsage::clear_counts_estimated() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.counts_estimated_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+}
+inline bool TokenUsage::counts_estimated() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.counts_estimated)
+  return _internal_counts_estimated();
+}
+inline void TokenUsage::set_counts_estimated(bool value) {
+  _internal_set_counts_estimated(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.counts_estimated)
+}
+inline bool TokenUsage::_internal_counts_estimated() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.counts_estimated_;
+}
+inline void TokenUsage::_internal_set_counts_estimated(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.counts_estimated_ = value;
 }
 
 #ifdef __GNUC__

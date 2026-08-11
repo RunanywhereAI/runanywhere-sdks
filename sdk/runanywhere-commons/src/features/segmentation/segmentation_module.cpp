@@ -249,8 +249,12 @@ rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t e
         auto* destination = out->add_class_summaries();
         destination->set_class_id(summary.class_id);
         destination->set_pixel_count(summary.pixel_count);
-        // SegmentationClassSummary.fraction was deleted outright: it is
-        // pixel_count / (width * height), derivable by the caller.
+        // Canonical coverage share. Engines still supply C-ABI fraction for
+        // validation above; the wire value is always pixel_count/(w*h).
+        destination->set_fraction(
+            (pixels64 > 0) ? static_cast<float>(static_cast<double>(summary.pixel_count) /
+                                                static_cast<double>(pixels64))
+                           : 0.0f);
         if (summary.label) {
             destination->set_label(summary.label);
         }

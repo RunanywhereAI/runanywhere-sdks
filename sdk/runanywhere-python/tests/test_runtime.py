@@ -87,7 +87,7 @@ def test_capabilities_reports_bound_modalities_when_the_core_exports_them(sdk) -
 def test_capabilities_is_honest_about_an_unrebuilt_core(sdk, monkeypatch) -> None:
     # An old native _core built before these bindings existed simply lacks the attribute
     # (methods live on the class, not the instance, so patch the class).
-    monkeypatch.delattr(type(sdk), "lora_apply")
+    monkeypatch.delattr(type(sdk), "lora_apply_proto")
     monkeypatch.delattr(type(sdk), "load_diarization_model")
     monkeypatch.delattr(type(sdk), "load_segmentation_model")
     monkeypatch.delattr(type(sdk), "create_voice_agent")

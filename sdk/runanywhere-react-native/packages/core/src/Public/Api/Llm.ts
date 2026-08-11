@@ -44,7 +44,8 @@ import { toLlmOptions, toToolCallingOptions } from './Options';
 import { toChatMessages } from './Inputs';
 import { pushStream } from './Stream';
 import {
-  emptyGenerationResult,
+  fromFinishReason,
+  generationResultFromAccumulated,
   toGenerationResult,
   toGenerationResultFromStream,
   toStructuredResult,
@@ -166,7 +167,7 @@ async function generateWithToolLoop(
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: result.toolCalls,
-    finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
+    finishReason: fromFinishReason(result.finishReason),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
@@ -286,7 +287,12 @@ export const llm = {
                         requestId,
                         options?.model ?? ''
                       )
-                    : emptyGenerationResult(requestId, options?.model ?? ''),
+                    : generationResultFromAccumulated(
+                        requestId,
+                        options?.model ?? '',
+                        accumulatedText,
+                        accumulatedThinking
+                      ),
                 });
                 controller.finish();
               }

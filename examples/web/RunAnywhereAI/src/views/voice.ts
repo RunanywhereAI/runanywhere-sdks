@@ -34,11 +34,11 @@ import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { appLogger } from '../services/app-logger';
 import { getCatalog, type CatalogEntry } from '../services/model-catalog';
-import { detectDeviceCapabilities } from '../services/device-capabilities';
 import {
   recommendVoicePipeline,
   type VoicePipelineSelection,
 } from '../services/model-recommendation';
+import { canRunByModelID } from '../services/model-compatibility-lookup';
 import {
   ensureModelReady,
   isModelLoaded,
@@ -209,18 +209,22 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
 }
 
 /**
- * Probe hardware once and derive the best-for-device voice trio (+ VAD). Cached
- * for the session; re-renders when it resolves so the setup card fills in.
+ * Probe commons can_run once and derive the voice trio (+ VAD). Cached for
+ * the session; re-renders when it resolves so the setup card fills in.
+ * No local tier/budget — unknown fit treats engine-compatible catalog entries
+ * as eligible.
  */
 function ensureVoicePipeline(): void {
   if (voicePipeline || pipelineProbePending) return;
   pipelineProbePending = true;
-  void detectDeviceCapabilities()
-    .then((caps) => {
-      voicePipeline = recommendVoicePipeline(caps.tier, caps.memoryBudgetBytes, getCatalog());
+  const catalog = getCatalog();
+  void canRunByModelID(catalog.map((entry) => entry.id))
+    .then((canRun) => {
+      voicePipeline = recommendVoicePipeline(catalog, canRun);
     })
     .catch((err) => {
       appLogger.warning('[voice] pipeline recommendation failed', err);
+      voicePipeline = recommendVoicePipeline(catalog, {});
     })
     .finally(() => {
       pipelineProbePending = false;

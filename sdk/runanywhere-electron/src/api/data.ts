@@ -21,6 +21,7 @@ import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
 import { DataAbi, toEmbeddingsRequest, toRerankRequest } from './data-abi';
+import { toPublicGenerationMetrics } from './llm-abi';
 import { RAC_CATEGORY, RAC_FRAMEWORK } from './native-backend';
 import { optionDefaults } from './options';
 import type { EmbedOptions, LlmOptions, RagConfig } from './options';
@@ -47,6 +48,15 @@ export interface DataDeps {
 // embeddings
 // ---------------------------------------------------------------------------
 
+function asFloat32Vector(input: Embedding | Float32Array, fieldPath: string): Float32Array {
+  if (input instanceof Float32Array) return input;
+  if (input?.vector instanceof Float32Array) return input.vector;
+  throw SDKException.validationFailed({
+    fieldPath,
+    message: 'expected Embedding or Float32Array',
+  });
+}
+
 /** Text embeddings. */
 export interface EmbeddingsNamespace {
   /**
@@ -58,6 +68,14 @@ export interface EmbeddingsNamespace {
    * console.log(a.vector.length);
    */
   embed(texts: string[], options?: EmbedOptions): Promise<Embedding[]>;
+  /**
+   * Cosine similarity via commons (`rac_embeddings_similarity`). Returns 0 for
+   * mismatched lengths, empty vectors, or zero norms. Routed through the
+   * backend so the preload never loads the native addon.
+   */
+  cosineSimilarity(a: Embedding | Float32Array, b: Embedding | Float32Array): Promise<number>;
+  /** L2 norm via commons (`rac_embeddings_norm`). */
+  computeNorm(vector: Embedding | Float32Array): Promise<number>;
 }
 
 /** Build the `embeddings` namespace over a backend. */
@@ -82,6 +100,16 @@ export function createEmbeddingsNamespace(deps: DataDeps): EmbeddingsNamespace {
         index: v.inputIndex,
         vector: Float32Array.from(v.values),
       }));
+    },
+    cosineSimilarity(a, b) {
+      const lhs = asFloat32Vector(a, 'a');
+      const rhs = asFloat32Vector(b, 'b');
+      return deps.backend.embeddingsSimilarity(lhs, rhs);
+    },
+    async computeNorm(vector) {
+      const values = asFloat32Vector(vector, 'vector');
+      if (!values.length) return 0;
+      return deps.backend.embeddingsNorm(values);
     },
   };
 }
@@ -176,19 +204,13 @@ function toMatch(chunk: {
 }
 
 function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRagResult {
-  const generationMs = raw.generationTimeMs || 0;
   return {
     answer: raw.answer,
     sources: raw.retrievedChunks.map(toMatch),
     thinkingText: raw.thinkingContent || undefined,
-    inputTokens: raw.usage?.inputTokens ?? 0,
-    outputTokens: raw.usage?.outputTokens ?? 0,
-    // Commons reports retrieval and generation time but not time-to-first-token for
-    // a non-streamed query, so retrieval time is the closest honest stand-in.
-    timeToFirstTokenMs: raw.retrievalTimeMs,
-    tokensPerSecond: generationMs > 0 ? (raw.usage?.outputTokens ?? 0) / (generationMs / 1000) : 0,
-    requestId: raw.requestId || requestId,
-    model,
+    // TokenUsage from the LLM leg of the RAG pipeline — never retrieve-time or
+    // a local outputTokens/generationMs rate. Copied complete from commons.
+    ...toPublicGenerationMetrics(raw.usage, raw.requestId || requestId, model),
   };
 }
 

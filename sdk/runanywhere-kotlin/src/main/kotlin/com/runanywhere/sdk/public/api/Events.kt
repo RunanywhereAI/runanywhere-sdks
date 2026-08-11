@@ -343,18 +343,14 @@ public sealed class DownloadEvent {
         val totalFiles: Int = 1,
     ) : DownloadEvent() {
         /**
-         * Fraction of the whole download that is done, 0.0..1.0, or null when the size is unknown.
+         * Fraction of the whole download that is done, 0.0..1.0, or null when
+         * commons has not yet reported a positive [overallProgress].
          *
-         * Prefers [overallProgress] because a multi-file model's byte counts are per-file: reaching
-         * the end of file one of three is 100% of those bytes but a third of the download, and a bar
-         * that fills and resets twice reads as a stall or a restart. Falls back to the byte ratio for
-         * a single file, and reports null rather than a fake 0 so a caller can show an
-         * indeterminate bar instead of one that looks stuck at the left edge.
+         * Never re-derives a byte ratio locally — multi-file plans make
+         * bytesDone/bytesTotal a per-file figure that is not overall progress.
          */
         public val fraction: Float?
-            get() =
-                overallProgress
-                    ?: bytesTotal.takeIf { it > 0 }?.let { (bytesDone.toFloat() / it).coerceIn(0f, 1f) }
+            get() = overallProgress
     }
 
     /** Downloaded bytes are being checksummed/validated. */

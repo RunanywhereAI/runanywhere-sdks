@@ -57,6 +57,19 @@ public class ThinkingTagPattern(
     schemaIndex = 1,
   )
   public val close_tag: String = "",
+  /**
+   * When true, the model's generation template already emits the open tag
+   * (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+   * starts inside reasoning and commons must not arm the bounded hold.
+   * optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+   */
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "templatePrefillsOpenTag",
+    schemaIndex = 2,
+  )
+  public val template_prefills_open_tag: Boolean? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ThinkingTagPattern, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -71,6 +84,7 @@ public class ThinkingTagPattern(
     if (unknownFields != other.unknownFields) return false
     if (open_tag != other.open_tag) return false
     if (close_tag != other.close_tag) return false
+    if (template_prefills_open_tag != other.template_prefills_open_tag) return false
     return true
   }
 
@@ -80,6 +94,7 @@ public class ThinkingTagPattern(
       result = unknownFields.hashCode()
       result = result * 37 + open_tag.hashCode()
       result = result * 37 + close_tag.hashCode()
+      result = result * 37 + (template_prefills_open_tag?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -89,24 +104,26 @@ public class ThinkingTagPattern(
     val result = mutableListOf<String>()
     result += """open_tag=${sanitize(open_tag)}"""
     result += """close_tag=${sanitize(close_tag)}"""
+    if (template_prefills_open_tag != null) result += """template_prefills_open_tag=$template_prefills_open_tag"""
     return result.joinToString(prefix = "ThinkingTagPattern{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     open_tag: String = this.open_tag,
     close_tag: String = this.close_tag,
+    template_prefills_open_tag: Boolean? = this.template_prefills_open_tag,
     unknownFields: ByteString = this.unknownFields,
-  ): ThinkingTagPattern = ThinkingTagPattern(open_tag, close_tag, unknownFields)
+  ): ThinkingTagPattern = ThinkingTagPattern(open_tag, close_tag, template_prefills_open_tag, unknownFields)
 
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ThinkingTagPattern> =
         object : ProtoAdapter<ThinkingTagPattern>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ThinkingTagPattern::class, 
-      "type.googleapis.com/runanywhere.v1.ThinkingTagPattern", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ThinkingTagPattern::class,
+      "type.googleapis.com/runanywhere.v1.ThinkingTagPattern",
+      PROTO_3,
+      null,
       "thinking_tag_pattern.proto"
     ) {
       override fun encodedSize(`value`: ThinkingTagPattern): Int {
@@ -117,6 +134,7 @@ public class ThinkingTagPattern(
         if (value.close_tag != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.close_tag)
         }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.template_prefills_open_tag)
         return size
       }
 
@@ -127,11 +145,13 @@ public class ThinkingTagPattern(
         if (value.close_tag != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.close_tag)
         }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.template_prefills_open_tag)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ThinkingTagPattern) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.template_prefills_open_tag)
         if (value.close_tag != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.close_tag)
         }
@@ -143,16 +163,19 @@ public class ThinkingTagPattern(
       override fun decode(reader: ProtoReader): ThinkingTagPattern {
         var open_tag: String = ""
         var close_tag: String = ""
+        var template_prefills_open_tag: Boolean? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> open_tag = ProtoAdapter.STRING.decode(reader)
             2 -> close_tag = ProtoAdapter.STRING.decode(reader)
+            3 -> template_prefills_open_tag = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ThinkingTagPattern(
           open_tag = open_tag,
           close_tag = close_tag,
+          template_prefills_open_tag = template_prefills_open_tag,
           unknownFields = unknownFields
         )
       }

@@ -117,7 +117,7 @@ function f32Frame(samples: Float32Array): AudioFrame {
 }
 
 /** Whatever the voice rendered, brought to the 16 kHz the recognizer wants. */
-function at16k(data: Float32Array, sampleRate: number): Float32Array {
+async function at16k(data: Float32Array, sampleRate: number): Promise<Float32Array> {
   return sampleRate === SAMPLE_RATE ? data : downsample(data, sampleRate, SAMPLE_RATE);
 }
 
@@ -147,7 +147,7 @@ test('stt: synthesized speech transcribes, with the timings commons measured',
       // Round-trip: the voice speaks a known phrase, the recognizer reads it
       // back. That is a real audio path rather than a fixture nobody can check.
       const spoken = await sdk.tts.synthesize('The quick brown fox.', {});
-      const resampled = at16k(spoken.data, spoken.sampleRate);
+      const resampled = await at16k(spoken.data, spoken.sampleRate);
 
       const result = await sdk.stt.transcribe(pcmInput(resampled), { wordTimestamps: true });
       assert.ok(result.text.trim().length > 0, `something was transcribed: ${result.text}`);
@@ -167,7 +167,7 @@ test('stt: a push stream emits started, a final transcript, then completed',
   async () => {
     await withModels([TTS_ID, STT_ID], async (sdk) => {
       const spoken = await sdk.tts.synthesize('Hello there.', {});
-      const resampled = at16k(spoken.data, spoken.sampleRate);
+      const resampled = await at16k(spoken.data, spoken.sampleRate);
 
       const stream = await sdk.stt.openStream({ encoding: 'PCM_F32_LE', sampleRate: SAMPLE_RATE });
       stream.pushFrame(f32Frame(resampled));

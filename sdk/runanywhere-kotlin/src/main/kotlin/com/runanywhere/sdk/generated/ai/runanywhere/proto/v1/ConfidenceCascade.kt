@@ -80,11 +80,11 @@ public class ConfidenceCascade(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ConfidenceCascade> = object : ProtoAdapter<ConfidenceCascade>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ConfidenceCascade::class, 
-      "type.googleapis.com/runanywhere.v1.ConfidenceCascade", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ConfidenceCascade::class,
+      "type.googleapis.com/runanywhere.v1.ConfidenceCascade",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: ConfidenceCascade): Int {

@@ -45,6 +45,7 @@
 // see the full decoded sequence. The proto section calls
 // `rac::llm::serialize_llm_stream_event()` directly.
 #include "features/llm/llm_stream_metrics_internal.h"
+#include "features/llm/json_schema_to_gbnf_internal.h"
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/llm_thinking_stream_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
@@ -136,12 +137,52 @@ using rac::llm::StreamTokenTiming;
 // produced BY the unary splitter (dispatch_terminal_once), and a second,
 // parallel definition of "agrees with unary" is precisely what drifted.
 
+/** Last-resort chars/4 estimate. Callers MUST set counts_estimated when used. */
 static int32_t estimate_tokens(const char* text) {
     if (!text)
         return 1;
     size_t len = strlen(text);
     int32_t tokens = static_cast<int32_t>((len + 3) / 4);
     return tokens > 0 ? tokens : 1;  // Minimum 1 token
+}
+
+/** Prefer ABI-v9 engine totals; false means the caller must estimate + flag. */
+static bool try_engine_stream_token_counts(const rac_llm_service_ops_t* ops, void* impl,
+                                           rac_llm_token_counts_t* out) {
+    if (!ops || !ops->get_stream_token_counts || !impl || !out) {
+        return false;
+    }
+    *out = {};
+    return ops->get_stream_token_counts(impl, out) == RAC_SUCCESS;
+}
+
+/**
+ * Resolve stream prompt/completion counts.
+ * 1) ops->get_stream_token_counts when non-NULL and successful
+ * 2) accumulated tokens_in_delta for completion
+ * 3) estimate_tokens as last resort (caller must treat as estimated)
+ */
+static void resolve_stream_token_counts(const rac_llm_service_ops_t* ops, void* impl,
+                                        const char* prompt, const char* completion_text,
+                                        int32_t delta_completion_tokens, int32_t* out_prompt,
+                                        int32_t* out_completion, bool* out_estimated) {
+    rac_llm_token_counts_t engine{};
+    if (try_engine_stream_token_counts(ops, impl, &engine)) {
+        *out_prompt = engine.prompt_tokens;
+        *out_completion = engine.completion_tokens;
+        *out_estimated = false;
+        return;
+    }
+
+    *out_estimated = true;
+    *out_prompt = estimate_tokens(prompt);
+    if (delta_completion_tokens > 0) {
+        *out_completion = delta_completion_tokens;
+    } else if (completion_text && completion_text[0] != '\0') {
+        *out_completion = estimate_tokens(completion_text);
+    } else {
+        *out_completion = 0;
+    }
 }
 
 /**
@@ -588,19 +629,18 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     int64_t total_time_ms = duration.count();
 
-    // Update result metrics
-    // Use actual token counts from backend if available, otherwise estimate
+    // Prefer backend-reported counts; chars/4 estimate is last resort only.
     RAC_LOG_DEBUG("LLM.Component", "Backend returned prompt_tokens=%d, completion_tokens=%d",
                   out_result->prompt_tokens, out_result->completion_tokens);
 
     if (out_result->prompt_tokens <= 0) {
         out_result->prompt_tokens = estimate_tokens(prompt);
-        RAC_LOG_DEBUG("LLM.Component", "Using estimated prompt_tokens=%d",
+        RAC_LOG_DEBUG("LLM.Component", "Estimated prompt_tokens=%d (backend did not report)",
                       out_result->prompt_tokens);
     }
     if (out_result->completion_tokens <= 0) {
         out_result->completion_tokens = estimate_tokens(out_result->text);
-        RAC_LOG_DEBUG("LLM.Component", "Using estimated completion_tokens=%d",
+        RAC_LOG_DEBUG("LLM.Component", "Estimated completion_tokens=%d (backend did not report)",
                       out_result->completion_tokens);
     }
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
@@ -616,10 +656,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
 
     RAC_LOG_INFO("LLM.Component", "Generation completed");
 
-    // Emit generation completed event
-    // Report the backend's real token counts — out_result falls back to a
-    // chars/4 estimate only when the backend returned 0; an estimate must
-    // never override a real count.
+    // Emit generation completed event. Real backend counts win; estimate only
+    // fills zeros (this C result has no counts_estimated carrier — proto paths do).
 #if defined(RAC_HAVE_PROTOBUF)
     emit_llm_generation_completed(
         generation_id.c_str(), model_id, model_name, out_result->prompt_tokens,
@@ -667,7 +705,8 @@ struct llm_stream_context {
     std::chrono::steady_clock::time_point first_token_time;
     bool first_token_recorded;
     std::string full_text;
-    int32_t prompt_tokens;
+    int32_t prompt_tokens = 0;
+    bool counts_estimated = true;
 
     // Per-stream sentinel filter. Stateful on purpose: a backend may split
     // `<|im_end|>` across two callbacks, and neither half is recognisable on
@@ -681,7 +720,8 @@ struct llm_stream_context {
     rac_inference_framework_t framework;
     float temperature;
     int32_t max_tokens;
-    int32_t token_count;  // Track tokens for streaming updates
+    // Accumulated tokens_in_delta from the engine (0 when engine cannot count).
+    int32_t token_count = 0;
 
     std::atomic<bool>* cancel_flag;
 
@@ -708,7 +748,7 @@ struct llm_stream_context {
  * directly.
  */
 static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_final,
-                                            const char* finish_reason, void* user_data) {
+                                            const char* finish_reason, int32_t tokens_in_delta, void* user_data) {
     auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
 
     if (ctx->cancel_flag && ctx->cancel_flag->load(std::memory_order_relaxed)) {
@@ -756,16 +796,17 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
 #endif
     }
 
-    // Accumulate text and track token count. Only the cleaned text reaches
-    // ctx->full_text — the raw backend token is intentionally discarded so
-    // downstream consumers (e.g. complete_callback's final_result.text)
-    // never see sentinel artifacts either.
+    // Accumulate text and engine-reported delta counts. Only cleaned text
+    // reaches ctx->full_text. tokens_in_delta may be >1 when the backend
+    // coalesces; 0 means the engine could not count this callback.
     if (!cleaned_empty) {
         ctx->full_text += cleaned;
-        ctx->token_count++;
+        if (tokens_in_delta > 0) {
+            ctx->token_count += tokens_in_delta;
+        }
 
         // Emit streaming update event (every 10 tokens to avoid spam)
-        if (ctx->token_count % 10 == 0) {
+        if (ctx->token_count > 0 && ctx->token_count % 10 == 0) {
 #if defined(RAC_HAVE_PROTOBUF)
             emit_llm_streaming_update(ctx->generation_id.c_str(), ctx->token_count);
 #endif
@@ -884,7 +925,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.user_data = user_data;
     ctx.start_time = std::chrono::steady_clock::now();
     ctx.first_token_recorded = false;
-    ctx.prompt_tokens = estimate_tokens(prompt);
+    ctx.prompt_tokens = 0;
+    ctx.counts_estimated = true;
     ctx.generation_id = generation_id;
     ctx.model_id = model_id;
     ctx.model_name = model_name;
@@ -900,6 +942,15 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     // Perform streaming generation
     result = rac_llm_generate_stream(service, prompt, effective_options, llm_stream_token_callback,
                                      &ctx);
+
+    // Prefer engine stream totals; else delta accumulation / estimate.
+    {
+        auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+        resolve_stream_token_counts(llm_service ? llm_service->ops : nullptr,
+                                    llm_service ? llm_service->impl : nullptr, prompt,
+                                    ctx.full_text.c_str(), ctx.token_count, &ctx.prompt_tokens,
+                                    &ctx.token_count, &ctx.counts_estimated);
+    }
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("LLM.Component", "Streaming generation failed");
@@ -948,9 +999,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens =
-        ctx.token_count > 0 ? ctx.token_count
-                            : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
+    final_result.completion_tokens = ctx.token_count;
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -1468,16 +1517,25 @@ const std::string& current_prompt_from_messages(const LLMGenerateRequest& reques
 
 void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
                                          const rac::llm::LifecycleLlmRef& ref,
-                                         std::string* out_open_tag, std::string* out_close_tag) {
+                                         std::string* out_open_tag, std::string* out_close_tag,
+                                         bool* out_template_prefills_open_tag = nullptr) {
     if (out_open_tag) {
         out_open_tag->clear();
     }
     if (out_close_tag) {
         out_close_tag->clear();
     }
+    if (out_template_prefills_open_tag) {
+        // Default to the loaded model's stamped prefill signal; a per-call
+        // ReasoningOptions.pattern may override below when the optional is set.
+        *out_template_prefills_open_tag = ref.template_prefills_open_tag;
+    }
     if (request.has_options() && request.options().has_reasoning() &&
         request.options().reasoning().has_pattern()) {
         const auto& pattern = request.options().reasoning().pattern();
+        if (out_template_prefills_open_tag && pattern.has_template_prefills_open_tag()) {
+            *out_template_prefills_open_tag = pattern.template_prefills_open_tag();
+        }
         if (!pattern.open_tag().empty() && !pattern.close_tag().empty()) {
             if (out_open_tag) {
                 *out_open_tag = pattern.open_tag();
@@ -1488,7 +1546,19 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
             return;
         }
     }
-    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, out_open_tag, out_close_tag);
+    bool registry_prefills = false;
+    if (rac::llm::model_thinking_tags_from_registry(ref.model_id, out_open_tag, out_close_tag,
+                                                    &registry_prefills)) {
+        // Request did not supply a pattern (or only supplied the optional
+        // prefill override above). Prefer the registry stamp when the lifecycle
+        // ref has not already carried it (e.g. stale load before enrichment).
+        if (out_template_prefills_open_tag && !ref.template_prefills_open_tag &&
+            !(request.has_options() && request.options().has_reasoning() &&
+              request.options().reasoning().has_pattern() &&
+              request.options().reasoning().pattern().has_template_prefills_open_tag())) {
+            *out_template_prefills_open_tag = registry_prefills;
+        }
+    }
 }
 
 // Fills `options` from `request`. The caller-owned `stop_storage`/`stop_ptrs`
@@ -1499,11 +1569,19 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
 //
 // `request.options()` is the sole generation-settings contract. When absent,
 // retain RAC_LLM_OPTIONS_DEFAULT values.
+//
+// When a schema arm is present and must constrain decoding but cannot be
+// compiled to GBNF, `*structured_error` is set (non-empty) and grammar is
+// left empty — callers MUST fail the request rather than generate freely.
 rac_llm_options_t
 options_from_request(const LLMGenerateRequest& request, const std::string& system_prompt,
                      std::vector<std::string>& stop_storage, std::vector<const char*>& stop_ptrs,
                      std::string& grammar_storage, std::vector<std::string>& history_storage,
-                     std::vector<const char*>& history_ptrs) {
+                     std::vector<const char*>& history_ptrs,
+                     std::string* structured_error = nullptr) {
+    if (structured_error) {
+        structured_error->clear();
+    }
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
@@ -1556,10 +1634,34 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
             ? RAC_TRUE
             : RAC_FALSE;
 
-    grammar_storage = (has_options && opts.has_structured_output() &&
-                       opts.structured_output().has_grammar())
-                          ? opts.structured_output().grammar()
-                          : std::string{};
+    // Structured-output constraint: honor an explicit grammar arm, otherwise
+    // compile the schema arm to GBNF. VALIDATION_ONLY skips decoder constraint.
+    // A present schema/grammar arm that fails to compile fails the call — never
+    // silently degrade to free generation (structured_output.proto contract).
+    grammar_storage.clear();
+    if (has_options && opts.has_structured_output()) {
+        const auto& so = opts.structured_output();
+        const auto mode = so.has_mode() ? so.mode()
+                                        : runanywhere::v1::STRUCTURED_OUTPUT_MODE_UNSPECIFIED;
+        const bool constrain =
+            mode != runanywhere::v1::STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+        if (constrain) {
+            if (so.has_grammar() && !so.grammar().empty()) {
+                grammar_storage = so.grammar();
+            } else if (so.has_schema() && !so.schema().empty()) {
+                std::string compile_error;
+                if (!rac::llm::json_schema_to_gbnf(so.schema(), &grammar_storage, &compile_error)) {
+                    grammar_storage.clear();
+                    if (structured_error) {
+                        *structured_error =
+                            compile_error.empty()
+                                ? "StructuredOutputOptions.schema could not be compiled to GBNF"
+                                : compile_error;
+                    }
+                }
+            }
+        }
+    }
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
@@ -1714,7 +1816,9 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
     perf->mutable_usage()->set_output_tokens(raw.completion_tokens);
 }
 
-void set_structured_output_if_present(const char* response, LLMGenerationResult* out) {
+void set_structured_output_if_present(const char* response, LLMGenerationResult* out,
+                                      const rac_structured_output_config_t* config = nullptr,
+                                      bool repair_attempted = false, int32_t repair_attempts = 0) {
     if (!response || !out) {
         return;
     }
@@ -1726,19 +1830,23 @@ void set_structured_output_if_present(const char* response, LLMGenerationResult*
         return;
     }
     rac_structured_output_validation_t validation{};
-    if (rac_structured_output_validate(response, nullptr, &validation) == RAC_SUCCESS) {
+    if (rac_structured_output_validate(response, config, &validation) == RAC_SUCCESS) {
+        auto* structured = out->mutable_structured_output_validation();
+        structured->set_repair_attempted(repair_attempted);
+        structured->set_repair_attempts(repair_attempts);
         if (validation.is_valid == RAC_TRUE && validation.extracted_json) {
             out->set_json_output(validation.extracted_json);
-            auto* structured = out->mutable_structured_output_validation();
             structured->set_is_valid(true);
             structured->set_contains_json(true);
             structured->set_raw_output(sanitize_utf8(response));
             structured->set_extracted_json(validation.extracted_json);
         } else if (validation.error_message) {
-            auto* structured = out->mutable_structured_output_validation();
             structured->set_is_valid(false);
-            structured->set_contains_json(false);
+            structured->set_contains_json(validation.extracted_json != nullptr);
             structured->set_raw_output(sanitize_utf8(response));
+            if (validation.extracted_json) {
+                structured->set_extracted_json(validation.extracted_json);
+            }
             rac::foundation::populate_sdk_error(structured->mutable_error(),
                                                 RAC_ERROR_VALIDATION_FAILED);
             structured->mutable_error()->set_message(validation.error_message);
@@ -1763,6 +1871,7 @@ struct ProtoStreamContext {
     bool emit_thoughts = false;
     int32_t prompt_tokens = 0;
     int32_t token_count = 0;
+    bool counts_estimated = true;
     std::string request_id;
     std::string conversation_id;
     std::string raw_text;
@@ -1922,10 +2031,11 @@ void apply_thinking_segment(ProtoStreamContext* ctx,
         // everything accumulated as answer so far is reasoning.
         //
         // This branch only runs for a model that declared NOTHING about
-        // reasoning — one that did gets `set_hold_ambiguous_prefix`, which
-        // settles the same question before any delta is dispatched. Here the
-        // deltas already handed to the callback keep the kind they were sent
-        // with; a callback cannot be un-called, and the terminal result is
+        // reasoning — one that did gets `set_hold_ambiguous_prefix` (or
+        // `start_inside_reasoning` when template_prefills_open_tag is set),
+        // which settles the same question before any delta is dispatched. Here
+        // the deltas already handed to the callback keep the kind they were
+        // sent with; a callback cannot be un-called, and the terminal result is
         // recomputed from the raw text regardless.
         ctx->thinking_text.insert(0, ctx->response_text);
         ctx->response_text.clear();
@@ -2066,23 +2176,35 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.set_response_tokens(content_tokens);
     rac::llm::set_content_rate(&timing, ctx->timing, content_tokens);
 
-    final_result.mutable_usage()->set_input_tokens(ctx->prompt_tokens);
-    final_result.mutable_usage()->set_output_tokens(ctx->timing.total_tokens);
-    final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->timing.total_tokens);
+    auto* usage = final_result.mutable_usage();
+    usage->set_input_tokens(ctx->prompt_tokens);
+    usage->set_output_tokens(ctx->timing.total_tokens);
+    usage->set_total_tokens(ctx->prompt_tokens + ctx->timing.total_tokens);
+    // Honest provenance: true only when we fell back to estimate / delta-only.
+    usage->set_counts_estimated(ctx->counts_estimated);
     final_result.set_generation_time_ms(static_cast<double>(timing.wall_ms));
     if (timing.ttft_ms > 0) {
-        final_result.mutable_usage()->set_ttft_ms(timing.ttft_ms);
+        usage->set_ttft_ms(timing.ttft_ms);
     }
     if (timing.prefill_ms > 0) {
+        usage->set_prefill_ms(timing.prefill_ms);
         final_result.set_prompt_eval_time_ms(timing.prefill_ms);
     }
     if (timing.decode_tokens_per_second > 0.0) {
-        final_result.mutable_usage()->set_decode_tokens_per_second(
-            timing.decode_tokens_per_second);
+        usage->set_decode_tokens_per_second(timing.decode_tokens_per_second);
     }
-    // The decode window is now measured (first produced delta to last), not
-    // reconstructed as `total − ttft`. A batch-buffered backend has no real
-    // window, so the honest figure there is the full wall clock.
+    // Wire the three fields that were previously computed and discarded (C3).
+    if (timing.time_to_first_content_token_ms > 0) {
+        usage->set_time_to_first_content_token_ms(timing.time_to_first_content_token_ms);
+    }
+    if (timing.content_tokens_per_second > 0.0) {
+        usage->set_content_tokens_per_second(timing.content_tokens_per_second);
+    }
+    usage->set_batch_buffered(timing.batch_buffered);
+    // Decode window is measured (first produced delta to last). When the
+    // backend batch-buffered, report wall as the honest decode_time_ms so
+    // consumers that only read decode_time_ms still see a usable figure;
+    // the batch_buffered flag on TokenUsage tells them which window it is.
     if (timing.batch_buffered || timing.decode_ms <= 0) {
         final_result.set_decode_time_ms(timing.wall_ms);
     } else {
@@ -2106,8 +2228,7 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
                           error_message, &final_result);
 }
 
-rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const char* finish_reason,
-                                 void* user_data) {
+rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const char* finish_reason, int32_t tokens_in_delta, void* user_data) {
     auto* ctx = static_cast<ProtoStreamContext*>(user_data);
     if (!ctx || !ctx->ref) {
         return RAC_FALSE;
@@ -2139,17 +2260,17 @@ rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const c
         return RAC_TRUE;
     }
 
-    // One engine delta = one token, timed HERE, at production. Doing it further
-    // down (at dispatch) makes the measurement depend on whether reasoning is
-    // visible to the caller, which is how TTFT came to mean "time to the first
-    // token after `</think>`" and inflated every rate derived from it.
+    // Timed HERE at production. Count via tokens_in_delta (may be >1 when the
+    // backend coalesces; 0 means the engine could not count this callback).
     const int64_t produced_ms = now_ms();
     if (ctx->timing.first_token_ms == 0) {
         ctx->timing.first_token_ms = produced_ms;
     }
     ctx->timing.last_token_ms = produced_ms;
-    ctx->timing.total_tokens += 1;
-    ctx->token_count = ctx->timing.total_tokens;
+    if (tokens_in_delta > 0) {
+        ctx->timing.total_tokens += tokens_in_delta;
+        ctx->token_count = ctx->timing.total_tokens;
+    }
 
     consume_thinking_aware_text(ctx, cleaned.c_str(), produced_ms);
     return RAC_TRUE;
@@ -2225,9 +2346,15 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
+    std::string structured_error;
     rac_llm_options_t options =
         options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
-                             history_storage, history_ptrs);
+                             history_storage, history_ptrs, &structured_error);
+    if (!structured_error.empty()) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          structured_error.c_str());
+    }
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -2268,7 +2395,7 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
         thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
         &response_len, &thinking, &thinking_len);
-    const std::string response_text =
+    std::string response_text =
         response ? std::string(response, response_len) : std::string();
     const std::string thinking_text =
         thinking ? std::string(thinking, thinking_len) : std::string();
@@ -2277,6 +2404,19 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
+    bool counts_estimated = false;
+    if (raw.prompt_tokens <= 0) {
+        raw.prompt_tokens = estimate_tokens(prompt.c_str());
+        counts_estimated = true;
+    }
+    if (raw.completion_tokens <= 0) {
+        raw.completion_tokens = clean_text.empty() ? 0 : estimate_tokens(clean_text.c_str());
+        raw.total_tokens = raw.prompt_tokens + raw.completion_tokens;
+        response_tokens = raw.completion_tokens;
+        counts_estimated = true;
+    } else if (raw.total_tokens <= 0) {
+        raw.total_tokens = raw.prompt_tokens + raw.completion_tokens;
+    }
     (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response_cstr, thinking_cstr,
                                         &thinking_tokens, &response_tokens);
 
@@ -2284,13 +2424,88 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     set_result_from_raw(ref, raw, response_cstr, response_text.size(), thinking_cstr,
                         thinking_text.size(), thinking_tokens, response_tokens, options.max_tokens,
                         &result);
-    set_structured_output_if_present(response_cstr, &result);
+    if (counts_estimated) {
+        result.mutable_usage()->set_counts_estimated(true);
+        if (result.has_performance() && result.performance().has_usage()) {
+            result.mutable_performance()->mutable_usage()->set_counts_estimated(true);
+        }
+    }
+
+    rac_structured_output_config_t structured_config = RAC_STRUCTURED_OUTPUT_DEFAULT;
+    std::string schema_storage;
+    bool want_repair = false;
+    if (request.has_options() && request.options().has_structured_output()) {
+        const auto& so = request.options().structured_output();
+        if (so.has_schema() && !so.schema().empty()) {
+            schema_storage = so.schema();
+            structured_config.json_schema = schema_storage.c_str();
+        }
+        structured_config.include_schema_in_prompt =
+            so.has_include_schema_in_prompt() ? (so.include_schema_in_prompt() ? RAC_TRUE : RAC_FALSE)
+                                              : RAC_TRUE;
+        want_repair = so.has_mode() &&
+                      so.mode() == runanywhere::v1::STRUCTURED_OUTPUT_MODE_REPAIR &&
+                      structured_config.json_schema != nullptr;
+    }
+    set_structured_output_if_present(
+        response_cstr, &result,
+        structured_config.json_schema ? &structured_config : nullptr);
+
+    // One-retry repair policy (commons-owned). Platform SDKs must not invent a
+    // second repair pass around generate().
+    if (want_repair && result.has_structured_output_validation() &&
+        !result.structured_output_validation().is_valid()) {
+        const std::string repair_prompt = rac::llm::structured_output_repair_prompt(
+            prompt, response_text, schema_storage);
+        const std::string effective_repair = rac::llm::apply_no_think_directive(
+            repair_prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
+        rac_llm_result_free(&raw);
+        raw = {};
+        const rac_result_t repair_rc =
+            (ref.ops && ref.ops->generate)
+                ? ref.ops->generate(ref.impl, effective_repair.c_str(), &options, &raw)
+                : RAC_ERROR_NOT_SUPPORTED;
+        if (repair_rc == RAC_SUCCESS) {
+            const std::string repair_clean =
+                rac::tokens::strip_special_tokens(raw.text ? raw.text : "");
+            response = nullptr;
+            response_len = 0;
+            thinking = nullptr;
+            thinking_len = 0;
+            (void)rac_llm_extract_thinking_with_tags(
+                repair_clean.c_str(),
+                thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+                thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+                &response_len, &thinking, &thinking_len);
+            response_text =
+                response ? std::string(response, response_len) : std::string();
+            const std::string repair_thinking =
+                thinking ? std::string(thinking, thinking_len) : std::string();
+            response_cstr = response_text.c_str();
+            thinking_tokens = 0;
+            response_tokens = raw.completion_tokens;
+            (void)rac_llm_split_thinking_tokens(
+                raw.completion_tokens, response_cstr,
+                repair_thinking.empty() ? nullptr : repair_thinking.c_str(), &thinking_tokens,
+                &response_tokens);
+            result.Clear();
+            set_result_from_raw(ref, raw, response_cstr, response_text.size(),
+                                repair_thinking.empty() ? nullptr : repair_thinking.c_str(),
+                                repair_thinking.size(), thinking_tokens, response_tokens,
+                                options.max_tokens, &result);
+            set_structured_output_if_present(response_cstr, &result, &structured_config,
+                                             /*repair_attempted=*/true,
+                                             /*repair_attempts=*/1);
+        }
+    } else if (result.has_structured_output_validation()) {
+        result.mutable_structured_output_validation()->set_repair_attempted(false);
+        result.mutable_structured_output_validation()->set_repair_attempts(0);
+    }
 
     publish_generation_event(
         runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, prompt.c_str(), nullptr, response_cstr,
         nullptr, ref.model_id, raw.completion_tokens,
-        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed,
-        raw.prompt_tokens > 0 ? raw.prompt_tokens : estimate_tokens(prompt.c_str()),
+        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed, raw.prompt_tokens,
         ref.framework_name, static_cast<double>(raw.tokens_per_second),
         static_cast<double>(raw.time_to_first_token_ms), options.temperature, options.max_tokens,
         lifecycle_context_length(ref), /*is_streaming=*/false,
@@ -2352,9 +2567,14 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
+    std::string structured_error;
     rac_llm_options_t options =
         options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
-                             history_storage, history_ptrs);
+                             history_storage, history_ptrs, &structured_error);
+    if (!structured_error.empty()) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -2362,13 +2582,15 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.user_data = user_data;
     ctx.ref = &ref;
     ctx.started_ms = now_ms();
-    ctx.prompt_tokens = estimate_tokens(prompt.c_str());
+    ctx.prompt_tokens = 0;
+    ctx.counts_estimated = true;
     ctx.emit_thoughts = request.has_options() && request.options().has_reasoning() &&
                         request.options().reasoning().include_in_output();
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();
+    bool template_prefills_open_tag = false;
     thinking_tags_from_request_or_model(request, ref, &ctx.thinking_open_tag,
-                                        &ctx.thinking_close_tag);
+                                        &ctx.thinking_close_tag, &template_prefills_open_tag);
     // A model-declared pair is tried first, with the built-ins kept behind it so
     // a model that ignores its own pattern still splits.
     if (!ctx.thinking_open_tag.empty() && !ctx.thinking_close_tag.empty()) {
@@ -2378,34 +2600,27 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
             pairs.push_back(std::move(builtin));
         }
         ctx.splitter.set_pairs(std::move(pairs));
-        // Reasoning chat templates such as Qwen/Bonsai/maple append the opening
-        // tag to the PROMPT and generate only the reasoning body plus the
-        // closing tag, so the stream can begin inside reasoning with nothing in
-        // the text to say so.
+        // Reasoning chat templates such as Qwen/Bonsai/maple may append the
+        // opening tag to the PROMPT and generate only the reasoning body plus
+        // the closing tag, so the stream can begin inside reasoning with nothing
+        // in the text to say so.
         //
-        // A declared pair does NOT prove that happened, and treating it as proof
-        // is a data-loss bug: `normalize_thinking_capability()` (model_registry)
-        // fills a default `<think>`/`</think>` pattern into EVERY model with
-        // `supports_thinking`, so the pair is a capability, not a statement about
-        // the template — the prefill itself lives in the model bundle's manifest
-        // (`gen_prefill`), which commons never sees and which has no field in
-        // idl/thinking_tag_pattern.proto. A reasoning-capable model that answers
-        // without reasoning on this turn produces no closing tag at all, and
-        // asserting "we started inside reasoning" routes its entire answer to
-        // the reasoning channel, which `emit_thoughts == false` then discards:
-        // zero deltas, empty text.
-        //
-        // So the pair arms a HOLD instead of an assertion. The splitter withholds
-        // answer-channel text until a delimiter settles the question, which is
-        // right either way it lands and is wrong in neither: when the model does
-        // reason, the hold ends at `</think>` and costs nothing (the text it
-        // covered was reasoning the caller was not going to be shown); when the
-        // model does not reason, the answer is delivered at end of stream —
-        // later than ideal, but complete, on the right channel, and never
-        // silently dropped. `disable_thinking` means no reasoning is coming, so
-        // there is nothing to hold for.
+        // A declared pair does NOT prove that happened: normalize_thinking_
+        // capability() fills a default `<think>`/`</think>` pattern into every
+        // model with supports_thinking, so the pair is a capability. The typed
+        // signal is ThinkingTagPattern.template_prefills_open_tag (plumbed from
+        // the qhexrt bundle's gen_prefill, or the DeepSeek-R1-Distill name
+        // heuristic). When that optional is true, assert start_inside_reasoning()
+        // — live answer deltas must not wait on a hold. When unset, arm the
+        // ambiguous HOLD: right when the model does reason (hold ends at
+        // `</think>`), and complete (if late) when it does not. disable_thinking
+        // means no reasoning is coming, so there is nothing to hold for.
         if (options.disable_thinking == RAC_FALSE) {
-            ctx.splitter.set_hold_ambiguous_prefix(true);
+            if (template_prefills_open_tag) {
+                ctx.splitter.start_inside_reasoning();
+            } else {
+                ctx.splitter.set_hold_ambiguous_prefix(true);
+            }
         }
     }
 
@@ -2432,6 +2647,20 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     } catch (...) {
         rac_error_set_details("Unknown C++ exception escaped LLM engine generate_stream");
         rc = RAC_ERROR_INFERENCE_FAILED;
+    }
+
+    // Prefer engine stream totals; else delta accumulation / estimate.
+    {
+        int32_t resolved_prompt = 0;
+        int32_t resolved_completion = 0;
+        bool estimated = true;
+        resolve_stream_token_counts(ref.ops, ref.impl, prompt.c_str(), ctx.raw_text.c_str(),
+                                    ctx.timing.total_tokens, &resolved_prompt, &resolved_completion,
+                                    &estimated);
+        ctx.prompt_tokens = resolved_prompt;
+        ctx.timing.total_tokens = resolved_completion;
+        ctx.token_count = resolved_completion;
+        ctx.counts_estimated = estimated;
     }
 
     const bool cancelled = rac::llm::lifecycle_llm_cancel_requested(&ref) ||
@@ -2590,9 +2819,15 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
+    std::string structured_error;
     rac_llm_options_t options = options_from_request(
         request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
-        history_ptrs);
+        history_ptrs, &structured_error);
+    if (!structured_error.empty()) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          structured_error.c_str());
+    }
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};

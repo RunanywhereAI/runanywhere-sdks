@@ -246,7 +246,7 @@ constexpr LoraAdapterConfig::ParseTableT_ LoraAdapterConfig::InternalGeneratePar
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(LoraAdapterConfig, _impl_.adapter_path_)}},
-      // optional float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
+      // optional float scale = 2;
       {::_pbi::TcParser::FastF32S1,
        {21, 2, 0,
         PROTOBUF_FIELD_OFFSET(LoraAdapterConfig, _impl_.scale_)}},
@@ -259,7 +259,7 @@ constexpr LoraAdapterConfig::ParseTableT_ LoraAdapterConfig::InternalGeneratePar
     }}, {{
       // optional string adapter_path = 1;
       {PROTOBUF_FIELD_OFFSET(LoraAdapterConfig, _impl_.adapter_path_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
+      // optional float scale = 2;
       {PROTOBUF_FIELD_OFFSET(LoraAdapterConfig, _impl_.scale_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // string adapter_id = 3 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(LoraAdapterConfig, _impl_.adapter_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -2483,60 +2483,60 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_lora_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\022lora_options.proto\022\016runanywhere.v1\032\014er"
-    "rors.proto\032\021rac_options.proto\"\200\001\n\021LoraAd"
-    "apterConfig\022\030\n\nadapter_id\030\003 \001(\tB\004\220\265\030\001\022\031\n"
-    "\014adapter_path\030\001 \001(\tH\000\210\001\001\022\033\n\005scale\030\002 \001(\002B"
-    "\007\212\265\030\0031.0H\001\210\001\001B\017\n\r_adapter_pathB\010\n\006_scale"
-    "\"\213\002\n\017LoraAdapterInfo\022\022\n\nadapter_id\030\001 \001(\t"
-    "\022\024\n\014adapter_path\030\002 \001(\t\022\r\n\005scale\030\003 \001(\002\022\017\n"
-    "\007applied\030\004 \001(\010\022\021\n\004rank\030\005 \001(\005H\000\210\001\001\022\022\n\005alp"
-    "ha\030\006 \001(\002H\001\210\001\001\022\027\n\nsize_bytes\030\007 \001(\003H\002\210\001\001\022\024"
-    "\n\014loaded_at_ms\030\010 \001(\003\022,\n\005error\030\t \001(\0132\030.ru"
-    "nanywhere.v1.SDKErrorH\003\210\001\001B\007\n\005_rankB\010\n\006_"
-    "alphaB\r\n\013_size_bytesB\010\n\006_error\"\273\001\n\027LoraA"
-    "dapterCatalogEntry\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002"
-    " \001(\t\022\031\n\021compatible_models\030\003 \003(\t\022#\n\rdefau"
-    "lt_scale\030\004 \001(\002B\007\212\265\030\0031.0H\000\210\001\001\022\014\n\004tags\030\005 \003"
-    "(\t\022\027\n\nlocal_path\030\006 \001(\tH\001\210\001\001B\020\n\016_default_"
-    "scaleB\r\n\013_local_path\"\321\001\n\027LoraAdapterCata"
-    "logQuery\022\027\n\nadapter_id\030\001 \001(\tH\000\210\001\001\022\025\n\010mod"
-    "el_id\030\002 \001(\tH\001\210\001\001\022\034\n\017downloaded_only\030\003 \001("
-    "\010H\002\210\001\001\022\031\n\014search_query\030\004 \001(\tH\003\210\001\001\022\014\n\004tag"
-    "s\030\005 \003(\tB\r\n\013_adapter_idB\013\n\t_model_idB\022\n\020_"
-    "downloaded_onlyB\017\n\r_search_query\"f\n\035Lora"
-    "AdapterCatalogListRequest\022;\n\005query\030\001 \001(\013"
-    "2\'.runanywhere.v1.LoraAdapterCatalogQuer"
-    "yH\000\210\001\001B\010\n\006_query\"\277\001\n\034LoraAdapterCatalogL"
-    "istResult\0228\n\007entries\030\001 \003(\0132\'.runanywhere"
-    ".v1.LoraAdapterCatalogEntry\022\023\n\013total_cou"
-    "nt\030\002 \001(\005\022\030\n\020downloaded_count\030\003 \001(\005\022,\n\005er"
-    "ror\030\004 \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001"
-    "B\010\n\006_error\"2\n\034LoraAdapterCatalogGetReque"
-    "st\022\022\n\nadapter_id\030\001 \001(\t\"\234\001\n\033LoraAdapterCa"
-    "talogGetResult\022\r\n\005found\030\001 \001(\010\0226\n\005entry\030\002"
-    " \001(\0132\'.runanywhere.v1.LoraAdapterCatalog"
-    "Entry\022,\n\005error\030\004 \001(\0132\030.runanywhere.v1.SD"
-    "KErrorH\000\210\001\001B\010\n\006_error\"\242\001\n\027LoraCompatibil"
-    "ityResult\022\025\n\ris_compatible\030\001 \001(\010\022 \n\023base"
-    "_model_required\030\002 \001(\tH\000\210\001\001\022,\n\005error\030\003 \001("
-    "\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001B\026\n\024_bas"
-    "e_model_requiredB\010\n\006_error\"r\n\020LoraApplyR"
-    "equest\022\022\n\nrequest_id\030\001 \001(\t\0223\n\010adapters\030\002"
-    " \003(\0132!.runanywhere.v1.LoraAdapterConfig\022"
-    "\025\n\rkeep_existing\030\003 \001(\010\"\220\001\n\017LoraApplyResu"
-    "lt\022\022\n\nrequest_id\030\001 \001(\t\0221\n\010adapters\030\002 \003(\013"
-    "2\037.runanywhere.v1.LoraAdapterInfo\022,\n\005err"
-    "or\030\006 \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001B"
-    "\010\n\006_error\";\n\021LoraRemoveRequest\022\023\n\013adapte"
-    "r_ids\030\001 \003(\t\022\021\n\tclear_all\030\002 \001(\010\"\253\001\n\tLoraS"
-    "tate\0228\n\017loaded_adapters\030\001 \003(\0132\037.runanywh"
-    "ere.v1.LoraAdapterInfo\022\032\n\rbase_model_id\030"
-    "\002 \001(\tH\000\210\001\001\022,\n\005error\030\003 \001(\0132\030.runanywhere."
-    "v1.SDKErrorH\001\210\001\001B\020\n\016_base_model_idB\010\n\006_e"
-    "rrorB\213\001\n\027ai.runanywhere.proto.v1B\020LoraOp"
-    "tionsProtoP\001Z<github.com/runanywhere/run"
-    "anywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004"
-    "RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "rors.proto\032\021rac_options.proto\"w\n\021LoraAda"
+    "pterConfig\022\030\n\nadapter_id\030\003 \001(\tB\004\220\265\030\001\022\031\n\014"
+    "adapter_path\030\001 \001(\tH\000\210\001\001\022\022\n\005scale\030\002 \001(\002H\001"
+    "\210\001\001B\017\n\r_adapter_pathB\010\n\006_scale\"\213\002\n\017LoraA"
+    "dapterInfo\022\022\n\nadapter_id\030\001 \001(\t\022\024\n\014adapte"
+    "r_path\030\002 \001(\t\022\r\n\005scale\030\003 \001(\002\022\017\n\007applied\030\004"
+    " \001(\010\022\021\n\004rank\030\005 \001(\005H\000\210\001\001\022\022\n\005alpha\030\006 \001(\002H\001"
+    "\210\001\001\022\027\n\nsize_bytes\030\007 \001(\003H\002\210\001\001\022\024\n\014loaded_a"
+    "t_ms\030\010 \001(\003\022,\n\005error\030\t \001(\0132\030.runanywhere."
+    "v1.SDKErrorH\003\210\001\001B\007\n\005_rankB\010\n\006_alphaB\r\n\013_"
+    "size_bytesB\010\n\006_error\"\273\001\n\027LoraAdapterCata"
+    "logEntry\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\031\n\021co"
+    "mpatible_models\030\003 \003(\t\022#\n\rdefault_scale\030\004"
+    " \001(\002B\007\212\265\030\0031.0H\000\210\001\001\022\014\n\004tags\030\005 \003(\t\022\027\n\nloca"
+    "l_path\030\006 \001(\tH\001\210\001\001B\020\n\016_default_scaleB\r\n\013_"
+    "local_path\"\321\001\n\027LoraAdapterCatalogQuery\022\027"
+    "\n\nadapter_id\030\001 \001(\tH\000\210\001\001\022\025\n\010model_id\030\002 \001("
+    "\tH\001\210\001\001\022\034\n\017downloaded_only\030\003 \001(\010H\002\210\001\001\022\031\n\014"
+    "search_query\030\004 \001(\tH\003\210\001\001\022\014\n\004tags\030\005 \003(\tB\r\n"
+    "\013_adapter_idB\013\n\t_model_idB\022\n\020_downloaded"
+    "_onlyB\017\n\r_search_query\"f\n\035LoraAdapterCat"
+    "alogListRequest\022;\n\005query\030\001 \001(\0132\'.runanyw"
+    "here.v1.LoraAdapterCatalogQueryH\000\210\001\001B\010\n\006"
+    "_query\"\277\001\n\034LoraAdapterCatalogListResult\022"
+    "8\n\007entries\030\001 \003(\0132\'.runanywhere.v1.LoraAd"
+    "apterCatalogEntry\022\023\n\013total_count\030\002 \001(\005\022\030"
+    "\n\020downloaded_count\030\003 \001(\005\022,\n\005error\030\004 \001(\0132"
+    "\030.runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006_error"
+    "\"2\n\034LoraAdapterCatalogGetRequest\022\022\n\nadap"
+    "ter_id\030\001 \001(\t\"\234\001\n\033LoraAdapterCatalogGetRe"
+    "sult\022\r\n\005found\030\001 \001(\010\0226\n\005entry\030\002 \001(\0132\'.run"
+    "anywhere.v1.LoraAdapterCatalogEntry\022,\n\005e"
+    "rror\030\004 \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001"
+    "\001B\010\n\006_error\"\242\001\n\027LoraCompatibilityResult\022"
+    "\025\n\ris_compatible\030\001 \001(\010\022 \n\023base_model_req"
+    "uired\030\002 \001(\tH\000\210\001\001\022,\n\005error\030\003 \001(\0132\030.runany"
+    "where.v1.SDKErrorH\001\210\001\001B\026\n\024_base_model_re"
+    "quiredB\010\n\006_error\"r\n\020LoraApplyRequest\022\022\n\n"
+    "request_id\030\001 \001(\t\0223\n\010adapters\030\002 \003(\0132!.run"
+    "anywhere.v1.LoraAdapterConfig\022\025\n\rkeep_ex"
+    "isting\030\003 \001(\010\"\220\001\n\017LoraApplyResult\022\022\n\nrequ"
+    "est_id\030\001 \001(\t\0221\n\010adapters\030\002 \003(\0132\037.runanyw"
+    "here.v1.LoraAdapterInfo\022,\n\005error\030\006 \001(\0132\030"
+    ".runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006_error\""
+    ";\n\021LoraRemoveRequest\022\023\n\013adapter_ids\030\001 \003("
+    "\t\022\021\n\tclear_all\030\002 \001(\010\"\253\001\n\tLoraState\0228\n\017lo"
+    "aded_adapters\030\001 \003(\0132\037.runanywhere.v1.Lor"
+    "aAdapterInfo\022\032\n\rbase_model_id\030\002 \001(\tH\000\210\001\001"
+    "\022,\n\005error\030\003 \001(\0132\030.runanywhere.v1.SDKErro"
+    "rH\001\210\001\001B\020\n\016_base_model_idB\010\n\006_errorB\213\001\n\027a"
+    "i.runanywhere.proto.v1B\020LoraOptionsProto"
+    "P\001Z<github.com/runanywhere/runanywhere-s"
+    "dks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Run"
+    "anywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_lora_5foptions_2eproto_deps[2] = {
@@ -2547,7 +2547,7 @@ static ::absl::once_flag descriptor_table_lora_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_lora_5foptions_2eproto = {
     false,
     false,
-    2194,
+    2184,
     descriptor_table_protodef_lora_5foptions_2eproto,
     "lora_options.proto",
     &descriptor_table_lora_5foptions_2eproto_once,
@@ -2701,7 +2701,7 @@ PROTOBUF_NOINLINE void LoraAdapterConfig::Clear() {
     target = stream->WriteStringMaybeAliased(1, _s, target);
   }
 
-  // optional float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
+  // optional float scale = 2;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteFloatToArray(

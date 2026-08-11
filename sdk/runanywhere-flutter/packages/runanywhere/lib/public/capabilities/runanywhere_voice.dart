@@ -240,11 +240,11 @@ class RunAnywhereVoice {
   ///
   /// The C ABI owns NO microphone (rac_voice_agent.h audio-ingress contract):
   /// subscribing to the handle callback alone is dead air. While this stream is
-  /// collected, a [VoiceAgentMicDriver] captures mic audio, segments utterances
-  /// by energy endpointing, and drives per-utterance turns through
-  /// `rac_voice_agent_process_turn_proto`; their VoiceEvents are forwarded here
-  /// and the synthesized reply is played back. Mirrors Kotlin
-  /// `RunAnywhere.streamVoiceAgent()` (mic driver + event fan-out).
+  /// collected, a [VoiceAgentMicDriver] captures mic audio and feeds raw frames
+  /// through `rac_voice_agent_feed_audio_proto` (commons owns segmentation);
+  /// VoiceEvents fan out via the proto callback and the synthesized reply is
+  /// played back. Mirrors Kotlin `RunAnywhere.streamVoiceAgent()` (mic driver +
+  /// event fan-out).
   ///
   /// Call [initializeWithLoadedModels] first. Cancelling the subscription stops
   /// capture/playback and tears the turn pipeline down.

@@ -39,7 +39,7 @@ static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGener
 static func generateStream(prompt: String, options: RALLMGenerationOptions? = nil) async throws -> AsyncStream<RALLMStreamEvent>
 static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent>
 static func cancelGeneration() async
-static func aggregateStream(prompt: String, events: AsyncStream<RALLMStreamEvent>, onThinking: ((String) async -> Void)? = nil, onToken: ((String) async -> Void)? = nil) async -> RALLMGenerationResult
+// Collect RunAnywhere.llm.generateStream and read GenerationEvent.completed — aggregateStream deleted (D3)
 static var webSearchToolDefinition: RAToolDefinition       // [SWIFT-ONLY]
 static func registerWebSearchTool() async                  // [SWIFT-ONLY]
 

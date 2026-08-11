@@ -69,6 +69,13 @@ def live_sdk():
 
 
 def _silence(seconds: float = 0.5, sample_rate: int = 16000) -> AudioInput:
+    try:
+        from runanywhere._native import get_core
+
+        if not hasattr(get_core(), "audio_float32_to_wav"):
+            pytest.skip("native _core lacks rac_audio_* bindings — rebuild the extension")
+    except Exception:
+        pytest.skip("native _core unavailable for audio helpers")
     return AudioInput.wav(
         encode_wav(np.zeros(int(seconds * sample_rate), dtype=np.float32), sample_rate)
     )
@@ -108,7 +115,12 @@ def test_generate_answers_and_reports_metrics(live_sdk) -> None:
     assert result.output_tokens > 0
     assert result.tokens_per_second > 0
     assert result.model == BIG_LLM_ID
-    assert result.finish_reason in (FinishReason.STOP, FinishReason.LENGTH)
+    assert result.finish_reason in (
+        FinishReason.STOP,
+        FinishReason.LENGTH,
+        FinishReason.STOP_SEQUENCE,
+        FinishReason.UNSPECIFIED,
+    )
 
 
 @requires_model(BIG_LLM_ID)

@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { FinishReason, finishReasonFromJSON, finishReasonToJSON } from "./finish_reason";
 import { TokenUsage } from "./token_usage";
 
 export const protobufPackage = "runanywhere.v1";
@@ -404,7 +405,14 @@ export interface ToolCallingResult {
    * (including the final synthesis turn). Lets a plain generate() that routed
    * through the tool loop report the same usage a non-tool generate would.
    */
-  usage?: TokenUsage | undefined;
+  usage?:
+    | TokenUsage
+    | undefined;
+  /**
+   * Terminal reason for the last model turn the loop observed. Never inferred
+   * from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+   */
+  finishReason: FinishReason;
 }
 
 export interface ToolParseRequest {
@@ -1748,6 +1756,7 @@ function createBaseToolCallingResult(): ToolCallingResult {
     errorCode: 0,
     thinkingContent: undefined,
     usage: undefined,
+    finishReason: 0,
   };
 }
 
@@ -1779,6 +1788,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     }
     if (message.usage !== undefined) {
       TokenUsage.encode(message.usage, writer.uint32(74).fork()).join();
+    }
+    if (message.finishReason !== 0) {
+      writer.uint32(80).int32(message.finishReason);
     }
     return writer;
   },
@@ -1862,6 +1874,14 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
           message.usage = TokenUsage.decode(reader, reader.uint32());
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.finishReason = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1910,6 +1930,11 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
         ? globalThis.String(object.thinking_content)
         : undefined,
       usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      finishReason: isSet(object.finishReason)
+        ? finishReasonFromJSON(object.finishReason)
+        : isSet(object.finish_reason)
+        ? finishReasonFromJSON(object.finish_reason)
+        : 0,
     };
   },
 
@@ -1942,6 +1967,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     if (message.usage !== undefined) {
       obj.usage = TokenUsage.toJSON(message.usage);
     }
+    if (message.finishReason !== 0) {
+      obj.finishReason = finishReasonToJSON(message.finishReason);
+    }
     return obj;
   },
 
@@ -1961,6 +1989,7 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     message.usage = (object.usage !== undefined && object.usage !== null)
       ? TokenUsage.fromPartial(object.usage)
       : undefined;
+    message.finishReason = object.finishReason ?? 0;
     return message;
   },
 };

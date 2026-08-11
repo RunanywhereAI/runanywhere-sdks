@@ -89,6 +89,27 @@ export type DownloadEvent = CanonicalDownloadEvent<
     bytesDone: number;
     bytesTotal: number;
     file?: string;
+    /**
+     * Throughput from the C++ orchestrator. Absent when not yet measured —
+     * never a zero standing in for unknown.
+     */
+    bytesPerSecond?: number;
+    /**
+     * Projected seconds remaining from commons. Absent when the total size
+     * or the rate is unknown.
+     */
+    etaSeconds?: number;
+    /** 0 on the first attempt. Above 0 means the transfer recovered. */
+    retryAttempt?: number;
+    /**
+     * 0..1 across every file in the plan. Absent until commons reports a
+     * positive value — never re-derived from bytes locally.
+     */
+    overallProgress?: number;
+    /** 0-based position in the planned file list. */
+    currentFileIndex?: number;
+    /** Files in the plan. 1 for a single-file model. */
+    totalFiles?: number;
   }
 >;
 

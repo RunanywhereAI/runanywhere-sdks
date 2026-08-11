@@ -72,11 +72,14 @@ import {
   generateWithTools,
 } from '@runanywhere/core';
 import type {
+  FinishReason,
   GenerationResult,
   LlmOptions,
   ReasoningOptions,
   ToolCallingResult,
 } from '@runanywhere/core';
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import {
   ToolCallingExecutionPolicy,
   ToolCallingModelPolicy,
@@ -89,7 +92,49 @@ import {
 import { logDiagnostic } from '../utils/diagnostics';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
-import type { ToolCallInfo } from '../types/chat';
+import type { MessageAnalytics, ToolCallInfo } from '../types/chat';
+
+/**
+ * Map public GenerationResult fields that already come from commons TokenUsage.
+ * Prefill / content-rate / batchBuffered / countsEstimated are not on the
+ * public surface — omit them (proto defaults via fromPartial), never invent.
+ */
+function usageFromGenerationResult(
+  result: GenerationResult | null | undefined
+): TokenUsage | undefined {
+  if (!result) return undefined;
+  return TokenUsage.fromPartial({
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    totalTokens: result.inputTokens + result.outputTokens,
+    decodeTokensPerSecond: result.tokensPerSecond,
+    ttftMs: result.timeToFirstTokenMs,
+  });
+}
+
+/** Analytics shell from terminal commons metrics only — no wall-clock latency. */
+function analyticsFromResult(
+  result: GenerationResult | null | undefined,
+  extras: Pick<
+    MessageAnalytics,
+    'completionStatus' | 'wasThinkingMode' | 'wasInterrupted' | 'retryCount'
+  >
+): MessageAnalytics {
+  const usage = usageFromGenerationResult(result);
+  return {
+    performance: {
+      // generationTimeMs is not on public GenerationResult — leave 0, do not
+      // substitute Date.now() wall latency.
+      latencyMs: 0,
+      memoryBytes: 0,
+      ...(usage ? { usage } : {}),
+    },
+    ...(result && result.timeToFirstTokenMs > 0
+      ? { timeToFirstToken: result.timeToFirstTokenMs }
+      : {}),
+    ...extras,
+  };
+}
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -116,6 +161,23 @@ function makeToolCallInfo(result: ToolCallingResult): ToolCallInfo | undefined {
   };
 }
 
+/** Map commons `FinishReason` onto the public union — never invent from toolCalls.length. */
+function mapToolFinishReason(raw: ProtoFinishReason): FinishReason {
+  switch (raw) {
+    case ProtoFinishReason.FINISH_REASON_TOOL_CALLS:
+      return 'toolCalls';
+    case ProtoFinishReason.FINISH_REASON_LENGTH:
+    case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+      return 'length';
+    case ProtoFinishReason.FINISH_REASON_CANCELLED:
+      return 'cancelled';
+    case ProtoFinishReason.FINISH_REASON_ERROR:
+      return 'unknown';
+    default:
+      return 'stop';
+  }
+}
+
 // Map the explicit tool-loop result onto the GenerationResult the finalizer
 // already knows how to render.
 function toGenerationResult(
@@ -126,7 +188,7 @@ function toGenerationResult(
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: result.toolCalls,
-    finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
+    finishReason: mapToolFinishReason(result.finishReason),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: result.usage?.ttftMs ?? 0,
@@ -480,7 +542,6 @@ export const ChatScreen: React.FC = () => {
           : options.thinkingModeEnabled
             ? { mode: 'on', includeInOutput: true }
             : { mode: 'off' };
-        const generationStartMs = Date.now();
         wasStoppedRef.current = false;
 
         const llmOptions: LlmOptions = {
@@ -616,8 +677,7 @@ export const ChatScreen: React.FC = () => {
         }
 
         const wasStopped = wasStoppedRef.current;
-        const finalContent =
-          result?.text || streamedText || '(No response generated)';
+        const finalContent = result?.text || streamedText;
         const thinkingContent = result?.thinkingText || streamedThoughts;
 
         // Build the final message with analytics and persist to disk once
@@ -625,30 +685,17 @@ export const ChatScreen: React.FC = () => {
         const finalMessage: Message = {
           id: assistantMessageId,
           role: MessageRole.Assistant,
-          content: finalContent,
+          content: finalContent || '—',
           ...(thinkingContent ? { thinkingContent } : {}),
           timestamp: new Date(),
           modelInfo: messageModelInfo,
           ...(toolCallInfo ? { toolCallInfo } : {}),
-          analytics: {
-            performance: {
-              latencyMs: Date.now() - generationStartMs,
-              memoryBytes: 0,
-              usage: {
-                inputTokens: result?.inputTokens ?? 0,
-                outputTokens: result?.outputTokens ?? 0,
-                totalTokens: (result?.inputTokens ?? 0) + (result?.outputTokens ?? 0),
-                decodeTokensPerSecond: result?.tokensPerSecond ?? 0,
-                prefillMs: 0,
-                ttftMs: result?.timeToFirstTokenMs ?? 0,
-              },
-            },
-            ...(result ? { timeToFirstToken: result.timeToFirstTokenMs } : {}),
+          analytics: analyticsFromResult(result, {
             completionStatus: wasStopped ? 'interrupted' : 'completed',
             wasThinkingMode,
             wasInterrupted: wasStopped,
             retryCount: 0,
-          },
+          }),
         };
 
         // Apply analytics fields in-memory first, then persist once.
@@ -676,24 +723,12 @@ export const ChatScreen: React.FC = () => {
           role: MessageRole.Assistant,
           content: errorContent,
           timestamp: new Date(),
-          analytics: {
-            performance: {
-              latencyMs: 0,
-              memoryBytes: 0,
-              usage: {
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                decodeTokensPerSecond: 0,
-                prefillMs: 0,
-                ttftMs: 0,
-              },
-            },
+          analytics: analyticsFromResult(null, {
             completionStatus: wasStopped ? 'interrupted' : 'error',
             wasThinkingMode: false,
             wasInterrupted: wasStopped,
             retryCount: 0,
-          },
+          }),
         };
         if (assistantMessageInserted) {
           updateMessage(errorMessage, currentConversation.id);

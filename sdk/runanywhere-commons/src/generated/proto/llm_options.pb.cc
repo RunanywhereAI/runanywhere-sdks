@@ -1183,7 +1183,7 @@ const ::_pbi::ClassData* LLMConfiguration_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_llm_5foptions_2eproto[2];
+    file_level_enum_descriptors_llm_5foptions_2eproto[1];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_llm_5foptions_2eproto = nullptr;
 const ::uint32_t
@@ -1321,88 +1321,85 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_llm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021llm_options.proto\022\016runanywhere.v1\032\014err"
-    "ors.proto\032\021model_types.proto\032\021rac_option"
-    "s.proto\032\027structured_output.proto\032\032thinki"
-    "ng_tag_pattern.proto\032\021token_usage.proto\032"
-    "\022tool_calling.proto\"\253\010\n\024LLMGenerationOpt"
-    "ions\022+\n\021max_output_tokens\030\001 \001(\005B\013\212\265\030\003512"
-    "\240\265\030\000H\000\210\001\001\0227\n\013temperature\030\002 \001(\002B\035\212\265\030\0030.7\261"
-    "\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@H\001\210\001\001\0221\n\005top_p\030\003 \001("
-    "\002B\035\212\265\030\0031.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?H\002\210\001\001\022\036\n"
-    "\005top_k\030\004 \001(\005B\n\212\265\030\00240\240\265\030\000H\003\210\001\001\022/\n\016repeat_"
-    "penalty\030\005 \001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000H\004\210\001\001\022\026"
-    "\n\016stop_sequences\030\006 \003(\t\022\?\n\023preferred_fram"
-    "ework\030\010 \001(\0162\".runanywhere.v1.InferenceFr"
-    "amework\022\032\n\rsystem_prompt\030\t \001(\tH\005\210\001\001\0228\n\tr"
-    "easoning\030\013 \001(\0132 .runanywhere.v1.Reasonin"
-    "gOptionsH\006\210\001\001\022>\n\020execution_target\030\014 \001(\0162"
-    "\037.runanywhere.v1.ExecutionTargetH\007\210\001\001\022G\n"
-    "\021structured_output\030\r \001(\0132\'.runanywhere.v"
-    "1.StructuredOutputOptionsH\010\210\001\001\022\030\n\004seed\030\017"
-    " \001(\003B\005\212\265\030\0010H\t\210\001\001\022\'\n\021frequency_penalty\030\020 "
-    "\001(\002B\007\212\265\030\0030.0H\n\210\001\001\022&\n\020presence_penalty\030\021 "
-    "\001(\002B\007\212\265\030\0030.0H\013\210\001\001\022\034\n\rrepeat_last_n\030\022 \001(\005"
-    "B\005\212\265\030\0010\022\034\n\005min_p\030\023 \001(\002B\010\212\265\030\0040.05H\014\210\001\001\022\023\n"
-    "\013echo_prompt\030\026 \001(\010\022=\n\014tool_calling\030\030 \001(\013"
-    "2\".runanywhere.v1.ToolCallingOptionsH\r\210\001"
-    "\001B\024\n\022_max_output_tokensB\016\n\014_temperatureB"
-    "\010\n\006_top_pB\010\n\006_top_kB\021\n\017_repeat_penaltyB\020"
-    "\n\016_system_promptB\014\n\n_reasoningB\023\n\021_execu"
-    "tion_targetB\024\n\022_structured_outputB\007\n\005_se"
-    "edB\024\n\022_frequency_penaltyB\023\n\021_presence_pe"
-    "naltyB\010\n\006_min_pB\017\n\r_tool_callingJ\004\010\027\020\030R\t"
-    "n_threads\"\231\007\n\023LLMGenerationResult\022\014\n\004tex"
-    "t\030\001 \001(\t\022\035\n\020thinking_content\030\002 \001(\tH\000\210\001\001\022\022"
-    "\n\nmodel_used\030\005 \001(\t\022\032\n\022generation_time_ms"
-    "\030\006 \001(\001\022\026\n\tframework\030\t \001(\tH\001\210\001\001\022\027\n\017thinki"
-    "ng_tokens\030\013 \001(\005\022\027\n\017response_tokens\030\014 \001(\005"
-    "\022\030\n\013json_output\030\r \001(\tH\002\210\001\001\0223\n\rfinish_rea"
-    "son\030\033 \001(\0162\034.runanywhere.v1.FinishReason\022"
-    "\032\n\rstop_sequence\030\034 \001(\tH\003\210\001\001\022<\n\013performan"
-    "ce\030\016 \001(\0132\".runanywhere.v1.PerformanceMet"
-    "ricsH\004\210\001\001\0229\n\013executed_on\030\017 \001(\0162\037.runanyw"
-    "here.v1.ExecutionTargetH\005\210\001\001\022U\n\034structur"
-    "ed_output_validation\030\020 \001(\0132*.runanywhere"
-    ".v1.StructuredOutputValidationH\006\210\001\001\022\034\n\024c"
-    "ached_prompt_tokens\030\024 \001(\005\022\033\n\023prompt_eval"
-    "_time_ms\030\025 \001(\003\022\026\n\016decode_time_ms\030\026 \001(\003\022,"
-    "\n\ntool_calls\030\027 \003(\0132\030.runanywhere.v1.Tool"
-    "Call\0220\n\014tool_results\030\030 \003(\0132\032.runanywhere"
-    ".v1.ToolResult\022)\n\005usage\030\031 \001(\0132\032.runanywh"
-    "ere.v1.TokenUsage\022,\n\005error\030\032 \001(\0132\030.runan"
-    "ywhere.v1.SDKErrorH\007\210\001\001B\023\n\021_thinking_con"
-    "tentB\014\n\n_frameworkB\016\n\014_json_outputB\020\n\016_s"
-    "top_sequenceB\016\n\014_performanceB\016\n\014_execute"
-    "d_onB\037\n\035_structured_output_validationB\010\n"
-    "\006_errorJ\004\010\n\020\013\"\216\002\n\020LLMConfiguration\022 \n\016co"
-    "ntext_length\030\001 \001(\005B\010\212\265\030\0042048\022\025\n\010model_id"
-    "\030\006 \001(\tH\000\210\001\001\022D\n\023preferred_framework\030\007 \001(\016"
-    "2\".runanywhere.v1.InferenceFrameworkH\001\210\001"
-    "\001\022B\n\017default_options\030\010 \001(\0132$.runanywhere"
-    ".v1.LLMGenerationOptionsH\002\210\001\001B\013\n\t_model_"
-    "idB\026\n\024_preferred_frameworkB\022\n\020_default_o"
-    "ptions\"@\n\013StreamToken\022\014\n\004text\030\001 \001(\t\022\024\n\014t"
-    "imestamp_ms\030\002 \001(\003\022\r\n\005index\030\003 \001(\005\"i\n\022Perf"
-    "ormanceMetrics\022\022\n\nlatency_ms\030\001 \001(\003\022\024\n\014me"
-    "mory_bytes\030\002 \001(\003\022)\n\005usage\030\006 \001(\0132\032.runany"
-    "where.v1.TokenUsage*\370\001\n\014FinishReason\022\035\n\031"
-    "FINISH_REASON_UNSPECIFIED\020\000\022\026\n\022FINISH_RE"
-    "ASON_STOP\020\001\022\030\n\024FINISH_REASON_LENGTH\020\002\022\037\n"
-    "\033FINISH_REASON_STOP_SEQUENCE\020\003\022\034\n\030FINISH"
-    "_REASON_TOOL_CALLS\020\004\022\033\n\027FINISH_REASON_CA"
-    "NCELLED\020\005\022\"\n\036FINISH_REASON_CONTEXT_OVERF"
-    "LOW\020\006\022\027\n\023FINISH_REASON_ERROR\020\007*\212\001\n\017Execu"
-    "tionTarget\022 \n\034EXECUTION_TARGET_UNSPECIFI"
-    "ED\020\000\022\036\n\032EXECUTION_TARGET_ON_DEVICE\020\001\022\032\n\026"
-    "EXECUTION_TARGET_CLOUD\020\002\022\031\n\025EXECUTION_TA"
-    "RGET_AUTO\020\003B\212\001\n\027ai.runanywhere.proto.v1B"
-    "\017LLMOptionsProtoP\001Z<github.com/runanywhe"
-    "re/runanywhere-sdks/idl/v1;runanywherev1"
-    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "ors.proto\032\023finish_reason.proto\032\021model_ty"
+    "pes.proto\032\021rac_options.proto\032\027structured"
+    "_output.proto\032\032thinking_tag_pattern.prot"
+    "o\032\021token_usage.proto\032\022tool_calling.proto"
+    "\"\253\010\n\024LLMGenerationOptions\022+\n\021max_output_"
+    "tokens\030\001 \001(\005B\013\212\265\030\003512\240\265\030\000H\000\210\001\001\0227\n\013temper"
+    "ature\030\002 \001(\002B\035\212\265\030\0030.7\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000"
+    "\000@H\001\210\001\001\0221\n\005top_p\030\003 \001(\002B\035\212\265\030\0031.0\261\265\030\000\000\000\000\000\000"
+    "\000\000\271\265\030\000\000\000\000\000\000\360\?H\002\210\001\001\022\036\n\005top_k\030\004 \001(\005B\n\212\265\030\0024"
+    "0\240\265\030\000H\003\210\001\001\022/\n\016repeat_penalty\030\005 \001(\002B\022\212\265\030\003"
+    "1.1\261\265\030\000\000\000\000\000\000\000\000H\004\210\001\001\022\026\n\016stop_sequences\030\006 "
+    "\003(\t\022\?\n\023preferred_framework\030\010 \001(\0162\".runan"
+    "ywhere.v1.InferenceFramework\022\032\n\rsystem_p"
+    "rompt\030\t \001(\tH\005\210\001\001\0228\n\treasoning\030\013 \001(\0132 .ru"
+    "nanywhere.v1.ReasoningOptionsH\006\210\001\001\022>\n\020ex"
+    "ecution_target\030\014 \001(\0162\037.runanywhere.v1.Ex"
+    "ecutionTargetH\007\210\001\001\022G\n\021structured_output\030"
+    "\r \001(\0132\'.runanywhere.v1.StructuredOutputO"
+    "ptionsH\010\210\001\001\022\030\n\004seed\030\017 \001(\003B\005\212\265\030\0010H\t\210\001\001\022\'\n"
+    "\021frequency_penalty\030\020 \001(\002B\007\212\265\030\0030.0H\n\210\001\001\022&"
+    "\n\020presence_penalty\030\021 \001(\002B\007\212\265\030\0030.0H\013\210\001\001\022\034"
+    "\n\rrepeat_last_n\030\022 \001(\005B\005\212\265\030\0010\022\034\n\005min_p\030\023 "
+    "\001(\002B\010\212\265\030\0040.05H\014\210\001\001\022\023\n\013echo_prompt\030\026 \001(\010\022"
+    "=\n\014tool_calling\030\030 \001(\0132\".runanywhere.v1.T"
+    "oolCallingOptionsH\r\210\001\001B\024\n\022_max_output_to"
+    "kensB\016\n\014_temperatureB\010\n\006_top_pB\010\n\006_top_k"
+    "B\021\n\017_repeat_penaltyB\020\n\016_system_promptB\014\n"
+    "\n_reasoningB\023\n\021_execution_targetB\024\n\022_str"
+    "uctured_outputB\007\n\005_seedB\024\n\022_frequency_pe"
+    "naltyB\023\n\021_presence_penaltyB\010\n\006_min_pB\017\n\r"
+    "_tool_callingJ\004\010\027\020\030R\tn_threads\"\303\007\n\023LLMGe"
+    "nerationResult\022\014\n\004text\030\001 \001(\t\022\035\n\020thinking"
+    "_content\030\002 \001(\tH\000\210\001\001\022\022\n\nmodel_used\030\005 \001(\t\022"
+    "\032\n\022generation_time_ms\030\006 \001(\001\022\026\n\tframework"
+    "\030\t \001(\tH\001\210\001\001\022\027\n\017thinking_tokens\030\013 \001(\005\022\027\n\017"
+    "response_tokens\030\014 \001(\005\022\030\n\013json_output\030\r \001"
+    "(\tH\002\210\001\001\0223\n\rfinish_reason\030\033 \001(\0162\034.runanyw"
+    "here.v1.FinishReason\022\032\n\rstop_sequence\030\034 "
+    "\001(\tH\003\210\001\001\022<\n\013performance\030\016 \001(\0132\".runanywh"
+    "ere.v1.PerformanceMetricsH\004\210\001\001\0229\n\013execut"
+    "ed_on\030\017 \001(\0162\037.runanywhere.v1.ExecutionTa"
+    "rgetH\005\210\001\001\022U\n\034structured_output_validatio"
+    "n\030\020 \001(\0132*.runanywhere.v1.StructuredOutpu"
+    "tValidationH\006\210\001\001\022\034\n\024cached_prompt_tokens"
+    "\030\024 \001(\005\022\033\n\023prompt_eval_time_ms\030\025 \001(\003\022\026\n\016d"
+    "ecode_time_ms\030\026 \001(\003\022,\n\ntool_calls\030\027 \003(\0132"
+    "\030.runanywhere.v1.ToolCall\0220\n\014tool_result"
+    "s\030\030 \003(\0132\032.runanywhere.v1.ToolResult\022)\n\005u"
+    "sage\030\031 \001(\0132\032.runanywhere.v1.TokenUsage\022,"
+    "\n\005error\030\032 \001(\0132\030.runanywhere.v1.SDKErrorH"
+    "\007\210\001\001B\023\n\021_thinking_contentB\014\n\n_frameworkB"
+    "\016\n\014_json_outputB\020\n\016_stop_sequenceB\016\n\014_pe"
+    "rformanceB\016\n\014_executed_onB\037\n\035_structured"
+    "_output_validationB\010\n\006_errorJ\004\010\003\020\004J\004\010\004\020\005"
+    "J\004\010\007\020\010J\004\010\010\020\tJ\004\010\021\020\022J\004\010\022\020\023J\004\010\023\020\024J\004\010\n\020\013\"\216\002\n"
+    "\020LLMConfiguration\022 \n\016context_length\030\001 \001("
+    "\005B\010\212\265\030\0042048\022\025\n\010model_id\030\006 \001(\tH\000\210\001\001\022D\n\023pr"
+    "eferred_framework\030\007 \001(\0162\".runanywhere.v1"
+    ".InferenceFrameworkH\001\210\001\001\022B\n\017default_opti"
+    "ons\030\010 \001(\0132$.runanywhere.v1.LLMGeneration"
+    "OptionsH\002\210\001\001B\013\n\t_model_idB\026\n\024_preferred_"
+    "frameworkB\022\n\020_default_options\"@\n\013StreamT"
+    "oken\022\014\n\004text\030\001 \001(\t\022\024\n\014timestamp_ms\030\002 \001(\003"
+    "\022\r\n\005index\030\003 \001(\005\"{\n\022PerformanceMetrics\022\022\n"
+    "\nlatency_ms\030\001 \001(\003\022\024\n\014memory_bytes\030\002 \001(\003\022"
+    ")\n\005usage\030\006 \001(\0132\032.runanywhere.v1.TokenUsa"
+    "geJ\004\010\003\020\004J\004\010\004\020\005J\004\010\005\020\006*\212\001\n\017ExecutionTarget"
+    "\022 \n\034EXECUTION_TARGET_UNSPECIFIED\020\000\022\036\n\032EX"
+    "ECUTION_TARGET_ON_DEVICE\020\001\022\032\n\026EXECUTION_"
+    "TARGET_CLOUD\020\002\022\031\n\025EXECUTION_TARGET_AUTO\020"
+    "\003B\212\001\n\027ai.runanywhere.proto.v1B\017LLMOption"
+    "sProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_llm_5foptions_2eproto_deps[7] = {
+    descriptor_table_llm_5foptions_2eproto_deps[8] = {
         &::descriptor_table_errors_2eproto,
+        &::descriptor_table_finish_5freason_2eproto,
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
         &::descriptor_table_structured_5foutput_2eproto,
@@ -1414,12 +1411,12 @@ static ::absl::once_flag descriptor_table_llm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5foptions_2eproto = {
     false,
     false,
-    3160,
+    2990,
     descriptor_table_protodef_llm_5foptions_2eproto,
     "llm_options.proto",
     &descriptor_table_llm_5foptions_2eproto_once,
     descriptor_table_llm_5foptions_2eproto_deps,
-    7,
+    8,
     5,
     schemas,
     file_message_globals,
@@ -1430,16 +1427,9 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5foptions_
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-FinishReason_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_llm_5foptions_2eproto);
-  return file_level_enum_descriptors_llm_5foptions_2eproto[0];
-}
-PROTOBUF_CONSTINIT const uint32_t FinishReason_internal_data_[] = {
-    524288u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ExecutionTarget_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_llm_5foptions_2eproto);
-  return file_level_enum_descriptors_llm_5foptions_2eproto[1];
+  return file_level_enum_descriptors_llm_5foptions_2eproto[0];
 }
 PROTOBUF_CONSTINIT const uint32_t ExecutionTarget_internal_data_[] = {
     262144u, 0u, };

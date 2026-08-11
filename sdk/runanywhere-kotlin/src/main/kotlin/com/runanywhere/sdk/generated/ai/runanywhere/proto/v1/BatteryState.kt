@@ -34,8 +34,8 @@ public enum class BatteryState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<BatteryState> = object : EnumAdapter<BatteryState>(
-      BatteryState::class, 
-      PROTO_3, 
+      BatteryState::class,
+      PROTO_3,
       BatteryState.BATTERY_STATE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): BatteryState? = BatteryState.fromValue(`value`)

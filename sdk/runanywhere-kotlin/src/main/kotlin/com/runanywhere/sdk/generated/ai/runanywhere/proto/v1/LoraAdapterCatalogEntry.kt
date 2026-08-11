@@ -159,11 +159,11 @@ public class LoraAdapterCatalogEntry(
     @JvmField
     public val ADAPTER: ProtoAdapter<LoraAdapterCatalogEntry> =
         object : ProtoAdapter<LoraAdapterCatalogEntry>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      LoraAdapterCatalogEntry::class, 
-      "type.googleapis.com/runanywhere.v1.LoraAdapterCatalogEntry", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      LoraAdapterCatalogEntry::class,
+      "type.googleapis.com/runanywhere.v1.LoraAdapterCatalogEntry",
+      PROTO_3,
+      null,
       "lora_options.proto"
     ) {
       override fun encodedSize(`value`: LoraAdapterCatalogEntry): Int {

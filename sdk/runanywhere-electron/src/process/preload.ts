@@ -254,10 +254,12 @@ contextBridge.exposeInMainWorld('runanywhere', {
         initArgs = { secureDir, baseDir, cp: controlPlane };
       }),
 
-  // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
-  // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
-  // this by hand in an app folds >8kHz energy into the band Whisper reads.
-  downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
+  // ---- audio helpers (commons DSP via utility-host RPC) ----
+  // Rate conversion + PCM16 packing for the mic -> STT path. Commons owns the
+  // math; these forward typed arrays over the same MessagePort as v3.* — never
+  // by loading runanywhere_native.node in the preload/renderer.
+  downsample: (samples: Float32Array, inRate: number, outRate: number) =>
+    downsample(samples, inRate, outRate),
   pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
   rms: (samples: Float32Array) => rms(samples),
 

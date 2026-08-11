@@ -24,52 +24,17 @@ internal object ChatRequestPolicy {
         )
 
     /**
-     * Trim the OLDEST prior turns so the prompt fits the model's context window. Small-context QHexRT
-     * models (e.g. Llama-3.2-1B = 512 on v79) otherwise fail with rc=-130 (generation-failed) once the
-     * accumulated conversation + the reply overrun MAXCTX. The output budget already reserves ~half the
-     * context (ChatGenerationBudgetPolicy); the input side (system + kept history + current prompt +
-     * template markers) must fit in the rest. There is no tokenizer on the app side, so token counts are
-     * ESTIMATED and deliberately over-counted (≈3 chars/token + per-message role markers) plus a context
-     * margin — better to trim a turn early than to overflow and crash. Large-context models (Qwen3.5 =
-     * 1024) keep their full history for normal conversations; only long chats on tiny models get trimmed.
-     *
-     * Kept turns are a CONTIGUOUS chronological block. Trailing turns that cannot fit are skipped rather
-     * than aborting the scan, so one oversized reply costs you that reply, not the entire conversation.
+     * Formerly trimmed oldest turns with a local chars/token estimate. Commons
+     * owns TokenUsage; there is no exported turn-windowing API, so do not invent
+     * app-side token budgets — return history unchanged.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun windowHistory(
         turn: ChatTurnSnapshot,
         contextTokens: Int,
         outputTokens: Int,
         systemPrompt: String?,
-    ): ChatTurnSnapshot {
-        if (contextTokens <= 0 || turn.history.isEmpty()) return turn // unknown context → don't trim
-        fun est(text: String): Int = (text.length / 3) + 8 // ~3 chars/token over-estimate + role markers
-        val margin = maxOf(24, contextTokens / 6) // BOS/system/generation-prompt markers + estimate slack
-        val inputBudget = (contextTokens - outputTokens - margin).coerceAtLeast(16)
-        val fixed = (systemPrompt?.takeIf { it.isNotBlank() }?.let { est(it) } ?: 0) + est(turn.prompt)
-        var available = inputBudget - fixed
-        // The current prompt + system prompt already fill the input budget — drop history entirely.
-        // Expected only for an extremely tight context or a very long single prompt.
-        if (available <= 0) return turn.copy(history = emptyList())
-        val kept = ArrayDeque<ProtoChatMessage>()
-        for (message in turn.history.asReversed()) { // keep the most RECENT turns that fit
-            val cost = est(message.content)
-            if (cost > available) {
-                // A single oversized message must not erase the whole history. A plain `break` here made
-                // trimming ALL-OR-NOTHING: one long assistant reply (a reasoning model easily emits 150-250
-                // tokens) exceeds the entire history budget on a 512-token model, so every older turn was
-                // discarded too — including the SHORT user turn that carried the facts, which would have fit
-                // with room to spare. The model then answers "I don't have information about your name"
-                // immediately after being told it. Skip trailing messages that cannot fit; once something
-                // HAS been kept, stop, so the result stays a contiguous chronological block.
-                if (kept.isEmpty()) continue
-                break
-            }
-            available -= cost
-            kept.addFirst(message)
-        }
-        return if (kept.size == turn.history.size) turn else turn.copy(history = kept.toList())
-    }
+    ): ChatTurnSnapshot = turn
 
     fun buildRequest(
         turn: ChatTurnSnapshot,

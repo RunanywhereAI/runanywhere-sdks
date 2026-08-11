@@ -101,6 +101,8 @@ struct ModelSelectionSheet: View {
     @State private var loadErrorMessage: String?
     @State private var searchText = ""
     @State private var showAddFromHuggingFace = false
+    /// Commons `can_run` by model id; empty means unknown (no local budget).
+    @State private var canRunByModelID: [String: Bool] = [:]
 
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
@@ -160,7 +162,8 @@ struct ModelSelectionSheet: View {
         let selection = recommendationEngine.recommend(
             tier: hardwareTier,
             appleFoundationAvailable: tierResolver.appleFoundationAvailable,
-            from: viewModel.availableModels
+            from: viewModel.availableModels,
+            canRunByModelID: canRunByModelID
         )
         let pick: RAModelInfo?
         switch context {
@@ -206,7 +209,10 @@ struct ModelSelectionSheet: View {
     private var handlers: ModelActionHandlers {
         ModelActionHandlers(
             onSelect: { model in Task { await selectAndLoadModel(model) } },
-            onChanged: { Task { await viewModel.loadModelsFromRegistry() } }
+            onChanged: { Task {
+                await viewModel.loadModelsFromRegistry()
+                await refreshCompatibility()
+            } }
         )
     }
 
@@ -237,10 +243,16 @@ struct ModelSelectionSheet: View {
         .adaptiveSheetFrame()
         .sheet(
             isPresented: $showAddFromHuggingFace,
-            onDismiss: { Task { await viewModel.loadModelsFromRegistry() } },
+            onDismiss: { Task {
+                await viewModel.loadModelsFromRegistry()
+                await refreshCompatibility()
+            } },
             content: { AddFromHuggingFaceView() }
         )
-        .task { await viewModel.loadModelsFromRegistry() }
+        .task {
+            await viewModel.loadModelsFromRegistry()
+            await refreshCompatibility()
+        }
         .alert(
             "Unable to Load Model",
             isPresented: Binding(
@@ -557,7 +569,7 @@ struct ModelSelectionSheet: View {
                             ModelOrgDetailView(
                                 org: group.org,
                                 visibleModelIDs: Set(group.models.map(\.id)),
-                                tier: hardwareTier,
+                                canRunByModelID: canRunByModelID,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,
                                 availabilityReason: unavailableReason(for:),
@@ -578,7 +590,7 @@ struct ModelSelectionSheet: View {
                             ModelOrgDetailView(
                                 org: group.org,
                                 visibleModelIDs: Set(group.models.map(\.id)),
-                                tier: hardwareTier,
+                                canRunByModelID: canRunByModelID,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,
                                 availabilityReason: unavailableReason(for:),
@@ -621,6 +633,12 @@ struct ModelSelectionSheet: View {
     private func unavailableReason(for model: RAModelInfo) -> String? {
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
+    }
+
+    private func refreshCompatibility() async {
+        canRunByModelID = await ModelCompatibilityLookup.canRunByModelID(
+            for: viewModel.availableModels.map(\.id)
+        )
     }
 }
 

@@ -104,7 +104,7 @@ scripts/build-windows.bat
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Plugin Registry  (src/plugin/)                                 │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 8u)    │
+│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 9u)    │
 │  Priority order: highest-priority plugin per primitive wins, no  │
 │  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
 │  dynamic (rac_registry_load_plugin / dlopen).                    │
@@ -132,9 +132,9 @@ Every AI capability follows the same two-layer design:
 - **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Unified Plugin ABI (v8)
+### Unified Plugin ABI (v9)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10 active primitive slots plus 7 reserved slots (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10 active primitive slots, one optional terminal token-count callback, and 6 reserved slots (the single source of truth for primitive slots is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
@@ -149,7 +149,12 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
 | `RAC_PRIMITIVE_RERANK` | `rerank_ops` | llamacpp (rank-pooling GGUF) |
 
-NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. `RAC_PRIMITIVE_RERANK` (wire value **11**, `rerank_ops`, promoted from `reserved_slot_2` at the same binary offset) was **revived as a first-class cross-encoder reranking primitive in ABI v8**. The *original* rerank slot (wire value 6, retired in ABI v4) stays permanently retired — the revived primitive is a new wire value, not a reuse of 6.
+NULL primitive slot = "not supported." ABI version mismatch → immediate rejection at registration.
+Current handshake is **`RAC_PLUGIN_API_VERSION = 9u`**: ABI v9 widens
+`rac_llm_stream_callback_fn` with `tokens_in_delta` and adds
+`get_stream_token_counts` on `rac_llm_service_ops_t`. A NULL callback makes commons estimate counts and set
+`TokenUsage.counts_estimated`.
+`RAC_PRIMITIVE_RERANK` (wire value **11**, `rerank_ops`, promoted from `reserved_slot_2` at the same binary offset) was **revived as a first-class cross-encoder reranking primitive in ABI v8**. The *original* rerank slot (wire value 6, retired in ABI v4) stays permanently retired — the revived primitive is a new wire value, not a reuse of 6.
 
 ### Platform Adapter Inversion-of-Control
 

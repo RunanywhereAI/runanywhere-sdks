@@ -57,7 +57,6 @@ def _entry(registration: ModelRegistration) -> CatalogEntry:
         primary=primary,
         archive=registration.archive,
         label=registration.label,
-        size_mb=(registration.size_bytes // (1024 * 1024)) or None,
     )
 
 

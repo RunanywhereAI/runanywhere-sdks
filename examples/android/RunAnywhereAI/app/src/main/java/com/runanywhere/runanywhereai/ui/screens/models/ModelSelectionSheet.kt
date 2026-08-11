@@ -373,7 +373,7 @@ private fun PickerBody(
         }
     }
 
-    val tier = device?.tier ?: HardwareTier.MID_RANGE
+    val tier = device?.tier ?: HardwareTier.UNKNOWN
     val hasNpu = device?.hasNpu ?: false
     val isChat = viewModel.modality == ModelSelectionContext.LLM ||
         viewModel.modality == ModelSelectionContext.RAG_LLM

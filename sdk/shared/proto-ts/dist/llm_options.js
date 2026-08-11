@@ -5,98 +5,19 @@
 //   protoc               v7.35.1
 // source: llm_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PerformanceMetrics = exports.StreamToken = exports.LLMConfiguration = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.FinishReason = exports.protobufPackage = void 0;
-exports.finishReasonFromJSON = finishReasonFromJSON;
-exports.finishReasonToJSON = finishReasonToJSON;
+exports.PerformanceMetrics = exports.StreamToken = exports.LLMConfiguration = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.protobufPackage = void 0;
 exports.executionTargetFromJSON = executionTargetFromJSON;
 exports.executionTargetToJSON = executionTargetToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
+const finish_reason_1 = require("./finish_reason");
 const model_types_1 = require("./model_types");
 const structured_output_1 = require("./structured_output");
 const thinking_tag_pattern_1 = require("./thinking_tag_pattern");
 const token_usage_1 = require("./token_usage");
 const tool_calling_1 = require("./tool_calling");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * One declared vocabulary, used in every place a finish reason is reported
- * on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
- */
-var FinishReason;
-(function (FinishReason) {
-    FinishReason[FinishReason["FINISH_REASON_UNSPECIFIED"] = 0] = "FINISH_REASON_UNSPECIFIED";
-    /** FINISH_REASON_STOP - End-of-turn token. OpenAI "stop" / Anthropic "end_turn". */
-    FinishReason[FinishReason["FINISH_REASON_STOP"] = 1] = "FINISH_REASON_STOP";
-    /** FINISH_REASON_LENGTH - Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens". */
-    FinishReason[FinishReason["FINISH_REASON_LENGTH"] = 2] = "FINISH_REASON_LENGTH";
-    /** FINISH_REASON_STOP_SEQUENCE - One of options.stop_sequences fired; see `stop_sequence`. */
-    FinishReason[FinishReason["FINISH_REASON_STOP_SEQUENCE"] = 3] = "FINISH_REASON_STOP_SEQUENCE";
-    /** FINISH_REASON_TOOL_CALLS - Model wants a tool run before it can continue. */
-    FinishReason[FinishReason["FINISH_REASON_TOOL_CALLS"] = 4] = "FINISH_REASON_TOOL_CALLS";
-    /** FINISH_REASON_CANCELLED - Caller cancelled. No cloud analogue. */
-    FinishReason[FinishReason["FINISH_REASON_CANCELLED"] = 5] = "FINISH_REASON_CANCELLED";
-    /** FINISH_REASON_CONTEXT_OVERFLOW - Conversation exceeded the allocated context window. */
-    FinishReason[FinishReason["FINISH_REASON_CONTEXT_OVERFLOW"] = 6] = "FINISH_REASON_CONTEXT_OVERFLOW";
-    /** FINISH_REASON_ERROR - Generation failed; see `error`. */
-    FinishReason[FinishReason["FINISH_REASON_ERROR"] = 7] = "FINISH_REASON_ERROR";
-    FinishReason[FinishReason["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(FinishReason || (exports.FinishReason = FinishReason = {}));
-function finishReasonFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "FINISH_REASON_UNSPECIFIED":
-            return FinishReason.FINISH_REASON_UNSPECIFIED;
-        case 1:
-        case "FINISH_REASON_STOP":
-            return FinishReason.FINISH_REASON_STOP;
-        case 2:
-        case "FINISH_REASON_LENGTH":
-            return FinishReason.FINISH_REASON_LENGTH;
-        case 3:
-        case "FINISH_REASON_STOP_SEQUENCE":
-            return FinishReason.FINISH_REASON_STOP_SEQUENCE;
-        case 4:
-        case "FINISH_REASON_TOOL_CALLS":
-            return FinishReason.FINISH_REASON_TOOL_CALLS;
-        case 5:
-        case "FINISH_REASON_CANCELLED":
-            return FinishReason.FINISH_REASON_CANCELLED;
-        case 6:
-        case "FINISH_REASON_CONTEXT_OVERFLOW":
-            return FinishReason.FINISH_REASON_CONTEXT_OVERFLOW;
-        case 7:
-        case "FINISH_REASON_ERROR":
-            return FinishReason.FINISH_REASON_ERROR;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return FinishReason.UNRECOGNIZED;
-    }
-}
-function finishReasonToJSON(object) {
-    switch (object) {
-        case FinishReason.FINISH_REASON_UNSPECIFIED:
-            return "FINISH_REASON_UNSPECIFIED";
-        case FinishReason.FINISH_REASON_STOP:
-            return "FINISH_REASON_STOP";
-        case FinishReason.FINISH_REASON_LENGTH:
-            return "FINISH_REASON_LENGTH";
-        case FinishReason.FINISH_REASON_STOP_SEQUENCE:
-            return "FINISH_REASON_STOP_SEQUENCE";
-        case FinishReason.FINISH_REASON_TOOL_CALLS:
-            return "FINISH_REASON_TOOL_CALLS";
-        case FinishReason.FINISH_REASON_CANCELLED:
-            return "FINISH_REASON_CANCELLED";
-        case FinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
-            return "FINISH_REASON_CONTEXT_OVERFLOW";
-        case FinishReason.FINISH_REASON_ERROR:
-            return "FINISH_REASON_ERROR";
-        case FinishReason.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var ExecutionTarget;
 (function (ExecutionTarget) {
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_UNSPECIFIED"] = 0] = "EXECUTION_TARGET_UNSPECIFIED";
@@ -811,9 +732,9 @@ exports.LLMGenerationResult = {
                     ? globalThis.String(object.json_output)
                     : undefined,
             finishReason: isSet(object.finishReason)
-                ? finishReasonFromJSON(object.finishReason)
+                ? (0, finish_reason_1.finishReasonFromJSON)(object.finishReason)
                 : isSet(object.finish_reason)
-                    ? finishReasonFromJSON(object.finish_reason)
+                    ? (0, finish_reason_1.finishReasonFromJSON)(object.finish_reason)
                     : 0,
             stopSequence: isSet(object.stopSequence)
                 ? globalThis.String(object.stopSequence)
@@ -887,7 +808,7 @@ exports.LLMGenerationResult = {
             obj.jsonOutput = message.jsonOutput;
         }
         if (message.finishReason !== 0) {
-            obj.finishReason = finishReasonToJSON(message.finishReason);
+            obj.finishReason = (0, finish_reason_1.finishReasonToJSON)(message.finishReason);
         }
         if (message.stopSequence !== undefined) {
             obj.stopSequence = message.stopSequence;

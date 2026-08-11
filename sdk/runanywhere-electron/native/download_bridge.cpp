@@ -4,7 +4,8 @@
 // Downloads are handle-free: rac_download_*_proto keys every task by model id
 // and task id inside commons, and progress arrives on one process-wide callback
 // rather than per call, so the subscription here is a long-lived
-// ThreadSafeFunction instead of the per-stream session the inference bridges use.
+// ThreadSafeFunction instead of the per-stream session the inference bridges
+// use.
 //
 // Storage is the opposite shape: rac_storage_analyzer_*_proto all take a handle
 // built from a rac_storage_callbacks_t, so this file owns the one analyzer the
@@ -137,9 +138,7 @@ Napi::Value CleanupTerminal(const Napi::CallbackInfo& info) {
     return RunNativeCall(
         info.Env(), "download_cleanup_terminal_tasks",
         [purged]() { return rac_download_cleanup_terminal_tasks_proto(purged.get()); },
-        [purged](Napi::Env env) {
-            return Napi::Number::New(env, static_cast<double>(*purged));
-        });
+        [purged](Napi::Env env) { return Napi::Number::New(env, static_cast<double>(*purged)); });
 }
 
 // ---------------------------------------------------------------------------
@@ -241,8 +240,8 @@ int64_t StorageTotalSpace(void*) {
 }
 
 // The only place in this process that removes model bytes. Commons decides what
-// to pass here; a path that is already gone is a completed delete, not an error,
-// which is what makes models.delete() idempotent.
+// to pass here; a path that is already gone is a completed delete, not an
+// error, which is what makes models.delete() idempotent.
 rac_result_t StorageDeletePath(const char* path, int recursive, void*) {
     if (!path || !*path) {
         return RAC_ERROR_INVALID_PATH;
@@ -287,23 +286,21 @@ rac_result_t EnsureAnalyzer(rac_storage_analyzer_handle_t* out_handle) {
     return RAC_SUCCESS;
 }
 
-using StorageProtoFn = rac_result_t (*)(rac_storage_analyzer_handle_t,
-                                        rac_model_registry_handle_t, const uint8_t*, size_t,
-                                        rac_proto_buffer_t*);
+using StorageProtoFn = rac_result_t (*)(rac_storage_analyzer_handle_t, rac_model_registry_handle_t,
+                                        const uint8_t*, size_t, rac_proto_buffer_t*);
 
 Napi::Promise RunStorageCall(Napi::Env env, std::string context, StorageProtoFn fn,
                              std::vector<uint8_t> request) {
-    return RunProtoCall(env, std::move(context),
-                        [fn, request = std::move(request)](rac_proto_buffer_t* out) {
-                            rac_storage_analyzer_handle_t analyzer = nullptr;
-                            const rac_result_t rc = EnsureAnalyzer(&analyzer);
-                            if (rc != RAC_SUCCESS) {
-                                return rc;
-                            }
-                            return fn(analyzer, rac_get_model_registry(),
-                                      request.empty() ? nullptr : request.data(), request.size(),
-                                      out);
-                        });
+    return RunProtoCall(
+        env, std::move(context), [fn, request = std::move(request)](rac_proto_buffer_t* out) {
+            rac_storage_analyzer_handle_t analyzer = nullptr;
+            const rac_result_t rc = EnsureAnalyzer(&analyzer);
+            if (rc != RAC_SUCCESS) {
+                return rc;
+            }
+            return fn(analyzer, rac_get_model_registry(),
+                      request.empty() ? nullptr : request.data(), request.size(), out);
+        });
 }
 
 Napi::Value StorageInfo(const Napi::CallbackInfo& info) {
@@ -318,14 +315,26 @@ Napi::Value StorageAvailability(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value StorageDeletePlan(const Napi::CallbackInfo& info) {
-    return RunStorageCall(info.Env(), "storage_delete_plan",
-                          rac_storage_analyzer_delete_plan_proto,
+    return RunStorageCall(info.Env(), "storage_delete_plan", rac_storage_analyzer_delete_plan_proto,
                           RequireProtoBytes(info, 0, "storageDeletePlanProto(requestBytes)"));
 }
 
 Napi::Value StorageDelete(const Napi::CallbackInfo& info) {
     return RunStorageCall(info.Env(), "storage_delete", rac_storage_analyzer_delete_proto,
                           RequireProtoBytes(info, 0, "storageDeleteProto(requestBytes)"));
+}
+
+Napi::Value ProgressPercent(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 3 || !info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()) {
+        Napi::TypeError::New(env, "downloadProgressPercent(overall, bytesDownloaded, totalBytes)")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    const float overall = info[0].As<Napi::Number>().FloatValue();
+    const int64_t downloaded = info[1].As<Napi::Number>().Int64Value();
+    const int64_t total = info[2].As<Napi::Number>().Int64Value();
+    return Napi::Number::New(env, rac_download_progress_percent(overall, downloaded, total));
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +457,7 @@ void RegisterDownloadBridge(Napi::Env env, Napi::Object exports) {
     exports.Set("downloadCleanupProto", Napi::Function::New(env, CleanupTerminal));
     exports.Set("downloadSubscribeProgress", Napi::Function::New(env, SubscribeProgress));
     exports.Set("downloadUnsubscribeProgress", Napi::Function::New(env, UnsubscribeProgress));
+    exports.Set("downloadProgressPercent", Napi::Function::New(env, ProgressPercent));
     exports.Set("storageInfoProto", Napi::Function::New(env, StorageInfo));
     exports.Set("storageAvailabilityProto", Napi::Function::New(env, StorageAvailability));
     exports.Set("storageDeletePlanProto", Napi::Function::New(env, StorageDeletePlan));

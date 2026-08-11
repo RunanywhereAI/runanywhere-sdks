@@ -38,8 +38,8 @@ public enum class Platform(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<Platform> = object : EnumAdapter<Platform>(
-      Platform::class, 
-      PROTO_3, 
+      Platform::class,
+      PROTO_3,
       Platform.PLATFORM_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): Platform? = Platform.fromValue(`value`)
