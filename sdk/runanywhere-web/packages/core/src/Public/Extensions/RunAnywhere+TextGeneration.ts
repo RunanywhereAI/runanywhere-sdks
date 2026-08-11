@@ -429,7 +429,7 @@ export async function aggregateStream(
       outputTokens,
       totalTokens: (result.usage?.totalTokens ?? 0) || inputTokens + outputTokens,
       decodeTokensPerSecond: (result.usage?.decodeTokensPerSecond ?? 0)
-        || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+        || (decodeMs > 0 ? (tokenCount / decodeMs) * 1000 : 0),
       prefillMs: result.usage?.prefillMs ?? 0,
       ttftMs: result.usage?.ttftMs ?? (ttftMs ?? 0),
     },
