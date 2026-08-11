@@ -80,6 +80,8 @@ jobs:
         run: |
           set -euo pipefail
           npm install
+          # Tests import ../../dist; typecheck of tsconfig.test.json needs dist/.
+          npm run build
           npm run typecheck
           npm test
 
@@ -115,12 +117,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          extra=()
+          # Avoid `extra=(); "${extra[@]}"` — bash 3.2 + `set -u` treats an empty
+          # array as unbound (macOS runners).
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            extra+=("-DRAC_NODE_DEV_DIR=${{ steps.nodedev.outputs.dir }}")
+            cmake --preset "${{ matrix.preset }}" \
+              -DRAC_BACKEND_SHERPA=OFF \
+              -DRAC_NODE_DEV_DIR="${{ steps.nodedev.outputs.dir }}"
+          else
+            cmake --preset "${{ matrix.preset }}" -DRAC_BACKEND_SHERPA=OFF
           fi
-          # Sherpa archive is optional on CI — keep green without it.
-          cmake --preset "${{ matrix.preset }}" -DRAC_BACKEND_SHERPA=OFF "${extra[@]}"
 
       - name: Build thin .node + commons + llamacpp
         shell: bash
