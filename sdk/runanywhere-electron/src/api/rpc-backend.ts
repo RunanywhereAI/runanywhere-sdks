@@ -67,6 +67,12 @@ export class RpcBackend implements RaBackend {
   memoryInfo(): Promise<MemoryInfo> {
     return this.call('memoryInfo', []);
   }
+  listPlugins(): Promise<string[]> {
+    return this.call('listPlugins', []);
+  }
+  isThinAddon(): Promise<boolean> {
+    return this.call('isThinAddon', []);
+  }
 
   // ---- desktop control plane (telemetry + auth) ----
   hasControlPlane(): Promise<boolean> {

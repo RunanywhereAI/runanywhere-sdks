@@ -4,6 +4,9 @@
 // inference runs here, isolated from the main + renderer processes. The request
 // routing itself lives in dispatch.ts (pure + unit-tested); this file only wires
 // the real addon + model resolver into it and manages the parent port.
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { NativeBackend } from '../api/native-backend';
 import { addon } from '../bridge';
 import { isCatalogId, registerCatalog } from '../catalog';
@@ -21,6 +24,25 @@ if (catalogPath) {
   const staged = require(catalogPath) as { CATALOG?: Record<string, unknown> };
   if (staged?.CATALOG) registerCatalog(staged.CATALOG as never);
 }
+
+/**
+ * Apply the main-process registration queue before any RPC (and before
+ * initialize via the same env inside the addon). Fat builds skip — backends
+ * are compile-linked. Thin builds load each existing path. Missing files are
+ * skipped so a partial stage does not brick the host. Never accept plugin
+ * paths over RPC (security — no v3.registerBackendPlugin).
+ */
+async function applyPluginRegistrationQueue(): Promise<void> {
+  if (!addon.thinAddon || typeof addon.loadPlugin !== 'function') return;
+  const raw = process.env.RUNANYWHERE_PLUGIN_PATHS;
+  if (!raw) return;
+  for (const pluginPath of raw.split(path.delimiter).filter(Boolean)) {
+    if (!fs.existsSync(pluginPath)) continue;
+    await addon.loadPlugin(pluginPath);
+  }
+}
+
+const pluginsReady: Promise<void> = applyPluginRegistrationQueue();
 
 // Map each load method to its model kind so the shared remote-source guard
 // (assertRemoteSupported) rejects a URL/HF STT/TTS/embedder consistently with the
@@ -130,7 +152,23 @@ parentPort.on('message', (e) => {
       duplex.settle(ev.data);
       return;
     }
-    dispatch(port, ev.data as RpcRequest, deps);
+    // Gate every RPC on plugin preload so a thin addon never serves with an
+    // empty registry. Fat builds no-op when RUNANYWHERE_PLUGIN_PATHS is unset.
+    void pluginsReady.then(
+      () => {
+        if (!alive) return;
+        dispatch(port, ev.data as RpcRequest, deps);
+      },
+      (err: unknown) => {
+        if (!alive) return;
+        const id = (ev.data as RpcRequest | undefined)?.id;
+        port.postMessage({
+          id,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    );
   });
   port.on('close', () => { alive = false; });
   port.start();

@@ -1,0 +1,45 @@
+{
+  "name": "@runanywhere/electron-onnx",
+  "version": "0.1.0",
+  "description": "RunAnywhere Electron SDK — ONNX backend plugin (embeddings / segmentation)",
+  "private": true,
+  "license": "SEE LICENSE IN ../../../../LICENSE",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "prebuilds",
+    "README.md"
+  ],
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@runanywhere/electron": ">=0.1.0 <1"
+  },
+  "devDependencies": {
+    "@runanywhere/electron": "file:../..",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-electron/packages/onnx"
+  }
+}

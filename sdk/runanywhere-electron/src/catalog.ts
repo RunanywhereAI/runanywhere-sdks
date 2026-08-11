@@ -10,8 +10,7 @@
 // every staged entry into the commons model registry (`catalogModelInfo` below),
 // and from then on `models.list`/`get`/`load` read commons, not this map.
 // Registration is buffered here because an app registers before the native addon
-// exists — `preload.js` and `host.js` in `examples/electron/RunAnywhereAI/` both
-// register at module load.
+// exists — the app preload and the SDK utility `host` both register at module load.
 //
 // Callers can also pass a HuggingFace repo id, a direct URL, or a local path, so
 // an app that registers nothing still resolves those.

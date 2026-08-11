@@ -221,6 +221,16 @@ export interface RaBackend {
   shutdown(): Promise<void>;
   /** Physical RAM, straight from the platform adapter commons itself reads. */
   memoryInfo(): Promise<MemoryInfo>;
+  /**
+   * Engine names currently in the plugin registry (`rac_registry_list_plugins`).
+   * Runtime truth for capabilities — not compile-time `RAC_HAVE_BACKEND_*`.
+   */
+  listPlugins(): Promise<string[]>;
+  /**
+   * True when the .node was built thin (`RAC_ELECTRON_THIN_ADDON`) and engines
+   * must arrive via RUNANYWHERE_PLUGIN_PATHS / loadPlugin.
+   */
+  isThinAddon(): Promise<boolean>;
 
   // ---- desktop control plane (telemetry + auth) ----
   /** Whether this build carries the desktop libcurl transport (auth + telemetry). */
@@ -530,6 +540,8 @@ export const BACKEND_METHODS: readonly string[] = [
   'version',
   'initialize',
   'shutdown',
+  'listPlugins',
+  'isThinAddon',
   'hasControlPlane',
   'devicePersistentId',
   'devStagingBaseUrl',

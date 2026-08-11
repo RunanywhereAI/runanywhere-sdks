@@ -236,6 +236,27 @@ export class SDKException extends Error {
       feature ? `${feature} not implemented` : 'Not implemented'
     );
   }
+  /** Linked backend / modality missing — prefer over a crash or bare Error. */
+  static featureNotAvailable(feature?: string): SDKException {
+    return SDKException.of(
+      ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+      feature ? `${feature} is not available` : 'Feature not available',
+      { category: ErrorCategory.ERROR_CATEGORY_CONFIGURATION, component: 'backend' }
+    );
+  }
+  /**
+   * Thin addon with an empty plugin registry (core package alone).
+   * Same code as {@link featureNotAvailable}; dedicated message for register() guidance.
+   */
+  static noBackendEngines(): SDKException {
+    return SDKException.of(
+      ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+      'No inference backends are registered. Install and call register() on at least one of ' +
+        '@runanywhere/electron-llamacpp, @runanywhere/electron-onnx, or @runanywhere/electron-sherpa ' +
+        'in the Electron main process before loading models.',
+      { category: ErrorCategory.ERROR_CATEGORY_CONFIGURATION, component: 'backend' }
+    );
+  }
   static cancelled(message = 'Operation cancelled'): SDKException {
     return SDKException.of(ErrorCode.ERROR_CODE_CANCELLED, message, {
       category: ErrorCategory.ERROR_CATEGORY_INTERNAL,

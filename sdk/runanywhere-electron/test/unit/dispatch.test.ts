@@ -511,6 +511,8 @@ test('ALLOWED_RPC_METHODS covers every RaBackend operation, namespaced', () => {
 
 test('bare addon-shaped names are rejected and never reach the addon', async () => {
   // One representative per capability the old allowlist proxied directly.
+  // Also assert plugin-load names stay unreachable (B4 security — renderer must
+  // never dlopen; paths arrive only via RUNANYWHERE_PLUGIN_PATHS from main).
   const legacy = [
     'initialize',
     'shutdown',
@@ -535,6 +537,10 @@ test('bare addon-shaped names are rejected and never reach the addon', async () 
     'ragQuery',
     'ragDestroySession',
     'registerModel',
+    'loadPlugin',
+    'registerBackendPlugin',
+    'v3.registerBackendPlugin',
+    'v3.loadPlugin',
   ];
 
   for (const method of legacy) {

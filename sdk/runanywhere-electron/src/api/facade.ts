@@ -19,6 +19,10 @@ import {
 import type { ImagesNamespace, LoraNamespace, ModelsNamespace, SegmentationNamespace } from './assets';
 import type { AuthState, RaBackend } from './backend';
 import {
+  backendsForRegistry,
+  type EngineRegistrySnapshot,
+} from '../backend/engines';
+import {
   createEmbeddingsNamespace,
   createRagNamespace,
   createRerankNamespace,
@@ -251,38 +255,92 @@ const UNAVAILABLE_CAPABILITIES: UnavailableCapability[] = [
 /**
  * Honest snapshot of what this Electron build can actually reach.
  *
- * The three engines (`InferenceFramework.LLAMA_CPP`/`ONNX`/`SHERPA`) and the
- * modalities built on them are statically linked into every build of this
- * addon (see `native-backend.ts`'s per-slot `load()`/`unloadHandle()`), so
- * their presence is a packaging fact rather than something that needs a
- * runtime probe. `images` is the one modality with namespace code but no
- * linked backend — reported in `unavailable` with the exact missing symbol,
- * matching the gap `images.ts` itself throws for.
+ * Dual path:
+ *   • Fat addon — backends are compile-linked; {@link backendsForRegistry}
+ *     returns the three known frameworks regardless of the registry list.
+ *   • Thin addon — backends come from `listPlugins()` after main-process
+ *     `*.register()` + RUNANYWHERE_PLUGIN_PATHS. Core-alone → `backends: []`;
+ *     model load throws typed {@link SDKException.noBackendEngines}.
+ * `images` stays unavailable until a diffusion plugin exists.
  */
-function capabilitiesSnapshot(): SDKCapabilities {
+function capabilitiesSnapshot(registry: EngineRegistrySnapshot): SDKCapabilities {
+  const backends = [...backendsForRegistry(registry)];
+  const modalities = modalitiesForBackends(backends);
+  const has = (name: string): boolean => modalities.includes(name);
   return {
-    modalities: [
-      'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank',
-      'diarization', 'segmentation', 'rag', 'lora',
-    ],
-    backends: [InferenceFramework.LLAMA_CPP, InferenceFramework.ONNX, InferenceFramework.SHERPA],
+    modalities,
+    backends,
     // Only formats this SDK can actually round-trip: raw PCM for live streams,
     // plus WAV through the built-in RIFF codec (audio.ts's encodeWav/decodeWav).
     audioFormats: [AudioFormat.PCM, AudioFormat.WAV],
-    streaming: { llm: true, vlm: true, stt: true, tts: true, vad: true, rag: true, images: false },
+    streaming: {
+      llm: has('llm'),
+      vlm: has('vlm'),
+      stt: has('stt'),
+      tts: has('tts'),
+      vad: has('vad'),
+      rag: has('rag'),
+      images: false,
+    },
     tools: {
-      registry: true,
+      registry: has('llm'),
       // llm.tools runs one grammar-constrained selection round at a time (text.ts's runToolLoop).
       parallel: false,
-      cancellation: true,
+      cancellation: has('llm'),
     },
     rag: {
       // Each rag.open() gets its own native session handle (native-backend.ts's ragSessions map).
-      multiSession: true,
-      persistent: true,
+      multiSession: has('rag'),
+      persistent: has('rag'),
     },
     unavailable: UNAVAILABLE_CAPABILITIES,
   };
+}
+
+/** Modalities reachable from the registered inference frameworks. */
+function modalitiesForBackends(backends: readonly InferenceFramework[]): string[] {
+  const mods = new Set<string>();
+  for (const framework of backends) {
+    switch (framework) {
+      case InferenceFramework.LLAMA_CPP:
+        mods.add('llm');
+        mods.add('vlm');
+        mods.add('lora');
+        mods.add('rag');
+        break;
+      case InferenceFramework.ONNX:
+        mods.add('embeddings');
+        mods.add('rerank');
+        mods.add('diarization');
+        mods.add('segmentation');
+        break;
+      case InferenceFramework.SHERPA:
+        mods.add('stt');
+        mods.add('tts');
+        mods.add('vad');
+        break;
+      case InferenceFramework.QHEXRT:
+        mods.add('llm');
+        mods.add('vlm');
+        mods.add('stt');
+        mods.add('tts');
+        break;
+      default: {
+        const _exhaustive: never = framework;
+        void _exhaustive;
+        break;
+      }
+    }
+  }
+  return [...mods];
+}
+
+async function readEngineRegistry(backend: RaBackend): Promise<EngineRegistrySnapshot> {
+  const [thinAddon, pluginNames] = await Promise.all([
+    backend.isThinAddon(),
+    backend.listPlugins(),
+  ]);
+  return { thinAddon, pluginNames };
 }
 
 const DEVICE_ID_KEY = 'runanywhere.deviceId';
@@ -647,7 +705,7 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     get environment() {
       return environment;
     },
-    capabilities: () => Promise.resolve(capabilitiesSnapshot()),
+    capabilities: async () => capabilitiesSnapshot(await readEngineRegistry(backend)),
     get events() {
       return hub.stream();
     },

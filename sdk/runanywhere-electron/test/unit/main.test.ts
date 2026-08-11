@@ -200,6 +200,29 @@ test('without nativePath the env does not force RUNANYWHERE_NATIVE_PATH', { skip
   }
 });
 
+test('pluginPaths option is forwarded as RUNANYWHERE_PLUGIN_PATHS', { skip: SKIP }, () => {
+  const { RunAnywhereMain, state } = freshMain();
+  const a = path.resolve('/plugins/librunanywhere_llamacpp.dylib');
+  const b = path.resolve('/plugins/librunanywhere_sherpa.dylib');
+  const m = new RunAnywhereMain({ hostPath: '/x/host.js', pluginPaths: [a, b] });
+  m.connect(asWebContents(fakeWebContents()));
+  assert.equal(
+    state.forks[0].opts.env.RUNANYWHERE_PLUGIN_PATHS,
+    [a, b].join(path.delimiter)
+  );
+});
+
+test('re-fork after kill replays RUNANYWHERE_PLUGIN_PATHS from pluginPaths', { skip: SKIP }, () => {
+  const { RunAnywhereMain, state } = freshMain();
+  const plugin = path.resolve('/plugins/librunanywhere_onnx.dylib');
+  const m = new RunAnywhereMain({ hostPath: '/x/host.js', pluginPaths: [plugin] });
+  m.connect(asWebContents(fakeWebContents()));
+  m.kill();
+  m.connect(asWebContents(fakeWebContents()));
+  assert.equal(state.forks.length, 2);
+  assert.equal(state.forks[1].opts.env.RUNANYWHERE_PLUGIN_PATHS, plugin);
+});
+
 test('kill() kills the child and the next connect() re-forks', { skip: SKIP }, () => {
   const { RunAnywhereMain, state } = freshMain();
   const m = new RunAnywhereMain({ hostPath: '/x/host.js' });

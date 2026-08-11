@@ -4,10 +4,19 @@
 // process. When the utility exits (crash or kill) it sends 'runanywhere-host-exited'
 // to every connected renderer (whose preload then fails all in-flight calls) and
 // lazily re-forks on the next connect() — call connect() again to recover.
+//
+// Backend plugins are declared in main only: LlamaCPP/ONNX/Sherpa.register()
+// record paths, and ensureChild copies them into RUNANYWHERE_PLUGIN_PATHS at
+// fork time. There is no renderer/RPC registration path (security).
 import * as path from 'path';
 
 import { MessageChannelMain, utilityProcess } from 'electron';
 import type { UtilityProcess, WebContents } from 'electron';
+
+import {
+  RUNANYWHERE_PLUGIN_PATHS_ENV,
+  backendPluginPathsEnvValue,
+} from '../backend/plugin-registry';
 
 export interface RunAnywhereMainOptions {
   /** Path to the compiled utility host (defaults to ./host.js beside this file). */
@@ -21,6 +30,12 @@ export interface RunAnywhereMainOptions {
    * without this the host cannot turn a catalog id into files.
    */
   catalogPath?: string;
+  /**
+   * Absolute paths to loadable backend plugins (`librunanywhere_*.{dylib,so,dll}`).
+   * When omitted, uses paths recorded by `*.register()` / `RUNANYWHERE_PLUGIN_PATHS`.
+   * Forwarded to the utility as `RUNANYWHERE_PLUGIN_PATHS` only — never via RPC.
+   */
+  pluginPaths?: readonly string[];
   /** Called when the utility exits (crash or intentional). */
   onExit?: (code: number) => void;
 }
@@ -31,12 +46,14 @@ export class RunAnywhereMain {
   private readonly hostPath: string;
   private readonly nativePath?: string;
   private readonly catalogPath?: string;
+  private readonly pluginPaths?: readonly string[];
   private readonly onExit?: (code: number) => void;
 
   constructor(opts: RunAnywhereMainOptions = {}) {
     this.hostPath = opts.hostPath ?? path.join(__dirname, 'host.js');
     this.nativePath = opts.nativePath;
     this.catalogPath = opts.catalogPath;
+    this.pluginPaths = opts.pluginPaths;
     this.onExit = opts.onExit;
   }
 
@@ -66,6 +83,11 @@ export class RunAnywhereMain {
     const env: Record<string, string | undefined> = { ...process.env };
     if (this.nativePath) env.RUNANYWHERE_NATIVE_PATH = this.nativePath;
     if (this.catalogPath) env.RUNANYWHERE_CATALOG_PATH = this.catalogPath;
+    const pluginPaths =
+      this.pluginPaths && this.pluginPaths.length > 0
+        ? this.pluginPaths.join(path.delimiter)
+        : backendPluginPathsEnvValue();
+    if (pluginPaths) env[RUNANYWHERE_PLUGIN_PATHS_ENV] = pluginPaths;
     const child = utilityProcess.fork(this.hostPath, [], { env, stdio: 'inherit' });
     child.on('exit', (code) => {
       // Only clear if THIS child is still current — a kill() + connect() may have

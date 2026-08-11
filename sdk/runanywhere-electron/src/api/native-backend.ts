@@ -10,6 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import type { NativeAddon } from '../bridge';
+import { assertBackendEnginesRegistered } from '../backend/engines';
 import { ErrorCode, SDKException } from '../errors';
 import {
   assertRemoteSupported,
@@ -171,6 +172,15 @@ export class NativeBackend implements RaBackend {
 
   async memoryInfo(): Promise<MemoryInfo> {
     return this.addon.memoryInfo();
+  }
+
+  async listPlugins(): Promise<string[]> {
+    if (typeof this.addon.listPlugins !== 'function') return [];
+    return this.addon.listPlugins();
+  }
+
+  async isThinAddon(): Promise<boolean> {
+    return this.addon.thinAddon === true;
   }
 
   // ---- desktop control plane (telemetry + auth) ----
@@ -389,6 +399,12 @@ export class NativeBackend implements RaBackend {
     source: string,
     options: BackendLoadOptions = {}
   ): Promise<LoadedModel> {
+    // Thin core-alone: initialize() is fine with zero engines; loading is not.
+    assertBackendEnginesRegistered({
+      thinAddon: Boolean(this.addon.thinAddon),
+      pluginNames:
+        typeof this.addon.listPlugins === 'function' ? this.addon.listPlugins() : [],
+    });
     const current = this.slots.get(slot);
     if (current && current.model.id === source) return current.model;
     const kind = SLOT_KIND[slot];
@@ -401,6 +417,15 @@ export class NativeBackend implements RaBackend {
     const model: LoadedModel = { id: source, path: resolved.primary };
     this.slots.set(slot, { handle, model });
     return model;
+  }
+
+  /** Runtime registry probe for capabilities() (B5) / core-alone zero-engines. */
+  engineRegistry(): { thinAddon: boolean; pluginNames: string[] } {
+    return {
+      thinAddon: Boolean(this.addon.thinAddon),
+      pluginNames:
+        typeof this.addon.listPlugins === 'function' ? [...this.addon.listPlugins()] : [],
+    };
   }
 
   async loaded(slot: LoadSlot): Promise<LoadedModel | null> {

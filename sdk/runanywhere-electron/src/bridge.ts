@@ -27,7 +27,23 @@ export interface NativeGenerationMetrics {
 /** Raw surface exported by runanywhere_native.node. */
 export interface NativeAddon {
   readonly version: string;
+  /**
+   * True when this .node was built with RAC_ELECTRON_THIN_ADDON (no statically
+   * linked backends). Engines then come from {@link loadPlugin} /
+   * RUNANYWHERE_PLUGIN_PATHS — never from compile-time RAC_HAVE_BACKEND_* macros.
+   */
+  readonly thinAddon?: boolean;
   initialize(secureDir: string, baseDir?: string): Promise<void>;
+  /**
+   * Host / main only. Wraps `rac_registry_load_plugin`. Do NOT put this on the
+   * RPC allowlist — plugin paths are injected via RUNANYWHERE_PLUGIN_PATHS by
+   * main before the utility host fork.
+   */
+  loadPlugin(absolutePath: string): Promise<void>;
+  /** Runtime registry snapshot — engine names currently registered. */
+  listPlugins(): string[];
+  /** Commons `RAC_PLUGIN_API_VERSION` as a runtime number. */
+  pluginApiVersion(): number;
   /** Free / total / used RAM from the platform adapter. Cheap enough to stay sync. */
   memoryInfo(): { totalBytes: number; availableBytes: number; usedBytes: number };
   // Desktop control plane (telemetry + auth). Present only when the addon is
@@ -377,7 +393,7 @@ export interface NativeAddon {
 }
 
 /**
- * Make the addon's own directory reachable by the Windows loader.
+ * Make a directory reachable by the Windows loader (PATH prepend).
  *
  * The .node's STATIC imports (onnxruntime.dll, sherpa) already resolve from
  * beside it — the loader searches a module's own directory for its dependents.
@@ -393,52 +409,144 @@ export interface NativeAddon {
  * whole flat set (QnnHtp/QnnSystem/QnnHtpPrepare/QnnHtpV<arch>Stub plus the skel
  * and its .cat) then resolves out of that one directory, which is the invariant
  * the Hexagon stack requires on Windows (there is no ADSP_LIBRARY_PATH here).
+ *
+ * Thin-addon dual path: also prepend every registered plugin directory and the
+ * directory that holds `librac_commons` / `rac_commons.dll` when present.
  */
 function addSidecarDirToDllSearch(dir: string): void {
   if (process.platform !== 'win32') return;
   const current = process.env.PATH ?? '';
+  const resolved = path.resolve(dir);
   const already = current
     .split(path.delimiter)
-    .some((entry) => entry && path.resolve(entry).toLowerCase() === dir.toLowerCase());
+    .some((entry) => entry && path.resolve(entry).toLowerCase() === resolved.toLowerCase());
   if (already) return;
   process.env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
+}
+
+function commonsLibraryFileName(platform: NodeJS.Platform = process.platform): string {
+  if (platform === 'win32') return 'rac_commons.dll';
+  if (platform === 'darwin') return 'librac_commons.dylib';
+  return 'librac_commons.so';
+}
+
+/** Absolute path to shared commons beside a thin addon, or `undefined`. */
+export function resolveCommonsLibrary(addonDir: string): string | undefined {
+  const candidate = path.join(addonDir, commonsLibraryFileName());
+  return fs.existsSync(candidate) ? candidate : undefined;
+}
+
+function repoBuildCandidates(): string[] {
+  const root = path.resolve(__dirname, '..', '..', '..');
+  const plat = process.platform;
+  const arch = process.arch;
+  const out: string[] = [];
+
+  if (plat === 'darwin') {
+    out.push(
+      path.join(root, 'build', 'electron-macos', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'electron-macos-metal', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'electron-shared-macos', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'macos-debug', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'macos-release', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node')
+    );
+  } else if (plat === 'linux') {
+    out.push(
+      path.join(root, 'build', 'linux-release', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'linux-debug', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node'),
+      path.join(root, 'build', 'linux-asan', 'sdk', 'runanywhere-electron', 'native', 'runanywhere_native.node')
+    );
+  } else if (plat === 'win32') {
+    if (arch === 'arm64') {
+      out.push(
+        path.join(
+          root,
+          'build',
+          'windows-arm64-release',
+          'sdk',
+          'runanywhere-electron',
+          'native',
+          'Release',
+          'runanywhere_native.node'
+        )
+      );
+    }
+    out.push(
+      path.join(
+        root,
+        'build',
+        'windows-release',
+        'sdk',
+        'runanywhere-electron',
+        'native',
+        'Release',
+        'runanywhere_native.node'
+      )
+    );
+  }
+  return out;
+}
+
+function pluginPathCandidatesFromEnv(): string[] {
+  const raw = process.env.RUNANYWHERE_PLUGIN_PATHS;
+  if (!raw) return [];
+  return raw.split(path.delimiter).filter(Boolean);
+}
+
+function prepareNativeLoad(addonPath: string): void {
+  const addonDir = path.dirname(addonPath);
+  addSidecarDirToDllSearch(addonDir);
+  const commons = resolveCommonsLibrary(addonDir);
+  if (commons) addSidecarDirToDllSearch(path.dirname(commons));
+  for (const pluginPath of pluginPathCandidatesFromEnv()) {
+    addSidecarDirToDllSearch(path.dirname(pluginPath));
+  }
 }
 
 function resolveAddon(): NativeAddon {
   const candidates = [
     process.env.RUNANYWHERE_NATIVE_PATH,
-    // Packaged prebuild bundled by scripts/bundle-native.js (dist -> pkg root).
+    // Packaged prebuild bundled by scripts/bundle-native (dist -> pkg root).
     path.resolve(
-      __dirname, '..', 'prebuilds', `${process.platform}-${process.arch}`,
+      __dirname,
+      '..',
+      'prebuilds',
+      `${process.platform}-${process.arch}`,
       'runanywhere_native.node'
     ),
-    // Local dev build (repo build dir): dist -> electron -> sdk -> repo root.
-    // Windows has one build tree per architecture; try the one matching this
-    // process before the x64 default.
-    ...(process.arch === 'arm64'
-      ? [path.resolve(
-          __dirname, '..', '..', '..', 'build', 'windows-arm64-release', 'sdk',
-          'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
-        )]
-      : []),
-    path.resolve(
-      __dirname, '..', '..', '..', 'build', 'windows-release', 'sdk',
-      'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
-    ),
+    ...repoBuildCandidates(),
     // Packaged (cmake-js default output next to the native package).
     path.resolve(__dirname, '..', 'native', 'build', 'Release', 'runanywhere_native.node'),
   ].filter((p): p is string => Boolean(p));
 
+  const tried: string[] = [];
   for (const p of candidates) {
+    tried.push(p);
     if (fs.existsSync(p)) {
-      addSidecarDirToDllSearch(path.dirname(p));
+      prepareNativeLoad(p);
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       return require(p) as NativeAddon;
     }
   }
+
+  const pluginHints = pluginPathCandidatesFromEnv()
+    .filter((p) => !fs.existsSync(p))
+    .map((p) => `  missing backend plugin: ${p}`);
+
   throw new Error(
-    'runanywhere_native.node not found. Set RUNANYWHERE_NATIVE_PATH to the built addon.\nTried:\n  ' +
-      candidates.join('\n  ')
+    [
+      'runanywhere_native.node not found (core addon).',
+      'Set RUNANYWHERE_NATIVE_PATH to the built addon, or run scripts/bundle-native.',
+      'Tried:',
+      ...tried.map((p) => `  ${p}`),
+      ...(pluginHints.length > 0
+        ? [
+            'Backend packages were registered but their artifacts are missing (thin path):',
+            ...pluginHints,
+            'Install / stage @runanywhere/electron-{llamacpp,onnx,sherpa} prebuilds, or use the fat addon.',
+          ]
+        : []),
+    ].join('\n')
   );
 }
 
@@ -468,4 +576,29 @@ function wrapNative(raw: NativeAddon): NativeAddon {
   }) as NativeAddon;
 }
 
-export const addon: NativeAddon = wrapNative(resolveAddon());
+/** Lazy native load — resolution failure surfaces on first use, not on import. */
+let _addon: NativeAddon | undefined;
+
+export function getAddon(): NativeAddon {
+  if (_addon === undefined) _addon = wrapNative(resolveAddon());
+  return _addon;
+}
+
+/**
+ * The loaded native addon. Property access triggers a one-shot resolve so
+ * importing `bridge` never crashes the utility host before env is set.
+ */
+export const addon: NativeAddon = new Proxy({} as NativeAddon, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getAddon(), prop, receiver);
+  },
+  has(_target, prop) {
+    return Reflect.has(getAddon(), prop);
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getAddon() as object);
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    return Reflect.getOwnPropertyDescriptor(getAddon() as object, prop);
+  },
+}) as NativeAddon;
