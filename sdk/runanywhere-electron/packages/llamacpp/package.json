@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron-llamacpp",
-  "version": "0.20.15",
+  "version": "0.20.16",
   "description": "RunAnywhere Electron SDK — LlamaCPP backend plugin (LLM / VLM / GGUF embeddings)",
   "publishConfig": {
     "access": "public"

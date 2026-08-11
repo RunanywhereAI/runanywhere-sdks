@@ -6,11 +6,11 @@
 
 ## Installation
 
-Add the Swift package and include the `RunAnywhereLlamaCPP` product (pin `0.20.15`):
+Add the Swift package and include the `RunAnywhereLlamaCPP` product (pin `0.20.16`):
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.20.15"),
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.20.16"),
 ],
 targets: [
     .target(
