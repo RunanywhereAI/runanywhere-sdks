@@ -28,6 +28,24 @@ test('frameworksFromPluginNames maps common registry / package stems', () => {
   assert.deepEqual([...frameworksFromPluginNames(['cloud', 'unknown'])], []);
 });
 
+test('frameworksFromPluginNames maps QHexRT from both of its stems', () => {
+  // The plugin ships as runanywhere_qhexrt.dll, but the engine's CMake target is
+  // rac_backend_qhexrt — a registry reporting either name must resolve to the
+  // same framework, or capabilities() silently omits the NPU on a box that has one.
+  for (const stem of [
+    'qhexrt',
+    'runanywhere_qhexrt',
+    'librunanywhere_qhexrt',
+    'rac_backend_qhexrt',
+  ]) {
+    assert.deepEqual(
+      [...frameworksFromPluginNames([stem])],
+      [InferenceFramework.QHEXRT],
+      `stem ${stem} should map to QHEXRT`
+    );
+  }
+});
+
 test('backendsForRegistry returns fat defaults when not thin', () => {
   assert.deepEqual(
     [...backendsForRegistry({ thinAddon: false, pluginNames: [] })],

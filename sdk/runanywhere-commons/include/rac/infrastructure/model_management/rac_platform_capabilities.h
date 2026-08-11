@@ -12,10 +12,14 @@
  *   - Apple-only frameworks — MLX, FOUNDATION_MODELS, COREML,
  *     SWIFT_TRANSFORMERS, FLUID_AUDIO — are supported only on Apple targets
  *     (iOS, macOS, and friends).
- *   - Qualcomm-Android-only — QHEXRT — is supported only on Android targets.
+ *   - Hexagon-NPU-only — QHEXRT — is supported on the two hosts that carry a
+ *     Hexagon NPU: arm64 Android, and Windows on ARM64 (Snapdragon X / X2
+ *     Elite, a real v81 target that runs the published bundles unmodified).
+ *     The condition mirrors RAC_QHEXRT_PLATFORM_SUPPORTED in
+ *     engines/qhexrt/qhexrt_backend.h and must stay in step with it.
  *   - Everything else (LLAMA_CPP, ONNX, SHERPA, SYSTEM_TTS, BUILT_IN, cloud,
  *     ...) is available everywhere and is never restricted.
- *   - WASM/Emscripten, desktop Linux, and Windows exclude both restricted
+ *   - WASM/Emscripten, desktop Linux, and x64 Windows exclude both restricted
  *     sets; desktop macOS behaves as Apple.
  */
 

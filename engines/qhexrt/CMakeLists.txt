@@ -591,6 +591,58 @@ rac_add_engine_plugin(qhexrt
     COMPILE_DEFINITIONS ${QHEXRT_COMPILE_DEFS}
 )
 
+# Where commons' bundled static deps live.
+#
+# rac_commons carries `zlibstatic` (and the other bundled archives) into its
+# INTERFACE link line as a BARE NAME, not a target — sdk/runanywhere-commons's
+# own CMakeLists flags this, because feeding the logical target name through
+# find_package cache variables is what libarchive's internal find_package(ZLIB)
+# demands. It resolves the name with a directory-scoped
+# `link_directories("${RAC_BUNDLED_LIB_DIR}")`, and directory scope reaches only
+# that directory and its children. `engines/` is a SIBLING of
+# `sdk/runanywhere-commons/` (the same scope gap the MSVC block below documents),
+# so an engine inherits the bare name without the directory that resolves it and
+# the link dies on `LNK1181: cannot open input file 'zlibstatic.lib'`.
+#
+# On ELF/Mach-O this stays hidden: the bundled archives are already folded into
+# librac_commons and the linker never has to find them again.
+target_link_directories(rac_backend_qhexrt PRIVATE "${CMAKE_BINARY_DIR}/_bundled_libs")
+
+# =============================================================================
+# Loadable-plugin file name
+# =============================================================================
+# The FILE NAME is a contract, not cosmetics. `rac_registry_load_plugin()`
+# derives the symbol it resolves from the file name:
+# `entry_symbol_from_path()` (plugin_loader.cpp) drops the directory, a `lib`
+# prefix, the extension and a `runanywhere_` prefix, then prepends
+# `rac_plugin_entry_`. A plugin shipped as `rac_backend_qhexrt.dll` therefore
+# makes the loader look up `rac_plugin_entry_rac_backend_qhexrt`, which nothing
+# defines — the load fails on a DLL that is otherwise perfectly good. The
+# Electron backend package resolves the same stem
+# (`pluginLibraryFileName()` in src/backend/plugin-registry.ts).
+#
+# QHexRT already satisfies the rest of the contract: `rac_plugin_entry_qhexrt.cpp`
+# is in QHEXRT_SOURCES, and the SHARED build gets `RAC_BUILDING_PLUGIN=1` from
+# rac_add_engine_plugin, so the entry is exported. Only the name was wrong, so
+# renaming the OUTPUT is the whole fix.
+#
+# The llamacpp / onnx / sherpa pattern — a separate `runanywhere_<id>` carrier
+# that links the engine — does NOT work here, and the reason is worth recording:
+# the entry's vtable references the six per-modality op tables
+# (`g_qhexrt_llm_ops` and friends) as DATA. A carrier in its own DLL has to
+# import those across a DLL boundary, and on MSVC an imported data symbol only
+# resolves through `__declspec(dllimport)` on the declaration — the declarations
+# here are plain `extern "C" const`, shared with the ELF/Mach-O builds where no
+# such annotation exists. `WINDOWS_EXPORT_ALL_SYMBOLS` does not rescue it: the
+# generated .def exports the data, but the consumer still emits a reference to
+# the plain name while the import library only offers `__imp_`, so the link dies
+# on six unresolved externals. Keeping the entry in the same binary as its
+# vtables sidesteps the boundary entirely.
+#
+# The TARGET keeps its name (`rac_backend_qhexrt`): the Android Kotlin QHexRT
+# module and its JNI bridge load `librac_backend_qhexrt.so` by that name, and 50+
+# in-tree references name the target. Only the emitted file is renamed, and only
+# where a loader reads it.
 if(RAC_STATIC_PLUGINS)
     target_sources(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_qhexrt.cpp
@@ -598,6 +650,31 @@ if(RAC_STATIC_PLUGINS)
     target_include_directories(rac_commons PRIVATE
         ${RAC_COMMONS_ROOT_DIR}/include
     )
+elseif(RAC_BUILD_SHARED AND NOT RAC_PLATFORM_ANDROID)
+    set_target_properties(rac_backend_qhexrt PROPERTIES OUTPUT_NAME runanywhere_qhexrt)
+
+    # Keep the export table to what is actually declared public.
+    #
+    # rac_add_engine_plugin turns WINDOWS_EXPORT_ALL_SYMBOLS ON for every
+    # SHARED_ONLY engine on Windows, because the OTHER engines ship a separate
+    # runanywhere_<id> carrier that has to resolve their op-vtable globals across
+    # a DLL boundary. QHexRT ships no carrier — this library IS the plugin — and
+    # on Windows nothing links against it at all: the loader opens it with
+    # LoadLibrary and asks for one symbol. Every consumer that LINKS
+    # rac_backend_qhexrt (the JNI bridge, the React Native package) is Android,
+    # where the property does not apply.
+    #
+    # So export-all buys nothing here and costs plenty. Measured on this target,
+    # win-arm64 Release: ON exports 981 symbols, most of them mangled MSVC STL
+    # internals (_Compressed_pair, basic_string, filesystem::path) dragged in from
+    # a DLL that statically links the closed-source QHexRT runtime; OFF exports
+    # 10 — rac_plugin_entry_qhexrt plus the nine RAC_QHEXRT_API entry points
+    # rac_qhexrt.h deliberately publishes. ON also emits LNK4286 (rac_qhexrt_probe
+    # defined in one object, *imported* by another), so it degrades the DLL's own
+    # internal linkage on the way past.
+    if(WIN32)
+        set_target_properties(rac_backend_qhexrt PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+    endif()
 endif()
 
 if(RAC_PLATFORM_ANDROID)

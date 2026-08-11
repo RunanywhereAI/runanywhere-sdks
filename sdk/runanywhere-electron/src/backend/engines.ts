@@ -57,6 +57,11 @@ function frameworkForPluginId(id: string): InferenceFramework | undefined {
     case BackendPluginId.Sherpa:
     case 'sherpa-onnx':
       return InferenceFramework.SHERPA;
+    // The engine's CMake target is rac_backend_qhexrt, so a registry that
+    // reports the target stem rather than the plugin stem still maps here.
+    case BackendPluginId.QHexRT:
+    case 'rac_backend_qhexrt':
+      return InferenceFramework.QHEXRT;
     default:
       return undefined;
   }

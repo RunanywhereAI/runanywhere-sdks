@@ -81,11 +81,27 @@ jobs:
           # Tests import ../../dist; typecheck of tsconfig.test.json needs dist/.
           npm run build
           # Example path aliases point at packages/*/dist/*.d.ts — build backends too.
-          for pkg in packages/llamacpp packages/onnx packages/sherpa; do
-            (cd "$pkg" && npm install && npm run build)
+          # Every backend package, not a hand-kept subset: a package missing here
+          # has no dist/, so the example app's typecheck resolves its path alias to
+          # nothing and the NEXT step fails with an error that names the app rather
+          # than the package that was never built.
+          # Named per package, and each stage announced: a bare loop reports only
+          # "exit code 1" for the whole step, which is why the previous failure
+          # here had to be bisected by hand.
+          for pkg in packages/*/; do
+            echo "::group::${pkg} npm install"
+            (cd "$pkg" && npm install) || { echo "FAILED: ${pkg} npm install"; exit 1; }
+            echo "::endgroup::"
+            echo "::group::${pkg} npm run build"
+            (cd "$pkg" && npm run build) || { echo "FAILED: ${pkg} npm run build"; exit 1; }
+            echo "::endgroup::"
           done
-          npm run typecheck
-          npm test
+          echo "::group::sdk typecheck"
+          npm run typecheck || { echo "FAILED: sdk npm run typecheck"; exit 1; }
+          echo "::endgroup::"
+          echo "::group::sdk unit tests"
+          npm test || { echo "FAILED: sdk npm test"; exit 1; }
+          echo "::endgroup::"
 
       # --- Thin native Option A ---
       - name: Install addon node deps

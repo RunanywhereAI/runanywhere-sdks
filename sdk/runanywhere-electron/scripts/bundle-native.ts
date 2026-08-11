@@ -23,6 +23,7 @@ const BundlePackageId = {
   LlamaCPP: 'llamacpp',
   ONNX: 'onnx',
   Sherpa: 'sherpa',
+  QHexRT: 'qhexrt',
 } as const;
 type BundlePackageId = (typeof BundlePackageId)[keyof typeof BundlePackageId];
 
@@ -31,12 +32,14 @@ const ALL_PACKAGES: readonly BundlePackageId[] = [
   BundlePackageId.LlamaCPP,
   BundlePackageId.ONNX,
   BundlePackageId.Sherpa,
+  BundlePackageId.QHexRT,
 ];
 
 const BACKEND_PACKAGES: readonly BundlePackageId[] = [
   BundlePackageId.LlamaCPP,
   BundlePackageId.ONNX,
   BundlePackageId.Sherpa,
+  BundlePackageId.QHexRT,
 ];
 
 /** Detected packaging posture for this build tree. */
@@ -363,7 +366,19 @@ function stageFiles(files: readonly StagedFile[]): {
 }
 
 /**
- * QAIRT/QNN runtime for Hexagon — flat directory into core prebuilds only.
+ * QAIRT/QNN runtime for Hexagon — the flat directory QHexRT requires, staged
+ * into the **qhexrt package** (it is that engine's dependency, and nothing else
+ * in the SDK opens these libraries).
+ *
+ * Flat is not a convenience: on Windows there is no `ADSP_LIBRARY_PATH`, so the
+ * loader resolves the HTP stub's dependencies through the DLL's own directory
+ * and every file — the four DLLs, the `libQnnHtpV<arch>Skel.so`, AND its
+ * `.cat` — must sit in ONE directory. The `.cat` is mandatory; without it the
+ * skel fails signature verification with no error naming the catalog.
+ *
+ * `.exe` entries are skipped: a staging dir built for the `qhx_*` tools carries
+ * them, and they are not part of the runtime.
+ *
  * Opt-in via RA_QNN_RUNTIME_DIR (licensed vendor SDK, absent on CI).
  */
 function stageQnnRuntime(): { files: number; bytes: number } {
@@ -373,7 +388,7 @@ function stageQnnRuntime(): { files: number; bytes: number } {
     console.error('  MISSING: RA_QNN_RUNTIME_DIR does not exist:', qnnDir);
     process.exit(1);
   }
-  const outDir = packageOutDir(BundlePackageId.Core);
+  const outDir = packageOutDir(BundlePackageId.QHexRT);
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   let qnnFiles = 0;
   let qnnBytes = 0;
@@ -385,7 +400,7 @@ function stageQnnRuntime(): { files: number; bytes: number } {
     qnnFiles++;
   }
   console.log(
-    `  + [core] QNN runtime: ${qnnFiles} files, ${(qnnBytes / 1e6).toFixed(1)} MB (from ${qnnDir})`
+    `  + [qhexrt] QNN runtime: ${qnnFiles} files, ${(qnnBytes / 1e6).toFixed(1)} MB (from ${qnnDir})`
   );
   return { files: qnnFiles, bytes: qnnBytes };
 }
@@ -416,7 +431,8 @@ if (staged.copied < staged.required) {
   process.exit(1);
 }
 
-const qnn = wantPackage === 'all' || wantPackage === BundlePackageId.Core
+// Runs after stageFiles so the carrier's resetPackageOutDir() cannot wipe it.
+const qnn = wantPackage === 'all' || wantPackage === BundlePackageId.QHexRT
   ? stageQnnRuntime()
   : { files: 0, bytes: 0 };
 
