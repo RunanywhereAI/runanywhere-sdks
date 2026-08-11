@@ -32,6 +32,7 @@
     "@runanywhere/electron": "file:../../../sdk/runanywhere-electron",
     "@runanywhere/electron-llamacpp": "file:../../../sdk/runanywhere-electron/packages/llamacpp",
     "@runanywhere/electron-onnx": "file:../../../sdk/runanywhere-electron/packages/onnx",
+    "@runanywhere/electron-qhexrt": "file:../../../sdk/runanywhere-electron/packages/qhexrt",
     "@runanywhere/electron-sherpa": "file:../../../sdk/runanywhere-electron/packages/sherpa"
   },
   "devDependencies": {

@@ -52,6 +52,12 @@ export interface CatalogEntry {
   readonly licenseUrl?: string;
   /** Chat template family, when the model needs one commons cannot infer. */
   readonly chatTemplate?: string;
+  /**
+   * Pin the engine instead of inferring it from `type`. Needed for weights only
+   * one backend can read — a QHexRT bundle is a prebuilt QNN context binary, and
+   * the `llm` default would hand it to llama.cpp.
+   */
+  readonly framework?: 'llamacpp' | 'onnx' | 'sherpa' | 'qhexrt';
 }
 
 export type Catalog = Readonly<Record<string, CatalogEntry>>;
@@ -135,6 +141,50 @@ function vlm(
   };
 }
 
+/**
+ * A QHexRT bundle — prebuilt QNN context binaries for the Hexagon NPU.
+ *
+ * Different in kind from every row above, in three ways that all matter:
+ *
+ *  - **The engine is pinned on the row.** A `.bin` context binary is readable by
+ *    exactly one backend, so the modality default (`llm` -> llama.cpp) would be
+ *    wrong. Pinning also makes a fallback visible: `actualBackend` after load is
+ *    what commons routed to, so a QHEXRT row that comes back LLAMA_CPP is a bug
+ *    you can see rather than a slow CPU run you cannot.
+ *  - **It is a folder, not a file.** `primary` is the bundle manifest; the
+ *    weights sit beside it and the manifest names them relatively.
+ *  - **It is arch-pinned.** `arch` selects the per-arch directory in the HF repo
+ *    (`v75`/`v79`/`v81`). A `v79` binary does not *load* on a `v81` device — a
+ *    load failure, not wrong output — so this is part of the row's identity, not
+ *    a tuning knob. `v81` is Snapdragon X / X2 Elite and 8-Gen-class phones.
+ */
+function npu(
+  repo: string,
+  arch: string,
+  manifest: string,
+  weights: readonly string[],
+  label: string,
+  params: string,
+  sizeMB: number,
+): CatalogEntry {
+  const l = LICENSES.apache2;
+  const files = [manifest, ...weights].map((name) => ({
+    url: `${HF}/${repo}/resolve/main/${arch}/${name}`,
+    as: name,
+  }));
+  return {
+    type: 'llm',
+    framework: 'qhexrt',
+    files,
+    primary: manifest,
+    label,
+    params,
+    sizeMB,
+    license: l.name,
+    licenseUrl: l.url,
+  };
+}
+
 function whisper(size: string, label: string, sizeMB: number): CatalogEntry {
   return {
     type: 'stt',
@@ -176,6 +226,23 @@ export const CATALOG: Catalog = {
   'lfm2.5-1.2b': llm('LiquidAI/LFM2.5-1.2B-Instruct-GGUF', 'LFM2.5-1.2B-Instruct-Q4_K_M.gguf', 'LFM2.5 1.2B', '1.2B', 697),
   'lfm2.5-1.2b-thinking': llm('LiquidAI/LFM2.5-1.2B-Thinking-GGUF', 'LFM2.5-1.2B-Thinking-Q4_K_M.gguf', 'LFM2.5 1.2B Thinking', '1.2B', 697),
   'lfm2.5-vl-1.6b': vlm('LiquidAI/LFM2.5-VL-1.6B-GGUF', 'LFM2.5-VL-1.6B-Q4_K_M.gguf', 'mmproj-LFM2.5-VL-1.6b-F16.gguf', 'LFM2.5 VL 1.6B', '1.6B', 1585),
+
+  // ---- LFM2.5 on the Hexagon NPU (QHexRT) ----
+  // Same weights family as the GGUF rows above, compiled to QNN context binaries.
+  // These load only on a Hexagon v81 device (Snapdragon X / X2 Elite on Windows
+  // ARM64); on any other machine the engine reports BACKEND_UNAVAILABLE and the
+  // router never selects them, so the rows are safe to ship everywhere.
+  // The repos are private — resolving them needs a Hugging Face token.
+  'lfm2.5-350m-npu': npu(
+    'runanywhere/lfm2_5_350m_HNPU', 'v81', 'lfm2-5-350m-2048.json',
+    ['lfm_pf_f16.bin', 'lfm_dec_f16.bin', 'lfm_lmh_f16.bin', 'lfm_embed_f16.bin', 'tokenizer.json'],
+    'LFM2.5 350M (NPU)', '350M', 1430,
+  ),
+  'lfm2.5-230m-npu': npu(
+    'runanywhere/lfm2_5_230m_HNPU', 'v81', 'lfm2-5-230m.json',
+    ['lfm230_pf_512_w8.bin', 'lfm230_dec_512_w8.bin', 'lfm230_lmh_w8.bin', 'lfm_embed_f16.bin', 'tokenizer.json'],
+    'LFM2.5 230M (NPU)', '230M', 539,
+  ),
 
   // ---- Gemma 4 (Google) — weights carry use restrictions, see LICENSES.gemma ----
   'gemma-4-e2b': llm('unsloth/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_K_M.gguf', 'Gemma 4 E2B', '2B eff.', 2963, true, 'gemma', 'gemma'),
