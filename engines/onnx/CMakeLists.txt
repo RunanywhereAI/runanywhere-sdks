@@ -206,6 +206,7 @@ if(RAC_STATIC_PLUGINS)
 else()
     add_library(runanywhere_onnx SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_onnx.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_onnx.cpp
     )
     set_target_properties(runanywhere_onnx PROPERTIES
         OUTPUT_NAME           runanywhere_onnx

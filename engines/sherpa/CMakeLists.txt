@@ -480,6 +480,7 @@ if(RAC_STATIC_PLUGINS)
 else()
     add_library(runanywhere_sherpa SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_sherpa.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_sherpa.cpp
     )
     set_target_properties(runanywhere_sherpa PROPERTIES
         OUTPUT_NAME           runanywhere_sherpa

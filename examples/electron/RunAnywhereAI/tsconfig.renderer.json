@@ -18,8 +18,10 @@
     // Run `npm --prefix ../../../sdk/runanywhere-electron run build` if the SDK
     // types resolve to nothing.
     "paths": {
-      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/src/index.ts"],
-      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/src/*.ts"],
+      // Match tsconfig.base — typecheck against built .d.ts, never proto-ts src
+      // (src needs @bufbuild/protobuf which the example does not install).
+      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/dist/*.d.ts"],
       "@shared/*": ["src/shared/*"]
     }
   },
