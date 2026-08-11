@@ -1,22 +1,17 @@
 /**
- * Shell smoke + visual-parity capture.
+ * Shell smoke + motion contract.
  *
- * Proves the three processes come up and the shell renders, then captures each
- * screen in both themes for comparison against the macOS SwiftUI app.
- *
- * Screenshots land in `test/e2e/__screenshots__/` and are the input to the
- * parity gate — they are compared against
- * `thoughts/shared/research/electron-parity/macos-reference-screenshots/`.
+ * Visual baselines live in `visual.spec.ts` (compared against
+ * `test/e2e/__screenshots__/`). This file keeps the structural and motion
+ * assertions that do not need pixel diffs.
  */
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const shots = path.join(appRoot, 'test', 'e2e', '__screenshots__');
+import { goRoute, setTheme, VIEWPORT, waitForShell } from './helpers';
 
-/** The macOS reference window size, so a diff compares like with like. */
-const VIEWPORT = { width: 1500, height: 1000 };
+const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let app: ElectronApplication;
 let page: Page;
@@ -26,13 +21,13 @@ test.beforeAll(async () => {
     args: [appRoot],
     env: {
       ...process.env,
-      // Keep the run off the user's real conversation/settings store.
+      // Isolate userData + pin SDK model dirs (see main IS_E2E).
       RA_E2E: '1',
     },
   });
   page = await app.firstWindow();
   await page.setViewportSize(VIEWPORT);
-  await page.waitForLoadState('domcontentloaded');
+  await waitForShell(page);
 });
 
 test.afterAll(async () => {
@@ -57,25 +52,16 @@ test('the sidebar list is scoped to the open destination', async () => {
   // conversation rows while the detail column shows Models is describing a screen
   // the user is not looking at. The search field and the Chats section appear
   // under Chat and nowhere else; the three destinations are always present.
-  await page.evaluate(() => {
-    location.hash = '#/chat';
-  });
-  await page.waitForTimeout(200);
+  await goRoute(page, 'chat');
   await expect(page.locator('.ra-sidebar-search')).toBeVisible();
   await expect(page.locator('.ra-sidebar-chats')).toBeVisible();
 
-  await page.evaluate(() => {
-    location.hash = '#/models';
-  });
-  await page.waitForTimeout(200);
+  await goRoute(page, 'models');
   await expect(page.locator('.ra-sidebar-search')).toBeHidden();
   await expect(page.locator('.ra-sidebar-chats')).toBeHidden();
   await expect(page.locator('.ra-nav-row')).toHaveCount(3);
 
-  await page.evaluate(() => {
-    location.hash = '#/chat';
-  });
-  await page.waitForTimeout(200);
+  await goRoute(page, 'chat');
 });
 
 test('every capability the app needs reaches the renderer', async () => {
@@ -127,39 +113,65 @@ test('streams survive contextBridge (own-property Symbol.asyncIterator)', async 
 });
 
 test('the toolbar shows a title and subtitle', async () => {
+  await goRoute(page, 'chat');
   await expect(page.locator('.ra-toolbar-title')).toContainText('Chat');
   await expect(page.locator('.ra-toolbar-subtitle')).not.toBeEmpty();
 });
 
 test('design tokens resolve to the Swift ladder, not the web warm neutrals', async () => {
-  const tokens = await page.evaluate(() => {
+  // Chromium may serialize #ffffff as #fff — compare via resolved rgb().
+  const readColor = async (varName: string): Promise<string> =>
+    page.evaluate((name) => {
+      const probe = document.createElement('div');
+      probe.style.color = `var(${name})`;
+      document.body.append(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    }, varName);
+
+  await setTheme(page, 'light');
+  const lightMeta = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
     return {
-      theme: document.documentElement.dataset.theme,
-      background: style.getPropertyValue('--ra-background').trim(),
-      surface: style.getPropertyValue('--ra-surface').trim(),
-      brand: style.getPropertyValue('--ra-brand').trim(),
-      onBrand: style.getPropertyValue('--ra-on-brand').trim(),
       composerRadius: style.getPropertyValue('--ra-radius-xl').trim(),
       hitTarget: style.getPropertyValue('--ra-hit-target').trim(),
     };
   });
 
-  expect(tokens.brand.toLowerCase()).toBe('#ff6900');
+  expect(await readColor('--ra-brand')).toBe('rgb(255, 105, 0)');
   // Ink on orange (6.1:1), never white body copy on the brand fill.
-  expect(tokens.onBrand.toLowerCase()).toBe('#10182b');
+  expect(await readColor('--ra-on-brand')).toBe('rgb(16, 24, 43)');
   // macOS column: the composer is 16, not the iOS 28.
-  expect(tokens.composerRadius).toBe('16px');
+  expect(lightMeta.composerRadius).toBe('16px');
   // macOS pointer-fine hit target, not the 44 touch target.
-  expect(tokens.hitTarget).toBe('28px');
+  expect(lightMeta.hitTarget).toBe('28px');
+  expect(await readColor('--ra-background')).toBe('rgb(251, 250, 248)');
+  expect(await readColor('--ra-surface')).toBe('rgb(255, 255, 255)');
 
-  if (tokens.theme === 'dark') {
-    expect(tokens.background.toLowerCase()).toBe('#0c0e17');
-    expect(tokens.surface.toLowerCase()).toBe('#131620');
-  } else {
-    expect(tokens.background.toLowerCase()).toBe('#fbfaf8');
-    expect(tokens.surface.toLowerCase()).toBe('#ffffff');
-  }
+  await setTheme(page, 'dark');
+  expect(await readColor('--ra-background')).toBe('rgb(12, 14, 23)');
+  expect(await readColor('--ra-surface')).toBe('rgb(19, 22, 32)');
+});
+
+test('motion tokens match the Motion.swift ladder', async () => {
+  // Assert from computed styles — Chromium may serialize 120ms as .12s, so
+  // resolve through a transitionDuration probe rather than the raw custom prop.
+  const readMs = async (varName: string): Promise<number> =>
+    page.evaluate((name) => {
+      const probe = document.createElement('div');
+      probe.style.transitionDuration = `var(${name})`;
+      document.body.append(probe);
+      const raw = getComputedStyle(probe).transitionDuration; // e.g. "0.12s"
+      probe.remove();
+      return Math.round(parseFloat(raw) * 1000);
+    }, varName);
+
+  expect(await readMs('--ra-duration-micro')).toBe(120);
+  expect(await readMs('--ra-duration-standard')).toBe(240);
+  expect(await readMs('--ra-duration-emphasis')).toBe(400);
+  expect(await readMs('--ra-duration-hero')).toBe(700);
+  expect(await readMs('--ra-reduced-fallback')).toBe(150);
 });
 
 test('reduced motion crossfades rather than blinking', async () => {
@@ -178,20 +190,22 @@ test('reduced motion crossfades rather than blinking', async () => {
   await page.emulateMedia({ reducedMotion: null });
 });
 
-for (const theme of ['dark', 'light'] as const) {
-  test(`captures every screen — ${theme}`, async () => {
-    await page.evaluate((next) => {
-      document.documentElement.dataset.theme = next;
-    }, theme);
-
-    const routes = ['chat', 'models', 'advanced'] as const;
-    for (const route of routes) {
-      await page.evaluate((r) => {
-        location.hash = `#/${r}`;
-      }, route);
-      // Let the view mount and its entrance animation settle.
-      await page.waitForTimeout(500);
-      await page.screenshot({ path: path.join(shots, `${route}-${theme}.png`) });
-    }
+test('reduced motion stops ambient loops', async () => {
+  // tokens.css sets `animation: none !important` under prefers-reduced-motion —
+  // ambient breathe/shimmer/spin must not keep running at a shortened duration.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const animation = await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.style.animation = 'ra-spin var(--ra-ambient-spin) linear infinite';
+    document.body.append(probe);
+    const styles = getComputedStyle(probe);
+    const result = {
+      name: styles.animationName,
+      duration: styles.animationDuration,
+    };
+    probe.remove();
+    return result;
   });
-}
+  expect(animation.name).toBe('none');
+  await page.emulateMedia({ reducedMotion: null });
+});
