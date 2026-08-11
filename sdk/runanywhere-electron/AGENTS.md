@@ -67,8 +67,10 @@ npm run typecheck  # tsc --noEmit over all four projects (src, test, scripts, na
 npm test           # node --test over dist-test/unit
 ```
 
-All three must pass before handoff, and they are exactly what `electron-sdk-ci.yml` runs. A green
-`build` with a red `typecheck` means a test file is lying about a type.
+All three must pass before handoff. `pr-build.yml` `electron-unit` runs them on Linux;
+`electron-sdk-ci.yml` re-runs the TypeScript gates on Windows and adds the thin native
+matrix (`electron-windows` / `electron-macos`). A green `build` with a red `typecheck`
+means a test file is lying about a type.
 
 **There is no `npm run lint` in this package yet** — no eslint config, no eslint dependency, no CI
 step. The rules above are still the standard, but today they are enforced by `strict` + `noEmit`

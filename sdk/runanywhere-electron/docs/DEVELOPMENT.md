@@ -87,25 +87,12 @@ into each backend package. Missing plugins fall back to core-only without failin
 
 ### Windows (MSVC — CI recipe; not cross-compilable from macOS)
 
-**Fat** (current `electron-sdk-ci.yml` `native-addon-build` lane):
+CI (`electron-sdk-ci.yml`) is a **single matrix job** (`windows-2022` + `macos-14`)
+that builds the **thin / Option A** presets and runs `loadPlugin` smoke. Fat-addon
+lanes are no longer in CI; local fat builds still work via `windows-release` +
+`RAC_STATIC_PLUGINS=ON` if you need them.
 
-```powershell
-# On windows-2022 (or a local VS 2022 x64 host). Resolve node-gyp cache first.
-npx --yes node-gyp install
-$ver = node -p "process.versions.node"
-$dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
-
-cmake --preset windows-release `
-  -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON `
-  -DRAC_BACKEND_ONNX=ON -DRAC_RUNTIME_ONNXRT=ON `
-  -DRAC_BACKEND_SHERPA=OFF `
-  -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_ELECTRON_ADDON=ON `
-  -DRAC_DESKTOP_ADAPTER=ON `
-  "-DRAC_NODE_DEV_DIR=$dir"
-cmake --build build/windows-release --target runanywhere_native --config Release
-```
-
-**Thin / Option A** (`electron-windows` preset — prove on a Windows runner):
+**Thin / Option A** (`electron-windows` preset — what CI runs):
 
 ```powershell
 npx --yes node-gyp install
