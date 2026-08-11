@@ -32,6 +32,18 @@
       "require": "./dist/*.js",
       "default": "./dist/*.js"
     },
+    "./convenience/*": {
+      "types": "./dist/convenience/*.d.ts",
+      "import": "./dist/convenience/*.js",
+      "require": "./dist/convenience/*.js",
+      "default": "./dist/convenience/*.js"
+    },
+    "./events/*": {
+      "types": "./dist/events/*.d.ts",
+      "import": "./dist/events/*.js",
+      "require": "./dist/events/*.js",
+      "default": "./dist/events/*.js"
+    },
     "./streams/*": {
       "types": "./dist/streams/*.d.ts",
       "import": "./dist/streams/*.js",
@@ -43,6 +55,18 @@
       "import": "./dist/*.js",
       "require": "./dist/*.js",
       "default": "./dist/*.js"
+    },
+    "./dist/convenience/*": {
+      "types": "./dist/convenience/*.d.ts",
+      "import": "./dist/convenience/*.js",
+      "require": "./dist/convenience/*.js",
+      "default": "./dist/convenience/*.js"
+    },
+    "./dist/events/*": {
+      "types": "./dist/events/*.d.ts",
+      "import": "./dist/events/*.js",
+      "require": "./dist/events/*.js",
+      "default": "./dist/events/*.js"
     },
     "./dist/streams/*": {
       "types": "./dist/streams/*.d.ts",
