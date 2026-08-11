@@ -8,7 +8,6 @@ from runanywhere.structured import (
     ToolCall,
     ToolRun,
     ToolSpec,
-    object_grammar,
     parse_structured,
     tool_call_prompt,
     tool_call_schema,
@@ -113,15 +112,6 @@ def test_parse_structured_bad_json_raises_sdk_exception():
 def test_parse_structured_empty_raises():
     with pytest.raises(SDKException):
         parse_structured("")
-
-
-# --- object_grammar delegation --------------------------------------------
-
-def test_object_grammar_delegates():
-    schema = {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"]}
-    grammar = object_grammar(schema)
-    assert isinstance(grammar, str)
-    assert grammar  # non-empty grammar text
 
 
 # --- dataclass smoke ------------------------------------------------------

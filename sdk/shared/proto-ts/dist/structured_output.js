@@ -5,13 +5,68 @@
 //   protoc               v7.35.1
 // source: structured_output.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StructuredOutputPromptResult = exports.StructuredOutputParseRequest_MetadataEntry = exports.StructuredOutputParseRequest = exports.StructuredOutputResult = exports.StructuredOutputValidation = exports.StructuredOutputOptions = exports.protobufPackage = void 0;
+exports.StructuredOutputPromptResult = exports.StructuredOutputParseRequest_MetadataEntry = exports.StructuredOutputParseRequest = exports.StructuredOutputResult = exports.StructuredOutputValidation = exports.StructuredOutputOptions = exports.StructuredOutputMode = exports.protobufPackage = void 0;
+exports.structuredOutputModeFromJSON = structuredOutputModeFromJSON;
+exports.structuredOutputModeToJSON = structuredOutputModeToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
+/**
+ * How commons applies StructuredOutputOptions on the ordinary LLM generate
+ * path. Platform SDKs must not invent a second policy.
+ */
+var StructuredOutputMode;
+(function (StructuredOutputMode) {
+    StructuredOutputMode[StructuredOutputMode["STRUCTURED_OUTPUT_MODE_UNSPECIFIED"] = 0] = "STRUCTURED_OUTPUT_MODE_UNSPECIFIED";
+    /** STRUCTURED_OUTPUT_MODE_CONSTRAINED - Compile schema→GBNF (or honor grammar/regex) and constrain decoding. */
+    StructuredOutputMode[StructuredOutputMode["STRUCTURED_OUTPUT_MODE_CONSTRAINED"] = 1] = "STRUCTURED_OUTPUT_MODE_CONSTRAINED";
+    /** STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY - Do not constrain decoding; validate the free-text result against schema. */
+    StructuredOutputMode[StructuredOutputMode["STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY"] = 2] = "STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY";
+    /**
+     * STRUCTURED_OUTPUT_MODE_REPAIR - Constrained (when a decoder arm is present), then one repair retry if
+     * the first answer fails schema validation.
+     */
+    StructuredOutputMode[StructuredOutputMode["STRUCTURED_OUTPUT_MODE_REPAIR"] = 3] = "STRUCTURED_OUTPUT_MODE_REPAIR";
+    StructuredOutputMode[StructuredOutputMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(StructuredOutputMode || (exports.StructuredOutputMode = StructuredOutputMode = {}));
+function structuredOutputModeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "STRUCTURED_OUTPUT_MODE_UNSPECIFIED":
+            return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED;
+        case 1:
+        case "STRUCTURED_OUTPUT_MODE_CONSTRAINED":
+            return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED;
+        case 2:
+        case "STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY":
+            return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+        case 3:
+        case "STRUCTURED_OUTPUT_MODE_REPAIR":
+            return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return StructuredOutputMode.UNRECOGNIZED;
+    }
+}
+function structuredOutputModeToJSON(object) {
+    switch (object) {
+        case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED:
+            return "STRUCTURED_OUTPUT_MODE_UNSPECIFIED";
+        case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED:
+            return "STRUCTURED_OUTPUT_MODE_CONSTRAINED";
+        case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY:
+            return "STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY";
+        case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR:
+            return "STRUCTURED_OUTPUT_MODE_REPAIR";
+        case StructuredOutputMode.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseStructuredOutputOptions() {
-    return { includeSchemaInPrompt: undefined, schema: undefined, grammar: undefined, regex: undefined };
+    return { includeSchemaInPrompt: undefined, schema: undefined, grammar: undefined, regex: undefined, mode: undefined };
 }
 exports.StructuredOutputOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -26,6 +81,9 @@ exports.StructuredOutputOptions = {
         }
         if (message.regex !== undefined) {
             writer.uint32(34).string(message.regex);
+        }
+        if (message.mode !== undefined) {
+            writer.uint32(40).int32(message.mode);
         }
         return writer;
     },
@@ -64,6 +122,13 @@ exports.StructuredOutputOptions = {
                     message.regex = reader.string();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.mode = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -82,6 +147,7 @@ exports.StructuredOutputOptions = {
             schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
             grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
             regex: isSet(object.regex) ? globalThis.String(object.regex) : undefined,
+            mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : undefined,
         };
     },
     toJSON(message) {
@@ -98,6 +164,9 @@ exports.StructuredOutputOptions = {
         if (message.regex !== undefined) {
             obj.regex = message.regex;
         }
+        if (message.mode !== undefined) {
+            obj.mode = structuredOutputModeToJSON(message.mode);
+        }
         return obj;
     },
     create(base) {
@@ -109,6 +178,7 @@ exports.StructuredOutputOptions = {
         message.schema = object.schema ?? undefined;
         message.grammar = object.grammar ?? undefined;
         message.regex = object.regex ?? undefined;
+        message.mode = object.mode ?? undefined;
         return message;
     },
 };
@@ -121,6 +191,8 @@ function createBaseStructuredOutputValidation() {
         validationErrors: [],
         validationTimeMs: 0,
         error: undefined,
+        repairAttempted: false,
+        repairAttempts: 0,
     };
 }
 exports.StructuredOutputValidation = {
@@ -145,6 +217,12 @@ exports.StructuredOutputValidation = {
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
+        }
+        if (message.repairAttempted !== false) {
+            writer.uint32(64).bool(message.repairAttempted);
+        }
+        if (message.repairAttempts !== 0) {
+            writer.uint32(72).int32(message.repairAttempts);
         }
         return writer;
     },
@@ -204,6 +282,20 @@ exports.StructuredOutputValidation = {
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.repairAttempted = reader.bool();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.repairAttempts = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -245,6 +337,16 @@ exports.StructuredOutputValidation = {
                     ? globalThis.Number(object.validation_time_ms)
                     : 0,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
+            repairAttempted: isSet(object.repairAttempted)
+                ? globalThis.Boolean(object.repairAttempted)
+                : isSet(object.repair_attempted)
+                    ? globalThis.Boolean(object.repair_attempted)
+                    : false,
+            repairAttempts: isSet(object.repairAttempts)
+                ? globalThis.Number(object.repairAttempts)
+                : isSet(object.repair_attempts)
+                    ? globalThis.Number(object.repair_attempts)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -270,6 +372,12 @@ exports.StructuredOutputValidation = {
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
         }
+        if (message.repairAttempted !== false) {
+            obj.repairAttempted = message.repairAttempted;
+        }
+        if (message.repairAttempts !== 0) {
+            obj.repairAttempts = Math.round(message.repairAttempts);
+        }
         return obj;
     },
     create(base) {
@@ -286,6 +394,8 @@ exports.StructuredOutputValidation = {
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
+        message.repairAttempted = object.repairAttempted ?? false;
+        message.repairAttempts = object.repairAttempts ?? 0;
         return message;
     },
 };

@@ -237,7 +237,7 @@ def capabilities() -> SDKCapabilities:
     wheel built before those bindings existed (or without CoreML for images) still gets
     an honest answer here. ``rerank`` remains unbound.
     """
-    lora_ok = _bound("lora_apply")
+    lora_ok = _bound("lora_apply_proto")
     diarization_ok = _bound("load_diarization_model")
     segmentation_ok = _bound("load_segmentation_model")
     voice_ok = _bound("create_voice_agent")
@@ -296,7 +296,7 @@ def capabilities() -> SDKCapabilities:
                     "not initialized yet (unknown until then)"
                     if not is_ready()
                     else "this native/_core build predates the LoRA bindings "
-                    "(lora_apply / lora_remove / lora_remove_all are not exported by "
+                    "(lora_apply_proto / lora_remove_proto / lora_list_proto are not exported by "
                     "native/module.cpp) — rebuild the native extension"
                 ),
             )

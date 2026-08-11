@@ -21,7 +21,9 @@
 #include <system_error>
 #include <vector>
 
+#include "llm_options.pb.h"
 #include "model_types.pb.h"
+#include "vlm_options.pb.h"
 #include "rac/core/rac_core.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -29,6 +31,7 @@
 #include "app.h"
 #include "catalog/catalog.h"
 #include "catalog/model_ref.h"
+#include "commands/bench_metrics.h"
 #include "commands/engine_options.h"
 #include "config/cli_paths.h"
 #include "io/image_io.h"
@@ -1945,7 +1948,117 @@ TestResult test_write_png_unwritable_path() {
   return result;
 }
 
-} // namespace
+TestResult test_bench_metrics_consume_only() {
+    TestResult result;
+    result.test_name = "bench_metrics_consume_only";
+
+    // LLM: consume TokenUsage + measured phase fields; no tok/s or decode_ms invent.
+    {
+        runanywhere::v1::LLMGenerationResult r;
+        r.set_generation_time_ms(1500.0);
+        r.set_prompt_eval_time_ms(200);
+        r.set_decode_time_ms(800);
+        auto* usage = r.mutable_usage();
+        usage->set_output_tokens(40);
+        usage->set_decode_tokens_per_second(50.0);
+        usage->set_prefill_ms(180);
+        usage->set_ttft_ms(210);  // must not alias into prompt_eval_ms
+
+        rcli::commands::bench_metrics::LlmVlmMetrics m;
+        if (!rcli::commands::bench_metrics::fill_llm(r, /*measured_e2e_ms=*/9999.0, &m)) {
+            result.details = "fill_llm rejected a valid result";
+            return result;
+        }
+        if (m.output_tokens != 40 || m.end_to_end_ms != 1500.0 || m.tokens_per_second != 50.0 ||
+            m.decode_ms != 800.0 || m.prompt_eval_ms != 200.0) {
+            result.expected = "tokens=40 e2e=1500 tps=50 decode=800 prefill=200";
+            result.actual = "tokens=" + std::to_string(m.output_tokens) +
+                            " e2e=" + std::to_string(m.end_to_end_ms) +
+                            " tps=" + std::to_string(m.tokens_per_second) +
+                            " decode=" + std::to_string(m.decode_ms) +
+                            " prefill=" + std::to_string(m.prompt_eval_ms);
+            return result;
+        }
+    }
+
+    // Missing decode throughput / phase times stay zero — no wall or tokens÷rate invent.
+    {
+        runanywhere::v1::LLMGenerationResult r;
+        r.mutable_usage()->set_output_tokens(256);
+        r.mutable_usage()->set_ttft_ms(500);  // still must not become prefill
+
+        rcli::commands::bench_metrics::LlmVlmMetrics m;
+        if (!rcli::commands::bench_metrics::fill_llm(r, /*measured_e2e_ms=*/20000.0, &m)) {
+            result.details = "fill_llm should accept tokens with missing rates";
+            return result;
+        }
+        if (m.tokens_per_second != 0.0 || m.decode_ms != 0.0 || m.prompt_eval_ms != 0.0 ||
+            m.end_to_end_ms != 20000.0 || m.output_tokens != 256) {
+            result.expected = "tps=0 decode=0 prefill=0 e2e=20000 tokens=256";
+            result.actual = "tps=" + std::to_string(m.tokens_per_second) +
+                            " decode=" + std::to_string(m.decode_ms) +
+                            " prefill=" + std::to_string(m.prompt_eval_ms) +
+                            " e2e=" + std::to_string(m.end_to_end_ms) +
+                            " tokens=" + std::to_string(m.output_tokens);
+            return result;
+        }
+    }
+
+    // Zero output tokens fail rather than inventing metrics.
+    {
+        runanywhere::v1::LLMGenerationResult r;
+        r.mutable_usage()->set_decode_tokens_per_second(99.0);
+        rcli::commands::bench_metrics::LlmVlmMetrics m;
+        if (rcli::commands::bench_metrics::fill_llm(r, 1000.0, &m)) {
+            result.details = "fill_llm must reject zero output tokens";
+            return result;
+        }
+    }
+
+    // VLM: never invent tok/s from e2e; decode_ms always absent (no carrier).
+    {
+        runanywhere::v1::VLMResult r;
+        r.set_total_time_ms(3000);
+        auto* usage = r.mutable_usage();
+        usage->set_output_tokens(64);
+        usage->set_prefill_ms(120);
+        usage->set_ttft_ms(130);
+
+        rcli::commands::bench_metrics::LlmVlmMetrics m;
+        if (!rcli::commands::bench_metrics::fill_vlm(r, /*measured_e2e_ms=*/9999.0, &m)) {
+            result.details = "fill_vlm rejected a valid result";
+            return result;
+        }
+        if (m.tokens_per_second != 0.0 || m.decode_ms != 0.0 || m.prompt_eval_ms != 120.0 ||
+            m.end_to_end_ms != 3000.0 || m.output_tokens != 64) {
+            result.expected = "tps=0 decode=0 prefill=120 e2e=3000 tokens=64";
+            result.actual = "tps=" + std::to_string(m.tokens_per_second) +
+                            " decode=" + std::to_string(m.decode_ms) +
+                            " prefill=" + std::to_string(m.prompt_eval_ms) +
+                            " e2e=" + std::to_string(m.end_to_end_ms) +
+                            " tokens=" + std::to_string(m.output_tokens);
+            return result;
+        }
+    }
+
+    // Prefill falls back to TokenUsage.prefill_ms when prompt_eval_time_ms is absent.
+    {
+        runanywhere::v1::LLMGenerationResult r;
+        r.mutable_usage()->set_output_tokens(8);
+        r.mutable_usage()->set_prefill_ms(77);
+        rcli::commands::bench_metrics::LlmVlmMetrics m;
+        if (!rcli::commands::bench_metrics::fill_llm(r, 100.0, &m) || m.prompt_eval_ms != 77.0) {
+            result.expected = "prefill_ms=77 from TokenUsage";
+            result.actual = "prefill=" + std::to_string(m.prompt_eval_ms);
+            return result;
+        }
+    }
+
+    result.passed = true;
+    return result;
+}
+
+}  // namespace
 
 int main(int argc, char **argv) {
   TestSuite suite("rcli_unit");
@@ -1975,5 +2088,6 @@ int main(int argc, char **argv) {
   suite.add("write_png_byte_exact", test_write_png_byte_exact);
   suite.add("write_png_multi_block", test_write_png_multi_block);
   suite.add("write_png_unwritable_path", test_write_png_unwritable_path);
+  suite.add("bench_metrics_consume_only", test_bench_metrics_consume_only);
   return suite.run(argc, argv);
 }

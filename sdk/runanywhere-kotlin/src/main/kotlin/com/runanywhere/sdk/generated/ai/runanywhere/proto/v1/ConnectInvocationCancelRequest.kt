@@ -96,11 +96,11 @@ public class ConnectInvocationCancelRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectInvocationCancelRequest> =
         object : ProtoAdapter<ConnectInvocationCancelRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ConnectInvocationCancelRequest::class, 
-      "type.googleapis.com/runanywhere.v1.ConnectInvocationCancelRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ConnectInvocationCancelRequest::class,
+      "type.googleapis.com/runanywhere.v1.ConnectInvocationCancelRequest",
+      PROTO_3,
+      null,
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectInvocationCancelRequest): Int {

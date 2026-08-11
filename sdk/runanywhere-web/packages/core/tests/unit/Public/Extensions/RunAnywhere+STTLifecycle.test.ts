@@ -76,8 +76,10 @@ describe('lifecycle-owned Web STT', () => {
       sampleRate: 16_000,
       channels: 1,
     });
+    // Commons rac_audio_float32_to_pcm16: round(f * 32768) saturate.
+    // [0, 0.5, -0.5] → [0, 16384, -16384] LE bytes.
     expect(Array.from(harness.requests[0]?.audio?.audioData ?? [])).toEqual([
-      0, 0, 0, 64, 1, 192,
+      0, 0, 0, 64, 0, 192,
     ]);
   });
 
@@ -255,6 +257,18 @@ function fakeSTTModule(): FakeSTTHarness {
     _rac_stt_component_destroy(): void {
       counters.componentDestroys += 1;
       currentLifecycleModelId = null;
+    },
+    // Commons audio convert ABI used by Float32 → PCM16 coerce.
+    _rac_audio_float32_to_pcm16(inPtr: number, nSamples: number, outPtr: number): number {
+      const floats = new Float32Array(heap, inPtr, nSamples);
+      const view = new DataView(heap, outPtr, nSamples * 2);
+      for (let i = 0; i < nSamples; i += 1) {
+        const sample = floats[i] ?? 0;
+        const clamped = Number.isFinite(sample) ? Math.max(-1, Math.min(1, sample)) : 0;
+        const pcm = Math.max(-32768, Math.min(32767, Math.round(clamped * 32768)));
+        view.setInt16(i * 2, pcm, true);
+      }
+      return 0;
     },
   };
 

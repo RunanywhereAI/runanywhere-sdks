@@ -204,7 +204,9 @@ struct ModelOrgDetailView: View {
     let org: ModelOrg
     /// Ids the caller's filters admitted, snapshotted at push time.
     let visibleModelIDs: Set<String>
-    let tier: HardwareTier
+    /// Commons `can_run` by model id when the SDK returned a verdict; absent
+    /// ids are not filtered by a local size budget.
+    var canRunByModelID: [String: Bool] = [:]
     /// The model the *caller's* picker considers active. Each picker scopes this
     /// differently (chat model, vision model, embedding model), so it stays a
     /// caller decision rather than being read from the registry here.
@@ -224,9 +226,15 @@ struct ModelOrgDetailView: View {
     }
 
     private func bestVariant(in variants: [RAModelInfo]) -> RAModelInfo? {
-        variants.last {
-            $0.consumerSizeBytes <= tier.memoryBudgetBytes && $0.consumerSizeBytes > 0
-        } ?? variants.first
+        if !canRunByModelID.isEmpty {
+            return variants.last { canRunByModelID[$0.id] == true } ?? variants.first
+        }
+        // No typed compatibility map — do not invent a local byte budget.
+        return variants.first
+    }
+
+    private var recommendedHighlight: String? {
+        canRunByModelID.isEmpty ? nil : "Compatible with this device"
     }
 
     var body: some View {
@@ -237,7 +245,7 @@ struct ModelOrgDetailView: View {
         List {
             if let best {
                 Section {
-                    row(for: best, in: variants, highlight: "Best for this device")
+                    row(for: best, in: variants, highlight: recommendedHighlight)
                 } header: {
                     Text("Recommended")
                 } footer: {

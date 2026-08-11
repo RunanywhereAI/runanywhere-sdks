@@ -128,6 +128,7 @@ object CppBridgeDevice {
 
         /** 0 = UNKNOWN. DeviceInfo has no efficiency_cores wire field today. */
         fun getEfficiencyCores(): Int = 0
+    }
 
     // Public API
 

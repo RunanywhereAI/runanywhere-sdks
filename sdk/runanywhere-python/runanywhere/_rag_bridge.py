@@ -169,16 +169,16 @@ def parse_result(raw: bytes, model: str) -> RagResult:
 
 
 def _result_from_pb(pb: Any, model: str) -> RagResult:
-    generation_ms = float(pb.generation_time_ms)
-    tokens = int(pb.usage.output_tokens)
+    # Metrics come only from commons TokenUsage — never from phase timings or
+    # host-side tokens/generation_time division.
+    usage = pb.usage
     return RagResult(
         answer=pb.answer,
         sources=[_match(chunk) for chunk in pb.retrieved_chunks],
-        input_tokens=int(pb.usage.input_tokens),
-        output_tokens=tokens,
-        # The pipeline reports phase timings, not a first-token timestamp.
-        time_to_first_token_ms=float(pb.retrieval_time_ms),
-        tokens_per_second=(tokens / (generation_ms / 1000.0)) if generation_ms > 0 else 0.0,
+        input_tokens=int(usage.input_tokens),
+        output_tokens=int(usage.output_tokens),
+        time_to_first_token_ms=float(usage.ttft_ms),
+        tokens_per_second=float(usage.decode_tokens_per_second),
         request_id=pb.request_id,
         model=model,
     )

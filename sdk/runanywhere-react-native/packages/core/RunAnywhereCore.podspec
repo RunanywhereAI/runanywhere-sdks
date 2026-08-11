@@ -36,6 +36,8 @@ Pod::Spec.new do |s|
   s.source_files = [
     "ios/**/*.{swift}",
     "ios/**/*.{h,m,mm}",
+    "cpp/AudioCaptureLevel.cpp",
+    "cpp/AudioCaptureLevel.hpp",
     "cpp/HybridLLM.cpp",
     "cpp/HybridLLM.hpp",
     "cpp/HybridRunAnywhereCore.cpp",

@@ -228,11 +228,11 @@ public class TokenUsage(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TokenUsage> = object : ProtoAdapter<TokenUsage>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      TokenUsage::class, 
-      "type.googleapis.com/runanywhere.v1.TokenUsage", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      TokenUsage::class,
+      "type.googleapis.com/runanywhere.v1.TokenUsage",
+      PROTO_3,
+      null,
       "token_usage.proto"
     ) {
       override fun encodedSize(`value`: TokenUsage): Int {

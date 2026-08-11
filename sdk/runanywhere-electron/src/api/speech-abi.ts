@@ -1,11 +1,8 @@
 // speech-abi.ts — typed access to the commons STT, TTS, and VAD proto ABIs.
 //
-// Three features in one file because they share a shape: none of them takes a
-// handle, each reads whatever `rac_model_lifecycle_load_proto` made resident
-// for its component, and each speaks one request message and one result or
-// event stream. That is also why the options each carry fields the component
-// ABI had no room for — word timestamps, diarization hints, the VAD hangover
-// dials — which is the point of the migration.
+// STT and TTS are handle-free lifecycle entry points. VAD streaming uses
+// `rac_vad_stream_*` over a component handle the backend owns — commons applies
+// min-speech / min-silence / prefix-padding and emits SPEECH_ACTIVITY events.
 
 import { SDKException } from '../errors';
 import { AudioEncoding, AudioFormat } from '@runanywhere/proto-ts/model_types';
@@ -25,16 +22,19 @@ import {
   TTSVoiceList,
 } from '@runanywhere/proto-ts/tts_options';
 import {
-  VADConfiguration,
-  VADProcessRequest,
+  SpeechActivityKind,
+  VADOptions as ProtoVadOptions,
   VADResult,
-  VADServiceState,
+  VADStreamEvent,
+  VADStreamEventKind,
 } from '@runanywhere/proto-ts/vad_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';
 import type { SttOptions, TtsOptions, VadOptions } from './options';
+import { VAD_DEFAULTS, toNativeVadConfig } from './options';
 import { newRequestId } from './types';
+import type { Segment, VadEvent } from './types';
 
 /** The sample rate every audio path in this SDK normalizes to. */
 export const SPEECH_SAMPLE_RATE = 16000;
@@ -185,99 +185,122 @@ export class TtsAbi {
 }
 
 // ---------------------------------------------------------------------------
-// vad
+// vad — rac_vad_stream_* / SPEECH_ACTIVITY (commons owns endpointing)
 // ---------------------------------------------------------------------------
 
-/**
- * One frame plus the turn-taking policy for it.
- *
- * `minSpeechMs`, `minSilenceMs`, and `prefixPaddingMs` are declared by the
- * public options type and were dropped on the way to the component ABI, which
- * had only a threshold. Commons owns the debounce, the hangover, and the
- * pre-roll, so they travel on every frame now.
- */
-export function toVadRequest(
-  samples: Float32Array,
-  options: VadOptions,
-  frameOffsetMs = 0
-): VADProcessRequest {
-  return VADProcessRequest.fromPartial({
-    audio: {
-      audioData: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
-      encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
-      sampleRate: SPEECH_SAMPLE_RATE,
-      channels: 1,
-      frameOffsetMs,
-    },
-    options: {
+/** Serialize public {@link VadOptions} for `rac_vad_stream_start_proto`. */
+export function toVadOptionsBytes(options: VadOptions = {}): Uint8Array {
+  return ProtoVadOptions.encode(
+    ProtoVadOptions.fromPartial({
       activationThreshold: options.activationThreshold,
-      minSpeechDurationMs: options.minSpeechMs ?? 0,
-      minSilenceDurationMs: options.minSilenceMs ?? 0,
-      prefixPaddingMs: options.prefixPaddingMs ?? 0,
+      minSpeechDurationMs: options.minSpeechMs ?? VAD_DEFAULTS.minSpeechMs,
+      minSilenceDurationMs: options.minSilenceMs ?? VAD_DEFAULTS.minSilenceMs,
+      prefixPaddingMs: options.prefixPaddingMs ?? VAD_DEFAULTS.prefixPaddingMs,
       sampleRate: SPEECH_SAMPLE_RATE,
-    },
-  });
+    })
+  ).finish();
 }
 
-/**
- * The detector's own configuration, which is a different message from the
- * per-frame request: `rac_vad_configure_lifecycle_proto` parses a
- * `VADConfiguration`, while `rac_vad_process_lifecycle_proto` parses a
- * `VADProcessRequest`.
- */
-export function toVadConfiguration(options: VadOptions): VADConfiguration {
-  return VADConfiguration.fromPartial({
-    modelId: '',
-    sampleRate: SPEECH_SAMPLE_RATE,
-    frameLengthMs: VAD_FRAME_MS,
-    // Left at 0 when the caller named no threshold, so configure and process
-    // both land on commons' default. Sending the proto's documented 0.5 here
-    // would arm the built-in energy detector at an RMS bar of 0.5 while every
-    // process call used the default, and commons rebuilds the detector when
-    // the threshold changes, so its debounce state would reset every frame and
-    // speech would never be reported.
-    activationThreshold: options.activationThreshold ?? 0,
-    enableAutoCalibration: false,
-    calibrationMultiplier: 1,
-  });
+function activityToEvent(activity: NonNullable<VADStreamEvent['activity']>): VadEvent | null {
+  if (activity.eventType === SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED) {
+    return { type: 'speechStarted', timestampMs: activity.audioStartMs };
+  }
+  if (activity.eventType === SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED) {
+    return { type: 'speechEnded', timestampMs: activity.audioEndMs };
+  }
+  return null;
 }
 
-/** The frame size every VAD path in this SDK feeds the detector. */
-export const VAD_FRAME_MS = 30;
+function frameToEvent(result: VADResult): VadEvent {
+  const isSpeech = result.isSpeech;
+  return {
+    type: 'activity',
+    isSpeech,
+    probability: result.probability || (isSpeech ? 1 : 0),
+    timestampMs: result.durationMs || 0,
+  };
+}
 
-/** The commons VAD layer, bound to one backend. */
+/** Decode one commons `VADStreamEvent` into zero or more public events. */
+export function decodeVadStreamEvent(raw: Uint8Array): VadEvent[] {
+  const event = VADStreamEvent.decode(raw);
+  if (event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY && event.activity) {
+    const mapped = activityToEvent(event.activity);
+    return mapped ? [mapped] : [];
+  }
+  if (event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME && event.result) {
+    return [frameToEvent(event.result)];
+  }
+  if (event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR) {
+    return [
+      {
+        type: 'failed',
+        error: event.error
+          ? SDKException.fromProto(event.error as never)
+          : SDKException.generationFailed('vad stream error'),
+      },
+    ];
+  }
+  return [];
+}
+
+/** The commons VAD stream layer, bound to one backend component handle. */
 export class VadAbi {
   constructor(private readonly backend: RaBackend) {}
 
-  async configure(config: VADConfiguration): Promise<VADServiceState> {
-    return VADServiceState.decode(
-      await this.backend.vadConfigureProto(VADConfiguration.encode(config).finish())
+  /** Ensure a component handle is open (energy detector; model optional). */
+  async open(options: VadOptions = {}): Promise<void> {
+    await this.backend.vadOpen(
+      toNativeVadConfig(options, { sampleRate: SPEECH_SAMPLE_RATE })
     );
   }
 
-  async process(request: VADProcessRequest): Promise<VADResult> {
-    return orThrow(
-      await invokeProto(
-        (bytes) => this.backend.vadProcessProto(bytes),
-        VADProcessRequest,
-        request,
-        VADResult
-      )
-    );
+  /**
+   * Feed one PCM16 buffer through a commons stream session and collect segments.
+   * Endpointing (min-speech / min-silence / prefix padding) is applied by commons.
+   */
+  async detect(pcm16: Uint8Array, options: VadOptions = {}): Promise<{
+    segments: Segment[];
+    probability: number;
+  }> {
+    await this.open(options);
+    const segments: Segment[] = [];
+    let openStart: number | null = null;
+    let probability = 0;
+
+    const onEvent = (raw: Uint8Array): void => {
+      for (const event of decodeVadStreamEvent(raw)) {
+        if (event.type === 'speechStarted') {
+          openStart = event.timestampMs ?? 0;
+        } else if (event.type === 'speechEnded' && openStart != null) {
+          segments.push({
+            startMs: openStart,
+            endMs: Math.max(event.timestampMs ?? openStart, openStart),
+          });
+          openStart = null;
+        } else if (event.type === 'activity') {
+          probability = Math.max(probability, event.probability);
+        } else if (event.type === 'failed') {
+          throw event.error;
+        }
+      }
+    };
+
+    await Promise.resolve(this.backend.vadSetStreamCallback(onEvent));
+    try {
+      const sessionId = await this.backend.vadStreamStart(toVadOptionsBytes(options));
+      if (pcm16.byteLength > 0) await this.backend.vadStreamFeed(sessionId, pcm16);
+      await this.backend.vadStreamStop(sessionId);
+    } finally {
+      await this.backend.vadUnsetStreamCallback();
+    }
+    return { segments, probability };
   }
 
-  async start(): Promise<VADServiceState> {
-    return VADServiceState.decode(await this.backend.vadStartProto());
-  }
-
-  async stop(): Promise<VADServiceState> {
-    return VADServiceState.decode(await this.backend.vadStopProto());
-  }
-
-  async reset(): Promise<VADServiceState> {
-    return VADServiceState.decode(await this.backend.vadResetProto());
+  async reset(): Promise<void> {
+    await this.backend.vadReset();
   }
 }
 
-export { STTStreamEventKind, TTSStreamEventKind };
-export type { STTOutput, STTStreamEvent, TTSOutput, TTSStreamEvent, VADResult };
+export { STTStreamEventKind, TTSStreamEventKind, VADStreamEventKind, SpeechActivityKind };
+export type { STTOutput, STTStreamEvent, TTSOutput, TTSStreamEvent, VADResult, VADStreamEvent };

@@ -140,11 +140,7 @@ export async function audioInputToFloat32(audio: AudioInput): Promise<Float32Arr
     return decodeContainerToFloat32(audio.bytes, audio.format.sampleRate);
   }
   const count = Math.floor(audio.bytes.byteLength / 2);
-  const copy = audio.bytes.buffer.slice(
-    audio.bytes.byteOffset,
-    audio.bytes.byteOffset + count * 2,
-  );
-  return commonsPcm16ToFloat32(copy);
+  return commonsPcm16ToFloat32(audio.bytes.subarray(0, count * 2));
 }
 
 /**

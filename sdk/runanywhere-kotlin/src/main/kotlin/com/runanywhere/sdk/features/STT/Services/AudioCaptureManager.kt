@@ -37,6 +37,8 @@ import androidx.core.content.ContextCompat
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.extensions.AUDIO_LEVEL_FLOOR_DB
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,8 +46,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
@@ -297,7 +297,7 @@ class AudioCaptureManager {
                         val bytesRead = record.read(buffer, 0, chunkBytes)
                         if (bytesRead > 0) {
                             val chunk = buffer.copyOf(bytesRead)
-                            currentAudioLevel = computeNormalizedLevel(chunk)
+                            currentAudioLevel = normalizedLevelFromPcm16Le(chunk)
                             try {
                                 onAudioData(chunk)
                             } catch (t: Throwable) {
@@ -470,29 +470,6 @@ class AudioCaptureManager {
         logger.info("AcousticEchoCanceler enabled (enabled=${canceler.enabled})")
     }
 
-    /**
-     * Compute a normalized audio level (0.0–1.0) for the given PCM 16-bit
-     * little-endian chunk. Uses RMS->dB mapping similar to Swift's
-     * `rac_audio_compute_level_db` but in pure Kotlin so this works on hosts
-     * without the native commons library.
-     */
-    private fun computeNormalizedLevel(pcm16le: ByteArray): Float {
-        if (pcm16le.size < 2) return 0f
-        val shorts = ByteBuffer.wrap(pcm16le).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        val sampleCount = shorts.remaining()
-        if (sampleCount == 0) return 0f
-        var sumSquares = 0.0
-        while (shorts.hasRemaining()) {
-            val s = shorts.get().toDouble() / Short.MAX_VALUE.toDouble()
-            sumSquares += s * s
-        }
-        val rms = kotlin.math.sqrt(sumSquares / sampleCount).toFloat()
-        if (rms <= 0f) return 0f
-        val db = 20f * kotlin.math.log10(rms.toDouble()).toFloat()
-        // Normalize -60 dB .. 0 dB → 0 .. 1.
-        return ((db + 60f) / 60f).coerceIn(0f, 1f)
-    }
-
     private fun appContextOrNull(): Context? =
         try {
             AndroidPlatformContext.applicationContext
@@ -549,6 +526,28 @@ class AudioCaptureManager {
         } else {
             legacyFocusListener?.let { manager.abandonAudioFocus(it) }
             legacyFocusListener = null
+        }
+    }
+
+    companion object {
+        /**
+         * Normalized mic level (0.0–1.0) for a PCM 16-bit little-endian chunk.
+         *
+         * Delegates to commons via JNI: `rac_audio_pcm16_to_float32` then
+         * `rac_audio_compute_level_normalized` (−60 dBFS → 0, 0 dBFS → 1).
+         */
+        @JvmStatic
+        fun normalizedLevelFromPcm16Le(
+            pcm16le: ByteArray,
+            length: Int = pcm16le.size,
+        ): Float {
+            val usable = length.coerceIn(0, pcm16le.size)
+            val even = usable - (usable % 2)
+            if (even < 2) return 0f
+            val bytes = if (even == pcm16le.size) pcm16le else pcm16le.copyOf(even)
+            val samples = RunAnywhereBridge.racAudioPcm16ToFloat32(bytes) ?: return 0f
+            if (samples.isEmpty()) return 0f
+            return RunAnywhereBridge.racAudioComputeLevelNormalized(samples, AUDIO_LEVEL_FLOOR_DB)
         }
     }
 }

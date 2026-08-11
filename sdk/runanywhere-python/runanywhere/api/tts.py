@@ -25,11 +25,18 @@ def _voice_model(options: Optional[TtsOptions]) -> Optional[str]:
     return options.model or options.voice
 
 
-def _encode(samples: np.ndarray, sample_rate: int, options: Optional[TtsOptions]) -> Audio:
+def _encode(
+    samples: np.ndarray,
+    sample_rate: int,
+    options: Optional[TtsOptions],
+    *,
+    duration_ms: int = 0,
+) -> Audio:
     rate = sample_rate
     if options is not None and options.sample_rate and options.sample_rate < sample_rate:
         # Only downsampling is available host-side; a higher request keeps the native rate,
-        # which Audio.sample_rate reports.
+        # which Audio.sample_rate reports. Host resampling does not invent duration —
+        # Audio.duration_ms stays the commons-reported value when the bridge carried it.
         samples = downsample(samples, sample_rate, options.sample_rate)
         rate = options.sample_rate
     fmt = options.format if options is not None else AudioFormat.PCM
@@ -38,7 +45,10 @@ def _encode(samples: np.ndarray, sample_rate: int, options: Optional[TtsOptions]
         data=data,
         sample_rate=rate,
         format=fmt,
-        duration_ms=int(round(len(samples) / rate * 1000)) if rate else 0,
+        # Model-output duration is commons-owned (rac_tts_result_t.duration_ms /
+        # TTSOutput.duration_ms). Leave 0 when the bridge did not surface it — never
+        # recompute from sample count here.
+        duration_ms=int(duration_ms) if duration_ms > 0 else 0,
     )
 
 
@@ -58,14 +68,24 @@ class Tts:
         check_tts_options(options)
         voice = runtime.tts(_voice_model(options))
         synthesis = voice.synthesize(text)
-        return _encode(synthesis.samples, synthesis.sample_rate, options)
+        return _encode(
+            synthesis.samples,
+            synthesis.sample_rate,
+            options,
+            duration_ms=synthesis.duration_ms,
+        )
 
     async def asynthesize(self, text: str, options: Optional[TtsOptions] = None) -> Audio:
         """Async form of :meth:`synthesize`."""
         check_tts_options(options)
         voice = runtime.tts(_voice_model(options))
         synthesis = await voice.asynthesize(text)
-        return _encode(synthesis.samples, synthesis.sample_rate, options)
+        return _encode(
+            synthesis.samples,
+            synthesis.sample_rate,
+            options,
+            duration_ms=synthesis.duration_ms,
+        )
 
     def synthesize_stream(
         self, text: str, options: Optional[TtsOptions] = None

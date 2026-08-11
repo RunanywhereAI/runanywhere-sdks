@@ -12,6 +12,7 @@
 import { AudioPlayback } from '../../Internal/Nitro/NitroAudioPlaybackSpec';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { float32ToWav } from '../../Public/Extensions/Audio/RunAnywhere+AudioConvert';
 
 const logger = new SDKLogger('AudioPlaybackManager');
 
@@ -22,8 +23,8 @@ export class AudioPlaybackManager {
 
   /**
    * Play raw PCM float32 audio (the format emitted by TTS) at the given
-   * sample rate. Encodes to an in-memory 16-bit WAV and hands the bytes to
-   * the native player directly.
+   * sample rate. Encodes to an in-memory 16-bit WAV via commons
+   * `rac_audio_float32_to_wav` and hands the bytes to the native player.
    */
   async play(audioData: ArrayBuffer | string, sampleRate = audioCaptureDefaults.ttsSampleRateHz): Promise<void> {
     if (this.state === 'playing') {
@@ -38,7 +39,7 @@ export class AudioPlaybackManager {
         typeof audioData === 'string'
           ? base64ToArrayBuffer(audioData)
           : audioData;
-      const wavBuffer = createWavFromPCMFloat32(pcmBytes, sampleRate);
+      const wavBuffer = float32ToWav(pcmBytes, sampleRate);
 
       this.state = 'playing';
       // Resolves when playback finishes; rejects on failure/interruption.
@@ -148,57 +149,6 @@ export class AudioPlaybackManager {
   /** Total duration of the loaded audio in seconds. */
   get duration(): number {
     return AudioPlayback.duration;
-  }
-}
-
-/**
- * Encode raw float32 PCM samples into an in-memory 16-bit mono WAV buffer.
- */
-function createWavFromPCMFloat32(
-  pcmFloat32: ArrayBuffer,
-  sampleRate: number
-): ArrayBuffer {
-  const floatView = new Float32Array(pcmFloat32);
-  const numSamples = floatView.length;
-  const int16Samples = new Int16Array(numSamples);
-  for (let i = 0; i < numSamples; i++) {
-    const floatSample = floatView[i] ?? 0;
-    const sample = Math.max(-1, Math.min(1, floatSample));
-    int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-  }
-
-  const wavDataSize = int16Samples.length * 2;
-  const wavBuffer = new ArrayBuffer(44 + wavDataSize);
-  const wavView = new DataView(wavBuffer);
-
-  writeString(wavView, 0, 'RIFF');
-  wavView.setUint32(4, 36 + wavDataSize, true);
-  writeString(wavView, 8, 'WAVE');
-
-  writeString(wavView, 12, 'fmt ');
-  wavView.setUint32(16, 16, true);
-  wavView.setUint16(20, 1, true);
-  wavView.setUint16(22, 1, true);
-  wavView.setUint32(24, sampleRate, true);
-  wavView.setUint32(28, sampleRate * 2, true);
-  wavView.setUint16(32, 2, true);
-  wavView.setUint16(34, 16, true);
-
-  writeString(wavView, 36, 'data');
-  wavView.setUint32(40, wavDataSize, true);
-
-  const wavBytes = new Uint8Array(wavBuffer);
-  const int16Bytes = new Uint8Array(int16Samples.buffer);
-  for (let i = 0; i < int16Bytes.length; i++) {
-    wavBytes[44 + i] = int16Bytes[i]!;
-  }
-
-  return wavBuffer;
-}
-
-function writeString(view: DataView, offset: number, str: string): void {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
   }
 }
 

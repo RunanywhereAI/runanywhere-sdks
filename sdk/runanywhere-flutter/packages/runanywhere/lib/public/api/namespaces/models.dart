@@ -193,6 +193,9 @@ class ModelsApi {
                       progress.currentFileName.isNotEmpty
                   ? progress.currentFileName
                   : null,
+              overallProgress: progress.overallProgress > 0
+                  ? progress.overallProgress
+                  : null,
             );
           }
       }
@@ -371,11 +374,9 @@ class LoraApi {
           LoraAdapterConfig(
             adapterPath: path,
             adapterId: adapterId,
-            scale:
-                scale ??
-                (entry.hasDefaultScale() && entry.defaultScale > 0
-                    ? entry.defaultScale
-                    : 1.0),
+            // Leave unset when omitted so commons resolve_effective_lora_scale
+            // owns catalog (including 0.0) → 1.0. Proto ctor only sets when non-null.
+            scale: scale,
           ),
         ],
         // Stack on top of the currently-applied set (old default behavior,

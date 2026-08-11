@@ -279,8 +279,8 @@ typedef struct rac_llm_info {
  * @return RAC_TRUE to continue, RAC_FALSE to stop generation
  */
 typedef rac_bool_t (*rac_llm_stream_callback_fn)(const char* token, rac_bool_t is_final,
-                                                 const char* finish_reason,
-                                                 int32_t tokens_in_delta, void* user_data);
+                                                 const char* finish_reason, int32_t tokens_in_delta,
+                                                 void* user_data);
 
 // =============================================================================
 // MEMORY MANAGEMENT

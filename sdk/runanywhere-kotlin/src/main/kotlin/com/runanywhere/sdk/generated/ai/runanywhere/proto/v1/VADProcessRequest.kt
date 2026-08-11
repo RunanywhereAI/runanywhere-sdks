@@ -85,11 +85,11 @@ public class VADProcessRequest(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADProcessRequest> = object : ProtoAdapter<VADProcessRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      VADProcessRequest::class, 
-      "type.googleapis.com/runanywhere.v1.VADProcessRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      VADProcessRequest::class,
+      "type.googleapis.com/runanywhere.v1.VADProcessRequest",
+      PROTO_3,
+      null,
       "vad_options.proto"
     ) {
       override fun encodedSize(`value`: VADProcessRequest): Int {

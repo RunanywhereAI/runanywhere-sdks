@@ -62,7 +62,6 @@ class Vlm:
                 request_id=runtime.new_request_id(),
                 include_thoughts=wants_thoughts(opts),
                 stop_sequences=opts.stop_sequences,
-                max_output_tokens=opts.max_output_tokens,
             ):
                 yield event
         finally:
@@ -82,7 +81,6 @@ class Vlm:
             request_id=runtime.new_request_id(),
             include_thoughts=wants_thoughts(opts),
             stop_sequences=opts.stop_sequences,
-            max_output_tokens=opts.max_output_tokens,
         )
         try:
             async for event in inner:

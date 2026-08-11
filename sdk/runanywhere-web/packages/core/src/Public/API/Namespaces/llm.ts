@@ -6,6 +6,7 @@
 import { LLMStreamEventKind, type LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import {
   ChatMessage as ProtoChatMessageMessage,
   MessageRole,
@@ -266,14 +267,7 @@ export const llm = {
               type: 'usage',
               requestId,
               sequence: sequence++,
-              usage: {
-                inputTokens: result.inputTokens,
-                outputTokens: result.outputTokens,
-                totalTokens: event.result.usage?.totalTokens ?? 0,
-                decodeTokensPerSecond: result.tokensPerSecond,
-                prefillMs: event.result.promptEvalTimeMs ?? 0,
-                ttftMs: result.timeToFirstTokenMs,
-              },
+              usage: event.result.usage ?? TokenUsage.create(),
             };
             yield { type: 'completed', requestId, result };
           }

@@ -361,6 +361,24 @@ export class RpcBackend implements RaBackend {
   vadClose(): Promise<void> {
     return this.call('vadClose', []);
   }
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): Promise<void> {
+    return this.call('vadSetStreamCallback', [], onEvent as (c: unknown) => void);
+  }
+  vadUnsetStreamCallback(): Promise<void> {
+    return this.call('vadUnsetStreamCallback', []);
+  }
+  vadStreamStart(optionsBytes: Uint8Array): Promise<number> {
+    return this.call('vadStreamStart', [optionsBytes]);
+  }
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void> {
+    return this.call('vadStreamFeed', [sessionId, audioBytes]);
+  }
+  vadStreamStop(sessionId: number): Promise<void> {
+    return this.call('vadStreamStop', [sessionId]);
+  }
+  vadStreamCancel(sessionId: number): Promise<void> {
+    return this.call('vadStreamCancel', [sessionId]);
+  }
 
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
   embedBatchProto(requestBytes: Uint8Array): Promise<Uint8Array> {

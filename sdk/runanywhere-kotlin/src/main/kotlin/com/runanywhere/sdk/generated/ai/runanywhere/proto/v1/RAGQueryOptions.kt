@@ -98,11 +98,11 @@ public class RAGQueryOptions(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGQueryOptions> = object : ProtoAdapter<RAGQueryOptions>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      RAGQueryOptions::class, 
-      "type.googleapis.com/runanywhere.v1.RAGQueryOptions", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      RAGQueryOptions::class,
+      "type.googleapis.com/runanywhere.v1.RAGQueryOptions",
+      PROTO_3,
+      null,
       "rag.proto"
     ) {
       override fun encodedSize(`value`: RAGQueryOptions): Int {

@@ -53,7 +53,11 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
+#include "rac/core/rac_audio_utils.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_stream.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diarization/rac_diarization_types.h"
@@ -835,51 +839,6 @@ void cancel_generate(int32_t handle) {
 }
 
 // =============================================================================
-// LoRA adapters on a loaded LLM (rac_llm_component_{load,remove,clear}_lora).
-// Backend-agnostic dispatch inside commons (llm_module.cpp); LlamaCPP is the only
-// engine that currently wires load_lora/remove_lora/clear_lora ops, so a non-LlamaCPP
-// resident model surfaces RAC_ERROR_NOT_SUPPORTED here rather than failing to bind.
-// The C ABI is write-only (no read-back) — same shape as the Electron addon
-// (addon.cpp's g_lora_applied) — so the Python side mirrors the applied set itself
-// (see runanywhere/_handles.py's LLMModel).
-// =============================================================================
-void lora_apply(int32_t handle, const std::string& adapter_path, std::optional<float> scale) {
-    rac_handle_t h = begin_op(g_llm_handles, handle);
-    if (!h) throw std::runtime_error("invalid handle");
-    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
-    rac_result_t rc;
-    {
-        py::gil_scoped_release release;
-        rc = rac_llm_component_load_lora(h, adapter_path.c_str(), scale.value_or(1.0f));
-    }
-    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_apply");
-}
-
-void lora_remove(int32_t handle, const std::string& adapter_path) {
-    rac_handle_t h = begin_op(g_llm_handles, handle);
-    if (!h) throw std::runtime_error("invalid handle");
-    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
-    rac_result_t rc;
-    {
-        py::gil_scoped_release release;
-        rc = rac_llm_component_remove_lora(h, adapter_path.c_str());
-    }
-    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_remove");
-}
-
-void lora_remove_all(int32_t handle) {
-    rac_handle_t h = begin_op(g_llm_handles, handle);
-    if (!h) throw std::runtime_error("invalid handle");
-    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
-    rac_result_t rc;
-    {
-        py::gil_scoped_release release;
-        rc = rac_llm_component_clear_lora(h);
-    }
-    if (rc != RAC_SUCCESS) raise_rac_error(rc, "lora_remove_all");
-}
-
-// =============================================================================
 // VLM: load_vlm_model / generate_vlm / unload_vlm_model
 // =============================================================================
 int32_t load_vlm_model(const std::string& model_path, const std::string& mmproj_path,
@@ -1415,7 +1374,9 @@ int32_t load_tts_voice(const std::string& dir, std::optional<std::string> id,
     return register_handle(g_tts_handles, h);
 }
 
-// synthesize(handle, text) -> (samples float32 ndarray, sample_rate int).
+// synthesize(handle, text) -> (samples float32 ndarray, sample_rate int, duration_ms int).
+// duration_ms is commons-owned (rac_tts_result_t.duration_ms); the Python SDK must not
+// recompute it from sample count.
 py::tuple synthesize(int32_t handle, const std::string& text) {
     rac_handle_t h = begin_op(g_tts_handles, handle);
     if (!h) throw std::runtime_error("invalid tts handle");
@@ -1434,8 +1395,9 @@ py::tuple synthesize(int32_t handle, const std::string& text) {
     py::array_t<float> samples(static_cast<py::ssize_t>(n));
     if (result.audio_data && n) std::memcpy(samples.mutable_data(), result.audio_data, n * sizeof(float));
     int32_t sr = result.sample_rate;
+    int64_t duration_ms = result.duration_ms;
     rac_tts_result_free(&result);
-    return py::make_tuple(samples, sr);
+    return py::make_tuple(samples, sr, static_cast<int64_t>(duration_ms));
 }
 
 void unload_tts_voice(int32_t handle) {
@@ -1513,6 +1475,296 @@ void load_vad_model(int32_t handle, const std::string& model_path,
 void unload_vad(int32_t handle) {
     rac_handle_t h = take_handle_when_idle(g_vad_handles, handle);
     if (h) rac_vad_component_destroy(h);
+}
+
+// =============================================================================
+// VAD streaming (rac_vad_stream_* — commons owns min-speech / silence / hangover).
+// =============================================================================
+struct VadStreamCtx {
+    py::function on_event;
+    std::exception_ptr py_exc;
+};
+
+void vad_stream_event_cb(const uint8_t* event_bytes, size_t event_size, void* ud) {
+    auto* ctx = static_cast<VadStreamCtx*>(ud);
+    if (!ctx || !event_bytes || event_size == 0) return;
+    std::string copy(reinterpret_cast<const char*>(event_bytes), event_size);
+    py::gil_scoped_acquire gil;
+    try {
+        ctx->on_event(py::bytes(copy));
+    } catch (py::error_already_set&) {
+        ctx->py_exc = std::current_exception();
+    } catch (...) {
+        ctx->py_exc = std::current_exception();
+    }
+}
+
+std::unordered_map<int32_t, VadStreamCtx*> g_vad_stream_ctx;
+
+void vad_set_stream_callback(int32_t handle, py::function on_event) {
+    rac_handle_t h = handle_for(g_vad_handles, handle);
+    if (!h) throw std::runtime_error("invalid vad handle");
+    auto it = g_vad_stream_ctx.find(handle);
+    if (it != g_vad_stream_ctx.end()) {
+        rac_vad_unset_stream_proto_callback(h);
+        rac_vad_proto_quiesce();
+        delete it->second;
+        g_vad_stream_ctx.erase(it);
+    }
+    auto* ctx = new VadStreamCtx();
+    ctx->on_event = std::move(on_event);
+    rac_result_t rc = rac_vad_set_stream_proto_callback(h, vad_stream_event_cb, ctx);
+    if (rc != RAC_SUCCESS) {
+        delete ctx;
+        raise_rac_error(rc, "vad_set_stream_callback");
+    }
+    g_vad_stream_ctx[handle] = ctx;
+}
+
+void vad_unset_stream_callback(int32_t handle) {
+    rac_handle_t h = handle_for(g_vad_handles, handle);
+    auto it = g_vad_stream_ctx.find(handle);
+    if (h) {
+        rac_vad_unset_stream_proto_callback(h);
+        rac_vad_proto_quiesce();
+    } else {
+        rac_vad_proto_quiesce();
+    }
+    if (it != g_vad_stream_ctx.end()) {
+        delete it->second;
+        g_vad_stream_ctx.erase(it);
+    }
+}
+
+uint64_t vad_stream_start(int32_t handle, const std::string& options_bytes) {
+    rac_handle_t h = handle_for(g_vad_handles, handle);
+    if (!h) throw std::runtime_error("invalid vad handle");
+    uint64_t session_id = 0;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_vad_stream_start_proto(
+            h, reinterpret_cast<const uint8_t*>(options_bytes.data()), options_bytes.size(),
+            &session_id);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "vad_stream_start");
+    return session_id;
+}
+
+void vad_stream_feed(uint64_t session_id, py::bytes audio_bytes) {
+    std::string buf = audio_bytes;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_vad_stream_feed_audio_proto(
+            session_id, reinterpret_cast<const uint8_t*>(buf.data()), buf.size());
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "vad_stream_feed");
+}
+
+void vad_stream_stop(uint64_t session_id) {
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_vad_stream_stop_proto(session_id);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "vad_stream_stop");
+}
+
+void vad_stream_cancel(uint64_t session_id) {
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_vad_stream_cancel_proto(session_id);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "vad_stream_cancel");
+}
+
+// =============================================================================
+// Audio DSP (rac_audio_*) — platforms must not re-implement these formulas.
+// =============================================================================
+py::array_t<int16_t> audio_float32_to_pcm16(
+    py::array_t<float, py::array::c_style | py::array::forcecast> samples) {
+    auto in = samples.request();
+    const size_t n = static_cast<size_t>(in.size);
+    py::array_t<int16_t> out(static_cast<py::ssize_t>(n));
+    rac_result_t rc = rac_audio_float32_to_pcm16(static_cast<const float*>(in.ptr), n,
+                                                 out.mutable_data());
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_float32_to_pcm16");
+    return out;
+}
+
+py::array_t<float> audio_pcm16_to_float32(
+    py::array_t<int16_t, py::array::c_style | py::array::forcecast> samples) {
+    auto in = samples.request();
+    const size_t n = static_cast<size_t>(in.size);
+    py::array_t<float> out(static_cast<py::ssize_t>(n));
+    rac_result_t rc =
+        rac_audio_pcm16_to_float32(static_cast<const int16_t*>(in.ptr), n, out.mutable_data());
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_pcm16_to_float32");
+    return out;
+}
+
+py::array_t<float> audio_resample_f32(
+    py::array_t<float, py::array::c_style | py::array::forcecast> samples, int32_t in_rate,
+    int32_t out_rate) {
+    auto in = samples.request();
+    float* out_ptr = nullptr;
+    size_t out_frames = 0;
+    rac_result_t rc =
+        rac_audio_resample_f32(static_cast<const float*>(in.ptr), static_cast<size_t>(in.size),
+                               in_rate, out_rate, &out_ptr, &out_frames);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_resample_f32");
+    py::array_t<float> out(static_cast<py::ssize_t>(out_frames));
+    if (out_frames && out_ptr) {
+        std::memcpy(out.mutable_data(), out_ptr, out_frames * sizeof(float));
+    }
+    rac_free(out_ptr);
+    return out;
+}
+
+float audio_compute_rms(py::array_t<float, py::array::c_style | py::array::forcecast> samples) {
+    auto in = samples.request();
+    float rms = 0.0f;
+    rac_result_t rc =
+        rac_audio_compute_rms(static_cast<const float*>(in.ptr), static_cast<size_t>(in.size), &rms);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_compute_rms");
+    return rms;
+}
+
+py::bytes audio_float32_to_wav(py::array_t<float, py::array::c_style | py::array::forcecast> samples,
+                               int32_t sample_rate) {
+    auto in = samples.request();
+    void* wav = nullptr;
+    size_t wav_size = 0;
+    rac_result_t rc = rac_audio_float32_to_wav(in.ptr, static_cast<size_t>(in.size) * sizeof(float),
+                                               sample_rate, &wav, &wav_size);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_float32_to_wav");
+    py::bytes out(reinterpret_cast<const char*>(wav), wav_size);
+    rac_free(wav);
+    return out;
+}
+
+py::tuple audio_wav_to_float32(py::bytes wav_data) {
+    std::string buf = wav_data;
+    float* samples = nullptr;
+    size_t n_samples = 0;
+    int32_t sample_rate = 0;
+    rac_result_t rc = rac_audio_wav_to_float32(buf.data(), buf.size(), &samples, &n_samples,
+                                               &sample_rate);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rac_audio_wav_to_float32");
+    py::array_t<float> out(static_cast<py::ssize_t>(n_samples));
+    if (n_samples && samples) {
+        std::memcpy(out.mutable_data(), samples, n_samples * sizeof(float));
+    }
+    rac_free(samples);
+    return py::make_tuple(sample_rate, out);
+}
+
+// =============================================================================
+// LLM proto stream — commons owns thinking/answer split + FinishReason.
+// =============================================================================
+struct LlmProtoStreamCtx {
+    py::function on_event;
+    std::exception_ptr py_exc;
+    bool stop = false;
+};
+
+void llm_proto_stream_cb(const uint8_t* event_bytes, size_t event_size, void* ud) {
+    auto* ctx = static_cast<LlmProtoStreamCtx*>(ud);
+    if (!ctx || ctx->stop) return;
+    std::string copy(event_bytes ? reinterpret_cast<const char*>(event_bytes) : "", event_size);
+    py::gil_scoped_acquire gil;
+    try {
+        py::object ret = ctx->on_event(py::bytes(copy));
+        if (py::isinstance<py::bool_>(ret) && !ret.cast<bool>()) ctx->stop = true;
+    } catch (py::error_already_set&) {
+        ctx->py_exc = std::current_exception();
+        ctx->stop = true;
+    } catch (...) {
+        ctx->py_exc = std::current_exception();
+        ctx->stop = true;
+    }
+}
+
+void llm_generate_stream_proto(const std::string& request_bytes, py::function on_event) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    LlmProtoStreamCtx ctx;
+    ctx.on_event = std::move(on_event);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_llm_generate_stream_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                           request_bytes.size(), llm_proto_stream_cb, &ctx);
+        rac_llm_proto_quiesce();
+    }
+    if (ctx.py_exc) std::rethrow_exception(ctx.py_exc);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "llm_generate_stream_proto");
+}
+
+void llm_cancel_proto() {
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_llm_cancel_proto(&out);
+    rac_proto_buffer_free(&out);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "llm_cancel_proto");
+}
+
+// =============================================================================
+// LoRA adapters via lifecycle proto ABI (rac_lora_*_proto).
+// Commons owns scale resolution (explicit → catalog incl. 0.0 → 1.0) — never
+// coerce an unset optional scale to 1.0f before the call.
+// =============================================================================
+py::bytes lora_apply_proto(const std::string& request_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_lora_apply_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                  request_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "lora_apply_proto");
+}
+
+py::bytes lora_remove_proto(const std::string& request_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_lora_remove_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                   request_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "lora_remove_proto");
+}
+
+py::bytes lora_list_proto(const std::string& state_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_lora_list_proto(reinterpret_cast<const uint8_t*>(state_bytes.data()),
+                                 state_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "lora_list_proto");
+}
+
+py::bytes lora_state_proto(const std::string& state_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_lora_state_proto(reinterpret_cast<const uint8_t*>(state_bytes.data()),
+                                  state_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "lora_state_proto");
 }
 
 // =============================================================================
@@ -2193,18 +2445,24 @@ PYBIND11_MODULE(_core, m) {
           py::arg("disable_thinking") = py::none(),
           "Stream tokens from an LLM handle; on_token(str) is called per token and "
           "may return False to stop.");
+    m.def("llm_generate_stream_proto", &llm_generate_stream_proto, py::arg("request_bytes"),
+          py::arg("on_event"),
+          "Stream LLMStreamEvent proto bytes via rac_llm_generate_stream_proto; "
+          "on_event(bytes) may return False to stop.");
+    m.def("llm_cancel_proto", &llm_cancel_proto, "Cancel the in-flight lifecycle LLM generation.");
     m.def("cancel_generate", &cancel_generate, py::arg("handle"),
           "Request cancellation of an in-flight LLM generation.");
     m.def("unload_model", &unload_model, py::arg("handle"), "Unload an LLM handle.");
 
-    // LoRA (LlamaCPP backend only; write-only — no read-back)
-    m.def("lora_apply", &lora_apply, py::arg("handle"), py::arg("adapter_path"),
-          py::arg("scale") = py::none(),
-          "Load and apply a LoRA adapter onto an LLM handle (recreates context, clears KV cache).");
-    m.def("lora_remove", &lora_remove, py::arg("handle"), py::arg("adapter_path"),
-          "Remove one LoRA adapter previously applied to an LLM handle.");
-    m.def("lora_remove_all", &lora_remove_all, py::arg("handle"),
-          "Remove every LoRA adapter applied to an LLM handle.");
+    // LoRA — lifecycle proto ABI; commons owns optional scale resolution.
+    m.def("lora_apply_proto", &lora_apply_proto, py::arg("request_bytes"),
+          "Apply LoRA adapters via rac_lora_apply_proto (optional scale preserved).");
+    m.def("lora_remove_proto", &lora_remove_proto, py::arg("request_bytes"),
+          "Remove LoRA adapters via rac_lora_remove_proto.");
+    m.def("lora_list_proto", &lora_list_proto, py::arg("state_bytes"),
+          "List applied LoRA adapters via rac_lora_list_proto.");
+    m.def("lora_state_proto", &lora_state_proto, py::arg("state_bytes"),
+          "Read LoRA state via rac_lora_state_proto.");
 
     // VLM
     m.def("load_vlm_model", &load_vlm_model, py::arg("model_path"), py::arg("mmproj_path"),
@@ -2274,7 +2532,7 @@ PYBIND11_MODULE(_core, m) {
     m.def("load_tts_voice", &load_tts_voice, py::arg("dir"), py::arg("id") = py::none(),
           py::arg("name") = py::none(), "Load a TTS voice dir (sherpa); returns an integer handle.");
     m.def("synthesize", &synthesize, py::arg("handle"), py::arg("text"),
-          "Synthesize speech; returns (float32 samples ndarray, sample_rate int).");
+          "Synthesize speech; returns (float32 samples, sample_rate, duration_ms).");
     m.def("unload_tts_voice", &unload_tts_voice, py::arg("handle"), "Unload a TTS handle.");
 
     // VAD
@@ -2291,6 +2549,33 @@ PYBIND11_MODULE(_core, m) {
           py::arg("id") = py::none(), py::arg("name") = py::none(),
           "Load a Silero/sherpa VAD model onto an existing energy VAD handle.");
     m.def("unload_vad", &unload_vad, py::arg("handle"), "Unload a VAD handle.");
+    m.def("vad_set_stream_callback", &vad_set_stream_callback, py::arg("handle"),
+          py::arg("on_event"),
+          "Register a VADStreamEvent proto-byte callback on a VAD handle.");
+    m.def("vad_unset_stream_callback", &vad_unset_stream_callback, py::arg("handle"),
+          "Unregister the VAD stream callback and quiesce in-flight dispatches.");
+    m.def("vad_stream_start", &vad_stream_start, py::arg("handle"), py::arg("options_bytes"),
+          "Start a VAD stream session from serialized VADOptions; returns session id.");
+    m.def("vad_stream_feed", &vad_stream_feed, py::arg("session_id"), py::arg("audio_bytes"),
+          "Feed raw mono PCM_S16_LE bytes into a VAD stream session.");
+    m.def("vad_stream_stop", &vad_stream_stop, py::arg("session_id"),
+          "Stop a VAD stream session (flush open segment).");
+    m.def("vad_stream_cancel", &vad_stream_cancel, py::arg("session_id"),
+          "Cancel a VAD stream session immediately.");
+
+    // Audio DSP (commons-owned)
+    m.def("audio_float32_to_pcm16", &audio_float32_to_pcm16, py::arg("samples"),
+          "Quantize float32 [-1,1] to int16 via rac_audio_float32_to_pcm16.");
+    m.def("audio_pcm16_to_float32", &audio_pcm16_to_float32, py::arg("samples"),
+          "Decode int16 PCM to float32 via rac_audio_pcm16_to_float32.");
+    m.def("audio_resample_f32", &audio_resample_f32, py::arg("samples"), py::arg("in_rate"),
+          py::arg("out_rate"), "Resample mono float32 via rac_audio_resample_f32.");
+    m.def("audio_compute_rms", &audio_compute_rms, py::arg("samples"),
+          "Linear RMS via rac_audio_compute_rms.");
+    m.def("audio_float32_to_wav", &audio_float32_to_wav, py::arg("samples"),
+          py::arg("sample_rate"), "Encode float32 mono as WAV via rac_audio_float32_to_wav.");
+    m.def("audio_wav_to_float32", &audio_wav_to_float32, py::arg("wav_data"),
+          "Decode WAV to (sample_rate, float32 samples) via rac_audio_wav_to_float32.");
 
     // Diarization (offline batch; ONNX Sortformer)
     m.def("load_diarization_model", &load_diarization_model, py::arg("model_path"),

@@ -305,7 +305,7 @@ export function createLlmNamespace(deps: LlmDeps): LlmNamespace {
       text: result.text,
       thinkingText: result.thinkingContent || undefined,
       toolCalls: calls,
-      finishReason: calls.length ? FinishReason.TOOL_CALLS : FinishReason.STOP,
+      finishReason: toPublicFinishReason(result.finishReason),
       inputTokens: result.usage?.inputTokens ?? 0,
       outputTokens: result.usage?.outputTokens ?? 0,
       timeToFirstTokenMs: result.usage?.ttftMs ?? 0,

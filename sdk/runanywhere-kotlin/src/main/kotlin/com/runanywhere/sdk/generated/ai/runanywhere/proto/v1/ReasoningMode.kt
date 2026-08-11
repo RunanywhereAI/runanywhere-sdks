@@ -40,8 +40,8 @@ public enum class ReasoningMode(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ReasoningMode> = object : EnumAdapter<ReasoningMode>(
-      ReasoningMode::class, 
-      PROTO_3, 
+      ReasoningMode::class,
+      PROTO_3,
       ReasoningMode.REASONING_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ReasoningMode? = ReasoningMode.fromValue(`value`)

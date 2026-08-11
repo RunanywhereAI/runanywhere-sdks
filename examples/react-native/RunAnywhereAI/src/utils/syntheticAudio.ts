@@ -2,8 +2,11 @@
  * syntheticAudio - deterministic 16-kHz mono PCM16 WAV generators.
  *
  * RN analog of iOS `SyntheticInputGenerator.swift` — produces the silent and
- * sine-tone inputs the STT benchmarks transcribe, so runs are reproducible
- * without microphone access.
+ * sine-tone **input fixtures** the STT benchmarks transcribe, so runs are
+ * reproducible without microphone access.
+ *
+ * KEEP: explicit input/test fixture generation only. Not model-output
+ * calculations (no encode-path scale, no level metering of results).
  */
 
 const SAMPLE_RATE = 16000;
@@ -46,7 +49,7 @@ export function silentAudioWav(durationSeconds: number): Uint8Array {
   );
 }
 
-/** 440 Hz sine-tone WAV of the given duration. */
+/** 440 Hz sine-tone WAV of the given duration (fixture amplitude only). */
 export function sineWaveAudioWav(
   durationSeconds: number,
   frequencyHz: number = 440

@@ -6,11 +6,11 @@
 
 import { AudioFormat, InferenceFramework, type ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
-  FinishReason as ProtoFinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { ToolChoiceMode } from '@runanywhere/proto-ts/tool_calling';
 import type { StructuredOutputOptions, StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';

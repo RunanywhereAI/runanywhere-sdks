@@ -775,12 +775,11 @@ async function runEmbeddings(a, b) {
   // embed() has no per-request model — commons reads whichever embedding model is
   // resident — so the screen makes its choice resident first. One batch call, and
   // the vectors come back in input order with commons' own index on each.
+  // Cosine similarity is commons-owned (`rac_embeddings_similarity`) via the
+  // SDK bridge — the app never computes the formula.
   await loadSelected('embedder');
   const [ea, eb] = await ra.embeddings.embed([a, b]);
-  const va = ea.vector, vb = eb.vector;
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < va.length; i++) { dot += va[i] * vb[i]; na += va[i] * va[i]; nb += vb[i] * vb[i]; }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+  return ra.embeddings.cosineSimilarity(ea, eb);
 }
 // ---- RAG (Knowledge tab) ----
 // Lazy singleton: memoize the in-flight promise so concurrent first-use (ingest
@@ -1485,6 +1484,8 @@ function wireSegmentation() {
       const { rgb, width, height } = await decodeRawRgb(file);
       const result = await ra.segmentation.segment(ra.image.rawRgb(rgb, width, height));
       paintClassMask(canvas, result);
+      // KEEP_DISPLAY_ONLY: commons supplies class.fraction; sort/top-N and ×100
+      // are presentation of those values, not recomputed coverage math.
       const classes = (result.classes || []).slice().sort((a, b) => b.fraction - a.fraction).slice(0, 12);
       $('segout').innerHTML = classes.length
         ? classes.map((c) => {

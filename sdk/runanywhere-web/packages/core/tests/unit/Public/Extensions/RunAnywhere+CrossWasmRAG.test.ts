@@ -4,7 +4,8 @@ import type {
   EmbeddingsResult,
   EmbeddingVector,
 } from '@runanywhere/proto-ts/embeddings_options';
-import { FinishReason, type LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   InferenceFramework,

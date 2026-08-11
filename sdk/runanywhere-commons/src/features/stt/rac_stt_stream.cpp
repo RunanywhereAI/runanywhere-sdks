@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cmath>
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
@@ -45,6 +44,7 @@
 #include "features/common/rac_stream_registry_internal.h"
 #include "features/stt/rac_stt_stream_internal.h"
 #include "features/stt/stt_transcript_text.h"
+#include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -403,16 +403,18 @@ float fallback_frame_rms(const uint8_t* bytes, size_t size) {
     const size_t count = size / sizeof(int16_t);
     if (!bytes || count == 0)
         return 0.0f;
-    double sum = 0.0;
+    std::vector<float> normalized(count);
     for (size_t i = 0; i < count; ++i) {
         int16_t raw_sample = 0;
         // The byte accumulator has byte alignment, so read without an
         // unaligned int16_t reinterpret_cast.
         std::memcpy(&raw_sample, bytes + i * sizeof(int16_t), sizeof(raw_sample));
-        const double sample = static_cast<double>(raw_sample);
-        sum += sample * sample;
+        normalized[i] = static_cast<float>(raw_sample) / RAC_AUDIO_PCM16_SCALE;
     }
-    return static_cast<float>(std::sqrt(sum / static_cast<double>(count)) / 32767.0);
+    float rms = 0.0f;
+    if (rac_audio_compute_rms(normalized.data(), count, &rms) != RAC_SUCCESS)
+        return 0.0f;
+    return rms;
 }
 
 void reset_fallback_utterance(StreamSession& session) {

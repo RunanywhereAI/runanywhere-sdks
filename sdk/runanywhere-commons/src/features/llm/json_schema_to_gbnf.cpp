@@ -7,18 +7,17 @@
  * commons constrains decoding. Deterministic output matching those ports.
  */
 
-#include "features/llm/json_schema_to_gbnf_internal.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "features/llm/json_schema_to_gbnf_internal.h"
 
 namespace rac::llm {
 namespace {
@@ -146,7 +145,8 @@ struct Builder {
             mark_used("ws");
 
             int max_items = -1;
-            if (s.contains("maxItems") && s["maxItems"].is_number() && !s["maxItems"].is_boolean()) {
+            if (s.contains("maxItems") && s["maxItems"].is_number() &&
+                !s["maxItems"].is_boolean()) {
                 max_items = static_cast<int>(std::floor(s["maxItems"].get<double>()));
             }
             if (max_items < 0) {

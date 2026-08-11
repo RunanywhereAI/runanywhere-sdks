@@ -19,36 +19,6 @@ class RagGenerationPolicyTest {
     }
 
     @Test
-    fun `normalizer strips complete and unclosed thinking while preserving answer`() {
-        assertEquals(
-            "The invoice total is $1,284.",
-            RagAnswerNormalizer.visibleAnswer(
-                "<think>private chain</think>The invoice total is $1,284.",
-            ),
-        )
-        assertEquals(
-            "The invoice total is $1,284.",
-            RagAnswerNormalizer.visibleAnswer(
-                "The invoice total is $1,284. <thinking>unfinished private chain",
-            ),
-        )
-        assertEquals("", RagAnswerNormalizer.visibleAnswer("<THINK>Thinking Process only"))
-    }
-
-    @Test
-    fun `normalizer tolerates malformed tag remnants without changing a plain answer`() {
-        assertEquals(
-            "The retained answer.",
-            RagAnswerNormalizer.visibleAnswer("< THINK >hidden< / THINK >The retained answer."),
-        )
-        assertEquals(
-            "The retained answer.",
-            RagAnswerNormalizer.visibleAnswer("The retained answer. <thinking"),
-        )
-        assertEquals("The retained answer.", RagAnswerNormalizer.visibleAnswer("The retained answer."))
-    }
-
-    @Test
     fun `query version rejects results after stop replacement or corpus reset`() {
         val request = RagQueryVersion(query = 7, corpus = 3)
 
@@ -58,11 +28,11 @@ class RagGenerationPolicyTest {
     }
 
     @Test
-    fun `sanitized fallback still retains retrieval sources and timing`() {
+    fun `blank commons answer keeps retrieval sources and timing with UI placeholder`() {
         val sources = listOf(RagSource(text = "Invoice total: $1,284", score = 0.91f, document = "invoice.pdf"))
 
         val message = buildRagAnswerMessage(
-            rawAnswer = "<think>private reasoning only",
+            rawAnswer = "   ",
             sources = sources,
             elapsedMs = 1_234,
         )
@@ -71,5 +41,15 @@ class RagGenerationPolicyTest {
         assertEquals("I couldn't produce a concise answer. Try asking more specifically.", message.text)
         assertEquals(sources, message.sources)
         assertEquals(1_234, message.elapsedMs)
+    }
+
+    @Test
+    fun `commons answer channel is shown without app-side tag parsing`() {
+        val message = buildRagAnswerMessage(
+            rawAnswer = "The invoice total is $1,284.",
+            sources = emptyList(),
+            elapsedMs = 10,
+        )
+        assertEquals("The invoice total is $1,284.", message.text)
     }
 }

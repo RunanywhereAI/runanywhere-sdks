@@ -8,18 +8,15 @@
 // normalized.
 
 import { SDKException } from '../errors';
-// Commons validates a JSON Schema but does not yet derive a decoding grammar
-// from one (structured_output.cpp's own TODO), so the GBNF still comes from
-// here. This import goes away when that lands.
-import { jsonSchemaToGrammar } from '../grammar';
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import {
-  FinishReason as ProtoFinishReason,
   LLMGenerationOptions,
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import { LLMGenerateRequest, LLMStreamEvent, LLMStreamEventKind } from '@runanywhere/proto-ts/llm_service';
 import { ChatMessage as ProtoChatMessage, MessageRole } from '@runanywhere/proto-ts/chat';
 import {
+  StructuredOutputMode,
   StructuredOutputParseRequest,
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
@@ -44,13 +41,15 @@ const REASONING_TO_PROTO: Record<ReasoningMode, ProtoReasoningMode> = {
 };
 
 /**
- * Collapse commons' finish reasons onto the four the public surface names.
- * STOP_SEQUENCE is a stop, and a context overflow is the context-window form of
- * running out of room, so both fold into their neighbour rather than inventing
- * public values the cross-SDK spec does not have.
+ * Collapse commons' finish reasons onto the public surface.
+ * STOP_SEQUENCE is a stop; CONTEXT_OVERFLOW folds into LENGTH.
+ * UNSPECIFIED stays UNKNOWN — never invent STOP/TOOL_CALLS from local state.
  */
 export function toPublicFinishReason(reason: ProtoFinishReason): FinishReason {
   switch (reason) {
+    case ProtoFinishReason.FINISH_REASON_STOP:
+    case ProtoFinishReason.FINISH_REASON_STOP_SEQUENCE:
+      return FinishReason.STOP;
     case ProtoFinishReason.FINISH_REASON_LENGTH:
     case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
       return FinishReason.LENGTH;
@@ -58,8 +57,11 @@ export function toPublicFinishReason(reason: ProtoFinishReason): FinishReason {
       return FinishReason.TOOL_CALLS;
     case ProtoFinishReason.FINISH_REASON_CANCELLED:
       return FinishReason.CANCELLED;
+    case ProtoFinishReason.FINISH_REASON_ERROR:
+      return FinishReason.ERROR;
+    case ProtoFinishReason.FINISH_REASON_UNSPECIFIED:
     default:
-      return FinishReason.STOP;
+      return FinishReason.UNKNOWN;
   }
 }
 
@@ -119,17 +121,16 @@ export function toProtoOptions(
             : undefined,
         }
       : undefined,
-    // Both fields, because they do different jobs. Commons reads `grammar` to
-    // constrain decoding (llm_module.cpp options_from_request) and `schema` to
-    // extract and validate the document afterwards; it does not derive one from
-    // the other, and its own TODO in structured_output.cpp is to build the GBNF
-    // from the schema. Until that lands, the SDK supplies the grammar.
-    // `strict: false` asks for validation without constraining the sampler.
+    // Schema only — commons compiles schema→GBNF and owns repair. Never ship a
+    // local grammar shim. `strict: false` asks for validation without
+    // constraining the sampler (VALIDATION_ONLY).
     structuredOutput: schema
       ? {
           schema: JSON.stringify(schema),
-          grammar: strict ? jsonSchemaToGrammar(schema) : undefined,
           includeSchemaInPrompt: true,
+          mode: strict
+            ? StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED
+            : StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY,
         }
       : undefined,
   });

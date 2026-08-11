@@ -40,7 +40,7 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
 fun RunAnywhere.generateStream(prompt: String, options: RALLMGenerationOptions? = null): Flow<RALLMStreamEvent>
 fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent>
 suspend fun RunAnywhere.cancelGeneration()
-suspend fun RunAnywhere.aggregateStream(prompt: String, events: Flow<RALLMStreamEvent>, onThinking: (suspend (String) -> Unit)? = null, onToken: (suspend (String) -> Unit)? = null): RALLMGenerationResult
+// Collect RunAnywhere.llm.generateStream and read GenerationEvent.Completed — aggregateStream deleted (D3)
 // [MISSING] webSearchToolDefinition : RAToolDefinition
 // [MISSING] suspend fun RunAnywhere.registerWebSearchTool()
 

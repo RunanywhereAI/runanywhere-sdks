@@ -30,6 +30,7 @@ export class VoiceAgentProtoAdapter {
       '_rac_voice_agent_initialize_proto',
       '_rac_voice_agent_component_states_proto',
       '_rac_voice_agent_process_voice_turn_proto',
+      '_rac_voice_agent_feed_audio_proto',
       '_rac_voice_agent_set_proto_callback',
     ]);
   }
@@ -93,6 +94,32 @@ export class VoiceAgentProtoAdapter {
           outResult,
         ),
         'rac_voice_agent_process_voice_turn_proto',
+      )
+    ));
+  }
+
+  /**
+   * Streaming mic ingress via `rac_voice_agent_feed_audio_proto`.
+   * `frameProtoBytes` is a serialized `VoiceAgentAudioFrame`. Returns null when
+   * the utterance is still open (empty result) or the export is missing.
+   */
+  feedAudio(handle: number, frameProtoBytes: Uint8Array): ProtoVoiceAgentResult | null {
+    if (!ensureExports(this.module, 'voiceAgent.feedAudio', [
+      '_rac_voice_agent_feed_audio_proto',
+    ])) {
+      return null;
+    }
+    const bridge = this.bridge();
+    return bridge.withHeapBytes(frameProtoBytes, (framePtr, frameSize) => (
+      bridge.callResultProto(
+        VoiceAgentResult,
+        (outResult) => this.module._rac_voice_agent_feed_audio_proto!(
+          handle,
+          framePtr,
+          frameSize,
+          outResult,
+        ),
+        'rac_voice_agent_feed_audio_proto',
       )
     ));
   }

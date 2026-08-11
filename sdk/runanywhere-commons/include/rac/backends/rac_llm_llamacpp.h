@@ -157,8 +157,8 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
  * Prompt count comes from the tokenizer; completion is the sum of
  * tokens_in_delta across non-final callbacks (exact, including coalesced stops).
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_stream_token_counts(
-    rac_handle_t handle, rac_llm_token_counts_t* out);
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_stream_token_counts(rac_handle_t handle,
+                                                                       rac_llm_token_counts_t* out);
 
 /**
  * Cancels ongoing generation.

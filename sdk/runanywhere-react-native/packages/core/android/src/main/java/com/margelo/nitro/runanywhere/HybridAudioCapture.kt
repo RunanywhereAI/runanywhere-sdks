@@ -34,11 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.log10
-import kotlin.math.sqrt
 
 class HybridAudioCapture : HybridAudioCaptureSpec() {
 
@@ -47,6 +43,24 @@ class HybridAudioCapture : HybridAudioCaptureSpec() {
         private const val TARGET_SAMPLE_RATE: Int = 16000
         private const val BYTES_PER_SAMPLE: Int = 2
         private const val CHUNK_DURATION_MS: Int = 100
+
+        init {
+            // `runanywherecore` is loaded by RunAnywhereCorePackage; this is a
+            // belt-and-suspenders so unit hosts that construct capture alone still
+            // resolve the JNI meter helper.
+            try {
+                System.loadLibrary("runanywherecore")
+            } catch (_: UnsatisfiedLinkError) {
+                // Already loaded by the package init path.
+            }
+        }
+
+        /**
+         * Commons meter via `rac_audio_pcm16_to_float32` +
+         * `rac_audio_compute_level_normalized` (see AudioCaptureLevel.cpp).
+         */
+        @JvmStatic
+        private external fun nativeComputeLevelNormalized(pcm16le: ByteArray): Double
     }
 
     private val logger = SDKLogger("AudioCapture")
@@ -248,26 +262,12 @@ class HybridAudioCapture : HybridAudioCaptureSpec() {
     // MARK: - Private helpers
 
     /**
-     * Compute a normalized audio level (0.0–1.0) for the given PCM 16-bit
-     * little-endian chunk. RMS->dB mapping identical to commons'
-     * `rac_audio_compute_level_db`, normalized -60 dB..0 dB → 0..1
-     * (Swift/Kotlin SDK parity).
+     * Normalized audio level (0.0–1.0) for a PCM 16-bit little-endian chunk.
+     * Delegates to commons via JNI (`AudioCaptureLevel.cpp`) — no local RMS math.
      */
     private fun computeNormalizedLevel(pcm16le: ByteArray): Double {
         if (pcm16le.size < 2) return 0.0
-        val shorts = ByteBuffer.wrap(pcm16le).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        val sampleCount = shorts.remaining()
-        if (sampleCount == 0) return 0.0
-        var sumSquares = 0.0
-        while (shorts.hasRemaining()) {
-            val s = shorts.get().toDouble() / Short.MAX_VALUE.toDouble()
-            sumSquares += s * s
-        }
-        val rms = sqrt(sumSquares / sampleCount)
-        if (rms <= 0.0) return 0.0
-        val db = 20.0 * log10(rms)
-        // Normalize -60 dB .. 0 dB → 0 .. 1.
-        return ((db + 60.0) / 60.0).coerceIn(0.0, 1.0)
+        return nativeComputeLevelNormalized(pcm16le)
     }
 
     private fun stopQuietly(record: AudioRecord) {

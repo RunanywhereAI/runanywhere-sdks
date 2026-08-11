@@ -39,7 +39,9 @@ export const lora = {
       adapters: [{
         adapterPath: artifact.localPath,
         adapterId,
-        scale: scale ?? 1,
+        // Leave unset when omitted so commons resolve_effective_lora_scale
+        // owns catalog (including 0.0) → 1.0.
+        ...(scale !== undefined ? { scale } : {}),
       }],
     });
     if (result.error) {

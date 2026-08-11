@@ -1,4 +1,8 @@
-"""Shared building blocks for schema-constrained generation and tool calling."""
+"""Shared building blocks for schema-constrained generation and tool calling.
+
+Schema→GBNF compilation lives in commons (``json_schema_to_gbnf``); this module only
+builds JSON-schema documents and parses constrained model output.
+"""
 from __future__ import annotations
 
 import json
@@ -6,10 +10,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from .errors import SDKException
-from .grammar import json_schema_to_grammar
 
 __all__ = [
-    "object_grammar",
     "parse_structured",
     "ToolSpec",
     "ToolCall",
@@ -47,11 +49,6 @@ class ToolRun:
     arguments: dict
     #: Present when the chosen tool had an ``execute`` function.
     result: Any = None
-
-
-def object_grammar(schema: dict) -> str:
-    """GBNF grammar constraining output to JSON matching ``schema``."""
-    return json_schema_to_grammar(schema)
 
 
 def tool_call_schema(tools: list[ToolSpec]) -> dict:

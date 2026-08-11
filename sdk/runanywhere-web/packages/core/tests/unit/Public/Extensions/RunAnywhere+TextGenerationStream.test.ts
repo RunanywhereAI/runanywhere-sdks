@@ -26,10 +26,10 @@ import {
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
-  FinishReason,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 
 import {
   ModalityProtoAdapter,
@@ -305,6 +305,10 @@ function terminalStreamEvent(text: string, tokenCount: number): ProtoLLMStreamEv
         decodeTokensPerSecond: tokenCount,
         prefillMs: 0,
         ttftMs: 0,
+        timeToFirstContentTokenMs: 0,
+        contentTokensPerSecond: 0,
+        batchBuffered: false,
+        countsEstimated: false,
       },
     },
   });

@@ -208,9 +208,8 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
     if (handle->actual_input_tokens > 0) {
         input_tokens = handle->actual_input_tokens;
     } else {
-        input_tokens = handle->prompt_length > 0
-                           ? static_cast<int32_t>((handle->prompt_length + 3) / 4)
-                           : 1;
+        input_tokens =
+            handle->prompt_length > 0 ? static_cast<int32_t>((handle->prompt_length + 3) / 4) : 1;
         if (input_tokens < 1)
             input_tokens = 1;
         counts_estimated = true;

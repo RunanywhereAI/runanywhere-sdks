@@ -275,7 +275,7 @@ class SegmentationRequest extends $pb.GeneratedMessage {
 /// SegmentationResult.height). Commons rejects any result whose pixel_counts
 /// do not sum to that product before encoding it into a SegmentationResult, so
 /// within this message the summaries partition the image and the division is
-/// exact.
+/// exact. `fraction` is that share, computed once by commons (tag 5).
 class SegmentationClassSummary extends $pb.GeneratedMessage {
   factory SegmentationClassSummary({
     $core.int? classId,
@@ -359,7 +359,8 @@ class SegmentationClassSummary extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLabel() => $_clearField(3);
 
-  /// Commons-owned coverage share in \[0.0, 1.0\] (idl tag 5).
+  /// Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+  /// Zero when width or height is zero (rejected upstream before encode).
   @$pb.TagNumber(5)
   $core.double get fraction => $_getN(3);
   @$pb.TagNumber(5)

@@ -14,6 +14,7 @@ exports.toolCallingRoleFromJSON = toolCallingRoleFromJSON;
 exports.toolCallingRoleToJSON = toolCallingRoleToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const finish_reason_1 = require("./finish_reason");
 const token_usage_1 = require("./token_usage");
 exports.protobufPackage = "runanywhere.v1";
 /**
@@ -1277,6 +1278,7 @@ function createBaseToolCallingResult() {
         errorCode: 0,
         thinkingContent: undefined,
         usage: undefined,
+        finishReason: 0,
     };
 }
 exports.ToolCallingResult = {
@@ -1307,6 +1309,9 @@ exports.ToolCallingResult = {
         }
         if (message.usage !== undefined) {
             token_usage_1.TokenUsage.encode(message.usage, writer.uint32(74).fork()).join();
+        }
+        if (message.finishReason !== 0) {
+            writer.uint32(80).int32(message.finishReason);
         }
         return writer;
     },
@@ -1380,6 +1385,13 @@ exports.ToolCallingResult = {
                     message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
                     continue;
                 }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.finishReason = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1427,6 +1439,11 @@ exports.ToolCallingResult = {
                     ? globalThis.String(object.thinking_content)
                     : undefined,
             usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
+            finishReason: isSet(object.finishReason)
+                ? (0, finish_reason_1.finishReasonFromJSON)(object.finishReason)
+                : isSet(object.finish_reason)
+                    ? (0, finish_reason_1.finishReasonFromJSON)(object.finish_reason)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -1458,6 +1475,9 @@ exports.ToolCallingResult = {
         if (message.usage !== undefined) {
             obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
         }
+        if (message.finishReason !== 0) {
+            obj.finishReason = (0, finish_reason_1.finishReasonToJSON)(message.finishReason);
+        }
         return obj;
     },
     create(base) {
@@ -1476,6 +1496,7 @@ exports.ToolCallingResult = {
         message.usage = (object.usage !== undefined && object.usage !== null)
             ? token_usage_1.TokenUsage.fromPartial(object.usage)
             : undefined;
+        message.finishReason = object.finishReason ?? 0;
         return message;
     },
 };

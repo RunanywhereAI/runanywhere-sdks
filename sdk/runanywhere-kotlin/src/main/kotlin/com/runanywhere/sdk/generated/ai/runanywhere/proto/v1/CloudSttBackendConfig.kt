@@ -141,11 +141,11 @@ public class CloudSttBackendConfig(
     @JvmField
     public val ADAPTER: ProtoAdapter<CloudSttBackendConfig> =
         object : ProtoAdapter<CloudSttBackendConfig>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      CloudSttBackendConfig::class, 
-      "type.googleapis.com/runanywhere.v1.CloudSttBackendConfig", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      CloudSttBackendConfig::class,
+      "type.googleapis.com/runanywhere.v1.CloudSttBackendConfig",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: CloudSttBackendConfig): Int {

@@ -17,6 +17,9 @@ public enum FinishReason: Sendable {
     case length
     case toolCalls
     case cancelled
+    case error
+    /// Producer gave no signal (`FINISH_REASON_UNSPECIFIED`) or an unrecognized value.
+    case unknown
 
     /// Decode the backend's finish-reason label (VLM/voice-agent paths,
     /// which still carry finishReason as a free-form String).
@@ -25,17 +28,23 @@ public enum FinishReason: Sendable {
         case "length", "max_tokens", "max_output_tokens": return .length
         case "tool_calls", "toolcalls", "tool_call": return .toolCalls
         case "cancelled", "canceled": return .cancelled
+        case "error": return .error
+        case "", "unspecified", "unknown": return .unknown
         default: return .stop
         }
     }
 
-    /// Decode the canonical `RAFinishReason` enum (LLM generate/stream path).
+    /// Decode the canonical `RAFinishReason` enum (LLM generate/stream/tool path).
+    /// Never invents `.toolCalls` / `.stop` from local tool-call counts.
     init(proto: RAFinishReason) {
         switch proto {
-        case .length: self = .length
+        case .stop, .stopSequence: self = .stop
+        case .length, .contextOverflow: self = .length
         case .toolCalls: self = .toolCalls
         case .cancelled: self = .cancelled
-        default: self = .stop
+        case .error: self = .error
+        case .unspecified: self = .unknown
+        case .UNRECOGNIZED: self = .unknown
         }
     }
 }
@@ -134,7 +143,7 @@ public struct GenerationResult: Sendable {
             text: proto.text,
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
-            finishReason: proto.toolCalls.isEmpty ? .stop : .toolCalls,
+            finishReason: FinishReason(proto: proto.finishReason),
             inputTokens: Int(proto.usage.inputTokens),
             outputTokens: Int(proto.usage.outputTokens),
             timeToFirstTokenMs: proto.usage.ttftMs,
@@ -431,9 +440,8 @@ public struct RagResult: Sendable {
         self.sources = proto.retrievedChunks.map(Match.init(proto:))
         self.inputTokens = Int(proto.usage.inputTokens)
         self.outputTokens = Int(proto.usage.outputTokens)
-        self.timeToFirstTokenMs = Int64(proto.retrievalTimeMs)
-        let seconds = Double(proto.generationTimeMs) / 1000.0
-        self.tokensPerSecond = seconds > 0 ? Float(Double(proto.usage.outputTokens) / seconds) : 0
+        self.timeToFirstTokenMs = proto.usage.ttftMs
+        self.tokensPerSecond = Float(proto.usage.decodeTokensPerSecond)
         self.requestId = proto.requestID
         self.model = model
     }

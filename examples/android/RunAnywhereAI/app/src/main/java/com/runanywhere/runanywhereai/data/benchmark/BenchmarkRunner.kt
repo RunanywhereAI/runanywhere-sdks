@@ -38,9 +38,9 @@ import java.io.FileOutputStream
 // with an observed min/max range (variance). Metrics are read off the SDK results
 // (same fields the chat screen trusts), never estimated.
 //
-// The LLM path uses generateStream + aggregateStream (not one-shot generate) so TTFT
-// has a client-side first-token fallback when the backend does not surface it —
-// matching the iOS example (the source of truth). Scenarios and the
+// The LLM path uses llm.generateStream (not one-shot generate) so the terminal
+// GenerationEvent.Completed carries commons TokenUsage — matching the iOS
+// example (the source of truth). Scenarios and the
 // load -> warmup -> measure -> unload flow also mirror the iOS providers.
 class BenchmarkRunner(private val context: Context) {
 
@@ -213,7 +213,8 @@ class BenchmarkRunner(private val context: Context) {
                 loadTimeMs = loadMs,
                 warmupTimeMs = warmupMs,
                 endToEndLatencyMs = e2eMs,
-                realTimeFactor = (e2eMs / (seconds * 1000.0)).takeIf { seconds > 0 },
+                // Public Transcription has no commons real_time_factor; leave unset.
+                realTimeFactor = null,
                 audioLengthSeconds = seconds,
                 memoryDeltaBytes = memBefore - memAfter,
             )

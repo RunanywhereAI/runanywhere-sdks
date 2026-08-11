@@ -735,6 +735,17 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racAudioFloat32ToPcm16(samples: FloatArray): ByteArray?
 
+    /**
+     * Normalized meter level in [0, 1] via `rac_audio_compute_level_normalized`.
+     * Pass [floorDb] = −60 for the historical platform meter window
+     * (`RAC_AUDIO_LEVEL_FLOOR_DB`). Returns 0 on empty input or commons failure.
+     */
+    @JvmStatic
+    external fun racAudioComputeLevelNormalized(
+        samples: FloatArray,
+        floorDb: Float,
+    ): Float
+
     /** Canonical 0..100 download percent via `rac_download_progress_percent`. */
     @JvmStatic
     external fun racDownloadProgressPercent(
@@ -1410,6 +1421,15 @@ object RunAnywhereBridge {
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racEmbeddingsEmbedBatchLifecycleProto(requestProto: ByteArray): ByteArray?
+
+    /** L2 norm via `rac_embeddings_norm`. Empty vector → 0. */
+    @JvmStatic external fun racEmbeddingsNorm(vector: FloatArray): Float
+
+    /**
+     * Cosine similarity via `rac_embeddings_similarity`. Returns 0 for empty
+     * vectors, mismatched dimensions, or zero norms.
+     */
+    @JvmStatic external fun racEmbeddingsSimilarity(lhs: FloatArray, rhs: FloatArray): Float
 
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
 

@@ -676,10 +676,24 @@ final class VoiceAgentViewModel: ObservableObject {
         guard !models.isEmpty else { return }
 
         let tier = tierResolver.resolve(from: DeviceInfoService.shared.deviceInfo)
+        Task {
+            let canRun = await ModelCompatibilityLookup.canRunByModelID(for: models.map(\.id))
+            await MainActor.run {
+                applyRecommendedPipeline(tier: tier, models: models, canRunByModelID: canRun)
+            }
+        }
+    }
+
+    private func applyRecommendedPipeline(
+        tier: HardwareTier,
+        models: [RAModelInfo],
+        canRunByModelID: [String: Bool]
+    ) {
         let pipeline = recommendationEngine.recommendVoicePipeline(
             tier: tier,
             appleFoundationAvailable: tierResolver.appleFoundationAvailable,
-            from: models
+            from: models,
+            canRunByModelID: canRunByModelID
         )
 
         if sttModel == nil, let stt = pipeline.stt { sttModel = selectedInfo(stt) }

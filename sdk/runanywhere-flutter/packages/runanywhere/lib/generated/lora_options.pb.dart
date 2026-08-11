@@ -82,8 +82,10 @@ class LoraAdapterConfig extends $pb.GeneratedMessage {
   void clearAdapterPath() => $_clearField(1);
 
   /// 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
-  /// subtract. Unbounded and signed. Unset falls back to the catalog entry's
-  /// default_scale, then to 1.0.
+  /// subtract. Unbounded and signed. Presence is authoritative: an explicit
+  /// 0.0 is honoured. Unset falls back to the catalog entry's default_scale
+  /// (including an explicit catalog 0.0), then to 1.0. Commons owns this
+  /// resolution — SDKs must not coerce unset/0 to 1.0 locally.
   @$pb.TagNumber(2)
   $core.double get scale => $_getN(1);
   @$pb.TagNumber(2)

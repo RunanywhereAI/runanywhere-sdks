@@ -2,48 +2,52 @@
  * EmbeddingsProto+Helpers.ts
  *
  * Ergonomic helpers for canonical Embeddings proto types.
- *
- * Mirrors Swift `EmbeddingsProto+Helpers.swift`
- * (`RAEmbeddingVector.cosineSimilarity(with:)` / `computeNorm()`).
+ * Norm / cosine similarity are owned by commons
+ * (`rac_embeddings_norm` / `rac_embeddings_similarity`) via the Nitro bridge.
  */
 
 import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  isNativeModuleAvailable,
+  requireNativeModule,
+} from '../../../native';
 
-function l2(values: number[]): number {
-  let sumSquares = 0;
-  for (const value of values) sumSquares += value * value;
-  return Math.sqrt(sumSquares);
+function requireEmbeddingsNative() {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  return requireNativeModule();
+}
+
+function floatValuesToBytes(values: number[]): ArrayBuffer {
+  const out = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    out[i] = values[i]!;
+  }
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
 }
 
 /**
- * Cosine similarity between two embedding vectors.
- *
- * Mirrors Swift `RAEmbeddingVector.cosineSimilarity(with:)`
- * (EmbeddingsProto+Helpers.swift:18-26): returns 0 for mismatched lengths,
- * empty vectors, or zero norms.
- *
- * `EmbeddingVector.norm` is deleted outright — the message carries only
- * `values`/`inputIndex` now, so the L2 norm is always recomputed here.
+ * Cosine similarity between two embedding vectors via
+ * `rac_embeddings_similarity`. Returns 0 for mismatched lengths, empty
+ * vectors, or zero norms (commons contract).
  */
 export function cosineSimilarity(
   a: EmbeddingVector,
   b: EmbeddingVector
 ): number {
-  if (a.values.length !== b.values.length || a.values.length === 0) return 0;
-  let dot = 0;
-  for (let i = 0; i < a.values.length; i++) {
-    dot += a.values[i]! * b.values[i]!;
-  }
-  const aNorm = l2(a.values);
-  const bNorm = l2(b.values);
-  if (aNorm <= 0 || bNorm <= 0) return 0;
-  return dot / (aNorm * bNorm);
+  return requireEmbeddingsNative().embeddingsSimilarity(
+    floatValuesToBytes(a.values),
+    floatValuesToBytes(b.values)
+  );
 }
 
 /**
- * L2 norm of an embedding vector's values.
- * Mirrors Swift `RAEmbeddingVector.computeNorm()`.
+ * L2 norm of an embedding vector's values via `rac_embeddings_norm`.
  */
 export function computeNorm(vector: EmbeddingVector): number {
-  return l2(vector.values);
+  return requireEmbeddingsNative().embeddingsNorm(
+    floatValuesToBytes(vector.values)
+  );
 }

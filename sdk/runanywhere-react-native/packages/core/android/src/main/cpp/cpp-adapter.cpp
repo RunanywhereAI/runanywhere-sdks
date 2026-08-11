@@ -4,6 +4,7 @@
 #include <fbjni/fbjni.h>
 #include "runanywherecoreOnLoad.hpp"
 #include "PlatformDownloadBridge.h"
+#include "AudioCaptureLevel.hpp"
 
 #define LOG_TAG "RunAnywhereJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -175,4 +176,28 @@ Java_com_margelo_nitro_runanywhere_PlatformAdapterBridge_nativeHttpDownloadRepor
     return RunAnywhereHttpDownloadReportComplete(task.c_str(),
                                                  static_cast<int>(result),
                                                  path.c_str());
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_margelo_nitro_runanywhere_HybridAudioCapture_nativeComputeLevelNormalized(
+    JNIEnv *env, jclass /*clazz*/, jbyteArray pcm16le) {
+  if (pcm16le == nullptr) {
+    return 0.0;
+  }
+  const jsize byteCount = env->GetArrayLength(pcm16le);
+  if (byteCount < 2) {
+    return 0.0;
+  }
+  const size_t even = static_cast<size_t>(byteCount) - (static_cast<size_t>(byteCount) % 2);
+  if (even < 2) {
+    return 0.0;
+  }
+  jbyte *bytes = env->GetByteArrayElements(pcm16le, nullptr);
+  if (bytes == nullptr) {
+    return 0.0;
+  }
+  const double level = ra_audio_capture_level_normalized_pcm16(
+      reinterpret_cast<const int16_t *>(bytes), even / sizeof(int16_t));
+  env->ReleaseByteArrayElements(pcm16le, bytes, JNI_ABORT);
+  return level;
 }

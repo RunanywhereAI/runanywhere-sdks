@@ -3,100 +3,64 @@
 // voice_agent_mic_driver.dart — audio ingress for the Flutter voice agent.
 //
 // The C ABI owns NO microphone (rac_voice_agent.h "Audio-Ingress Contract"):
-// the platform SDK must capture mic audio and push complete utterances into
-// the C core, or the session is dead air. Without this driver the Flutter
-// voice agent only subscribed to the output event stream and never fed any
-// PCM, so VAD/STT never saw audio → the LLM got no input → no reply.
+// the platform SDK must capture mic audio and push raw frames into the C core
+// via `rac_voice_agent_feed_audio_proto`, or the session is dead air.
 //
-// Mirrors Kotlin `VoiceAgentMicDriver`: capture 16 kHz mono PCM16 via
-// [AudioCaptureManager], segment utterances with energy-based endpointing,
-// and drive each utterance through `rac_voice_agent_process_turn_proto`
-// (DartBridgeVoiceAgent.processTurnStream). The turn's VoiceEvents are
-// forwarded to [events] (so the public eventStream observes them) and the
-// synthesized TTS reply is played through [AudioPlaybackManager].
-//
-// The endpointing is intentionally simple — the C++ pipeline re-runs its own
-// VAD over each submitted buffer; the only job here is deciding where one
-// utterance ends. Mic chunks that arrive while a turn is processing are
-// dropped: the pipeline is strictly turn-taking (no barge-in), which also
-// avoids transcribing the device's own TTS output.
+// Mirrors Kotlin/Swift `VoiceAgentMicDriver`: capture 16 kHz mono PCM16 via
+// [AudioCaptureManager], feed every chunk to commons (which owns energy VAD,
+// hangover, pre-roll, and the STT → LLM → TTS turn), forward VoiceEvents from
+// [VoiceAgentStreamAdapter], and play the synthesized WAV reply returned
+// inline. NO SDK-side RMS / segmenter / endpointing.
 
 import 'dart:async';
-import 'dart:math';
+import 'dart:collection';
 import 'dart:typed_data';
 
+import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
 import 'package:runanywhere/features/stt/services/audio_capture_manager.dart';
 import 'package:runanywhere/features/tts/services/audio_playback_manager.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_pb;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_events_pb;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_audio.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
-/// Captures mic audio and drives per-utterance voice-agent turns. [start]
+/// Captures mic audio and feeds raw frames to the in-core voice agent. [start]
 /// begins capture; [events] streams every turn's VoiceEvents; [stop] tears
-/// capture + playback down. Mirrors Kotlin `VoiceAgentMicDriver`.
+/// capture + playback down. Mirrors Kotlin/Swift `VoiceAgentMicDriver`.
 class VoiceAgentMicDriver {
   VoiceAgentMicDriver();
 
   static final _logger = SDKLogger('VoiceAgentMic');
 
   static const int _sampleRateHz = RADefaultsAudioCapture.micSampleRateHz;
-  static const int _bytesPerSample = 2;
-
-  /// Absolute floor for the adaptive speech threshold (normalized RMS).
-  static const double _speechRmsThreshold =
-      RADefaultsVoiceAgent.speechRmsThreshold;
-
-  /// Speech must exceed this multiple of the tracked ambient noise floor.
-  static const double _speechFloorMultiplier =
-      RADefaultsVoiceAgent.speechFloorMultiplier;
-
-  /// Per-chunk rate at which the ambient floor creeps up toward louder ambient.
-  static const double _noiseFloorRise = 0.05;
-
-  /// Trailing silence that closes an utterance.
-  static const int _endOfUtteranceSilenceMs = 800;
-
-  /// Utterances with less accumulated speech than this are noise.
-  static const int _minSpeechMs = 300;
-
-  /// Hard cap so a noisy room cannot grow an unbounded buffer.
-  static const int _maxUtteranceMs = 15000;
-
-  /// Leading chunks kept so the utterance onset is not clipped.
-  static const int _preRollChunks = 3;
-
-  /// Piper's native rate; used when an audio frame omits sample_rate_hz.
-  static const int _defaultTtsSampleRateHz =
-      RADefaultsAudioCapture.ttsSampleRateHz;
+  static const int _channelCapacity =
+      RADefaultsAudioCapture.micChannelCapacity;
+  static const Duration _feedIdleSleep = Duration(milliseconds: 20);
 
   final AudioCaptureManager _capture = AudioCaptureManager();
   final AudioPlaybackManager _playback = AudioPlaybackManager();
   final StreamController<voice_events_pb.VoiceEvent> _out =
       StreamController<voice_events_pb.VoiceEvent>();
+  final Queue<Uint8List> _queue = Queue<Uint8List>();
 
   StreamSubscription<Uint8List>? _micSub;
+  StreamSubscription<voice_events_pb.VoiceEvent>? _eventSub;
   bool _stopped = false;
-  bool _processing = false;
-
-  // Segmentation state.
-  final List<Uint8List> _preRoll = <Uint8List>[];
-  final BytesBuilder _utterance = BytesBuilder();
-  bool _inSpeech = false;
-  int _speechMs = 0;
-  int _silenceMs = 0;
-  double _noiseFloor = _speechRmsThreshold;
+  bool _feedRunning = false;
 
   /// VoiceEvents produced by each turn (userSaid, llm tokens, audio, pipeline
-  /// state). The public eventStream yields from this.
+  /// state). The public eventStream yields from this. Sourced from the
+  /// commons proto callback via [VoiceAgentStreamAdapter] — not from a local
+  /// segmenter driving `process_turn_proto`.
   Stream<voice_events_pb.VoiceEvent> get events => _out.stream;
 
-  /// Begin mic capture. On permission/capture failure the [events] stream is
-  /// closed with an error so the collector can surface it.
+  /// Begin mic capture + feed loop. On permission/capture failure the [events]
+  /// stream is closed with an error so the collector can surface it.
   Future<void> start() async {
     // The voice agent runs a single full-duplex (.playAndRecord) session for the
     // whole turn-taking loop — the `record` plugin configures it on
@@ -106,9 +70,26 @@ class VoiceAgentMicDriver {
     // the reply is dropped. Mirrors the iOS Swift driver
     // (playback.managesAudioSession = false).
     _playback.managesAudioSession = false;
+    _stopped = false;
+
+    // Attach the proto callback BEFORE capture so events from the first turn
+    // are not dropped (mirrors Swift VoiceSession.events).
+    final handle = await DartBridge.voiceAgent.getHandle();
+    _eventSub = VoiceAgentStreamAdapter(handle).stream().listen(
+      (event) {
+        if (!_out.isClosed) _out.add(event);
+      },
+      onError: (Object e, StackTrace st) {
+        if (!_out.isClosed) _out.addError(e, st);
+      },
+      cancelOnError: false,
+    );
+
     final stream =
         await _capture.startRecording(sampleRate: _sampleRateHz, numChannels: 1);
     if (stream == null) {
+      await _eventSub?.cancel();
+      _eventSub = null;
       _out.addError(StateError(
           'Microphone capture unavailable (permission denied or busy)'));
       unawaited(_out.close());
@@ -116,10 +97,11 @@ class VoiceAgentMicDriver {
     }
     _logger.info('Voice-agent mic capture started');
     _micSub = stream.listen(
-      _onChunk,
+      _enqueueChunk,
       onError: (Object e, StackTrace st) => _logger.warning('Mic error: $e'),
       cancelOnError: false,
     );
+    unawaited(_feedLoop());
   }
 
   /// Stop capture + playback and close the event stream.
@@ -130,167 +112,102 @@ class VoiceAgentMicDriver {
     _micSub = null;
     await _capture.stopRecording();
     await _playback.stop();
+    await _eventSub?.cancel();
+    _eventSub = null;
+    _queue.clear();
+    // Wait for the feed loop to observe _stopped before closing events.
+    while (_feedRunning) {
+      await Future<void>.delayed(_feedIdleSleep);
+    }
     if (!_out.isClosed) {
       await _out.close();
     }
     _logger.info('Voice-agent mic capture stopped');
   }
 
-  void _onChunk(Uint8List chunk) {
-    // Drop chunks while a turn is processing (turn-taking, no barge-in).
-    if (_stopped || _processing || chunk.isEmpty) return;
-
-    final chunkMs = chunk.length * 1000 ~/ (_sampleRateHz * _bytesPerSample);
-    final level = _rms(chunk);
-    // Adaptive endpointing: track the ambient floor — drop instantly to any
-    // quieter level, creep up only while not in speech — and require a chunk
-    // to rise clearly above that floor to count as speech.
-    final speechThreshold =
-        max(_speechRmsThreshold, _noiseFloor * _speechFloorMultiplier);
-    final isSpeech = level >= speechThreshold;
-    if (level < _noiseFloor) {
-      _noiseFloor = level;
-    } else if (!isSpeech) {
-      _noiseFloor += (level - _noiseFloor) * _noiseFloorRise;
-    }
-
-    if (!_inSpeech) {
-      _preRoll.add(chunk);
-      while (_preRoll.length > _preRollChunks) {
-        _preRoll.removeAt(0);
-      }
-      if (isSpeech) {
-        _inSpeech = true;
-        _speechMs = chunkMs;
-        _silenceMs = 0;
-        _utterance.clear();
-        for (final pre in _preRoll) {
-          _utterance.add(pre);
-        }
-        _preRoll.clear();
-      }
-      return;
-    }
-
-    _utterance.add(chunk);
-    if (isSpeech) {
-      _speechMs += chunkMs;
-      _silenceMs = 0;
-    } else {
-      _silenceMs += chunkMs;
-    }
-
-    final utteranceMs =
-        _utterance.length * 1000 ~/ (_sampleRateHz * _bytesPerSample);
-    if (_silenceMs >= _endOfUtteranceSilenceMs || utteranceMs >= _maxUtteranceMs) {
-      final audio = _utterance.toBytes();
-      final hadSpeech = _speechMs >= _minSpeechMs;
-      _resetSegmentation();
-      if (hadSpeech) {
-        unawaited(_processTurn(audio));
-      } else {
-        _logger.debug('Utterance discarded (${_speechMs}ms speech < '
-            '${_minSpeechMs}ms)');
-      }
+  void _enqueueChunk(Uint8List chunk) {
+    if (_stopped || chunk.isEmpty) return;
+    _queue.add(chunk);
+    while (_queue.length > _channelCapacity) {
+      _queue.removeFirst();
     }
   }
 
-  void _resetSegmentation() {
-    _inSpeech = false;
-    _speechMs = 0;
-    _silenceMs = 0;
-    _utterance.clear();
-    _preRoll.clear();
+  List<Uint8List> _drainChunks() {
+    if (_queue.isEmpty) return const <Uint8List>[];
+    final drained = _queue.toList(growable: false);
+    _queue.clear();
+    return drained;
   }
 
-  Future<void> _processTurn(Uint8List audio) async {
-    _processing = true;
-    final ttsPcm = BytesBuilder();
-    var ttsSampleRate = 0;
-    var ttsEncoding = model_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
+  /// Drains captured frames and feeds them to commons. The core blocks the
+  /// feed call for the duration of a turn when an utterance closes and returns
+  /// the synthesized reply inline as WAV. Per-stage VoiceEvents fan out through
+  /// the handle callback (forwarded by [_eventSub]).
+  Future<void> _feedLoop() async {
+    _feedRunning = true;
     try {
-      // `VoiceAgentTurnRequest` carries a fixed input contract (bytes only,
-      // no sample-rate/channels/encoding fields) — the same 16 kHz mono
-      // PCM16 [_sampleRateHz]/[_bytesPerSample] this driver already
-      // captures at (idl/voice_agent_service.proto).
-      final request = voice_agent_pb.VoiceAgentTurnRequest(
-        requestId: 'turn-${DateTime.now().microsecondsSinceEpoch}',
-        audioData: audio,
-      );
-      _logger.info('Submitting voice turn (${audio.length} bytes)');
+      while (!_stopped) {
+        final chunks = _drainChunks();
+        if (chunks.isEmpty) {
+          await Future<void>.delayed(_feedIdleSleep);
+          continue;
+        }
 
-      await for (final ev in DartBridge.voiceAgent.processTurnStream(request)) {
-        if (!_out.isClosed) {
-          _out.add(ev);
-        }
-        if (ev.hasAudio() && ev.audio.pcm.isNotEmpty) {
-          ttsPcm.add(ev.audio.pcm is Uint8List
-              ? ev.audio.pcm as Uint8List
-              : Uint8List.fromList(ev.audio.pcm));
-          if (ev.audio.sampleRateHz > 0) {
-            ttsSampleRate = ev.audio.sampleRateHz;
+        for (final chunk in chunks) {
+          if (_stopped) return;
+
+          try {
+            final frame = voice_agent_pb.VoiceAgentAudioFrame(
+              audioData: chunk,
+              sampleRateHz: _sampleRateHz,
+              channels: 1,
+              encoding: model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+              isFinal: false,
+            );
+            final outcome = await DartBridge.voiceAgent.feedAudioProto(frame);
+            if (_stopped) return;
+
+            if (outcome.status == RacResultCodes.errorNotInitialized) {
+              throw StateError('Voice agent is no longer initialized');
+            }
+            if (outcome.status != RAC_SUCCESS) {
+              _logger.warning('Voice feed failed: rc=${outcome.status}');
+              _queue.clear();
+              continue;
+            }
+
+            final reply = outcome.result?.synthesizedAudio;
+            if (reply != null && reply.isNotEmpty) {
+              _logger.info('Playing agent reply (${reply.length} WAV bytes)');
+              // Frames captured while the turn was computed predate playout —
+              // drop them so the reply onset cannot seed the echo estimate
+              // (mirrors Swift/Kotlin).
+              _queue.clear();
+              await _playReply(
+                reply is Uint8List ? reply : Uint8List.fromList(reply),
+              );
+            }
+          } catch (e) {
+            _logger.warning('Voice feed failed: $e');
+            _queue.clear();
+            if (!_out.isClosed) {
+              _out.addError(e);
+            }
           }
-          if (ev.audio.encoding !=
-              model_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-            ttsEncoding = ev.audio.encoding;
-          }
         }
-      }
-    } catch (e) {
-      _logger.warning('Voice turn failed: $e');
-      if (!_out.isClosed) {
-        _out.addError(e);
       }
     } finally {
-      _processing = false;
-      _resetSegmentation();
+      _feedRunning = false;
     }
-
-    await _playTts(ttsPcm.toBytes(), ttsSampleRate, ttsEncoding);
   }
 
-  // Play the turn's synthesized reply through the TTS sink. Runs before the
-  // next mic chunk is processed (the _processing gate is cleared above but the
-  // playback await keeps the turn logically open), so the mic stays gated
-  // while the device speaks — no self-transcription.
-  Future<void> _playTts(
-    Uint8List pcm,
-    int sampleRateHz,
-    model_pb.AudioEncoding encoding,
-  ) async {
-    if (pcm.isEmpty || _stopped) return;
-    final sampleRate = sampleRateHz > 0 ? sampleRateHz : _defaultTtsSampleRateHz;
-    // TTS backends emit f32 LE by default (AudioFrameEvent contract); only
-    // convert as PCM16 when the frame explicitly says so.
-    final wav =
-        encoding == model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE
-            ? DartBridgeAudio.int16ToWav(pcm, sampleRate)
-            : DartBridgeAudio.float32ToWav(pcm, sampleRate);
-    if (wav == null || wav.isEmpty) {
-      _logger.warning('TTS audio conversion failed (${pcm.length} bytes, '
-          '${sampleRate}Hz, $encoding)');
-      return;
-    }
-    _processing = true; // keep mic gated while speaking
+  Future<void> _playReply(Uint8List wav) async {
+    if (wav.isEmpty || _stopped) return;
     try {
       await _playback.play(wav);
     } catch (e) {
       _logger.warning('Agent reply playback failed: $e');
-    } finally {
-      _processing = false;
-      _resetSegmentation();
     }
-  }
-
-  double _rms(Uint8List chunk) {
-    final samples = chunk.length ~/ _bytesPerSample;
-    if (samples == 0) return 0.0;
-    final data = ByteData.sublistView(chunk);
-    var sum = 0.0;
-    for (var i = 0; i < samples; i++) {
-      final sample = data.getInt16(i * _bytesPerSample, Endian.little).toDouble();
-      sum += sample * sample;
-    }
-    return sqrt(sum / samples) / 32767.0;
   }
 }

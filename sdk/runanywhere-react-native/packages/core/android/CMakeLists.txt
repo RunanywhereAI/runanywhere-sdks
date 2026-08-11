@@ -52,6 +52,7 @@ file(GLOB HYBRID_CORE_DOMAIN_SOURCES CONFIGURE_DEPENDS "../cpp/HybridRunAnywhere
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
+    ../cpp/AudioCaptureLevel.cpp
     ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
     ${HYBRID_CORE_DOMAIN_SOURCES}

@@ -105,11 +105,11 @@ public class ReasoningOptions(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ReasoningOptions> = object : ProtoAdapter<ReasoningOptions>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ReasoningOptions::class, 
-      "type.googleapis.com/runanywhere.v1.ReasoningOptions", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ReasoningOptions::class,
+      "type.googleapis.com/runanywhere.v1.ReasoningOptions",
+      PROTO_3,
+      null,
       "thinking_tag_pattern.proto"
     ) {
       override fun encodedSize(`value`: ReasoningOptions): Int {

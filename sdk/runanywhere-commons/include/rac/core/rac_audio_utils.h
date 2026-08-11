@@ -121,10 +121,23 @@ RAC_API rac_result_t rac_audio_pcm16_to_float32(const int16_t* in, size_t n_samp
 RAC_API rac_result_t rac_audio_float32_to_pcm16(const float* in, size_t n_samples, int16_t* out);
 
 /**
+ * @brief Compute linear RMS of Float32 PCM samples in [-1.0, 1.0].
+ *
+ * Accumulates in double precision. A zero sample count writes 0.0 and succeeds
+ * when @p out_rms is non-NULL (platforms use that as the empty-frame energy).
+ *
+ * @param samples Pointer to float32 PCM samples (may be NULL when count == 0).
+ * @param count   Number of samples.
+ * @param out_rms Output linear RMS (always >= 0).
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER when @p out_rms is NULL or
+ *         when @p count > 0 and @p samples is NULL.
+ */
+RAC_API rac_result_t rac_audio_compute_rms(const float* samples, size_t count, float* out_rms);
+
+/**
  * @brief Compute audio RMS level in dBFS.
  *
- * Computes the root-mean-square of the supplied Float32 PCM samples (range
- * [-1.0, 1.0]) and returns the value converted to decibels. Centralises the
+ * Runs rac_audio_compute_rms and converts to decibels. Centralises the
  * level-meter DSP that used to be hand-rolled in each platform SDK (Swift
  * AudioCaptureManager, etc.).
  *
@@ -152,7 +165,7 @@ RAC_API rac_result_t rac_audio_compute_level_db(const float* samples, size_t cou
  *         when floor_db >= 0.
  */
 RAC_API rac_result_t rac_audio_compute_level_normalized(const float* samples, size_t count,
-                                                       float floor_db, float* out_0_1);
+                                                        float floor_db, float* out_0_1);
 
 /**
  * @brief Resample mono Float32 PCM with linear interpolation.
@@ -169,7 +182,7 @@ RAC_API rac_result_t rac_audio_compute_level_normalized(const float* samples, si
  * @return RAC_SUCCESS or an error code.
  */
 RAC_API rac_result_t rac_audio_resample_f32(const float* in, size_t in_frames, int32_t in_rate,
-                                           int32_t out_rate, float** out, size_t* out_frames);
+                                            int32_t out_rate, float** out, size_t* out_frames);
 
 /**
  * @brief Convert a raw interleaved PCM byte count to integer milliseconds.
@@ -184,7 +197,27 @@ RAC_API rac_result_t rac_audio_resample_f32(const float* in, size_t in_frames, i
  * @return RAC_SUCCESS or RAC_ERROR_INVALID_ARGUMENT / RAC_ERROR_NULL_POINTER.
  */
 RAC_API rac_result_t rac_audio_pcm_bytes_to_ms(size_t byte_count, const rac_audio_format_t* format,
-                                              int64_t* out_ms);
+                                               int64_t* out_ms);
+
+/**
+ * @brief Decode a 16-bit PCM WAV (RIFF) buffer to mono Float32 samples.
+ *
+ * Scans RIFF sub-chunks for `fmt ` and `data`. Stereo is down-mixed to mono.
+ * Only uncompressed PCM (format tag 1) at 16 bits per sample is supported.
+ * Allocates @p out_samples with rac_alloc; caller must rac_free(*out_samples).
+ *
+ * @param wav_data        Input WAV bytes.
+ * @param wav_size        Size of @p wav_data in bytes.
+ * @param out_samples     Output: allocated float buffer (may be NULL when
+ *                        out_n_samples == 0).
+ * @param out_n_samples   Output: number of mono frames written.
+ * @param out_sample_rate Output: sample rate from the fmt chunk.
+ * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, RAC_ERROR_INVALID_ARGUMENT, or
+ *         RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+ */
+RAC_API rac_result_t rac_audio_wav_to_float32(const void* wav_data, size_t wav_size,
+                                              float** out_samples, size_t* out_n_samples,
+                                              int32_t* out_sample_rate);
 
 #ifdef __cplusplus
 }

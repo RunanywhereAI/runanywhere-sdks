@@ -190,6 +190,12 @@ export interface EmscriptenRunanywhereModule {
     audioSize: number,
     outResult: number,
   ): number;
+  _rac_voice_agent_feed_audio_proto?(
+    handle: number,
+    frameBytes: number,
+    frameSize: number,
+    outResult: number,
+  ): number;
   _rac_voice_agent_component_destroy_proto?(handle: number): number;
 
   _rac_vlm_generate_proto?(
@@ -217,6 +223,14 @@ export interface EmscriptenRunanywhereModule {
     requestBytes: number,
     requestSize: number,
     outResult: number,
+  ): number;
+  _rac_embeddings_norm?(vectorPtr: number, dimension: number, outNormPtr: number): number;
+  _rac_embeddings_similarity?(
+    lhsPtr: number,
+    lhsDimension: number,
+    rhsPtr: number,
+    rhsDimension: number,
+    outSimilarityPtr: number,
   ): number;
 
   _rac_segmentation_segment_lifecycle_proto?(

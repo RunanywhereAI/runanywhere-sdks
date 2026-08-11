@@ -258,8 +258,9 @@ the GIL held.
 `options.py` defines the `*Options` dataclasses with the v3 spec's field names and defaults.
 `_options_bridge.llm_kwargs` maps `LlmOptions` onto the kwargs `native/module.cpp`'s
 `generate` actually accepts: `max_output_tokens` → `max_tokens`, `reasoning.mode == OFF` →
-`disable_thinking=True`, `structured_output.schema` → a compiled GBNF `grammar`; `temperature`
-/ `top_p` / `top_k` / `system_prompt` pass through verbatim.
+typed `reasoning.mode=OFF`, and `structured_output.schema` → typed
+`StructuredOutputOptions.schema`; `temperature` / `top_p` / `top_k` / `system_prompt` pass
+through verbatim. Commons owns schema-to-GBNF compilation and repair.
 
 **A knob the bridge cannot carry is never silently dropped.** Setting `min_p`,
 `frequency_penalty`, `presence_penalty`, `repetition_penalty`, `seed`, `reasoning.pattern`,
@@ -271,11 +272,10 @@ start ignoring the field.
 
 ### Structured output, grammar & tools
 
-`grammar.py` compiles a JSON schema to a GBNF grammar (`json_schema_to_grammar`);
-`structured.py` builds `object_grammar`, the tool-call schema/prompt, and parses model output
-(`parse_structured`). `llm.generate_structured` constrains decoding to the schema's grammar
-and returns a `StructuredResult` (`valid=False` with the raw text when parsing fails rather
-than raising). Tools go through `llm.tools.register(tool, executor)`: `llm.generate` runs the
+`structured.py` forwards typed schema/options to commons and parses the typed result.
+`llm.generate_structured` returns a `StructuredResult` (`valid=False` with the raw text when
+validation fails rather than raising); grammar compilation and repair remain in commons.
+Tools go through `llm.tools.register(tool, executor)`: `llm.generate` runs the
 loop, executing the matched tool (awaiting a coroutine result) and feeding the observation
 back, up to `max_tool_calls`. The loop also stops early when the model repeats a call with
 identical arguments, since that makes no further progress. A call with no registered executor

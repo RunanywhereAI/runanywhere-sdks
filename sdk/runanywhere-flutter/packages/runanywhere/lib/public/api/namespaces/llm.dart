@@ -13,7 +13,7 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
 import 'package:runanywhere/generated/llm_service.pbenum.dart'
     show LLMStreamEventKind;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
-    show ToolCall, ToolDefinition, ToolResult;
+    show ToolDefinition;
 import 'package:runanywhere/generated/tool_calling.pbenum.dart'
     show ToolChoiceMode;
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -204,19 +204,8 @@ class LlmApi {
     if (result.hasErrorMessage()) {
       throw SDKException.generationFailed(result.errorMessage);
     }
-    return GenerationResult(
-      text: result.text,
-      thinkingText: result.hasThinkingContent() && result.thinkingContent.isNotEmpty
-          ? result.thinkingContent
-          : null,
-      toolCalls: List<ToolCall>.unmodifiable(result.toolCalls),
-      toolResults: List<ToolResult>.unmodifiable(result.toolResults),
-      finishReason: result.toolCalls.isEmpty
-          ? FinishReason.stop
-          : FinishReason.toolCalls,
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      tokensPerSecond: result.usage.decodeTokensPerSecond,
+    return GenerationResult.fromToolCalling(
+      result,
       requestId: request.requestId,
       model:
           await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '',

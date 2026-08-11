@@ -58,8 +58,8 @@ public enum class FinishReason(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<FinishReason> = object : EnumAdapter<FinishReason>(
-      FinishReason::class, 
-      PROTO_3, 
+      FinishReason::class,
+      PROTO_3,
       FinishReason.FINISH_REASON_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): FinishReason? = FinishReason.fromValue(`value`)

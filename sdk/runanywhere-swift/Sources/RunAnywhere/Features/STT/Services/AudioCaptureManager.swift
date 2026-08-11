@@ -386,12 +386,17 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
         let frames = Int(buffer.frameLength)
         guard frames > 0 else { return }
 
-        // RMS->dB DSP centralised in commons (rac_audio_compute_level_db).
-        var dbLevel: Float = -100
-        _ = rac_audio_compute_level_db(channelData.pointee, frames, &dbLevel)
-
-        // Normalize to 0-1 range (-60dB to 0dB)
-        let normalizedLevel = max(0, min(1, (dbLevel + 60) / 60))
+        // RMS → dBFS → [0,1] meter window owned by commons
+        // (`rac_audio_compute_level_normalized` with RAC_AUDIO_LEVEL_FLOOR_DB).
+        var normalizedLevel: Float = 0
+        guard rac_audio_compute_level_normalized(
+            channelData.pointee,
+            frames,
+            RAC_AUDIO_LEVEL_FLOOR_DB,
+            &normalizedLevel
+        ) == RAC_SUCCESS else {
+            return
+        }
 
         DispatchQueue.main.async {
             self.audioLevel = normalizedLevel

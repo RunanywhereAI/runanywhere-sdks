@@ -2,23 +2,24 @@
 //  HardwareTier.swift
 //  RunAnywhereAI
 //
-//  Pure, testable classification of the device's on-device inference capability.
-//  Consumed by the hardware-aware model recommendation engine.
+//  Display-only device capability label. Commons does not publish a typed
+//  capability tier on DeviceInfo, so the example surfaces `.unknown` rather
+//  than inventing RAM / Neural Engine thresholds or memory budgets.
 //
 
 import Foundation
 import RunAnywhere
 
-/// Coarse capability class of the current device, derived only from
-/// `SystemDeviceInfo`. Single responsibility: map raw device facts to a tier
-/// plus the memory budget we are willing to spend on a model.
+/// Coarse capability label for UI copy. Only `.unknown` is produced today —
+/// typed tiers would come from an SDK/commons field when one exists.
 enum HardwareTier: Int, CaseIterable, Comparable {
-    /// < ~4 GB RAM. Prefer the smallest quantized / ONNX variants.
+    /// No typed capability tier from the SDK/commons.
+    case unknown
+    /// Reserved for a future commons-owned low-end tier.
     case lowEnd
-    /// ~4-8 GB RAM. Balanced small-to-mid models.
+    /// Reserved for a future commons-owned mid-range tier.
     case midRange
-    /// >= ~8 GB RAM with Neural Engine / Apple Silicon. Full spread including
-    /// larger "genius" models.
+    /// Reserved for a future commons-owned high-end tier.
     case highEnd
 
     static func < (lhs: HardwareTier, rhs: HardwareTier) -> Bool {
@@ -28,6 +29,7 @@ enum HardwareTier: Int, CaseIterable, Comparable {
     /// Consumer-facing headline describing the tier.
     var displayName: String {
         switch self {
+        case .unknown: return "Capabilities unknown"
         case .lowEnd: return "Efficient device"
         case .midRange: return "Balanced device"
         case .highEnd: return "High-performance device"
@@ -37,6 +39,7 @@ enum HardwareTier: Int, CaseIterable, Comparable {
     /// Short tagline shown under the headline.
     var tagline: String {
         switch self {
+        case .unknown: return "Model fit uses SDK compatibility when available"
         case .lowEnd: return "Tuned for small, fast models"
         case .midRange: return "Runs balanced models smoothly"
         case .highEnd: return "Runs larger, smarter models"
@@ -45,44 +48,22 @@ enum HardwareTier: Int, CaseIterable, Comparable {
 
     var systemImage: String {
         switch self {
+        case .unknown: return "questionmark.circle"
         case .lowEnd: return "bolt"
         case .midRange: return "gauge.with.dots.needle.50percent"
         case .highEnd: return "sparkles"
         }
     }
-
-    /// Largest model (by required bytes) we recommend downloading on this tier.
-    /// Kept well under total RAM to leave headroom for the OS and runtime.
-    var memoryBudgetBytes: Int64 {
-        switch self {
-        case .lowEnd: return 700_000_000       // ~0.7 GB
-        case .midRange: return 2_000_000_000   // ~2 GB
-        case .highEnd: return 5_000_000_000    // ~5 GB
-        }
-    }
 }
 
-/// Value type that resolves a `HardwareTier` from a `SystemDeviceInfo`.
-/// Detection reads only from already-collected device facts; it performs no
-/// new native calls (Single Responsibility / Open-Closed friendly).
+/// Resolves display tier + Apple Foundation availability. Detection never
+/// invents RAM/ANE thresholds; tier stays `.unknown` until commons owns one.
 struct HardwareTierResolver {
-    /// GB expressed in bytes for readable thresholds.
-    private static let gigabyte: Int64 = 1_073_741_824
-
-    /// Resolve a tier from the given device info. Falls back to `.midRange`
-    /// when memory is unknown so the UI never shows an empty recommendation.
+    /// No typed `capability_tier` on DeviceInfo / commons today — surface
+    /// unknown instead of local memory/ANE policy.
     func resolve(from device: SystemDeviceInfo?) -> HardwareTier {
-        guard let device, device.totalMemory > 0 else { return .midRange }
-
-        let totalGB = Double(device.totalMemory) / Double(Self.gigabyte)
-
-        if totalGB >= 8 && device.neuralEngineAvailable {
-            return .highEnd
-        }
-        if totalGB >= 4 {
-            return .midRange
-        }
-        return .lowEnd
+        _ = device
+        return .unknown
     }
 
     /// Whether Apple's built-in Foundation model is available as the default

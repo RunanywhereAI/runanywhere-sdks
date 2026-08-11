@@ -69,8 +69,9 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
             metrics.endToEndLatencyMs = elapsed * 1000
 
             metrics.audioLengthSeconds = audioDuration
-            // Wall-clock RTF: the transcript carries no backend timing block.
-            metrics.realTimeFactor = audioDuration > 0 ? elapsed / audioDuration : nil
+            // Public STT transcript carries no commons real_time_factor; leave
+            // unset rather than inventing wall elapsed / audioDuration.
+            metrics.realTimeFactor = nil
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter

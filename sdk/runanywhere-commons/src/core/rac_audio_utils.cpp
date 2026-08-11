@@ -242,23 +242,45 @@ size_t rac_audio_wav_header_size(void) {
     return WAV_HEADER_SIZE;
 }
 
-rac_result_t rac_audio_compute_level_db(const float* samples, size_t count, float* out_db) {
-    if (!samples || count == 0 || !out_db) {
+rac_result_t rac_audio_compute_rms(const float* samples, size_t count, float* out_rms) {
+    if (!out_rms) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (count == 0) {
+        *out_rms = 0.0f;
+        return RAC_SUCCESS;
+    }
+    if (!samples) {
         return RAC_ERROR_NULL_POINTER;
     }
 
-    // Accumulate squared samples in double precision to avoid loss-of-significance
-    // on long buffers (e.g. 4096-sample taps at 16 kHz).
     double sum_sq = 0.0;
     for (size_t i = 0; i < count; ++i) {
         sum_sq += static_cast<double>(samples[i]) * static_cast<double>(samples[i]);
     }
+    *out_rms = static_cast<float>(std::sqrt(sum_sq / static_cast<double>(count)));
+    return RAC_SUCCESS;
+}
 
-    const double rms = std::sqrt(sum_sq / static_cast<double>(count));
+rac_result_t rac_audio_compute_level_db(const float* samples, size_t count, float* out_db) {
+    if (!out_db) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    // Preserve the historical contract: zero/NULL input is an error for the
+    // dB meter (unlike rac_audio_compute_rms, which treats empty as 0).
+    if (!samples || count == 0) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    float rms = 0.0f;
+    const rac_result_t rc = rac_audio_compute_rms(samples, count, &rms);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
 
     // Silence floor: clamp -inf to -100 dB (well below the -60 dB normalisation
     // bottom used by audio meters in the platform SDKs).
-    *out_db = (rms <= 1e-10) ? -100.0f : static_cast<float>(20.0 * std::log10(rms));
+    *out_db = (rms <= 1e-10f) ? -100.0f : static_cast<float>(20.0 * std::log10(rms));
     return RAC_SUCCESS;
 }
 
@@ -324,8 +346,7 @@ rac_result_t rac_audio_resample_f32(const float* in, size_t in_frames, int32_t i
     if (in_rate == out_rate) {
         std::memcpy(buffer, in, out_len * sizeof(float));
     } else {
-        const double ratio =
-            static_cast<double>(in_rate) / static_cast<double>(out_rate);
+        const double ratio = static_cast<double>(in_rate) / static_cast<double>(out_rate);
         for (size_t i = 0; i < out_len; ++i) {
             const double src_idx = static_cast<double>(i) * ratio;
             size_t idx0 = static_cast<size_t>(src_idx);
@@ -369,5 +390,115 @@ rac_result_t rac_audio_pcm_bytes_to_ms(size_t byte_count, const rac_audio_format
         (static_cast<double>(byte_count) / static_cast<double>(bytes_per_frame) /
          static_cast<double>(format->sample_rate)) *
         1000.0);
+    return RAC_SUCCESS;
+}
+
+static uint16_t read_uint16_le(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0] | (static_cast<uint16_t>(p[1]) << 8));
+}
+
+static uint32_t read_uint32_le(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
+}
+
+static bool tag_eq(const uint8_t* p, const char* tag) {
+    return p[0] == static_cast<uint8_t>(tag[0]) && p[1] == static_cast<uint8_t>(tag[1]) &&
+           p[2] == static_cast<uint8_t>(tag[2]) && p[3] == static_cast<uint8_t>(tag[3]);
+}
+
+rac_result_t rac_audio_wav_to_float32(const void* wav_data, size_t wav_size, float** out_samples,
+                                      size_t* out_n_samples, int32_t* out_sample_rate) {
+    if (!out_samples || !out_n_samples || !out_sample_rate) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_samples = nullptr;
+    *out_n_samples = 0;
+    *out_sample_rate = 0;
+
+    if (!wav_data || wav_size < 12) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint8_t* bytes = static_cast<const uint8_t*>(wav_data);
+    if (!tag_eq(bytes, "RIFF") || !tag_eq(bytes + 8, "WAVE")) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    uint16_t channels = 1;
+    uint16_t audio_format = 0;
+    uint16_t bits = 16;
+    int32_t sample_rate = 0;
+    size_t data_offset = 0;
+    size_t data_len = 0;
+    bool have_fmt = false;
+    bool have_data = false;
+
+    size_t p = 12;
+    while (p + 8 <= wav_size) {
+        const uint8_t* chunk = bytes + p;
+        const uint32_t size = read_uint32_le(chunk + 4);
+        const size_t body = p + 8;
+        if (body > wav_size || size > wav_size - body) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        if (tag_eq(chunk, "fmt ")) {
+            if (size < 16) {
+                return RAC_ERROR_INVALID_ARGUMENT;
+            }
+            audio_format = read_uint16_le(bytes + body);
+            channels = read_uint16_le(bytes + body + 2);
+            if (channels == 0) {
+                channels = 1;
+            }
+            sample_rate = static_cast<int32_t>(read_uint32_le(bytes + body + 4));
+            bits = read_uint16_le(bytes + body + 14);
+            have_fmt = true;
+        } else if (tag_eq(chunk, "data")) {
+            data_offset = body;
+            data_len = size;
+            have_data = true;
+            break;
+        }
+
+        // Chunks are word-aligned.
+        p = body + size + (size % 2);
+    }
+
+    if (!have_fmt || !have_data) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (audio_format != WAV_FORMAT_PCM || bits != WAV_BITS_PER_SAMPLE_16) {
+        return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
+    }
+    if (sample_rate <= 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const size_t bytes_per_frame = static_cast<size_t>(channels) * sizeof(int16_t);
+    if (bytes_per_frame == 0 || data_len < bytes_per_frame) {
+        *out_sample_rate = sample_rate;
+        return RAC_SUCCESS;
+    }
+    const size_t frames = data_len / bytes_per_frame;
+    float* out = static_cast<float*>(rac_alloc(frames * sizeof(float)));
+    if (!out) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (size_t i = 0; i < frames; ++i) {
+        double sum = 0.0;
+        for (uint16_t c = 0; c < channels; ++c) {
+            const size_t off = data_offset + (i * channels + c) * sizeof(int16_t);
+            const int16_t sample = static_cast<int16_t>(read_uint16_le(bytes + off));
+            sum += static_cast<double>(sample) / static_cast<double>(RAC_AUDIO_PCM16_SCALE);
+        }
+        out[i] = static_cast<float>(sum / static_cast<double>(channels));
+    }
+
+    *out_samples = out;
+    *out_n_samples = frames;
+    *out_sample_rate = sample_rate;
     return RAC_SUCCESS;
 }

@@ -384,7 +384,7 @@ The primary feature. `LLMViewModel` is split across 7 files via extensions:
 
 **Analytics**: Per-message (`MessageAnalytics`) and per-conversation (`ConversationAnalytics`) tracking. Metrics include TTFT, tokens/sec, token counts, thinking mode usage, completion rate. Displayed in `ChatDetailsView` (3-tab sheet).
 
-**Thinking mode**: Models with `supportsThinking: true` emit `<think>...</think>` tags. When thinking mode is disabled by the user, `/no_think\n` is prepended to prompts. Thinking content is extracted via `ThinkingContentParser` and shown in a collapsible section.
+**Thinking mode**: Models with `supportsThinking: true` expose reasoning through the SDK (`reasoning` options + `thinkingText` / stream thought events). Commons owns tag parsing and `/no_think` directives — the app only toggles reasoning mode and renders the returned thinking channel in a collapsible section.
 
 ### 2. Voice Agent (`Features/Voice/VoiceAssistantView.swift`, `VoiceAgentViewModel.swift`)
 
@@ -440,7 +440,7 @@ Real-time camera-based image description. `AVCaptureSession` with BGRA pixel for
 
 PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
-**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → `RunAnywhere.rag.open(embeddingModel:llmModel:)` → `session.ingest(document: RagDocument(text:metadata:))` → user asks question → `session.query(question:options:)` → thinking content parsed via `ThinkingContentParser`. The session stays open across turns for the same document and model pair.
+**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → `RunAnywhere.rag.open(embeddingModel:llmModel:)` → `session.ingest(document: RagDocument(text:metadata:))` → user asks question → `session.query(question:options:)` → render `thinkingText` from the SDK result when present. The session stays open across turns for the same document and model pair.
 
 Path resolution handles multi-file embedding models (e.g., `all-minilm-l6-v2` with `model.onnx` + `vocab.txt`).
 

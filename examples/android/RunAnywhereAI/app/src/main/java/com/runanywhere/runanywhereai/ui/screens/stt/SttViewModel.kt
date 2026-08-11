@@ -382,11 +382,12 @@ class SttViewModel : ViewModel() {
             )
             transcript = result.text.trim()
             routing = result.routing
-            val audioMs = audio.size.toLong() / (AudioRecorder.SAMPLE_RATE * 2L / 1000L)
+            // Public hybrid/Transcription surfaces do not expose commons RTF.
+            // Do not invent elapsed/PCM-bytes as real_time_factor in the example app.
             metrics = SttMetrics(
-                audioSec = audioMs / 1000.0,
+                audioSec = 0.0,
                 processingMs = elapsed,
-                realTimeFactor = if (audioMs > 0) elapsed.toDouble() / audioMs else null,
+                realTimeFactor = null,
                 words = result.text.trim().split(Regex("\\s+")).count { it.isNotBlank() },
             )
         } catch (e: CancellationException) {
@@ -445,11 +446,13 @@ class SttViewModel : ViewModel() {
         val text = output.text.trim()
         // STTOutput.duration_ms is populated for every non-empty buffer; never
         // re-derive length from PCM bytes when the commons field is absent.
+        // real_time_factor is not on public Transcription — leave unset rather
+        // than inventing elapsed/audioMs in the example app.
         val audioMs = output.durationMs.takeIf { it > 0 }
         metrics = SttMetrics(
             audioSec = (audioMs ?: 0L) / 1000.0,
             processingMs = elapsed,
-            realTimeFactor = audioMs?.let { elapsed.toDouble() / it },
+            realTimeFactor = null,
             words = text.split(Regex("\\s+")).count { it.isNotBlank() },
         )
         text

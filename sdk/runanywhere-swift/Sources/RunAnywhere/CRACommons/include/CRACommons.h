@@ -126,6 +126,7 @@
 // Model management
 #include "rac_lora_registry.h"
 #include "rac_model_assignment.h"
+#include "rac_model_compatibility.h"
 #include "rac_model_format_ids.h"
 #include "rac_model_paths.h"
 #include "rac_model_registry.h"

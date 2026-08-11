@@ -233,15 +233,13 @@ inline bool gen_prefill_is_opening_think_tag(std::string_view value) {
     // Opening-tag prefills are `<think>` / `<thinking>` plus optional trailing
     // whitespace. A value that also closes the block (e.g. no_think shape) is
     // not an "open tag already emitted" signal.
-    const bool has_open =
-        value.find("<think>") != std::string_view::npos ||
-        value.find("<thinking>") != std::string_view::npos;
+    const bool has_open = value.find("<think>") != std::string_view::npos ||
+                          value.find("<thinking>") != std::string_view::npos;
     if (!has_open) {
         return false;
     }
-    const bool has_close =
-        value.find("</think>") != std::string_view::npos ||
-        value.find("</thinking>") != std::string_view::npos;
+    const bool has_close = value.find("</think>") != std::string_view::npos ||
+                           value.find("</thinking>") != std::string_view::npos;
     return !has_close;
 }
 
@@ -291,8 +289,7 @@ inline bool enrich_thinking_prefill_from_qhexrt_manifest(runanywhere::v1::ModelI
         }
     }
 
-    if (!saw_gen_prefill_key && !set_true &&
-        detail::deepseek_r1_distill_name_heuristic(*model)) {
+    if (!saw_gen_prefill_key && !set_true && detail::deepseek_r1_distill_name_heuristic(*model)) {
         set_true = true;
     }
 

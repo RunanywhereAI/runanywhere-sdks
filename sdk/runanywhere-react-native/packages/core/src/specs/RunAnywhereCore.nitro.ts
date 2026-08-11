@@ -326,6 +326,34 @@ export interface RunAnywhereCore extends HybridObject<{
   ): number;
 
   /**
+   * Float32 PCM → WAV via sync `rac_audio_float32_to_wav` (canonical
+   * RAC_AUDIO_PCM16_SCALE quantization). Empty input returns an empty buffer.
+   */
+  audioFloat32ToWav(pcmBytes: ArrayBuffer, sampleRate: number): ArrayBuffer;
+
+  /**
+   * Int16 PCM → Float32 sample bytes via sync `rac_audio_pcm16_to_float32`.
+   */
+  audioPcm16ToFloat32(pcm16Bytes: ArrayBuffer): ArrayBuffer;
+
+  /**
+   * Int16 PCM → WAV via sync `rac_audio_int16_to_wav`.
+   */
+  audioInt16ToWav(pcm16Bytes: ArrayBuffer, sampleRate: number): ArrayBuffer;
+
+  /**
+   * L2 norm of a dense float32 vector (raw sample bytes) via
+   * `rac_embeddings_norm`.
+   */
+  embeddingsNorm(vectorBytes: ArrayBuffer): number;
+
+  /**
+   * Cosine similarity of two dense float32 vectors via
+   * `rac_embeddings_similarity`.
+   */
+  embeddingsSimilarity(lhsBytes: ArrayBuffer, rhsBytes: ArrayBuffer): number;
+
+  /**
    * Register a process-wide native DownloadProgress proto callback.
    */
   setDownloadProgressCallbackProto(

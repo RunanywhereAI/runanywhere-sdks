@@ -369,6 +369,13 @@ export interface RaBackend {
   vadProcess(samples: Float32Array): Promise<boolean>;
   vadReset(): Promise<void>;
   vadClose(): Promise<void>;
+  /** Register SPEECH_ACTIVITY stream callback (sync on native; RPC may await). */
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): void | Promise<void>;
+  vadUnsetStreamCallback(): Promise<void>;
+  vadStreamStart(optionsBytes: Uint8Array): Promise<number>;
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void>;
+  vadStreamStop(sessionId: number): Promise<void>;
+  vadStreamCancel(sessionId: number): Promise<void>;
 
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
   //
@@ -475,6 +482,7 @@ export const BACKEND_STREAMING_METHODS: ReadonlySet<string> = new Set([
   'voiceProcessTurn',
   'ragQueryStream',
   'downloadWatch',
+  'vadSetStreamCallback',
 ]);
 
 /** Every backend operation name, used to build the RPC allowlist. */
@@ -578,6 +586,12 @@ export const BACKEND_METHODS: readonly string[] = [
   'vadProcess',
   'vadReset',
   'vadClose',
+  'vadSetStreamCallback',
+  'vadUnsetStreamCallback',
+  'vadStreamStart',
+  'vadStreamFeed',
+  'vadStreamStop',
+  'vadStreamCancel',
   'embed',
   'rerank',
   'diarize',

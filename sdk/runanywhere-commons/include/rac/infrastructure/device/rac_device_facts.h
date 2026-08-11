@@ -47,11 +47,10 @@ extern "C" {
  *         RAC_ERROR_NOT_FOUND if every tier is empty.
  */
 RAC_API rac_result_t rac_device_resolve_chip_name(const char* soc_manufacturer,
-                                                   const char* soc_model,
-                                                   const char* build_hardware,
-                                                   const char* cpuinfo_hardware,
-                                                   const char* architecture_fallback,
-                                                   char* out, size_t out_size);
+                                                  const char* soc_model, const char* build_hardware,
+                                                  const char* cpuinfo_hardware,
+                                                  const char* architecture_fallback, char* out,
+                                                  size_t out_size);
 
 /**
  * Classify GPU family from SoC manufacturer/model and/or an already-resolved
@@ -67,9 +66,8 @@ RAC_API rac_result_t rac_device_resolve_chip_name(const char* soc_manufacturer,
  *         RAC_ERROR_NULL_POINTER / RAC_ERROR_BUFFER_TOO_SMALL on bad buffers.
  */
 RAC_API rac_result_t rac_device_classify_gpu_family(const char* soc_manufacturer,
-                                                    const char* soc_model,
-                                                    const char* chip_name, char* out,
-                                                    size_t out_size);
+                                                    const char* soc_model, const char* chip_name,
+                                                    char* out, size_t out_size);
 
 /**
  * Heuristic NPU presence from SoC + chip strings.
@@ -78,8 +76,7 @@ RAC_API rac_result_t rac_device_classify_gpu_family(const char* soc_manufacturer
  * Dimensity, and Exynos / s5e 2xxx parts. False when nothing matches —
  * never invents presence for unknown silicon.
  */
-RAC_API rac_bool_t rac_device_heuristic_has_npu(const char* soc_manufacturer,
-                                                const char* soc_model,
+RAC_API rac_bool_t rac_device_heuristic_has_npu(const char* soc_manufacturer, const char* soc_model,
                                                 const char* chip_name);
 
 /**
@@ -94,8 +91,7 @@ RAC_API rac_bool_t rac_device_heuristic_has_npu(const char* soc_manufacturer,
  *
  * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER if an out pointer is NULL.
  */
-RAC_API rac_result_t rac_device_split_performance_cores(const int64_t* max_freqs,
-                                                        size_t count,
+RAC_API rac_result_t rac_device_split_performance_cores(const int64_t* max_freqs, size_t count,
                                                         int32_t* out_performance,
                                                         int32_t* out_efficiency);
 

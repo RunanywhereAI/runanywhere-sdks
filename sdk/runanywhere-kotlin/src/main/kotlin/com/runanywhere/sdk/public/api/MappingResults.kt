@@ -30,12 +30,13 @@ internal fun finishReasonOf(raw: ai.runanywhere.proto.v1.FinishReason): FinishRe
         ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_STOP,
         ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_STOP_SEQUENCE,
         -> FinishReason.STOP
-        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_LENGTH -> FinishReason.LENGTH
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_LENGTH,
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_CONTEXT_OVERFLOW,
+        -> FinishReason.LENGTH
         ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_TOOL_CALLS -> FinishReason.TOOL_CALLS
         ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_CANCELLED -> FinishReason.CANCELLED
-        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_CONTEXT_OVERFLOW,
-        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_ERROR,
-        -> FinishReason.UNKNOWN
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_ERROR -> FinishReason.ERROR
+        // UNSPECIFIED and unrecognized — never invent STOP/TOOL_CALLS from local state.
         else -> FinishReason.UNKNOWN
     }
 
@@ -222,6 +223,7 @@ internal fun RAGResult.toRagResult(model: String): RagResult =
     RagResult(
         answer = answer,
         sources = retrieved_chunks.map { it.toMatch() },
+        thinkingText = thinking_content?.takeIf { it.isNotEmpty() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
         // Never map retrieval_time_ms into TTFT — different quantity. Surface

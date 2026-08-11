@@ -6,11 +6,11 @@ import {
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
-  FinishReason,
   LLMGenerationOptions,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import {
   SDKEvent,

@@ -2582,6 +2582,30 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioFloat32ToPcm16(
     return out;
 }
 
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioComputeLevelNormalized(
+    JNIEnv* env, jclass /*clazz*/, jfloatArray samples, jfloat floorDb) {
+    if (samples == nullptr) {
+        return 0.0f;
+    }
+    const jsize n_samples = env->GetArrayLength(samples);
+    if (n_samples == 0) {
+        return 0.0f;
+    }
+    jfloat* in = env->GetFloatArrayElements(samples, nullptr);
+    if (in == nullptr) {
+        return 0.0f;
+    }
+    float out = 0.0f;
+    const rac_result_t rc = rac_audio_compute_level_normalized(
+        in, static_cast<size_t>(n_samples), floorDb, &out);
+    env->ReleaseFloatArrayElements(samples, in, JNI_ABORT);
+    if (rc != RAC_SUCCESS) {
+        return 0.0f;
+    }
+    return out;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPercent(
     JNIEnv* /*env*/, jclass /*clazz*/, jfloat overallProgress, jlong bytesDownloaded,
@@ -5869,6 +5893,56 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatch
     rac_result_t rc =
         rac_embeddings_embed_batch_lifecycle_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchLifecycleProto");
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsNorm(JNIEnv* env,
+                                                                           jclass /*clazz*/,
+                                                                           jfloatArray vector) {
+    float norm = 0.0f;
+    if (vector == nullptr) {
+        (void)rac_embeddings_norm(nullptr, 0, &norm);
+        return norm;
+    }
+    const jsize n = env->GetArrayLength(vector);
+    if (n == 0) {
+        (void)rac_embeddings_norm(nullptr, 0, &norm);
+        return norm;
+    }
+    jfloat* elems = env->GetFloatArrayElements(vector, nullptr);
+    if (elems == nullptr) {
+        return 0.0f;
+    }
+    const rac_result_t rc = rac_embeddings_norm(elems, static_cast<size_t>(n), &norm);
+    env->ReleaseFloatArrayElements(vector, elems, JNI_ABORT);
+    return rc == RAC_SUCCESS ? norm : 0.0f;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsSimilarity(
+    JNIEnv* env, jclass /*clazz*/, jfloatArray lhs, jfloatArray rhs) {
+    float similarity = 0.0f;
+    const jsize lhs_n = lhs != nullptr ? env->GetArrayLength(lhs) : 0;
+    const jsize rhs_n = rhs != nullptr ? env->GetArrayLength(rhs) : 0;
+    if (lhs_n == 0 || rhs_n == 0) {
+        (void)rac_embeddings_similarity(nullptr, 0, nullptr, 0, &similarity);
+        return similarity;
+    }
+    jfloat* lhs_elems = env->GetFloatArrayElements(lhs, nullptr);
+    if (lhs_elems == nullptr) {
+        return 0.0f;
+    }
+    jfloat* rhs_elems = env->GetFloatArrayElements(rhs, nullptr);
+    if (rhs_elems == nullptr) {
+        env->ReleaseFloatArrayElements(lhs, lhs_elems, JNI_ABORT);
+        return 0.0f;
+    }
+    const rac_result_t rc =
+        rac_embeddings_similarity(lhs_elems, static_cast<size_t>(lhs_n), rhs_elems,
+                                  static_cast<size_t>(rhs_n), &similarity);
+    env->ReleaseFloatArrayElements(rhs, rhs_elems, JNI_ABORT);
+    env->ReleaseFloatArrayElements(lhs, lhs_elems, JNI_ABORT);
+    return rc == RAC_SUCCESS ? similarity : 0.0f;
 }
 
 JNIEXPORT void JNICALL

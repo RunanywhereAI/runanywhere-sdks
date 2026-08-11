@@ -191,11 +191,12 @@ def test_llm_kwargs_maps_reasoning_off() -> None:
     assert "disable_thinking" not in on
 
 
-def test_llm_kwargs_builds_a_grammar_for_structured_output() -> None:
+def test_llm_kwargs_forwards_structured_schema_to_commons() -> None:
     kwargs = llm_kwargs(
         LlmOptions(structured_output=StructuredOutput(schema={"type": "object"}))
     )
-    assert "root" in kwargs["grammar"]
+    assert "grammar" not in kwargs
+    assert kwargs["structured_schema"] == '{"type":"object"}'
 
 
 def test_llm_kwargs_rejects_a_thinking_pattern() -> None:

@@ -26,6 +26,7 @@ import type {
 } from '@runanywhere/proto-ts/rag';
 import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
 import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
+import { TokenUsage as TokenUsageMessage } from '@runanywhere/proto-ts/token_usage';
 import {
   rAGConfigurationDefaults,
   rAGRetrievalOptionsDefaults,
@@ -665,7 +666,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     );
 
     this.lifecycleVersion += 1;
-    this.config = { ...createDefaultRAGConfiguration(), ...config };
+    this.config = createDefaultRAGConfiguration(config);
     this.chunks = [];
     this.documents.clear();
     this.lastUpdatedMs = Date.now();
@@ -1338,14 +1339,7 @@ function nowUs(): number {
 
 /** `TokenUsage` zero value — used where a RAG result has no real usage to report. */
 function emptyTokenUsage(): TokenUsage {
-  return {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    decodeTokensPerSecond: 0,
-    prefillMs: 0,
-    ttftMs: 0,
-  };
+  return TokenUsageMessage.create();
 }
 
 function assertNativeHandle(handle: number, feature: string): number {
@@ -1378,9 +1372,12 @@ export function createDefaultRAGConfiguration(
   // are honored end-to-end because RAGConfiguration numeric fields are proto3
   // `optional` — commons distinguishes "unset" from "explicit zero" via
   // `has_*()` in `build_backend_config` (rac_rag_proto_abi.cpp).
+  const definedOverrides = Object.fromEntries(
+    Object.entries(overrides).filter(([, value]) => value !== undefined),
+  ) as Partial<RAGConfiguration>;
   return {
     ...rAGConfigurationDefaults(),
-    ...overrides,
+    ...definedOverrides,
   };
 }
 

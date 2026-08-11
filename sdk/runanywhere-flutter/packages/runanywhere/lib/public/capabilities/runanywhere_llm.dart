@@ -153,8 +153,6 @@ class RunAnywhereLLM {
     // a remote round-trip per call.
     await DartBridge.ensureServicesReady();
 
-    final startTime = DateTime.now();
-
     // No "model loaded" pre-flight here — Swift has none; commons surfaces
     // a structured error when no model is loaded.
     final modelId = currentModelId;
@@ -166,15 +164,11 @@ class RunAnywhereLLM {
       );
       final result = await _generateProto(effectiveRequest);
 
-      final endTime = DateTime.now();
-      final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
       if ((!result.hasModelUsed() || result.modelUsed.isEmpty) &&
           modelId != null) {
         result.modelUsed = modelId;
       }
-      if (!result.hasGenerationTimeMs() || result.generationTimeMs <= 0) {
-        result.generationTimeMs = latencyMs;
-      }
+      // generation_time_ms is commons-owned — never backfill from wall clock.
 
       return result;
     } catch (e) {

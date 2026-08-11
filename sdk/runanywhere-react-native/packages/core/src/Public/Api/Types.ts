@@ -338,6 +338,7 @@ export type FinishReason =
   | 'toolCalls'
   | 'cancelled'
   | 'contentFilter'
+  | 'error'
   | 'unknown';
 
 /** Generated text plus the metrics every generation reports. */

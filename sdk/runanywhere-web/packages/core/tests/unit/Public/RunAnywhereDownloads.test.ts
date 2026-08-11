@@ -2,22 +2,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DownloadFailureReason } from '@runanywhere/proto-ts/download_service';
 import { __testing__ } from '../../../src/Public/SDKCore';
 import { Downloads } from '../../../src/Public/Extensions/RunAnywhere+Downloads';
+import { ensureDownloadStorageReady } from '../../../src/Infrastructure/BrowserStorage';
 import { ProtoErrorCode } from '../../../src/Foundation/SDKException';
 
 describe('browser download safeguards', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('fails before start when storage quota cannot fit the plan', async () => {
+  it('reports insufficient storage via commons-backed readiness when quota is too small', async () => {
     vi.stubGlobal('navigator', {
       storage: {
         estimate: vi.fn().mockResolvedValue({ usage: 900, quota: 1_000 }),
+        persist: vi.fn().mockResolvedValue(false),
+        persisted: vi.fn().mockResolvedValue(false),
       },
     });
-    await expect(__testing__.assertBrowserStorageQuota(
-      'large-model',
-      { files: [{ expectedBytes: 200 }] } as never,
-      0,
-    )).rejects.toThrow('Insufficient browser storage');
+    const readiness = await ensureDownloadStorageReady({ requiredBytes: 200 });
+    expect(readiness.availableBytes).toBe(100);
+    expect(readiness.sufficient).toBe(false);
   });
 
   it('reads free space from navigator.storage.estimate for the download planner', async () => {

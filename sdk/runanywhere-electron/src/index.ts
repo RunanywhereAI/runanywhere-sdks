@@ -135,13 +135,12 @@ export type { RagSession } from './api/data';
 
 // ---- errors, platform helpers, and the model store ----
 // Not a second API surface: these are the pieces a host application needs that
-// have no namespace of their own — typed errors, renderer-side audio DSP, and
-// the staged catalog it hands the SDK before initialize().
+// have no namespace of their own — typed errors, renderer-side audio helpers
+// (commons DSP via the N-API addon), and the staged catalog it hands the SDK
+// before initialize().
 export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException, raiseForRac } from './errors';
-export { jsonSchemaToGrammar } from './grammar';
-export type { JsonSchema } from './grammar';
+export type { JsonSchema } from './api/types';
 export { speakableText } from './speech';
-export { streamWithMetrics } from './stream';
 export {
   float32ToPcm16,
   pcm16ToFloat32,
@@ -150,6 +149,8 @@ export {
   rms,
   encodeWav,
   decodeWav,
+  pcmDurationMs,
+  float32DurationMs,
   MicRecorder,
   SpeakerPlayer,
 } from './audio';

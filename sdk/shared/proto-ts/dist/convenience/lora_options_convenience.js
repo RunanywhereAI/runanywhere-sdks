@@ -13,13 +13,8 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loraAdapterCatalogEntryDefaults = exports.validateLoraAdapterConfig = exports.loraAdapterConfigDefaults = void 0;
+exports.loraAdapterCatalogEntryDefaults = exports.validateLoraAdapterConfig = void 0;
 const _errors_1 = require("./_errors");
-const loraAdapterConfigDefaults = () => ({
-    adapterId: '',
-    scale: 1.0,
-});
-exports.loraAdapterConfigDefaults = loraAdapterConfigDefaults;
 const validateLoraAdapterConfig = (m) => {
     if (m.adapterId === '') {
         throw new _errors_1.ValidationError({

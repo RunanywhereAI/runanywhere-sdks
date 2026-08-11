@@ -192,9 +192,10 @@ contextBridge.exposeInMainWorld('runanywhere', {
         initArgs = { secureDir, baseDir, cp: controlPlane };
       }),
 
-  // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
-  // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
-  // this by hand in an app folds >8kHz energy into the band Whisper reads.
+  // ---- audio helpers (commons DSP via the N-API addon; lazy-loaded) ----
+  // Rate conversion + PCM16 packing for the mic -> STT path. Commons owns the
+  // math (`rac_audio_resample_f32` / `rac_audio_float32_to_pcm16` /
+  // `rac_audio_compute_rms`); these just forward typed arrays.
   downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
   pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
   rms: (samples: Float32Array) => rms(samples),

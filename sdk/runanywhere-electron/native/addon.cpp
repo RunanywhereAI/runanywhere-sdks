@@ -39,6 +39,7 @@
 #include "tool_bridge.h"
 #include "data_bridge.h"
 #include "download_bridge.h"
+#include "audio_bridge.h"
 #include "lora_bridge.h"
 #include "speech_bridge.h"
 #include "voice_bridge.h"
@@ -61,6 +62,7 @@
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_stream.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_types.h"
@@ -2741,6 +2743,177 @@ Napi::Value VadStatistics(const Napi::CallbackInfo& info) {
     return out;
 }
 
+// =============================================================================
+// VAD stream proto ABI (rac_vad_stream_*). Commons owns min-speech / silence /
+// prefix-padding endpointing and emits SPEECH_ACTIVITY events on the registered
+// callback. Mirror Python's vad_set_stream_callback / vad_stream_* surface.
+// =============================================================================
+
+struct VadStreamCtx {
+    Napi::ThreadSafeFunction emit;
+};
+
+std::mutex& VadStreamMutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::unordered_map<int32_t, VadStreamCtx*>& VadStreamSlots() {
+    static std::unordered_map<int32_t, VadStreamCtx*> slots;
+    return slots;
+}
+
+void ForwardVadStreamEvent(const uint8_t* bytes, size_t size, void* user_data) {
+    auto* ctx = static_cast<VadStreamCtx*>(user_data);
+    if (ctx == nullptr || bytes == nullptr || size == 0)
+        return;
+    auto* payload = new std::vector<uint8_t>(bytes, bytes + size);
+    const napi_status status = ctx->emit.BlockingCall(
+        payload, [](Napi::Env env, Napi::Function callback, std::vector<uint8_t>* held) {
+            std::unique_ptr<std::vector<uint8_t>> owned(held);
+            callback.Call({Napi::Buffer<uint8_t>::Copy(env, owned->data(), owned->size())});
+        });
+    if (status != napi_ok)
+        delete payload;
+}
+
+void ClearVadStreamSlot(int32_t hid, rac_handle_t h) {
+    VadStreamCtx* ctx = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(VadStreamMutex());
+        auto it = VadStreamSlots().find(hid);
+        if (it != VadStreamSlots().end()) {
+            ctx = it->second;
+            VadStreamSlots().erase(it);
+        }
+    }
+    if (h != nullptr)
+        rac_vad_unset_stream_proto_callback(h);
+    rac_vad_proto_quiesce();
+    if (ctx != nullptr) {
+        ctx->emit.Release();
+        delete ctx;
+    }
+}
+
+Napi::Value VadSetStreamCallback(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsFunction()) {
+        Napi::TypeError::New(env, "vadSetStreamCallback(handleId, onEvent) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = handle_for(g_vad_handles, hid);
+    if (h == nullptr) {
+        Napi::Error::New(env, "invalid vad handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    ClearVadStreamSlot(hid, h);
+
+    auto* ctx = new VadStreamCtx();
+    ctx->emit = Napi::ThreadSafeFunction::New(env, info[1].As<Napi::Function>(),
+                                              "runanywhere_vad_stream", 0, 1);
+    ctx->emit.Unref(env);
+    {
+        std::lock_guard<std::mutex> lock(VadStreamMutex());
+        VadStreamSlots()[hid] = ctx;
+    }
+    const rac_result_t rc = rac_vad_set_stream_proto_callback(h, ForwardVadStreamEvent, ctx);
+    if (rc != RAC_SUCCESS) {
+        ClearVadStreamSlot(hid, h);
+        rac_electron::ThrowProtoError(env, rc, "vad_set_stream_callback");
+        return env.Undefined();
+    }
+    return env.Undefined();
+}
+
+Napi::Value VadUnsetStreamCallback(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "vadUnsetStreamCallback(handleId) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    return RunNativeCall(env, "vad_unset_stream_callback", [hid]() {
+        rac_handle_t h = handle_for(g_vad_handles, hid);
+        ClearVadStreamSlot(hid, h);
+        return RAC_SUCCESS;
+    });
+}
+
+Napi::Value VadStreamStart(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "vadStreamStart(handleId, optionsBytes) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    auto options = std::make_shared<std::vector<uint8_t>>(
+        rac_electron::RequireProtoBytes(info, 1, "vadStreamStart(handleId, optionsBytes)"));
+    auto session = std::make_shared<uint64_t>(0);
+    return RunNativeCall(
+        env, "vad_stream_start",
+        [hid, options, session]() -> rac_result_t {
+            rac_handle_t h = handle_for(g_vad_handles, hid);
+            if (h == nullptr)
+                return RAC_ERROR_INVALID_HANDLE;
+            return rac_vad_stream_start_proto(h, options->empty() ? nullptr : options->data(),
+                                             options->size(), session.get());
+        },
+        [session](Napi::Env e) {
+            return Napi::Number::New(e, static_cast<double>(*session));
+        });
+}
+
+Napi::Value VadStreamFeed(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "vadStreamFeed(sessionId, audioBytes) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const uint64_t session_id =
+        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    auto audio = std::make_shared<std::vector<uint8_t>>();
+    if (!rac_electron::ReadProtoBytes(info[1], audio.get())) {
+        Napi::TypeError::New(env, "vadStreamFeed(sessionId, audioBytes) expects bytes")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return RunNativeCall(env, "vad_stream_feed", [session_id, audio]() {
+        return rac_vad_stream_feed_audio_proto(session_id, audio->empty() ? nullptr : audio->data(),
+                                               audio->size());
+    });
+}
+
+Napi::Value VadStreamStop(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "vadStreamStop(sessionId) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const uint64_t session_id =
+        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    return RunNativeCall(env, "vad_stream_stop",
+                         [session_id]() { return rac_vad_stream_stop_proto(session_id); });
+}
+
+Napi::Value VadStreamCancel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "vadStreamCancel(sessionId) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    const uint64_t session_id =
+        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    return RunNativeCall(env, "vad_stream_cancel",
+                         [session_id]() { return rac_vad_stream_cancel_proto(session_id); });
+}
+
 Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) {
@@ -2749,8 +2922,10 @@ Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "vad unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
-        if (h)
+        if (h) {
+            ClearVadStreamSlot(hid, h);
             rac_vad_component_destroy(h);
+        }
         return RAC_SUCCESS;
     });
 }
@@ -3671,6 +3846,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     rac_electron::RegisterVoiceBridge(env, exports);
     rac_electron::RegisterDataBridge(env, exports);
     rac_electron::RegisterDownloadBridge(env, exports);
+    rac_electron::RegisterAudioBridge(env, exports);
     rac_electron::RegisterLoraBridge(env, exports);
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("memoryInfo", Napi::Function::New(env, MemoryInfo));
@@ -3697,6 +3873,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("vadSetThreshold", Napi::Function::New(env, VadSetThreshold));
     exports.Set("vadReset", Napi::Function::New(env, VadReset));
     exports.Set("vadStatistics", Napi::Function::New(env, VadStatistics));
+    exports.Set("vadSetStreamCallback", Napi::Function::New(env, VadSetStreamCallback));
+    exports.Set("vadUnsetStreamCallback", Napi::Function::New(env, VadUnsetStreamCallback));
+    exports.Set("vadStreamStart", Napi::Function::New(env, VadStreamStart));
+    exports.Set("vadStreamFeed", Napi::Function::New(env, VadStreamFeed));
+    exports.Set("vadStreamStop", Napi::Function::New(env, VadStreamStop));
+    exports.Set("vadStreamCancel", Napi::Function::New(env, VadStreamCancel));
     exports.Set("unloadVad", Napi::Function::New(env, UnloadVad));
     exports.Set("loadModel", Napi::Function::New(env, LoadModel));
     exports.Set("generate", Napi::Function::New(env, Generate));

@@ -645,6 +645,33 @@ export class NativeBackend implements RaBackend {
     await this.addon.unloadVad(handle);
   }
 
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): void {
+    if (this.vadHandle == null) throw SDKException.invalidState('no VAD is open');
+    this.addon.vadSetStreamCallback(this.vadHandle, onEvent);
+  }
+
+  async vadUnsetStreamCallback(): Promise<void> {
+    if (this.vadHandle == null) return;
+    await this.addon.vadUnsetStreamCallback(this.vadHandle);
+  }
+
+  async vadStreamStart(optionsBytes: Uint8Array): Promise<number> {
+    if (this.vadHandle == null) throw SDKException.invalidState('no VAD is open');
+    return this.addon.vadStreamStart(this.vadHandle, optionsBytes);
+  }
+
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void> {
+    return this.addon.vadStreamFeed(sessionId, audioBytes);
+  }
+
+  vadStreamStop(sessionId: number): Promise<void> {
+    return this.addon.vadStreamStop(sessionId);
+  }
+
+  vadStreamCancel(sessionId: number): Promise<void> {
+    return this.addon.vadStreamCancel(sessionId);
+  }
+
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
 
   embedBatchProto(requestBytes: Uint8Array): Promise<Uint8Array> {

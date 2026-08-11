@@ -25,7 +25,7 @@ import {
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
-import { FinishReason } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { MessageRole } from '@runanywhere/proto-ts/chat';
 
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';

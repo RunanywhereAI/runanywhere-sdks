@@ -328,7 +328,7 @@ exports.SegmentationRequest = {
     },
 };
 function createBaseSegmentationClassSummary() {
-    return { classId: 0, pixelCount: 0, label: "" };
+    return { classId: 0, pixelCount: 0, label: "", fraction: 0 };
 }
 exports.SegmentationClassSummary = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -340,6 +340,9 @@ exports.SegmentationClassSummary = {
         }
         if (message.label !== "") {
             writer.uint32(26).string(message.label);
+        }
+        if (message.fraction !== 0) {
+            writer.uint32(45).float(message.fraction);
         }
         return writer;
     },
@@ -371,6 +374,13 @@ exports.SegmentationClassSummary = {
                     message.label = reader.string();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 45) {
+                        break;
+                    }
+                    message.fraction = reader.float();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -392,6 +402,7 @@ exports.SegmentationClassSummary = {
                     ? globalThis.Number(object.pixel_count)
                     : 0,
             label: isSet(object.label) ? globalThis.String(object.label) : "",
+            fraction: isSet(object.fraction) ? globalThis.Number(object.fraction) : 0,
         };
     },
     toJSON(message) {
@@ -405,6 +416,9 @@ exports.SegmentationClassSummary = {
         if (message.label !== "") {
             obj.label = message.label;
         }
+        if (message.fraction !== 0) {
+            obj.fraction = message.fraction;
+        }
         return obj;
     },
     create(base) {
@@ -415,6 +429,7 @@ exports.SegmentationClassSummary = {
         message.classId = object.classId ?? 0;
         message.pixelCount = object.pixelCount ?? 0;
         message.label = object.label ?? "";
+        message.fraction = object.fraction ?? 0;
         return message;
     },
 };

@@ -19,9 +19,11 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.FinishReason
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.SDKError
+import ai.runanywhere.proto.v1.TokenUsage
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -152,5 +154,39 @@ class LlmStreamEventsTest {
                     .orEmpty()
                     .contains("backend crashed"),
             )
+        }
+
+    @Test
+    fun `weaker terminal text yields to accumulated stream without inventing metrics`() =
+        runBlocking {
+            val raw =
+                flowOf(
+                    LLMStreamEvent(token = "here's the code:", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
+                    LLMStreamEvent(token = "\nfn main()", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
+                    LLMStreamEvent(
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                        finish_reason = FinishReason.FINISH_REASON_STOP,
+                        result =
+                            LLMGenerationResult(
+                                text = "hi",
+                                usage =
+                                    TokenUsage(
+                                        input_tokens = 3,
+                                        output_tokens = 11,
+                                        total_tokens = 14,
+                                        decode_tokens_per_second = 22.0,
+                                        ttft_ms = 4L,
+                                    ),
+                            ),
+                    ),
+                )
+
+            val events = mapLLMStreamEvents("req-6", "model-a", raw).toList()
+            val completed = events.last() as GenerationEvent.Completed
+            assertEquals("here's the code:\nfn main()", completed.result.text)
+            assertEquals(3, completed.result.inputTokens)
+            assertEquals(11, completed.result.outputTokens)
+            assertEquals(22.0f, completed.result.tokensPerSecond, 0.0f)
+            assertEquals(4L, completed.result.timeToFirstTokenMs)
         }
 }

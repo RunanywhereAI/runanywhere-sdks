@@ -22,21 +22,24 @@ struct SimplifiedModelsView: View {
     @State private var selectedModality: ModelModalityFilter = .all
     @State private var showAddFromHuggingFace = false
     @State private var showAddFromURL = false
+    /// Commons `can_run` by model id; empty means unknown (no local budget).
+    @State private var canRunByModelID: [String: Bool] = [:]
 
     private let recommendationEngine = ModelRecommendationEngine()
     private let tierResolver = HardwareTierResolver()
 
-    /// Detected hardware tier for the current device.
+    /// Display tier — unknown until commons publishes a typed capability tier.
     private var hardwareTier: HardwareTier {
         tierResolver.resolve(from: deviceInfo.deviceInfo)
     }
 
-    /// Hardware-aware recommendations computed from the live catalog.
+    /// Catalog recommendations filtered by commons can_run when known.
     private var recommendation: RecommendedSelection {
         recommendationEngine.recommend(
             tier: hardwareTier,
             appleFoundationAvailable: tierResolver.appleFoundationAvailable,
-            from: viewModel.availableModels
+            from: viewModel.availableModels,
+            canRunByModelID: canRunByModelID
         )
     }
 
@@ -133,6 +136,7 @@ struct SimplifiedModelsView: View {
         // the SDK which models still have recoverable bytes and label their action
         // "Resume" rather than "Get".
         await ModelDownloadTracker.shared.refreshResumable(viewModel.availableModels.map(\.id))
+        await refreshCompatibility()
     }
 
     /// Clean search: matches friendly family/variant names + tags only — never
@@ -164,6 +168,13 @@ struct SimplifiedModelsView: View {
     private func refreshAfterChange() async {
         await viewModel.loadModelsFromRegistry()
         await storageViewModel.refreshData()
+        await refreshCompatibility()
+    }
+
+    private func refreshCompatibility() async {
+        canRunByModelID = await ModelCompatibilityLookup.canRunByModelID(
+            for: viewModel.availableModels.map(\.id)
+        )
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
@@ -284,7 +295,7 @@ struct SimplifiedModelsView: View {
                             ModelOrgDetailView(
                                 org: group.org,
                                 visibleModelIDs: Set(group.models.map(\.id)),
-                                tier: hardwareTier,
+                                canRunByModelID: canRunByModelID,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: viewModel.isLoadingModel,
                                 availabilityReason: unavailableReason(for:),

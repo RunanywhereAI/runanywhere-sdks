@@ -26,18 +26,16 @@ import {
   TtsAbi,
   TTSStreamEventKind,
   VadAbi,
+  decodeVadStreamEvent,
   toFloatSamples,
   toSttRequest,
   toTtsRequest,
-  toVadConfiguration,
-  toVadRequest,
+  toVadOptionsBytes,
 } from './speech-abi';
 import type { STTOutput } from './speech-abi';
 import {
   TTS_DEFAULTS,
-  VAD_DEFAULTS,
   audioFormatFromOrdinal,
-  toNativeVadConfig,
 } from './options';
 import type {
   DiarizationOptions,
@@ -56,7 +54,6 @@ import type {
   AudioInput,
   DiarizationResult,
   ModelRef,
-  Segment,
   SpeechHandle,
   SttState,
   SttStream,
@@ -78,9 +75,6 @@ export interface SpeechDeps {
 }
 
 const STT_SAMPLE_RATE = 16000;
-// 30 ms at 16 kHz: small enough for responsive endpointing, large enough that the
-// energy VAD sees a stable RMS.
-const VAD_FRAME_SAMPLES = 480;
 
 // ---------------------------------------------------------------------------
 // Audio normalization
@@ -144,10 +138,6 @@ function toPcm16At16k(input: AudioInput): Uint8Array {
     return input.bytes;
   }
   return pcm16Bytes(toMono16k(input));
-}
-
-function durationMsOf(samples: number, sampleRate = STT_SAMPLE_RATE): number {
-  return sampleRate > 0 ? Math.round((samples / sampleRate) * 1000) : 0;
 }
 
 /** Float32 samples of one pushed {@link AudioFrame}, in the stream's established encoding. */
@@ -737,129 +727,39 @@ export interface VadNamespace {
 }
 
 /**
- * Turns per-frame speech flags into debounced segments.
+ * Live VAD push stream backed by commons `rac_vad_stream_*`.
  *
- * `minSpeechMs` / `minSilenceMs` / `prefixPaddingMs` have no equivalent in
- * `rac_vad_config_t` (it exposes an energy threshold, sample rate, frame length,
- * and calibration only), so the debouncing lives here. It belongs in commons so
- * every SDK shares one implementation.
- */
-class SegmentTracker {
-  private readonly minSpeechMs: number;
-  private readonly minSilenceMs: number;
-  private readonly prefixPaddingMs: number;
-  private speaking = false;
-  private candidateStartMs = -1;
-  private lastSpeechMs = -1;
-  private pendingSilenceMs = 0;
-
-  constructor(options: VadOptions) {
-    this.minSpeechMs = options.minSpeechMs ?? VAD_DEFAULTS.minSpeechMs;
-    this.minSilenceMs = options.minSilenceMs ?? VAD_DEFAULTS.minSilenceMs;
-    this.prefixPaddingMs = options.prefixPaddingMs ?? VAD_DEFAULTS.prefixPaddingMs;
-  }
-
-  /** Feed one frame; returns the transitions it caused. */
-  push(
-    isSpeech: boolean,
-    atMs: number,
-    frameMs: number
-  ): Array<{ started?: number } | { ended: Segment }> {
-    const out: Array<{ started?: number } | { ended: Segment }> = [];
-    if (isSpeech) {
-      this.pendingSilenceMs = 0;
-      this.lastSpeechMs = atMs + frameMs;
-      if (!this.speaking) {
-        if (this.candidateStartMs < 0) this.candidateStartMs = atMs;
-        if (atMs + frameMs - this.candidateStartMs >= this.minSpeechMs) {
-          this.speaking = true;
-          out.push({ started: Math.max(0, this.candidateStartMs - this.prefixPaddingMs) });
-        }
-      }
-      return out;
-    }
-    if (!this.speaking) {
-      this.candidateStartMs = -1;
-      return out;
-    }
-    this.pendingSilenceMs += frameMs;
-    if (this.pendingSilenceMs >= this.minSilenceMs) {
-      const segment: Segment = {
-        startMs: Math.max(0, this.candidateStartMs - this.prefixPaddingMs),
-        endMs: this.lastSpeechMs,
-      };
-      this.speaking = false;
-      this.candidateStartMs = -1;
-      this.pendingSilenceMs = 0;
-      out.push({ ended: segment });
-    }
-    return out;
-  }
-
-  /** Close an open segment when the audio ends mid-speech. */
-  finish(): Segment | null {
-    if (!this.speaking) return null;
-    const segment: Segment = {
-      startMs: Math.max(0, this.candidateStartMs - this.prefixPaddingMs),
-      endMs: this.lastSpeechMs,
-    };
-    this.speaking = false;
-    return segment;
-  }
-}
-
-function* frames(samples: Float32Array, size: number): Generator<Float32Array> {
-  for (let i = 0; i < samples.length; i += size) {
-    yield samples.subarray(i, Math.min(samples.length, i + size));
-  }
-}
-
-/**
- * Live VAD push stream backing `vad.openStream`.
- *
- * Pushed frames are converted to mono float32 at 16 kHz and buffered until
- * there is enough audio for one fixed-size `VAD_FRAME_SAMPLES` window — the
- * same rebinning `vad.detect`/`detectStream` already do — then run through
- * the persistent native detector in push order.
+ * Endpointing (min-speech / min-silence / prefix padding) is applied by commons;
+ * this stream only feeds PCM and maps SPEECH_ACTIVITY / FRAME events.
  */
 function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: VadOptions = {}): VadStream {
   const vad = new VadAbi(deps.backend);
   const events = new AsyncQueue<VadEvent>();
-  const tracker = new SegmentTracker(options);
   const rate = format.sampleRate || STT_SAMPLE_RATE;
-  let pending = new Float32Array(0);
-  let atMs = 0;
+  let sessionId: number | null = null;
   let closed = false;
-  // Frames must reach the native detector in push order; each push chains onto
-  // this promise rather than racing a concurrent vadProcess call.
+  let finished = false;
+  // Feeds must reach commons in push order; each push chains onto this promise.
   let chain = Promise.resolve();
 
-  function append(samples: Float32Array): void {
-    const merged = new Float32Array(pending.length + samples.length);
-    merged.set(pending, 0);
-    merged.set(samples, pending.length);
-    pending = merged;
+  function frameToPcm16(frame: AudioFrame): Uint8Array {
+    if (format.encoding === AudioEncoding.PCM_S16_LE && rate === STT_SAMPLE_RATE) {
+      return frame.samples;
+    }
+    let floats = frameToFloat32(frame, format);
+    if (rate !== STT_SAMPLE_RATE) floats = downsample(floats, rate, STT_SAMPLE_RATE);
+    return pcm16Bytes(floats);
   }
 
-  async function drain(): Promise<void> {
-    while (!closed && pending.length >= VAD_FRAME_SAMPLES) {
-      const frame = pending.slice(0, VAD_FRAME_SAMPLES);
-      pending = pending.slice(VAD_FRAME_SAMPLES);
-      const frameMs = durationMsOf(VAD_FRAME_SAMPLES);
-      const result = await vad.process(toVadRequest(frame, options, atMs));
-      if (closed) return;
-      for (const t of tracker.push(result.isSpeech, atMs, frameMs)) {
-        if ('ended' in t) events.push({ type: 'speechEnded', timestampMs: t.ended.endMs });
-        else if (t.started !== undefined) events.push({ type: 'speechStarted', timestampMs: t.started });
+  function onNativeEvent(raw: Uint8Array): void {
+    if (closed) return;
+    for (const event of decodeVadStreamEvent(raw)) {
+      if (event.type === 'failed') {
+        events.push(event);
+        finished = true;
+        return;
       }
-      // The detector's own score, not a boolean widened to 0/1.
-      events.push({
-        type: 'activity',
-        isSpeech: result.isSpeech,
-        probability: result.probability,
-        timestampMs: atMs,
-      });
-      atMs += frameMs;
+      events.push(event);
     }
   }
 
@@ -869,23 +769,40 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
     });
   }
 
+  // Open the component + register the callback + start the session before the
+  // caller can push. createVadStream is only called from openStream after arm().
+  const ready = (async () => {
+    await vad.open(options);
+    await Promise.resolve(deps.backend.vadSetStreamCallback(onNativeEvent));
+    sessionId = await deps.backend.vadStreamStart(toVadOptionsBytes(options));
+  })().catch((e) => {
+    events.push({ type: 'failed', error: asSDKException(e) });
+    events.complete();
+  });
+
   return {
     events,
     pushFrame(frame) {
-      if (closed) return;
-      let floats = frameToFloat32(frame, format);
-      if (rate !== STT_SAMPLE_RATE) floats = downsample(floats, rate, STT_SAMPLE_RATE);
-      append(floats);
-      chainNext(drain);
+      if (closed || finished) return;
+      const pcm = frameToPcm16(frame);
+      chainNext(async () => {
+        await ready;
+        if (closed || finished || sessionId == null) return;
+        await deps.backend.vadStreamFeed(sessionId, pcm);
+      });
     },
     flush() {
-      // No partial-result buffer beyond frame alignment: nothing to flush early.
+      // Commons processes each feed as it arrives.
     },
     finish() {
       chainNext(async () => {
-        if (closed) return;
-        const open = tracker.finish();
-        if (open) events.push({ type: 'speechEnded', timestampMs: open.endMs });
+        if (closed || finished) return;
+        await ready;
+        finished = true;
+        if (sessionId != null) {
+          await deps.backend.vadStreamStop(sessionId);
+          sessionId = null;
+        }
         events.push({ type: 'completed' });
         events.complete();
       });
@@ -893,53 +810,30 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
     async close() {
       if (closed) return;
       closed = true;
-      await vad.stop();
-      events.complete();
+      try {
+        await ready;
+        if (sessionId != null && !finished) {
+          await deps.backend.vadStreamCancel(sessionId);
+          sessionId = null;
+        }
+      } finally {
+        await deps.backend.vadUnsetStreamCallback().catch(() => undefined);
+        events.complete();
+      }
     },
   };
 }
 
-/** Build the `vad` namespace over the commons lifecycle VAD ABI. */
+/** Build the `vad` namespace over commons `rac_vad_stream_*`. */
 export function createVadNamespace(deps: SpeechDeps): VadNamespace {
   const vad = new VadAbi(deps.backend);
 
-  // Configure carries the turn-taking dials the component ABI had no field
-  // for; start arms the session they apply to. Both work with no VAD model
-  // loaded, because the lifecycle path falls back to the built-in energy
-  // detector the same way the component path always has.
-  async function arm(options: VadOptions): Promise<void> {
-    await vad.configure(toVadConfiguration(options));
-    await vad.start();
-  }
-
   async function detect(input: AudioInput, options: VadOptions = {}): Promise<VadResult> {
     deps.requireReady();
-    const samples = toMono16k(input);
-    await arm(options);
-    const tracker = new SegmentTracker(options);
-    const segments: Segment[] = [];
-    let probability = 0;
-    let atMs = 0;
-    try {
-      for (const frame of frames(samples, VAD_FRAME_SAMPLES)) {
-        const frameMs = durationMsOf(frame.length);
-        const result = await vad.process(toVadRequest(new Float32Array(frame), options, atMs));
-        probability = Math.max(probability, result.probability);
-        for (const t of tracker.push(result.isSpeech, atMs, frameMs)) {
-          if ('ended' in t) segments.push(t.ended);
-        }
-        atMs += frameMs;
-      }
-      const open = tracker.finish();
-      if (open) segments.push(open);
-    } finally {
-      await vad.stop();
-    }
+    const pcm16 = toPcm16At16k(input);
+    const { segments, probability } = await vad.detect(pcm16, options);
     return {
       isSpeech: segments.length > 0,
-      // The peak frame score, which is what "was there speech in this clip"
-      // asks. The old speech-frame ratio answered a different question, and
-      // could only ever be a ratio because the component ABI returned a bool.
       probability,
       segments,
     };
@@ -948,7 +842,6 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
   async function openStream(format: AudioFormatSpec, options: VadOptions = {}): Promise<VadStream> {
     deps.requireReady();
     rejectContainerFormat(format, 'vad.openStream', 'vad.detect');
-    await arm(options);
     return createVadStream(deps, format, options);
   }
 
@@ -985,8 +878,6 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
 
   async function reset(): Promise<void> {
     deps.requireReady();
-    // Commons owns the detector's rolling state; this clears the debounce and
-    // the segment history so an unrelated recording does not inherit them.
     await vad.reset();
   }
 

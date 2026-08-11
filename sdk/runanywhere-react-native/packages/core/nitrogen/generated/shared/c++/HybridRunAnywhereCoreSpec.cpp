@@ -56,6 +56,11 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("downloadResumeProto", &HybridRunAnywhereCoreSpec::downloadResumeProto);
       prototype.registerHybridMethod("downloadProgressPollProto", &HybridRunAnywhereCoreSpec::downloadProgressPollProto);
       prototype.registerHybridMethod("downloadProgressPercent", &HybridRunAnywhereCoreSpec::downloadProgressPercent);
+      prototype.registerHybridMethod("audioFloat32ToWav", &HybridRunAnywhereCoreSpec::audioFloat32ToWav);
+      prototype.registerHybridMethod("audioPcm16ToFloat32", &HybridRunAnywhereCoreSpec::audioPcm16ToFloat32);
+      prototype.registerHybridMethod("audioInt16ToWav", &HybridRunAnywhereCoreSpec::audioInt16ToWav);
+      prototype.registerHybridMethod("embeddingsNorm", &HybridRunAnywhereCoreSpec::embeddingsNorm);
+      prototype.registerHybridMethod("embeddingsSimilarity", &HybridRunAnywhereCoreSpec::embeddingsSimilarity);
       prototype.registerHybridMethod("setDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::setDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::clearDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearCache", &HybridRunAnywhereCoreSpec::clearCache);

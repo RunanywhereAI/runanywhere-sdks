@@ -72,11 +72,13 @@ import {
   generateWithTools,
 } from '@runanywhere/core';
 import type {
+  FinishReason,
   GenerationResult,
   LlmOptions,
   ReasoningOptions,
   ToolCallingResult,
 } from '@runanywhere/core';
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import {
   ToolCallingExecutionPolicy,
   ToolCallingModelPolicy,
@@ -116,6 +118,23 @@ function makeToolCallInfo(result: ToolCallingResult): ToolCallInfo | undefined {
   };
 }
 
+/** Map commons `FinishReason` onto the public union — never invent from toolCalls.length. */
+function mapToolFinishReason(raw: ProtoFinishReason): FinishReason {
+  switch (raw) {
+    case ProtoFinishReason.FINISH_REASON_TOOL_CALLS:
+      return 'toolCalls';
+    case ProtoFinishReason.FINISH_REASON_LENGTH:
+    case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+      return 'length';
+    case ProtoFinishReason.FINISH_REASON_CANCELLED:
+      return 'cancelled';
+    case ProtoFinishReason.FINISH_REASON_ERROR:
+      return 'unknown';
+    default:
+      return 'stop';
+  }
+}
+
 // Map the explicit tool-loop result onto the GenerationResult the finalizer
 // already knows how to render.
 function toGenerationResult(
@@ -126,7 +145,7 @@ function toGenerationResult(
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: result.toolCalls,
-    finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
+    finishReason: mapToolFinishReason(result.finishReason),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: result.usage?.ttftMs ?? 0,
@@ -641,6 +660,10 @@ export const ChatScreen: React.FC = () => {
                 decodeTokensPerSecond: result?.tokensPerSecond ?? 0,
                 prefillMs: 0,
                 ttftMs: result?.timeToFirstTokenMs ?? 0,
+                timeToFirstContentTokenMs: 0,
+                contentTokensPerSecond: 0,
+                batchBuffered: false,
+                countsEstimated: false,
               },
             },
             ...(result && result.timeToFirstTokenMs > 0
@@ -689,6 +712,10 @@ export const ChatScreen: React.FC = () => {
                 decodeTokensPerSecond: 0,
                 prefillMs: 0,
                 ttftMs: 0,
+                timeToFirstContentTokenMs: 0,
+                contentTokensPerSecond: 0,
+                batchBuffered: false,
+                countsEstimated: false,
               },
             },
             completionStatus: wasStopped ? 'interrupted' : 'error',

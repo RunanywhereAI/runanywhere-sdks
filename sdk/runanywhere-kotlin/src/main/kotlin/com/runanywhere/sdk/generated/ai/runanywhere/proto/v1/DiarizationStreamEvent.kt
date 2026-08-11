@@ -138,11 +138,11 @@ public class DiarizationStreamEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiarizationStreamEvent> =
         object : ProtoAdapter<DiarizationStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      DiarizationStreamEvent::class, 
-      "type.googleapis.com/runanywhere.v1.DiarizationStreamEvent", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      DiarizationStreamEvent::class,
+      "type.googleapis.com/runanywhere.v1.DiarizationStreamEvent",
+      PROTO_3,
+      null,
       "diarization.proto"
     ) {
       override fun encodedSize(`value`: DiarizationStreamEvent): Int {

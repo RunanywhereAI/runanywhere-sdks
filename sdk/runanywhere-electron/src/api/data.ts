@@ -47,6 +47,36 @@ export interface DataDeps {
 // embeddings
 // ---------------------------------------------------------------------------
 
+/** Sync commons vector math exported by runanywhere_native.node (data_bridge.cpp). */
+interface EmbeddingsMathNative {
+  embeddingsNorm(vector: Float32Array): number;
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): number;
+}
+
+let embeddingsMathInjected: EmbeddingsMathNative | null = null;
+
+/** Test hook — unit tests inject a fake so they do not need the .node. */
+export function setEmbeddingsMathNativeForTests(native: EmbeddingsMathNative | null): void {
+  embeddingsMathInjected = native;
+}
+
+function embeddingsMathNative(): EmbeddingsMathNative {
+  if (embeddingsMathInjected) return embeddingsMathInjected;
+  // Lazy require: bridge.ts throws at import when the .node is missing.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { addon } = require('../bridge') as { addon: EmbeddingsMathNative };
+  return addon;
+}
+
+function asFloat32Vector(input: Embedding | Float32Array, fieldPath: string): Float32Array {
+  if (input instanceof Float32Array) return input;
+  if (input?.vector instanceof Float32Array) return input.vector;
+  throw SDKException.validationFailed({
+    fieldPath,
+    message: 'expected Embedding or Float32Array',
+  });
+}
+
 /** Text embeddings. */
 export interface EmbeddingsNamespace {
   /**
@@ -58,6 +88,13 @@ export interface EmbeddingsNamespace {
    * console.log(a.vector.length);
    */
   embed(texts: string[], options?: EmbedOptions): Promise<Embedding[]>;
+  /**
+   * Cosine similarity via commons (`rac_embeddings_similarity`). Returns 0 for
+   * mismatched lengths, empty vectors, or zero norms.
+   */
+  cosineSimilarity(a: Embedding | Float32Array, b: Embedding | Float32Array): number;
+  /** L2 norm via commons (`rac_embeddings_norm`). */
+  computeNorm(vector: Embedding | Float32Array): number;
 }
 
 /** Build the `embeddings` namespace over a backend. */
@@ -82,6 +119,16 @@ export function createEmbeddingsNamespace(deps: DataDeps): EmbeddingsNamespace {
         index: v.inputIndex,
         vector: Float32Array.from(v.values),
       }));
+    },
+    cosineSimilarity(a, b) {
+      const lhs = asFloat32Vector(a, 'a');
+      const rhs = asFloat32Vector(b, 'b');
+      return embeddingsMathNative().embeddingsSimilarity(lhs, rhs);
+    },
+    computeNorm(vector) {
+      const values = asFloat32Vector(vector, 'vector');
+      if (!values.length) return 0;
+      return embeddingsMathNative().embeddingsNorm(values);
     },
   };
 }
@@ -176,17 +223,16 @@ function toMatch(chunk: {
 }
 
 function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRagResult {
-  const generationMs = raw.generationTimeMs || 0;
   return {
     answer: raw.answer,
     sources: raw.retrievedChunks.map(toMatch),
     thinkingText: raw.thinkingContent || undefined,
     inputTokens: raw.usage?.inputTokens ?? 0,
     outputTokens: raw.usage?.outputTokens ?? 0,
-    // Commons reports retrieval and generation time but not time-to-first-token for
-    // a non-streamed query, so retrieval time is the closest honest stand-in.
-    timeToFirstTokenMs: raw.retrievalTimeMs,
-    tokensPerSecond: generationMs > 0 ? (raw.usage?.outputTokens ?? 0) / (generationMs / 1000) : 0,
+    // TokenUsage from the LLM leg of the RAG pipeline — never retrieve-time or
+    // a local outputTokens/generationMs rate.
+    timeToFirstTokenMs: raw.usage?.ttftMs ?? 0,
+    tokensPerSecond: raw.usage?.decodeTokensPerSecond ?? 0,
     requestId: raw.requestId || requestId,
     model,
   };

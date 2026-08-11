@@ -23,7 +23,7 @@ class ModelRecommendationTest {
         )
 
         val recommendation = ModelRecommendation.recommend(
-            tier = HardwareTier.HIGH_END,
+            tier = HardwareTier.UNKNOWN,
             hasNpu = true,
             models = models,
         )

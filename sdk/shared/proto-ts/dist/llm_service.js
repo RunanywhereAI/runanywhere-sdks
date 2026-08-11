@@ -12,6 +12,7 @@ exports.lLMStreamEventKindToJSON = lLMStreamEventKindToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const chat_1 = require("./chat");
 const errors_1 = require("./errors");
+const finish_reason_1 = require("./finish_reason");
 const llm_options_1 = require("./llm_options");
 const tool_calling_1 = require("./tool_calling");
 exports.protobufPackage = "runanywhere.v1";
@@ -348,9 +349,9 @@ exports.LLMStreamEvent = {
                     ? globalThis.String(object.request_id)
                     : "",
             finishReason: isSet(object.finishReason)
-                ? (0, llm_options_1.finishReasonFromJSON)(object.finishReason)
+                ? (0, finish_reason_1.finishReasonFromJSON)(object.finishReason)
                 : isSet(object.finish_reason)
-                    ? (0, llm_options_1.finishReasonFromJSON)(object.finish_reason)
+                    ? (0, finish_reason_1.finishReasonFromJSON)(object.finish_reason)
                     : 0,
             result: isSet(object.result) ? llm_options_1.LLMGenerationResult.fromJSON(object.result) : undefined,
             toolCall: isSet(object.toolCall)
@@ -381,7 +382,7 @@ exports.LLMStreamEvent = {
             obj.requestId = message.requestId;
         }
         if (message.finishReason !== 0) {
-            obj.finishReason = (0, llm_options_1.finishReasonToJSON)(message.finishReason);
+            obj.finishReason = (0, finish_reason_1.finishReasonToJSON)(message.finishReason);
         }
         if (message.result !== undefined) {
             obj.result = llm_options_1.LLMGenerationResult.toJSON(message.result);

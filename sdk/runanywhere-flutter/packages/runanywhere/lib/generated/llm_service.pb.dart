@@ -17,6 +17,7 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'chat.pb.dart' as $1;
 import 'errors.pb.dart' as $3;
+import 'finish_reason.pbenum.dart' as $4;
 import 'llm_options.pb.dart' as $0;
 import 'llm_service.pbenum.dart';
 import 'tool_calling.pb.dart' as $2;
@@ -149,7 +150,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $2.ToolCall? toolCall,
     $3.SDKError? error,
     $core.String? partialJson,
-    $0.FinishReason? finishReason,
+    $4.FinishReason? finishReason,
     $0.LLMGenerationResult? result,
   }) {
     final result$ = create();
@@ -189,8 +190,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aOM<$3.SDKError>(19, _omitFieldNames ? '' : 'error',
         subBuilder: $3.SDKError.create)
     ..aOS(20, _omitFieldNames ? '' : 'partialJson')
-    ..aE<$0.FinishReason>(21, _omitFieldNames ? '' : 'finishReason',
-        enumValues: $0.FinishReason.values)
+    ..aE<$4.FinishReason>(21, _omitFieldNames ? '' : 'finishReason',
+        enumValues: $4.FinishReason.values)
     ..aOM<$0.LLMGenerationResult>(22, _omitFieldNames ? '' : 'result',
         subBuilder: $0.LLMGenerationResult.create)
     ..hasRequiredFields = false;
@@ -290,9 +291,9 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   void clearPartialJson() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $0.FinishReason get finishReason => $_getN(7);
+  $4.FinishReason get finishReason => $_getN(7);
   @$pb.TagNumber(21)
-  set finishReason($0.FinishReason value) => $_setField(21, value);
+  set finishReason($4.FinishReason value) => $_setField(21, value);
   @$pb.TagNumber(21)
   $core.bool hasFinishReason() => $_has(7);
   @$pb.TagNumber(21)

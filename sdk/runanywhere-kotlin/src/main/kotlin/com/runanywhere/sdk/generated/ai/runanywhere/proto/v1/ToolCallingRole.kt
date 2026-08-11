@@ -34,8 +34,8 @@ public enum class ToolCallingRole(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingRole> = object : EnumAdapter<ToolCallingRole>(
-      ToolCallingRole::class, 
-      PROTO_3, 
+      ToolCallingRole::class,
+      PROTO_3,
       ToolCallingRole.TOOL_CALLING_ROLE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ToolCallingRole? = ToolCallingRole.fromValue(`value`)

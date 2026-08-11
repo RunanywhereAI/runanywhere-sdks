@@ -64,10 +64,11 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
       metrics.endToEndLatencyMs = elapsedMs;
 
       metrics.audioLengthSeconds = audioDuration;
-      final transcribedMs = result.durationMs > 0
-          ? result.durationMs
-          : (audioDuration * 1000).round();
-      metrics.realTimeFactor = elapsedMs / transcribedMs;
+      // Commons owns transcribed duration (STTResult.durationMs). Never fall back
+      // to the fixture length — omit RTF when the engine did not report duration.
+      if (result.durationMs > 0) {
+        metrics.realTimeFactor = elapsedMs / result.durationMs;
+      }
 
       // memoryDeltaBytes stays 0: no portable Dart available-memory probe.
       return metrics;
@@ -92,6 +93,7 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
   }
 
   /// Sine-wave PCM Int16 little-endian mono audio buffer.
+  /// Explicit input/fixture synthesis only — not model-output math.
   static Uint8List _sineWaveAudio({
     required double durationSeconds,
     double frequencyHz = 440.0,
@@ -99,7 +101,8 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
   }) {
     final sampleCount = (durationSeconds * sampleRate).round();
     final bytes = ByteData(sampleCount * 2);
-    const amplitude = 32767 / 2; // Int16.max / 2, matching iOS.
+    // Fixture amplitude (Int16.max / 2), matching iOS SyntheticInputGenerator.
+    const amplitude = 32767 / 2;
     for (var i = 0; i < sampleCount; i++) {
       final time = i / sampleRate;
       final value =

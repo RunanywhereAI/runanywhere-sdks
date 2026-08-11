@@ -481,6 +481,9 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_discover_proto"
     "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"
+    # Commons-owned model fit (can_run / can_fit). Platforms supply available
+    # RAM/storage on the request; WASM consumers must not reimplement budgets.
+    "_rac_model_compatibility_check_proto"
     "_rac_model_info_is_downloaded"
     # Derive parameterCountB + isSmallModel from
     # RAModelInfo proto so the web example can drop its inlined heuristics.
@@ -753,12 +756,14 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # Audio utilities (rac_audio_utils.h) — PCM/WAV/level/resample for Web FFI.
     "_rac_audio_compute_level_db"
     "_rac_audio_compute_level_normalized"
+    "_rac_audio_compute_rms"
     "_rac_audio_float32_to_pcm16"
     "_rac_audio_float32_to_wav"
     "_rac_audio_int16_to_wav"
     "_rac_audio_pcm16_to_float32"
     "_rac_audio_pcm_bytes_to_ms"
     "_rac_audio_resample_f32"
+    "_rac_audio_wav_to_float32"
     "_rac_audio_wav_header_size"
 
     # Voice Agent
@@ -786,6 +791,9 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_initialize_proto"
     "_rac_voice_agent_component_states_proto"
     "_rac_voice_agent_process_voice_turn_proto"
+    # Streaming mic ingress — energy segmentation lives in commons
+    # (`voice_agent_feed_abi.cpp`). Required by VoiceAgentProtoAdapter.feedAudio.
+    "_rac_voice_agent_feed_audio_proto"
 
     # Solutions runtime (rac/solutions/rac_solution.h).
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/

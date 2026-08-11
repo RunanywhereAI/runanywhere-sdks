@@ -174,7 +174,7 @@ int main() {
     std::fprintf(stdout, "test_rerank\n");
 
     // (1) ABI + primitive naming.
-    check(RAC_PLUGIN_API_VERSION == 8u, "RAC_PLUGIN_API_VERSION must be 8");
+    check(RAC_PLUGIN_API_VERSION == 9u, "RAC_PLUGIN_API_VERSION must be 9");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_RERANK), "rerank") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_RERANK) == \"rerank\"");
     check(static_cast<int>(RAC_PRIMITIVE_RERANK) == 11, "RAC_PRIMITIVE_RERANK wire value is 11");

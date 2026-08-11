@@ -145,9 +145,10 @@ struct ShareCardData: Sendable {
     }
 
     private static func charsPerSecond(_ result: BenchmarkResult) -> Double? {
-        guard let chars = result.metrics.charactersProcessed else { return nil }
-        let seconds = result.metrics.endToEndLatencyMs / 1000
-        return seconds > 0 ? Double(chars) / seconds : nil
+        // No commons chars/s field on TTS results. Do not invent characters /
+        // wall-latency in the example app share card.
+        _ = result
+        return nil
     }
 
     private static func makeRow(_ result: BenchmarkResult) -> ShareCardRow {

@@ -24,6 +24,8 @@ export const FinishReason = {
   LENGTH: 'LENGTH',
   TOOL_CALLS: 'TOOL_CALLS',
   CANCELLED: 'CANCELLED',
+  ERROR: 'ERROR',
+  UNKNOWN: 'UNKNOWN',
 } as const;
 export type FinishReason = (typeof FinishReason)[keyof typeof FinishReason];
 

@@ -16,13 +16,14 @@ import {
 } from '@runanywhere/proto-ts/llm_service';
 import { ChatMessage as ChatMessageMessage, MessageRole, type ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
-  FinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import type {
   StructuredOutputOptions,
   StructuredOutputResult,
@@ -220,8 +221,6 @@ function finalLLMResult(
 ): LLMGenerationResult {
   const final = finalEvent?.result;
   const generationTimeMs = final?.generationTimeMs ?? 0;
-  const inputTokens = final?.usage?.inputTokens ?? 0;
-  const outputTokens = final?.usage?.outputTokens ?? 0;
   // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
@@ -238,14 +237,7 @@ function finalLLMResult(
       || FinishReason.FINISH_REASON_UNSPECIFIED,
     thinkingTokens: final?.thinkingTokens ?? 0,
     responseTokens: final?.responseTokens ?? 0,
-    usage: {
-      inputTokens,
-      outputTokens,
-      totalTokens: final?.usage?.totalTokens ?? 0,
-      decodeTokensPerSecond: final?.usage?.decodeTokensPerSecond ?? 0,
-      prefillMs: final?.usage?.prefillMs ?? 0,
-      ttftMs: final?.usage?.ttftMs ?? 0,
-    },
+    usage: final?.usage ?? TokenUsage.create(),
     error: final?.error ?? finalEvent?.error,
     cachedPromptTokens: 0,
     promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,

@@ -21,5 +21,9 @@ export const WASM_CAPABILITY_EXPORT_MANIFEST: Readonly<Record<WasmCapability, re
   'structured-output': ['_rac_structured_output_parse_proto', '_rac_structured_output_validate_proto'],
   'tool-calling': ['_rac_tool_calling_session_create_proto', '_rac_tool_calling_session_destroy_proto'],
   lora: ['_rac_lora_register_proto', '_rac_lora_apply_proto'],
-  'voice-agent': ['_rac_voice_agent_initialize_proto', '_rac_voice_agent_process_voice_turn_proto'],
+  'voice-agent': [
+    '_rac_voice_agent_initialize_proto',
+    '_rac_voice_agent_process_voice_turn_proto',
+    '_rac_voice_agent_feed_audio_proto',
+  ],
 };

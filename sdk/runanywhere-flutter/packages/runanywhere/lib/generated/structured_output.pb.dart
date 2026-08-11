@@ -16,8 +16,11 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'errors.pb.dart' as $0;
+import 'structured_output.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'structured_output.pbenum.dart';
 
 enum StructuredOutputOptions_Constraint { schema, grammar, regex, notSet }
 
@@ -27,6 +30,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     $core.String? schema,
     $core.String? grammar,
     $core.String? regex,
+    StructuredOutputMode? mode,
   }) {
     final result = create();
     if (includeSchemaInPrompt != null)
@@ -34,6 +38,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     if (schema != null) result.schema = schema;
     if (grammar != null) result.grammar = grammar;
     if (regex != null) result.regex = regex;
+    if (mode != null) result.mode = mode;
     return result;
   }
 
@@ -62,6 +67,8 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'schema')
     ..aOS(3, _omitFieldNames ? '' : 'grammar')
     ..aOS(4, _omitFieldNames ? '' : 'regex')
+    ..aE<StructuredOutputMode>(5, _omitFieldNames ? '' : 'mode',
+        enumValues: StructuredOutputMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -107,6 +114,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   void clearIncludeSchemaInPrompt() => $_clearField(1);
 
   /// A JSON Schema document, verbatim. Unsupported keywords are rejected.
+  /// Commons compiles this to GBNF on the generate path (mode permitting).
   @$pb.TagNumber(2)
   $core.String get schema => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -135,6 +143,16 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   $core.bool hasRegex() => $_has(3);
   @$pb.TagNumber(4)
   void clearRegex() => $_clearField(4);
+
+  /// Unset = CONSTRAINED when a constraint arm is present, else free text.
+  @$pb.TagNumber(5)
+  StructuredOutputMode get mode => $_getN(4);
+  @$pb.TagNumber(5)
+  set mode(StructuredOutputMode value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMode() => $_clearField(5);
 }
 
 class StructuredOutputValidation extends $pb.GeneratedMessage {
@@ -146,6 +164,8 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? validationErrors,
     $fixnum.Int64? validationTimeMs,
     $0.SDKError? error,
+    $core.bool? repairAttempted,
+    $core.int? repairAttempts,
   }) {
     final result = create();
     if (isValid != null) result.isValid = isValid;
@@ -156,6 +176,8 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
       result.validationErrors.addAll(validationErrors);
     if (validationTimeMs != null) result.validationTimeMs = validationTimeMs;
     if (error != null) result.error = error;
+    if (repairAttempted != null) result.repairAttempted = repairAttempted;
+    if (repairAttempts != null) result.repairAttempts = repairAttempts;
     return result;
   }
 
@@ -180,6 +202,8 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
     ..aInt64(6, _omitFieldNames ? '' : 'validationTimeMs')
     ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
+    ..aOB(8, _omitFieldNames ? '' : 'repairAttempted')
+    ..aI(9, _omitFieldNames ? '' : 'repairAttempts')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -261,6 +285,26 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   void clearError() => $_clearField(7);
   @$pb.TagNumber(7)
   $0.SDKError ensureError() => $_ensure(6);
+
+  /// True when commons issued the single repair retry (mode=REPAIR).
+  @$pb.TagNumber(8)
+  $core.bool get repairAttempted => $_getBF(7);
+  @$pb.TagNumber(8)
+  set repairAttempted($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRepairAttempted() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRepairAttempted() => $_clearField(8);
+
+  /// 0 = first pass only; 1 = repair pass produced the reported verdict.
+  @$pb.TagNumber(9)
+  $core.int get repairAttempts => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set repairAttempts($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasRepairAttempts() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRepairAttempts() => $_clearField(9);
 }
 
 class StructuredOutputResult extends $pb.GeneratedMessage {

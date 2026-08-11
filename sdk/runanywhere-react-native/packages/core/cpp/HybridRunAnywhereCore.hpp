@@ -159,6 +159,18 @@ public:
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
   double downloadProgressPercent(double overallProgress, double bytesDownloaded,
                                  double totalBytes) override;
+  std::shared_ptr<ArrayBuffer>
+  audioFloat32ToWav(const std::shared_ptr<ArrayBuffer> &pcmBytes,
+                    double sampleRate) override;
+  std::shared_ptr<ArrayBuffer>
+  audioPcm16ToFloat32(const std::shared_ptr<ArrayBuffer> &pcm16Bytes) override;
+  std::shared_ptr<ArrayBuffer>
+  audioInt16ToWav(const std::shared_ptr<ArrayBuffer> &pcm16Bytes,
+                  double sampleRate) override;
+  double embeddingsNorm(const std::shared_ptr<ArrayBuffer> &vectorBytes) override;
+  double embeddingsSimilarity(
+      const std::shared_ptr<ArrayBuffer> &lhsBytes,
+      const std::shared_ptr<ArrayBuffer> &rhsBytes) override;
   std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
           &onProgressBytes) override;

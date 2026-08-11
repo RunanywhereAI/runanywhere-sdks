@@ -835,11 +835,13 @@ _rac_error_set_details
 # Audio utilities — WAV / PCM / level / resample helpers used by platform FFIs.
 _rac_audio_compute_level_db
 _rac_audio_compute_level_normalized
+_rac_audio_compute_rms
 _rac_audio_float32_to_pcm16
 _rac_audio_float32_to_wav
 _rac_audio_pcm16_to_float32
 _rac_audio_pcm_bytes_to_ms
 _rac_audio_resample_f32
+_rac_audio_wav_to_float32
 
 # ============================================================================
 # Swift-called commons RAC_API symbols missing from

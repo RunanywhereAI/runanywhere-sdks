@@ -201,19 +201,15 @@ async function applyCatalogAdapter(
     );
   }
 
-  // `defaultScale` is optional now ("Unset means 1.0").
-  const scale =
-    options?.scale ??
-    (entry.defaultScale !== undefined && entry.defaultScale > 0
-      ? entry.defaultScale
-      : 1.0);
+  // Leave scale unset when the caller omits it so commons
+  // resolve_effective_lora_scale owns catalog (including 0.0) → 1.0.
   return apply(
     LoraApplyRequestMessage.fromPartial({
       adapters: [
         LoraAdapterConfigMessage.fromPartial({
           adapterPath,
           adapterId: entry.id || undefined,
-          scale,
+          ...(options?.scale !== undefined ? { scale: options.scale } : {}),
         }),
       ],
       keepExisting: !(options?.replaceExisting ?? false),

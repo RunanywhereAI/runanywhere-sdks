@@ -319,22 +319,12 @@ class HybridAudioCapture: HybridAudioCaptureSpec {
         let frames = Int(buffer.frameLength)
         guard frames > 0 else { return }
 
-        // RMS→dB level computation. The Swift SDK delegates this to commons
-        // (rac_audio_compute_level_db), but this pod has no `CRACommons`
-        // Swift module map (RACommons.xcframework ships only the C ABI for
-        // the C++ bridges), so the identical math is inlined here:
-        // level_db = 20 * log10(rms), then normalized -60dB..0dB → 0..1.
-        let samples = channelData.pointee
-        var sumSquares: Double = 0
-        for index in 0..<frames {
-            let sample = Double(samples[index])
-            sumSquares += sample * sample
-        }
-        let rms = (sumSquares / Double(frames)).squareRoot()
-        let dbLevel: Double = rms > 0 ? 20.0 * log10(rms) : -100.0
-
-        // Normalize to 0-1 range (-60dB to 0dB) — Swift SDK parity.
-        let normalizedLevel = max(0.0, min(1.0, (dbLevel + 60.0) / 60.0))
+        // RMS→dB→[0,1] lives in commons (`rac_audio_compute_level_normalized`)
+        // via the AudioCaptureLevel ObjC++ bridge — no local DSP here.
+        let normalizedLevel = AudioCaptureLevel.normalizedFromFloat32Samples(
+            channelData.pointee,
+            count: frames
+        )
 
         state.withLock { $0.audioLevel = normalizedLevel }
     }

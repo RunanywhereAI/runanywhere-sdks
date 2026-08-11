@@ -86,7 +86,8 @@ bool is_exynos_xclipse_model(std::string_view model) {
     const std::string m = to_lower(model);
     // Match 2[2-9]xx digit runs (Exynos 2200, 2400, s5e9925, …).
     for (size_t i = 0; i + 3 < m.size(); ++i) {
-        if (m[i] == '2' && m[i + 1] >= '2' && m[i + 1] <= '9' && std::isdigit(static_cast<unsigned char>(m[i + 2])) &&
+        if (m[i] == '2' && m[i + 1] >= '2' && m[i + 1] <= '9' &&
+            std::isdigit(static_cast<unsigned char>(m[i + 2])) &&
             std::isdigit(static_cast<unsigned char>(m[i + 3]))) {
             return true;
         }
@@ -200,7 +201,7 @@ rac_result_t rac_device_resolve_chip_name(const char* soc_manufacturer, const ch
 }
 
 rac_result_t rac_device_classify_gpu_family(const char* soc_manufacturer, const char* soc_model,
-                                           const char* chip_name, char* out, size_t out_size) {
+                                            const char* chip_name, char* out, size_t out_size) {
     if (out == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -285,8 +286,7 @@ rac_bool_t rac_device_heuristic_has_npu(const char* soc_manufacturer, const char
 }
 
 rac_result_t rac_device_split_performance_cores(const int64_t* max_freqs, size_t count,
-                                               int32_t* out_performance,
-                                               int32_t* out_efficiency) {
+                                                int32_t* out_performance, int32_t* out_efficiency) {
     if (out_performance == nullptr || out_efficiency == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
