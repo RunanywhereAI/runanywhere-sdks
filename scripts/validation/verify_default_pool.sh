@@ -52,7 +52,7 @@ TARGETS = {
     "swift":  Path("bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift"),
     "kotlin": Path("bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt"),
     "dart":   Path("bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart"),
-    "ts":     Path("bindings/shared/proto-ts/src/defaults/pool.ts"),
+    "ts":     Path("bindings/proto-ts/src/defaults/pool.ts"),
     "python": Path("bindings/python/runanywhere/_generated_defaults.py"),
     # The Flutter and RN Android plugins get their own copy because neither
     # depends on the Kotlin SDK; they must match it byte-for-byte in value.

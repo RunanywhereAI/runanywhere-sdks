@@ -520,7 +520,7 @@ let package = Package(
                 "RABackendMLXBinary",
                 "RABackendNeuRTBinary",
             ],
-            path: "apps/rcli",
+            path: "rcli",
             exclude: [
                 "dist",
             ],

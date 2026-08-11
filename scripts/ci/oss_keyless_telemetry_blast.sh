@@ -28,7 +28,7 @@ case "$(uname -s)" in
     ;;
 esac
 
-RCLI="${RA_RCLI_BIN:-$ROOT/build/$PRESET/apps/rcli/rcli}"
+RCLI="${RA_RCLI_BIN:-$ROOT/build/$PRESET/rcli/rcli}"
 
 if [[ "${RA_SKIP_BUILD:-0}" != "1" ]]; then
   if [[ ! -d "$ROOT/build/$PRESET" ]]; then

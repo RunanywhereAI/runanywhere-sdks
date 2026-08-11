@@ -145,7 +145,7 @@ try {
 |----------|------|
 | **Docs site** | [docs.runanywhere.ai/react-native/introduction](https://docs.runanywhere.ai/react-native/introduction) |
 | **API reference** | [Docs/Documentation.md](Docs/Documentation.md) |
-| **Example app** | [examples/react-native/RunAnywhereAI/](../../examples/react-native/RunAnywhereAI/) |
+| **Example app** | [bindings/react-native/example/](../../bindings/react-native/example/) |
 | **Contributing / building from source** | [Docs/DEVELOPMENT.md](Docs/DEVELOPMENT.md) |
 
 ---

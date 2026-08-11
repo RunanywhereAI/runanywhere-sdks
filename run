@@ -65,7 +65,7 @@ ${C_BOLD}MINIMAL EXAMPLES${C_RESET}
   ${C_CMD}example android clean${C_RESET}        Clean its build outputs
   ${C_CMD}example ios${C_RESET}     {build|run|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
-  ${C_CMD}example flutter${C_RESET} {build|clean}   ${C_DIM}(examples/flutter/RunAnywhereAI)${C_RESET}
+  ${C_CMD}example flutter${C_RESET} {build|clean}   ${C_DIM}(bindings/flutter/example)${C_RESET}
 
 ${C_BOLD}RCLI${C_RESET}
   ${C_CMD}rcli build${C_RESET} ${C_DIM}[--env-staging]${C_RESET}    Build the desktop CLI (host preset). --env-staging bakes the
@@ -207,7 +207,7 @@ cmd_example_android() {
 }
 
 cmd_example_flutter() {
-    local ex_dir="${EX:-examples/flutter/RunAnywhereAI}"
+    local ex_dir="${EX:-bindings/flutter/example}"
     case "${1:-}" in
         build)  (cd "${ex_dir}" && flutter build apk) ;;
         clean)  (cd "${ex_dir}" && flutter clean) ;;

@@ -20,7 +20,7 @@ bindings/flutter/
     └── runanywhere_qhexrt/     # QHexRT Qualcomm Hexagon NPU backend (Android-only)
 ```
 
-Example app: `examples/flutter/RunAnywhereAI/`.
+Example app: `bindings/flutter/example/`.
 
 ## Package Dependency Graph
 
@@ -47,7 +47,7 @@ melos version          # Bump versions + generate workspace CHANGELOG
 ./scripts/package-sdk.sh                      # Validate all packages (pub publish --dry-run)
 ./scripts/package-sdk.sh --natives-from PATH  # Stage native binaries then validate
 
-# Example app (from examples/flutter/RunAnywhereAI/)
+# Example app (from bindings/flutter/example/)
 flutter pub get
 flutter run                    # Run on connected device/emulator
 flutter run -d <device-id>     # Run on specific device

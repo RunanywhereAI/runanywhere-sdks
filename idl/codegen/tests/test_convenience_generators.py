@@ -101,7 +101,7 @@ GENERATORS: list[tuple[str, str, Path]] = [
         # The TS generator emits one file per .proto under the convenience/
         # directory. For this fixture (single proto: test_options.proto) the
         # output is test_options_convenience.ts.
-        Path("sdk") / "shared" / "proto-ts" / "src" / "convenience"
+        Path("bindings") / "proto-ts" / "src" / "convenience"
         / "test_options_convenience.ts",
     ),
 ]

@@ -5,16 +5,16 @@
   "description": "RunAnywhere React Native SDK - Multi-Package Monorepo",
   "workspaces": [
     "packages/*",
-    "../shared/proto-ts"
+    "../proto-ts"
   ],
   "scripts": {
     "build": "yarn build:proto && yarn workspaces foreach -At --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run build",
-    "build:proto": "yarn exec tsc -p ../shared/proto-ts/tsconfig.json",
+    "build:proto": "yarn exec tsc -p ../proto-ts/tsconfig.json",
     "typecheck": "yarn typecheck:proto && yarn workspace @runanywhere/core build && yarn workspaces foreach -At --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run typecheck",
-    "typecheck:proto": "yarn exec tsc -p ../shared/proto-ts/tsconfig.json --noEmit",
+    "typecheck:proto": "yarn exec tsc -p ../proto-ts/tsconfig.json --noEmit",
     "lint": "yarn workspaces foreach -A --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run lint",
     "lint:fix": "yarn workspaces foreach -A --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run lint:fix",
-    "clean": "yarn workspaces foreach -A --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run clean && rm -rf ../shared/proto-ts/dist",
+    "clean": "yarn workspaces foreach -A --exclude runanywhere-react-native-monorepo --exclude @runanywhere/proto-ts run clean && rm -rf ../proto-ts/dist",
     "example": "yarn workspace runanywhere-example",
     "core:nitrogen": "yarn workspace @runanywhere/core nitrogen",
     "core:prepare": "yarn workspace @runanywhere/core nitrogen",

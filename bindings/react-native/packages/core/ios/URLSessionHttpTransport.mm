@@ -3,7 +3,7 @@
 // URLSessionHttpTransport.mm (React Native wrapper)
 //
 // Per-SDK wrapper around the canonical implementation in
-//   bindings/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
+//   bindings/shared-apple/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
 //
 // flutter-core-012: this used to be a 462-line standalone copy of the
 // implementation that drifted from the Flutter version (no host-session
@@ -33,7 +33,7 @@
 #if __has_include("URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm")
 #include "URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
 #else
-#include "../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+#include "../../../../shared-apple/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
 #endif
 
 #undef RAC_URLS_C_PREFIX

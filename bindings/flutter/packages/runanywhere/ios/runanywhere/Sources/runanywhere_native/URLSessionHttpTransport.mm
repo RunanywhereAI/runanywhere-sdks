@@ -3,7 +3,7 @@
 // URLSessionHttpTransport.mm (Flutter wrapper)
 //
 // Per-SDK wrapper around the package mirror of the canonical implementation in
-//   bindings/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
+//   bindings/shared-apple/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
 //
 // flutter-core-012: this used to be a 686-line standalone copy of the
 // implementation. It has been collapsed into a thin shim that defines the

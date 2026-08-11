@@ -1,7 +1,0 @@
-# Generated test audio files (run ./tests/scripts/generate-test-audio.sh to create)
-noise.wav
-silence.wav
-speech.wav
-
-# Keep the directory in clean checkouts.
-!.gitkeep

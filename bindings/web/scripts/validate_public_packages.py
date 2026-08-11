@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 
 PROTO_PACKAGE = "@runanywhere/proto-ts"
 PROTO_LICENSE_METADATA = "SEE LICENSE IN LICENSE"
-PROTO_LICENSE_PATH = Path(__file__).resolve().parents[2] / "shared/proto-ts/LICENSE"
+PROTO_LICENSE_PATH = Path(__file__).resolve().parents[2] / "proto-ts/LICENSE"
 EXPECTED_PACKAGES = {
     PROTO_PACKAGE,
     "@runanywhere/web",
@@ -254,7 +254,7 @@ def _validate_proto_license(
     if actual_digest != expected_digest:
         raise PackageValidationError(
             f"{archive.name}: proto-ts LICENSE does not match "
-            "bindings/shared/proto-ts/LICENSE"
+            "bindings/proto-ts/LICENSE"
         )
 
 

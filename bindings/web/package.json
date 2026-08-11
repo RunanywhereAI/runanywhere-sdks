@@ -4,7 +4,7 @@
   "version": "0.20.17",
   "description": "RunAnywhere Web SDK - On-device AI for the browser via RACommons WASM",
   "workspaces": [
-    "../shared/proto-ts",
+    "../proto-ts",
     "packages/core",
     "packages/llamacpp",
     "packages/onnx"
@@ -33,7 +33,7 @@
     "test:browser:release": "RA_RUN_FULL_E2E=1 playwright test tests/browser/release-app.e2e.spec.ts",
     "test:browser:nvidia": "RA_RUN_FULL_E2E=1 playwright test tests/browser/llm-generate.spec.ts tests/browser/vlm-generate.spec.ts tests/browser/speech-rag-e2e.spec.ts tests/browser/nemotron-streaming.e2e.spec.ts",
     "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx wasm/build-onnx-webgpu packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
-    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
+    "clean": "rm -rf ../proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
   },
   "engines": {
     "node": ">=22.12.0"

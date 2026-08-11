@@ -245,7 +245,7 @@ Expected publish-time artifacts:
 - `packages/onnx/dist/**`
 - `packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}`
 - `packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}`
-- `../shared/proto-ts/dist/**`
+- `../proto-ts/dist/**`
 
 `packages/onnx` must not publish `wasm/sherpa/**` (the directory no longer exists).
 

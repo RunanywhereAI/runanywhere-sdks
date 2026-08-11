@@ -8,13 +8,13 @@
 # Install via: scripts/setup/setup-toolchain.sh (or `npm install -g ts-proto@${TS_PROTO_VERSION}`).
 #
 # Output:
-#   bindings/shared/proto-ts/src/
+#   bindings/proto-ts/src/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-TS_OUT_DIR="${REPO_ROOT}/bindings/shared/proto-ts/src"
+TS_OUT_DIR="${REPO_ROOT}/bindings/proto-ts/src"
 
 # Load TS_PROTO_VERSION from the centralized VERSIONS file so the install hint
 # below matches what setup-toolchain.sh actually installs.

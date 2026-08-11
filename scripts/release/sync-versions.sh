@@ -20,7 +20,7 @@
 #   bindings/swift/.../Generated/Versions.swift     (RAVersions.sdkVersion)
 #   bindings/kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
 #   bindings/kotlin/src/main/.../SDKConstants.kt    (Kotlin VERSION constant)
-#   bindings/shared/proto-ts/package.json + package-lock.json   (proto-ts package version)
+#   bindings/proto-ts/package.json + package-lock.json   (proto-ts package version)
 #   bindings/web/package.json                       (root version)
 #   bindings/web/packages/*/package.json            (each package version)
 #   bindings/web/.../Version.ts                     (web SDK_VERSION constant)
@@ -266,8 +266,8 @@ bump_line "${REPO_ROOT}/bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/foun
 # packages can use `^${NEW_VERSION}` as a single moving target.
 echo ""
 echo ">> Shared proto-ts:"
-bump_json_version "${REPO_ROOT}/bindings/shared/proto-ts/package.json"
-bump_npm_lock_root_version "${REPO_ROOT}/bindings/shared/proto-ts/package-lock.json"
+bump_json_version "${REPO_ROOT}/bindings/proto-ts/package.json"
+bump_npm_lock_root_version "${REPO_ROOT}/bindings/proto-ts/package-lock.json"
 # Also bump the first-party `@runanywhere/proto-ts` pin in
 # `dependencies/versions.json` (the central TS-deps registry that
 # renovate.json's customManager and syncpack read). The proto-ts package is

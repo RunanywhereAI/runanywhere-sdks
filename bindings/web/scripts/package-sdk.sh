@@ -65,7 +65,7 @@ cd "$WEB_ROOT"
 echo ">> npm ci"
 npm ci
 
-# proto-ts is a SIBLING workspace member (../shared/proto-ts), so npm's hoisting
+# proto-ts is a SIBLING workspace member (../proto-ts), so npm's hoisting
 # from $WEB_ROOT places @bufbuild/protobuf into $WEB_ROOT/node_modules only —
 # unreachable when tsc compiles proto-ts from its own sibling dir (TS2307 on
 # '@bufbuild/protobuf/wire' in a clean CI checkout; only passes locally via a
@@ -73,7 +73,7 @@ npm ci
 # lockfile first, mirroring the RN SDK's package-sdk.sh. --workspaces=false stops
 # npm from detecting the monorepo root and failing on the `workspace:*` protocol.
 echo ">> npm ci proto-ts (standalone, so tsc can resolve @bufbuild/protobuf)"
-(cd "$REPO_ROOT/bindings/shared/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
+(cd "$REPO_ROOT/bindings/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
 
 echo ">> npm run build:ts"
 npm run build:ts
@@ -92,8 +92,8 @@ PACKAGE_VERSION="$(node -p "require('./package.json').version")"
 # core and LlamaCPP entry tarballs also vendor this exact payload. Installing
 # either entry package from GitHub Releases therefore never asks npm for an
 # unpublished proto-ts version.
-echo ">> npm pack ../shared/proto-ts"
-(cd ../shared/proto-ts && npm pack --silent --pack-destination "$DIST_DIR" >/dev/null)
+echo ">> npm pack ../proto-ts"
+(cd ../proto-ts && npm pack --silent --pack-destination "$DIST_DIR" >/dev/null)
 PROTO_ARCHIVE="$DIST_DIR/runanywhere-proto-ts-$PACKAGE_VERSION.tgz"
 [ -f "$PROTO_ARCHIVE" ] || { echo "ERROR: npm pack did not produce $PROTO_ARCHIVE" >&2; exit 1; }
 python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \

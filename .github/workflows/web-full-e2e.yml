@@ -37,7 +37,7 @@ jobs:
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
       - name: Install proto-ts dependencies
-        working-directory: bindings/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
       - name: Check out the demo app
         uses: actions/checkout@v7

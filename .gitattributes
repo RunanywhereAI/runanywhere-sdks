@@ -18,8 +18,8 @@ bindings/flutter/packages/runanywhere/lib/generated/**  linguist-generated=true 
 # TypeScript (RN + Web)
 bindings/react-native/packages/core/src/generated/**  linguist-generated=true -diff
 bindings/web/packages/core/src/generated/**  linguist-generated=true -diff
-bindings/shared/proto-ts/src/**  linguist-generated=true -diff
-bindings/shared/proto-ts/dist/**  linguist-generated=true -diff
+bindings/proto-ts/src/**  linguist-generated=true -diff
+bindings/proto-ts/dist/**  linguist-generated=true -diff
 
 # C++
 core/src/generated/proto/**  linguist-generated=true -diff

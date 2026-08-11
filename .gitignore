@@ -143,7 +143,7 @@ gradle.properties
 
 # But keep project-level gradle properties if needed
 !gradle.properties.example
-!examples/flutter/RunAnywhereAI/android/gradle.properties
+!bindings/flutter/example/android/gradle.properties
 # The in-repo minimal Kotlin harness is a CI gate; a clean clone must build it.
 !bindings/kotlin/example/gradle.properties
 
@@ -266,8 +266,8 @@ bindings/web/emsdk/
 # External repositories and distribution
 EXTERNAL/
 dist/
-!bindings/shared/proto-ts/dist/
-!bindings/shared/proto-ts/dist/**
+!bindings/proto-ts/dist/
+!bindings/proto-ts/dist/**
 
 # Configuration files with real values
 bindings/swift/Configuration/RunAnywhereConfig.staging.json
@@ -444,7 +444,6 @@ external_examples/
 docs/release/
 docs/research/
 docs/rfcs/
-examples/SMOKE_MATRIX.md
 docs/API_PARITY_MATRIX.md
 docs/engine_plugin_authoring.md
 docs/graph_primitives.md

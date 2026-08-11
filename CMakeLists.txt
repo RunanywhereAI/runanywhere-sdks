@@ -76,7 +76,7 @@ option(RAC_BUILD_SERVER       "Build the OpenAI-compatible HTTP server (runanywh
 option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Models, System TTS) on Apple hosts" ON)
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
-option(RAC_BUILD_CLI          "Build the rcli desktop CLI (apps/rcli)" OFF)
+option(RAC_BUILD_CLI          "Build the rcli desktop CLI (rcli)" OFF)
 option(RAC_BUILD_ELECTRON_HARNESS "Build the runanywhere-electron M0 Win32 inference harness" OFF)
 option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addon" OFF)
 option(RAC_BUILD_PYTHON_MODULE "Build the runanywhere-python pybind11 _core module" OFF)
@@ -270,7 +270,7 @@ endif()
 # rcli desktop CLI. Added after engines/ because it links the
 # rac_backend_* targets that only exist once the engine subdirs configured.
 if(RAC_BUILD_CLI)
-    add_subdirectory(apps/rcli)
+    add_subdirectory(rcli)
 endif()
 
 # runanywhere-electron M0 inference harness. Added after engines/ because it

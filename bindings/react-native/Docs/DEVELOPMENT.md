@@ -67,7 +67,7 @@ After staging local natives, iOS consumes the package-owned `ios/Binaries/*.xcfr
 # 1. Ensure SDK is set up (from previous step)
 
 # 2. Navigate to the sample app
-cd ../../examples/react-native/RunAnywhereAI
+cd ../../bindings/react-native/example
 
 # 3. Install sample app dependencies (Yarn Berry workspace, not npm)
 corepack enable

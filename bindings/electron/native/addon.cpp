@@ -533,7 +533,7 @@ Napi::Value HfTokenConfigured(const Napi::CallbackInfo& info) {
 // =============================================================================
 // Desktop control plane: telemetry + auth over the libcurl HTTP transport.
 //
-// A behavioral port of rcli's bootstrap (apps/rcli/src/bootstrap.cpp)
+// A behavioral port of rcli's bootstrap (rcli/src/bootstrap.cpp)
 // and the Electron/Python-mirrored module.cpp. The desktop adapter linked into
 // commons provides the libcurl transport, so telemetry HTTP is delivered
 // entirely in C++ (rac_http_client_* over the registered transport) — never on

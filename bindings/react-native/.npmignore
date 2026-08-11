@@ -27,7 +27,6 @@ android/src/main/jniLibs/
 
 # Example apps
 example/
-examples/
 
 # Tests
 __tests__/

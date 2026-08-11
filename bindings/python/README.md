@@ -171,7 +171,7 @@ runanywhere list --all
 runanywhere serve
 ```
 
-Use `--json` for machine-readable output. For the standalone binary, see the [RunAnywhere CLI](../../apps/rcli/README.md).
+Use `--json` for machine-readable output. For the standalone binary, see the [RunAnywhere CLI](../../rcli/README.md).
 
 ## Errors
 

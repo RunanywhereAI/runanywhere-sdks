@@ -3,7 +3,7 @@
 On-device AI for Flutter — run LLMs, speech-to-text, text-to-speech, and voice pipelines locally. Private, offline-capable, production-ready.
 
 <p align="center">
-  <img src="../../examples/logo.svg" alt="RunAnywhere Logo" width="120"/>
+  <img src="../../docs/logo.svg" alt="RunAnywhere Logo" width="120"/>
 </p>
 
 <p align="center">
@@ -180,7 +180,7 @@ try {
 |----------|------|
 | **Docs site** | [docs.runanywhere.ai/flutter/introduction](https://docs.runanywhere.ai/flutter/introduction) |
 | **API reference** | [docs/Documentation.md](docs/Documentation.md) |
-| **Example app** | [examples/flutter/RunAnywhereAI/](../../examples/flutter/RunAnywhereAI/) |
+| **Example app** | [bindings/flutter/example/](../../bindings/flutter/example/) |
 | **Contributing / platform setup** | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 
 ---

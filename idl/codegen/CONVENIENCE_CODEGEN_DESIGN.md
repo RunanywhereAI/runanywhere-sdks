@@ -25,9 +25,9 @@ following anchors:
 | Wire ships annotation classes (`RacWireStringOption.kt`, etc.)      | `bindings/kotlin/.../generated/ai/runanywhere/proto/v1/RacWireStringOption.kt`     |
 | Dart `factory` constructor takes nullable camelCase named args      | `bindings/flutter/packages/runanywhere/lib/generated/stt_options.pb.dart:39-91`    |
 | Dart represents `int64` via `package:fixnum/fixnum.dart` `Int64`    | `stt_options.pb.dart:15`; existing `stt_options_helpers.dart:8` consumes `Int64(...)`     |
-| ts-proto first-char-lower helper rule                               | `bindings/shared/proto-ts/src/model_types.ts:47` (`audioFormatFromJSON`); `stt_options.ts:58` (`sTTLanguageFromJSON`) |
-| ts-proto package root has no star re-exports                        | `bindings/shared/proto-ts/src/index.ts:5` (`export {};`)                                       |
-| ts-proto uses `Long` from `"long"` for `int64`                      | `bindings/shared/proto-ts/src/stt_options.ts:8`                                                |
+| ts-proto first-char-lower helper rule                               | `bindings/proto-ts/src/model_types.ts:47` (`audioFormatFromJSON`); `stt_options.ts:58` (`sTTLanguageFromJSON`) |
+| ts-proto package root has no star re-exports                        | `bindings/proto-ts/src/index.ts:5` (`export {};`)                                       |
+| ts-proto uses `Long` from `"long"` for `int64`                      | `bindings/proto-ts/src/stt_options.ts:8`                                                |
 | ts-proto interfaces require all non-optional fields in literals     | `stt_options.ts:265-290` (`STTConfiguration`)                                             |
 | `generate_ts.sh` passes `useOptionals=messages`                     | `idl/codegen/generate_ts.sh:73`                                                           |
 | `generate_dart.sh` strips `ra_convenience.dart` (slot reserved)     | `idl/codegen/generate_dart.sh:119`                                                        |
@@ -500,10 +500,10 @@ Same descriptor-set strategy as Kotlin / Dart. ts-proto discards
 
 One file per `.proto` module — NOT a single mega-file:
 
-`bindings/shared/proto-ts/src/convenience/<base>_convenience.ts`
+`bindings/proto-ts/src/convenience/<base>_convenience.ts`
 
 Rationale: ts-proto already emits one `.ts` file per `.proto` module,
-and `bindings/shared/proto-ts/src/index.ts` deliberately does NOT
+and `bindings/proto-ts/src/index.ts` deliberately does NOT
 star-re-export anything (verified at `index.ts:5`: `export {};`) to
 avoid duplicate-type ambiguity across files. A single convenience
 mega-file would force every convenience helper to live in one
@@ -877,7 +877,7 @@ Verification: `STTLanguage` → `sTTLanguage` (matches
 ### 6.4 Shared TS `ValidationError`
 
 ```ts
-// bindings/shared/proto-ts/src/convenience/_errors.ts
+// bindings/proto-ts/src/convenience/_errors.ts
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -993,7 +993,7 @@ if (e is SDKException && e.fieldPath != null) { ... }
 | Swift      | `SDKException.validationFailed(fieldPath:message:)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/swift/.../SDKException.swift`                        |
 | Kotlin     | `SDKException.validationFailed(fieldPath, message)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/kotlin/.../foundation/errors/SDKException.kt`        |
 | Dart       | `SDKException.validationFailed(message, fieldPath: ...)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/flutter/.../foundation/errors/sdk_exception.dart`    |
-| TypeScript | `new ValidationError({fieldPath, message})` → exposes `.code`, `.category`, `.fieldPath`, `.message`     | `bindings/shared/proto-ts/src/convenience/_errors.ts` (hand-written)       |
+| TypeScript | `new ValidationError({fieldPath, message})` → exposes `.code`, `.category`, `.fieldPath`, `.message`     | `bindings/proto-ts/src/convenience/_errors.ts` (hand-written)       |
 
 ### 9.2 Wire-format / runtime constraints
 

@@ -2137,9 +2137,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:../shared/proto-ts":
+"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:../proto-ts":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/proto-ts@workspace:../shared/proto-ts"
+  resolution: "@runanywhere/proto-ts@workspace:../proto-ts"
   dependencies:
     "@bufbuild/protobuf": ^2.12.1
     typescript: ^5.9.3

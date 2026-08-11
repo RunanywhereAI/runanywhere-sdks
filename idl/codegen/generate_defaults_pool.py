@@ -27,7 +27,7 @@
 #   bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift
 #   bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt
 #   bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart
-#   bindings/shared/proto-ts/src/defaults/pool.ts
+#   bindings/proto-ts/src/defaults/pool.ts
 #
 # The C header comes from generate_cpp_defaults.py, which covers every
 # rac_default in idl/ rather than just the pool.
@@ -110,7 +110,7 @@ DART = Target(
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 TS = Target(
-    rel_path="bindings/shared/proto-ts/src/defaults/pool.ts",
+    rel_path="bindings/proto-ts/src/defaults/pool.ts",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 # Python consumes the flat C ABI for everything but RAG and has no convenience

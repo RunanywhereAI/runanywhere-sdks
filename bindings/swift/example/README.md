@@ -23,7 +23,7 @@ changes you must stage the XCFrameworks and export the variable.
 ## Run
 
 ```bash
-cd examples/swift/minimal
+cd bindings/swift/example
 
 # Build
 RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build
@@ -53,7 +53,7 @@ enough. The catalog is *not* auto-seeded, though: `ensureLoaded` rejects an
 unknown id with `Model '…' is not registered`, so the one `models.register`
 call above is required. To try a different model, change `modelId`/`modelURL`
 in `Sources/main.swift` (the canonical ids and URLs live in
-`apps/rcli/src/catalog/catalog.cpp`).
+`rcli/src/catalog/catalog.cpp`).
 
 Deliberately absent: model catalogs, download/load calls, theming, UI. Those
 either live in the SDK already or belong in a full example app.

@@ -425,7 +425,7 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
 
 #ifdef RAC_PY_CONTROL_PLANE
 // =============================================================================
-// Control plane: telemetry + auth. Ports rcli's bootstrap (apps/rcli/
+// Control plane: telemetry + auth. Ports rcli's bootstrap (rcli/
 // src/bootstrap.cpp: initialize_sdk_metadata + initialize_telemetry_auth), but
 // registers a Python urllib-backed HTTP transport instead of commons' libcurl one
 // (no third-party client, per this SDK's stdlib-HTTP rule). Auth, model

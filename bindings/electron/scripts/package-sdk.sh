@@ -6,7 +6,7 @@
 # bindings/web/scripts/package-sdk.sh.
 #
 # Why this exists: the workspace manifest declares
-#   "@runanywhere/proto-ts": "file:../shared/proto-ts"
+#   "@runanywhere/proto-ts": "file:../proto-ts"
 # as a RUNTIME dependency, which is correct for local development (the SDK sets
 # `install-links=true` so the dep is copied rather than symlinked) but resolves
 # to nothing on a consumer machine. `npm publish` straight from the workspace
@@ -38,8 +38,8 @@ mkdir -p "${DIST_DIR}"
 # proto-ts is packed first so it can be vendored into the entry tarball, the
 # same way the Web SDK does it: installing @runanywhere/electron then never
 # asks npm for a proto-ts version that may not be published yet.
-echo ">> npm pack ../shared/proto-ts"
-(cd "${REPO_ROOT}/bindings/shared/proto-ts" && npm pack --silent --pack-destination "${DIST_DIR}" >/dev/null)
+echo ">> npm pack ../proto-ts"
+(cd "${REPO_ROOT}/bindings/proto-ts" && npm pack --silent --pack-destination "${DIST_DIR}" >/dev/null)
 PROTO_ARCHIVE="${DIST_DIR}/runanywhere-proto-ts-${PACKAGE_VERSION}.tgz"
 [ -f "${PROTO_ARCHIVE}" ] || { echo "ERROR: npm pack did not produce ${PROTO_ARCHIVE}" >&2; exit 1; }
 python3 "${REPO_ROOT}/scripts/release/rewrite_npm_package.py" \

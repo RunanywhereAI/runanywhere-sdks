@@ -2,7 +2,7 @@
 //
 // The SDK owns the entry SHAPE; the APP owns WHICH models it offers. That split
 // matches every other platform in this repo (iOS `ModelCatalogBootstrap.swift`,
-// Android `ModelCatalog.kt`, web `model-catalog.ts` — all in `examples/`, none in
+// Android `ModelCatalog.kt`, web `model-catalog.ts` — all in example apps, none in
 // an SDK), and it is what lets two apps ship different model lists against one
 // SDK build.
 //

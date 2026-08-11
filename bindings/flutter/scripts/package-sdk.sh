@@ -339,7 +339,7 @@ plutil -lint "$FLUTTER_PRIVACY_MANIFEST" >/dev/null
 # Flutter publishes as an independent archive, so its ObjC++ HTTP transport
 # cannot include a source file through a monorepo-relative path. Keep the small
 # package mirror byte-identical to the canonical cross-SDK implementation.
-SHARED_HTTP_TRANSPORT="${REPO_ROOT}/bindings/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+SHARED_HTTP_TRANSPORT="${REPO_ROOT}/bindings/shared-apple/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
 FLUTTER_HTTP_TRANSPORT="${FLUTTER_ROOT}/packages/runanywhere/ios/runanywhere/Sources/runanywhere_native/URLSessionHttpTransportImpl.inc.mm"
 if ! cmp -s "$SHARED_HTTP_TRANSPORT" "$FLUTTER_HTTP_TRANSPORT"; then
     echo "ERROR: Flutter URLSession transport mirror drifted from the canonical shared implementation" >&2

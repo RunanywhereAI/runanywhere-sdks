@@ -316,7 +316,7 @@ jobs:
           SWIFT_BUILD_JOBS: 2
         run: |
           set -euo pipefail
-          bash apps/rcli/scripts/build-mlx-cli.sh
+          bash rcli/scripts/build-mlx-cli.sh
           export RUNANYWHERE_USE_LOCAL_NATIVES=1
           BIN_DIR="$(swift build -c release --show-bin-path)"
           [ -x "$BIN_DIR/RunAnywhereMLXCLI" ]
@@ -470,7 +470,7 @@ jobs:
           RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
           RCLI_NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
           RCLI_NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
-        run: bash apps/rcli/scripts/package-rcli.sh .build macos-arm64
+        run: bash rcli/scripts/package-rcli.sh .build macos-arm64
       - name: Remove ephemeral signing credentials
         if: always()
         env:
@@ -488,10 +488,10 @@ jobs:
         with:
           name: rcli-macos
           path: |
-            apps/rcli/dist/rcli-macos-arm64-v*.tar.gz
-            apps/rcli/dist/rcli-macos-arm64-v*.tar.gz.sha256
-            apps/rcli/dist/rcli-macos-arm64-v*.dmg
-            apps/rcli/dist/rcli-macos-arm64-v*.dmg.sha256
+            rcli/dist/rcli-macos-arm64-v*.tar.gz
+            rcli/dist/rcli-macos-arm64-v*.tar.gz.sha256
+            rcli/dist/rcli-macos-arm64-v*.dmg
+            rcli/dist/rcli-macos-arm64-v*.dmg.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -516,14 +516,14 @@ jobs:
       - name: Package rcli tarball
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash apps/rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
       - name: Upload rcli Linux artifact
         uses: actions/upload-artifact@v7
         with:
           name: rcli-linux
           path: |
-            apps/rcli/dist/rcli-linux-x86_64-v*.tar.gz
-            apps/rcli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+            rcli/dist/rcli-linux-x86_64-v*.tar.gz
+            rcli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -607,7 +607,7 @@ jobs:
       - name: Package rcli ZIP
         shell: pwsh
         run: >-
-          ./apps/rcli/scripts/package-rcli-windows.ps1
+          ./rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
           -Version ${{ needs.validate.outputs.version }}
       - name: Upload rcli Windows artifact
@@ -615,8 +615,8 @@ jobs:
         with:
           name: rcli-windows
           path: |
-            apps/rcli/dist/rcli-windows-x86_64-v*.zip
-            apps/rcli/dist/rcli-windows-x86_64-v*.zip.sha256
+            rcli/dist/rcli-windows-x86_64-v*.zip
+            rcli/dist/rcli-windows-x86_64-v*.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -1535,7 +1535,7 @@ jobs:
       - name: Build the current in-tree Flutter consumer
         run: |
           set -euo pipefail
-          cd examples/flutter/RunAnywhereAI
+          cd bindings/flutter/example
           flutter pub get
           flutter analyze
           flutter test

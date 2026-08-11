@@ -103,10 +103,10 @@ Two example apps remain in-tree:
 
 | App | Path | Build System |
 |-----|------|-------------|
-| Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
-| React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
+| Flutter | `bindings/flutter/example/` | Flutter + Dart FFI |
+| React Native | `bindings/react-native/example/` | RN 0.85 + NitroModules |
 
-All example apps share one visual identity — brand orange `#FF6900` (the logo primary, **not** the legacy `#FF5500`), documented in `examples/DESIGN_GUIDELINE.md`. Each app hand-maintains a small theme file that mirrors that doc; see the "Design System" section in each app's `AGENTS.md`.
+All example apps share one visual identity — brand orange `#FF6900` (the logo primary, **not** the legacy `#FF5500`), documented in `docs/DESIGN_GUIDELINE.md`. Each app hand-maintains a small theme file that mirrors that doc; see the "Design System" section in each app's `AGENTS.md`.
 
 ### Minimal Examples (in-repo harnesses)
 These are how you verify an SDK change locally — and what monorepo CI builds. Each consumes the SDK **from local source**, so an edit is visible without staging or publishing anything.
@@ -118,9 +118,6 @@ These are how you verify an SDK change locally — and what monorepo CI builds. 
 | Web | `bindings/web/example/` | Vite aliases + `tsconfig` paths into `packages/*/src`; `RAC_USE_INSTALLED_SDK=1` switches to installed tarballs |
 
 Each is deliberately small: one prompt in, one streamed completion out. They are contributor harnesses, not showcases — feature-complete UI belongs in the consumer repos above.
-
-### Playground
-`Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
 
 ---
 
@@ -417,7 +414,7 @@ The example publishes `window.__RUNANYWHERE_SDK__` and `window.__RUNANYWHERE_AI_
 ### Flutter Example
 
 ```bash
-cd examples/flutter/RunAnywhereAI/
+cd bindings/flutter/example/
 
 flutter pub get
 flutter run
@@ -429,7 +426,7 @@ RUN_IOS=1 ./scripts/verify.sh  # Also builds iOS
 ### React Native Example
 
 ```bash
-cd examples/react-native/RunAnywhereAI/
+cd bindings/react-native/example/
 
 yarn install
 yarn start          # Metro bundler
@@ -617,7 +614,6 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 | Web minimal example | `npm run dev` (from `bindings/web/example/`) | Manual browser testing at `localhost:3000` | N/A | Streams one completion; needs the WASM pairs built |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `core/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |
-| Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |
 | iOS/Swift SDK | Not buildable | Not buildable | Not available | Requires macOS + Xcode |
 | Android emulator | Not runnable | Not runnable | N/A | No KVM support in cloud VM |
 
@@ -629,22 +625,6 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 - **C++ compiler**: Default clang on this VM lacks `libc++` headers. Use `gcc`/`g++` via `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
 - **`local.properties`**: Auto-created at root, `bindings/kotlin/`, and `bindings/kotlin/example/` with `sdk.dir=/opt/android-sdk`.
 - **pre-commit hooks**: Installed via `pre-commit install`. Requires `git config --unset-all core.hooksPath` first if `core.hooksPath` is set.
-
-### Linux Voice Assistant Quick Start
-
-```bash
-# 1. Build commons with backends
-cd core
-CC=gcc CXX=g++ ./scripts/build-linux.sh
-
-# 2. Build voice assistant
-cd ../../Playground/linux-voice-assistant
-CC=gcc CXX=g++ cmake -B build && cmake --build build
-
-# 3. Run test pipeline (headless, no mic needed)
-export LD_LIBRARY_PATH="../../core/dist/linux/lib:../../core/third_party/sherpa-onnx-linux/lib"
-./build/test-pipeline /path/to/audio.wav
-```
 
 ### Standard commands
 

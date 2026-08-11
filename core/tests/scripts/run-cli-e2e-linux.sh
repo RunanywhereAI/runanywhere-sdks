@@ -43,7 +43,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 DOCKER_IMAGE="${RAC_REAL_INFERENCE_IMAGE:-rac-real-inference-linux}"
 MODEL_DIR="${RAC_TEST_MODEL_DIR:-${HOME}/.local/share/runanywhere/Models}"
 LOG_DIR="${RAC_TEST_LOG_DIR:-${COMMONS_ROOT}/build/cli-e2e-logs}"
-RCLI="/build/apps/rcli/rcli"
+RCLI="/build/rcli/rcli"
 BUILD_ONLY=false
 SKIP_BUILD=false
 

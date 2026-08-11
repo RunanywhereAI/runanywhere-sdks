@@ -27,8 +27,8 @@
 #   FLUTTER_CENTRALIZATION_STRICT=1 ... check_flutter_centralization.sh  # fail on warn
 #
 # Scope:
-#   - Walks bindings/flutter/**/pubspec.yaml and
-#     examples/flutter/**/pubspec.yaml
+#   - Walks bindings/flutter/**/pubspec.yaml (the SDK packages and the
+#     in-repo example app at bindings/flutter/example/)
 #   - Skips the workspace root pubspec itself (that IS the source of truth)
 #   - Ignores SDK-bundled deps (`sdk: flutter`) and path/git deps
 
@@ -155,11 +155,10 @@ while IFS= read -r -d '' f; do
   PUBSPEC_TARGETS+=("$f")
 done < <(find \
   "${REPO_ROOT}/bindings/flutter" \
-  "${REPO_ROOT}/examples/flutter" \
   -type f -name pubspec.yaml -print0 2>/dev/null)
 
 if [[ "${#PUBSPEC_TARGETS[@]}" -eq 0 ]]; then
-  echo "warning: no pubspec.yaml files found under bindings/flutter/ or examples/flutter/" >&2
+  echo "warning: no pubspec.yaml files found under bindings/flutter/" >&2
 fi
 
 # Extract `^x.y.z` / `x.y.z` pins from a package pubspec, restricted to
@@ -252,15 +251,15 @@ flutter_compile_sdk="$(version_value FLUTTER_ANDROID_COMPILE_SDK)"
 flutter_target_sdk="$(version_value FLUTTER_ANDROID_TARGET_SDK)"
 flutter_ndk="$(version_value FLUTTER_NDK_VERSION)"
 
-expect_literal "examples/flutter/RunAnywhereAI/android/gradle/wrapper/gradle-wrapper.properties" \
+expect_literal "bindings/flutter/example/android/gradle/wrapper/gradle-wrapper.properties" \
   "gradle-${flutter_gradle}-all.zip"
-expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+expect_literal "bindings/flutter/example/android/settings.gradle" \
   "id \"com.android.application\" version \"${flutter_agp}\" apply false"
-expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+expect_literal "bindings/flutter/example/android/settings.gradle" \
   "id \"org.jetbrains.kotlin.android\" version \"${flutter_kotlin}\" apply false"
 
 flutter_owned_gradle_files=(
-  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
+  "bindings/flutter/example/android/app/build.gradle"
   "bindings/flutter/packages/runanywhere/android/build.gradle"
   "bindings/flutter/packages/runanywhere_llamacpp/android/build.gradle"
   "bindings/flutter/packages/runanywhere_onnx/android/build.gradle"
@@ -281,7 +280,7 @@ flutter_android_builds=(
   "bindings/flutter/packages/runanywhere_llamacpp/android/build.gradle"
   "bindings/flutter/packages/runanywhere_onnx/android/build.gradle"
   "bindings/flutter/packages/runanywhere_qhexrt/android/build.gradle"
-  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
+  "bindings/flutter/example/android/app/build.gradle"
 )
 for build_file in "${flutter_android_builds[@]}"; do
   expect_literal "${build_file}" "compileSdk = ${flutter_compile_sdk}"

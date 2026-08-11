@@ -18,11 +18,7 @@ const TARGETS_REMOTE_ORIGIN = Boolean(
 const RELEASE_TRACE_ENABLED = process.env.RA_E2E_TRACE === '1'
   && !TARGETS_REMOTE_ORIGIN;
 
-const REPO_ROOT = resolve(__dirname, '../../../../..');
-export const AUDIO_FIXTURE = resolve(
-  REPO_ROOT,
-  'Playground/openclaw-hybrid-assistant/tests/audio/edge-cases/weather-command.wav',
-);
+export const AUDIO_FIXTURE = resolve(__dirname, '../fixtures/weather-command.wav');
 export const IMAGE_FIXTURE = resolve(__dirname, '../fixtures/release-image.jpg');
 export const RAG_FIXTURE = resolve(__dirname, '../fixtures/release-rag.txt');
 

@@ -29,9 +29,6 @@ Brief description of the changes made.
 - [ ] Tested on iOS
 - [ ] Tested on Android
 
-**Playground:**
-- [ ] Tested on target platform
-- [ ] Verified no regressions in existing Playground projects
 **Web SDK / Web Sample:**
 - [ ] Tested in Chrome (Desktop)
 - [ ] Tested in Firefox
@@ -52,8 +49,8 @@ Please add the appropriate label(s):
 - [ ] `Commons` - Changes to shared native code (`core`)
 
 **Sample Apps:**
-- [ ] `Flutter Sample` - Changes to Flutter example app (`examples/flutter`)
-- [ ] `React Native Sample` - Changes to React Native example app (`examples/react-native`)
+- [ ] `Flutter Sample` - Changes to Flutter example app (`bindings/flutter/example`)
+- [ ] `React Native Sample` - Changes to React Native example app (`bindings/react-native/example`)
 - [ ] `Minimal Examples` - Changes to an in-repo SDK harness (`bindings/{swift,kotlin,web}/example`)
 
 The iOS, Android, Web, and Electron consumer apps live in their own

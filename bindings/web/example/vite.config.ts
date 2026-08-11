@@ -25,7 +25,7 @@ const onnxWasmDir = wasmDir('@runanywhere/web-onnx', 'onnx');
 
 // Every package must resolve to the same source modules, otherwise a
 // package-root import can land on `dist/` and create a duplicate SDK singleton.
-const protoTsSrc = path.resolve(workspaceRoot, 'bindings/shared/proto-ts/src');
+const protoTsSrc = path.resolve(workspaceRoot, 'bindings/proto-ts/src');
 const webCoreSrc = path.resolve(workspaceRoot, 'bindings/web/packages/core/src');
 const localSDKSourceAliases = [
   {

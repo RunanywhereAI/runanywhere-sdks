@@ -1,0 +1,94 @@
+{
+  "name": "@runanywhere/proto-ts",
+  "version": "0.20.17",
+  "description": "Shared RunAnywhere ts-proto generated types and stream wrappers",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "RunAnywhere AI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "bindings/proto-ts"
+  },
+  "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/bindings/proto-ts",
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./convenience/*": {
+      "types": "./dist/convenience/*.d.ts",
+      "import": "./dist/convenience/*.js",
+      "require": "./dist/convenience/*.js",
+      "default": "./dist/convenience/*.js"
+    },
+    "./events/*": {
+      "types": "./dist/events/*.d.ts",
+      "import": "./dist/events/*.js",
+      "require": "./dist/events/*.js",
+      "default": "./dist/events/*.js"
+    },
+    "./streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "require": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./dist/convenience/*": {
+      "types": "./dist/convenience/*.d.ts",
+      "import": "./dist/convenience/*.js",
+      "require": "./dist/convenience/*.js",
+      "default": "./dist/convenience/*.js"
+    },
+    "./dist/events/*": {
+      "types": "./dist/events/*.d.ts",
+      "import": "./dist/events/*.js",
+      "require": "./dist/events/*.js",
+      "default": "./dist/events/*.js"
+    },
+    "./dist/streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "require": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist && find src -type f \\( -name '*.js' -o -name '*.js.map' -o -name '*.d.ts' -o -name '*.d.ts.map' \\) -delete"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

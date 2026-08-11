@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 FLUTTER_PACKAGES="${REPO_ROOT}/bindings/flutter/packages"
-ANDROID_PROJECT="${REPO_ROOT}/examples/flutter/RunAnywhereAI/android"
+ANDROID_PROJECT="${REPO_ROOT}/bindings/flutter/example/android"
 VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/core/VERSION")"
 FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/rac-flutter-release.XXXXXX")"
 trap 'rm -rf "${FIXTURE}"' EXIT

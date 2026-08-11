@@ -215,11 +215,11 @@ else
     "static readonly version = '${ONNX_VERSION_IOS_PIN}'"
 fi
 
-expect_literal "bindings/shared/proto-ts/package.json" "\"version\": \"${VERSION}\""
-expect_literal "bindings/shared/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
-expect_literal "bindings/shared/proto-ts/package.json" '"LICENSE"'
-expect_literal "bindings/shared/proto-ts/LICENSE" 'RunAnywhere License Notice'
-expect_count "bindings/shared/proto-ts/package-lock.json" "\"version\": \"${VERSION}\"" 2
+expect_literal "bindings/proto-ts/package.json" "\"version\": \"${VERSION}\""
+expect_literal "bindings/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
+expect_literal "bindings/proto-ts/package.json" '"LICENSE"'
+expect_literal "bindings/proto-ts/LICENSE" 'RunAnywhere License Notice'
+expect_count "bindings/proto-ts/package-lock.json" "\"version\": \"${VERSION}\"" 2
 expect_literal "dependencies/versions.json" "\"@runanywhere/proto-ts\": \"^${VERSION}\""
 
 for package_json in \

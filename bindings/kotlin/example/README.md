@@ -44,13 +44,13 @@ You also need `local.properties` with `sdk.dir` (Android Studio writes it; it is
 gitignored):
 
 ```bash
-echo "sdk.dir=$HOME/Library/Android/sdk" > examples/kotlin/minimal/local.properties
+echo "sdk.dir=$HOME/Library/Android/sdk" > bindings/kotlin/example/local.properties
 ```
 
 ## Run
 
 ```bash
-cd examples/kotlin/minimal
+cd bindings/kotlin/example
 
 # Build + install + launch on a connected arm64 device/emulator
 ./gradlew :app:installDebug
@@ -77,7 +77,7 @@ call to make. **Download and load are automatic** — passing `LlmOptions.model`
 is enough. The catalog is *not* auto-seeded, though: an unknown id is rejected
 before generation, so the one `models.register` call is required. To try a
 different model, change `MODEL_ID`/`MODEL_URL` in `MainActivity.kt` (the
-canonical ids and URLs live in `apps/rcli/src/catalog/catalog.cpp`).
+canonical ids and URLs live in `rcli/src/catalog/catalog.cpp`).
 
 Deliberately absent: Compose, a design system, model catalogs, navigation.
 

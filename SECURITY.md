@@ -24,7 +24,7 @@ This policy covers:
 - RunAnywhere SDKs (Swift, Kotlin, React Native, Flutter, Web, Electron, Python)
 - CLI (`rcli`) and shared C/C++ core (`runanywhere-commons`)
 - Native inference engines and runtime modules
-- Example applications and Playground demos in this repository
+- Example applications in this repository
 
 ## Responsible Disclosure
 

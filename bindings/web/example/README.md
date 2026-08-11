@@ -6,7 +6,7 @@ button, one streamed answer. Plain DOM, no framework, no design system.
 This is the in-repo contributor harness and the release consumer gate target —
 it builds against the **local SDK source** by default (Vite aliases +
 `tsconfig.json` paths into `bindings/web/packages/*/src` and
-`bindings/shared/proto-ts/src`), so an SDK edit shows up here without a publish step.
+`bindings/proto-ts/src`), so an SDK edit shows up here without a publish step.
 
 ## Commands
 

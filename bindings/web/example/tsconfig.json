@@ -16,8 +16,8 @@
       "@runanywhere/web/backend": ["../../../bindings/web/packages/core/src/backend.ts"],
       "@runanywhere/web/browser": ["../../../bindings/web/packages/core/src/browser.ts"],
       "@runanywhere/web-llamacpp": ["../../../bindings/web/packages/llamacpp/src/index.ts"],
-      "@runanywhere/proto-ts": ["../../../bindings/shared/proto-ts/src/index.ts"],
-      "@runanywhere/proto-ts/*": ["../../../bindings/shared/proto-ts/src/*.ts"]
+      "@runanywhere/proto-ts": ["../../../bindings/proto-ts/src/index.ts"],
+      "@runanywhere/proto-ts/*": ["../../../bindings/proto-ts/src/*.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

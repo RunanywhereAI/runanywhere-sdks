@@ -109,7 +109,7 @@ melos bootstrap
 ## Testing with the Sample App
 
 ```bash
-cd ../../examples/flutter/RunAnywhereAI
+cd ../../bindings/flutter/example
 flutter pub get
 cd ios && pod install && cd ..
 flutter run

@@ -117,7 +117,7 @@ setup_flutter() {
     if [ -d "${REPO_ROOT}/bindings/flutter/packages/runanywhere" ]; then
         (cd "${REPO_ROOT}/bindings/flutter/packages/runanywhere" && flutter pub get </dev/null) && ok "sdk pub get"
     fi
-    for ex in "${REPO_ROOT}"/examples/flutter/*/; do
+    for ex in "${REPO_ROOT}"/bindings/flutter/example/; do
         [ -d "${ex}" ] && [ -f "${ex}/pubspec.yaml" ] && (cd "${ex}" && flutter pub get </dev/null) && ok "$(basename "${ex}") pub get"
     done
 }

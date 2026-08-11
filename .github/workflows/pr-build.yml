@@ -160,7 +160,7 @@ jobs:
       - name: Smoke (modelless)
         run: |
           set -euo pipefail
-          RCLI=build/rcli-macos-release/apps/rcli/rcli
+          RCLI=build/rcli-macos-release/rcli/rcli
           "$RCLI" version
           BACKENDS="$("$RCLI" backends --json)"
           echo "$BACKENDS"
@@ -171,7 +171,7 @@ jobs:
           "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
           "$RCLI" info --json
       - name: Package smoke
-        run: bash apps/rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+        run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
 
   rcli-linux:
     # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
@@ -188,7 +188,7 @@ jobs:
       - name: Smoke (modelless)
         run: |
           set -euo pipefail
-          RCLI=build/rcli-linux-release/apps/rcli/rcli
+          RCLI=build/rcli-linux-release/rcli/rcli
           "$RCLI" version
           BACKENDS="$("$RCLI" backends --json)"
           echo "$BACKENDS"
@@ -196,7 +196,7 @@ jobs:
           "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
           "$RCLI" info --json
       - name: Package smoke
-        run: bash apps/rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
 
   rcli-windows:
     # Windows is compiled and exercised on the native runner. MLX remains
@@ -242,7 +242,7 @@ jobs:
       - name: Package and smoke
         shell: pwsh
         run: >-
-          ./apps/rcli/scripts/package-rcli-windows.ps1
+          ./rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
 
   python-windows:
@@ -621,7 +621,7 @@ jobs:
         with:
           platform: node
       # Install + typecheck from the workspace root so the in-tree
-      # @runanywhere/proto-ts package (bindings/shared/proto-ts) is resolved as a
+      # @runanywhere/proto-ts package (bindings/proto-ts) is resolved as a
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
       # llamacpp, mlx, and onnx — exactly the surface this PR touches.
@@ -638,7 +638,7 @@ jobs:
       # out the Web workspace. Install proto-ts last so TypeScript resolution
       # from its real path always sees its direct @bufbuild/protobuf dependency.
       - name: Install proto-ts dependencies (standalone install)
-        working-directory: bindings/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: bindings/web
@@ -669,7 +669,7 @@ jobs:
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
       - name: Install proto-ts dependencies
-        working-directory: bindings/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
       - name: Install minimal example dependencies
         working-directory: bindings/web/example

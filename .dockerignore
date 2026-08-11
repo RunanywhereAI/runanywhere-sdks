@@ -29,8 +29,3 @@ core/third_party/*/bin
 core/tests/build
 core/build
 core/build-*
-examples/**/build
-examples/**/.gradle
-examples/**/node_modules
-Playground/**/build
-Playground/**/.build

@@ -18,7 +18,7 @@ Swift alignment source of truth: `bindings/swift/ARCHITECTURE.md`, especially §
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
 | `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend registration and capability probe |
 
-Additional workspace dependency: `../shared/proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
+Additional workspace dependency: `../proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
 
 ## Common Commands
 
@@ -230,11 +230,11 @@ bindings/react-native/packages/core
 bindings/react-native/packages/llamacpp
 bindings/react-native/packages/mlx
 bindings/react-native/packages/onnx
-examples/react-native/RunAnywhereAI
-bindings/shared/proto-ts
+bindings/react-native/example
+bindings/proto-ts
 ```
 
-The inner `bindings/react-native/package.json` also declares workspaces (`packages/*` + `../shared/proto-ts`) for standalone operation.
+The inner `bindings/react-native/package.json` also declares workspaces (`packages/*` + `../proto-ts`) for standalone operation.
 
 ## CI/CD
 

@@ -463,7 +463,7 @@ echo ">> yarn install --immutable (cwd=$YARN_CWD)"
 # packages that consume generated protocol types vendor this exact archive, so
 # installing a GitHub Release tarball never depends on an unpublished registry
 # copy of proto-ts. The MLX registration-only package has no protocol imports.
-# proto-ts is a SIBLING workspace member (../shared/proto-ts), so Yarn's
+# proto-ts is a SIBLING workspace member (../proto-ts), so Yarn's
 # node-modules linker hoists its deps into the RN root — unreachable when tsc
 # compiles proto-ts from its own sibling dir (TS2307 on '@bufbuild/protobuf/wire'
 # in a clean CI checkout; only passes locally via a stray repo-root install).
@@ -471,12 +471,12 @@ echo ">> yarn install --immutable (cwd=$YARN_CWD)"
 # SDK + idl-drift-check recipe. --workspaces=false stops npm from detecting the
 # monorepo root and failing on the `workspace:*` protocol.
 echo ">> npm ci proto-ts (standalone, so tsc can resolve @bufbuild/protobuf)"
-(cd "$REPO_ROOT/bindings/shared/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
+(cd "$REPO_ROOT/bindings/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
 echo ">> yarn build:proto"
 corepack yarn build:proto
 PROTO_STAGING="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-rn-proto.XXXXXX")"
 trap 'rm -rf "$PROTO_STAGING"' EXIT
-(cd "$REPO_ROOT/bindings/shared/proto-ts" && npm pack --silent --pack-destination "$PROTO_STAGING" >/dev/null)
+(cd "$REPO_ROOT/bindings/proto-ts" && npm pack --silent --pack-destination "$PROTO_STAGING" >/dev/null)
 
 # Generate the core Nitro bindings from the locked workspace.
 echo ">> yarn core:nitrogen"
