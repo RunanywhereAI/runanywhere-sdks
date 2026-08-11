@@ -70,6 +70,19 @@ export interface CatalogEntry {
    * ignore the conversation and answer as if every turn were the first.
    */
   chatTemplate?: 'chatml' | 'llama3' | 'gemma' | 'mistral';
+  /**
+   * Pin the engine for this row instead of inferring one from `type`.
+   *
+   * The inference in {@link FRAMEWORK_OF_TYPE} is a per-MODALITY default —
+   * an `llm` means llama.cpp — which cannot express a model whose weights only
+   * one engine can read. A QHexRT bundle is a prebuilt QNN context binary: no
+   * other backend can load it, and llama.cpp would be handed a `.bin` it has no
+   * way to parse. Naming the engine on the ROW is also what keeps
+   * `actualBackend` meaningful after load — commons reports what it routed to,
+   * so a row that pinned QHEXRT and came back LLAMA_CPP is a visible fallback
+   * rather than a silent one.
+   */
+  framework?: 'llamacpp' | 'onnx' | 'sherpa' | 'qhexrt';
 }
 
 /** A model table: catalog id -> entry. */
@@ -129,7 +142,31 @@ const FRAMEWORK_OF_TYPE: Record<ModelType, InferenceFramework> = {
   segmentation: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
 };
 
+/** Engine names a catalog row may pin, as the proto enum commons stores. */
+const FRAMEWORK_BY_NAME: Record<
+  NonNullable<CatalogEntry['framework']>,
+  InferenceFramework
+> = {
+  llamacpp: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  onnx: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  sherpa: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  qhexrt: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+};
+
+function frameworkOf(entry: CatalogEntry): InferenceFramework {
+  return entry.framework !== undefined
+    ? FRAMEWORK_BY_NAME[entry.framework]
+    : FRAMEWORK_OF_TYPE[entry.type];
+}
+
 function formatOf(entry: CatalogEntry): ModelFormat {
+  // A QHexRT row is a prebuilt QNN context bundle, and the format follows from
+  // the ENGINE rather than the primary file's extension: the primary is the
+  // bundle manifest (`*.json`), which the extension ladder below would read as a
+  // plain folder. Commons rejects that pairing at registration — the row simply
+  // never appears in models.list(), so the model is invisible in a picker with
+  // no error anywhere to explain it.
+  if (entry.framework === 'qhexrt') return ModelFormat.MODEL_FORMAT_QNN_CONTEXT;
   if (entry.archive) return ModelFormat.MODEL_FORMAT_FOLDER;
   if (/\.gguf$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_GGUF;
   if (/\.onnx$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_ONNX;
@@ -180,7 +217,7 @@ export function catalogModelInfo(id: string, entry: CatalogEntry): ModelInfo {
     name: entry.label ?? id,
     category: CATEGORY_OF_TYPE[entry.type],
     format: formatOf(entry),
-    framework: FRAMEWORK_OF_TYPE[entry.type],
+    framework: frameworkOf(entry),
     downloadUrl: entry.files[0]?.url ?? '',
     localPath: '',
     downloadSizeBytes: entry.sizeMB ? entry.sizeMB * 1_000_000 : 0,
