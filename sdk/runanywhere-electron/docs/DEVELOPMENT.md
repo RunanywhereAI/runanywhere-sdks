@@ -133,6 +133,64 @@ host). `win_delay_load_hook.cc` rewrites that name to the running process /
 | Plugin `LoadLibrary` path | Plugins resolve `rac_commons.dll` via PATH / same-dir search — stage sidecars together. |
 | Electron vs Node host | Hook already falls back to `GetModuleHandle(NULL)` — keep that; do not hard-code `electron.exe`. |
 
+### Windows on ARM64 (Snapdragon X / X2 Elite) — the QHexRT NPU lane
+
+A different build from the x64 Windows recipe above, because a different set of
+engines can compile. **llama.cpp, ONNX and Sherpa do not build for win-arm64**
+(ggml hard-errors "MSVC is not supported for ARM"; `FetchONNXRuntime.cmake` picks
+its download by `CMAKE_SIZEOF_VOID_P==8` and would fetch the x64 runtime, failing
+at link with LNK1112). The `windows-arm64-release` preset therefore turns them
+off, and **QHexRT is the only engine on this host** — there is no CPU fallback,
+which is exactly why a load that reports `actualBackend != QHEXRT` is a bug.
+
+QHexRT needs a receipt-validated prebuilt tree before configure — the engine
+decides routable-vs-shell at configure time, so staging it afterwards silently
+gives you the not-routable shell. `stage_prebuilt_for_sdk.sh` is POSIX-only
+(symlinked `current`, `ps -o lstart=`, `llvm-nm`, ELF `.a` names), so on Windows
+the payload is published as a plain `versions/<64-hex-receipt>/` directory and
+named explicitly:
+
+```powershell
+cmake -S . -B build/electron-win-arm64 -G "Visual Studio 18 2026" -A ARM64 `
+  -DRAC_BUILD_SHARED=ON -DRAC_STATIC_PLUGINS=OFF `
+  -DRAC_BACKEND_QHEXRT=ON "-DQHEXRT_ROOT=<...>/engines/qhexrt/prebuilt/versions/<receipt>" `
+  -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_RUNTIME_ONNXRT=OFF `
+  -DRAC_BACKEND_SHERPA=OFF -DRAC_BUILD_PLATFORM=OFF `
+  -DRAC_BUILD_ELECTRON_ADDON=ON -DRAC_ELECTRON_THIN_ADDON=ON `
+  "-DRAC_NODE_DEV_DIR=$env:LOCALAPPDATA/node-gyp/Cache/22.14.0"
+cmake --build build/electron-win-arm64 --config Release `
+  --target rac_commons rac_backend_qhexrt runanywhere_qhexrt runanywhere_native
+```
+
+Configure prints `QHexRT engine discovered` + `Engine available: 1` when the
+receipt validated; `Engine available: 0` means you are building the shell.
+
+Stage the addon, the plugin, and the QAIRT runtime:
+
+```powershell
+$env:RA_NATIVE_DIR = "<repo>/build/electron-win-arm64/sdk/runanywhere-electron/native/Release"
+$env:RA_QNN_RUNTIME_DIR = "<neurun>/build/qairt-runtime-248"   # the flat 6-file set
+npm run bundle:native
+```
+
+`RA_QNN_RUNTIME_DIR` stages into **`packages/qhexrt/prebuilds/<plat>-<arch>/`**,
+beside the plugin, because there is no `ADSP_LIBRARY_PATH` on Windows: the loader
+resolves the HTP stub's dependencies through the DLL's own directory, and
+`bridge.ts` prepends every registered plugin directory to `PATH` because QHexRT
+opens `QnnHtp.dll` by bare name (a bare-name load searches the EXECUTABLE's
+directory, never the addon's). All six files — the four DLLs, the
+`libQnnHtpV81Skel.so`, and **`libqnnhtpv81.cat`** — go in that one directory. The
+`.cat` is mandatory; without it the skel fails signature verification with no
+error that names the catalog.
+
+Two load-time compatibility axes, both silent until they fire: bundles are
+arch-pinned (a `v79` binary does not *load* on `v81`), and the deployed QAIRT must
+be **>=** the QAIRT that compiled the bundle (2.47-compiled bundle vs 2.41 runtime
+= `err=0x1388`, message only in the backend's stderr).
+
+Cross-repo preflight for all of the above:
+`pwsh neurun/QHexRT/device_suites/run_windows_e2e.ps1 --preflight-only --qhexrt-prebuilt <dir>`.
+
 ### HTTP transport (D4)
 
 Desktop Electron adapters (`posix_platform_adapter` / `win32_platform_adapter`)

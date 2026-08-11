@@ -92,8 +92,15 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
 
 ### Honesty and readiness
 
-- Document what is true today. Do not claim encryption, remote Phase-2 auth, or Windows
-  QHexRT/NPU unless packaging and runtime are wired end-to-end.
+- Document what is true today. Do not claim encryption or remote Phase-2 auth unless
+  packaging and runtime are wired end-to-end.
+- **Windows QHexRT/NPU is wired** on Windows ARM64 (Snapdragon X / X2 Elite, Hexagon
+  v81): `@runanywhere/electron-qhexrt` ships `runanywhere_qhexrt.dll` plus the flat
+  QAIRT set in its own `prebuilds/win32-arm64/`, and a v81 bundle loads and generates
+  through the thin addon. What is NOT wired on that host: llama.cpp, ONNX and Sherpa
+  do not build for win-arm64 (ggml rejects MSVC for ARM; `FetchONNXRuntime.cmake` has
+  no win-arm64 URL — see the `windows-arm64-release` preset comments), so the NPU is
+  the only engine there and there is no CPU fallback to hide behind.
 - Win32 secure store is DPAPI; do not label it "plaintext M0" in headers/docs.
 - Phase-2 `completeServicesInitialization` is a local lifecycle seam unless real auth
   lands.
@@ -111,9 +118,16 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
     links only `rac_commons`; engines load at runtime via N-API `loadPlugin` /
     `RUNANYWHERE_PLUGIN_PATHS` (`rac_registry_load_plugin`). Never expose
     `loadPlugin` / `registerBackendPlugin` on the renderer RPC allowlist.
-- Backend packages (`packages/{llamacpp,onnx,sherpa}`) use
-  `LlamaCPP|ONNX|Sherpa.register()` to record paths; main copies them into
+- Backend packages (`packages/{llamacpp,onnx,sherpa,qhexrt}`) use
+  `LlamaCPP|ONNX|Sherpa|QHexRT.register()` to record paths; main copies them into
   `RUNANYWHERE_PLUGIN_PATHS` at utility fork only (no RPC).
+- **The plugin FILE NAME is a contract.** `rac_registry_load_plugin()` derives the
+  symbol it resolves from the filename (`entry_symbol_from_path()` strips
+  `lib`/`runanywhere_`, prepends `rac_runtime_entry_`), so every engine ships a
+  thin `runanywhere_<id>` carrier even when its own CMake target is named
+  differently (`rac_backend_qhexrt` stays that on Android, where the Kotlin module
+  loads it by name). A plugin shipped under the target name resolves a symbol that
+  does not exist.
 - **HTTP downloads (D4):** keep `platform_adapter.http_download` NULL. With
   `RAC_DESKTOP_ADAPTER=ON`, `initialize()` registers the libcurl transport via
   `rac_desktop_http_transport_register()` — do not fill the adapter download slot.
