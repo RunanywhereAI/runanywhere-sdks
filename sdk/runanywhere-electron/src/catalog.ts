@@ -17,7 +17,7 @@
 
 import {
   ArchiveType,
-  InferenceFramework,
+  InferenceFramework as ProtoInferenceFramework,
   ModelCategory,
   ModelFileRole,
   ModelFormat,
@@ -25,6 +25,9 @@ import {
   ModelRegistryStatus,
   ModelSource,
 } from '@runanywhere/proto-ts/model_types';
+
+import { frameworkToProto } from './api/model-abi';
+import { InferenceFramework } from './api/types';
 
 export type ModelType =
   | 'llm'
@@ -70,6 +73,34 @@ export interface CatalogEntry {
    * ignore the conversation and answer as if every turn were the first.
    */
   chatTemplate?: 'chatml' | 'llama3' | 'gemma' | 'mistral';
+  /**
+   * Pin the engine for this row instead of inferring one from `type`.
+   *
+   * The inference in {@link FRAMEWORK_OF_TYPE} is a per-MODALITY default —
+   * an `llm` means llama.cpp — which cannot express a model whose weights only
+   * one engine can read. A QHexRT bundle is a prebuilt QNN context binary: no
+   * other backend can load it, and llama.cpp would be handed a `.bin` it has no
+   * way to parse. Naming the engine on the ROW is also what keeps
+   * `actualBackend` meaningful after load — commons reports what it routed to,
+   * so a row that pinned QHEXRT and came back LLAMA_CPP is a visible fallback
+   * rather than a silent one.
+   *
+   * The SDK's {@link InferenceFramework} — the same domain enum
+   * `models.register({ framework })` and `load({ framework })` take — never a
+   * hand-written string. {@link frameworkToProto} is the ONE place it becomes
+   * the generated IDL value commons stores, so a catalog row cannot drift from
+   * the rest of the surface or from the proto.
+   *
+   * Deliberately NOT the generated enum itself. A catalog table is authored by
+   * the APP and this one is loaded by the utility host through a plain
+   * `require()`; importing a generated MESSAGE module there pulls in
+   * `@bufbuild/protobuf/wire`, and `@runanywhere/proto-ts` is a linked
+   * dependency, so Node realpaths it out of the app's `node_modules` and the
+   * runtime cannot be resolved — MODULE_NOT_FOUND before the first window
+   * appears. Typecheck, lint, unit tests and the renderer bundle all pass while
+   * that is broken, so keep the app-facing value a plain string.
+   */
+  framework?: InferenceFramework;
 }
 
 /** A model table: catalog id -> entry. */
@@ -119,17 +150,32 @@ const CATEGORY_OF_TYPE: Record<ModelType, ModelCategory> = {
   segmentation: ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
 };
 
-const FRAMEWORK_OF_TYPE: Record<ModelType, InferenceFramework> = {
-  llm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  vlm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  embedder: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  stt: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  tts: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  diarization: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  segmentation: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+const FRAMEWORK_OF_TYPE: Record<ModelType, ProtoInferenceFramework> = {
+  llm: ProtoInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  vlm: ProtoInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  embedder: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  stt: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  tts: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  diarization: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  segmentation: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
 };
 
+function frameworkOf(entry: CatalogEntry): ProtoInferenceFramework {
+  return entry.framework !== undefined
+    ? frameworkToProto(entry.framework)
+    : FRAMEWORK_OF_TYPE[entry.type];
+}
+
 function formatOf(entry: CatalogEntry): ModelFormat {
+  // A QHexRT row is a prebuilt QNN context bundle, and the format follows from
+  // the ENGINE rather than the primary file's extension: the primary is the
+  // bundle manifest (`*.json`), which the extension ladder below would read as a
+  // plain folder. Commons rejects that pairing at registration — the row simply
+  // never appears in models.list(), so the model is invisible in a picker with
+  // no error anywhere to explain it.
+  if (entry.framework === InferenceFramework.QHEXRT) {
+    return ModelFormat.MODEL_FORMAT_QNN_CONTEXT;
+  }
   if (entry.archive) return ModelFormat.MODEL_FORMAT_FOLDER;
   if (/\.gguf$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_GGUF;
   if (/\.onnx$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_ONNX;
@@ -180,7 +226,7 @@ export function catalogModelInfo(id: string, entry: CatalogEntry): ModelInfo {
     name: entry.label ?? id,
     category: CATEGORY_OF_TYPE[entry.type],
     format: formatOf(entry),
-    framework: FRAMEWORK_OF_TYPE[entry.type],
+    framework: frameworkOf(entry),
     downloadUrl: entry.files[0]?.url ?? '',
     localPath: '',
     downloadSizeBytes: entry.sizeMB ? entry.sizeMB * 1_000_000 : 0,

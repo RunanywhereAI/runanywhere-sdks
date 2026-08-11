@@ -17,6 +17,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electro
 import { RunAnywhereMain } from '@runanywhere/electron/main';
 import { LlamaCPP } from '@runanywhere/electron-llamacpp';
 import { ONNX } from '@runanywhere/electron-onnx';
+import { QHexRT } from '@runanywhere/electron-qhexrt';
 import { Sherpa } from '@runanywhere/electron-sherpa';
 import { capConversations, EMPTY_CONVERSATIONS, type ConversationsFile } from '../shared/conversation';
 import {
@@ -64,9 +65,14 @@ if (IS_E2E) {
 // Backend registration is main-process only (security): paths flow to the
 // utility host via RUNANYWHERE_PLUGIN_PATHS at fork — never over RPC.
 // Call before any RunAnywhereMain.connect() so re-forks replay the same queue.
+// Registering a backend only records a path; a plugin whose prebuild is absent
+// for this platform is dropped from the fork env rather than failing the app, so
+// the NPU package can be declared unconditionally and simply not appear in
+// capabilities() on a machine that has no Hexagon.
 LlamaCPP.register();
 ONNX.register();
 Sherpa.register();
+QHexRT.register();
 // Resolve the addon at startup but keep the failure readable: an uncaught throw
 // here would close the app with no window and no message.
 let nativePath: string | null = null;

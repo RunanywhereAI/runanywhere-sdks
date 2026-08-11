@@ -50,9 +50,25 @@ rac_bool_t rac_framework_supported_on_platform(int32_t inference_framework) {
             return RAC_FALSE;
 #endif
 
-        // Qualcomm Hexagon NPU runtime: Android-only.
+        // Qualcomm Hexagon NPU runtime: Snapdragon Android AND Windows on ARM64.
+        //
+        // This condition is the same one the engine compiles itself against
+        // (RAC_QHEXRT_PLATFORM_SUPPORTED in engines/qhexrt/qhexrt_backend.h) and
+        // MUST stay in step with it. It is duplicated rather than included
+        // because commons must not depend on an engine header.
+        //
+        // Windows on ARM64 (Snapdragon X / X2 Elite) is a REAL Hexagon v81
+        // target, not a simulator: QAIRT ships a native aarch64-windows-msvc HTP
+        // stack and the published v81 context binaries load unmodified. While
+        // this said Android-only, a QHexRT model registered on a Snapdragon X2
+        // Elite was hidden from every list/query surface — `models.list()`
+        // silently returned every OTHER row — even though `get`-by-id, load and
+        // generate all worked on the NPU. That is the worst shape a filter can
+        // have: the model runs, but no UI driven by list() can offer it, and
+        // nothing anywhere reports a reason.
         case kFrameworkQHexRT:
-#if defined(__ANDROID__)
+#if (defined(__ANDROID__) && defined(__aarch64__)) || \
+    (defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__)))
             return RAC_TRUE;
 #else
             return RAC_FALSE;

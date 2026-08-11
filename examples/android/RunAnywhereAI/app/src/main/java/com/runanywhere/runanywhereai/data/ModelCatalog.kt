@@ -66,6 +66,12 @@ internal object ModelCatalog {
         // LFM2.5 (Liquid AI)
         SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 538_771_163L, contextLength = 512),
         SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048),
+        // contextLength MUST be 512: the bundle's manifest caps max_ctx there.
+        // supportsThinking: the model emits <think> itself and answers only after
+        // closing it, so nothing is shown for the first seconds of a request.
+        // The bundle ships decode + lmhead only (no prefill graph), so the prompt
+        // runs through decode and TTFT grows with prompt length; decode is flat.
+        SingleFileModel("lfm2_5_1_2b_thinking", "LFM2.5 1.2B Thinking (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_1_2b_thinking_HNPU/lfm2-5-1.2b-thinking.json", QHEXRT, LANGUAGE, 1_454_013_999L, contextLength = 512, supportsThinking = true),
         // contextLength MUST be 512: LFM2.5-2.6B has 32 query heads, and GQA-native attention is
         // HTP-correct only at <=16, so the bundle ships materialized MHA capped at 512.
         // supportsThinking: its chat template opens <think> unconditionally (no enable_thinking flag),

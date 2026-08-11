@@ -40,6 +40,7 @@
       "@runanywhere/electron/backend": ["../../../sdk/runanywhere-electron/dist/backend.d.ts"],
       "@runanywhere/electron-llamacpp": ["../../../sdk/runanywhere-electron/packages/llamacpp/dist/index.d.ts"],
       "@runanywhere/electron-onnx": ["../../../sdk/runanywhere-electron/packages/onnx/dist/index.d.ts"],
+      "@runanywhere/electron-qhexrt": ["../../../sdk/runanywhere-electron/packages/qhexrt/dist/index.d.ts"],
       "@runanywhere/electron-sherpa": ["../../../sdk/runanywhere-electron/packages/sherpa/dist/index.d.ts"],
       "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/dist/index.d.ts"],
       "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/dist/*.d.ts"],
