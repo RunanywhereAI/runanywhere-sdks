@@ -1,10 +1,6 @@
 # RunAnywhere AI — Android Example
 
 <p align="center">
-  <img src="../../../examples/logo.svg" alt="RunAnywhere Logo" width="120"/>
-</p>
-
-<p align="center">
   <a href="https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai">
     <img src="https://img.shields.io/badge/Google%20Play-Download-414141?style=for-the-badge&logo=google-play&logoColor=white" alt="Get it on Google Play" />
   </a>
@@ -17,7 +13,7 @@
   <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
-**A production-ready reference app for the [RunAnywhere Kotlin SDK](../../../sdk/runanywhere-kotlin/).** Chat, speech, vision, voice agents, RAG, and model management—all running on-device with privacy-first, offline-capable inference.
+**A production-ready reference app for the RunAnywhere Kotlin SDK.** Chat, speech, vision, voice agents, RAG, and model management—all running on-device with privacy-first, offline-capable inference.
 
 ---
 
@@ -28,17 +24,16 @@
 | **Android Studio** | Latest stable (Ladybug or newer recommended) |
 | **Android SDK** | API 24+ (Android 7.0); compile/target SDK 37 |
 | **JDK** | 17 |
-| **NDK & CMake** | As required by the repo root native build scripts |
-| **Disk space** | Several GB for native builds and downloaded AI models |
+| **Disk space** | Several GB for downloaded AI models |
 | **Device** | ARM64 physical device recommended; emulator supported for most features |
 
-Export `ANDROID_HOME` and `ANDROID_NDK_HOME` before building native libraries.
+No NDK, CMake, or native toolchain is required — the SDK ships prebuilt native libraries inside its published AARs.
 
 ---
 
 ## Setup
 
-> **Important:** This sample consumes four local AARs from `libs/` (core, LlamaCPP, ONNX, QHexRT). A clean clone must build native libraries and stage SDK artifacts before the app will compile.
+> This sample consumes the RunAnywhere SDK **entirely from Maven Central**. There is nothing to stage, build, or link locally: a clean clone compiles as soon as Gradle can reach the network.
 
 ### 1. Clone and open the example
 
@@ -47,25 +42,11 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks/examples/android/RunAnywhereAI
 ```
 
-### 2. Build native libraries (repo root)
+### 2. Point Gradle at your Android SDK
 
-From the example directory, build the Android native core for your target ABI:
+Export `ANDROID_HOME`, or copy `local.properties.example` to `local.properties` and set `sdk.dir`.
 
-```bash
-../../../scripts/build/build-core-android.sh arm64-v8a
-```
-
-This produces the JNI libraries the Kotlin SDK packages expect. Re-run this step after any change to the C++ layer in `runanywhere-commons`.
-
-### 3. Stage SDK AARs into `libs/`
-
-```bash
-./scripts/stage-sdk-aars.sh debug
-```
-
-This builds the four Kotlin SDK modules (core, LlamaCPP, ONNX, QHexRT) against the staged natives and copies deterministic AAR names into `libs/`. Run again after SDK or native changes.
-
-### 4. Verify and run
+### 3. Verify and run
 
 ```bash
 ./scripts/verify.sh
@@ -77,13 +58,25 @@ Or open the project in Android Studio and run the **app** configuration, or inst
 ./gradlew :app:installDebug
 ```
 
-### After modifying the SDK
+---
 
-| Change | Action |
-|--------|--------|
-| C++ / commons | Re-run `build-core-android.sh`, then `stage-sdk-aars.sh` |
-| Kotlin SDK | Re-run `stage-sdk-aars.sh` |
-| App UI only | Rebuild in Android Studio or `./gradlew :app:assembleDebug` |
+## SDK dependency
+
+All SDK artifacts come from Maven Central under the group `io.github.sanchitmonga22`, pinned by the single `runanywhere` version in `gradle/libs.versions.toml`:
+
+| Coordinate | Role |
+|---|---|
+| `runanywhere-sdk` | Core SDK + commons native libraries |
+| `runanywhere-llamacpp` | LlamaCPP backend (LLM, VLM) |
+| `runanywhere-onnx` | Sherpa-ONNX backend (STT, TTS, VAD) |
+| `runanywhere-qhexrt-android` | QHexRT backend (Qualcomm Hexagon NPU) |
+
+All four are published together; never mix versions. To move to a new SDK release, bump `runanywhere` in `gradle/libs.versions.toml`, then regenerate the dependency lock and verification metadata:
+
+```bash
+./gradlew :app:dependencies --write-locks
+./gradlew --write-verification-metadata sha256 :app:assembleDebug
+```
 
 ---
 
@@ -106,7 +99,7 @@ Or open the project in Android Studio and run the **app** configuration, or inst
 
 ## NPU / QHexRT (Snapdragon devices)
 
-On supported Qualcomm Hexagon NPU hardware, the app can register the QHexRT backend for accelerated inference. The QHexRT AAR is included in the standard four-AAR staging flow.
+On supported Qualcomm Hexagon NPU hardware, the app can register the QHexRT backend for accelerated inference. The QHexRT backend ships as `io.github.sanchitmonga22:runanywhere-qhexrt-android` and is already on the app's dependency list.
 
 To test private `runanywhere/*_HNPU` model bundles:
 
@@ -129,15 +122,14 @@ RunAnywhereAI/
 │   ├── ui/navigation/               # Compose navigation
 │   ├── ui/theme/                    # Material 3 theming (#FF6900 brand)
 │   └── data/                        # Model catalog, settings repositories
-├── libs/                            # Staged SDK AARs (not committed on clean clone)
+├── gradle/libs.versions.toml         # SDK Maven coordinates + all dependency versions
 ├── scripts/
-│   ├── stage-sdk-aars.sh            # Build and copy AARs into libs/
 │   ├── verify.sh                    # Strict debug APK build gate
 │   └── smoke.sh                     # Fast SDK API coverage check
 └── README.md
 ```
 
-The app depends on local AARs rather than Maven coordinates so SDK changes in the monorepo are immediately testable.
+The app resolves every SDK artifact from Maven Central — it contains no local AARs and no relative paths into an SDK source tree, so it builds standalone.
 
 ---
 
@@ -145,11 +137,10 @@ The app depends on local AARs rather than Maven coordinates so SDK changes in th
 
 | Symptom | Fix |
 |---------|-----|
-| Missing `libs/*.aar` | Run `./scripts/stage-sdk-aars.sh debug` |
-| Native link errors after commons changes | Re-run `../../../scripts/build/build-core-android.sh arm64-v8a`, then restage AARs |
-| Gradle dependency verification failures | Ensure all four AARs are present; run `./scripts/verify.sh` for the exact gate |
-| QHexRT / NPU models unavailable | Confirm device support and that the QHexRT AAR was staged; HNPU bundles require a saved HF token |
-| Out of memory during native build | Close other Gradle daemons; the repo recommends limited workers for SDK builds |
+| `Could not find io.github.sanchitmonga22:runanywhere-*` | Check the `runanywhere` version in `gradle/libs.versions.toml` is actually published to Maven Central, and that `mavenCentral()` is reachable |
+| Gradle dependency verification failures | Regenerate metadata: `./gradlew --write-verification-metadata sha256 :app:assembleDebug` |
+| Dependency lock mismatch after a version bump | Regenerate the lock: `./gradlew :app:dependencies --write-locks` |
+| QHexRT / NPU models unavailable | Confirm the device has a supported Hexagon NPU; HNPU bundles also require a saved HF token |
 
 For a quick static check without a full compile:
 
@@ -163,10 +154,8 @@ For a quick static check without a full compile:
 
 | Resource | Link |
 |----------|------|
-| **Kotlin SDK** | [sdk/runanywhere-kotlin/README.md](../../../sdk/runanywhere-kotlin/README.md) |
-| **iOS example** | [examples/ios/RunAnywhereAI](../../ios/RunAnywhereAI/README.md) |
-| **React Native example** | [examples/react-native/RunAnywhereAI](../../react-native/RunAnywhereAI/README.md) |
-| **Flutter example** | [examples/flutter/RunAnywhereAI](../../flutter/RunAnywhereAI/README.md) |
+| **Kotlin SDK** | [github.com/RunanywhereAI/runanywhere-sdks](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-kotlin) |
+| **Maven Central** | [io.github.sanchitmonga22](https://central.sonatype.com/namespace/io.github.sanchitmonga22) |
 | **Play Store** | [com.runanywhere.runanywhereai](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
 | **Discord** | [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd) |
 | **Issues** | [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues) |
@@ -176,4 +165,4 @@ For a quick static check without a full compile:
 
 ## License
 
-This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../../LICENSE) for details.
+This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE) for details.

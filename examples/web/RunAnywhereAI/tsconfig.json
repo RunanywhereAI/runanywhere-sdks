@@ -10,17 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@runanywhere/web": ["../../../sdk/runanywhere-web/packages/core/src/index.ts"],
-      "@runanywhere/web/backend": ["../../../sdk/runanywhere-web/packages/core/src/backend.ts"],
-      "@runanywhere/web/browser": ["../../../sdk/runanywhere-web/packages/core/src/browser.ts"],
-      "@runanywhere/web-llamacpp": ["../../../sdk/runanywhere-web/packages/llamacpp/src/index.ts"],
-      "@runanywhere/web-onnx": ["../../../sdk/runanywhere-web/packages/onnx/src/index.ts"],
-      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/src/index.ts"],
-      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/src/*.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src", "vite.config.ts"]
 }

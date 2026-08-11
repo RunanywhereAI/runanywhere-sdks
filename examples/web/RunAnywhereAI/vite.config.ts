@@ -5,43 +5,14 @@ import { fileURLToPath } from 'url';
 
 // __dirname is not available in ESM; derive it from import.meta.url
 const __dir = path.dirname(fileURLToPath(import.meta.url));
-const useInstalledSDK = process.env.RAC_USE_INSTALLED_SDK === '1';
 
-// Absolute path to the workspace root (runanywhere-sdks/)
-const workspaceRoot = path.resolve(__dir, '../../..');
-
-// Local development resolves source workspaces. Release-candidate validation
-// opts into the installed tarballs, including their exact WASM payloads.
-const coreWasmDir = useInstalledSDK
-  ? path.resolve(__dir, 'node_modules/@runanywhere/web/wasm')
-  : path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/wasm');
-const llamacppWasmDir = useInstalledSDK
-  ? path.resolve(__dir, 'node_modules/@runanywhere/web-llamacpp/wasm')
-  : path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
-const onnxWasmDir = useInstalledSDK
-  ? path.resolve(__dir, 'node_modules/@runanywhere/web-onnx/wasm')
-  : path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm');
-const webCoreSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts');
-const webCoreBackendSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/backend.ts');
-const webCoreBrowserSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/browser.ts');
-const llamacppSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/index.ts');
-const onnxSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/src/index.ts');
-
-// Local source alias for proto-ts keeps the example on package-root import
-// paths while avoiding direct `dist/*` imports in application code/config.
-const protoTsSrc = path.resolve(workspaceRoot, 'sdk/shared/proto-ts/src');
-const localSDKSourceAliases = [
-  // Ensure all packages resolve to the same source modules during development.
-  // Without this, package-root imports can resolve to dist/ and create
-  // duplicate singletons while the demo runs against local source.
-  { find: /^@runanywhere\/web-llamacpp$/, replacement: llamacppSrc },
-  { find: /^@runanywhere\/web-onnx$/, replacement: onnxSrc },
-  { find: /^@runanywhere\/web\/backend$/, replacement: webCoreBackendSrc },
-  { find: /^@runanywhere\/web\/browser$/, replacement: webCoreBrowserSrc },
-  { find: /^@runanywhere\/web$/, replacement: webCoreSrc },
-  { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsSrc + '/$1.ts' },
-  { find: '@runanywhere/proto-ts', replacement: protoTsSrc + '/index.ts' },
-];
+// The app consumes the published Web SDK packages only — every module and
+// every WASM artifact comes from `node_modules/@runanywhere/*`. There are no
+// source aliases into any SDK checkout, so `npm install` is the single
+// mechanism that decides which SDK version this app runs against.
+const coreWasmDir = path.resolve(__dir, 'node_modules/@runanywhere/web/wasm');
+const llamacppWasmDir = path.resolve(__dir, 'node_modules/@runanywhere/web-llamacpp/wasm');
+const onnxWasmDir = path.resolve(__dir, 'node_modules/@runanywhere/web-onnx/wasm');
 
 /**
  * Vite plugin to copy the canonical Emscripten runtime artifacts into the
@@ -91,11 +62,12 @@ function copyWasmPlugin(requireCompleteArtifacts: boolean): Plugin {
       );
       if (missingOrEmpty.length > 0) {
         const formattedFiles = missingOrEmpty
-          .map((file) => `  - ${path.relative(workspaceRoot, file)}`)
+          .map((file) => `  - ${path.relative(__dir, file)}`)
           .join('\n');
         this.error(
           `Required Web SDK WASM artifacts are missing or empty:\n${formattedFiles}\n` +
-            'Run `npm run build:wasm:all` from sdk/runanywhere-web before building the example.',
+            'These ship inside the published @runanywhere/web, @runanywhere/web-llamacpp, ' +
+            'and @runanywhere/web-onnx packages — run `npm install` to restore them.',
         );
       }
     },
@@ -132,9 +104,6 @@ export default defineConfig(({ command }) => {
       // optional capability with a CPU fallback on browsers that lack it.
       target: 'chrome86',
     },
-    resolve: {
-      alias: useInstalledSDK ? [] : localSDKSourceAliases,
-    },
     server: {
       // Canonical URL is always http://localhost:3000 — do not advertise
       // 127.0.0.1 (different browser origin / storage).
@@ -143,11 +112,6 @@ export default defineConfig(({ command }) => {
       strictPort: true,
       headers: isolationHeaders,
       cors: false,
-      fs: {
-        // Allow Vite to serve files from the entire workspace
-        allow: [workspaceRoot],
-        strict: true,
-      },
     },
     preview: {
       host: 'localhost',

@@ -8,6 +8,15 @@ The example may break when the SDK facade changes; update it to the latest API r
 
 ## Architecture and Dependency Rules
 
+**The SDK is consumed remotely, from npm — always.** The four
+`@runanywhere/*` packages are ordinary `dependencies` in `package.json`, and
+`npm install` is the only mechanism that decides which SDK version this app
+runs against. There are no source aliases, `paths` mappings, `--prefix`
+scripts, or `fs.allow` whitelists pointing at any SDK checkout, and none may be
+reintroduced: to test an unreleased SDK build, `npm install` a packed tarball
+or `npm link`, never an alias. Both the TypeScript modules and every WASM
+runtime artifact come out of `node_modules/@runanywhere/*`.
+
 The demo consumes exactly three publishable Web packages:
 
 - `@runanywhere/web` for backend-neutral SDK lifecycle and public inference
@@ -74,6 +83,7 @@ the Web SDK's documented browser floor. This build target does not polyfill
 missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
 
 ```bash
+npm install   # pulls the @runanywhere/* SDK packages (JS + WASM) from npm
 npm run lint
 npm run typecheck
 npm run build
@@ -82,9 +92,10 @@ npm run dev   # http://localhost:3000 (COOP/COEP enabled)
 
 Production Vercel releases use `npm run release:deploy`. No Vercel secrets,
 serverless functions, relay, or WAF configuration are required by this static
-example. The command builds all four Web SDK WASM variants, verifies `dist`,
-builds an isolated static Vercel prebuilt output, rejects unexpected functions,
-and deploys that exact output. After deployment, verify COOP/COEP headers,
+example, and no Emscripten toolchain is needed — the WASM ships inside the
+installed SDK packages. The command builds the app, verifies `dist`, builds an
+isolated static Vercel prebuilt output, rejects unexpected functions, and
+deploys that exact output. After deployment, verify COOP/COEP headers,
 `crossOriginIsolated`, SPA routing, and all four canonical JS/WASM pairs.
 
 Keep `scripts/` limited to its two distinct workflows: `release.sh` owns static
@@ -113,7 +124,7 @@ than adding another single-use wrapper.
 
 ## Browser Requirements
 
-The Vite dev server sets COOP/COEP headers for SharedArrayBuffer. Runtime WASM assets are copied from the SDK workspace when present — there are **four independently built execution artifacts** across three packages (CPU and WebGPU are separate llama.cpp builds):
+The Vite dev server sets COOP/COEP headers for SharedArrayBuffer. Runtime WASM assets are copied out of the installed packages (`node_modules/@runanywhere/{web,web-llamacpp,web-onnx}/wasm`) — there are **four independently built execution artifacts** across three packages (CPU and WebGPU are separate llama.cpp builds):
 
 | WASM artifact | Owning package | Loaded by | Used by views |
 | --- | --- | --- | --- |
@@ -152,11 +163,13 @@ and `application/wasm` MIME types.
 
 ## Validation Standard
 
-A passing build or app launch is only smoke validation. End-to-end modality validation requires browser launch, model download, model load, real inference, and reviewed logs/screenshots. Keep automated release coverage in `../../../sdk/runanywhere-web/tests/browser/`.
+A passing build or app launch is only smoke validation. End-to-end modality validation requires browser launch, model download, model load, real inference, and reviewed logs/screenshots. Automated release coverage lives with the Web SDK (its own `tests/browser/` Playwright suite), not in this app.
 
-Before handoff, run `npm run lint`, `npm run typecheck`, and a production
-`npm run build`, plus the SDK's typecheck, lint, unit, build, smoke browser
-suite, and opt-in `npm run test:browser:release` real-model journey. Then use
+Before handoff, run `npm install`, `npm run lint`, `npm run typecheck`, and a
+production `npm run build`. When a Web SDK checkout is available, also run its
+typecheck, lint, unit, build, smoke browser suite, and opt-in
+`npm run test:browser:release` real-model journey against a packed candidate
+installed here. Then use
 Playwright, Puppeteer, or the in-app browser against the actual built app. A full-demo
 release must exercise navigation and honest empty/error states plus real LLM,
 VLM, STT batch + streaming, TTS playback, VAD, Voice Agent, RAG/Documents,

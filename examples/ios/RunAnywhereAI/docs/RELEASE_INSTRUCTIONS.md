@@ -227,10 +227,15 @@ nm -gjU "$BIN" 2>/dev/null \
   | sed 's/^_//' \
   | sort -u > /tmp/runanywhere_archive_exported_symbols.txt
 
+# `swift package resolve` places the SDK sources here. Xcode archives resolve
+# into DerivedData instead — override with
+# SDK_CHECKOUT=<path-to-runanywhere-sdks-checkout> when auditing those.
+SDK_CHECKOUT="${SDK_CHECKOUT:-.build/checkouts/runanywhere-sdks}"
+
 if [[ "$BIN" == */Contents/MacOS/* ]]; then
   SRC_DIRS=(
-    ../../../sdk/runanywhere-swift/Sources/RunAnywhere
-    ../../../sdk/runanywhere-swift/Sources/MLXRuntime
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/RunAnywhere"
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/MLXRuntime"
   )
   REQUIRED_SYMBOLS=(
     rac_proto_buffer_free
@@ -244,10 +249,10 @@ if [[ "$BIN" == */Contents/MacOS/* ]]; then
   )
 else
   SRC_DIRS=(
-    ../../../sdk/runanywhere-swift/Sources/RunAnywhere
-    ../../../sdk/runanywhere-swift/Sources/LlamaCPPRuntime
-    ../../../sdk/runanywhere-swift/Sources/ONNXRuntime
-    ../../../sdk/runanywhere-swift/Sources/MLXRuntime
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/RunAnywhere"
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/LlamaCPPRuntime"
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/ONNXRuntime"
+    "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/MLXRuntime"
   )
   REQUIRED_SYMBOLS=(
     rac_proto_buffer_free
@@ -352,8 +357,8 @@ Command-line export is optional and still does not upload:
 ```bash
 xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
-  -exportPath "../../../build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
-  -exportOptionsPlist "../../../build/archives/ExportOptions-app-store-connect.plist" \
+  -exportPath "build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
+  -exportOptionsPlist "build/archives/ExportOptions-app-store-connect.plist" \
   -allowProvisioningUpdates
 ```
 

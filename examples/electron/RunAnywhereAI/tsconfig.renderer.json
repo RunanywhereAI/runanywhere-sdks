@@ -11,17 +11,18 @@
     "types": [],
     // The renderer only ever imports SDK *types* (for the contextBridge surface
     // in env.d.ts); it never loads SDK code, which is Node-flavoured. Resolving
-    // through node_modules to the built .d.ts is what makes that safe, and
+    // through node_modules to the published .d.ts is what makes that safe, and
     // `skipLibCheck` keeps those declarations from being re-checked in a
     // DOM-only project.
     //
-    // Run `npm --prefix ../../../sdk/runanywhere-electron run build` if the SDK
-    // types resolve to nothing.
+    // `moduleResolution: bundler` reads package `exports`, so every dependency —
+    // including `@runanywhere/proto-ts/defaults/pool`, which the exports map maps
+    // to `dist/defaults/pool` — resolves with no alias at all. This block
+    // deliberately overrides tsconfig.base's node10 shim, which the renderer does
+    // not need and must not use.
+    //
+    // Run `npm install` if the SDK types resolve to nothing.
     "paths": {
-      // Match tsconfig.base — typecheck against built .d.ts, never proto-ts src
-      // (src needs @bufbuild/protobuf which the example does not install).
-      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/dist/index.d.ts"],
-      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/dist/*.d.ts"],
       "@shared/*": ["src/shared/*"]
     }
   },

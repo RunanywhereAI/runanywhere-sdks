@@ -8,6 +8,11 @@
 agp = "9.2.1"
 kotlin = "2.4.0"
 
+# RunAnywhere SDK — consumed entirely from Maven Central
+# (group io.github.sanchitmonga22). One version drives the core SDK and every
+# backend module; they are published together and must never be mixed.
+runanywhere = "0.20.15"
+
 # AndroidX core
 coreKtx = "1.19.0"
 activityCompose = "1.13.0"
@@ -20,20 +25,15 @@ composeBom = "2026.06.00"
 navigationCompose = "2.9.8"
 kotlinxSerializationJson = "1.11.0"
 
-# Coroutines — must match the version the RunAnywhere SDK AAR is compiled against
-# (sdk/runanywhere-kotlin coroutines = 1.11.0); a lower transitive version is
-# missing SendChannel.close$default / Job.cancel$default at runtime.
+# Coroutines — the SDK POM brings kotlinx-coroutines-core 1.11.0, but the Android
+# artifact (Dispatchers.Main) only arrives transitively via androidx at an older
+# version. Pin -android to the same 1.11.0 so core and android never skew.
 coroutines = "1.11.0"
 
 # Testing
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-
-# Proto3
-# The app supplies dependencies for the local SDK AARs, which have no POM.
-# Keep this aligned with sdk/runanywhere-kotlin and the 5.5.1-generated bindings.
-wire = "5.5.1"
 
 # Networking
 okhttp = "5.4.0"
@@ -46,6 +46,12 @@ camerax = "1.4.2"
 
 
 [libraries]
+# RunAnywhere SDK — core + backend engines, all resolved from Maven Central.
+runanywhere-sdk = { group = "io.github.sanchitmonga22", name = "runanywhere-sdk", version.ref = "runanywhere" }
+runanywhere-llamacpp = { group = "io.github.sanchitmonga22", name = "runanywhere-llamacpp", version.ref = "runanywhere" }
+runanywhere-onnx = { group = "io.github.sanchitmonga22", name = "runanywhere-onnx", version.ref = "runanywhere" }
+runanywhere-qhexrt = { group = "io.github.sanchitmonga22", name = "runanywhere-qhexrt-android", version.ref = "runanywhere" }
+
 # AndroidX core / lifecycle / activity
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -68,9 +74,6 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-
-# Proto3
-proto-wire-runtime = { group = "com.squareup.wire", name = "wire-runtime", version.ref = "wire" }
 
 # Networking
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }

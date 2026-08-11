@@ -10,8 +10,8 @@ This file documents the iOS example application for the RunAnywhere on-device AI
 ```bash
 cd examples/ios/RunAnywhereAI/
 
-# Simulator (handles SDK + XCFramework dependencies automatically)
-./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
+# Simulator (resolves the published SDK release automatically)
+./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro"
 
 # Physical device
 ./scripts/build_and_run_ios_sample.sh device
@@ -25,7 +25,7 @@ cd examples/ios/RunAnywhereAI/
 # Open via Xcode (SPM resolves dependencies automatically)
 open RunAnywhereAI.xcodeproj
 
-# Verify XCFrameworks exist locally
+# Resolve the remote SDK release and build the app
 ./scripts/verify.sh
 
 # Quick smoke test (greps for SDK API calls, no compilation)
@@ -110,11 +110,15 @@ nm -gjU "$BIN" 2>/dev/null \
   | sed 's/^_//' \
   | sort -u > /tmp/runanywhere_archive_exported_symbols.txt
 
+# `swift package resolve` places the SDK sources here. Xcode archives resolve
+# into DerivedData instead — override with
+# SDK_CHECKOUT=<path-to-runanywhere-sdks-checkout> when auditing those.
+SDK_CHECKOUT="${SDK_CHECKOUT:-.build/checkouts/runanywhere-sdks}"
 SRC_DIRS=(
-  ../../../sdk/runanywhere-swift/Sources/RunAnywhere
-  ../../../sdk/runanywhere-swift/Sources/LlamaCPPRuntime
-  ../../../sdk/runanywhere-swift/Sources/ONNXRuntime
-  ../../../sdk/runanywhere-swift/Sources/MLXRuntime
+  "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/RunAnywhere"
+  "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/LlamaCPPRuntime"
+  "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/ONNXRuntime"
+  "$SDK_CHECKOUT/sdk/runanywhere-swift/Sources/MLXRuntime"
 )
 
 rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
@@ -183,8 +187,8 @@ repository's App Store Connect export options plist when present:
 ```bash
 xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
-  -exportPath "../../../build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
-  -exportOptionsPlist "../../../build/archives/ExportOptions-app-store-connect.plist" \
+  -exportPath "build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
+  -exportOptionsPlist "build/archives/ExportOptions-app-store-connect.plist" \
   -allowProvisioningUpdates
 ```
 
@@ -567,7 +571,7 @@ existing canonical proto APIs, it can live in `RunAnywhere+ExampleShims.swift`.
 ## Design System
 
 All styling is centralized — no inline magic numbers or color literals in views:
-- **Colors**: `AppColors` — brand primary `#FF6900` (the RunAnywhere logo orange), semantic tokens for text/backgrounds/bubbles/badges/status. Canonical palette: `../../DESIGN_GUIDELINE.md`.
+- **Colors**: `AppColors` — brand primary `#FF6900` (the RunAnywhere logo orange), semantic tokens for text/backgrounds/bubbles/badges/status. Canonical palette: [`examples/DESIGN_GUIDELINE.md`](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/examples/DESIGN_GUIDELINE.md).
 - **Spacing**: `AppSpacing` — xxSmall(2) to xxxLarge(40), icon sizes, button heights, corner radii, strokes
 - **Typography**: `AppTypography` — system text styles + custom sizes + weighted/monospaced variants
 - **Layout**: `AppLayout` — window sizes, content widths, animation durations
@@ -579,8 +583,8 @@ All styling is centralized — no inline magic numbers or color literals in view
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/build_and_run_ios_sample.sh` | End-to-end build+deploy (simulator/device/mac) with optional SDK rebuild |
-| `scripts/verify.sh` | Local gate: checks XCFrameworks exist, resolves packages, runs full xcodebuild |
+| `scripts/build_and_run_ios_sample.sh` | End-to-end resolve+build+deploy (simulator/device/mac) |
+| `scripts/verify.sh` | Local gate: resolves the remote SDK release, runs full xcodebuild |
 | `scripts/smoke.sh` | Fast preflight: greps source for SDK API call patterns (no compilation) |
 
 ---
@@ -589,7 +593,7 @@ All styling is centralized — no inline magic numbers or color literals in view
 
 | File | Purpose |
 |------|---------|
-| `Package.swift` | SPM deps: local path `../../..` → RunAnywhere + ONNX + LlamaCPP |
+| `Package.swift` | SPM deps: remote `github.com/RunanywhereAI/runanywhere-sdks` (revision-pinned to the v0.20.15 tag) → RunAnywhere + ONNX + LlamaCPP + MLX |
 | `Info.plist` | URL scheme `runanywhere`, background mode `audio`, Live Activities enabled |
 | `RunAnywhereAI.entitlements` | macOS sandbox, camera, mic, network, app group |
 | `RunAnywhereConfig-Debug.plist` | Dev API URL, debug logging, 30s timeout |

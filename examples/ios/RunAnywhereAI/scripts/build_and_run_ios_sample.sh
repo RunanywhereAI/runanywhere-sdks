@@ -5,17 +5,10 @@
 #
 # Builds and runs the RunAnywhereAI sample app.
 #
-# PROJECT STRUCTURE:
-# ─────────────────────────────────────────────────────────────────────────────
-# runanywhere-commons/                 Unified C++ library with backends
-#   scripts/build-ios.sh               Build commons C++ libraries for iOS
-#
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh    Build / package native xcframeworks
-#   (RACommons, RABackendONNX, RABackendLLAMACPP, RABackendSherpa,
-#   RABackendMLX) into
-#   sdk/runanywhere-swift/Binaries/. The Swift SDK itself is compiled by
-#   Xcode/SwiftPM directly and no longer has a per-SDK orchestrator script.
-# ─────────────────────────────────────────────────────────────────────────────
+# The RunAnywhere SDK — Swift sources and native XCFrameworks alike — is
+# consumed entirely from its published GitHub release. SwiftPM downloads the
+# checksum-verified binary artifacts on resolve, so this script needs nothing
+# outside this app directory.
 #
 # USAGE:
 #   ./build_and_run_ios_sample.sh [target] [options]
@@ -26,40 +19,21 @@
 #   mac                      Build and run on macOS
 #
 # BUILD OPTIONS:
-#   --build-commons   Build runanywhere-commons C++ libraries (iOS)
-#   --build-sdk       Build native xcframeworks (RACommons + RABackend*) into
-#                     sdk/runanywhere-swift/Binaries/ via the consolidated
-#                     sdk/runanywhere-swift/scripts/build-core-xcframework.sh
-#   --build-all       Build everything (commons C++ + native xcframeworks)
-#   --skip-app        Only build SDK components, skip Xcode app build
-#   --local           Use local builds
+#   --skip-app        Resolve dependencies only, skip Xcode app build
 #   --clean           Clean build artifacts
 #   --help            Show this help message
 #
 # EXAMPLES:
 #   ./build_and_run_ios_sample.sh device                     # Run app
-#   ./build_and_run_ios_sample.sh device --build-all --local # Full local build
-#   ./build_and_run_ios_sample.sh simulator --build-commons  # Rebuild commons
-#   ./build_and_run_ios_sample.sh --build-all --skip-app     # Build SDK only
+#   ./build_and_run_ios_sample.sh simulator "iPhone 16 Pro"  # Run on simulator
+#   ./build_and_run_ios_sample.sh mac --clean                # Clean Mac build
 #
 # =============================================================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../../../../" && pwd)"
-
-# Project directories
-COMMONS_DIR="$WORKSPACE_ROOT/sdk/runanywhere-commons"
-SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdk/runanywhere-swift"
-APP_DIR="$SCRIPT_DIR/.."
-
-# Build scripts
-# Per-SDK Swift orchestrator was removed; the canonical native build
-# entrypoint is the repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh which builds
-# / packages all xcframeworks into sdk/runanywhere-swift/Binaries/.
-COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
-SWIFT_BUILD_SCRIPT="$WORKSPACE_ROOT/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
+APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Colors
 RED='\033[0;31m'
@@ -82,14 +56,13 @@ log_header() {
 }
 
 show_help() {
-    head -40 "$0" | tail -35
+    sed -n '/^# USAGE:/,/^# ===/p' "$0"
     exit 0
 }
 
 # Timing
 TOTAL_START_TIME=0
-TIME_COMMONS=0
-TIME_SWIFT=0
+TIME_RESOLVE=0
 TIME_APP=0
 TIME_DEPLOY=0
 
@@ -108,35 +81,18 @@ format_duration() {
 
 TARGET="device"
 DEVICE_NAME=""
-BUILD_COMMONS=false
-BUILD_SDK=false
 SKIP_APP=false
 CLEAN_BUILD=false
-LOCAL_MODE=false
 
-[[ "$1" == "--help" || "$1" == "-h" ]] && show_help
+[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && show_help
 
 for arg in "$@"; do
     case "$arg" in
         simulator|device|mac)
             TARGET="$arg"
             ;;
-        --build-all)
-            BUILD_COMMONS=true
-            BUILD_SDK=true
-            ;;
-        --build-commons)
-            BUILD_COMMONS=true
-            BUILD_SDK=true
-            ;;
-        --build-sdk)
-            BUILD_SDK=true
-            ;;
         --skip-app)
             SKIP_APP=true
-            ;;
-        --local)
-            LOCAL_MODE=true
             ;;
         --clean)
             CLEAN_BUILD=true
@@ -150,45 +106,22 @@ for arg in "$@"; do
 done
 
 # =============================================================================
-# Build Functions
+# Dependency Resolution
 # =============================================================================
 
-build_commons() {
-    log_header "Building runanywhere-commons"
+resolve_dependencies() {
+    log_header "Resolving RunAnywhere SDK from the published GitHub release"
     local start_time=$(date +%s)
 
-    if [[ ! -x "$COMMONS_BUILD_SCRIPT" ]]; then
-        log_error "Commons build script not found: $COMMONS_BUILD_SCRIPT"
-        exit 1
-    fi
+    cd "$APP_DIR"
+    log_step "Running: xcodebuild -resolvePackageDependencies"
+    xcodebuild \
+        -project RunAnywhereAI.xcodeproj \
+        -scheme RunAnywhereAI \
+        -resolvePackageDependencies
 
-    local FLAGS=""
-    [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
-
-    log_step "Running: build-all-ios.sh $FLAGS"
-    "$COMMONS_BUILD_SCRIPT" $FLAGS
-
-    TIME_COMMONS=$(($(date +%s) - start_time))
-    log_time "Commons build time: $(format_duration $TIME_COMMONS)"
-}
-
-build_swift_sdk() {
-    log_header "Building Swift native xcframeworks"
-    local start_time=$(date +%s)
-
-    if [[ ! -x "$SWIFT_BUILD_SCRIPT" ]]; then
-        log_error "Native xcframework build script not found: $SWIFT_BUILD_SCRIPT"
-        exit 1
-    fi
-
-    local FLAGS=""
-    $CLEAN_BUILD && FLAGS="$FLAGS --clean"
-
-    log_step "Running: build-core-xcframework.sh $FLAGS"
-    "$SWIFT_BUILD_SCRIPT" $FLAGS
-
-    TIME_SWIFT=$(($(date +%s) - start_time))
-    log_time "Swift native build time: $(format_duration $TIME_SWIFT)"
+    TIME_RESOLVE=$(($(date +%s) - start_time))
+    log_time "Dependency resolve time: $(format_duration $TIME_RESOLVE)"
 }
 
 # =============================================================================
@@ -200,7 +133,6 @@ build_app() {
     local start_time=$(date +%s)
 
     cd "$APP_DIR"
-    export RUNANYWHERE_USE_LOCAL_NATIVES=1
 
     local DESTINATION
     case "$TARGET" in
@@ -299,8 +231,7 @@ print_summary() {
     echo -e "${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
     echo ""
 
-    (( TIME_COMMONS > 0 )) && printf "  %-25s %s\n" "runanywhere-commons:" "$(format_duration $TIME_COMMONS)"
-    (( TIME_SWIFT > 0 )) && printf "  %-25s %s\n" "runanywhere-swift:" "$(format_duration $TIME_SWIFT)"
+    (( TIME_RESOLVE > 0 )) && printf "  %-25s %s\n" "SDK resolve:" "$(format_duration $TIME_RESOLVE)"
     (( TIME_APP > 0 )) && printf "  %-25s %s\n" "iOS App:" "$(format_duration $TIME_APP)"
     (( TIME_DEPLOY > 0 )) && printf "  %-25s %s\n" "Deploy:" "$(format_duration $TIME_DEPLOY)"
 
@@ -318,18 +249,11 @@ main() {
 
     log_header "RunAnywhereAI Build Pipeline"
     echo "Target:       $TARGET"
-    echo "Build:        commons=$BUILD_COMMONS sdk=$BUILD_SDK"
-    echo "Local Mode:   $LOCAL_MODE"
+    echo "SDK source:   github.com/RunanywhereAI/runanywhere-sdks (release)"
     echo "Skip App:     $SKIP_APP"
     echo ""
 
-    # Build commons if requested (and in local mode or explicitly requested)
-    if $BUILD_COMMONS && $LOCAL_MODE; then
-        build_commons
-    fi
-
-    # Build Swift SDK
-    $BUILD_SDK && build_swift_sdk
+    resolve_dependencies
 
     # Build and deploy app
     if ! $SKIP_APP; then

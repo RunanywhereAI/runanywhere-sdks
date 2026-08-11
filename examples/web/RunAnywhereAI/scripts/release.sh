@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${PROJECT_ROOT}/../../.." && pwd)"
 STAGE_ROOT="${PROJECT_ROOT}/.vercel-stage"
 
 cd "${PROJECT_ROOT}"
@@ -89,38 +88,10 @@ NODE
   echo "Staged the verified static app in ${STAGE_ROOT}"
 }
 
-activate_emscripten() {
-  local web_sdk_dir="${REPO_ROOT}/sdk/runanywhere-web"
-  local emsdk_env="${web_sdk_dir}/emsdk/emsdk_env.sh"
-  local setup_script="${web_sdk_dir}/wasm/scripts/setup-emsdk.sh"
-  local expected_emscripten
-  local actual_emscripten
-
-  expected_emscripten="$(sed -n 's/^EMSCRIPTEN_VERSION=//p' "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS")"
-  [[ -n "${expected_emscripten}" ]] || die "EMSCRIPTEN_VERSION is missing from sdk/runanywhere-commons/VERSIONS"
-
-  if [[ ! -f "${emsdk_env}" ]]; then
-    "${setup_script}" "${web_sdk_dir}/emsdk"
-  fi
-
-  export EMSDK_QUIET=1
-  # shellcheck disable=SC1090
-  source "${emsdk_env}" >/dev/null
-  actual_emscripten="$(emcc --version | sed -nE '1s/.*[^0-9]([0-9]+\.[0-9]+\.[0-9]+)(-git)?.*/\1/p')"
-
-  if [[ "${actual_emscripten}" != "${expected_emscripten}" ]]; then
-    "${setup_script}" "${web_sdk_dir}/emsdk"
-    # shellcheck disable=SC1090
-    source "${emsdk_env}" >/dev/null
-    actual_emscripten="$(emcc --version | sed -nE '1s/.*[^0-9]([0-9]+\.[0-9]+\.[0-9]+)(-git)?.*/\1/p')"
-  fi
-
-  [[ "${actual_emscripten}" == "${expected_emscripten}" ]] \
-    || die "Emscripten ${expected_emscripten} is required (found ${actual_emscripten:-unknown})"
-}
-
 deploy_prebuilt() {
-  activate_emscripten
+  # No Emscripten toolchain is needed: the canonical JS/WASM runtime pairs ship
+  # inside the installed @runanywhere/web* packages and are copied into dist by
+  # the Vite `copy-wasm` plugin.
   require_command vercel
   [[ -f .vercel/project.json ]] || die "this checkout is not linked to Vercel; run 'vercel link' first"
 

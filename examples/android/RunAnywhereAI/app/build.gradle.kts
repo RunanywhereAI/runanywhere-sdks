@@ -164,10 +164,15 @@ android {
 }
 
 dependencies {
-    implementation(files("../libs/runanywhere-sdk.aar"))
-    implementation(files("../libs/runanywhere-llamacpp.aar"))
-    implementation(files("../libs/runanywhere-onnx.aar"))
-    implementation(files("../libs/runanywhere-qhexrt.aar"))
+    // RunAnywhere SDK — resolved from Maven Central, never from a local AAR.
+    // The published POMs carry the SDK's own transitive runtime dependencies
+    // (wire-runtime, okhttp, coroutines-core, okio, kotlin-stdlib,
+    // kotlinx-serialization-json, androidx core-ktx), so the app only declares
+    // what it uses itself.
+    implementation(libs.runanywhere.sdk)
+    implementation(libs.runanywhere.llamacpp)
+    implementation(libs.runanywhere.onnx)
+    implementation(libs.runanywhere.qhexrt)
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 
@@ -188,10 +193,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
-    // files(...) AARs carry no POM; declare coroutines 1.11.0 directly so it outranks
-    // the older transitive core from androidx (SDK is compiled against 1.11.0).
+    // The SDK POM pins kotlinx-coroutines-core 1.11.0, but the Android artifact
+    // (Dispatchers.Main) only arrives transitively via androidx at an older
+    // version. Declare it directly so -android and -core stay on 1.11.0.
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.proto.wire.runtime)
     testImplementation(libs.junit)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -246,21 +251,11 @@ val verifyPlayRelease = tasks.register("verifyPlayRelease") {
     }
 }
 
-val localSdkVersion = providers.environmentVariable("SDK_VERSION").orNull
-    ?.removePrefix("v")
-    ?.takeIf { it.isNotBlank() }
-    ?: "0.1.12-SNAPSHOT"
-val localSdkAars = fileTree("../libs") { include("*.aar") }
-
 val generateReleaseSbom = tasks.register("generateReleaseSbom") {
     group = "verification"
-    description = "Writes a CycloneDX JSON inventory for the release runtime classpath and local SDK AARs."
+    description = "Writes a CycloneDX JSON inventory for the release runtime classpath."
     val output = layout.buildDirectory.file("reports/release-sbom.cdx.json")
-    inputs.files(localSdkAars)
-        .withPropertyName("localSdkAars")
-        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.property("applicationVersion", android.defaultConfig.versionName.orEmpty())
-    inputs.property("localSdkVersion", localSdkVersion)
     outputs.file(output)
     doLast {
         data class Component(
@@ -278,11 +273,6 @@ val generateReleaseSbom = tasks.register("generateReleaseSbom") {
                 version = artifact.moduleVersion.id.version,
                 file = artifact.file,
             )
-        }.toMutableList()
-        localSdkAars.files.forEach { aar ->
-            if (components.none { it.file.canonicalFile == aar.canonicalFile }) {
-                components += Component("com.runanywhere.local", aar.nameWithoutExtension, localSdkVersion, aar)
-            }
         }
 
         fun String.json(): String = buildString {

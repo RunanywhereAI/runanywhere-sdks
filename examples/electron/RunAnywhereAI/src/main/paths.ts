@@ -1,21 +1,27 @@
 /**
  * Where things live, and which native addon to load.
  *
- * Dev: prefer `node_modules/@runanywhere/electron` (the `file:` link), else the
- * monorepo SDK path. Packaged: the same package is inside the asar; native
- * files are rewritten to `app.asar.unpacked` (see electron-builder.yml asarUnpack).
+ * The SDK is located the same way in every environment — by resolving the
+ * installed package, never by walking up to a checkout. Dev and packaged differ
+ * only in where `node_modules` sits (beside the app, or inside the asar); native
+ * files are then rewritten to `app.asar.unpacked` (see electron-builder.yml
+ * asarUnpack).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
 /** `out/main` in a built tree, so the app root is two levels up. */
 const appRoot = path.resolve(__dirname, '..', '..');
-const repoRoot = path.resolve(appRoot, '..', '..', '..');
 
+/**
+ * The installed `@runanywhere/electron`, wherever npm put it.
+ *
+ * `package.json` is an explicit entry in the SDK's `exports` map precisely so a
+ * consumer can do this; resolving it and taking the directory works from
+ * `node_modules`, from a hoisted parent, and from inside `app.asar`.
+ */
 function resolveSdkRoot(): string {
-  const fromNodeModules = path.join(appRoot, 'node_modules', '@runanywhere', 'electron');
-  if (fs.existsSync(path.join(fromNodeModules, 'package.json'))) return fromNodeModules;
-  return path.join(repoRoot, 'sdk', 'runanywhere-electron');
+  return path.dirname(require.resolve('@runanywhere/electron/package.json'));
 }
 
 /** electron-builder mirrors unpacked globs under `app.asar.unpacked/`. */

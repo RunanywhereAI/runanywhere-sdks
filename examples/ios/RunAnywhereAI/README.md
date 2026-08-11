@@ -1,7 +1,7 @@
 # RunAnywhere AI — iOS Example
 
 <p align="center">
-  <img src="../../../examples/logo.svg" alt="RunAnywhere Logo" width="120"/>
+  <img src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/examples/logo.svg" alt="RunAnywhere Logo" width="120"/>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
-**A production-ready reference app for the [RunAnywhere Swift SDK](../../../sdk/runanywhere-swift/).** LLM chat, speech, vision, voice agents, RAG, benchmarks, and model management—privacy-first and offline-capable on iPhone, iPad, and Mac.
+**A production-ready reference app for the [RunAnywhere Swift SDK](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/sdk/runanywhere-swift/).** LLM chat, speech, vision, voice agents, RAG, benchmarks, and model management—privacy-first and offline-capable on iPhone, iPad, and Mac.
 
 ---
 
@@ -28,50 +28,26 @@
 |------|---------|
 | **Xcode** | 26+ with Swift 6.2 and iOS 17.5+ simulator runtimes |
 | **Command Line Tools** | Selected in Xcode → Settings → Locations |
-| **CMake & Ninja** | For root native XCFramework generation |
-| **Disk space** | Several GB for XCFramework output and AI models |
+| **Disk space** | Several GB for the downloaded SDK artifacts and AI models |
 | **Device** | Apple Silicon recommended (physical device for MLX and best LLM performance) |
 
 ---
 
 ## Setup
 
-> **Important:** This sample links the local Swift SDK through `Package.swift`. A clean clone must build iOS XCFrameworks before Xcode can link the native backends.
+> **This sample consumes the RunAnywhere Swift SDK entirely from its published GitHub release.** There is no monorepo checkout to build and no XCFramework to stage — SwiftPM downloads the checksum-verified native archives during resolve.
 
-### 1. Clone and enter the example
+### 1. Get the example
 
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks/examples/ios/RunAnywhereAI
 ```
 
-### 2. Build native XCFrameworks (repo root)
+### 2. Resolve packages and build
 
 ```bash
-cd ../../..
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
-cd examples/ios/RunAnywhereAI
-```
-
-Expected artifacts under `sdk/runanywhere-swift/Binaries/`:
-
-| Artifact | Needed for |
-|----------|-----------|
-| `RACommons.xcframework` | Core (required) |
-| `RABackendLLAMACPP.xcframework` | LLM and VLM |
-| `RABackendONNX.xcframework` · `RABackendSherpa.xcframework` | STT, TTS, VAD |
-| `onnxruntime.xcframework` · `onnx.xcframework` | ONNX Runtime for the two above |
-| `RABackendMLX.xcframework` · `RunAnywhereMLXRuntime.xcframework` · `RunAnywhereMLXMetal.xcframework` | Apple MLX (this app links `RunAnywhereMLX`) |
-| `RABackendNeuRT.xcframework` | NeuRT — ANE text generation + Core ML image generation |
-
-All ten are produced by one run of the script. A short list is the usual cause of link errors on the MLX path, since this app's `Package.swift` depends on the `RunAnywhereMLX` product.
-
-Re-run this step after any C++ change in `runanywhere-commons`.
-
-### 3. Resolve packages and build
-
-```bash
-RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve
+swift package resolve
 
 xcodebuild \
   -project RunAnywhereAI.xcodeproj \
@@ -87,14 +63,14 @@ xcodebuild \
   build
 ```
 
-### 4. Run the app
+### 3. Run the app
 
 **Option A — Xcode:** Open `RunAnywhereAI.xcodeproj`, select a simulator or device, press **Run** (⌘R).
 
 **Option B — Script:**
 
 ```bash
-./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
+./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro"
 # Physical device:
 ./scripts/build_and_run_ios_sample.sh device
 # macOS:
@@ -107,12 +83,15 @@ xcodebuild \
 ./scripts/verify.sh
 ```
 
-### After modifying the SDK
+### Moving to a newer SDK release
+
+The SDK dependency is pinned in `Package.swift` (and mirrored in the Xcode
+project) to the exact commit behind a published tag. To take a newer release,
+update the revision in both places and resolve again.
 
 | Change | Action |
 |--------|--------|
-| Swift SDK source | Xcode picks up changes on rebuild |
-| C++ / commons | Re-run `build-core-xcframework.sh` |
+| New SDK release | Update the pinned revision in `Package.swift` + `RunAnywhereAI.xcodeproj`, then resolve |
 | Stale package errors | **File → Packages → Reset Package Caches**, then resolve again |
 
 ---
@@ -163,7 +142,7 @@ Architecture: **MVVM** with Swift Observation (`@Observable` view models), a sin
 
 | Symptom | Fix |
 |---------|-----|
-| Missing XCFramework errors | Run `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` from repo root |
+| Missing XCFramework errors | The native archives ship with the SDK release — reset package caches and rerun `swift package resolve` so SwiftPM re-downloads them |
 | Package resolution failures | Reset package caches in Xcode; rerun `swift package resolve` |
 | Sandbox / derived-data issues | Clean build folder (⇧⌘K); delete DerivedData if needed |
 | MLX models unavailable | Use a physical device; MLX returns unavailable on simulator |
@@ -183,10 +162,10 @@ Filter runtime logs in Console.app: `subsystem:com.runanywhere.RunAnywhereAI`.
 
 | Resource | Link |
 |----------|------|
-| **Swift SDK** | [sdk/runanywhere-swift/README.md](../../../sdk/runanywhere-swift/README.md) |
-| **Android example** | [examples/android/RunAnywhereAI](../../android/RunAnywhereAI/README.md) |
-| **React Native example** | [examples/react-native/RunAnywhereAI](../../react-native/RunAnywhereAI/README.md) |
-| **Flutter example** | [examples/flutter/RunAnywhereAI](../../flutter/RunAnywhereAI/README.md) |
+| **Swift SDK** | [sdk/runanywhere-swift/README.md](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/sdk/runanywhere-swift/README.md) |
+| **Android example** | [examples/android/RunAnywhereAI](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/examples/android/RunAnywhereAI/README.md) |
+| **React Native example** | [examples/react-native/RunAnywhereAI](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/examples/react-native/RunAnywhereAI/README.md) |
+| **Flutter example** | [examples/flutter/RunAnywhereAI](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/examples/flutter/RunAnywhereAI/README.md) |
 | **App Store** | [RunAnywhere on the App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
 | **Discord** | [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd) |
 | **Issues** | [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues) |
@@ -196,4 +175,4 @@ Filter runtime logs in Console.app: `subsystem:com.runanywhere.RunAnywhereAI`.
 
 ## License
 
-This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../../LICENSE) for details.
+This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE) for details.

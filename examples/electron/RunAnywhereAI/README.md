@@ -20,12 +20,18 @@ or from a terminal:
 
 ```bat
 cd examples/electron/RunAnywhereAI
+npm install        :: pulls the SDK from npm
 npm start          :: CPU
 npm run start:gpu  :: CUDA
 ```
 
-Prerequisites: the SDK must be built (`cd sdk/runanywhere-electron && npm install && npm run build`)
-and a native prebuild present under `sdk/runanywhere-electron/prebuilds/`.
+The only prerequisite is `npm install`. This app consumes the SDK **entirely from
+the npm registry** — `@runanywhere/electron` plus the `-llamacpp` / `-onnx` /
+`-sherpa` backend packages and `@runanywhere/proto-ts`. There are no `file:` links
+and no path aliases into the monorepo, so the app builds standalone anywhere the
+folder is copied. The native prebuilds ship inside the `@runanywhere/electron`
+package (`node_modules/@runanywhere/electron/prebuilds/`); nothing has to be built
+from source.
 
 > If the window never appears, check that `ELECTRON_RUN_AS_NODE` isn't set — it makes
 > `electron.exe` run as plain Node. The `.cmd` launcher clears it.
@@ -75,9 +81,9 @@ npm run package:mac    # dmg + zip (arm64)
 npm run package:win    # nsis (x64 + arm64)
 ```
 
-Native artifacts under `@runanywhere/electron/prebuilds/` (and any future
-`.node` / `.dylib` / `.dll` / `.so` / `plugins/`) are `asarUnpack`ed — they
-cannot load from inside `app.asar`. Stage a prebuild first
-(`cd sdk/runanywhere-electron && npm run bundle:native`).
+Native artifacts under `node_modules/@runanywhere/electron/prebuilds/` (and any
+future `.node` / `.dylib` / `.dll` / `.so` / `plugins/`) are `asarUnpack`ed — they
+cannot load from inside `app.asar`. They arrive with the published package, so
+`npm install` is all the staging there is.
 
 Publishing / code signing is not wired yet; local packages are unsigned.
