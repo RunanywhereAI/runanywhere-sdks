@@ -46,6 +46,12 @@ python3 "${REPO_ROOT}/scripts/release/rewrite_npm_package.py" \
     --archive "${PROTO_ARCHIVE}" \
     --exact-version "${PACKAGE_VERSION}"
 
+# Build the entry package BEFORE the backends. Each backend imports types from
+# `@runanywhere/electron/backend`, which resolves through the workspace link to
+# the entry package's dist/ -- so building a backend first fails with TS2307.
+echo ">> build @runanywhere/electron"
+npm run build --silent
+
 echo ">> npm pack @runanywhere/electron"
 npm pack --silent --pack-destination "${DIST_DIR}" >/dev/null
 ENTRY_ARCHIVE="${DIST_DIR}/runanywhere-electron-${PACKAGE_VERSION}.tgz"
@@ -61,6 +67,27 @@ python3 "${REPO_ROOT}/scripts/release/rewrite_npm_package.py" \
 for pkg in llamacpp onnx qhexrt sherpa; do
     pkg_dir="${ELECTRON_ROOT}/packages/${pkg}"
     [ -d "${pkg_dir}" ] || { echo "ERROR: missing package dir ${pkg_dir}" >&2; exit 1; }
+    # Build, don't assume. These packages have no `prepack` hook, so `npm pack`
+    # ships whatever dist/ happens to be on disk -- which for a package that has
+    # never been built locally is nothing at all. @runanywhere/electron-qhexrt
+    # 0.20.16 was published that way: a manifest whose main/types point into
+    # dist/, and no dist/ in the tarball. The post-pack audit below now makes
+    # that unpublishable rather than merely unlikely.
+    # Each backend imports types from `@runanywhere/electron/backend`, resolved
+    # through a hand-made symlink in its own node_modules -- this package set
+    # declares no npm `workspaces`, so nothing recreates it. node_modules is
+    # gitignored, so a fresh clone (or a package added later, as qhexrt was in
+    # #664) simply has no link and fails with TS2307. Guarantee it here instead
+    # of depending on whatever the local tree happens to have.
+    link_dir="${pkg_dir}/node_modules/@runanywhere"
+    if [ ! -e "${link_dir}/electron" ]; then
+        echo ">> linking @runanywhere/electron into packages/${pkg}"
+        mkdir -p "${link_dir}"
+        ln -sfn ../../../.. "${link_dir}/electron"
+    fi
+
+    echo ">> build packages/${pkg}"
+    (cd "${pkg_dir}" && npm run build --silent)
     echo ">> npm pack packages/${pkg}"
     (cd "${pkg_dir}" && npm pack --silent --pack-destination "${DIST_DIR}" >/dev/null)
     artifact="${DIST_DIR}/runanywhere-electron-${pkg}-${PACKAGE_VERSION}.tgz"
@@ -74,7 +101,7 @@ done
 # manifest is the exact defect this script exists to prevent.
 echo ">> Auditing packed manifests"
 python3 - "${DIST_DIR}" "${PACKAGE_VERSION}" <<'PY'
-import json, sys, tarfile
+import fnmatch, json, sys, tarfile
 from pathlib import Path
 
 dist, version = Path(sys.argv[1]), sys.argv[2]
@@ -101,7 +128,39 @@ for archive in archives:
     license_field = manifest.get("license", "")
     if ".." in license_field:
         failures.append(f"{archive.name}: license {license_field!r} escapes the package")
-    print(f"  ok  {archive.name}  ({manifest['name']}@{manifest['version']})")
+
+    # Every entry point the manifest advertises must actually be in the tarball.
+    # npm silently drops `files` entries that do not exist on disk, so a package
+    # whose dist/ was never built packs cleanly and then fails at import time in
+    # every consumer -- which is exactly how electron-qhexrt 0.20.16 shipped.
+    with tarfile.open(archive, "r:gz") as bundle:
+        present = {n[len("package/"):] for n in bundle.getnames() if n.startswith("package/")}
+
+    def entry_points(node):
+        if isinstance(node, str):
+            yield node
+        elif isinstance(node, dict):
+            for nested in node.values():
+                yield from entry_points(nested)
+
+    advertised = set()
+    for field in ("main", "module", "types", "typings", "bin"):
+        advertised.update(entry_points(manifest.get(field)))
+    advertised.update(entry_points(manifest.get("exports")))
+
+    for entry in sorted(advertised):
+        rel = entry.lstrip("./")
+        if not rel:
+            continue
+        if "*" in rel:
+            # A subpath pattern like "./dist/*.js" is satisfied by any match,
+            # not by a file literally named with an asterisk.
+            if not fnmatch.filter(present, rel):
+                failures.append(f"{archive.name}: pattern {entry!r} matches nothing in the tarball")
+        elif rel not in present:
+            failures.append(f"{archive.name}: advertises {entry!r} but it is not in the tarball")
+
+    print(f"  ok  {archive.name}  ({manifest['name']}@{manifest['version']}, {len(present)} files)")
 
 if failures:
     print("\nERROR: packaged manifests are not publishable:")
