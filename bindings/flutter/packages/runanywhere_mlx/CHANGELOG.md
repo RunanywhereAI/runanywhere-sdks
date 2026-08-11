@@ -1,3 +1,8 @@
+## [0.20.17] - 2026-08-11
+
+- Electron QHexRT backend and its commons platform-capability changes.
+- Swift package is now consumable by version (`from:`) rather than only by git revision.
+
 ## [0.20.15] - 2026-08-11
 
 - Suite version bump.
