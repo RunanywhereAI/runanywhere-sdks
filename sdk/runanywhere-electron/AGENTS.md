@@ -122,12 +122,22 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
   `LlamaCPP|ONNX|Sherpa|QHexRT.register()` to record paths; main copies them into
   `RUNANYWHERE_PLUGIN_PATHS` at utility fork only (no RPC).
 - **The plugin FILE NAME is a contract.** `rac_registry_load_plugin()` derives the
-  symbol it resolves from the filename (`entry_symbol_from_path()` strips
-  `lib`/`runanywhere_`, prepends `rac_runtime_entry_`), so every engine ships a
-  thin `runanywhere_<id>` carrier even when its own CMake target is named
-  differently (`rac_backend_qhexrt` stays that on Android, where the Kotlin module
-  loads it by name). A plugin shipped under the target name resolves a symbol that
-  does not exist.
+  symbol it resolves from the filename: `entry_symbol_from_path()` in
+  `sdk/runanywhere-commons/src/plugin/plugin_loader.cpp` strips `lib` /
+  `runanywhere_` and the extension, then prepends **`rac_plugin_entry_`**. (Do not
+  confuse it with `rac_runtime_entry_`, which the separate *runtime* registry in
+  `rac_runtime_registry.cpp` derives the same way for `rac_runtime_*` plugins.)
+  A plugin shipped under its CMake target name therefore resolves a symbol that
+  does not exist. Two shapes satisfy the contract:
+  - llamacpp / onnx / sherpa ship a thin `runanywhere_<id>` **carrier** that links
+    `rac_backend_<id>`.
+  - QHexRT has **no carrier**: the engine is the plugin, and
+    `engines/qhexrt/CMakeLists.txt` renames only its `OUTPUT_NAME` to
+    `runanywhere_qhexrt` on shared non-Android builds. The target stays
+    `rac_backend_qhexrt`, which is what Android's Kotlin module and JNI bridge
+    load by name. A carrier cannot work there: the entry's vtable references the
+    op tables as DATA, and MSVC resolves imported data only through
+    `__declspec(dllimport)` on declarations shared with the ELF/Mach-O builds.
 - **HTTP downloads (D4):** keep `platform_adapter.http_download` NULL. With
   `RAC_DESKTOP_ADAPTER=ON`, `initialize()` registers the libcurl transport via
   `rac_desktop_http_transport_register()` — do not fill the adapter download slot.

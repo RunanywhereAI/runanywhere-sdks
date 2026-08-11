@@ -151,15 +151,23 @@ the payload is published as a plain `versions/<64-hex-receipt>/` directory and
 named explicitly:
 
 ```powershell
+# node.lib must match the Node that will load the addon, so derive the version
+# rather than pinning one.
+npx --yes node-gyp install
+$ver = node -p "process.versions.node"
+
 cmake -S . -B build/electron-win-arm64 -G "Visual Studio 18 2026" -A ARM64 `
   -DRAC_BUILD_SHARED=ON -DRAC_STATIC_PLUGINS=OFF `
   -DRAC_BACKEND_QHEXRT=ON "-DQHEXRT_ROOT=<...>/engines/qhexrt/prebuilt/versions/<receipt>" `
   -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_RUNTIME_ONNXRT=OFF `
   -DRAC_BACKEND_SHERPA=OFF -DRAC_BUILD_PLATFORM=OFF `
   -DRAC_BUILD_ELECTRON_ADDON=ON -DRAC_ELECTRON_THIN_ADDON=ON `
-  "-DRAC_NODE_DEV_DIR=$env:LOCALAPPDATA/node-gyp/Cache/22.14.0"
+  "-DRAC_NODE_DEV_DIR=$env:LOCALAPPDATA/node-gyp/Cache/$ver"
+
+# rac_backend_qhexrt is the TARGET; runanywhere_qhexrt.dll is what it emits
+# (OUTPUT_NAME). There is no runanywhere_qhexrt target to build.
 cmake --build build/electron-win-arm64 --config Release `
-  --target rac_commons rac_backend_qhexrt runanywhere_qhexrt runanywhere_native
+  --target rac_commons rac_backend_qhexrt runanywhere_native
 ```
 
 Configure prints `QHexRT engine discovered` + `Engine available: 1` when the
