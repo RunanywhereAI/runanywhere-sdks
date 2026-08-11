@@ -652,6 +652,29 @@ if(RAC_STATIC_PLUGINS)
     )
 elseif(RAC_BUILD_SHARED AND NOT RAC_PLATFORM_ANDROID)
     set_target_properties(rac_backend_qhexrt PROPERTIES OUTPUT_NAME runanywhere_qhexrt)
+
+    # Keep the export table to what is actually declared public.
+    #
+    # rac_add_engine_plugin turns WINDOWS_EXPORT_ALL_SYMBOLS ON for every
+    # SHARED_ONLY engine on Windows, because the OTHER engines ship a separate
+    # runanywhere_<id> carrier that has to resolve their op-vtable globals across
+    # a DLL boundary. QHexRT ships no carrier — this library IS the plugin — and
+    # on Windows nothing links against it at all: the loader opens it with
+    # LoadLibrary and asks for one symbol. Every consumer that LINKS
+    # rac_backend_qhexrt (the JNI bridge, the React Native package) is Android,
+    # where the property does not apply.
+    #
+    # So export-all buys nothing here and costs plenty. Measured on this target,
+    # win-arm64 Release: ON exports 981 symbols, most of them mangled MSVC STL
+    # internals (_Compressed_pair, basic_string, filesystem::path) dragged in from
+    # a DLL that statically links the closed-source QHexRT runtime; OFF exports
+    # 10 — rac_plugin_entry_qhexrt plus the nine RAC_QHEXRT_API entry points
+    # rac_qhexrt.h deliberately publishes. ON also emits LNK4286 (rac_qhexrt_probe
+    # defined in one object, *imported* by another), so it degrades the DLL's own
+    # internal linkage on the way past.
+    if(WIN32)
+        set_target_properties(rac_backend_qhexrt PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS OFF)
+    endif()
 endif()
 
 if(RAC_PLATFORM_ANDROID)
