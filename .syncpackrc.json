@@ -2,12 +2,12 @@
   "$schema": "https://unpkg.com/syncpack@13/dist/schema.json",
   "source": [
     "package.json",
-    "sdk/shared/proto-ts/package.json",
-    "sdk/runanywhere-web/package.json",
-    "sdk/runanywhere-web/packages/*/package.json",
-    "sdk/runanywhere-react-native/package.json",
-    "sdk/runanywhere-react-native/packages/*/package.json",
-    "sdk/runanywhere-web/example/package.json",
+    "bindings/shared/proto-ts/package.json",
+    "bindings/web/package.json",
+    "bindings/web/packages/*/package.json",
+    "bindings/react-native/package.json",
+    "bindings/react-native/packages/*/package.json",
+    "bindings/web/example/package.json",
     "examples/react-native/RunAnywhereAI/package.json"
   ],
   "dependencyTypes": ["dev", "prod", "peer"],

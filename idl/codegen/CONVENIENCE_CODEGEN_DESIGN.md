@@ -19,21 +19,21 @@ following anchors:
 | `rac_*` field numbers 50001–50012                                   | `idl/rac_options.proto:97-135`                                                            |
 | Swift generator parses descriptor set via `protoc --include_imports`| `idl/codegen/generate_swift_convenience.py:678-690`                                       |
 | Swift generator emits one file (`RAConvenience.swift`)              | `idl/codegen/generate_swift_convenience.py:697-700`                                       |
-| Wire stamps `@RacDefaultOption("...")` on annotated fields          | `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/STTOptions.kt:50, :58, :87` |
-| Wire emits a `public companion object` on every message             | `sdk/runanywhere-kotlin/.../generated/ai/runanywhere/proto/v1/STTConfiguration.kt:248`    |
+| Wire stamps `@RacDefaultOption("...")` on annotated fields          | `bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/STTOptions.kt:50, :58, :87` |
+| Wire emits a `public companion object` on every message             | `bindings/kotlin/.../generated/ai/runanywhere/proto/v1/STTConfiguration.kt:248`    |
 | Wire uses snake_case for the constructor parameter names            | `STTOptions.kt:66, :117, :140`; `STTConfiguration.kt:284-302`                             |
-| Wire ships annotation classes (`RacWireStringOption.kt`, etc.)      | `sdk/runanywhere-kotlin/.../generated/ai/runanywhere/proto/v1/RacWireStringOption.kt`     |
-| Dart `factory` constructor takes nullable camelCase named args      | `sdk/runanywhere-flutter/packages/runanywhere/lib/generated/stt_options.pb.dart:39-91`    |
+| Wire ships annotation classes (`RacWireStringOption.kt`, etc.)      | `bindings/kotlin/.../generated/ai/runanywhere/proto/v1/RacWireStringOption.kt`     |
+| Dart `factory` constructor takes nullable camelCase named args      | `bindings/flutter/packages/runanywhere/lib/generated/stt_options.pb.dart:39-91`    |
 | Dart represents `int64` via `package:fixnum/fixnum.dart` `Int64`    | `stt_options.pb.dart:15`; existing `stt_options_helpers.dart:8` consumes `Int64(...)`     |
-| ts-proto first-char-lower helper rule                               | `sdk/shared/proto-ts/src/model_types.ts:47` (`audioFormatFromJSON`); `stt_options.ts:58` (`sTTLanguageFromJSON`) |
-| ts-proto package root has no star re-exports                        | `sdk/shared/proto-ts/src/index.ts:5` (`export {};`)                                       |
-| ts-proto uses `Long` from `"long"` for `int64`                      | `sdk/shared/proto-ts/src/stt_options.ts:8`                                                |
+| ts-proto first-char-lower helper rule                               | `bindings/shared/proto-ts/src/model_types.ts:47` (`audioFormatFromJSON`); `stt_options.ts:58` (`sTTLanguageFromJSON`) |
+| ts-proto package root has no star re-exports                        | `bindings/shared/proto-ts/src/index.ts:5` (`export {};`)                                       |
+| ts-proto uses `Long` from `"long"` for `int64`                      | `bindings/shared/proto-ts/src/stt_options.ts:8`                                                |
 | ts-proto interfaces require all non-optional fields in literals     | `stt_options.ts:265-290` (`STTConfiguration`)                                             |
 | `generate_ts.sh` passes `useOptionals=messages`                     | `idl/codegen/generate_ts.sh:73`                                                           |
 | `generate_dart.sh` strips `ra_convenience.dart` (slot reserved)     | `idl/codegen/generate_dart.sh:119`                                                        |
 | `generate_kotlin.sh` strips Wire's gRPC stubs                       | `idl/codegen/generate_kotlin.sh:87-88`                                                    |
-| `SDKException.validationFailed(message)` factory (Kotlin)           | `sdk/runanywhere-kotlin/.../foundation/errors/SDKException.kt:128`                        |
-| `SDKException.validationFailed(reason)` factory (Dart)              | `sdk/runanywhere-flutter/.../foundation/errors/sdk_exception.dart:260`                    |
+| `SDKException.validationFailed(message)` factory (Kotlin)           | `bindings/kotlin/.../foundation/errors/SDKException.kt:128`                        |
+| `SDKException.validationFailed(reason)` factory (Dart)              | `bindings/flutter/.../foundation/errors/sdk_exception.dart:260`                    |
 | Hand-written Kotlin drift duplicates                                | `RAAudioFormatExtensions.kt:33-65`; `public/configuration/SDKEnvironment.kt:41-74`         |
 | Hand-written Dart drift duplicates                                  | `public/extensions/stt/stt_options_helpers.dart:13-78`; `public/configuration/sdk_environment.dart:10-22` |
 
@@ -60,14 +60,14 @@ proto descriptor set and emits `RAConvenience.swift` with:
 Kotlin / Dart / TypeScript currently hand-write each of these helpers in
 the SDK source tree — for example:
 
-- `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
+- `bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
   (generated `wireString` + `audioFormatFromWireString` replacing the prior
   hand-written `RAAudioFormatExtensions.kt`)
-- `sdk/runanywhere-kotlin/src/main/.../public/configuration/SDKEnvironment.kt`
+- `bindings/kotlin/src/main/.../public/configuration/SDKEnvironment.kt`
   (hand-written `wireString` + `sdkEnvironmentFromWireString`)
-- `sdk/runanywhere-flutter/.../public/extensions/stt/stt_options_helpers.dart`
+- `bindings/flutter/.../public/extensions/stt/stt_options_helpers.dart`
   (hand-written `STTLanguageBcp47.bcp47` + `fromBcp47`)
-- `sdk/runanywhere-flutter/.../public/configuration/sdk_environment.dart`
+- `bindings/flutter/.../public/configuration/sdk_environment.dart`
   (hand-written `SDKEnvironmentExtension.description`)
 
 These helpers drift over time relative to the proto annotations
@@ -79,7 +79,7 @@ finding (T3.3): Swift has codegen, no other SDK does.
 
 Square Wire (Kotlin generator) propagates the option-extension definitions
 into Kotlin source as runtime annotations
-(`sdk/runanywhere-kotlin/src/main/.../v1/RacWireStringOption.kt`,
+(`bindings/kotlin/src/main/.../v1/RacWireStringOption.kt`,
 `RacDefaultOption.kt`, `RacRequiredOption.kt`, `RacMinOption.kt`, …),
 and stamps every annotated field / enum constant with the corresponding
 annotation:
@@ -138,7 +138,7 @@ module imported by all four generators including the existing Swift one).
    invocation in Section 5).
 
 2. The Wire-generated Kotlin output at
-   `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/`
+   `bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/`
    for naming conformance verification only (not for parsing).
    The generator emits references to the Wire types; it does not
    import or read them at codegen time.
@@ -146,7 +146,7 @@ module imported by all four generators including the existing Swift one).
 ### 1.2 Output
 
 Single file:
-`sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
+`bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
 
 Single-file output (not one file per message) matches the Swift output
 shape, keeps the `generated/convenience/` subtree free of `*Client.kt`
@@ -198,7 +198,7 @@ Naming choices:
   `AudioFormat` with `AUDIO_FORMAT_UNSPECIFIED` as the unknown-input
   fallback. T3.3-impl's per-language follow-up MUST update the two
   known callers (search `audioFormatFromWireString` under
-  `sdk/runanywhere-kotlin/`) to handle the new nullable contract —
+  `bindings/kotlin/`) to handle the new nullable contract —
   typically `audioFormatFromWireString(s) ?: AudioFormat.AUDIO_FORMAT_UNSPECIFIED`
   to preserve the pre-IDL behavior. The same pattern applies to
   `sdkEnvironmentFromWireString` (which already returns nullable, so
@@ -259,7 +259,7 @@ Notes:
   Mirrors Swift's `public func validate() throws` (instance method).
 - Throws `com.runanywhere.sdk.foundation.errors.SDKException` using
   the existing `validationFailed(message)` factory
-  (`sdk/runanywhere-kotlin/.../foundation/errors/SDKException.kt`).
+  (`bindings/kotlin/.../foundation/errors/SDKException.kt`).
   This is the same hand-written exception the Wire-generated message
   classes ship for hand-rolled validators today.
 - Kotlin does not need `throws` declarations; the generator emits a
@@ -325,7 +325,7 @@ contain no `rac_*` metadata).
 ### 2.2 Output
 
 Single file:
-`sdk/runanywhere-flutter/packages/runanywhere/lib/generated/convenience/ra_convenience.dart`
+`bindings/flutter/packages/runanywhere/lib/generated/convenience/ra_convenience.dart`
 
 The path lives under `lib/generated/` so it sits alongside the
 `.pb.dart` outputs. The pre-existing `rm -f "${OUT_DIR}/ra_convenience.dart"`
@@ -500,10 +500,10 @@ Same descriptor-set strategy as Kotlin / Dart. ts-proto discards
 
 One file per `.proto` module — NOT a single mega-file:
 
-`sdk/shared/proto-ts/src/convenience/<base>_convenience.ts`
+`bindings/shared/proto-ts/src/convenience/<base>_convenience.ts`
 
 Rationale: ts-proto already emits one `.ts` file per `.proto` module,
-and `sdk/shared/proto-ts/src/index.ts` deliberately does NOT
+and `bindings/shared/proto-ts/src/index.ts` deliberately does NOT
 star-re-export anything (verified at `index.ts:5`: `export {};`) to
 avoid duplicate-type ambiguity across files. A single convenience
 mega-file would force every convenience helper to live in one
@@ -576,7 +576,7 @@ Naming choices:
 - `<enumName>FromWireString(s)` — returns `undefined` (not `null`)
   to match ts-proto's idiomatic optional return.
 - Drift retired: any hand-written wireString switches in
-  `sdk/runanywhere-web/` and `sdk/runanywhere-react-native/` (none
+  `bindings/web/` and `bindings/react-native/` (none
   found at audit time — see Section 7).
 
 #### `rac_default` — defaults factory
@@ -877,7 +877,7 @@ Verification: `STTLanguage` → `sTTLanguage` (matches
 ### 6.4 Shared TS `ValidationError`
 
 ```ts
-// sdk/shared/proto-ts/src/convenience/_errors.ts
+// bindings/shared/proto-ts/src/convenience/_errors.ts
 export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -902,20 +902,20 @@ duplicate hand-written helpers are deleted in a follow-up.
 
 | Hand-written file                                                                                      | Helper        | Annotation backing  |
 | ------------------------------------------------------------------------------------------------------ | ------------- | ------------------- |
-| `sdk/runanywhere-kotlin/src/main/.../RAAudioFormatExtensions.kt` (retired; superseded by generated `RAConvenience.kt`) | `wireString`, `audioFormatFromWireString` | `rac_wire_string` on `AudioFormat`     |
-| `sdk/runanywhere-kotlin/src/main/.../public/configuration/SDKEnvironment.kt:41-74`                     | `wireString`, `sdkEnvironmentFromWireString` | `rac_wire_string` on `SDKEnvironment` |
+| `bindings/kotlin/src/main/.../RAAudioFormatExtensions.kt` (retired; superseded by generated `RAConvenience.kt`) | `wireString`, `audioFormatFromWireString` | `rac_wire_string` on `AudioFormat`     |
+| `bindings/kotlin/src/main/.../public/configuration/SDKEnvironment.kt:41-74`                     | `wireString`, `sdkEnvironmentFromWireString` | `rac_wire_string` on `SDKEnvironment` |
 
 ### 7.2 Dart — confirmed duplicates
 
 | Hand-written file                                                              | Helper                                           | Annotation backing                            |
 | ------------------------------------------------------------------------------ | ------------------------------------------------ | --------------------------------------------- |
-| `sdk/runanywhere-flutter/.../public/extensions/stt/stt_options_helpers.dart:13-78` | `STTLanguageBcp47.bcp47` / `fromBcp47`           | `rac_wire_string` on `STTLanguage` (the BCP-47 codes ARE the wire strings) |
-| `sdk/runanywhere-flutter/.../public/configuration/sdk_environment.dart:11-22`  | `SDKEnvironmentExtension.description`            | `rac_display_name` on `SDKEnvironment` (TODO: add to proto) |
+| `bindings/flutter/.../public/extensions/stt/stt_options_helpers.dart:13-78` | `STTLanguageBcp47.bcp47` / `fromBcp47`           | `rac_wire_string` on `STTLanguage` (the BCP-47 codes ARE the wire strings) |
+| `bindings/flutter/.../public/configuration/sdk_environment.dart:11-22`  | `SDKEnvironmentExtension.description`            | `rac_display_name` on `SDKEnvironment` (TODO: add to proto) |
 
 ### 7.3 TypeScript — none found at audit time
 
 No hand-written `wireString` / `defaults()` / `validate()` shims
-located in `sdk/runanywhere-web/` or `sdk/runanywhere-react-native/`
+located in `bindings/web/` or `bindings/react-native/`
 during the audit (Grep across `case AudioFormat.AUDIO_FORMAT_*` and
 `case SDKEnvironment.SDK_ENVIRONMENT_*` returned 0 SDK-side hits).
 The TypeScript drift target is forward-looking: once the generator
@@ -944,7 +944,7 @@ combine multiple steps.
 - [ ] **Step 5**: Validate each generated convenience helper produces
       the same string mappings / default values / validation errors as
       the hand-written equivalent in Section 7. Use unit tests in
-      `sdk/<lang>/.../convenience-parity-test/`.
+      `bindings/<lang>/.../convenience-parity-test/`.
 - [ ] **Step 6**: Land per-language follow-up PRs that DELETE the
       hand-written drift duplicates from Section 7 and reroute call
       sites onto the generated helpers.
@@ -990,10 +990,10 @@ if (e is SDKException && e.fieldPath != null) { ... }
 
 | Language   | Exception type / shape                                                                                   | Origin                                                                |
 | ---------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Swift      | `SDKException.validationFailed(fieldPath:message:)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-swift/.../SDKException.swift`                        |
-| Kotlin     | `SDKException.validationFailed(fieldPath, message)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-kotlin/.../foundation/errors/SDKException.kt`        |
-| Dart       | `SDKException.validationFailed(message, fieldPath: ...)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-flutter/.../foundation/errors/sdk_exception.dart`    |
-| TypeScript | `new ValidationError({fieldPath, message})` → exposes `.code`, `.category`, `.fieldPath`, `.message`     | `sdk/shared/proto-ts/src/convenience/_errors.ts` (hand-written)       |
+| Swift      | `SDKException.validationFailed(fieldPath:message:)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/swift/.../SDKException.swift`                        |
+| Kotlin     | `SDKException.validationFailed(fieldPath, message)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/kotlin/.../foundation/errors/SDKException.kt`        |
+| Dart       | `SDKException.validationFailed(message, fieldPath: ...)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `bindings/flutter/.../foundation/errors/sdk_exception.dart`    |
+| TypeScript | `new ValidationError({fieldPath, message})` → exposes `.code`, `.category`, `.fieldPath`, `.message`     | `bindings/shared/proto-ts/src/convenience/_errors.ts` (hand-written)       |
 
 ### 9.2 Wire-format / runtime constraints
 

@@ -7,8 +7,8 @@
  * LoraAdapterImportRequest/Result deleted, "lora-delete-download-import-
  * bookkeeping"). The Swift and Kotlin SDKs each ship an SDK-level
  * `lora.registerArtifact`/`lora.download` convenience that composes the
- * models domain internally (see `sdk/runanywhere-swift/.../
- * RunAnywhere+LoRADownload.swift` and `sdk/runanywhere-kotlin/.../
+ * models domain internally (see `bindings/swift/.../
+ * RunAnywhere+LoRADownload.swift` and `bindings/kotlin/.../
  * RunAnywhereLoRA.kt`), but the React Native SDK (`@runanywhere/core`) has
  * no equivalent — only the bare catalog register/query/get verbs exist
  * there. This module reproduces the same composition those two SDKs use

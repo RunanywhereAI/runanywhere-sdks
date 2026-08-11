@@ -9,13 +9,13 @@
 #     brew install grpc-swift   # provides protoc-gen-grpc-swift
 #
 # Output:
-#   sdk/runanywhere-swift/Sources/RunAnywhere/Generated/
+#   bindings/swift/Sources/RunAnywhere/Generated/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Generated"
+OUT_DIR="${REPO_ROOT}/bindings/swift/Sources/RunAnywhere/Generated"
 
 mkdir -p "${OUT_DIR}"
 

@@ -13,14 +13,14 @@ on Linux machines where clang lacks C++ stdlib headers.
 ```bash
 cd examples/python/RunAnywhereAI
 python3 -m venv .venv
-CC=gcc CXX=g++ .venv/bin/pip install -e "../../../sdk/runanywhere-python[server,rag]"
+CC=gcc CXX=g++ .venv/bin/pip install -e "../../../bindings/python[server,rag]"
 ```
 
 To reuse an existing repo CMake build tree instead of compiling from scratch, pass it
 as the scikit-build build directory:
 
 ```bash
-CC=gcc CXX=g++ .venv/bin/pip install -e "../../../sdk/runanywhere-python[server,rag]" \
+CC=gcc CXX=g++ .venv/bin/pip install -e "../../../bindings/python[server,rag]" \
     --no-build-isolation \
     --config-settings=build-dir=../../../build/<your-build-dir>
 ```

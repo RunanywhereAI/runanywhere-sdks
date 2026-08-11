@@ -131,7 +131,7 @@ struct LlamaCppVLMBackend {
     // Lifecycle barrier — destroy() flips this true so future entry-point
     // calls fail fast, then spin-waits for `in_flight` to drain before
     // freeing the backend. Mirrors the voice_agent pattern at
-    // sdk/runanywhere-commons/src/features/voice_agent/voice_agent.cpp:179.
+    // core/src/features/voice_agent/voice_agent.cpp:179.
     // This closes the "object with member mutex cannot be safely destroyed
     // by itself" race window between unload_model's mutex release and the
     // delete that follows.
@@ -186,7 +186,7 @@ struct LlamaCppVLMBackend {
  * out fast when is_shutting_down is already set.
  *
  * Mirrors voice_agent.cpp's in_flight pattern
- * (sdk/runanywhere-commons/src/features/voice_agent/voice_agent.cpp:216-218).
+ * (core/src/features/voice_agent/voice_agent.cpp:216-218).
  */
 struct InFlightGuard {
     LlamaCppVLMBackend* backend;

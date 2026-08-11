@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-ORT_SCRIPT="${REPO_ROOT}/sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
-SHERPA_SCRIPT="${REPO_ROOT}/sdk/runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
+ORT_SCRIPT="${REPO_ROOT}/bindings/web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+SHERPA_SCRIPT="${REPO_ROOT}/bindings/web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
 
 fail() {
   echo "[FAIL] WASM provenance contract: $*" >&2

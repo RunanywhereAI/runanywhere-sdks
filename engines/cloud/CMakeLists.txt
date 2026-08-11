@@ -35,7 +35,7 @@ message(STATUS "Configuring cloud backend...")
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 # NOTE: rac_static_register_cloud.cpp is intentionally NOT in this list — it
 # is the self-registration carrier (see the bottom of this file) and is compiled

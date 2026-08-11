@@ -183,7 +183,7 @@ export async function registerAll(
       // Bonsai (PrismML)
       // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
       // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
-      // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
+      // core/VERSIONS — stock upstream cannot load it.
       registerModel({
         id: 'bonsai-27b-q1_0',
         name: 'Bonsai-27B 1-bit Q1_0 (CPU)',

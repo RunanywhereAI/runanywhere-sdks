@@ -15,19 +15,19 @@ repos:
       - id: trailing-whitespace
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
-            sdk/runanywhere-commons/src/generated/|
-            sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/shared/proto-ts/src/|
+            bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
+            core/src/generated/|
+            bindings/swift/Sources/RunAnywhere/Generated/|
+            bindings/shared/proto-ts/src/|
             idl/
           )
       - id: end-of-file-fixer
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
-            sdk/runanywhere-commons/src/generated/|
-            sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/shared/proto-ts/src/|
+            bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
+            core/src/generated/|
+            bindings/swift/Sources/RunAnywhere/Generated/|
+            bindings/shared/proto-ts/src/|
             idl/
           )
       - id: check-yaml
@@ -83,9 +83,9 @@ repos:
   #   hooks:
   #     - id: android-app-lint
   #       name: Android App Lint
-  #       entry: bash -c 'cd sdk/runanywhere-kotlin/example && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "local.properties" ]; then ./gradlew :app:lint; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
+  #       entry: bash -c 'cd bindings/kotlin/example && if [ -f "./gradlew" ] && [ -n "$ANDROID_HOME" -o -f "local.properties" ]; then ./gradlew :app:lint; else echo "Skipping Android lint (no gradle or SDK)"; exit 0; fi'
   #       language: system
-  #       files: ^sdk/runanywhere-kotlin/example/.*\.(kt|kts|java|xml)$
+  #       files: ^bindings/kotlin/example/.*\.(kt|kts|java|xml)$
   #       pass_filenames: false
 
   # SwiftLint for iOS SDK (with autofix)
@@ -93,23 +93,23 @@ repos:
     hooks:
       - id: ios-sdk-swiftlint-fix
         name: iOS SDK SwiftLint AutoFix
-        entry: bash -c 'cd sdk/runanywhere-swift && if which swiftlint >/dev/null; then swiftlint --fix --quiet 2>/dev/null || true; else echo "SwiftLint not installed"; fi'
+        entry: bash -c 'cd bindings/swift && if which swiftlint >/dev/null; then swiftlint --fix --quiet 2>/dev/null || true; else echo "SwiftLint not installed"; fi'
         language: system
-        files: ^sdk/runanywhere-swift/.*\.swift$
+        files: ^bindings/swift/.*\.swift$
         pass_filenames: false
 
       - id: ios-sdk-swiftlint
         name: iOS SDK SwiftLint
-        entry: bash -c 'cd sdk/runanywhere-swift && if which swiftlint >/dev/null; then swiftlint --strict; else echo "SwiftLint not installed"; exit 0; fi'
+        entry: bash -c 'cd bindings/swift && if which swiftlint >/dev/null; then swiftlint --strict; else echo "SwiftLint not installed"; exit 0; fi'
         language: system
-        files: ^sdk/runanywhere-swift/.*\.swift$
+        files: ^bindings/swift/.*\.swift$
         pass_filenames: false
 
       - id: ios-sdk-periphery
         name: iOS SDK Periphery (Unused Code)
-        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
+        entry: bash -c 'cd bindings/swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
         language: system
-        files: ^sdk/runanywhere-swift/.*\.swift$
+        files: ^bindings/swift/.*\.swift$
         pass_filenames: false
 
   # NOTE (ci-037, FIXED-PARTIAL): clang-format + dart format hooks are deferred to a

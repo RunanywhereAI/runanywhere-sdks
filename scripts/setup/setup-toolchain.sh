@@ -9,7 +9,7 @@
 #   macOS 13+ (Homebrew-driven)
 #   Ubuntu 22.04+ (apt + user-local pip/npm)
 #
-# Tools installed (all pins sourced from sdk/runanywhere-commons/VERSIONS):
+# Tools installed (all pins sourced from core/VERSIONS):
 #   protoc                 35.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
 #   protoc-gen-swift       1.38.x   (swift-protobuf)                — SWIFT_PROTOBUF_VERSION
 #   wire-compiler          5.5.x    (Kotlin via Square Wire)        — WIRE_VERSION
@@ -42,13 +42,13 @@ for arg in "$@"; do
 done
 
 # Single source of truth for codegen toolchain pins lives in
-# sdk/runanywhere-commons/VERSIONS so this script, idl/codegen/generate_*.sh,
+# core/VERSIONS so this script, idl/codegen/generate_*.sh,
 # and gradle/libs.versions.toml all agree. Load it here; fall back to
 # documented defaults if anything is missing so the script still works on a
 # minimal checkout.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+VERSIONS_FILE="${REPO_ROOT}/core/VERSIONS"
 if [ -f "${VERSIONS_FILE}" ]; then
     # shellcheck disable=SC1090
     set -a

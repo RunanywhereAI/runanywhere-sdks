@@ -58,7 +58,7 @@ RUN_IOS=1 ./scripts/verify.sh
 # Android:
 ../../../scripts/build/build-core-android.sh arm64-v8a
 # iOS:
-../../../sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+../../../bindings/swift/scripts/build-core-xcframework.sh
 ```
 
 For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` if Pods are stale.
@@ -68,11 +68,11 @@ For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` 
 The app depends on five local Flutter SDK packages via `path:` dependencies in `pubspec.yaml`:
 
 ```
-runanywhere           → ../../../sdk/runanywhere-flutter/packages/runanywhere
-runanywhere_llamacpp  → ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
-runanywhere_mlx       → ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
-runanywhere_qhexrt    → ../../../sdk/runanywhere-flutter/packages/runanywhere_qhexrt
-runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+runanywhere           → ../../../bindings/flutter/packages/runanywhere
+runanywhere_llamacpp  → ../../../bindings/flutter/packages/runanywhere_llamacpp
+runanywhere_mlx       → ../../../bindings/flutter/packages/runanywhere_mlx
+runanywhere_qhexrt    → ../../../bindings/flutter/packages/runanywhere_qhexrt
+runanywhere_onnx      → ../../../bindings/flutter/packages/runanywhere_onnx
 ```
 
 These packages wrap pre-built native C++ libraries via Dart FFI (`dart:ffi`), not method channels. AI inference calls go directly from Dart → native `.so`/xcframework without any platform channel hop.
@@ -144,7 +144,7 @@ All AI calls go through `RunAnywhere`:
 - **iOS Podfile post_install**: forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` on all pods and Runner — locally built xcframeworks only contain arm64 simulator slices
 - **iOS Podfile permission flags**: `PERMISSION_MICROPHONE=1`, `PERMISSION_SPEECH_RECOGNIZER=1`, `PERMISSION_CAMERA=1` must be set for `permission_handler` to compile those capabilities
 - **Gradle heap**: `-Xmx6g` in `gradle.properties` — native compilation is memory-intensive
-- **Flutter 3.44.6 / AGP 9.0.1 / Gradle 9.1.0** — canonical pins live in `sdk/runanywhere-commons/VERSIONS`
+- **Flutter 3.44.6 / AGP 9.0.1 / Gradle 9.1.0** — canonical pins live in `core/VERSIONS`
 
 ## Analysis Options
 

@@ -38,7 +38,7 @@ all interactions.
 
 ## 🛠️ Development Setup
 
-This is a monorepo: a single C++ core (`sdk/runanywhere-commons`) behind the
+This is a monorepo: a single C++ core (`core`) behind the
 `rac_*` C ABI, with five thin platform SDKs — **Swift, Kotlin, Flutter, React
 Native, and Web** — plus a minimal example harness per SDK. (The full iOS,
 Android, Web, and Electron consumer apps live in their own repositories:

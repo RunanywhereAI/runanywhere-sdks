@@ -71,7 +71,7 @@ linux-voice-assistant/
 
 ```bash
 # Step 1: Download Sherpa-ONNX
-cd ../../sdk/runanywhere-commons
+cd ../../core
 ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons

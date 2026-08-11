@@ -44,17 +44,17 @@ Brief description of the changes made.
 Please add the appropriate label(s):
 
 **SDKs:**
-- [ ] `Swift SDK` - Changes to Swift SDK (`sdk/runanywhere-swift`)
-- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/runanywhere-kotlin`)
-- [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/runanywhere-flutter`)
-- [ ] `React Native SDK` - Changes to React Native SDK (`sdk/runanywhere-react-native`)
-- [ ] `Web SDK` - Changes to Web SDK (`sdk/runanywhere-web`)
-- [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
+- [ ] `Swift SDK` - Changes to Swift SDK (`bindings/swift`)
+- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`bindings/kotlin`)
+- [ ] `Flutter SDK` - Changes to Flutter SDK (`bindings/flutter`)
+- [ ] `React Native SDK` - Changes to React Native SDK (`bindings/react-native`)
+- [ ] `Web SDK` - Changes to Web SDK (`bindings/web`)
+- [ ] `Commons` - Changes to shared native code (`core`)
 
 **Sample Apps:**
 - [ ] `Flutter Sample` - Changes to Flutter example app (`examples/flutter`)
 - [ ] `React Native Sample` - Changes to React Native example app (`examples/react-native`)
-- [ ] `Minimal Examples` - Changes to an in-repo SDK harness (`sdk/runanywhere-{swift,kotlin,web}/example`)
+- [ ] `Minimal Examples` - Changes to an in-repo SDK harness (`bindings/{swift,kotlin,web}/example`)
 
 The iOS, Android, Web, and Electron consumer apps live in their own
 repositories (`RunanywhereAI/runanywhere-{ios,android,web,electron}`) — open

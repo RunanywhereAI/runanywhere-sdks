@@ -24,7 +24,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
 WORKDIR /workspace
 
 # Copy SDK commons (needed for headers and libraries)
-COPY sdk/runanywhere-commons /workspace/sdk/runanywhere-commons
+COPY core /workspace/core
 
 # Copy the linux voice assistant
 COPY Playground/linux-voice-assistant /workspace/Playground/linux-voice-assistant
@@ -32,12 +32,12 @@ COPY Playground/linux-voice-assistant /workspace/Playground/linux-voice-assistan
 WORKDIR /workspace/Playground/linux-voice-assistant
 
 # Step 1: Download Sherpa-ONNX
-RUN cd /workspace/sdk/runanywhere-commons && \
+RUN cd /workspace/core && \
     chmod +x scripts/linux/*.sh && \
     ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons
-RUN cd /workspace/sdk/runanywhere-commons && \
+RUN cd /workspace/core && \
     chmod +x scripts/*.sh && \
     ./scripts/build-linux.sh
 

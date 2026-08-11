@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
-**A cross-platform reference app for the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/).** One TypeScript codebase demonstrating on-device LLM chat, speech, vision, RAG, voice agents, and model management on iOS and Android.
+**A cross-platform reference app for the [RunAnywhere React Native SDK](../../../bindings/react-native/).** One TypeScript codebase demonstrating on-device LLM chat, speech, vision, RAG, voice agents, and model management on iOS and Android.
 
 ---
 
@@ -62,7 +62,7 @@ Use `--ignore-scripts` on first install so postinstall hooks do not mask missing
 ```bash
 cd ../../..
 ./scripts/build/build-core-android.sh arm64-v8a
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./bindings/swift/scripts/build-core-xcframework.sh
 cd examples/react-native/RunAnywhereAI
 ```
 
@@ -103,7 +103,7 @@ yarn android        # Android emulator or device
 | Change | Action |
 |--------|--------|
 | TypeScript SDK | Metro hot-reloads automatically |
-| C++ / commons | Re-run root native build scripts, then re-stage into RN packages via `sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from <path>` |
+| C++ / commons | Re-run root native build scripts, then re-stage into RN packages via `bindings/react-native/scripts/package-sdk.sh --natives-from <path>` |
 | Stale iOS codegen | Remove `ios/build/generated` and rerun `yarn pod-install` |
 
 ---
@@ -156,7 +156,7 @@ RunAnywhereAI/
 ├── scripts/
 │   ├── verify.sh
 │   └── smoke.sh
-└── package.json                # Workspace deps → sdk/runanywhere-react-native/packages/*
+└── package.json                # Workspace deps → bindings/react-native/packages/*
 ```
 
 SDK packages use **NitroModules** for JSI bridging. Hermes does not support `for await...of` on Nitro async iterables—use manual `iterator.next()` loops (see chat and download flows in the app).
@@ -187,7 +187,7 @@ yarn typecheck
 
 | Resource | Link |
 |----------|------|
-| **React Native SDK** | [sdk/runanywhere-react-native/README.md](../../../sdk/runanywhere-react-native/README.md) |
+| **React Native SDK** | [bindings/react-native/README.md](../../../bindings/react-native/README.md) |
 | **iOS example** | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) |
 | **Android example** | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) |
 | **Flutter example** | [examples/flutter/RunAnywhereAI](../../flutter/RunAnywhereAI/README.md) |

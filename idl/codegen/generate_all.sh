@@ -126,7 +126,7 @@ fi
 # (which uses ts-proto for messages) — different tools, different outputs.
 #
 # A single shared script renders the streams once into
-# sdk/shared/proto-ts/src/streams. Both RN and Web consume the result via
+# bindings/shared/proto-ts/src/streams. Both RN and Web consume the result via
 # @runanywhere/proto-ts; the previous generate_rn_streams.sh /
 # generate_web_streams.sh pair was byte-identical and overwrote each
 # other's output, masking unilateral edits.

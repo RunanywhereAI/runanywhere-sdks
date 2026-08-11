@@ -1,7 +1,7 @@
 // RunAnywhere IDL — error types (codes, categories, structured errors).
 //
 // Canonical numeric values come from
-// sdk/runanywhere-commons/include/rac/core/rac_error.h. Changing a value is a
+// core/include/rac/core/rac_error.h. Changing a value is a
 // wire break across every SDK; adding one is safe.
 
 syntax = "proto3";
@@ -227,7 +227,7 @@ enum ErrorCode {
     // squats four codes here for WASM bridge failures; codegen tags these
     // as platform=web only. They are preserved verbatim so existing Web
     // consumers don't break, but new SDKs SHOULD NOT emit them.
-    // Source: sdk/runanywhere-web/packages/core/src/Foundation/ErrorTypes.ts:58
+    // Source: bindings/web/packages/core/src/Foundation/ErrorTypes.ts:58
     ERROR_CODE_WASM_LOAD_FAILED           = 900;
     ERROR_CODE_WASM_NOT_LOADED            = 901;
     ERROR_CODE_WASM_CALLBACK_ERROR        = 902;

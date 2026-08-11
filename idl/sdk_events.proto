@@ -577,7 +577,7 @@ enum VoiceEventKind {
 
     // Deleted: the VOICE_SESSION_* mirror family. Confirmed near-dead --
     // exactly one hand-written reference in the whole tree
-    // (sdk/runanywhere-web/.../Foundation/EventBus.ts, VOICE_SESSION_TURN_COMPLETED)
+    // (bindings/web/.../Foundation/EventBus.ts, VOICE_SESSION_TURN_COMPLETED)
     // vs. the live STT_*/VAD_*/RECORDING_*/PLAYBACK_* families above, which
     // this cut leaves untouched. That one Web reference moves to
     // VOICE_EVENT_KIND_STT_COMPLETED / TRANSCRIPTION_FINAL in Phase D.

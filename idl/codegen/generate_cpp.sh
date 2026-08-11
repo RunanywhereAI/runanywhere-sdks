@@ -8,20 +8,20 @@
 #   apt-get install libprotobuf-dev protobuf-compiler   # Ubuntu
 #
 # Output:
-#   sdk/runanywhere-commons/src/generated/proto/
+#   core/src/generated/proto/
 #
-# The generated headers live inside sdk/runanywhere-commons so the C ABI shim
+# The generated headers live inside core so the C ABI shim
 # layer can `#include "model_types.pb.h"` for proto-encoded wire conversions.
 # protoc emits bare filenames directly into OUT_DIR (no runanywhere/idl/
 # prefix). This committed copy is the single source the rac_commons build
-# compiles (via its own *.pb.cc list in sdk/runanywhere-commons/CMakeLists.txt);
+# compiles (via its own *.pb.cc list in core/CMakeLists.txt);
 # it also serves IDE navigation + the CI drift check.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-commons/src/generated/proto"
+OUT_DIR="${REPO_ROOT}/core/src/generated/proto"
 
 mkdir -p "${OUT_DIR}"
 

@@ -33,8 +33,8 @@ executable wake-word backend.
 From the repository root:
 
 ```bash
-bash sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
-bash sdk/runanywhere-commons/scripts/build-linux.sh
+bash core/scripts/linux/download-sherpa-onnx.sh
+bash core/scripts/build-linux.sh
 
 cd Playground/openclaw-hybrid-assistant
 ./scripts/download-models.sh
@@ -119,7 +119,7 @@ systemctl --user enable --now openclaw-voice.service
 
 ## Troubleshooting
 
-- Missing native libraries: add `sdk/runanywhere-commons/dist/linux/lib` and the Sherpa library directory to `LD_LIBRARY_PATH`.
+- Missing native libraries: add `core/dist/linux/lib` and the Sherpa library directory to `LD_LIBRARY_PATH`.
 - Missing models: rerun `./scripts/download-models.sh`.
 - No microphone input: run `./build/openclaw-assistant --list-devices` and select a device with `--input`.
 - Cannot reach OpenClaw: verify the gateway URL and that its WebSocket port is reachable.

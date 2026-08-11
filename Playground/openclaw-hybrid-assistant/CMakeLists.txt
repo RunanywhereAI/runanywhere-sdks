@@ -20,7 +20,7 @@ find_package(Threads REQUIRED)
 
 # Set paths relative to this CMakeLists.txt
 set(ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
-set(RAC_COMMONS_DIR "${ROOT_DIR}/sdk/runanywhere-commons")
+set(RAC_COMMONS_DIR "${ROOT_DIR}/core")
 set(RAC_DIST_DIR "${RAC_COMMONS_DIR}/dist/linux")
 set(RAC_LIB_DIR "${RAC_DIST_DIR}/lib")
 set(SHERPA_DIR "${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux")

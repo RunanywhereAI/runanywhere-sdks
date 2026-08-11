@@ -19,7 +19,7 @@
 # =============================================================================
 #
 # Sherpa-ONNX does NOT publish a prebuilt static archive for WASM.
-# sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh currently builds a
+# bindings/web/wasm/scripts/build-sherpa-onnx.sh currently builds a
 # STANDALONE Emscripten module (sherpa-onnx-wasm-nodejs.wasm, 12 MB) which is
 # shipped separately at packages/onnx/wasm/sherpa/sherpa-onnx.wasm. That
 # standalone module CANNOT be linked into racommons-llamacpp.wasm — it is a
@@ -28,7 +28,7 @@
 # To flip this engine on for EMSCRIPTEN the following vendored artifacts are
 # required:
 #
-#   sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/
+#   core/third_party/sherpa-onnx-wasm/
 #     ├── lib/
 #     │   ├── libsherpa-onnx-c-api.a       (sherpa public C API)
 #     │   ├── libsherpa-onnx-core.a        (core kernels)
@@ -45,7 +45,7 @@
 #         └── sherpa-onnx/c-api/c-api.h    (published by sherpa upstream)
 #
 # Build recipe:
-#   cd sdk/runanywhere-web/wasm/third_party/sherpa-onnx
+#   cd bindings/web/wasm/third_party/sherpa-onnx
 #   # Modify CMakeLists to build static archive targets instead of the
 #   # standalone sherpa-onnx-wasm-nodejs executable. Currently the WASM build
 #   # recipes in build-wasm-simd-{asr,tts,vad,nodejs}.sh all produce a final
@@ -68,7 +68,7 @@
 #     rac_plugin_entry_sherpa.cpp → RAC_STATIC_PLUGIN_REGISTER(sherpa) is
 #     the only registration path. No dlopen. Export symbol
 #     _rac_backend_sherpa_register must be kept live — add to
-#     RAC_EXPORTED_FUNCTIONS in sdk/runanywhere-web/wasm/CMakeLists.txt.
+#     RAC_EXPORTED_FUNCTIONS in bindings/web/wasm/CMakeLists.txt.
 #   - Piper TTS uses espeak-ng which has static initialization side-effects.
 #     Verify the C++ static constructors survive --whole-archive equivalent
 #     (Emscripten lacks -Wl,--whole-archive; use -sEXPORT_ALL=0 +
@@ -76,7 +76,7 @@
 #
 # Gate recipe (replace the current force-OFF):
 #   set(RAC_SHERPA_WASM_RUNTIME_DIR
-#       "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm")
+#       "${CMAKE_SOURCE_DIR}/core/third_party/sherpa-onnx-wasm")
 #   if(EMSCRIPTEN AND NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
 #       set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
 #   endif()
@@ -89,10 +89,10 @@ option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONN
 # EXISTS-gated disable under Emscripten: only force OFF when vendored
 # Sherpa-ONNX WASM static archives are missing. Drop
 # libsherpa-onnx-c-api.a + deps under
-# sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/ to enable.
+# core/third_party/sherpa-onnx-wasm/lib/ to enable.
 if(EMSCRIPTEN)
     set(RAC_SHERPA_WASM_RUNTIME_DIR
-        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm")
+        "${CMAKE_SOURCE_DIR}/core/third_party/sherpa-onnx-wasm")
     if(NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
         message(STATUS "RAC_BACKEND_SHERPA: no WASM Sherpa archive at "
                        "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a; "
@@ -139,7 +139,7 @@ include(FetchONNXRuntime)
 # without re-running discovery logic.
 
 set(SHERPA_ONNX_AVAILABLE OFF)
-get_filename_component(RUNANYWHERE_COMMONS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+get_filename_component(RUNANYWHERE_COMMONS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../core" ABSOLUTE)
 
 if(RAC_PLATFORM_IOS)
     set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-ios")
@@ -297,7 +297,7 @@ elseif(RAC_PLATFORM_WINDOWS)
 
 elseif(EMSCRIPTEN)
     # WASM / Emscripten: sherpa-onnx static archives vendored under
-    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.
+    # core/third_party/sherpa-onnx-wasm/.
     # Build recipe lives in the banner at the top of this file. The guard at the
     # engine gate above short-circuits this engine when the archives are absent,
     # so reaching here implies `libsherpa-onnx-c-api.a` exists.
@@ -360,7 +360,7 @@ set(RAC_SHERPA_ONNX_AVAILABLE "${SHERPA_ONNX_AVAILABLE}" CACHE INTERNAL
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 set(SHERPA_BACKEND_SOURCES
     sherpa_model_inspector.cpp

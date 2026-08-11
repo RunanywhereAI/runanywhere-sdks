@@ -5,20 +5,20 @@ name: IDL drift check
 # a generated file, this job fails with ::error::IDL-generated code is out of
 # sync with .proto sources. Fixing the PR is a one-liner locally:
 #
-#   ./idl/codegen/generate_all.sh && (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
+#   ./idl/codegen/generate_all.sh && (cd bindings/shared/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
 
 on:
   pull_request:
     paths:
       - 'idl/**'
-      - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
-      - 'sdk/shared/proto-ts/**'
-      - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'sdk/runanywhere-python/runanywhere/_proto/**'
+      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
+      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
+      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
+      - 'bindings/shared/proto-ts/**'
+      - 'core/src/generated/proto/**'
+      - 'bindings/python/runanywhere/_proto/**'
       - 'idl/codegen/generate_python.sh'
-      - 'sdk/runanywhere-commons/VERSIONS'
+      - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
@@ -29,14 +29,14 @@ on:
     branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
-      - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
-      - 'sdk/shared/proto-ts/**'
-      - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'sdk/runanywhere-python/runanywhere/_proto/**'
+      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
+      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
+      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
+      - 'bindings/shared/proto-ts/**'
+      - 'core/src/generated/proto/**'
+      - 'bindings/python/runanywhere/_proto/**'
       - 'idl/codegen/generate_python.sh'
-      - 'sdk/runanywhere-commons/VERSIONS'
+      - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
@@ -104,11 +104,11 @@ jobs:
           # this drift job) — Kotlin bindings drifted through CI undetected.
           #
           # Install the real wire-compiler from Maven Central, pinned to
-          # WIRE_VERSION in sdk/runanywhere-commons/VERSIONS (the same version
+          # WIRE_VERSION in core/VERSIONS (the same version
           # that produced the committed Kotlin bindings), and expose it as
           # `wire-compiler` on PATH. Hard-fail if it is missing, matching the
           # protoc-gen-grpc-swift gate above.
-          WIRE_VERSION="$(grep -E '^WIRE_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          WIRE_VERSION="$(grep -E '^WIRE_VERSION=' core/VERSIONS | cut -d= -f2)"
           echo "wire-compiler version (pinned): ${WIRE_VERSION}"
           JAR_URL="https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
           mkdir -p "$HOME/.local/bin"
@@ -142,22 +142,22 @@ jobs:
           sdk: stable
 
       - name: Install Dart plugin (protoc-gen-dart)
-        # Pinned to PROTOC_GEN_DART_VERSION in sdk/runanywhere-commons/VERSIONS
+        # Pinned to PROTOC_GEN_DART_VERSION in core/VERSIONS
         # (single source of truth for IDL codegen toolchain). Bump there first
         # — this workflow mirrors that pin.
         run: |
           set -euo pipefail
-          PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' core/VERSIONS | cut -d= -f2)"
           dart pub global activate protoc_plugin "$PROTOC_GEN_DART_VERSION"
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
-        # Pinned to TS_PROTO_VERSION in sdk/runanywhere-commons/VERSIONS
+        # Pinned to TS_PROTO_VERSION in core/VERSIONS
         # (single source of truth). Major-bumped to 2.x; generated TS still
         # parses under tsc 5.9 strict.
         run: |
           set -euo pipefail
-          TS_PROTO_VERSION="$(grep -E '^TS_PROTO_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          TS_PROTO_VERSION="$(grep -E '^TS_PROTO_VERSION=' core/VERSIONS | cut -d= -f2)"
           npm install -g "ts-proto@${TS_PROTO_VERSION}" protobufjs
 
       - name: Install Python protobuf + pyyaml runtime
@@ -167,7 +167,7 @@ jobs:
         # needs both packages available before generate_all.sh runs.
         run: |
           set -euo pipefail
-          PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' core/VERSIONS | cut -d= -f2)"
           # python3 is REQUIRED in CI. generate_all.sh soft-skips every
           # convenience + modality-ABI generator with a warning (exit 0) when
           # python3 is absent, which would let annotation edits pass the drift
@@ -205,7 +205,7 @@ jobs:
       - name: Build shared TypeScript proto package
         run: |
           set -euo pipefail
-          cd sdk/shared/proto-ts
+          cd bindings/shared/proto-ts
           # `--workspaces=false` so npm doesn't walk up into the repo-root
           # Yarn workspace (which uses `workspace:*` deps that npm can't
           # parse — bails with EUNSUPPORTEDPROTOCOL).
@@ -224,7 +224,7 @@ jobs:
             echo "To fix locally:"
             echo "  ./scripts/setup/setup-toolchain.sh"
             echo "  ./idl/codegen/generate_all.sh"
-            echo "  (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build)"
+            echo "  (cd bindings/shared/proto-ts && npm install --package-lock=false && npm run build)"
             echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
             exit 1
           fi

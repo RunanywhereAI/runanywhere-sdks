@@ -39,7 +39,7 @@ case "${OS}" in
     *)       OS=other ;;
 esac
 
-NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
+NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/bindings/kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
 NDK_VERSION="${NDK_VERSION:-27.0.12077973}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -107,15 +107,15 @@ setup_android() {
     else
         warn "Android NDK ${NDK_VERSION} not found — install it before running ./run sdk commons build-android"
     fi
-    ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin" "${sdk}" "${ndk}"
-    ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin/example" "${sdk}" "${ndk}"
+    ensure_local_props "${REPO_ROOT}/bindings/kotlin" "${sdk}" "${ndk}"
+    ensure_local_props "${REPO_ROOT}/bindings/kotlin/example" "${sdk}" "${ndk}"
 }
 
 setup_flutter() {
     heading "Flutter"
     if ! have flutter; then err "flutter not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere" && flutter pub get </dev/null) && ok "sdk pub get"
+    if [ -d "${REPO_ROOT}/bindings/flutter/packages/runanywhere" ]; then
+        (cd "${REPO_ROOT}/bindings/flutter/packages/runanywhere" && flutter pub get </dev/null) && ok "sdk pub get"
     fi
     for ex in "${REPO_ROOT}"/examples/flutter/*/; do
         [ -d "${ex}" ] && [ -f "${ex}/pubspec.yaml" ] && (cd "${ex}" && flutter pub get </dev/null) && ok "$(basename "${ex}") pub get"
@@ -125,8 +125,8 @@ setup_flutter() {
 setup_rn() {
     heading "React Native"
     if ! have yarn && ! have npm; then err "yarn/npm not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-react-native" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-react-native"
+    if [ -d "${REPO_ROOT}/bindings/react-native" ]; then
+        cd "${REPO_ROOT}/bindings/react-native"
         if have yarn; then yarn install && ok "yarn install"; else npm install && ok "npm install"; fi
     fi
 }
@@ -138,11 +138,11 @@ setup_ios() {
         return 0
     fi
     if ! have swift; then err "swift not found (install Xcode)"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-swift" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
+    if [ -d "${REPO_ROOT}/bindings/swift" ]; then
+        (cd "${REPO_ROOT}/bindings/swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
     fi
-    if [ -f "${REPO_ROOT}/sdk/runanywhere-swift/example/Package.swift" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-swift/example" \
+    if [ -f "${REPO_ROOT}/bindings/swift/example/Package.swift" ]; then
+        (cd "${REPO_ROOT}/bindings/swift/example" \
             && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) \
             && ok "minimal example swift package resolve"
     fi
@@ -151,14 +151,14 @@ setup_ios() {
 setup_web() {
     heading "Web"
     if ! have yarn && ! have npm; then err "yarn/npm not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-web" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-web"
+    if [ -d "${REPO_ROOT}/bindings/web" ]; then
+        cd "${REPO_ROOT}/bindings/web"
         if have yarn; then yarn install && ok "sdk yarn install"; else npm install && ok "sdk npm install"; fi
     fi
     # The minimal harness is a standalone npm project (not a workspace member),
     # so it installs on its own.
-    if [ -f "${REPO_ROOT}/sdk/runanywhere-web/example/package.json" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-web/example"
+    if [ -f "${REPO_ROOT}/bindings/web/example/package.json" ]; then
+        cd "${REPO_ROOT}/bindings/web/example"
         npm install && ok "minimal example npm install"
     fi
 }

@@ -22,7 +22,7 @@
 #     rac_max_float     (50007, double) -> participates in `validate<Msg>` (float)
 #
 # Output:
-#   sdk/shared/proto-ts/src/convenience/<base>_convenience.ts (one file per
+#   bindings/shared/proto-ts/src/convenience/<base>_convenience.ts (one file per
 #   source proto that carries at least one rac_* annotation).
 #
 # Constraints honoured:
@@ -34,7 +34,7 @@
 #     proto3 zero value (or rac_default when set) and may omit nested
 #     message + proto3-optional fields unless explicitly defaulted.
 #   * Validate throws ValidationError from `./_errors` (hand-written, see
-#     sdk/shared/proto-ts/src/convenience/_errors.ts).
+#     bindings/shared/proto-ts/src/convenience/_errors.ts).
 #
 # Invoked by generate_all.sh AFTER generate_ts.sh so the message / enum
 # names referenced by the convenience file are already on disk.
@@ -208,7 +208,7 @@ def _ts_proto_function_prefix(symbol: str) -> str:
     """First character lowercased, rest preserved.
 
     ts-proto's deterministic rule for deriving the function-name prefix
-    from a type symbol. Verified at sdk/shared/proto-ts/src/stt_options.ts:58
+    from a type symbol. Verified at bindings/shared/proto-ts/src/stt_options.ts:58
     (`sTTLanguageFromJSON` derived from `STTLanguage`) and model_types.ts:47
     (`audioFormatFromJSON` from `AudioFormat`).
     """
@@ -222,7 +222,7 @@ def _proto_field_to_ts_camel(name: str) -> str:
 
     ts-proto uses the standard snake_case-to-camelCase rule and DOES NOT
     apply Swift's `Id`->`ID` upper-case shortcut (verified at
-    sdk/shared/proto-ts/src/stt_options.ts:266 — `modelId`, not `modelID`).
+    bindings/shared/proto-ts/src/stt_options.ts:266 — `modelId`, not `modelID`).
     """
     parts = name.split("_")
     if not parts:
@@ -298,7 +298,7 @@ def _ts_zero_literal(
     """Return the proto3 zero-value literal for a required ts-proto field.
 
     Matches ts-proto's own `createBase<Msg>` initialiser semantics (verified
-    in sdk/shared/proto-ts/src/stt_options.ts:540, where enum-typed fields
+    in bindings/shared/proto-ts/src/stt_options.ts:540, where enum-typed fields
     take the bare numeric `0` and string/number/bool fall back to `""`/`0`/`false`).
     """
     t = field.type

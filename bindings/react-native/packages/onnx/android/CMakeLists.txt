@@ -1,0 +1,197 @@
+# =============================================================================
+# COUPLING NOTE: This file references librac_commons.so + RAC headers from the
+# sibling @runanywhere/core npm package via a hard-coded relative path:
+#   ../../core/android/src/main/jniLibs/${ANDROID_ABI}/librac_commons.so
+#   ../../core/android/src/main/jniLibs/include/
+# (computed via RN_NODE_MODULES → @runanywhere/core/android/src/main/jniLibs/).
+#
+# This is a known fragility — if the package directory structure changes,
+# update the path here. Future improvement: migrate to Android Prefab module
+# consumption (build.gradle: `prefab { commons { ... } }`) so the dependency
+# is declared at the Gradle layer rather than the CMake layer.
+#
+# Prefab adoption was attempted but deferred because librac_commons.so is a
+# pre-built binary downloaded by core's Gradle task (not produced by core's
+# externalNativeBuild), so AGP's `prefabPublishing` publisher cannot
+# auto-export it without additional manifest wiring. The relative-path
+# coupling is therefore documented and intentionally preserved.
+# =============================================================================
+project(runanywhereonnx)
+# Must match core/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
+
+set(PACKAGE_NAME runanywhereonnx)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 20)
+
+# =============================================================================
+# 16KB Page Alignment for Android 15+ (API 35) Compliance
+# Required starting November 1, 2025 for Google Play submissions
+# =============================================================================
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
+
+# Path to pre-built native libraries (downloaded from runanywhere-binaries)
+set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
+
+# =============================================================================
+# RABackendONNX - STT/TTS/VAD backend (REQUIRED)
+# Downloaded via Gradle downloadNativeLibs task
+# =============================================================================
+if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+endif()
+
+add_library(rac_backend_onnx SHARED IMPORTED)
+set_target_properties(rac_backend_onnx PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_onnx.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found RABackendONNX at ${JNILIB_DIR}/librac_backend_onnx.so")
+
+# =============================================================================
+# ONNX Runtime (REQUIRED)
+# =============================================================================
+if(NOT EXISTS "${JNILIB_DIR}/libonnxruntime.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] ONNX Runtime not found at ${JNILIB_DIR}/libonnxruntime.so\n"
+                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
+endif()
+
+add_library(onnxruntime SHARED IMPORTED)
+set_target_properties(onnxruntime PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libonnxruntime.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
+
+# =============================================================================
+# Sherpa ONNX libraries (required by the package's speech contract)
+# =============================================================================
+foreach(_required_sherpa_lib
+    libsherpa-onnx-c-api.so
+    libsherpa-onnx-jni.so
+    librac_backend_sherpa.so)
+    if(NOT EXISTS "${JNILIB_DIR}/${_required_sherpa_lib}")
+        message(FATAL_ERROR "[RunAnywhereONNX] Required Sherpa library not found: ${JNILIB_DIR}/${_required_sherpa_lib}")
+    endif()
+endforeach()
+
+add_library(sherpa_onnx_c_api SHARED IMPORTED)
+set_target_properties(sherpa_onnx_c_api PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-c-api.so"
+    IMPORTED_NO_SONAME TRUE
+)
+add_library(sherpa_onnx_jni SHARED IMPORTED)
+set_target_properties(sherpa_onnx_jni PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
+    IMPORTED_NO_SONAME TRUE
+)
+add_library(rac_backend_sherpa SHARED IMPORTED)
+set_target_properties(rac_backend_sherpa PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_sherpa.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found required Sherpa native libraries")
+
+add_library(${PACKAGE_NAME} SHARED
+    src/main/cpp/cpp-adapter.cpp
+    ../cpp/HybridRunAnywhereONNX.cpp
+)
+
+# =============================================================================
+# Fix NitroModules prefab path for library modules
+# The prefab config generated by AGP has incorrect paths when building library modules
+# We need to create the NitroModules target BEFORE the autolinking.cmake runs
+# =============================================================================
+if(DEFINED REACT_NATIVE_NITRO_BUILD_DIR)
+    # Find NitroModules.so in the app's build directory
+    set(NITRO_LIBS_DIR "${REACT_NATIVE_NITRO_BUILD_DIR}/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/${ANDROID_ABI}")
+    if(EXISTS "${NITRO_LIBS_DIR}/libNitroModules.so")
+        message(STATUS "[RunAnywhereONNX] Using NitroModules from app build: ${NITRO_LIBS_DIR}")
+        add_library(react-native-nitro-modules::NitroModules SHARED IMPORTED)
+        set_target_properties(react-native-nitro-modules::NitroModules PROPERTIES
+            IMPORTED_LOCATION "${NITRO_LIBS_DIR}/libNitroModules.so"
+        )
+    endif()
+endif()
+
+# Add Nitrogen specs (this handles all React Native linking)
+include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhereonnx+autolinking.cmake)
+
+# =============================================================================
+# Include directories
+# =============================================================================
+# Get core package include dir (for rac/*.h headers)
+get_filename_component(RN_NODE_MODULES "${CMAKE_SOURCE_DIR}/../../.." ABSOLUTE)
+set(CORE_INCLUDE_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/include")
+set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/${ANDROID_ABI}")
+
+include_directories(
+    "src/main/cpp"
+    "../cpp"
+    "${CMAKE_SOURCE_DIR}/include"
+    # RAC API headers from core package (flat access for all subdirectories)
+    "${CORE_INCLUDE_DIR}"
+    "${CORE_INCLUDE_DIR}/rac"
+    "${CORE_INCLUDE_DIR}/rac/core"
+    "${CORE_INCLUDE_DIR}/rac/core/capabilities"
+    "${CORE_INCLUDE_DIR}/rac/features"
+    "${CORE_INCLUDE_DIR}/rac/features/llm"
+    "${CORE_INCLUDE_DIR}/rac/features/stt"
+    "${CORE_INCLUDE_DIR}/rac/features/tts"
+    "${CORE_INCLUDE_DIR}/rac/features/vad"
+    "${CORE_INCLUDE_DIR}/rac/features/voice_agent"
+    "${CORE_INCLUDE_DIR}/rac/features/platform"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/device"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/download"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/events"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/model_management"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/network"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/storage"
+    "${CORE_INCLUDE_DIR}/rac/infrastructure/telemetry"
+)
+
+# =============================================================================
+# RACommons - Core SDK functionality (from core package)
+# =============================================================================
+if(NOT EXISTS "${CORE_JNILIB_DIR}/librac_commons.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RACommons not found at ${CORE_JNILIB_DIR}/librac_commons.so\n"
+                        "Run: ./gradlew :runanywhere_core:downloadNativeLibs")
+endif()
+
+add_library(rac_commons SHARED IMPORTED)
+set_target_properties(rac_commons PROPERTIES
+    IMPORTED_LOCATION "${CORE_JNILIB_DIR}/librac_commons.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found RACommons at ${CORE_JNILIB_DIR}/librac_commons.so")
+
+# =============================================================================
+# Linking - ONNX backend and RACommons are REQUIRED
+# =============================================================================
+find_library(LOG_LIB log)
+
+target_link_libraries(
+    ${PACKAGE_NAME}
+    ${LOG_LIB}
+    android
+    c++_shared
+    rac_commons
+    rac_backend_onnx
+    onnxruntime
+)
+
+target_link_libraries(
+    ${PACKAGE_NAME}
+    sherpa_onnx_c_api
+    sherpa_onnx_jni
+    rac_backend_sherpa)
+
+# HAS_ONNX is always defined since ONNX backend is required
+target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1 ORT_API_VERSION=17)
+
+# 16KB page alignment - MUST be on target for Android 15+ compliance
+target_link_options(${PACKAGE_NAME} PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384)

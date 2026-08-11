@@ -32,7 +32,7 @@ fi
 if [ "${REFRESH_IOS_NATIVE:-0}" = "1" ]; then
     require_command xcodebuild
     log "Refreshing iOS XCFramework artifacts"
-    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
+    "${REPO_ROOT}/bindings/swift/scripts/build-core-xcframework.sh"
 fi
 
 require_command flutter

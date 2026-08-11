@@ -101,7 +101,7 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
 
     // "stt.backend.created" now emitted once by the commons STT
     // service layer
-    // (sdk/runanywhere-commons/src/features/stt/rac_stt_service.cpp) so future
+    // (core/src/features/stt/rac_stt_service.cpp) so future
     // backends inherit the emit without duplicating it per plugin.
 
     return RAC_SUCCESS;

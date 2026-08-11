@@ -14,14 +14,14 @@
 # an app build — without needing a linked libc++/RACommons or an NDK.
 #
 # Run from anywhere. Requires `yarn install` to have run in
-# sdk/runanywhere-react-native (for the Nitro and React Native jsi headers).
+# bindings/react-native (for the Nitro and React Native jsi headers).
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-RN="$REPO/sdk/runanywhere-react-native"
+RN="$REPO/bindings/react-native"
 NM="$RN/node_modules"
-COMMONS_INCLUDE="$REPO/sdk/runanywhere-commons/include"
+COMMONS_INCLUDE="$REPO/core/include"
 
 CXX="${CXX:-}"
 if [[ -z "$CXX" ]]; then
@@ -43,7 +43,7 @@ for required in \
     "$NM/react-native/ReactCommon/jsi/jsi/jsi.h" \
     "$COMMONS_INCLUDE"; do
     if [[ ! -e "$required" ]]; then
-        echo "::error::missing ${required#"$REPO"/} — run \`yarn install\` in sdk/runanywhere-react-native"
+        echo "::error::missing ${required#"$REPO"/} — run \`yarn install\` in bindings/react-native"
         exit 1
     fi
 done

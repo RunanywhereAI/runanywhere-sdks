@@ -178,24 +178,24 @@ scan_grep "idl" \
 # =========================================================================
 
 # 1a. *Dto.kt or *DTO.kt files
-scan_find "sdk/runanywhere-kotlin" "*Dto.kt" "kotlin:dto-file" \
+scan_find "bindings/kotlin" "*Dto.kt" "kotlin:dto-file" \
   -not -path "*/build/*" -not -path "*/test/*"
-scan_find "sdk/runanywhere-kotlin" "*DTO.kt" "kotlin:dto-file" \
+scan_find "bindings/kotlin" "*DTO.kt" "kotlin:dto-file" \
   -not -path "*/build/*" -not -path "*/test/*"
 
 # 1b. org.json.JSONObject usage in non-test SDK source
-scan_grep_filtered "sdk/runanywhere-kotlin/src" \
+scan_grep_filtered "bindings/kotlin/src" \
   "org\.json\.JSON(Object|Array)" "*.kt" "kotlin:org-json-usage" \
   "/test/" "/tests/" "/__tests__/" "/build/"
 
 # 1c. Hand-written JSON serialisation (toJson/fromJson/JsonObject) outside proto
-scan_grep_filtered "sdk/runanywhere-kotlin/src" \
+scan_grep_filtered "bindings/kotlin/src" \
   "(toJson|fromJson|JsonObject)" "*.kt" "kotlin:json-serialisation" \
   "/test/" "/tests/" "/__tests__/" "/proto/" "/generated/" "/build/"
 
 # 1d. First-party deprecated compatibility declarations. Wire-generated
 # Message.newBuilder() overrides are tool-owned and intentionally excluded.
-scan_grep_filtered "sdk/runanywhere-kotlin/src" \
+scan_grep_filtered "bindings/kotlin/src" \
   "@Deprecated" "*.kt" "kotlin:deprecated-declaration" \
   "/test/" "/tests/" "/generated/" "/build/"
 
@@ -204,16 +204,16 @@ scan_grep_filtered "sdk/runanywhere-kotlin/src" \
 # =========================================================================
 
 # 2a. Hand-written *Types.swift DTO files
-scan_find "sdk/runanywhere-swift/Sources" "*Types.swift" "swift:types-dto-file" \
+scan_find "bindings/swift/Sources" "*Types.swift" "swift:types-dto-file" \
   -not -path "*/.build/*" -not -path "*/proto/*"
 
 # 2b. JSONDecoder/JSONEncoder/JSONSerialization in bridge code
-scan_grep_filtered "sdk/runanywhere-swift/Sources" \
+scan_grep_filtered "bindings/swift/Sources" \
   "(JSONDecoder|JSONEncoder|JSONSerialization)" "*.swift" "swift:json-bridge" \
   "/Tests/" "/.build/"
 
 # 2c. Deprecated Swift compatibility declarations.
-scan_grep_filtered "sdk/runanywhere-swift/Sources" \
+scan_grep_filtered "bindings/swift/Sources" \
   "@available\\([^)]*deprecated" "*.swift" "swift:deprecated-declaration" \
   "/Tests/" "/.build/"
 
@@ -222,20 +222,20 @@ scan_grep_filtered "sdk/runanywhere-swift/Sources" \
 # =========================================================================
 
 # 3a. Vendored nlohmann/json.hpp
-scan_find "sdk/runanywhere-flutter" "json.hpp" "flutter:vendored-nlohmann" \
+scan_find "bindings/flutter" "json.hpp" "flutter:vendored-nlohmann" \
   -path "*/nlohmann/*" -not -path "*/test/*" -not -path "*/tests/*" \
   -not -path "*/build/*" -not -path "*/.cxx/*"
 
 # 3b. *_bridge.cpp or *_bridge.h files
-scan_find "sdk/runanywhere-flutter/packages" "*_bridge.cpp" "flutter:json-bridge-cpp" \
+scan_find "bindings/flutter/packages" "*_bridge.cpp" "flutter:json-bridge-cpp" \
   -not -path "*/test/*" -not -path "*/tests/*" -not -path "*/build/*" \
   -not -path "*/.cxx/*"
-scan_find "sdk/runanywhere-flutter/packages" "*_bridge.h" "flutter:json-bridge-header" \
+scan_find "bindings/flutter/packages" "*_bridge.h" "flutter:json-bridge-header" \
   -not -path "*/test/*" -not -path "*/tests/*" -not -path "*/build/*" \
   -not -path "*/.cxx/*"
 
 # 3c. Deprecated Dart compatibility declarations.
-scan_grep_filtered "sdk/runanywhere-flutter/packages" \
+scan_grep_filtered "bindings/flutter/packages" \
   "@Deprecated" "*.dart" "flutter:deprecated-declaration" \
   "/test/" "/tests/" "/build/" "/generated/"
 
@@ -244,29 +244,29 @@ scan_grep_filtered "sdk/runanywhere-flutter/packages" \
 # =========================================================================
 
 # 4a. Vendored nlohmann/json.hpp
-scan_find "sdk/runanywhere-react-native" "json.hpp" "rn:vendored-nlohmann" \
+scan_find "bindings/react-native" "json.hpp" "rn:vendored-nlohmann" \
   -path "*/nlohmann/*" -not -path "*/node_modules/*" -not -path "*/.cxx/*" -not -path "*/build/*"
 
 # 4b. C++ bridge files using nlohmann/JSON
-scan_grep_filtered "sdk/runanywhere-react-native/packages" \
+scan_grep_filtered "bindings/react-native/packages" \
   "(nlohmann|json\.hpp)" "*.cpp" "rn:cpp-json-bridge" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/.cxx/" "/build/"
-scan_grep_filtered "sdk/runanywhere-react-native/packages" \
+scan_grep_filtered "bindings/react-native/packages" \
   "(jsonString|jsonEscape)" "*.cpp" "rn:cpp-json-bridge" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/.cxx/" "/build/"
 
 # 4c. TypeScript files with JSON.parse/JSON.stringify (source only, not build artifacts)
-scan_grep_filtered "sdk/runanywhere-react-native/packages" \
+scan_grep_filtered "bindings/react-native/packages" \
   "(JSON\.parse|JSON\.stringify)" "*.ts" "rn:ts-json-serialisation" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/build/" "/lib/" "/.cxx/"
 
 # 4d. *Bridge.ts files that are JSON-based bridges
-scan_find "sdk/runanywhere-react-native/packages" "*Bridge.ts" "rn:bridge-ts-file" \
+scan_find "bindings/react-native/packages" "*Bridge.ts" "rn:bridge-ts-file" \
   -not -path "*/test/*" -not -path "*/tests/*" -not -path "*/__tests__/*" \
   -not -path "*/node_modules/*" -not -path "*/build/*" -not -path "*/lib/*"
 
 # 4e. Deprecated TypeScript compatibility declarations.
-scan_grep_filtered "sdk/runanywhere-react-native/packages" \
+scan_grep_filtered "bindings/react-native/packages" \
   "@deprecated" "*.ts" "rn:deprecated-declaration" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/build/" "/lib/"
 
@@ -275,17 +275,17 @@ scan_grep_filtered "sdk/runanywhere-react-native/packages" \
 # =========================================================================
 
 # 5a. JSON.parse/JSON.stringify in TypeScript source
-scan_grep_filtered "sdk/runanywhere-web/packages" \
+scan_grep_filtered "bindings/web/packages" \
   "(JSON\.parse|JSON\.stringify)" "*.ts" "web:ts-json-serialisation" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/dist/" "/build/"
 
 # 5b. Hand-written *Types.ts files (non-proto type definitions)
-scan_find "sdk/runanywhere-web/packages" "*Types.ts" "web:hand-written-types-ts" \
+scan_find "bindings/web/packages" "*Types.ts" "web:hand-written-types-ts" \
   -not -path "*/test/*" -not -path "*/tests/*" -not -path "*/__tests__/*" \
   -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*"
 
 # 5c. Deprecated TypeScript compatibility declarations.
-scan_grep_filtered "sdk/runanywhere-web/packages" \
+scan_grep_filtered "bindings/web/packages" \
   "@deprecated" "*.ts" "web:deprecated-declaration" \
   "/test/" "/tests/" "/__tests__/" "/node_modules/" "/dist/" "/build/"
 
@@ -294,22 +294,22 @@ scan_grep_filtered "sdk/runanywhere-web/packages" \
 # =========================================================================
 
 # 6a. Public headers declaring rac_*_json functions
-scan_grep "sdk/runanywhere-commons/include" \
+scan_grep "core/include" \
   "(RAC_API|RAC_LLAMACPP_API|RAC_ONNX_API).*_json" "*.h" "cpp:public-json-api"
 
 # 6b. Public headers with config_json or out_json parameters (service vtable slots)
-scan_grep "sdk/runanywhere-commons/include" \
+scan_grep "core/include" \
   "(config_json|out_json|out_stats_json)" "*.h" "cpp:json-param-in-public-api"
 
 # 6c. Deprecated C/C++ public declarations.
-scan_grep "sdk/runanywhere-commons/include" \
+scan_grep "core/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "cpp:deprecated-declaration"
 
 # 6d. Packaged header mirrors are public API too. A clean canonical header is
 # insufficient if SwiftPM or an AAR still advertises a retired declaration.
-scan_grep "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include" \
+scan_grep "bindings/swift/Sources/RunAnywhere/CRACommons/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "swift-c:deprecated-declaration"
-scan_grep "sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs/include" \
+scan_grep "bindings/react-native/packages/core/android/src/main/jniLibs/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "rn-c:deprecated-declaration"
 
 # 6e. Retired compatibility surfaces that must never reappear under a neutral
@@ -322,9 +322,9 @@ scan_git_grep \
   "all:public-test-hook" "sdk"
 scan_git_grep \
   "rac_extract_archive[[:space:]]*\\(" \
-  "all:retired-archive-adapter-api" "sdk/runanywhere-commons/include" \
-  "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include" \
-  "sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs/include"
+  "all:retired-archive-adapter-api" "core/include" \
+  "bindings/swift/Sources/RunAnywhere/CRACommons/include" \
+  "bindings/react-native/packages/core/android/src/main/jniLibs/include"
 
 # ---------------------------------------------------------------------------
 # Report

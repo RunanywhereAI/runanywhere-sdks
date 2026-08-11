@@ -6,7 +6,7 @@ source "${SCRIPT_DIR}/../_validation_lib.sh"
 
 validation_init "commons-proto-checks"
 
-COMMONS_DIR="${VALIDATION_REPO_ROOT}/sdk/runanywhere-commons"
+COMMONS_DIR="${VALIDATION_REPO_ROOT}/core"
 COMMONS_BUILD_DIR="${COMMONS_BUILD_DIR:-${VALIDATION_BUILD_ROOT}/commons-proto}"
 
 if [[ "$(uname -s)" == "Linux" ]]; then

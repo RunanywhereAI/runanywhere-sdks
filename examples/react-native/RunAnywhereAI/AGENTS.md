@@ -155,7 +155,7 @@ files were deleted and every consumer migrated to `useTheme()`.
 
 - **Min SDK**: 24, **Target/Compile SDK**: 36, **NDK**: 27.3.13750724, **Kotlin**: 2.1.20, **Gradle**: 9.0.0
 - **ABI filter**: `arm64-v8a` only
-- **`syncSdkNativeLibs` Gradle task**: copies `.so` files from `sdk/runanywhere-react-native/` into `node_modules/@runanywhere/*/android/` before each build (runs before `preBuild`)
+- **`syncSdkNativeLibs` Gradle task**: copies `.so` files from `bindings/react-native/` into `node_modules/@runanywhere/*/android/` before each build (runs before `preBuild`)
 - **16KB page alignment**: enabled for Android 15+ compatibility (`useLegacyPackaging=false`, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`)
 - **`packagingOptions.pickFirsts`**: resolves 12+ duplicate `.so` conflicts across SDK packages
 - QHexRT/QNN: the QHexRT package declares FastRPC libraries and installs DSP skels from assets
@@ -225,5 +225,5 @@ Voice sessions are SDK-owned: `RunAnywhere.voice.createSession(...)` captures th
 ## After Modifying the SDK
 
 - **TypeScript changes**: Picked up by Metro automatically (hot-reload)
-- **C++ changes**: Rebuild commons in the owning layer (`./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` / `./scripts/build/build-core-android.sh` from the repo root) and re-stage into the RN packages with `sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from <build/native-artifacts>`
+- **C++ changes**: Rebuild commons in the owning layer (`./bindings/swift/scripts/build-core-xcframework.sh` / `./scripts/build/build-core-android.sh` from the repo root) and re-stage into the RN packages with `bindings/react-native/scripts/package-sdk.sh --natives-from <build/native-artifacts>`
 - **Missing xcframeworks** (`RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, etc.): Means the native artifact build step was skipped — run `build-core-xcframework.sh` / `build-core-android.sh`, then re-run `scripts/package-sdk.sh --natives-from PATH`

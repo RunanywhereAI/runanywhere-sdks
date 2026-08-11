@@ -16,7 +16,7 @@ import { safeEvaluateExpression } from './mathParser';
  * JSON Schema object STRING — the same OpenAI `parameters` / Anthropic
  * `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
  * Mirrors the Swift `ToolParameter.schemaProperty`/`jsonSchema(for:)` helpers
- * (sdk/runanywhere-swift/.../ToolCallingTypes.swift) and Kotlin's equivalent,
+ * (bindings/swift/.../ToolCallingTypes.swift) and Kotlin's equivalent,
  * neither of which the React Native SDK currently exposes — build the schema
  * string directly here.
  */

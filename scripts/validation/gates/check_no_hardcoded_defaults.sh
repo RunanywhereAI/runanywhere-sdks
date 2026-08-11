@@ -69,12 +69,12 @@ LIST_ONLY=0
 # ---------------------------------------------------------------------------
 mapfile -t FILES < <(
   find \
-    sdk/runanywhere-swift/Sources \
-    sdk/runanywhere-kotlin/src/main \
-    sdk/runanywhere-flutter/packages \
-    sdk/runanywhere-react-native/packages \
-    sdk/runanywhere-web/packages \
-    sdk/runanywhere-python/runanywhere \
+    bindings/swift/Sources \
+    bindings/kotlin/src/main \
+    bindings/flutter/packages \
+    bindings/react-native/packages \
+    bindings/web/packages \
+    bindings/python/runanywhere \
     -type f \
     \( -name '*.swift' -o -name '*.kt' -o -name '*.dart' -o -name '*.ts' -o -name '*.py' \) \
     2>/dev/null \

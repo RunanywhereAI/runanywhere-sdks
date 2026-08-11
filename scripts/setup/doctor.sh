@@ -86,7 +86,7 @@ row "Shell"    " " "${SHELL_NAME}"
 echo
 printf "${C_BOLD}Toolchains${C_RESET} ${C_DIM}(scanning…)${C_RESET}\n"
 
-NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
+NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/bindings/kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
 NDK_VERSION="${NDK_VERSION:-27.0.12077973}"
 
 ANDROID_SDK=""

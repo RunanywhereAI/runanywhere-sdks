@@ -23,8 +23,8 @@
     },
     {
       "customType": "regex",
-      "description": "Native-toolchain pins in sdk/runanywhere-commons/VERSIONS (shell KEY=VALUE) — GitHub-tag-sourced C/C++ deps. Keyed on concrete KEY names rather than the previous `# renovate:` annotation gate (no such annotations exist in the file, which made the manager match zero entries). LLAMACPP_VERSION → PrismML-Eng/llama.cpp (Bonsai fork pin; do not point back at ggerganov tags while the prism-* pin is active).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "description": "Native-toolchain pins in core/VERSIONS (shell KEY=VALUE) — GitHub-tag-sourced C/C++ deps. Keyed on concrete KEY names rather than the previous `# renovate:` annotation gate (no such annotations exist in the file, which made the manager match zero entries). LLAMACPP_VERSION → PrismML-Eng/llama.cpp (Bonsai fork pin; do not point back at ggerganov tags while the prism-* pin is active).",
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^LLAMACPP_VERSION=(?<currentValue>\\S+)"
       ],
@@ -36,7 +36,7 @@
     {
       "customType": "regex",
       "description": "USEARCH_VERSION → unum-cloud/usearch (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^USEARCH_VERSION=(?<currentValue>\\S+)"
       ],
@@ -48,7 +48,7 @@
     {
       "customType": "regex",
       "description": "CPPHTTPLIB_VERSION → yhirose/cpp-httplib (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^CPPHTTPLIB_VERSION=(?<currentValue>\\S+)"
       ],
@@ -60,7 +60,7 @@
     {
       "customType": "regex",
       "description": "ZLIB_VERSION → madler/zlib (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^ZLIB_VERSION=(?<currentValue>\\S+)"
       ],
@@ -72,7 +72,7 @@
     {
       "customType": "regex",
       "description": "GOOGLETEST_VERSION → google/googletest (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^GOOGLETEST_VERSION=(?<currentValue>\\S+)"
       ],
@@ -84,7 +84,7 @@
     {
       "customType": "regex",
       "description": "TS_PROTO_VERSION → ts-proto (npm) — Renovate publishes PRs to bump the centralized pin, and idl-drift-check verifies generated bindings still match.",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^TS_PROTO_VERSION=(?<currentValue>\\S+)"
       ],
@@ -96,7 +96,7 @@
     {
       "customType": "regex",
       "description": "NLOHMANN_JSON_VERSION → nlohmann/json (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^NLOHMANN_JSON_VERSION=(?<currentValue>\\S+)"
       ],
@@ -108,7 +108,7 @@
     {
       "customType": "regex",
       "description": "PROTOBUF_VERSION → protocolbuffers/protobuf (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^PROTOBUF_VERSION=(?<currentValue>\\S+)"
       ],
@@ -120,7 +120,7 @@
     {
       "customType": "regex",
       "description": "LIBARCHIVE_VERSION → libarchive/libarchive (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "fileMatch": ["^core/VERSIONS$"],
       "matchStrings": [
         "^LIBARCHIVE_VERSION=(?<currentValue>\\S+)"
       ],

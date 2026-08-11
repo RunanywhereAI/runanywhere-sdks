@@ -13,7 +13,7 @@
 # To flip this engine on for EMSCRIPTEN the following vendored artifact is
 # required:
 #
-#   sdk/runanywhere-commons/third_party/onnxruntime-wasm/
+#   core/third_party/onnxruntime-wasm/
 #     ├── lib/libonnxruntime.a          (static archive, SIMD build recommended)
 #     └── include/                      (C + C++ headers)
 #         ├── onnxruntime_c_api.h       (required)
@@ -41,7 +41,7 @@
 #
 # Gate recipe (replace the current force-OFF):
 #   set(RAC_ONNX_WASM_RUNTIME_DIR
-#       "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+#       "${CMAKE_SOURCE_DIR}/core/third_party/onnxruntime-wasm")
 #   if(EMSCRIPTEN AND NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
 #       set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
 #   endif()
@@ -54,11 +54,11 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 # EXISTS-gated disable under Emscripten: only force OFF when the vendored
 # ONNX Runtime WASM static archive is missing. When present, build normally.
 # Drop libonnxruntime.a under
-# sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/ to enable.
+# core/third_party/onnxruntime-wasm/lib/ to enable.
 if(EMSCRIPTEN)
     if(NOT DEFINED RAC_ONNX_WASM_RUNTIME_DIR OR RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
         set(RAC_ONNX_WASM_RUNTIME_DIR
-            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
+            "${CMAKE_SOURCE_DIR}/core/third_party/onnxruntime-wasm"
             CACHE PATH "Vendored ONNX Runtime WASM root (CPU or WebGPU)" FORCE)
     endif()
     if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
@@ -115,7 +115,7 @@ endif()
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
 # Resolve the runanywhere-commons root for include paths.
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 set(ONNX_BACKEND_SOURCES
     rac_backend_onnx_register.cpp

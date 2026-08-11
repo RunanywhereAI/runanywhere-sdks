@@ -49,7 +49,7 @@ RUN cmake --version
 WORKDIR /workspace
 
 # Copy the SDK and commons (needed for building)
-COPY sdk/runanywhere-commons /workspace/sdk/runanywhere-commons
+COPY core /workspace/core
 
 # Copy the openclaw-hybrid-assistant
 COPY Playground/openclaw-hybrid-assistant /workspace/Playground/openclaw-hybrid-assistant
@@ -61,12 +61,12 @@ WORKDIR /workspace/Playground/openclaw-hybrid-assistant
 RUN echo "Building for $(uname -m)"
 
 # Step 1: Download Sherpa-ONNX
-RUN cd /workspace/sdk/runanywhere-commons && \
+RUN cd /workspace/core && \
     chmod +x scripts/linux/*.sh && \
     ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons
-RUN cd /workspace/sdk/runanywhere-commons && \
+RUN cd /workspace/core && \
     chmod +x scripts/*.sh && \
     ./scripts/build-linux.sh
 
@@ -83,7 +83,7 @@ RUN mkdir -p build && cd build && \
     cmake --build . -j$(nproc)
 
 # Set library path for runtime
-ENV LD_LIBRARY_PATH=/workspace/sdk/runanywhere-commons/dist/linux/lib:/workspace/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib
+ENV LD_LIBRARY_PATH=/workspace/core/dist/linux/lib:/workspace/core/third_party/sherpa-onnx-linux/lib
 
 # Verify the build
 RUN ls -la build/ && \

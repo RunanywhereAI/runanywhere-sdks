@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
-**A cross-platform reference app for the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/).** LLM chat, speech, vision, voice agents, RAG, tools, and model management via Dart FFI—mirroring the native iOS example's feature set.
+**A cross-platform reference app for the [RunAnywhere Flutter SDK](../../../bindings/flutter/).** LLM chat, speech, vision, voice agents, RAG, tools, and model management via Dart FFI—mirroring the native iOS example's feature set.
 
 ---
 
@@ -55,11 +55,11 @@ flutter pub get
 ```bash
 cd ../../..
 ./scripts/build/build-core-android.sh arm64-v8a
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./bindings/swift/scripts/build-core-xcframework.sh
 cd examples/flutter/RunAnywhereAI
 ```
 
-- Android `.so` files land in `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/`.
+- Android `.so` files land in `bindings/flutter/packages/*/android/src/main/jniLibs/`.
 - iOS XCFrameworks land in each package's `ios/<package>/Frameworks/` directory.
 - Local consumption is enabled by `runanywhere.useLocalNatives=true` in `android/gradle.properties`.
 
@@ -124,7 +124,7 @@ MLX registers only on physical iOS hardware; the arm64 simulator validates compi
 
 ## NPU / QHexRT (Android)
 
-The `runanywhere_qhexrt` package accelerates inference on supported Snapdragon/Hexagon devices. QHexRT native libraries are private local artifacts—stage them into `sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs/arm64-v8a/` before building; do not commit them.
+The `runanywhere_qhexrt` package accelerates inference on supported Snapdragon/Hexagon devices. QHexRT native libraries are private local artifacts—stage them into `bindings/flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs/arm64-v8a/` before building; do not commit them.
 
 To test private HNPU bundles: **Settings → Downloads** → save a Hugging Face token → download/load an HNPU model → **Clear** to revert to public downloads. Token is passed via `RunAnywhere.setHfToken(...)` at runtime.
 
@@ -141,7 +141,7 @@ RunAnywhereAI/
 │   │   ├── design_system/      # AppColors (#FF6900), typography, spacing
 │   │   └── services/           # Audio, conversation store, permissions
 │   └── helpers/
-├── pubspec.yaml                # path: deps → sdk/runanywhere-flutter/packages/*
+├── pubspec.yaml                # path: deps → bindings/flutter/packages/*
 ├── android/                    # minSdk 24, packagingOptions for duplicate .so
 ├── ios/                        # Podfile, deployment target 17.5
 ├── scripts/
@@ -177,7 +177,7 @@ flutter test
 
 | Resource | Link |
 |----------|------|
-| **Flutter SDK** | [sdk/runanywhere-flutter/README.md](../../../sdk/runanywhere-flutter/README.md) |
+| **Flutter SDK** | [bindings/flutter/README.md](../../../bindings/flutter/README.md) |
 | **iOS example** | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) |
 | **Android example** | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) |
 | **React Native example** | [examples/react-native/RunAnywhereAI](../../react-native/RunAnywhereAI/README.md) |

@@ -217,7 +217,7 @@ function(_qhexrt_require_archive_symbols archive)
 endfunction()
 
 get_filename_component(RAC_COMMONS_ROOT_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 # Prebuilt QHexRT tree. Default to the gitignored in-tree staging dir so an
 # authorized checkout that ran QHexRT's verified staging script "just works".
@@ -557,7 +557,7 @@ if(_qhexrt_platform_supported AND _qhexrt_prebuilt_valid)
                 PATHS
                     "$ENV{HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship/android_aarch64"
                     "${CMAKE_SOURCE_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-kotlin/src/main/jniLibs/arm64-v8a"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/../../bindings/kotlin/src/main/jniLibs/arm64-v8a"
                 NO_DEFAULT_PATH)
         endif()
         if(QHEXRT_LIBCDSPRPC AND EXISTS "${QHEXRT_LIBCDSPRPC}")
@@ -594,13 +594,13 @@ rac_add_engine_plugin(qhexrt
 # Where commons' bundled static deps live.
 #
 # rac_commons carries `zlibstatic` (and the other bundled archives) into its
-# INTERFACE link line as a BARE NAME, not a target — sdk/runanywhere-commons's
+# INTERFACE link line as a BARE NAME, not a target — core's
 # own CMakeLists flags this, because feeding the logical target name through
 # find_package cache variables is what libarchive's internal find_package(ZLIB)
 # demands. It resolves the name with a directory-scoped
 # `link_directories("${RAC_BUNDLED_LIB_DIR}")`, and directory scope reaches only
 # that directory and its children. `engines/` is a SIBLING of
-# `sdk/runanywhere-commons/` (the same scope gap the MSVC block below documents),
+# `core/` (the same scope gap the MSVC block below documents),
 # so an engine inherits the bare name without the directory that resolves it and
 # the link dies on `LNK1181: cannot open input file 'zlibstatic.lib'`.
 #
@@ -685,7 +685,7 @@ if(RAC_PLATFORM_ANDROID)
         -Wl,-z,max-page-size=16384
         -Wl,-z,common-page-size=16384)
 elseif(MSVC)
-    # engines/ is a sibling of sdk/runanywhere-commons/, so it does NOT inherit
+    # engines/ is a sibling of core/, so it does NOT inherit
     # that directory's MSVC defaults. <mutex>/<filesystem> need an exception
     # model, and the sources are UTF-8.
     target_compile_options(rac_backend_qhexrt PRIVATE /EHsc /Zc:__cplusplus /utf-8)

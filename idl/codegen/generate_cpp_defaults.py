@@ -16,7 +16,7 @@
 # does not take effect.
 #
 # Output:
-#   sdk/runanywhere-commons/include/rac/rac_defaults_generated.h
+#   core/include/rac/rac_defaults_generated.h
 #
 # Macro naming is mechanical: RAC_DEFAULT_<MESSAGE>_<FIELD>, both in
 # SCREAMING_SNAKE, with a trailing _DEFAULTS stripped from the message so the
@@ -52,7 +52,7 @@ from _convenience_common import (
 C_PROFILE = LangProfile(int64_wrapper=None, int64_suffix="LL", float_suffix="f")
 
 HEADER_GUARD = "RAC_DEFAULTS_GENERATED_H"
-OUT_RELPATH = Path("sdk/runanywhere-commons/include/rac/rac_defaults_generated.h")
+OUT_RELPATH = Path("core/include/rac/rac_defaults_generated.h")
 
 
 def macro_name(message_name: str, field_name: str) -> str:

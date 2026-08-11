@@ -11,7 +11,7 @@ Restart=always
 RestartSec=3
 KillMode=process
 Environment=HOME=/home/runanywhere
-Environment="LD_LIBRARY_PATH=/home/runanywhere/runanywhere-sdks/sdk/runanywhere-commons/build/lib"
+Environment="LD_LIBRARY_PATH=/home/runanywhere/runanywhere-sdks/core/build/lib"
 
 [Install]
 WantedBy=default.target

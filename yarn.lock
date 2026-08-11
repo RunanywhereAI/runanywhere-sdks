@@ -2725,9 +2725,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@runanywhere/core@workspace:*, @runanywhere/core@workspace:sdk/runanywhere-react-native/packages/core":
+"@runanywhere/core@workspace:*, @runanywhere/core@workspace:bindings/react-native/packages/core":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/core@workspace:sdk/runanywhere-react-native/packages/core"
+  resolution: "@runanywhere/core@workspace:bindings/react-native/packages/core"
   dependencies:
     "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
@@ -2760,9 +2760,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/llamacpp@workspace:*, @runanywhere/llamacpp@workspace:sdk/runanywhere-react-native/packages/llamacpp":
+"@runanywhere/llamacpp@workspace:*, @runanywhere/llamacpp@workspace:bindings/react-native/packages/llamacpp":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/llamacpp@workspace:sdk/runanywhere-react-native/packages/llamacpp"
+  resolution: "@runanywhere/llamacpp@workspace:bindings/react-native/packages/llamacpp"
   dependencies:
     "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
@@ -2778,9 +2778,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/mlx@workspace:*, @runanywhere/mlx@workspace:sdk/runanywhere-react-native/packages/mlx":
+"@runanywhere/mlx@workspace:*, @runanywhere/mlx@workspace:bindings/react-native/packages/mlx":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/mlx@workspace:sdk/runanywhere-react-native/packages/mlx"
+  resolution: "@runanywhere/mlx@workspace:bindings/react-native/packages/mlx"
   dependencies:
     eslint: ^9.39.4
     react-native-nitro-modules: ^0.33.9
@@ -2793,9 +2793,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/onnx@workspace:*, @runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx":
+"@runanywhere/onnx@workspace:*, @runanywhere/onnx@workspace:bindings/react-native/packages/onnx":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx"
+  resolution: "@runanywhere/onnx@workspace:bindings/react-native/packages/onnx"
   dependencies:
     "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
@@ -2811,18 +2811,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:sdk/shared/proto-ts":
+"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:bindings/shared/proto-ts":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/proto-ts@workspace:sdk/shared/proto-ts"
+  resolution: "@runanywhere/proto-ts@workspace:bindings/shared/proto-ts"
   dependencies:
     "@bufbuild/protobuf": ^2.12.1
     typescript: ^5.9.3
   languageName: unknown
   linkType: soft
 
-"@runanywhere/qhexrt@workspace:*, @runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt":
+"@runanywhere/qhexrt@workspace:*, @runanywhere/qhexrt@workspace:bindings/react-native/packages/qhexrt":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt"
+  resolution: "@runanywhere/qhexrt@workspace:bindings/react-native/packages/qhexrt"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
     "@types/jest": ^29.5.12

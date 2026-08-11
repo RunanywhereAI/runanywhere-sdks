@@ -11,7 +11,7 @@
 # hand-written in CppBridge+ModalityProtoABI.swift.
 #
 # Output:
-#   sdk/runanywhere-swift/Sources/RunAnywhere/Generated/ModalityProtoABI+Generated.swift
+#   bindings/swift/Sources/RunAnywhere/Generated/ModalityProtoABI+Generated.swift
 #
 # Phase B simplification (B2 + B3): the generated file is now emitted directly
 # onto `extension CppBridge.<Modality>` (no parallel `CppBridge_Generated`
@@ -53,8 +53,8 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 MANIFEST_PATH = SCRIPT_DIR / "swift-modality-abi.yaml"
 OUTPUT_PATH = (
     REPO_ROOT
-    / "sdk"
-    / "runanywhere-swift"
+    / "bindings"
+    / "swift"
     / "Sources"
     / "RunAnywhere"
     / "Generated"

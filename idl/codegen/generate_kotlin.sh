@@ -6,10 +6,10 @@
 # Requirements (one of):
 #   brew install wire                                 # wire-compiler binary
 #   (or) Gradle's com.squareup.wire:wire-gradle-plugin:4.9.9 in
-#        sdk/runanywhere-kotlin/build.gradle.kts
+#        bindings/kotlin/build.gradle.kts
 #
 # Output:
-#   sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/
+#   bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/
 #
 # Wire emits pure Kotlin data classes with no Java protobuf dependency.
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated"
+OUT_DIR="${REPO_ROOT}/bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated"
 
 mkdir -p "${OUT_DIR}"
 
@@ -26,7 +26,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # definitions are passed too — Wire treats `service { rpc ... }` blocks
     # as informational and emits the message types only. The streaming
     # client wrapper is hand-written in
-    # sdk/runanywhere-kotlin/src/main/kotlin/.../adapters/
+    # bindings/kotlin/src/main/kotlin/.../adapters/
     # using kotlinx.coroutines Flow + the Wire-generated message types.
     #
     # Canonical proto-file list from generate_all.sh, with fallback
@@ -104,7 +104,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # dependency. The hand-written ~150 LOC adapter is the bridge.
 else
     echo "warning: wire-compiler not on PATH." >&2
-    echo "         The Gradle Wire plugin in sdk/runanywhere-kotlin/build.gradle.kts" >&2
+    echo "         The Gradle Wire plugin in bindings/kotlin/build.gradle.kts" >&2
     echo "         will regenerate at build time. For one-off CLI runs, install via" >&2
     echo "         'brew install wire' (macOS) or download from" >&2
     echo "         https://github.com/square/wire/releases" >&2

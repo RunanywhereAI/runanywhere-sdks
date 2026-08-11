@@ -2,7 +2,7 @@
 # cmake/platform.cmake — host/target platform detection
 #
 # Hoists the if(EMSCRIPTEN) ... elseif(IOS) ... cascade currently duplicated
-# inside `sdk/runanywhere-commons/CMakeLists.txt` into one shared function.
+# inside `core/CMakeLists.txt` into one shared function.
 # Subdirectories call `rac_detect_platform()` and read the resulting
 # RAC_PLATFORM_* variables.
 #

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/sdk/runanywhere-commons/VERSION")"
+VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/core/VERSION")"
 FAILURES=0
 
 if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
@@ -29,13 +29,13 @@ validate_pr_release_bump() {
     FAILURES=$((FAILURES + 1))
     return
   fi
-  if ! git -C "${REPO_ROOT}" cat-file -e "${base_sha}:sdk/runanywhere-commons/VERSION" 2>/dev/null; then
+  if ! git -C "${REPO_ROOT}" cat-file -e "${base_sha}:core/VERSION" 2>/dev/null; then
     echo "[FAIL] PR base ${base_sha} is unavailable; fetch it before running this gate" >&2
     FAILURES=$((FAILURES + 1))
     return
   fi
 
-  base_version="$(git -C "${REPO_ROOT}" show "${base_sha}:sdk/runanywhere-commons/VERSION" | tr -d '[:space:]')"
+  base_version="$(git -C "${REPO_ROOT}" show "${base_sha}:core/VERSION" | tr -d '[:space:]')"
   if ! [[ "${base_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
     echo "[FAIL] invalid PR-base release version: ${base_version}" >&2
     FAILURES=$((FAILURES + 1))
@@ -127,10 +127,10 @@ expect_count() {
   fi
 }
 
-expect_exact_file "sdk/runanywhere-commons/VERSION" "${VERSION}"
-expect_literal "sdk/runanywhere-commons/VERSIONS" "PROJECT_VERSION=${VERSION}"
+expect_exact_file "core/VERSION" "${VERSION}"
+expect_literal "core/VERSIONS" "PROJECT_VERSION=${VERSION}"
 expect_literal "AGENTS.md" \
-  "**Current version**: \`${VERSION}\` (canonical source: \`sdk/runanywhere-commons/VERSION\`)"
+  "**Current version**: \`${VERSION}\` (canonical source: \`core/VERSION\`)"
 
 # SwiftPM consumers resolve prebuilt XCFrameworks from a GitHub release. During
 # release preparation, the canonical SDK train can temporarily be ahead of the
@@ -172,17 +172,17 @@ if [ "${SPM_TEMP_PIN}" -eq 1 ]; then
 else
   expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${VERSION}\")"
 fi
-expect_exact_file "sdk/runanywhere-swift/VERSION" "${VERSION}"
-expect_literal "sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift" \
+expect_exact_file "bindings/swift/VERSION" "${VERSION}"
+expect_literal "bindings/swift/Sources/RunAnywhere/Generated/Versions.swift" \
   "public static let sdkVersion = \"${VERSION}\""
 
-expect_literal "sdk/runanywhere-kotlin/gradle.properties" "runanywhere.nativeLibVersion=${VERSION}"
-expect_literal "sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
+expect_literal "bindings/kotlin/gradle.properties" "runanywhere.nativeLibVersion=${VERSION}"
+expect_literal "bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
   "const val VERSION = \"${VERSION}\""
 for kotlin_publication in \
-  sdk/runanywhere-kotlin/build.gradle.kts \
-  sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts \
-  sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/build.gradle.kts; do
+  bindings/kotlin/build.gradle.kts \
+  bindings/kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts \
+  bindings/kotlin/modules/runanywhere-core-onnx/build.gradle.kts; do
   expect_literal "${kotlin_publication}" 'name.set("RunAnywhere License")'
   expect_literal "${kotlin_publication}" \
     'url.set("https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE")'
@@ -191,7 +191,7 @@ done
 read_version_pin() {
   local key="$1"
   awk -F= -v key="${key}" '$1 == key { print substr($0, index($0, "=") + 1); exit }' \
-    "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+    "${REPO_ROOT}/core/VERSIONS"
 }
 
 ONNX_VERSION_IOS_PIN="$(read_version_pin ONNX_VERSION_IOS)"
@@ -203,163 +203,163 @@ elif [ "${ONNX_VERSION_IOS_PIN}" != "${ONNX_VERSION_ANDROID_PIN}" ]; then
   echo "[FAIL] VERSIONS: shared SDK ONNX metadata requires matching iOS/Android pins; found iOS=${ONNX_VERSION_IOS_PIN}, Android=${ONNX_VERSION_ANDROID_PIN}" >&2
   FAILURES=$((FAILURES + 1))
 else
-  expect_literal "sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift" \
+  expect_literal "bindings/swift/Sources/RunAnywhere/Generated/Versions.swift" \
     "public static let onnxRuntimeIOS = \"${ONNX_VERSION_IOS_PIN}\""
-  expect_literal "sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift" \
+  expect_literal "bindings/swift/Sources/ONNXRuntime/ONNX.swift" \
     "public static let onnxRuntimeVersion = RAVersions.onnxRuntimeIOS"
-  expect_literal "sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/kotlin/com/runanywhere/sdk/core/onnx/ONNX.kt" \
+  expect_literal "bindings/kotlin/modules/runanywhere-core-onnx/src/main/kotlin/com/runanywhere/sdk/core/onnx/ONNX.kt" \
     "const val onnxRuntimeVersion = \"${ONNX_VERSION_ANDROID_PIN}\""
-  expect_literal "sdk/runanywhere-flutter/packages/runanywhere_onnx/lib/onnx.dart" \
+  expect_literal "bindings/flutter/packages/runanywhere_onnx/lib/onnx.dart" \
     "static const String onnxRuntimeVersion = '${ONNX_VERSION_IOS_PIN}'"
-  expect_literal "sdk/runanywhere-react-native/packages/onnx/src/ONNXProvider.ts" \
+  expect_literal "bindings/react-native/packages/onnx/src/ONNXProvider.ts" \
     "static readonly version = '${ONNX_VERSION_IOS_PIN}'"
 fi
 
-expect_literal "sdk/shared/proto-ts/package.json" "\"version\": \"${VERSION}\""
-expect_literal "sdk/shared/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
-expect_literal "sdk/shared/proto-ts/package.json" '"LICENSE"'
-expect_literal "sdk/shared/proto-ts/LICENSE" 'RunAnywhere License Notice'
-expect_count "sdk/shared/proto-ts/package-lock.json" "\"version\": \"${VERSION}\"" 2
+expect_literal "bindings/shared/proto-ts/package.json" "\"version\": \"${VERSION}\""
+expect_literal "bindings/shared/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
+expect_literal "bindings/shared/proto-ts/package.json" '"LICENSE"'
+expect_literal "bindings/shared/proto-ts/LICENSE" 'RunAnywhere License Notice'
+expect_count "bindings/shared/proto-ts/package-lock.json" "\"version\": \"${VERSION}\"" 2
 expect_literal "dependencies/versions.json" "\"@runanywhere/proto-ts\": \"^${VERSION}\""
 
 for package_json in \
-  sdk/runanywhere-web/package.json \
-  sdk/runanywhere-web/packages/core/package.json \
-  sdk/runanywhere-web/packages/llamacpp/package.json \
-  sdk/runanywhere-web/packages/onnx/package.json; do
+  bindings/web/package.json \
+  bindings/web/packages/core/package.json \
+  bindings/web/packages/llamacpp/package.json \
+  bindings/web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"version\": \"${VERSION}\""
 done
-expect_literal "sdk/runanywhere-web/packages/core/src/Foundation/Version.ts" \
+expect_literal "bindings/web/packages/core/src/Foundation/Version.ts" \
   "export const SDK_VERSION = '${VERSION}'"
 for package_json in \
-  sdk/runanywhere-web/packages/llamacpp/package.json \
-  sdk/runanywhere-web/packages/onnx/package.json; do
+  bindings/web/packages/llamacpp/package.json \
+  bindings/web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/web\": \">=${VERSION} <1\""
 done
 # core + llamacpp + onnx each declare the published peer/dep range.
-expect_count "sdk/runanywhere-web/package-lock.json" \
+expect_count "bindings/web/package-lock.json" \
   "\"@runanywhere/proto-ts\": \"^${VERSION}\"" 3
-expect_count "sdk/runanywhere-web/package-lock.json" \
+expect_count "bindings/web/package-lock.json" \
   "\"@runanywhere/web\": \">=${VERSION} <1\"" 2
 
 for package_json in \
-  sdk/runanywhere-react-native/package.json \
-  sdk/runanywhere-react-native/packages/core/package.json \
-  sdk/runanywhere-react-native/packages/llamacpp/package.json \
-  sdk/runanywhere-react-native/packages/mlx/package.json \
-  sdk/runanywhere-react-native/packages/onnx/package.json \
-  sdk/runanywhere-react-native/packages/qhexrt/package.json; do
+  bindings/react-native/package.json \
+  bindings/react-native/packages/core/package.json \
+  bindings/react-native/packages/llamacpp/package.json \
+  bindings/react-native/packages/mlx/package.json \
+  bindings/react-native/packages/onnx/package.json \
+  bindings/react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"version\": \"${VERSION}\""
 done
-expect_literal "sdk/runanywhere-react-native/lerna.json" "\"version\": \"${VERSION}\""
+expect_literal "bindings/react-native/lerna.json" "\"version\": \"${VERSION}\""
 for package_json in \
-  sdk/runanywhere-react-native/packages/llamacpp/package.json \
-  sdk/runanywhere-react-native/packages/mlx/package.json \
-  sdk/runanywhere-react-native/packages/onnx/package.json \
-  sdk/runanywhere-react-native/packages/qhexrt/package.json; do
+  bindings/react-native/packages/llamacpp/package.json \
+  bindings/react-native/packages/mlx/package.json \
+  bindings/react-native/packages/onnx/package.json \
+  bindings/react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/core\": \">=${VERSION}\""
 done
-expect_literal "sdk/runanywhere-react-native/packages/core/src/Foundation/Constants/SDKConstants.ts" \
+expect_literal "bindings/react-native/packages/core/src/Foundation/Constants/SDKConstants.ts" \
   "version: '${VERSION}'"
-expect_literal "sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTProvider.ts" \
+expect_literal "bindings/react-native/packages/qhexrt/src/QHexRTProvider.ts" \
   "static readonly version = '${VERSION}'"
 for gradle_file in \
-  sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle \
-  sdk/runanywhere-react-native/packages/onnx/android/build.gradle; do
+  bindings/react-native/packages/llamacpp/android/build.gradle \
+  bindings/react-native/packages/onnx/android/build.gradle; do
   expect_literal "${gradle_file}" \
     "def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : \"${VERSION}\""
 done
-expect_count "sdk/runanywhere-react-native/yarn.lock" \
+expect_count "bindings/react-native/yarn.lock" \
   "\"@runanywhere/core\": \">=${VERSION}\"" 4
 expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 4
 
 for pubspec in \
-  sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
+  bindings/flutter/packages/runanywhere/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_llamacpp/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_mlx/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_onnx/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "version: ${VERSION}"
 done
 for pubspec in \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
+  bindings/flutter/packages/runanywhere_llamacpp/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_mlx/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_onnx/pubspec.yaml \
+  bindings/flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "runanywhere: ^${VERSION}"
 done
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+expect_literal "bindings/flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
   "static final String version = _nativeVersion"
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+expect_literal "bindings/flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
   "RacNative.bindings.rac_sdk_get_version()"
-reject_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+reject_literal "bindings/flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
   "_fallbackVersion"
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/qhexrt.dart" \
+expect_literal "bindings/flutter/packages/runanywhere_qhexrt/lib/qhexrt.dart" \
   "static const String version = '${VERSION}'"
 for changelog in \
-  sdk/runanywhere-flutter/packages/runanywhere/CHANGELOG.md \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/CHANGELOG.md \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/CHANGELOG.md \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/CHANGELOG.md \
-  sdk/runanywhere-flutter/packages/runanywhere_qhexrt/CHANGELOG.md; do
+  bindings/flutter/packages/runanywhere/CHANGELOG.md \
+  bindings/flutter/packages/runanywhere_llamacpp/CHANGELOG.md \
+  bindings/flutter/packages/runanywhere_mlx/CHANGELOG.md \
+  bindings/flutter/packages/runanywhere_onnx/CHANGELOG.md \
+  bindings/flutter/packages/runanywhere_qhexrt/CHANGELOG.md; do
   expect_literal "${changelog}" "## [${VERSION}] -"
 done
 
 for gradle_file in \
-  sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle \
-  sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle; do
+  bindings/flutter/packages/runanywhere/android/build.gradle \
+  bindings/flutter/packages/runanywhere_llamacpp/android/build.gradle \
+  bindings/flutter/packages/runanywhere_onnx/android/build.gradle \
+  bindings/flutter/packages/runanywhere_qhexrt/android/build.gradle; do
   expect_literal "${gradle_file}" "version = '${VERSION}'"
 done
 for binary_config in \
-  sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle; do
+  bindings/flutter/packages/runanywhere/android/binary_config.gradle \
+  bindings/flutter/packages/runanywhere_llamacpp/android/binary_config.gradle \
+  bindings/flutter/packages/runanywhere_onnx/android/binary_config.gradle; do
   expect_literal "${binary_config}" "fallbackCoreVersion = \"${VERSION}\""
   # Gradle expands these placeholders when selecting an ABI/version archive.
   # shellcheck disable=SC2016
   expect_literal "${binary_config}" 'RACommons-android-${abi}-v${coreVersion}.zip'
 done
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
+expect_literal "bindings/flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
   "private const val SDK_VERSION = \"${VERSION}\""
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
+expect_literal "bindings/flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
   "private const val COMMONS_VERSION = \"${VERSION}\""
-expect_count "sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Sources/runanywhere/RunAnywherePlugin.swift" \
+expect_count "bindings/flutter/packages/runanywhere/ios/runanywhere/Sources/runanywhere/RunAnywherePlugin.swift" \
   "result(\"${VERSION}\")" 2
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
+expect_literal "bindings/flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
   "private const val BACKEND_VERSION = \"${VERSION}\""
 
 for podspec in \
-  sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec; do
+  bindings/flutter/packages/runanywhere/ios/runanywhere.podspec \
+  bindings/flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec \
+  bindings/flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec \
+  bindings/flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec; do
   expect_literal "${podspec}" "s.version          = '${VERSION}'"
 done
 
 for package_manifest in \
-  sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift; do
+  bindings/flutter/packages/runanywhere/ios/runanywhere/Package.swift \
+  bindings/flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift \
+  bindings/flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift; do
   expect_spm_version "${package_manifest}"
 done
 
 for release_doc in \
-  sdk/runanywhere-react-native/AGENTS.md \
-  sdk/runanywhere-react-native/packages/mlx/README.md \
-  sdk/runanywhere-flutter/AGENTS.md \
-  sdk/runanywhere-flutter/README.md \
-  sdk/runanywhere-flutter/packages/runanywhere/README.md \
-  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/README.md \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/README.md \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/README.md \
-  sdk/runanywhere-flutter/docs/ARCHITECTURE.md \
-  sdk/runanywhere-flutter/docs/Documentation.md \
-  sdk/runanywhere-swift/ARCHITECTURE.md \
-  sdk/runanywhere-swift/Sources/LlamaCPPRuntime/README.md \
-  sdk/runanywhere-swift/Sources/ONNXRuntime/README.md \
-  sdk/runanywhere-kotlin/README.md; do
+  bindings/react-native/AGENTS.md \
+  bindings/react-native/packages/mlx/README.md \
+  bindings/flutter/AGENTS.md \
+  bindings/flutter/README.md \
+  bindings/flutter/packages/runanywhere/README.md \
+  bindings/flutter/packages/runanywhere_llamacpp/README.md \
+  bindings/flutter/packages/runanywhere_mlx/README.md \
+  bindings/flutter/packages/runanywhere_onnx/README.md \
+  bindings/flutter/docs/ARCHITECTURE.md \
+  bindings/flutter/docs/Documentation.md \
+  bindings/swift/ARCHITECTURE.md \
+  bindings/swift/Sources/LlamaCPPRuntime/README.md \
+  bindings/swift/Sources/ONNXRuntime/README.md \
+  bindings/kotlin/README.md; do
   expect_literal "${release_doc}" "${VERSION}"
 done
 

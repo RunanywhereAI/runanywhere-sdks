@@ -8,7 +8,7 @@
 #
 # Build instructions:
 #   1. Build runanywhere-commons for Linux first:
-#      cd sdk/runanywhere-commons
+#      cd core
 #      ./scripts/linux/download-sherpa-onnx.sh
 #      ./scripts/build-linux.sh
 #
@@ -39,7 +39,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # =============================================================================
 
 # Path to runanywhere-commons
-set(RAC_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons")
+set(RAC_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core")
 set(RAC_COMMONS_DIST "${RAC_COMMONS_DIR}/dist/linux")
 set(RAC_COMMONS_LIB_DIR "${RAC_COMMONS_DIST}/lib")
 
@@ -160,7 +160,7 @@ endif()
 # Set RPATH so the executable can find libraries at runtime
 set_target_properties(voice-assistant PROPERTIES
     BUILD_RPATH "${RAC_COMMONS_LIB_DIR};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
-    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../sdk/runanywhere-commons/dist/linux/lib"
+    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../core/dist/linux/lib"
 )
 
 # =============================================================================

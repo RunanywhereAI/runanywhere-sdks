@@ -2,7 +2,7 @@
 #
 # Manifest that drives codegen of CppBridge+ModalityProtoABI.swift.
 #
-# Source enumerated from sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/
+# Source enumerated from bindings/swift/Sources/RunAnywhere/Foundation/
 # Bridge/Extensions/CppBridge+ModalityProtoABI.swift (~1,191 LOC). Each entry
 # captures the swift method name, the rac_* C symbol resolved via dlsym, the
 # request/response proto types, the call kind, and an optional handle context.

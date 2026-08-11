@@ -7,7 +7,7 @@
 # function from their CMakeLists.txt — no copy-pasted CMake per backend.
 #
 # This is the helper that
-# `sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h` already
+# `core/include/rac/plugin/rac_plugin_entry.h` already
 # documents (~line 126).
 #
 # Usage in engines/<name>/CMakeLists.txt:
@@ -123,7 +123,7 @@ function(rac_add_engine_plugin name)
         # Append to rac_commons; rac_commons must already exist.
         if(NOT TARGET rac_commons)
             message(FATAL_ERROR "rac_add_engine_plugin(${name}): rac_commons target not found. "
-                                "Did you call this before add_subdirectory(sdk/runanywhere-commons)?")
+                                "Did you call this before add_subdirectory(core)?")
         endif()
         target_sources(rac_commons PRIVATE ${P_SOURCES})
         if(P_INCLUDE_DIRECTORIES)

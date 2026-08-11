@@ -85,7 +85,7 @@ rac_result_t rac_tts_sherpa_create(const char* model_path, const rac_tts_sherpa_
 
     // "tts.backend.created" now emitted once by the commons TTS
     // service layer
-    // (sdk/runanywhere-commons/src/features/tts/rac_tts_service.cpp) so future
+    // (core/src/features/tts/rac_tts_service.cpp) so future
     // backends inherit the emit without duplicating it per plugin.
 
     return RAC_SUCCESS;

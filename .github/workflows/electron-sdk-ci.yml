@@ -9,16 +9,16 @@ name: electron-sdk-ci
 on:
   push:
     paths:
-      - 'sdk/runanywhere-electron/**'
-      - 'sdk/runanywhere-commons/**'
+      - 'bindings/electron/**'
+      - 'core/**'
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
       - '.github/workflows/electron-sdk-ci.yml'
   pull_request:
     paths:
-      - 'sdk/runanywhere-electron/**'
-      - 'sdk/runanywhere-commons/**'
+      - 'bindings/electron/**'
+      - 'core/**'
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
@@ -73,7 +73,7 @@ jobs:
       # --- TypeScript gates (Windows only — Linux coverage is pr-build electron-unit) ---
       - name: SDK install / typecheck / unit tests
         if: matrix.run_typescript
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         shell: bash
         run: |
           set -euo pipefail
@@ -105,7 +105,7 @@ jobs:
 
       # --- Thin native Option A ---
       - name: Install addon node deps
-        working-directory: sdk/runanywhere-electron/native
+        working-directory: bindings/electron/native
         shell: bash
         run: npm install
 
@@ -163,7 +163,7 @@ jobs:
 
       - name: Assert symbols + stage prebuild + loadPlugin smoke
         shell: bash
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         env:
           PRESET: ${{ matrix.preset }}
           PREBUILD_DIR: ${{ matrix.prebuild_dir }}
@@ -176,8 +176,8 @@ jobs:
           mkdir -p "$out"
 
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            node_path="$root/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
-            commons_path="$root/sdk/runanywhere-commons/Release/${COMMONS_NAME}"
+            node_path="$root/bindings/electron/native/Release/runanywhere_native.node"
+            commons_path="$root/core/Release/${COMMONS_NAME}"
             llama_dir="$root/engines/llamacpp/Release"
             plugin_path="$llama_dir/${PLUGIN_NAME}"
 
@@ -249,8 +249,8 @@ jobs:
               [[ -f "$out/$base" ]] || cp "$dll" "$out/"
             done
           else
-            node_path="$root/sdk/runanywhere-electron/native/runanywhere_native.node"
-            commons_path="$root/sdk/runanywhere-commons/${COMMONS_NAME}"
+            node_path="$root/bindings/electron/native/runanywhere_native.node"
+            commons_path="$root/core/${COMMONS_NAME}"
             llama_dir="$root/engines/llamacpp"
             plugin_path="$llama_dir/${PLUGIN_NAME}"
 
@@ -328,5 +328,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: sdk/runanywhere-electron/${{ matrix.prebuild_dir }}/
+          path: bindings/electron/${{ matrix.prebuild_dir }}/
           if-no-files-found: error

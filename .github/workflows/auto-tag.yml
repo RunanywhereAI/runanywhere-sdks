@@ -88,8 +88,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          REVIEWED=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
-          BEFORE=$(git show "${BASE_SHA}:sdk/runanywhere-commons/VERSIONS" \
+          REVIEWED=$(grep -E '^PROJECT_VERSION=' core/VERSIONS | cut -d= -f2 | xargs)
+          BEFORE=$(git show "${BASE_SHA}:core/VERSIONS" \
             | grep -E '^PROJECT_VERSION=' | cut -d= -f2 | xargs)
 
           BASE_VERSION="${BEFORE%%-*}"

@@ -202,7 +202,7 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
 
     // "llm.backend.created" now emitted once by the commons LLM
     // service layer
-    // (sdk/runanywhere-commons/src/features/llm/rac_llm_service.cpp) so future
+    // (core/src/features/llm/rac_llm_service.cpp) so future
     // backends inherit the emit without duplicating it per plugin.
 
     return RAC_SUCCESS;

@@ -3,9 +3,9 @@
 # sync_rac_api_exports.sh
 #
 # Companion to check_rac_api_exports.sh. Regenerates the symbols
-# section of sdk/runanywhere-commons/exports/RACommons.exports by
+# section of core/exports/RACommons.exports by
 # parsing every RAC_API-decorated declaration under
-# sdk/runanywhere-commons/include/rac/**/*.h and appending any newly
+# core/include/rac/**/*.h and appending any newly
 # discovered symbols to the curated exports list.
 #
 # Existing content (comment headers + previously-listed symbols) is
@@ -45,8 +45,8 @@ if [[ "${MODE}" == "check" ]]; then
     exec "${SCRIPT_DIR}/check_rac_api_exports.sh" --strict
 fi
 
-COMMONS_INCLUDE="${REPO_ROOT}/sdk/runanywhere-commons/include"
-EXPORTS_DIR="${REPO_ROOT}/sdk/runanywhere-commons/exports"
+COMMONS_INCLUDE="${REPO_ROOT}/core/include"
+EXPORTS_DIR="${REPO_ROOT}/core/exports"
 EXPORTS_FILE="${EXPORTS_DIR}/RACommons.exports"
 RAG_EXPORTS_FILE="${EXPORTS_DIR}/RACommons.rag.exports"
 

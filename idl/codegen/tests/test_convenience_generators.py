@@ -79,20 +79,20 @@ GENERATORS: list[tuple[str, str, Path]] = [
     (
         "swift",
         "generate_swift_convenience.py",
-        Path("sdk") / "runanywhere-swift" / "Sources" / "RunAnywhere"
+        Path("bindings") / "swift" / "Sources" / "RunAnywhere"
         / "Generated" / "RAConvenience.swift",
     ),
     (
         "kotlin",
         "generate_kotlin_convenience.py",
-        Path("sdk") / "runanywhere-kotlin" / "src" / "main" / "kotlin"
+        Path("bindings") / "kotlin" / "src" / "main" / "kotlin"
         / "com" / "runanywhere" / "sdk" / "generated" / "convenience"
         / "RAConvenience.kt",
     ),
     (
         "dart",
         "generate_dart_convenience.py",
-        Path("sdk") / "runanywhere-flutter" / "packages" / "runanywhere"
+        Path("bindings") / "flutter" / "packages" / "runanywhere"
         / "lib" / "generated" / "convenience" / "ra_convenience.dart",
     ),
     (

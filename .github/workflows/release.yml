@@ -46,7 +46,7 @@ on:
       reuse_native_web_run_id:
         description: >-
           Run id whose native-web artifact to reuse instead of rebuilding (skips native_web).
-          Only safe when nothing under sdk/runanywhere-web/wasm, engines, or commons changed
+          Only safe when nothing under bindings/web/wasm, engines, or commons changed
           since that run; a packaging-only re-release is the intended case.
         required: false
         default: ''
@@ -108,7 +108,7 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Releasing version: $V"
           # VERSIONS file should already be bumped before tag (sync-versions.sh)
-          PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' core/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
             echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
@@ -125,7 +125,7 @@ jobs:
           fi
           for manifest in \
             Package.swift \
-            sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec; do
+            bindings/flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec; do
             if grep -Eq '0{64}' "$manifest"; then
               echo "::error::$manifest contains a placeholder Apple binary/resource checksum."
               exit 1
@@ -167,11 +167,11 @@ jobs:
         with:
           platform: ios
       - name: Download vendored ONNX Runtime (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+        run: bash core/scripts/ios/download-onnx.sh
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+        run: bash core/scripts/ios/download-sherpa-onnx.sh
       - name: Build pinned Sherpa/ONNX static inventory (macOS arm64)
-        run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
       - name: Build + package XCFrameworks (commons + backends)
         # build-ios.sh delegates the build to build-core-xcframework.sh (the
         # same script pr-build.yml uses, so PR-time and tag-time take identical
@@ -182,14 +182,14 @@ jobs:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           # Build the real NeuRT engine from the checked-out neurun source.
           NEURT_ROOT: ${{ github.workspace }}/neurun
-        run: bash sdk/runanywhere-commons/scripts/build-ios.sh
+        run: bash core/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7
         with:
           name: native-ios-macos
           path: |
-            sdk/runanywhere-commons/dist/packages/*.zip
-            sdk/runanywhere-commons/dist/packages/*.sha256
+            core/dist/packages/*.zip
+            core/dist/packages/*.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -215,7 +215,7 @@ jobs:
       # before configure. pr-build.yml runs this same step; the release job was
       # missing it, which failed configure with "Sherpa-ONNX not found".
       - name: Download vendored Sherpa-ONNX (Android)
-        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
+        run: bash core/scripts/android/download-sherpa-onnx.sh
       - name: Build + package commons for Android (${{ matrix.abi }})
         # build-android.sh delegates the build to build-core-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
@@ -223,14 +223,14 @@ jobs:
         # RACommons-android-<abi>-v<version>.zip + .sha256 under dist/.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-commons/scripts/build-android.sh ${{ matrix.abi }}
+        run: bash core/scripts/build-android.sh ${{ matrix.abi }}
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v7
         with:
           name: native-android-${{ matrix.abi }}
           path: |
-            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
-            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            core/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            core/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -250,14 +250,14 @@ jobs:
         # RACommons-linux-x86_64-v<version>.tar.gz + .sha256 under dist/.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-commons/scripts/build-linux.sh
+        run: bash core/scripts/build-linux.sh
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
           name: native-linux
           path: |
-            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz
-            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz.sha256
+            core/dist/RACommons-linux-*.tar.gz
+            core/dist/RACommons-linux-*.tar.gz.sha256
           retention-days: 7
           # Strict: matches iOS/Android/Web uploads + the `== 'success'`
           # publish gate (pass3-syn-007). A missing tarball blocks publish.
@@ -284,7 +284,7 @@ jobs:
       - name: Stage exact Apple release candidates
         run: |
           set -euo pipefail
-          BINARIES="$GITHUB_WORKSPACE/sdk/runanywhere-swift/Binaries"
+          BINARIES="$GITHUB_WORKSPACE/bindings/swift/Binaries"
           rm -rf "$BINARIES"
           mkdir -p "$BINARIES"
           for archive in "$GITHUB_WORKSPACE"/native-ios-staging/*-ios-v*.zip; do
@@ -316,7 +316,7 @@ jobs:
           SWIFT_BUILD_JOBS: 2
         run: |
           set -euo pipefail
-          bash sdk/runanywhere-cli/scripts/build-mlx-cli.sh
+          bash apps/rcli/scripts/build-mlx-cli.sh
           export RUNANYWHERE_USE_LOCAL_NATIVES=1
           BIN_DIR="$(swift build -c release --show-bin-path)"
           [ -x "$BIN_DIR/RunAnywhereMLXCLI" ]
@@ -470,7 +470,7 @@ jobs:
           RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
           RCLI_NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
           RCLI_NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh .build macos-arm64
+        run: bash apps/rcli/scripts/package-rcli.sh .build macos-arm64
       - name: Remove ephemeral signing credentials
         if: always()
         env:
@@ -488,10 +488,10 @@ jobs:
         with:
           name: rcli-macos
           path: |
-            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz
-            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz.sha256
-            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.dmg
-            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.dmg.sha256
+            apps/rcli/dist/rcli-macos-arm64-v*.tar.gz
+            apps/rcli/dist/rcli-macos-arm64-v*.tar.gz.sha256
+            apps/rcli/dist/rcli-macos-arm64-v*.dmg
+            apps/rcli/dist/rcli-macos-arm64-v*.dmg.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -507,7 +507,7 @@ jobs:
           platform: linux
       - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev patchelf
       - name: Sherpa-ONNX prebuilts
-        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+        run: ./core/scripts/linux/download-sherpa-onnx.sh
       - name: Build rcli (Linux x86_64)
         run: |
           set -euo pipefail
@@ -516,14 +516,14 @@ jobs:
       - name: Package rcli tarball
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+        run: bash apps/rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
       - name: Upload rcli Linux artifact
         uses: actions/upload-artifact@v7
         with:
           name: rcli-linux
           path: |
-            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz
-            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+            apps/rcli/dist/rcli-linux-x86_64-v*.tar.gz
+            apps/rcli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -546,7 +546,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
       - name: Sherpa-ONNX prebuilts
         shell: cmd
-        run: sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Build rcli (Windows x86_64)
         shell: pwsh
         run: |
@@ -560,7 +560,7 @@ jobs:
             Select-Object -First 1
           if (-not $Onnx) { throw "onnxruntime.dll not found" }
           $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib" |
+          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
             Out-File $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Unit tests
         shell: pwsh
@@ -607,7 +607,7 @@ jobs:
       - name: Package rcli ZIP
         shell: pwsh
         run: >-
-          ./sdk/runanywhere-cli/scripts/package-rcli-windows.ps1
+          ./apps/rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
           -Version ${{ needs.validate.outputs.version }}
       - name: Upload rcli Windows artifact
@@ -615,8 +615,8 @@ jobs:
         with:
           name: rcli-windows
           path: |
-            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip
-            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip.sha256
+            apps/rcli/dist/rcli-windows-x86_64-v*.zip
+            apps/rcli/dist/rcli-windows-x86_64-v*.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -634,11 +634,11 @@ jobs:
         with:
           platform: windows
       - name: Build commons + backends for Windows x64
-        working-directory: sdk/runanywhere-commons
+        working-directory: core
         shell: cmd
         run: scripts\build-windows.bat
       - name: Package Windows outputs
-        working-directory: sdk/runanywhere-commons
+        working-directory: core
         shell: bash
         run: |
           set -euo pipefail
@@ -666,8 +666,8 @@ jobs:
         with:
           name: native-windows
           path: |
-            sdk/runanywhere-commons/dist/RACommons-windows-*.zip
-            sdk/runanywhere-commons/dist/RACommons-windows-*.zip.sha256
+            core/dist/RACommons-windows-*.zip
+            core/dist/RACommons-windows-*.zip.sha256
           retention-days: 7
           # Strict: matches iOS/Android/Web uploads + the `== 'success'`
           # publish gate (pass3-syn-007). A missing zip blocks publish.
@@ -691,22 +691,22 @@ jobs:
         with:
           platform: web
       - name: Vendor ONNX Runtime and Sherpa-ONNX WASM archives
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run vendor:wasm:speech
       - name: Build WASM (core, CPU llama.cpp, ONNX + Sherpa)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run build:wasm -- --core --llamacpp --onnx
       - name: Build WASM (WebGPU llama.cpp)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run build:wasm -- --webgpu
       - name: Build WASM (WebGPU ONNX + Sherpa)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run build:wasm -- --onnx-webgpu
       - name: Package Web/WASM outputs
         # All five artifacts are required release inputs. Emscripten 5+ embeds
         # pthread workers in the generated glue, so only the JS/WASM pairs are
         # portable publish requirements.
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: |
           set -euo pipefail
           required_files=(
@@ -741,8 +741,8 @@ jobs:
         with:
           name: native-web
           path: |
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz.sha256
+            bindings/web/dist/RACommons-web-*.tar.gz
+            bindings/web/dist/RACommons-web-*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -776,12 +776,12 @@ jobs:
         # POM and Gradle module metadata, into one self-contained repository.
         env:
           SDK_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-kotlin/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
+        run: bash bindings/kotlin/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
       - name: Upload Kotlin SDK artifacts
         uses: actions/upload-artifact@v7
         with:
           name: sdk-kotlin
-          path: sdk/runanywhere-kotlin/dist/sdk-kotlin/**
+          path: bindings/kotlin/dist/sdk-kotlin/**
           retention-days: 7
           if-no-files-found: error
 
@@ -816,24 +816,24 @@ jobs:
         # workspaces → npm install + build:ts → npm pack each package → checksum.
         # The script packs @runanywhere/proto-ts alongside the SDK packages (it
         # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
-        run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
+        run: bash bindings/web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
       # The browser gates drive the in-repo minimal harness
-      # (sdk/runanywhere-web/example). The full demo app lives in
+      # (bindings/web/example). The full demo app lives in
       # github.com/RunanywhereAI/runanywhere-web and is validated there.
       - name: Install minimal example dependencies
-        working-directory: sdk/runanywhere-web/example
+        working-directory: bindings/web/example
         run: npm ci --no-audit --no-fund
       - name: Install Playwright Chromium
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npx playwright install --with-deps chromium
       - name: Packaged-browser smoke (readiness)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run test:browser:smoke
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v7
         with:
           name: sdk-web
-          path: sdk/runanywhere-web/dist/sdk-web/**
+          path: bindings/web/dist/sdk-web/**
           retention-days: 7
           if-no-files-found: error
 
@@ -896,14 +896,14 @@ jobs:
       - name: Package RN SDK tarballs
         run: |
           set -euo pipefail
-          bash sdk/runanywhere-react-native/scripts/package-sdk.sh \
+          bash bindings/react-native/scripts/package-sdk.sh \
             --mode ci \
             --natives-from "$GITHUB_WORKSPACE/rn-natives-staging"
       - name: Upload RN SDK artifacts
         uses: actions/upload-artifact@v7
         with:
           name: sdk-react-native
-          path: sdk/runanywhere-react-native/dist/sdk-rn/**
+          path: bindings/react-native/dist/sdk-rn/**
           retention-days: 7
           if-no-files-found: error
 
@@ -958,7 +958,7 @@ jobs:
       - name: Build swift-starter-example against local artifacts
         run: |
           set -euo pipefail
-          BINARIES="$GITHUB_WORKSPACE/sdk/runanywhere-swift/Binaries"
+          BINARIES="$GITHUB_WORKSPACE/bindings/swift/Binaries"
           rm -rf "$BINARIES"
           mkdir -p "$BINARIES"
           for archive in "$GITHUB_WORKSPACE"/native-ios-staging/*-ios-v*.zip; do
@@ -1114,10 +1114,10 @@ jobs:
 
           version = os.environ["RELEASE_VERSION"]
           sdk_catalog = Path(
-              "sdk/runanywhere-kotlin/gradle/libs.versions.toml"
+              "bindings/kotlin/gradle/libs.versions.toml"
           ).read_text(encoding="utf-8")
           sdk_wrapper = Path(
-              "sdk/runanywhere-kotlin/gradle/wrapper/gradle-wrapper.properties"
+              "bindings/kotlin/gradle/wrapper/gradle-wrapper.properties"
           ).read_text(encoding="utf-8")
           agp_version = re.search(
               r'(?m)^agp\s*=\s*"([^"]+)"$', sdk_catalog
@@ -1373,7 +1373,7 @@ jobs:
         run: |
           set -euo pipefail
           # Policy: STRICT (see comment block above validate_consumer_swift).
-          STARTER="$GITHUB_WORKSPACE/sdk/runanywhere-web/example"
+          STARTER="$GITHUB_WORKSPACE/bindings/web/example"
           STAGING="$GITHUB_WORKSPACE/sdk-web-staging"
           LOCAL_SDK="$STARTER/local-sdk"
           if [ ! -f "$STARTER/package.json" ]; then
@@ -1480,13 +1480,13 @@ jobs:
     timeout-minutes: 45
     steps:
       # Check out THIS repo so the local Flutter SDK packages under
-      # sdk/runanywhere-flutter/ are present and can be staged with the
+      # bindings/flutter/ are present and can be staged with the
       # freshly-built native artifacts from native_ios / native_android.
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
-      # FLUTTER_VERSION sourced from sdk/runanywhere-commons/VERSIONS.
+      # FLUTTER_VERSION sourced from core/VERSIONS.
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
@@ -1526,12 +1526,12 @@ jobs:
           # The package contract owns the core/LlamaCPP/ONNX split and rejects
           # private QHexRT/QNN leakage. Do not hand-copy a combined archive into
           # the core plugin: analysis alone would never notice that bad layout.
-          bash sdk/runanywhere-flutter/scripts/package-sdk.sh \
+          bash bindings/flutter/scripts/package-sdk.sh \
             --mode ci \
             --natives-from "$STAGING"
           # Exercise the otherwise-unreachable remote download branch against
           # local release-shaped zips, including checksum corruption rejection.
-          bash sdk/runanywhere-flutter/scripts/test-android-remote-downloads.sh
+          bash bindings/flutter/scripts/test-android-remote-downloads.sh
       - name: Build the current in-tree Flutter consumer
         run: |
           set -euo pipefail
@@ -1979,7 +1979,7 @@ jobs:
           RAC_CHECKSUM_SKIP: RunAnywhereMLXRuntime
         run: |
           set -euo pipefail
-          if ! ./sdk/runanywhere-swift/scripts/sync-checksums.sh --check release-flat; then
+          if ! ./bindings/swift/scripts/sync-checksums.sh --check release-flat; then
             echo "::error::The built Apple archives do not match the tagged package contracts. Rebuild deterministic archives and commit their checksums before creating the tag."
             exit 1
           fi

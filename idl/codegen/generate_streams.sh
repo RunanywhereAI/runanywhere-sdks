@@ -8,7 +8,7 @@
 #
 # Replaces the byte-identical pair generate_rn_streams.sh
 # + generate_web_streams.sh, both of which used to write to the same
-# OUT_DIR (sdk/shared/proto-ts/src/streams). Running both in sequence was
+# OUT_DIR (bindings/shared/proto-ts/src/streams). Running both in sequence was
 # a silent overwrite trap — any unilateral edit to one script would be
 # overwritten on the next generate_all.sh run by the unchanged copy in
 # the other script.
@@ -19,12 +19,12 @@
 # triple.
 #
 # Output:
-#   sdk/shared/proto-ts/src/streams/
+#   bindings/shared/proto-ts/src/streams/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUT_DIR="${REPO_ROOT}/sdk/shared/proto-ts/src/streams"
+OUT_DIR="${REPO_ROOT}/bindings/shared/proto-ts/src/streams"
 TEMPLATE="${SCRIPT_DIR}/templates/ts_async_iterable.njk"
 
 mkdir -p "${OUT_DIR}"

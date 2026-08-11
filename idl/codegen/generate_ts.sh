@@ -4,21 +4,21 @@
 # Generate shared TypeScript bindings via ts-proto for React Native and Web.
 #
 # Requirements: pinned ts-proto version sourced from
-#   sdk/runanywhere-commons/VERSIONS::TS_PROTO_VERSION
+#   core/VERSIONS::TS_PROTO_VERSION
 # Install via: scripts/setup/setup-toolchain.sh (or `npm install -g ts-proto@${TS_PROTO_VERSION}`).
 #
 # Output:
-#   sdk/shared/proto-ts/src/
+#   bindings/shared/proto-ts/src/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-TS_OUT_DIR="${REPO_ROOT}/sdk/shared/proto-ts/src"
+TS_OUT_DIR="${REPO_ROOT}/bindings/shared/proto-ts/src"
 
 # Load TS_PROTO_VERSION from the centralized VERSIONS file so the install hint
 # below matches what setup-toolchain.sh actually installs.
-VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+VERSIONS_FILE="${REPO_ROOT}/core/VERSIONS"
 if [ -f "${VERSIONS_FILE}" ]; then
     set -a
     eval "$(grep -E '^[A-Z_][A-Z0-9_]*=' "${VERSIONS_FILE}")"
