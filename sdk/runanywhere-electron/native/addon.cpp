@@ -6,18 +6,20 @@
 // Napi::ThreadSafeFunction on a worker thread (BlockingCall = backpressure) and
 // resolves a Promise in the TSFN finalizer.
 //
-// Modalities: LLM (generate) and VLM (generateVlm, image + prompt) — both served
-// by the already-linked llama.cpp engine.
+// Modalities: LLM (generate) and VLM (generateVlm, image + prompt) — both
+// served by the already-linked llama.cpp engine.
 
 #include <napi.h>
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -30,21 +32,23 @@
 #endif
 
 #include "rac/core/rac_core.h"
+#include "rac/plugin/rac_plugin_loader.h"
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_neurt.h"
 #endif
-#include "llm_bridge.h"
-#include "model_bridge.h"
-#include "tool_bridge.h"
+#include "audio_bridge.h"
 #include "data_bridge.h"
 #include "download_bridge.h"
-#include "audio_bridge.h"
+#include "llm_bridge.h"
+#include "logging_bridge.h"
 #include "lora_bridge.h"
-#include "speech_bridge.h"
-#include "voice_bridge.h"
-#include "vlm_bridge.h"
+#include "model_bridge.h"
 #include "proto_bridge.h"
+#include "speech_bridge.h"
+#include "tool_bridge.h"
+#include "vlm_bridge.h"
+#include "voice_bridge.h"
 
 #include "rac/core/rac_types.h"
 #include "rac/features/diarization/rac_diarization_service.h"
@@ -67,12 +71,14 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 // Desktop control plane (telemetry + auth). Compiled only when the desktop
 // adapter — which carries the libcurl HTTP transport — is linked into commons
-// (RAC_ELECTRON_HAVE_DESKTOP, set by native/CMakeLists.txt when RAC_DESKTOP_ADAPTER=ON).
+// (RAC_ELECTRON_HAVE_DESKTOP, set by native/CMakeLists.txt when
+// RAC_DESKTOP_ADAPTER=ON).
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
@@ -92,7 +98,8 @@
 #endif
 
 // Engine backends — linked when present (see native/CMakeLists.txt foreach).
-// Required backends keep their commons headers; optional ones declare register only.
+// Required backends keep their commons headers; optional ones declare register
+// only.
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
 #include "rac/backends/rac_llm_llamacpp.h"
 #endif
@@ -168,18 +175,18 @@ rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, in
 // =============================================================================
 // In-flight operation tracking — prevents destroy-during-call use-after-free.
 //
-// Blocking rac_* calls (generate/embed/transcribe/synthesize/rag_*) may run on a
-// worker thread while another thread calls unload_*()/shutdown(). Mark a handle
-// busy for every blocking op (keyed by the globally-unique integer id) and make
-// unload/shutdown WAIT for the handle to go idle before destroying it.
+// Blocking rac_* calls (generate/embed/transcribe/synthesize/rag_*) may run on
+// a worker thread while another thread calls unload_*()/shutdown(). Mark a
+// handle busy for every blocking op (keyed by the globally-unique integer id)
+// and make unload/shutdown WAIT for the handle to go idle before destroying it.
 // =============================================================================
 std::condition_variable g_inflight_cv;
 std::unordered_map<int32_t, int> g_inflight;  // handle id -> active blocking-op count
 
-// A component is not re-entrant. While every blocking op ran on the JS thread the
-// event loop serialised them for free; now that they run on the libuv pool, two
-// awaited-in-parallel calls could reach one engine at once, so each handle carries
-// a gate the worker holds for the duration of its rac_* call.
+// A component is not re-entrant. While every blocking op ran on the JS thread
+// the event loop serialised them for free; now that they run on the libuv pool,
+// two awaited-in-parallel calls could reach one engine at once, so each handle
+// carries a gate the worker holds for the duration of its rac_* call.
 std::unordered_map<int32_t, std::shared_ptr<std::mutex>> g_op_gates;
 
 rac_handle_t begin_op(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -271,6 +278,88 @@ void throw_rac_error(Napi::Env env, rac_result_t code, const std::string& contex
     make_rac_error(env, code, msg).ThrowAsJavaScriptException();
 }
 
+// Idempotent wrapper: a second load of the same plugin (host pre-load + env
+// replay inside initialize, or a re-fork that already registered) is success.
+rac_result_t load_plugin_path(const char* path) {
+    if (path == nullptr || path[0] == '\0')
+        return RAC_ERROR_NULL_POINTER;
+    rac_result_t rc = rac_registry_load_plugin(path);
+    if (rc == RAC_ERROR_PLUGIN_DUPLICATE)
+        return RAC_SUCCESS;
+    return rc;
+}
+
+#ifdef RAC_ELECTRON_THIN_ADDON
+// Path list separator matches Node's `path.delimiter` (Unix `:` / Windows `;`).
+#ifdef _WIN32
+constexpr char kPluginPathDelimiter = ';';
+#else
+constexpr char kPluginPathDelimiter = ':';
+#endif
+
+// Load every absolute path in RUNANYWHERE_PLUGIN_PATHS. Main sets this before
+// forking the utility host; it is NEVER an RPC argument (renderer must not be
+// able to dlopen arbitrary native code). Compiled only for thin builds — fat
+// builds may still receive the env for forward-compat but skip loading here.
+rac_result_t load_plugins_from_env() {
+    const char* raw = std::getenv("RUNANYWHERE_PLUGIN_PATHS");
+    if (raw == nullptr || raw[0] == '\0')
+        return RAC_SUCCESS;
+    std::string list(raw);
+    std::string path;
+    std::istringstream stream(list);
+    while (std::getline(stream, path, kPluginPathDelimiter)) {
+        if (path.empty())
+            continue;
+        rac_result_t rc = load_plugin_path(path.c_str());
+        if (rc != RAC_SUCCESS)
+            return rc;
+    }
+    return RAC_SUCCESS;
+}
+#endif  // RAC_ELECTRON_THIN_ADDON
+
+// =============================================================================
+// loadPlugin(absolutePath) — host / main only. Not on the RPC allowlist.
+// =============================================================================
+Napi::Value LoadPlugin(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "loadPlugin(absolutePath) expects a string")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string path = info[0].As<Napi::String>().Utf8Value();
+    return RunNativeCall(env, "rac_registry_load_plugin",
+                         [path]() { return load_plugin_path(path.c_str()); });
+}
+
+// listPlugins() -> string[] of currently registered engine names (runtime).
+Napi::Value ListPlugins(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    (void)info;
+    const char** names = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_registry_list_plugins(&names, &count);
+    if (rc != RAC_SUCCESS) {
+        throw_rac_error(env, rc, "rac_registry_list_plugins");
+        return env.Undefined();
+    }
+    Napi::Array out = Napi::Array::New(env, count);
+    for (size_t i = 0; i < count; ++i) {
+        out.Set(i, Napi::String::New(env, names[i] != nullptr ? names[i] : ""));
+    }
+    rac_registry_free_plugin_list(names, count);
+    return out;
+}
+
+// pluginApiVersion() — commons' RAC_PLUGIN_API_VERSION as a runtime number.
+Napi::Value PluginApiVersion(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    (void)info;
+    return Napi::Number::New(env, static_cast<double>(rac_plugin_api_version()));
+}
+
 // =============================================================================
 // initialize(secureDir[, baseDir])
 // =============================================================================
@@ -294,6 +383,13 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 #else
         rac_electron_fill_posix_adapter(&g_adapter, secure.c_str());
 #endif
+        // The adapter's own `log` writes straight to stderr. Commons routes every
+        // record through this slot, so replacing it here is what gives the
+        // `logging` namespace something to subscribe to — and what puts the
+        // stderr write itself behind `logging.setLocalEnabled`. The adapter files
+        // stay untouched because the M0 harness links them without this bridge.
+        g_adapter.log = [](rac_log_level_t level, const char* category, const char* message,
+                           void*) { rac_electron::ForwardLog(level, category, message); };
 
         rac_config_t cfg;
         std::memset(&cfg, 0, sizeof(cfg));
@@ -308,10 +404,12 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             return rc;
 
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
-        // The download orchestrator refuses to start without a registered HTTP
-        // transport, and downloading a model has nothing to do with having
-        // control-plane credentials — so the libcurl transport goes up here
-        // rather than only inside configureControlPlane().
+        // D4 — desktop HTTP path. Platform adapters leave http_download NULL on
+        // purpose (that slot is the Web/Emscripten async driver). Model downloads,
+        // HF fetches inside the orchestrator, and control-plane POSTs all need the
+        // process-wide libcurl transport vtable. Register it here at initialize()
+        // — not only inside configureControlPlane() — so downloads work before
+        // any API key / phase-2 handshake.
         rc = rac_desktop_http_transport_register();
         if (rc != RAC_SUCCESS) {
             rac_shutdown();
@@ -323,7 +421,12 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
         // rac_shutdown(), so register exactly once — re-registering after a
         // shutdown+re-init would fail (RAC already-registered), which is why
         // initialize() must be safe to call again after shutdown().
-        // Each call is gated by RAC_HAVE_BACKEND_<X> from native/CMakeLists.txt.
+        //
+        // FAT builds: each call is gated by RAC_HAVE_BACKEND_<X> from
+        // native/CMakeLists.txt (zero macros ⇒ empty block in thin mode).
+        // THIN builds: engines arrive via rac_registry_load_plugin — either an
+        // explicit loadPlugin() from the host, or RUNANYWHERE_PLUGIN_PATHS set
+        // by main before the utility fork (never an RPC argument).
         static bool backends_registered = false;
         if (!backends_registered) {
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -356,6 +459,17 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 #ifdef RAC_HAVE_BACKEND_CLOUD
             rac_backend_cloud_register();
 #endif
+#ifdef RAC_ELECTRON_THIN_ADDON
+            // Runtime plugins (thin addon only). Fat/static builds ignore the env
+            // — rac_registry_load_plugin returns FEATURE_NOT_AVAILABLE there, and
+            // backends are already linked via RAC_HAVE_BACKEND_*. Idempotent with
+            // a prior host loadPlugin() thanks to DUPLICATE→success.
+            rc = load_plugins_from_env();
+            if (rc != RAC_SUCCESS) {
+                rac_shutdown();
+                return rc;
+            }
+#endif
             backends_registered = true;
         }
         g_initialized.store(true);
@@ -384,6 +498,37 @@ Napi::Value MemoryInfo(const Napi::CallbackInfo& info) {
     return out;
 }
 
+// hfTokenSet(token) — the process-wide Hugging Face bearer. Commons attaches it
+// as `Authorization: Bearer` to https requests whose host is exactly
+// huggingface.co / hf.co (downloads, the HEAD size preflight, and the Hub tree
+// API), never to a CDN/LFS redirect target and never over a caller-supplied
+// Authorization header. Without it a gated or private repo 401s.
+//
+// null restores the environment fallback commons resolves for itself (HF_TOKEN,
+// then $HF_TOKEN_PATH, then $HF_HOME/token, then ~/.cache/huggingface/token);
+// an empty string is an explicit opt-out that suppresses that fallback too.
+// Synchronous: the C entry point is a mutex and a string copy.
+Napi::Value HfTokenSet(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || info[0].IsNull() || info[0].IsUndefined()) {
+        rac_http_hf_token_set(nullptr);
+        return env.Undefined();
+    }
+    if (!info[0].IsString()) {
+        throw Napi::TypeError::New(env, "hfTokenSet(token) expects a string or null");
+    }
+    const std::string token = info[0].As<Napi::String>().Utf8Value();
+    rac_http_hf_token_set(token.c_str());
+    return env.Undefined();
+}
+
+// hfTokenConfigured() — whether a non-empty token is active, resolved exactly
+// the way the request dispatcher resolves it. The token itself is deliberately
+// unreadable across this boundary, so this is the only thing a caller can ask.
+Napi::Value HfTokenConfigured(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), rac_http_hf_token_is_configured() == RAC_TRUE);
+}
+
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
 // =============================================================================
 // Desktop control plane: telemetry + auth over the libcurl HTTP transport.
@@ -398,9 +543,10 @@ Napi::Value MemoryInfo(const Napi::CallbackInfo& info) {
 // =============================================================================
 
 // Delivers a queued telemetry batch over the desktop HTTP transport. Wired via
-// rac_telemetry_manager_set_http_callback (user_data = the manager); reports the
-// outcome back through rac_telemetry_manager_http_complete. Runs on commons'
-// telemetry thread — pure C++, never touches JS or a ThreadSafeFunction.
+// rac_telemetry_manager_set_http_callback (user_data = the manager); reports
+// the outcome back through rac_telemetry_manager_http_complete. Runs on
+// commons' telemetry thread — pure C++, never touches JS or a
+// ThreadSafeFunction.
 void electron_telemetry_http_callback(void* user_data, const char* endpoint, const char* json_body,
                                       size_t json_length, rac_bool_t requires_auth) {
     auto* manager = static_cast<rac_telemetry_manager_t*>(user_data);
@@ -472,12 +618,12 @@ void electron_telemetry_http_callback(void* user_data, const char* endpoint, con
 }
 
 // The auth manager's persistence vtable, backed by the same secure store the
-// public `secure` namespace uses (DPAPI on Windows, owner-only files elsewhere).
-// Without it rac_auth_save_tokens is a no-op, every process start re-authenticates
-// from scratch, and the refresh token is unusable — which is what Electron did
-// before this. The slots follow rac_secure_storage_t's own return convention,
-// which is NOT rac_result_t: 0/length for success, RAC_ERROR_FILE_NOT_FOUND for a
-// clean miss, negative for a real failure.
+// public `secure` namespace uses (DPAPI on Windows, owner-only files
+// elsewhere). Without it rac_auth_save_tokens is a no-op, every process start
+// re-authenticates from scratch, and the refresh token is unusable — which is
+// what Electron did before this. The slots follow rac_secure_storage_t's own
+// return convention, which is NOT rac_result_t: 0/length for success,
+// RAC_ERROR_FILE_NOT_FOUND for a clean miss, negative for a real failure.
 int auth_storage_store(const char* key, const char* value, void*) {
     if (!key || !value || !g_adapter.secure_set)
         return -1;
@@ -517,10 +663,10 @@ int auth_storage_delete(const char* key, void*) {
     return g_adapter.secure_delete(key, g_adapter.user_data) == RAC_SUCCESS ? 0 : -1;
 }
 
-// Commons flushes on batch size and on a five-second timeout, but that timeout is
-// only evaluated when the next event arrives — a queue that goes quiet holds its
-// events until shutdown, and a crash loses them. This thread is the wall clock
-// commons does not have.
+// Commons flushes on batch size and on a five-second timeout, but that timeout
+// is only evaluated when the next event arrives — a queue that goes quiet holds
+// its events until shutdown, and a crash loses them. This thread is the wall
+// clock commons does not have.
 constexpr std::chrono::seconds kTelemetryFlushInterval{30};
 std::thread g_telemetry_flush_thread;
 std::condition_variable g_telemetry_flush_cv;
@@ -564,9 +710,9 @@ void telemetry_flush_thread_stop() {
     g_telemetry_flush_thread.join();
 }
 
-// Detach + destroy the telemetry manager. Flush first (while the transport is up)
-// so the last batch is delivered; then detach the sink so no shutdown-time event
-// routes to a torn-down transport.
+// Detach + destroy the telemetry manager. Flush first (while the transport is
+// up) so the last batch is delivered; then detach the sink so no shutdown-time
+// event routes to a torn-down transport.
 void telemetry_teardown_flush() {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
     if (g_telemetry_manager)
@@ -595,7 +741,8 @@ Napi::Value DevicePersistentId(const Napi::CallbackInfo& info) {
     return Napi::String::New(env, device_id);
 }
 
-// devStagingBaseUrl(): baked staging backend URL for keyless dev (empty if none).
+// devStagingBaseUrl(): baked staging backend URL for keyless dev (empty if
+// none).
 Napi::Value DevStagingBaseUrl(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     const char* baked = rac_dev_config_get_staging_base_url();
@@ -604,8 +751,8 @@ Napi::Value DevStagingBaseUrl(const Napi::CallbackInfo& info) {
     return Napi::String::New(env, "");
 }
 
-// Runs transport-register + state seed + telemetry sink + two-phase init off the
-// JS thread; resolves with the serialized SdkInitResult bytes.
+// Runs transport-register + state seed + telemetry sink + two-phase init off
+// the JS thread; resolves with the serialized SdkInitResult bytes.
 class ControlPlaneWorker : public Napi::AsyncWorker {
    public:
     ControlPlaneWorker(Napi::Env env, int32_t environment, std::string api_key,
@@ -658,8 +805,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
 
         // Auth persistence must be installed before phase 1: phase 1 writes the
         // API key and base URL through this same vtable.
-        static const rac_secure_storage_t auth_storage = {auth_storage_store,
-                                                          auth_storage_retrieve,
+        static const rac_secure_storage_t auth_storage = {auth_storage_store, auth_storage_retrieve,
                                                           auth_storage_delete, nullptr};
         rac_auth_init(&auth_storage);
         // Restore tokens from the previous run. A miss is first launch; anything
@@ -677,9 +823,8 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
                 g_telemetry_manager = rac_telemetry_manager_create(
                     env, device_id_.c_str(), platform_.c_str(), sdk_version_.c_str());
                 if (g_telemetry_manager) {
-                    rac_telemetry_manager_set_device_info(g_telemetry_manager,
-                                                          rac_desktop_device_model(),
-                                                          rac_desktop_os_version());
+                    rac_telemetry_manager_set_device_info(
+                        g_telemetry_manager, rac_desktop_device_model(), rac_desktop_os_version());
                     rac_telemetry_manager_set_http_callback(
                         g_telemetry_manager, electron_telemetry_http_callback, g_telemetry_manager);
                     rac_events_set_telemetry_sink(g_telemetry_manager);
@@ -814,9 +959,7 @@ Napi::Value TelemetryFlush(const Napi::CallbackInfo& info) {
 Napi::Value AuthState(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     Napi::Object out = Napi::Object::New(env);
-    auto text = [&](const char* value) {
-        return Napi::String::New(env, value ? value : "");
-    };
+    auto text = [&](const char* value) { return Napi::String::New(env, value ? value : ""); };
     out.Set("authenticated", Napi::Boolean::New(env, rac_auth_is_authenticated()));
     out.Set("needsRefresh", Napi::Boolean::New(env, rac_auth_needs_refresh()));
     out.Set("expiresAtUnixSec",
@@ -840,9 +983,9 @@ Napi::Value ClearAuth(const Napi::CallbackInfo& info) {
 // token trio and block their calling thread, so we drive them on a worker
 // thread and marshal tokens to JS via a bounded ThreadSafeFunction).
 // =============================================================================
-// Metrics copied out of the engine's completion callback. The rac_*_result_t the
-// callback receives is only valid for the duration of the call, so every field is
-// copied by value here and handed to JS from the TSFN finalizer.
+// Metrics copied out of the engine's completion callback. The rac_*_result_t
+// the callback receives is only valid for the duration of the call, so every
+// field is copied by value here and handed to JS from the TSFN finalizer.
 struct StreamMetrics {
     bool present = false;
     int32_t prompt_tokens = 0;
@@ -936,9 +1079,9 @@ void stream_vlm_complete_cb(const rac_vlm_result_t* r, void* ud) {
 
 // Create the TSFN + worker thread; resolve/reject the returned Promise in the
 // finalizer (JS loop, after the producer thread Release()d).
-// When lease_id != 0, the caller already took the in-flight lease; we end_op when
-// the worker finishes (covers unload-during-generate). `gate` is that handle's
-// serialisation mutex and is held for the whole stream.
+// When lease_id != 0, the caller already took the in-flight lease; we end_op
+// when the worker finishes (covers unload-during-generate). `gate` is that
+// handle's serialisation mutex and is held for the whole stream.
 Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
                            std::function<rac_result_t(StreamCtx*)> run, int32_t lease_id = 0,
                            std::shared_ptr<std::mutex> gate = nullptr) {
@@ -949,7 +1092,8 @@ Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
     ctx->gate = std::move(gate);
     try {
         ctx->tsfn = Napi::ThreadSafeFunction::New(
-            env, on_token, "ra-stream", /*maxQueueSize*/ 256, /*initialThreadCount*/ 1, ctx,
+            env, on_token, "ra-stream", /*maxQueueSize*/ 256,
+            /*initialThreadCount*/ 1, ctx,
             [](Napi::Env env, void* /*data*/, StreamCtx* c) {
                 if (c->worker.joinable())
                     c->worker.join();
@@ -1018,8 +1162,8 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
     std::string name =
         (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
 
-    // Optional load-time placement: rac_llm_config_t is the only pre-load knob the
-    // component layer exposes (thread count and GPU offload live on the
+    // Optional load-time placement: rac_llm_config_t is the only pre-load knob
+    // the component layer exposes (thread count and GPU offload live on the
     // llamacpp-direct API, which bypasses the plugin registry, so they are not
     // settable here). Read here, on the JS thread; applied on the worker.
     bool has_framework = false;
@@ -1073,9 +1217,9 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
-// Optional per-request generation options (from a JS object). Strings and string
-// vectors are held by value so the pointers handed to rac_* stay valid for the
-// whole streaming call, which runs on a worker thread.
+// Optional per-request generation options (from a JS object). Strings and
+// string vectors are held by value so the pointers handed to rac_* stay valid
+// for the whole streaming call, which runs on a worker thread.
 struct GenOpts {
     bool has_max = false;
     int32_t max_tokens = 0;
@@ -1103,8 +1247,8 @@ struct GenOpts {
     std::string grammar;
     std::vector<std::string> stop_sequences;
     std::vector<std::string> history;
-    // Pointer views over the vectors above; rebuilt by apply_*_opts because a copy
-    // of this struct must not carry pointers into the source's storage.
+    // Pointer views over the vectors above; rebuilt by apply_*_opts because a
+    // copy of this struct must not carry pointers into the source's storage.
     std::vector<const char*> stop_ptrs;
     std::vector<const char*> history_ptrs;
 };
@@ -1256,7 +1400,8 @@ void apply_vlm_opts(rac_vlm_options_t& opts, GenOpts& o) {
     }
 }
 
-// generate(handle, prompt, onToken) OR generate(handle, prompt, options, onToken).
+// generate(handle, prompt, onToken) OR generate(handle, prompt, options,
+// onToken).
 Napi::Value Generate(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 3 || !info[0].IsNumber() || !info[1].IsString()) {
@@ -1306,8 +1451,8 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
 }
 
 // cancelGenerate(handleId) — asks the engine to stop the in-flight generation.
-// Safe to call from the JS thread while a worker streams: it only sets a flag the
-// engine polls, so it takes handle_for (no idle wait) rather than a lease.
+// Safe to call from the JS thread while a worker streams: it only sets a flag
+// the engine polls, so it takes handle_for (no idle wait) rather than a lease.
 Napi::Value CancelGenerate(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber())
@@ -1420,7 +1565,8 @@ Napi::Value LoraRemove(const Napi::CallbackInfo& info) {
         nullptr, [hid]() { end_op(hid); });
 }
 
-// loraList(handleId) -> [{ id, scale }] for the adapters applied to that handle.
+// loraList(handleId) -> [{ id, scale }] for the adapters applied to that
+// handle.
 Napi::Value LoraList(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     std::vector<std::pair<std::string, float>> applied;
@@ -1483,8 +1629,9 @@ Napi::Value LoadVlmModel(const Napi::CallbackInfo& info) {
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
 }
 
-// One image, owned by value so it survives on the worker thread. Mirrors the three
-// rac_vlm_image_format_t variants: a file path, raw RGB pixels, or base64 bytes.
+// One image, owned by value so it survives on the worker thread. Mirrors the
+// three rac_vlm_image_format_t variants: a file path, raw RGB pixels, or base64
+// bytes.
 struct VlmImage {
     rac_vlm_image_format_t format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
     std::string file_path;
@@ -1503,8 +1650,9 @@ bool parse_vlm_image(Napi::Env env, const Napi::Value& v, VlmImage* out) {
         return true;
     }
     if (!v.IsObject()) {
-        Napi::TypeError::New(
-            env, "vlm image must be a path, { path }, { base64 }, or { rgb, width, height }")
+        Napi::TypeError::New(env,
+                             "vlm image must be a path, { path }, { base64 }, "
+                             "or { rgb, width, height }")
             .ThrowAsJavaScriptException();
         return false;
     }
@@ -1703,8 +1851,8 @@ Napi::Float32Array embedding_to_js(Napi::Env env, const rac_embedding_vector_t& 
     return arr;
 }
 
-// normalize / pooling arrive as the rac_embeddings_{normalize,pooling}_t ints; -1
-// means "leave the model config's own default in place".
+// normalize / pooling arrive as the rac_embeddings_{normalize,pooling}_t ints;
+// -1 means "leave the model config's own default in place".
 rac_embeddings_options_t parse_embed_opts(const Napi::Value& v) {
     rac_embeddings_options_t opts = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
     if (!v.IsObject())
@@ -1952,10 +2100,10 @@ struct SttResultBox {
     SttResultBox& operator=(const SttResultBox&) = delete;
 };
 
-// transcribe(handleId, pcm16Bytes[, options]) -> { text, language?, confidence, words[] }.
-// Audio = mono PCM16 bytes at options.sampleRate (16 kHz default). The decode runs
-// on a worker; the audio is copied because the JS-owned bytes may be collected or
-// resized before the worker reads them.
+// transcribe(handleId, pcm16Bytes[, options]) -> { text, language?, confidence,
+// words[] }. Audio = mono PCM16 bytes at options.sampleRate (16 kHz default).
+// The decode runs on a worker; the audio is copied because the JS-owned bytes
+// may be collected or resized before the worker reads them.
 Napi::Value Transcribe(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     const uint8_t* pcm_data = nullptr;
@@ -2113,7 +2261,8 @@ Napi::Value SttInfo(const Napi::CallbackInfo& info) {
     out.Set("supportsStreaming",
             Napi::Boolean::New(env, rac_stt_component_supports_streaming(h) == RAC_TRUE));
     // Commons returns the supported-language list as a JSON array string; hand it
-    // through verbatim and let the TS layer parse it (no JSON parser in the addon).
+    // through verbatim and let the TS layer parse it (no JSON parser in the
+    // addon).
     char* langs = nullptr;
     if (rac_stt_component_get_supported_languages(h, &langs) == RAC_SUCCESS && langs) {
         out.Set("languagesJson", Napi::String::New(env, langs));
@@ -2429,6 +2578,9 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             // anything else: commons must not hold a pointer into this addon once
             // the runtime starts tearing down.
             rac_electron::ShutdownDownloadBridge();
+            // Same reason: commons keeps calling the adapter's log slot right
+            // through rac_shutdown(), so the JS subscriber has to go first.
+            rac_electron::ShutdownLoggingBridge();
             // Destroy every still-loaded component and clear the handle maps so no id
             // outlives the runtime — a later unload/use can't touch freed native
             // state, and a re-init starts from a clean slate.
@@ -2632,7 +2784,8 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
             if (rc != RAC_SUCCESS || !h)
                 return rc == RAC_SUCCESS ? RAC_ERROR_UNKNOWN : rc;
             if (!model_path.empty()) {
-                // A model-backed VAD (e.g. Silero) must be loaded before initialize().
+                // A model-backed VAD (e.g. Silero) must be loaded before
+                // initialize().
                 rc = rac_vad_component_load_model(h, model_path.c_str(), model_path.c_str(),
                                                   model_path.c_str());
                 if (rc != RAC_SUCCESS) {
@@ -2659,10 +2812,10 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
 // vadProcess(handleId, Float32Array) -> bool (speech in this frame).
 //
 // Deliberately still synchronous. A VAD call is one 10-30 ms frame fed to a
-// stateful detector, and frames must be seen in order: dispatching them onto the
-// libuv pool would let two frames race and answer out of order, which is a worse
-// failure than the microseconds of loop time an energy frame costs. Everything
-// else in this file that blocks now runs on a worker.
+// stateful detector, and frames must be seen in order: dispatching them onto
+// the libuv pool would let two frames race and answer out of order, which is a
+// worse failure than the microseconds of loop time an energy frame costs.
+// Everything else in this file that blocks now runs on a worker.
 Napi::Value VadProcess(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
@@ -2723,7 +2876,8 @@ Napi::Value VadReset(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
-// vadStatistics(handleId) -> { threshold, ambientLevel, recentAverage, recentMax }.
+// vadStatistics(handleId) -> { threshold, ambientLevel, recentAverage,
+// recentMax }.
 Napi::Value VadStatistics(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     Napi::Object out = Napi::Object::New(env);
@@ -2861,11 +3015,9 @@ Napi::Value VadStreamStart(const Napi::CallbackInfo& info) {
             if (h == nullptr)
                 return RAC_ERROR_INVALID_HANDLE;
             return rac_vad_stream_start_proto(h, options->empty() ? nullptr : options->data(),
-                                             options->size(), session.get());
+                                              options->size(), session.get());
         },
-        [session](Napi::Env e) {
-            return Napi::Number::New(e, static_cast<double>(*session));
-        });
+        [session](Napi::Env e) { return Napi::Number::New(e, static_cast<double>(*session)); });
 }
 
 Napi::Value VadStreamFeed(const Napi::CallbackInfo& info) {
@@ -2875,8 +3027,7 @@ Napi::Value VadStreamFeed(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    const uint64_t session_id =
-        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    const uint64_t session_id = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
     auto audio = std::make_shared<std::vector<uint8_t>>();
     if (!rac_electron::ReadProtoBytes(info[1], audio.get())) {
         Napi::TypeError::New(env, "vadStreamFeed(sessionId, audioBytes) expects bytes")
@@ -2895,8 +3046,7 @@ Napi::Value VadStreamStop(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "vadStreamStop(sessionId) bad args").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    const uint64_t session_id =
-        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    const uint64_t session_id = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
     return RunNativeCall(env, "vad_stream_stop",
                          [session_id]() { return rac_vad_stream_stop_proto(session_id); });
 }
@@ -2908,8 +3058,7 @@ Napi::Value VadStreamCancel(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    const uint64_t session_id =
-        static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    const uint64_t session_id = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
     return RunNativeCall(env, "vad_stream_cancel",
                          [session_id]() { return rac_vad_stream_cancel_proto(session_id); });
 }
@@ -3108,7 +3257,8 @@ struct DiarizationResultBox {
 };
 
 // diarize(handleId, Float32Array, options?) ->
-//   { segments: [{ speakerId, speakerIndex, startMs, endMs }], speakerCount, durationMs }.
+//   { segments: [{ speakerId, speakerIndex, startMs, endMs }], speakerCount,
+//   durationMs }.
 Napi::Value Diarize(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
@@ -3252,7 +3402,8 @@ struct SegmentationResultBox {
     SegmentationResultBox& operator=(const SegmentationResultBox&) = delete;
 };
 
-// segment(handleId, { data, width, height, pixelFormat, strideBytes }, options?) ->
+// segment(handleId, { data, width, height, pixelFormat, strideBytes },
+// options?) ->
 //   { width, height, classMask: Uint16Array, classes, diagnosticRgba? }.
 Napi::Value Segment(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -3365,8 +3516,9 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
 // ---- RAG (retrieval-augmented generation) -------------------------------
 //
 // Proto-byte C ABI: the SDK encodes runanywhere.v1 RAG* messages (ts-proto) and
-// hands them across as Buffers; commons returns serialized RAGResult/RAGStatistics
-// in an owned rac_proto_buffer_t that we copy into a Napi::Buffer and free.
+// hands them across as Buffers; commons returns serialized
+// RAGResult/RAGStatistics in an owned rac_proto_buffer_t that we copy into a
+// Napi::Buffer and free.
 
 // Copy an owned proto-out buffer to a JS Buffer (throwing on failure), always
 // releasing the native buffer.
@@ -3494,7 +3646,8 @@ class RagProtoWorker : public Napi::AsyncWorker {
     rac_result_t code_ = RAC_SUCCESS;
 };
 
-// Validate (handleId, protoBytes) and dispatch a RagProtoWorker; returns its Promise.
+// Validate (handleId, protoBytes) and dispatch a RagProtoWorker; returns its
+// Promise.
 static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, const char* what) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
@@ -3528,8 +3681,8 @@ static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, c
 // session-create can resolve embedding/LLM model ids to on-disk paths. The
 // Electron SDK otherwise loads models by explicit path and never populates the
 // registry. rac_register_model deep-copies the struct. Outside the RAG guard
-// above: RAG was the first caller, but `models.register` is the general path and
-// a build without RAG still needs it.
+// above: RAG was the first caller, but `models.register` is the general path
+// and a build without RAG still needs it.
 static char* rag_dup_cstr(const std::string& s) {
     char* p = static_cast<char*>(std::malloc(s.size() + 1));
     if (p)
@@ -3573,8 +3726,8 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
 #ifdef RAC_ELECTRON_HAVE_RAG
 
 // Async (worker-thread) — session create resolves model ids and loads embedding
-// (+ optional LLM) services, which can take seconds. A sync call would block the
-// utility-host event loop the same way ingest/query used to.
+// (+ optional LLM) services, which can take seconds. A sync call would block
+// the utility-host event loop the same way ingest/query used to.
 class RagCreateSessionWorker : public Napi::AsyncWorker {
    public:
     RagCreateSessionWorker(Napi::Env env, std::vector<uint8_t> config)
@@ -3678,8 +3831,8 @@ Napi::Value RagSearch(const Napi::CallbackInfo& info) {
 }
 
 // ragQueryStream(handleId, queryProtoBytes, onEvent) -> Promise<void>. onEvent
-// receives each serialized runanywhere.v1.RAGStreamEvent as a Buffer; the TS layer
-// decodes them into retrieved / token / completed events.
+// receives each serialized runanywhere.v1.RAGStreamEvent as a Buffer; the TS
+// layer decodes them into retrieved / token / completed events.
 struct RagStreamCtx {
     Napi::ThreadSafeFunction tsfn;
     std::thread worker;
@@ -3826,12 +3979,11 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
 #else  // !RAC_ELECTRON_HAVE_RAG
 
 // One handler behind every rag* export. Typed, so the TS layer recovers an
-// SDKException with a real ErrorCode instead of parsing a string (and instead of
-// a bare TypeError from calling an undefined method).
+// SDKException with a real ErrorCode instead of parsing a string (and instead
+// of a bare TypeError from calling an undefined method).
 Napi::Value RagUnavailable(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    throw_rac_error(env, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-                    "rag (this build has no RAG pipeline)");
+    throw_rac_error(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag (this build has no RAG pipeline)");
     return env.Undefined();
 }
 
@@ -3848,8 +4000,19 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     rac_electron::RegisterDownloadBridge(env, exports);
     rac_electron::RegisterAudioBridge(env, exports);
     rac_electron::RegisterLoraBridge(env, exports);
+    rac_electron::RegisterLoggingBridge(env, exports);
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("memoryInfo", Napi::Function::New(env, MemoryInfo));
+    // Plugin loader — host / main only. Do NOT add these to ALLOWED_RPC_METHODS
+    // or expose them through RaBackend; paths come from RUNANYWHERE_PLUGIN_PATHS.
+    exports.Set("loadPlugin", Napi::Function::New(env, LoadPlugin));
+    exports.Set("listPlugins", Napi::Function::New(env, ListPlugins));
+    exports.Set("pluginApiVersion", Napi::Function::New(env, PluginApiVersion));
+#ifdef RAC_ELECTRON_THIN_ADDON
+    exports.Set("thinAddon", Napi::Boolean::New(env, true));
+#else
+    exports.Set("thinAddon", Napi::Boolean::New(env, false));
+#endif
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
     // Desktop control plane (telemetry + auth). Present only when the desktop
     // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
@@ -3864,6 +4027,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 #else
     exports.Set("hasControlPlane", Napi::Boolean::New(env, false));
 #endif
+    exports.Set("hfTokenSet", Napi::Function::New(env, HfTokenSet));
+    exports.Set("hfTokenConfigured", Napi::Function::New(env, HfTokenConfigured));
     exports.Set("secureSet", Napi::Function::New(env, SecureSet));
     exports.Set("secureGet", Napi::Function::New(env, SecureGet));
     exports.Set("secureDelete", Napi::Function::New(env, SecureDelete));
@@ -3927,9 +4092,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("ragStats", Napi::Function::New(env, RagStats));
     exports.Set("ragDestroySession", Napi::Function::New(env, RagDestroySession));
 #else
-    for (const char* name : {"ragCreateSession", "ragIngest", "ragQuery", "ragSearch",
-                             "ragQueryStream", "ragCancel", "ragClear", "ragStats",
-                             "ragDestroySession"}) {
+    for (const char* name :
+         {"ragCreateSession", "ragIngest", "ragQuery", "ragSearch", "ragQueryStream", "ragCancel",
+          "ragClear", "ragStats", "ragDestroySession"}) {
         exports.Set(name, Napi::Function::New(env, RagUnavailable));
     }
 #endif

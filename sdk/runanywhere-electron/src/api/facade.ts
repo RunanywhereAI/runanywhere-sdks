@@ -5,13 +5,11 @@
 // object shape, which is why `RunAnywhere.llm.generate` and
 // `window.runanywhere.llm.generate` are the same function written once.
 
-import * as path from 'path';
-
 import { catalogEntries, catalogModelInfo } from '../catalog';
-import { modelsRoot } from '../download';
 import { ErrorCategory, SDKException, asSDKException } from '../errors';
 import { bindAudioBackend } from '../audio';
 import { ModelAbi } from './model-abi';
+import type { ComponentLifecycleSnapshot, SDKComponent } from './model-abi';
 import {
   IMAGES_GAP,
   createImagesNamespace,
@@ -21,6 +19,10 @@ import {
 } from './assets';
 import type { ImagesNamespace, LoraNamespace, ModelsNamespace, SegmentationNamespace } from './assets';
 import type { AuthState, RaBackend } from './backend';
+import {
+  backendsForRegistry,
+  type EngineRegistrySnapshot,
+} from '../backend/engines';
 import {
   createEmbeddingsNamespace,
   createRagNamespace,
@@ -42,6 +44,10 @@ import type {
   VadNamespace,
   VoiceNamespace,
 } from './speech';
+import { createStorageNamespace } from './storage';
+import type { StorageNamespace } from './storage';
+import { createLoggingNamespace } from './logging';
+import type { LoggingNamespace } from './logging';
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
 import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
@@ -118,11 +124,18 @@ export interface TelemetryNamespace {
 }
 
 /**
- * Encrypted key-value storage. An Electron platform extra, not part of the
- * cross-SDK spec — the other SDKs expose their platform keystore differently.
+ * Platform secure storage for small credentials. An Electron platform extra,
+ * not part of the cross-SDK spec — the other SDKs expose their platform
+ * keystore differently.
+ *
+ * How well it is protected is a property of the platform adapter, and this is
+ * where that is said plainly rather than assumed: on Win32 values are DPAPI
+ * ciphertext, encrypted with the current user's key; on macOS and Linux they
+ * are 0600 files inside a 0700 directory — unreadable by another local user,
+ * but NOT encrypted at rest. Treat it as "owner-only", not as a keychain.
  */
 export interface SecureStore {
-  /** Store `value` under `key`, encrypted at rest. */
+  /** Store `value` under `key`. */
   set(key: string, value: string): Promise<void>;
   /** Read `key`, or null when absent. */
   get(key: string): Promise<string | null>;
@@ -159,6 +172,29 @@ export interface RunAnywhereApi {
   capabilities(): Promise<SDKCapabilities>;
   /** Lifecycle, model, and error breadcrumbs. */
   readonly events: AsyncIterableIterator<SdkEvent>;
+  /**
+   * Set the Hugging Face bearer token model downloads authenticate with, so a
+   * gated or private repo stops answering 401.
+   *
+   * Pass `null` to fall back to the environment lookup commons resolves —
+   * `HF_TOKEN`, then `$HF_TOKEN_PATH`, then `$HF_HOME/token`, then
+   * `~/.cache/huggingface/token`, the order `huggingface_hub` uses, so
+   * `hf auth login` is honoured. Pass an empty string to clear the token and
+   * disable that fallback too.
+   *
+   * The token is held in the platform secure store, not in settings, and is
+   * re-applied on the next {@link initialize} so a gated model still downloads
+   * after a cold start. It is attached only to https requests whose host is
+   * exactly `huggingface.co` or `hf.co` — never to a CDN or LFS redirect target.
+   */
+  setHfToken(token: string | null): Promise<void>;
+  /**
+   * What commons' lifecycle store holds for one component right now.
+   *
+   * An unloaded component is an answer rather than a failure: the snapshot comes
+   * back with `COMPONENT_LIFECYCLE_STATE_NOT_LOADED` and no model id.
+   */
+  componentLifecycleSnapshot(component: SDKComponent): Promise<ComponentLifecycleSnapshot>;
 
   readonly llm: LlmNamespace;
   readonly vlm: VlmNamespace;
@@ -174,6 +210,10 @@ export interface RunAnywhereApi {
   readonly rag: RagNamespace;
   readonly models: ModelsNamespace;
   readonly lora: LoraNamespace;
+  /** What is on disk and what it costs to reclaim; see {@link StorageNamespace}. */
+  readonly storage: StorageNamespace;
+  /** Log level, sinks, and the record stream; see {@link LoggingNamespace}. */
+  readonly logging: LoggingNamespace;
   /** Electron platform extra; see {@link SecureStore}. */
   readonly secure: SecureStore;
   /** Electron platform extra; see {@link AuthNamespace}. */
@@ -216,39 +256,101 @@ const UNAVAILABLE_CAPABILITIES: UnavailableCapability[] = [
 /**
  * Honest snapshot of what this Electron build can actually reach.
  *
- * The three engines (`InferenceFramework.LLAMA_CPP`/`ONNX`/`SHERPA`) and the
- * modalities built on them are statically linked into every build of this
- * addon (see `native-backend.ts`'s per-slot `load()`/`unloadHandle()`), so
- * their presence is a packaging fact rather than something that needs a
- * runtime probe. `images` is the one modality with namespace code but no
- * linked backend — reported in `unavailable` with the exact missing symbol,
- * matching the gap `images.ts` itself throws for.
+ * Dual path:
+ *   • Fat addon — backends are compile-linked; {@link backendsForRegistry}
+ *     returns the three known frameworks regardless of the registry list.
+ *   • Thin addon — backends come from `listPlugins()` after main-process
+ *     `*.register()` + RUNANYWHERE_PLUGIN_PATHS. Core-alone → `backends: []`;
+ *     model load throws typed {@link SDKException.noBackendEngines}.
+ * `images` stays unavailable until a diffusion plugin exists.
  */
-function capabilitiesSnapshot(): SDKCapabilities {
+function capabilitiesSnapshot(registry: EngineRegistrySnapshot): SDKCapabilities {
+  const backends = [...backendsForRegistry(registry)];
+  const modalities = modalitiesForBackends(backends);
+  const has = (name: string): boolean => modalities.includes(name);
   return {
-    modalities: [
-      'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank',
-      'diarization', 'segmentation', 'rag', 'lora',
-    ],
-    backends: [InferenceFramework.LLAMA_CPP, InferenceFramework.ONNX, InferenceFramework.SHERPA],
+    modalities,
+    backends,
     // Only formats this SDK can actually round-trip: raw PCM for live streams,
     // plus WAV through the built-in RIFF codec (audio.ts's encodeWav/decodeWav).
     audioFormats: [AudioFormat.PCM, AudioFormat.WAV],
-    streaming: { llm: true, vlm: true, stt: true, tts: true, vad: true, rag: true, images: false },
+    streaming: {
+      llm: has('llm'),
+      vlm: has('vlm'),
+      stt: has('stt'),
+      tts: has('tts'),
+      vad: has('vad'),
+      rag: has('rag'),
+      images: false,
+    },
     tools: {
-      registry: true,
+      registry: has('llm'),
       // llm.tools runs one grammar-constrained selection round at a time (text.ts's runToolLoop).
       parallel: false,
-      cancellation: true,
+      cancellation: has('llm'),
     },
     rag: {
       // Each rag.open() gets its own native session handle (native-backend.ts's ragSessions map).
-      multiSession: true,
-      persistent: true,
+      multiSession: has('rag'),
+      persistent: has('rag'),
     },
     unavailable: UNAVAILABLE_CAPABILITIES,
   };
 }
+
+/** Modalities reachable from the registered inference frameworks. */
+function modalitiesForBackends(backends: readonly InferenceFramework[]): string[] {
+  const mods = new Set<string>();
+  for (const framework of backends) {
+    switch (framework) {
+      case InferenceFramework.LLAMA_CPP:
+        mods.add('llm');
+        mods.add('vlm');
+        mods.add('lora');
+        mods.add('rag');
+        break;
+      case InferenceFramework.ONNX:
+        mods.add('embeddings');
+        mods.add('rerank');
+        mods.add('diarization');
+        mods.add('segmentation');
+        break;
+      case InferenceFramework.SHERPA:
+        mods.add('stt');
+        mods.add('tts');
+        mods.add('vad');
+        break;
+      case InferenceFramework.QHEXRT:
+        mods.add('llm');
+        mods.add('vlm');
+        mods.add('stt');
+        mods.add('tts');
+        break;
+      default: {
+        const _exhaustive: never = framework;
+        void _exhaustive;
+        break;
+      }
+    }
+  }
+  return [...mods];
+}
+
+async function readEngineRegistry(backend: RaBackend): Promise<EngineRegistrySnapshot> {
+  const [thinAddon, pluginNames] = await Promise.all([
+    backend.isThinAddon(),
+    backend.listPlugins(),
+  ]);
+  return { thinAddon, pluginNames };
+}
+
+// A bearer token is a credential, so it lives in the platform secure store and
+// never in a settings file next to the app's window geometry. What that store
+// is differs by platform and this SDK does not overstate it: Win32 is DPAPI
+// (encrypted with the current user's key), while the POSIX adapter is an
+// owner-only file store — 0600 files in a 0700 directory, restricted to the
+// user but NOT encrypted at rest (see native/posix_platform_adapter.cpp).
+const HF_TOKEN_KEY = 'runanywhere.hfToken';
 
 /** The host OS as the backend's platform enum (macos/linux/windows) — NOT the
  * SDK binding name. The binding ("electron") is reported separately as sdk_binding. */
@@ -280,7 +382,7 @@ function outcomeOf(resultBytes: Uint8Array, deviceId: string): ControlPlaneOutco
   if (result.error) {
     const failure = SDKException.fromProto(result.error);
     return {
-      status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+      status: failure.category === ErrorCategory.ERROR_CATEGORY_NETWORK ? 'offline' : 'rejected',
       message: failure.message,
       deviceId: deviceId || null,
     };
@@ -360,7 +462,7 @@ async function runControlPlane(
   } catch (error) {
     const failure = asSDKException(error);
     return {
-      status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+      status: failure.category === ErrorCategory.ERROR_CATEGORY_NETWORK ? 'offline' : 'rejected',
       message: failure.message,
       deviceId: deviceId || null,
     };
@@ -373,18 +475,35 @@ async function runControlPlane(
  * Best-effort per entry: one malformed row must not stop the SDK from coming up,
  * and a row that fails to register simply will not list.
  */
-async function seedCatalog(backend: RaBackend, baseDir?: string): Promise<void> {
+async function seedCatalog(backend: RaBackend): Promise<void> {
   const entries = Object.entries(catalogEntries());
   if (!entries.length) return;
-  const root = baseDir ? path.join(baseDir, 'models') : modelsRoot();
   const abi = new ModelAbi(backend);
   for (const [id, entry] of entries) {
     try {
-      await abi.register(catalogModelInfo(id, entry, root));
+      await abi.register(catalogModelInfo(id, entry));
     } catch {
       // A rejected row is visible through models.list() being short, which is a
       // better failure than refusing to initialize.
     }
+  }
+  // Relink the rows whose files are already on disk from a previous run. A
+  // seeded row carries no local_path (see `catalogModelInfo`), so this is what
+  // turns "declared" into "downloaded" — commons walks its own storage layout
+  // and only links a row whose declared files are all present, which is why
+  // `downloaded` now tracks bytes rather than the fact of being catalogued.
+  try {
+    await abi.discover({
+      linkDownloaded: true,
+      includeUserImports: true,
+      includeBuiltIn: false,
+      purgeInvalid: false,
+      recursive: false,
+      searchRoots: [],
+    });
+  } catch {
+    // A failed sweep costs the app a `downloaded` flag until the next refresh(),
+    // which is not a reason to fail initialization.
   }
 }
 
@@ -411,6 +530,9 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
   // baseDir is read through a function because the namespaces are built before
   // `initialize` has been told where the store is.
   const deps = { backend, hub, requireReady, baseDir: () => baseDir };
+  // Only for `componentLifecycleSnapshot`, which Swift puts on the facade rather
+  // than on `models`; everything else about the registry goes through `models`.
+  const modelAbi = new ModelAbi(backend);
   // `models` comes first because the llm namespace loads through it: commons
   // reads the language model out of its lifecycle store, and putting it there is
   // the models namespace's job.
@@ -429,7 +551,12 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
   const diarization = createDiarizationNamespace(deps);
   const segmentation = createSegmentationNamespace(deps);
   const rag = createRagNamespace(deps);
-  const lora = createLoraNamespace(deps);
+  const lora = createLoraNamespace({ ...deps, models });
+  const storage = createStorageNamespace(deps);
+  // Diagnostics are usable before `initialize()`: a level set now is the level
+  // the native load itself logs at, which is exactly when a start-up failure
+  // needs to be visible.
+  const logging = createLoggingNamespace(deps);
   const voice = createVoiceNamespace({
     ...deps,
     stt,
@@ -447,10 +574,21 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       await backend.initialize({ baseDir: options.baseDir, secureDir: options.secureDir });
       version = await backend.version();
       ready = true;
+      // A token a previous run stored is re-applied before anything can reach
+      // HuggingFace, so a gated model still downloads on a cold start instead of
+      // making the app ask for the token again. Nothing stored leaves commons on
+      // its own environment fallback, which is the right default.
+      try {
+        const storedToken = await backend.secureGet(HF_TOKEN_KEY);
+        if (storedToken) await backend.hfTokenSet(storedToken);
+      } catch {
+        // No keystore, or an addon predating the binding: public repos still
+        // download, and setHfToken() reports the real reason if one is set.
+      }
       // The app's staged catalog becomes registry rows here, before anything can
       // list or load. Commons' registry is in-memory per process, so this runs on
       // every start — the same reseed Swift does in ModelCatalogBootstrap.
-      await seedCatalog(backend, options.baseDir);
+      await seedCatalog(backend);
       // Commons owns the stable install identifier even when no control plane is configured.
       try {
         deviceId = await backend.devicePersistentId();
@@ -497,6 +635,23 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     delete: (key) => backend.secureDelete(key),
   };
 
+  async function setHfToken(token: string | null): Promise<void> {
+    requireReady();
+    const normalized = token === null ? null : token.trim();
+    // The backend applies it to both transfer paths before anything is
+    // persisted, so a rejected addon binding fails here rather than leaving a
+    // stored token that nothing is using.
+    await backend.hfTokenSet(normalized);
+    // A cleared token forgets the stored one rather than persisting the
+    // clearing: the next run then resolves the environment chain again, which
+    // is what a machine-wide `hf auth login` is supposed to mean.
+    if (!normalized) {
+      await backend.secureDelete(HF_TOKEN_KEY);
+      return;
+    }
+    await backend.secureSet(HF_TOKEN_KEY, normalized);
+  }
+
   /** Commons' live token state wins over whatever initialize saw: a token loaded
    * from the previous run is real even when this run never reached the network. */
   async function authInfo(): Promise<AuthInfo> {
@@ -515,7 +670,7 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       } catch (error) {
         const failure = asSDKException(error);
         controlPlane = {
-          status: failure.category === ErrorCategory.NETWORK ? 'offline' : 'rejected',
+          status: failure.category === ErrorCategory.ERROR_CATEGORY_NETWORK ? 'offline' : 'rejected',
           message: failure.message,
           deviceId: deviceId || null,
         };
@@ -547,9 +702,14 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     get environment() {
       return environment;
     },
-    capabilities: () => Promise.resolve(capabilitiesSnapshot()),
+    capabilities: async () => capabilitiesSnapshot(await readEngineRegistry(backend)),
     get events() {
       return hub.stream();
+    },
+    setHfToken,
+    componentLifecycleSnapshot: (component) => {
+      requireReady();
+      return modelAbi.componentSnapshot(component);
     },
     llm,
     vlm,
@@ -565,6 +725,8 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     rag,
     models,
     lora,
+    storage,
+    logging,
     secure,
     auth,
     telemetry,

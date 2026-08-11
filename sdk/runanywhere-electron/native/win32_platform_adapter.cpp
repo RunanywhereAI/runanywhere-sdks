@@ -308,6 +308,8 @@ void rac_electron_fill_win32_adapter(rac_platform_adapter_t* out, const char* se
     out->get_memory_info = win_get_memory_info;
     out->file_list_directory = win_list_dir;
     out->is_non_empty_directory = win_is_non_empty_dir;
-    // http_download / http_download_cancel / extract_archive / get_vendor_id: NULL (M0).
+    // http_download / http_download_cancel: NULL by design (D4). Downloads go
+    // through rac_desktop_http_transport_register() in addon.cpp — do not fill
+    // these slots. extract_archive / get_vendor_id: also NULL.
     out->user_data = nullptr;
 }

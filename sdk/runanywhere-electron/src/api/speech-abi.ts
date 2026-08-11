@@ -31,13 +31,17 @@ import {
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';
+import { audioFormatToProto, optionDefaults } from './options';
 import type { SttOptions, TtsOptions, VadOptions } from './options';
-import { VAD_DEFAULTS, toNativeVadConfig } from './options';
-import { newRequestId } from './types';
+import { AudioFormat as PublicAudioFormat, newRequestId, toProtoError } from './types';
 import type { Segment, VadEvent } from './types';
 
-/** The sample rate every audio path in this SDK normalizes to. */
-export const SPEECH_SAMPLE_RATE = 16000;
+/**
+ * The sample rate every audio path in this SDK normalizes to.
+ * `idl/sdk_defaults.proto`'s `AudioCaptureDefaults.mic_sample_rate_hz`, read
+ * rather than restated.
+ */
+export const SPEECH_SAMPLE_RATE = optionDefaults.micSampleRateHz;
 
 function orThrow<T extends { error?: { message?: string } | undefined }>(result: T): T {
   if (result.error) throw SDKException.fromProto(result.error as never);
@@ -54,12 +58,19 @@ function orThrow<T extends { error?: { message?: string } | undefined }>(result:
  * `diarize` and `speakersExpected` reach commons for the first time here; the
  * component ABI had no field for either, so `SttOptions.diarization` used to be
  * declared and dropped.
+ *
+ * The unset policy across this file: a field the proto declares OPTIONAL is left
+ * absent so commons applies its own `rac_default`; a field the proto declares as
+ * a plain scalar cannot be left absent (proto3 would send the zero value, i.e.
+ * punctuation OFF), so the IDL default is read from the generated
+ * `*Defaults()` helper and sent explicitly. Nothing here states a literal.
  */
 export function toSttRequest(
   pcm16: Uint8Array,
   options: SttOptions,
   requestId = newRequestId('stt')
 ): STTTranscriptionRequest {
+  const defaults = optionDefaults.stt();
   return STTTranscriptionRequest.fromPartial({
     requestId,
     audio: {
@@ -70,12 +81,12 @@ export function toSttRequest(
       channels: 1,
     },
     options: {
+      ...defaults,
       language: options.language,
-      enablePunctuation: options.punctuation ?? true,
-      diarize: options.diarization ?? false,
+      enablePunctuation: options.punctuation ?? defaults.enablePunctuation,
+      diarize: options.diarization ?? defaults.diarize,
       speakersExpected: options.maxSpeakers,
-      enableWordTimestamps: options.wordTimestamps ?? true,
-      silenceDurationMs: 0,
+      enableWordTimestamps: options.wordTimestamps ?? defaults.enableWordTimestamps,
     },
     metadata: {},
   });
@@ -114,23 +125,34 @@ export class SttAbi {
 // tts
 // ---------------------------------------------------------------------------
 
+/**
+ * One synthesis request. Every unnamed knob falls back to the IDL default
+ * (`tTSOptionsDefaults()`), so `speed`, `pitch`, `volume`, `languageCode`, and
+ * the "0 = the voice's native rate" sample rate all come from
+ * `idl/tts_options.proto` rather than being retyped here.
+ *
+ * `audioFormat` is the exception: the public surface always hands the caller
+ * back float32 samples (`toFloatSamples` below), so PCM is a hard requirement of
+ * this path rather than a preference. `TtsOptions.format` describes what the
+ * caller wants to DO with the audio, which is `tts.speak`'s business.
+ */
 export function toTtsRequest(
   text: string,
   options: TtsOptions,
   requestId = newRequestId('tts')
 ): TTSSynthesisRequest {
+  const defaults = optionDefaults.tts();
   return TTSSynthesisRequest.fromPartial({
     requestId,
     text,
     options: {
-      voice: options.voice ?? '',
-      languageCode: options.language ?? '',
-      speed: options.speed ?? 1,
-      pitch: options.pitch ?? 1,
-      volume: 1,
-      audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-      // 0 means the voice's native rate; naming any other forces a resample.
-      sampleRate: options.sampleRate ?? 0,
+      ...defaults,
+      voice: options.voice ?? defaults.voice,
+      languageCode: options.language ?? defaults.languageCode,
+      speed: options.speed ?? defaults.speed,
+      pitch: options.pitch ?? defaults.pitch,
+      audioFormat: audioFormatToProto(PublicAudioFormat.PCM),
+      sampleRate: options.sampleRate ?? defaults.sampleRate,
     },
   });
 }
@@ -190,12 +212,13 @@ export class TtsAbi {
 
 /** Serialize public {@link VadOptions} for `rac_vad_stream_start_proto`. */
 export function toVadOptionsBytes(options: VadOptions = {}): Uint8Array {
+  const defaults = optionDefaults.vad();
   return ProtoVadOptions.encode(
     ProtoVadOptions.fromPartial({
       activationThreshold: options.activationThreshold,
-      minSpeechDurationMs: options.minSpeechMs ?? VAD_DEFAULTS.minSpeechMs,
-      minSilenceDurationMs: options.minSilenceMs ?? VAD_DEFAULTS.minSilenceMs,
-      prefixPaddingMs: options.prefixPaddingMs ?? VAD_DEFAULTS.prefixPaddingMs,
+      minSpeechDurationMs: options.minSpeechMs ?? defaults.minSpeechDurationMs,
+      minSilenceDurationMs: options.minSilenceMs ?? defaults.minSilenceDurationMs,
+      prefixPaddingMs: options.prefixPaddingMs ?? defaults.prefixPaddingMs,
       sampleRate: SPEECH_SAMPLE_RATE,
     })
   ).finish();
@@ -212,11 +235,10 @@ function activityToEvent(activity: NonNullable<VADStreamEvent['activity']>): Vad
 }
 
 function frameToEvent(result: VADResult): VadEvent {
-  const isSpeech = result.isSpeech;
   return {
     type: 'activity',
-    isSpeech,
-    probability: result.probability || (isSpeech ? 1 : 0),
+    isSpeech: result.isSpeech,
+    probability: result.probability,
     timestampMs: result.durationMs || 0,
   };
 }
@@ -236,8 +258,8 @@ export function decodeVadStreamEvent(raw: Uint8Array): VadEvent[] {
       {
         type: 'failed',
         error: event.error
-          ? SDKException.fromProto(event.error as never)
-          : SDKException.generationFailed('vad stream error'),
+          ? toProtoError(SDKException.fromProto(event.error as never))
+          : toProtoError(SDKException.generationFailed('vad stream error')),
       },
     ];
   }
@@ -250,9 +272,13 @@ export class VadAbi {
 
   /** Ensure a component handle is open (energy detector; model optional). */
   async open(options: VadOptions = {}): Promise<void> {
-    await this.backend.vadOpen(
-      toNativeVadConfig(options, { sampleRate: SPEECH_SAMPLE_RATE })
-    );
+    const config: { activationThreshold?: number; sampleRate: number } = {
+      sampleRate: SPEECH_SAMPLE_RATE,
+    };
+    if (options.activationThreshold !== undefined) {
+      config.activationThreshold = options.activationThreshold;
+    }
+    await this.backend.vadOpen(config);
   }
 
   /**
@@ -281,7 +307,7 @@ export class VadAbi {
         } else if (event.type === 'activity') {
           probability = Math.max(probability, event.probability);
         } else if (event.type === 'failed') {
-          throw event.error;
+          throw SDKException.fromProto(event.error);
         }
       }
     };

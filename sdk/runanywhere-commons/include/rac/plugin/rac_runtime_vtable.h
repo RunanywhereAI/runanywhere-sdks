@@ -520,19 +520,14 @@ typedef const rac_runtime_vtable_t* (*rac_runtime_entry_fn)(void);
 /**
  * @brief Declare a runtime entry point in a public header.
  *
- * The entry symbol is annotated with `RAC_API` (= default ELF/Mach-O
- * visibility, dllexport on Windows) for parity with `RAC_PLUGIN_ENTRY_DECL`.
- * `rac_runtime_load` → `dlsym(handle, "rac_runtime_entry_<name>")` MUST be
- * able to find this symbol regardless of how the host runtime library was
- * linked — notably, even when a SHARED carrier sets visibility=hidden
- * globally and the real definition lives in a sibling static archive.
- * Without an explicit annotation at declaration time, loadability depends
- * on transitive default visibility of the host runtime target — a brittle
- * invariant that a future visibility tightening would silently break
- * (mirrors the engine-plugin entry declaration).
+ * Uses `RAC_PLUGIN_API` (same Windows export rules as `RAC_PLUGIN_ENTRY_DECL`)
+ * so a shared-commons consumer that inherits `RAC_USING_SHARED` does not
+ * dllimport its own `rac_runtime_entry_<name>` symbol. `rac_runtime_load` →
+ * `dlsym` / `GetProcAddress` MUST find this symbol when a SHARED carrier sets
+ * visibility=hidden globally.
  */
 #define RAC_RUNTIME_ENTRY_DECL(name) \
-    RAC_API const rac_runtime_vtable_t* rac_runtime_entry_##name(void)
+    RAC_PLUGIN_API const rac_runtime_vtable_t* rac_runtime_entry_##name(void)
 
 #define RAC_RUNTIME_ENTRY_DEF(name) RAC_RUNTIME_ENTRY_DECL(name)
 

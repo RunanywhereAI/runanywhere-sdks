@@ -88,60 +88,32 @@ const DEFAULT_LOAD_RE = /^load(Model|VlmModel|EmbeddingModel|SttModel|TtsVoice)$
 
 /**
  * Explicit allowlist of RPC method names the utility host will dispatch.
- * Matches the native addon surface plus host-owned helpers (downloadModel,
- * modelStatus, exists). Unknown methods are rejected before touching `api`.
+ * Unknown methods are rejected before touching `api`.
+ *
+ * **This list is a security boundary, not a convenience.** `dispatch` resolves an
+ * allowed name straight off `deps.api`, and in `host.ts` that object is a Proxy
+ * whose fallthrough is the raw addon. So every bare addon-shaped name here would
+ * hand any renderer a direct, LEASE-LESS call into native code — bypassing
+ * `NativeBackend`, and with it the `take_handle_when_idle` / `begin_op` leases
+ * that stop an unload-during-generate use-after-free.
+ *
+ * It previously carried 38 such names. The v3 facade used exactly one of them
+ * (`version`); `RpcBackend` namespaces every other call through
+ * {@link rpcMethodFor}. The 37 unused names were removed rather than kept "just
+ * in case" — an unreachable capability is still reachable by anything that can
+ * post to the port.
+ *
+ * Adding a bare name here re-opens that hole. Add a `RaBackend` operation
+ * instead: it arrives as `v3.<op>` and goes through the lease-taking path.
  */
 export const ALLOWED_RPC_METHODS: ReadonlySet<string> = new Set([
-  // lifecycle
-  'initialize',
-  'shutdown',
+  // The ONLY bare name a renderer may send. It is answered from `deps.getVersion()`
+  // in `dispatch` and never reaches `api`, so it grants no addon access at all.
   'version',
-  // secure store
-  'secureSet',
-  'secureGet',
-  'secureDelete',
-  // host-owned filesystem / download
-  'downloadModel',
-  'modelStatus',
-  'exists',
-  // VAD
-  'createVad',
-  'vadProcess',
-  'vadIsActive',
-  'vadSetThreshold',
-  'vadReset',
-  'unloadVad',
-  // LLM
-  'loadModel',
-  'generate',
-  'unloadModel',
-  // VLM
-  'loadVlmModel',
-  'generateVlm',
-  'unloadVlmModel',
-  // embeddings
-  'loadEmbeddingModel',
-  'embed',
-  'unloadEmbeddingModel',
-  // STT
-  'loadSttModel',
-  'transcribe',
-  'unloadSttModel',
-  // TTS
-  'loadTtsVoice',
-  'synthesize',
-  'unloadTtsVoice',
-  // registry + RAG
-  'registerModel',
-  'ragCreateSession',
-  'ragIngest',
-  'ragQuery',
-  'ragSearch',
-  'ragStats',
-  'ragClear',
-  'ragDestroySession',
-  // v3 backend contract — one entry per RaBackend operation, namespaced so it
-  // cannot collide with the deprecated addon-shaped methods above.
+  // v3 backend contract — one entry per RaBackend operation, namespaced.
+  // `host.ts` routes a `v3.<op>` through its NativeBackend instance, so every
+  // integer handle stays inside the utility process and every in-flight call
+  // takes the `begin_op` lease that makes unload-during-generate safe.
   ...BACKEND_METHODS.map(rpcMethodFor),
 ]);
 

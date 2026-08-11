@@ -2361,9 +2361,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     // Apply the no-think directive at the prompt level when disable_thinking is
     // set (proto LLMGenerationOptions.disable_thinking). Telemetry/events below
     // keep the original prompt; only the engine sees the directive.
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name,
-                                           ref.supports_thinking);
+    const std::string effective_prompt = rac::llm::apply_no_think_directive(
+        prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
     const int64_t started = now_ms();
     rc = (ref.ops && ref.ops->generate)
              ? ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw)
@@ -2459,7 +2458,7 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         const std::string repair_prompt = rac::llm::structured_output_repair_prompt(
             prompt, response_text, schema_storage);
         const std::string effective_repair = rac::llm::apply_no_think_directive(
-            repair_prompt, options.disable_thinking, ref.framework_name, ref.supports_thinking);
+            repair_prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
         rac_llm_result_free(&raw);
         raw = {};
         const rac_result_t repair_rc =
@@ -2633,7 +2632,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // as an opaque `WebAssembly.Exception` (no `.message`) in JS; on native
     // SDKs it would be undefined behaviour through a C ABI return.
     const std::string effective_prompt = rac::llm::apply_no_think_directive(
-        prompt, options.disable_thinking, ref.framework_name, ref.supports_thinking);
+        prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
     // See rac_llm_stream_reset_final_signal() in rac_llm_service.h: reset
     // right before the call the same way rac_llm_generate_stream() does,
     // since this path calls ref.ops->generate_stream() directly rather than
@@ -2832,8 +2831,8 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
-    const std::string effective_query =
-        rac::llm::apply_no_think_directive(query, options.disable_thinking);
+    const std::string effective_query = rac::llm::apply_no_think_directive(
+        query, options.disable_thinking, ref.framework, ref.supports_thinking);
     const int64_t started = now_ms();
     rc = (ref.ops && ref.ops->generate_from_context)
              ? ref.ops->generate_from_context(ref.impl, effective_query.c_str(), &options, &raw)

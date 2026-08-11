@@ -23,6 +23,7 @@
 
 #include "../common/rac_service_factory_internal.h"
 #include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 
@@ -37,6 +38,27 @@ const rac_llm_service_ops_t* llm_ops(const rac_engine_vtable_t* vt) {
 // See rac_llm_stream_reset_final_signal() in rac_llm_service.h: thread-local
 // because generate_stream() is synchronous/blocking on the calling thread.
 thread_local bool g_llm_stream_final_signal_seen = false;
+
+/**
+ * Applies the no-think directive on the struct-vtable path, which carries only a
+ * service handle. Unlike the lifecycle paths there is no LifecycleLlmRef to read
+ * the model's thinking capability from, so this resolves it from the registry by
+ * the service's own model id (the same id/path/basename order rac_llm_create()
+ * used to find the model). Both gates are therefore honored here too, and a
+ * model that does not speak "/no_think" never receives it — including on the
+ * RAG and voice-agent paths, which reach the engine through this API.
+ */
+std::string apply_no_think_directive_for_service(const rac_llm_service_t* service,
+                                                 const char* prompt,
+                                                 rac_bool_t disable_thinking) {
+    if (disable_thinking == RAC_FALSE) {
+        return prompt;
+    }
+    const rac::llm::ModelThinkingProfile profile =
+        rac::llm::model_thinking_profile_from_registry(service->model_id);
+    return rac::llm::apply_no_think_directive(prompt, disable_thinking, profile.framework,
+                                              profile.supports_thinking);
+}
 
 }  // namespace
 
@@ -129,13 +151,8 @@ rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                  (void*)service->ops->generate, service->impl);
     RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: calling backend generate...");
 
-    // TODO(RUN-81): framework identity is not threaded through this legacy generic
-    // C-API path (only a service vtable is in scope), so we cannot skip the
-    // directive for engines that suppress thinking natively. Keep injecting — the
-    // safe default: QHexRT harmlessly strips a redundant "/no_think"; llama.cpp
-    // needs it. The SDK/proto hot paths ARE framework-gated (llm_module.cpp).
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
+    const std::string effective_prompt = apply_no_think_directive_for_service(
+        service, prompt, options ? options->disable_thinking : RAC_FALSE);
     rac_result_t result =
         service->ops->generate(service->impl, effective_prompt.c_str(), options, out_result);
 
@@ -154,8 +171,8 @@ rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
+    const std::string effective_prompt = apply_no_think_directive_for_service(
+        service, prompt, options ? options->disable_thinking : RAC_FALSE);
     rac_llm_stream_reset_final_signal();
     return service->ops->generate_stream(service->impl, effective_prompt.c_str(), options, callback,
                                          user_data);

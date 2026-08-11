@@ -4,7 +4,8 @@
 // Downloads are handle-free: rac_download_*_proto keys every task by model id
 // and task id inside commons, and progress arrives on one process-wide callback
 // rather than per call, so the subscription here is a long-lived
-// ThreadSafeFunction instead of the per-stream session the inference bridges use.
+// ThreadSafeFunction instead of the per-stream session the inference bridges
+// use.
 //
 // Storage is the opposite shape: rac_storage_analyzer_*_proto all take a handle
 // built from a rac_storage_callbacks_t, so this file owns the one analyzer the
@@ -17,6 +18,7 @@
 #include "proto_bridge.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
@@ -28,6 +30,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
@@ -135,9 +138,7 @@ Napi::Value CleanupTerminal(const Napi::CallbackInfo& info) {
     return RunNativeCall(
         info.Env(), "download_cleanup_terminal_tasks",
         [purged]() { return rac_download_cleanup_terminal_tasks_proto(purged.get()); },
-        [purged](Napi::Env env) {
-            return Napi::Number::New(env, static_cast<double>(*purged));
-        });
+        [purged](Napi::Env env) { return Napi::Number::New(env, static_cast<double>(*purged)); });
 }
 
 // ---------------------------------------------------------------------------
@@ -239,8 +240,8 @@ int64_t StorageTotalSpace(void*) {
 }
 
 // The only place in this process that removes model bytes. Commons decides what
-// to pass here; a path that is already gone is a completed delete, not an error,
-// which is what makes models.delete() idempotent.
+// to pass here; a path that is already gone is a completed delete, not an
+// error, which is what makes models.delete() idempotent.
 rac_result_t StorageDeletePath(const char* path, int recursive, void*) {
     if (!path || !*path) {
         return RAC_ERROR_INVALID_PATH;
@@ -285,23 +286,21 @@ rac_result_t EnsureAnalyzer(rac_storage_analyzer_handle_t* out_handle) {
     return RAC_SUCCESS;
 }
 
-using StorageProtoFn = rac_result_t (*)(rac_storage_analyzer_handle_t,
-                                        rac_model_registry_handle_t, const uint8_t*, size_t,
-                                        rac_proto_buffer_t*);
+using StorageProtoFn = rac_result_t (*)(rac_storage_analyzer_handle_t, rac_model_registry_handle_t,
+                                        const uint8_t*, size_t, rac_proto_buffer_t*);
 
 Napi::Promise RunStorageCall(Napi::Env env, std::string context, StorageProtoFn fn,
                              std::vector<uint8_t> request) {
-    return RunProtoCall(env, std::move(context),
-                        [fn, request = std::move(request)](rac_proto_buffer_t* out) {
-                            rac_storage_analyzer_handle_t analyzer = nullptr;
-                            const rac_result_t rc = EnsureAnalyzer(&analyzer);
-                            if (rc != RAC_SUCCESS) {
-                                return rc;
-                            }
-                            return fn(analyzer, rac_get_model_registry(),
-                                      request.empty() ? nullptr : request.data(), request.size(),
-                                      out);
-                        });
+    return RunProtoCall(
+        env, std::move(context), [fn, request = std::move(request)](rac_proto_buffer_t* out) {
+            rac_storage_analyzer_handle_t analyzer = nullptr;
+            const rac_result_t rc = EnsureAnalyzer(&analyzer);
+            if (rc != RAC_SUCCESS) {
+                return rc;
+            }
+            return fn(analyzer, rac_get_model_registry(),
+                      request.empty() ? nullptr : request.data(), request.size(), out);
+        });
 }
 
 Napi::Value StorageInfo(const Napi::CallbackInfo& info) {
@@ -316,8 +315,7 @@ Napi::Value StorageAvailability(const Napi::CallbackInfo& info) {
 }
 
 Napi::Value StorageDeletePlan(const Napi::CallbackInfo& info) {
-    return RunStorageCall(info.Env(), "storage_delete_plan",
-                          rac_storage_analyzer_delete_plan_proto,
+    return RunStorageCall(info.Env(), "storage_delete_plan", rac_storage_analyzer_delete_plan_proto,
                           RequireProtoBytes(info, 0, "storageDeletePlanProto(requestBytes)"));
 }
 
@@ -339,6 +337,116 @@ Napi::Value ProgressPercent(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, rac_download_progress_percent(overall, downloaded, total));
 }
 
+// ---------------------------------------------------------------------------
+// File manager: the SDK's own cache and temp directories
+// ---------------------------------------------------------------------------
+//
+// The analyzer above measures and removes MODEL bytes. Cache and Temp are the
+// file manager's business, and commons owns both halves of it: rac_model_paths
+// resolves {base_dir}/RunAnywhere/{Cache,Temp} and rac_file_manager clears them
+// (recursive delete, then recreate empty). This file only supplies the I/O.
+//
+// rac_file_callbacks_t is a wider struct than rac_storage_callbacks_t: the five
+// slots the two share are the same functions, and the three below are the ones
+// only the file manager needs.
+
+rac_result_t FileCreateDirectory(const char* path, int recursive, void*) {
+    if (!path || !*path) {
+        return RAC_ERROR_INVALID_PATH;
+    }
+    std::error_code ec;
+    const fs::path target(path);
+    if (recursive) {
+        fs::create_directories(target, ec);
+    } else {
+        fs::create_directory(target, ec);
+    }
+    // A directory that already existed is a satisfied request, not a failure —
+    // create_directory reports "not created" through `ec` either way.
+    if (ec && !fs::is_directory(target, ec)) {
+        return RAC_ERROR_DIRECTORY_CREATION_FAILED;
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t FileListDirectory(const char* path, char*** out_entries, size_t* out_count, void*) {
+    if (!path || !*path || !out_entries || !out_count) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_entries = nullptr;
+    *out_count = 0;
+    std::error_code ec;
+    std::vector<std::string> names;
+    for (const fs::directory_entry& entry : fs::directory_iterator(
+             fs::path(path), fs::directory_options::skip_permission_denied, ec)) {
+        names.push_back(entry.path().filename().string());
+    }
+    if (ec) {
+        return RAC_ERROR_DIRECTORY_NOT_FOUND;
+    }
+    if (names.empty()) {
+        return RAC_SUCCESS;
+    }
+    // malloc/strdup rather than new[]: `free_entries` below is the only thing
+    // that ever releases these, and keeping the pair C-shaped keeps the two
+    // allocators impossible to mismatch.
+    auto** entries = static_cast<char**>(std::malloc(names.size() * sizeof(char*)));
+    if (!entries) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    for (size_t i = 0; i < names.size(); ++i) {
+        entries[i] = strdup(names[i].c_str());
+        if (!entries[i]) {
+            for (size_t j = 0; j < i; ++j) {
+                std::free(entries[j]);
+            }
+            std::free(entries);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+    *out_entries = entries;
+    *out_count = names.size();
+    return RAC_SUCCESS;
+}
+
+void FileFreeEntries(char** entries, size_t count, void*) {
+    if (!entries) {
+        return;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        std::free(entries[i]);
+    }
+    std::free(entries);
+}
+
+rac_file_callbacks_t FileCallbacks() {
+    rac_file_callbacks_t callbacks;
+    std::memset(&callbacks, 0, sizeof(callbacks));
+    callbacks.create_directory = FileCreateDirectory;
+    callbacks.delete_path = StorageDeletePath;
+    callbacks.list_directory = FileListDirectory;
+    callbacks.free_entries = FileFreeEntries;
+    callbacks.path_exists = StoragePathExists;
+    callbacks.get_file_size = StorageFileSize;
+    callbacks.get_available_space = StorageAvailableSpace;
+    callbacks.get_total_space = StorageTotalSpace;
+    return callbacks;
+}
+
+Napi::Value ClearCache(const Napi::CallbackInfo& info) {
+    return RunNativeCall(info.Env(), "file_manager_clear_cache", []() {
+        const rac_file_callbacks_t callbacks = FileCallbacks();
+        return rac_file_manager_clear_cache(&callbacks);
+    });
+}
+
+Napi::Value ClearTemp(const Napi::CallbackInfo& info) {
+    return RunNativeCall(info.Env(), "file_manager_clear_temp", []() {
+        const rac_file_callbacks_t callbacks = FileCallbacks();
+        return rac_file_manager_clear_temp(&callbacks);
+    });
+}
+
 }  // namespace
 
 void RegisterDownloadBridge(Napi::Env env, Napi::Object exports) {
@@ -354,6 +462,8 @@ void RegisterDownloadBridge(Napi::Env env, Napi::Object exports) {
     exports.Set("storageAvailabilityProto", Napi::Function::New(env, StorageAvailability));
     exports.Set("storageDeletePlanProto", Napi::Function::New(env, StorageDeletePlan));
     exports.Set("storageDeleteProto", Napi::Function::New(env, StorageDelete));
+    exports.Set("fileManagerClearCache", Napi::Function::New(env, ClearCache));
+    exports.Set("fileManagerClearTemp", Napi::Function::New(env, ClearTemp));
 }
 
 void ShutdownDownloadBridge() {

@@ -21,6 +21,7 @@ import {
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import { ReasoningMode as ProtoReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';
@@ -136,21 +137,38 @@ export function toProtoOptions(
   });
 }
 
-/** Throughput and token accounting, straight out of the result. */
+/**
+ * Project a commons {@link TokenUsage} onto the public metrics block.
+ *
+ * Copies every field verbatim (including prefill, first-content latency,
+ * content TPS, batchBuffered, countsEstimated). Flat convenience fields are
+ * projections of that copy — never recomputed or filled from sibling scalars.
+ * Absence becomes the proto zero value, not a platform-invented substitute.
+ */
+export function toPublicGenerationMetrics(
+  usage: TokenUsage | undefined,
+  requestId: string,
+  model: string
+): GenerationMetrics {
+  const copied = TokenUsage.fromPartial(usage ?? {});
+  return {
+    usage: copied,
+    inputTokens: copied.inputTokens,
+    outputTokens: copied.outputTokens,
+    timeToFirstTokenMs: copied.ttftMs,
+    tokensPerSecond: copied.decodeTokensPerSecond,
+    requestId,
+    model,
+  };
+}
+
+/** Throughput and token accounting, straight out of the LLM result. */
 export function toPublicMetrics(
   result: LLMGenerationResult,
   requestId: string,
   model: string
 ): GenerationMetrics {
-  const usage = result.usage;
-  return {
-    inputTokens: usage?.inputTokens ?? 0,
-    outputTokens: usage?.outputTokens ?? result.responseTokens,
-    timeToFirstTokenMs: usage?.ttftMs ?? 0,
-    tokensPerSecond: usage?.decodeTokensPerSecond ?? 0,
-    requestId,
-    model: result.modelUsed || model,
-  };
+  return toPublicGenerationMetrics(result.usage, requestId, result.modelUsed || model);
 }
 
 /** Raise a commons-authored error, or return the result when there is none. */

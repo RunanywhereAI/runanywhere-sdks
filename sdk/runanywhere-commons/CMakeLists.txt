@@ -1078,6 +1078,10 @@ set(RAC_COMMONS_SOURCES
 
 if(RAC_BUILD_SHARED)
     add_library(rac_commons SHARED ${RAC_COMMONS_SOURCES})
+    # Dependents (Electron addon, engine plugins, carriers) import the C ABI
+    # from this dylib/so/dll. Windows needs dllimport; Apple/ELF RAC_API is
+    # visibility("default") either way, but the define keeps the contract one.
+    target_compile_definitions(rac_commons INTERFACE RAC_USING_SHARED=1)
 else()
     add_library(rac_commons STATIC ${RAC_COMMONS_SOURCES})
 endif()
@@ -1129,28 +1133,50 @@ if(RAC_BUILD_SHARED)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
+    # Sidecar layout: plugin dylibs / the .node resolve librac_commons via
+    # @loader_path / $ORIGIN when staged next to each other (Electron Option A).
+    # APPEND keeps CMake's absolute build-tree dependency RPATHs for local runs.
+    if(APPLE)
+        set_property(TARGET rac_commons APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties(rac_commons PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET rac_commons APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties(rac_commons PROPERTIES INSTALL_RPATH "$ORIGIN")
+    elseif(WIN32)
+        # MSVC has no ELF/Mach-O visibility. RAC_API → dllexport covers annotated
+        # C ABI symbols; WINDOWS_EXPORT_ALL_SYMBOLS is the Windows peer of the
+        # Android/Linux/macOS `-fvisibility=default` override below — a safety
+        # net until TODO(v0.21) finishes RAC_API coverage (thinking helpers,
+        # legacy service handles, etc.). Electron thin addons + plugin DLLs
+        # then resolve rac_* via the import library without a hand-maintained
+        # .def. Drop this once every public C ABI symbol carries RAC_API.
+        set_target_properties(rac_commons PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    endif()
 endif()
 
 # Android: override the hidden-visibility preset for rac_commons. The JNI
 # shared library librunanywhere_jni.so dynamic-links against librac_commons.so
 # and needs every rac_* C ABI function resolvable at link time. Several
 # functions in the public C headers are still missing the `RAC_API`
-# visibility attribute (rac_llm_{extract,strip}_thinking,
-# rac_llm_split_thinking_tokens, rac_voice_agent_set_proto_callback,
-# rac_llm_{,un}set_stream_proto_callback); hiding them breaks JNI/shared
-# consumers with `undefined symbol` errors. Forcing default visibility on this target
-# matches the macOS/iOS xcframework behaviour, where commons is a static
-# archive and every symbol is visible to downstream consumers. The override
-# is target-scoped so engine backends keep their hidden-visibility hardening.
+# visibility attribute (historically rac_llm_{extract,strip}_thinking,
+# rac_llm_split_thinking_tokens — now annotated; remaining gaps include
+# some legacy service-handle and proto-adapter helpers). Hiding them breaks
+# JNI/shared consumers with `undefined symbol` errors. Forcing default
+# visibility on this target matches the macOS/iOS xcframework behaviour,
+# where commons is a static archive and every symbol is visible to
+# downstream consumers. The override is target-scoped so engine backends
+# keep their hidden-visibility hardening.
 # TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
-# and drop this Android-specific override. Linux and macOS shared dev builds
-# need the same override: the test executables (test_graph_scheduler,
-# test_pipeline_executor) link directly against internal C++ classes
-# (`rac::graph::GraphScheduler`, etc.) that don't yet carry RAC_API. With
-# the default hidden visibility on SHARED builds the test linker fails with
-# `undefined reference to <class>::<class>()`. The official macOS CMake presets
-# still use RAC_BUILD_SHARED=OFF, so this only affects explicit shared dev
-# builds such as the native plugin gate.
+# and drop this Android-specific override (and the Windows
+# WINDOWS_EXPORT_ALL_SYMBOLS safety net above). Linux and macOS shared
+# dev builds need the same override: the test executables
+# (test_graph_scheduler, test_pipeline_executor) link directly against
+# internal C++ classes (`rac::graph::GraphScheduler`, etc.) that don't yet
+# carry RAC_API. With the default hidden visibility on SHARED builds the
+# test linker fails with `undefined reference to <class>::<class>()`. The
+# official macOS CMake presets still use RAC_BUILD_SHARED=OFF, so this only
+# affects explicit shared dev builds such as the native plugin gate /
+# electron-macos preset.
 if(ANDROID
    OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND RAC_BUILD_SHARED)
    OR (RAC_PLATFORM_MACOS AND RAC_BUILD_SHARED))

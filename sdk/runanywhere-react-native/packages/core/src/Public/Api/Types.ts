@@ -6,12 +6,31 @@
  * default is declared.
  */
 
+import type {
+  AgentState as CanonicalAgentState,
+  DownloadEvent as CanonicalDownloadEvent,
+  GenerationEventWithDeprecated,
+  RagEventWithDeprecated,
+  TokenKind as CanonicalTokenKind,
+  TranscriptAlternative as CanonicalTranscriptAlternative,
+  TranscriptionEvent as CanonicalTranscriptionEvent,
+  VoiceEvent as CanonicalVoiceEvent,
+} from '@runanywhere/proto-ts/events/public_events';
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import type { ModelCategory, InferenceFramework, ModelInfo } from '@runanywhere/proto-ts/model_types';
 import type { ToolCall, ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 
 export type { ModelCategory, InferenceFramework, ModelInfo };
 export type { ToolCall, ToolDefinition };
+
+/**
+ * Remap canonical `failed.error: SDKError` → `Error` so RN's published public
+ * API stays compatible for one release. Emit sites already pass `SDKException`
+ * (extends `Error`) or plain `Error`.
+ */
+type WithJsErrorOnFailed<T> = T extends { type: 'failed'; error: unknown }
+  ? Omit<T, 'error'> & { error: Error }
+  : T;
 
 /** Control-plane environment the SDK talks to. */
 export type Environment = SDKEnvironment;
@@ -605,46 +624,48 @@ export interface SDKCapabilities {
 }
 
 // ---------------------------------------------------------------------------
-// Events
+// Events (derived from `@runanywhere/proto-ts/events/public_events`)
 // ---------------------------------------------------------------------------
 
-/** Whether a streamed token is answer text or private reasoning. */
-export type TokenKind = 'text' | 'thought';
+/**
+ * Whether a streamed token is answer text or private reasoning.
+ * Canonical values are lowercase — keep the type-only public surface (no
+ * UPPERCASE const object) so existing string-literal consumers stay valid.
+ */
+export type TokenKind = CanonicalTokenKind;
+
+/** One alternative transcript for a still-revising partial segment. */
+export type TranscriptAlternative = CanonicalTranscriptAlternative;
+
+/**
+ * Flat usage arm RN already publishes. Canonical nests `usage: TUsage`; remap
+ * locally so the public field shape does not change.
+ */
+type RnGenerationUsageEvent = {
+  type: 'usage';
+  requestId: string;
+  sequence: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+type CanonicalGenerationEvent = GenerationEventWithDeprecated<
+  GenerationResult,
+  string,
+  ToolCall,
+  { inputTokens: number; outputTokens: number },
+  unknown
+>;
 
 /** `started`, then deltas, then a terminal `completed`/`failed`/`cancelled`. */
 export type GenerationEvent =
-  | { type: 'started'; requestId: string }
-  | { type: 'outputItemAdded'; requestId: string; sequence: number; itemId: string; index: number; item: unknown }
-  | { type: 'textDelta'; requestId: string; sequence: number; itemId: string; index: number; text: string }
-  | { type: 'reasoningDelta'; requestId: string; sequence: number; itemId: string; index: number; text: string }
-  | { type: 'toolCallAdded'; requestId: string; sequence: number; itemId: string; index: number; call: ToolCall }
-  | { type: 'toolArgumentsDelta'; requestId: string; sequence: number; itemId: string; delta: string }
-  | { type: 'toolArgumentsDone'; requestId: string; sequence: number; itemId: string; arguments: string }
-  | { type: 'usage'; requestId: string; sequence: number; inputTokens: number; outputTokens: number }
-  | { type: 'completed'; requestId: string; result: GenerationResult }
-  | { type: 'failed'; requestId: string; partial?: string; error: Error }
-  | { type: 'cancelled'; requestId: string; partial?: string }
-  // @deprecated Use textDelta/reasoningDelta.
-  | { type: 'token'; text: string; kind: TokenKind }
-  // @deprecated Use toolCallAdded.
-  | { type: 'toolCall'; toolCall: ToolCall };
-
-/** One alternative transcript for a still-revising partial segment. */
-export interface TranscriptAlternative {
-  text: string;
-  confidence?: number;
-}
+  | WithJsErrorOnFailed<Exclude<CanonicalGenerationEvent, { type: 'usage' }>>
+  | RnGenerationUsageEvent;
 
 /** `started`, then partials, then a terminal `completed`/`failed`/`cancelled`. */
-export type TranscriptionEvent =
-  | { type: 'started'; requestId: string }
-  | { type: 'speechStarted'; requestId: string; sequence: number; timestampMs?: number }
-  | { type: 'partial'; requestId: string; sequence: number; segmentId: string; revision: number; alternatives: TranscriptAlternative[] }
-  | { type: 'transcriptFinal'; requestId: string; sequence: number; segment: Transcription }
-  | { type: 'speechEnded'; requestId: string; sequence: number; timestampMs?: number }
-  | { type: 'completed'; requestId: string }
-  | { type: 'failed'; requestId: string; error: Error }
-  | { type: 'cancelled'; requestId: string };
+export type TranscriptionEvent = WithJsErrorOnFailed<
+  CanonicalTranscriptionEvent<Transcription, TranscriptAlternative>
+>;
 
 /** Frame-level speech detection over a live push stream (`vad.openStream`). */
 export type VadEvent =
@@ -654,26 +675,22 @@ export type VadEvent =
   | { type: 'failed'; error: Error }
   | { type: 'completed' };
 
-/** What the agent is doing right now. */
-export type AgentState = 'listening' | 'thinking' | 'speaking';
+/**
+ * What the agent is doing right now.
+ * Canonical values are lowercase — type-only re-export (no const object).
+ */
+export type AgentState = CanonicalAgentState;
 
-/** Turn-by-turn progress of a voice session. */
-export type VoiceEvent =
-  | { type: 'userTranscribed'; text: string; isFinal: boolean }
-  | { type: 'agentStateChanged'; state: AgentState }
-  | { type: 'agentResponse'; text: string }
-  | { type: 'speechStarted' }
-  | { type: 'speechEnded' }
-  | { type: 'error'; message: string; recoverable: boolean };
+/**
+ * Turn-by-turn progress of a voice session.
+ * `inputSilent` and optional id fields are additive from the canonical grammar.
+ */
+export type VoiceEvent = CanonicalVoiceEvent;
 
 /** Retrieval, then answer deltas, then a terminal `completed`/`failed`. */
-export type RagEvent =
-  | { type: 'retrieved'; matches: Match[] }
-  | { type: 'textDelta'; text: string; kind: TokenKind }
-  | { type: 'completed'; result: RagResult }
-  | { type: 'failed'; error: Error }
-  // @deprecated Use textDelta.
-  | { type: 'token'; text: string; kind: TokenKind };
+export type RagEvent = WithJsErrorOnFailed<
+  RagEventWithDeprecated<Match, RagResult>
+>;
 
 /** Diffusion progress, then `completed`. */
 export type ImageEvent =
@@ -687,14 +704,21 @@ export type ImageEvent =
   | { type: 'completed'; result: ImageResult };
 
 /** Byte progress, optional extraction, then a terminal `completed`/`failed`/`cancelled`. */
-export type DownloadEvent =
-  | { type: 'started'; operationId: string; sequence: number }
-  | { type: 'progress'; operationId: string; sequence: number; bytesDone: number; bytesTotal: number; percent?: number; file?: string }
-  | { type: 'verifying'; operationId: string; sequence: number }
-  | { type: 'extracting'; operationId: string; sequence: number; percent?: number }
-  | { type: 'completed'; operationId: string; sequence: number; model: ModelInfo }
-  | { type: 'failed'; operationId: string; sequence: number; error: Error }
-  | { type: 'cancelled'; operationId: string; sequence: number };
+export type DownloadEvent = WithJsErrorOnFailed<
+  CanonicalDownloadEvent<
+    { model: ModelInfo },
+    {
+      bytesDone: number;
+      bytesTotal: number;
+      /**
+       * Commons-owned percent via `rac_download_progress_percent`. Omit when
+       * indeterminate — never invent a local 0 standing in for unknown.
+       */
+      percent?: number;
+      file?: string;
+    }
+  >
+>;
 
 // ---------------------------------------------------------------------------
 // Sessions

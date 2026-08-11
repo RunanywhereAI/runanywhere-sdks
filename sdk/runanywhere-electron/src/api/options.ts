@@ -5,16 +5,26 @@
 // (`maxTokens` for maxOutputTokens, `speed` -> rac `rate`), so every rename is
 // resolved here and nowhere else.
 
+import { AudioFormat as ProtoAudioFormat } from '@runanywhere/proto-ts/model_types';
+import { diarizationOptionsDefaults } from '@runanywhere/proto-ts/convenience/diarization_convenience';
+import { diffusionGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/diffusion_options_convenience';
+import { embeddingsOptionsDefaults } from '@runanywhere/proto-ts/convenience/embeddings_options_convenience';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
+import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
+import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
+import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
+import { vADOptionsDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
+import { audioCaptureDefaults, storageDefaults } from '@runanywhere/proto-ts/defaults/pool';
+// `AudioFormat`, `ReasoningMode`, and `ToolChoice` are each a const object plus a
+// type of the same name, so one value import supplies both.
+import { AudioFormat, ReasoningMode, ToolChoice } from './types';
 import type {
-  AudioFormat,
   ImageMode,
   InferenceFramework,
   JsonSchema,
   ModelCategory,
   NormalizeMode,
   PoolingMode,
-  ReasoningMode,
-  ToolChoice,
   ToolDefinition,
 } from './types';
 
@@ -193,68 +203,82 @@ export interface LoadOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Defaults — one table, shared by both surfaces
+// Defaults — read from the IDL, never restated
 // ---------------------------------------------------------------------------
+//
+// Every default the SDK needs client-side comes from the generated
+// `@runanywhere/proto-ts/convenience/*` helpers, which are produced from the
+// `(runanywhere.v1.rac_default)` annotations in `idl/`, or from the central
+// `defaults/pool`. Nothing here transcribes a literal. This mirrors the Web
+// SDK's `Public/API/Options.ts:293-303`.
+//
+// A default is only consulted where the SDK itself does the work (the
+// client-side VAD debounce, a UI-facing fallback label). Everything that
+// crosses into commons leaves an unset field ABSENT so commons applies its own
+// `rac_default` — the contract `llm-abi.ts` documents.
+
+/** Every IDL default the SDK reads, grouped by option object. */
+export const optionDefaults = {
+  llm: lLMGenerationOptionsDefaults,
+  stt: sTTOptionsDefaults,
+  tts: tTSOptionsDefaults,
+  vad: vADOptionsDefaults,
+  embed: embeddingsOptionsDefaults,
+  image: diffusionGenerationOptionsDefaults,
+  diarization: diarizationOptionsDefaults,
+  rag: rAGConfigurationDefaults,
+  contextLength: storageDefaults.contextLength,
+  /** The rate every audio path in this SDK normalizes to. */
+  micSampleRateHz: audioCaptureDefaults.micSampleRateHz,
+  /** Playback fallback when a synthesis result reports no rate of its own. */
+  ttsSampleRateHz: audioCaptureDefaults.ttsSampleRateHz,
+} as const;
 
 /**
- * Defaults for {@link LlmOptions} that have no counterpart in
- * `idl/llm_options.proto`. Every sampling knob used to be transcribed here;
- * they are gone because both paths below now leave an unset field absent and
- * let commons apply its own `rac_default` annotation, which is the cross-SDK
- * source of truth. `maxToolCalls` went the same way in F5, when the tool loop
- * moved into commons; what is left is the one knob the SDK still decides.
+ * The one knob the SDK still decides for {@link LlmOptions}: `idl/llm_options.proto`
+ * has no tool-choice field, so there is no `rac_default` to read. Every sampling
+ * knob that used to live here is gone — both request builders leave an unset
+ * field absent and let commons apply its own annotation.
  */
 export const LLM_DEFAULTS = {
-  toolChoice: 'AUTO' as ToolChoice,
+  toolChoice: ToolChoice.AUTO as ToolChoice,
 } as const;
 
-/** Spec defaults for {@link ReasoningOptions}. */
-export const REASONING_DEFAULTS = { mode: 'ON', includeInOutput: false } as const;
-
-/** Spec defaults for {@link SttOptions}. */
-export const STT_DEFAULTS = {
-  punctuation: true,
-  wordTimestamps: true,
-  diarization: false,
-  translateToEnglish: false,
+/**
+ * Spec defaults for {@link ReasoningOptions}. `idl/thinking_tag_pattern.proto`
+ * carries the pattern, not a policy, so these two stay local: "may think, do not
+ * surface the thoughts" is the SDK's own contract.
+ */
+export const REASONING_DEFAULTS = {
+  mode: ReasoningMode.ON,
+  includeInOutput: false,
 } as const;
 
-/** Spec defaults for {@link TtsOptions}. */
-export const TTS_DEFAULTS = {
-  language: 'en-US',
-  speed: 1.0,
-  pitch: 1.0,
-  format: 'PCM' as AudioFormat,
-  sampleRate: 22050,
-} as const;
-
-/** Spec defaults for {@link VadOptions}. */
-export const VAD_DEFAULTS = {
-  minSpeechMs: 100,
-  minSilenceMs: 300,
-  prefixPaddingMs: 0,
-} as const;
-
-/** Spec defaults for {@link EmbedOptions}. */
-export const EMBED_DEFAULTS = {
-  normalize: 'L2' as NormalizeMode,
-  pooling: 'MEAN' as PoolingMode,
-} as const;
-
-/** Spec defaults for {@link ImageOptions}. */
-export const IMAGE_DEFAULTS = { mode: 'GENERATE' as ImageMode, reportPartials: false } as const;
-
-/** Spec defaults for {@link SegmentationOptions}. */
+/**
+ * Spec defaults for {@link SegmentationOptions}. `SegmentationOptions` in
+ * `idl/segmentation.proto` carries no `rac_default` annotations, so the proto3
+ * zero value is the default and this states it explicitly for the one field the
+ * public option exposes.
+ */
 export const SEGMENTATION_DEFAULTS = { includeDiagnosticImage: false } as const;
 
-/** Spec defaults for {@link TurnHandlingOptions}. */
+/**
+ * Spec defaults for {@link ImageOptions}. `mode` has no IDL counterpart at all —
+ * commons infers inpainting from a mask's presence — so it stays local;
+ * `reportPartials` is an SDK-side streaming policy, not a generation knob.
+ */
+export const IMAGE_DEFAULTS = { mode: 'GENERATE' as ImageMode, reportPartials: false } as const;
+
+/**
+ * Spec defaults for {@link TurnHandlingOptions}. Deliberately local: there is no
+ * IDL counterpart for either dial. `TurnDetection` has `silence_duration_ms` but
+ * no maximum-delay or interruption-duration field, and commons' own endpointing
+ * caps are compile-time constants in `voice_agent_feed_abi.cpp`.
+ */
 export const TURN_DEFAULTS = {
   endpointing: { minDelayMs: 500, maxDelayMs: 3000 },
   interruption: { enabled: true, minDurationMs: 500 },
 } as const;
-
-/** Spec defaults for {@link RagConfig}. */
-export const RAG_DEFAULTS = { topK: 5, chunkSize: 512, chunkOverlap: 64 } as const;
 
 // ---------------------------------------------------------------------------
 // Native mapping
@@ -310,6 +334,63 @@ export function toNativeGenerateOptions(
   return native;
 }
 
+// ---------------------------------------------------------------------------
+// C-ABI enum mirrors
+// ---------------------------------------------------------------------------
+//
+// These are the C enum's ordinals, NOT the proto's. They exist because the
+// addon's remaining N-API bindings take and return bare ints
+// (`NativeAddon.synthesize` resolves `audioFormat: number`), and the proto
+// numbering is different: `rac_audio_format_enum_t` starts at PCM = 0 while
+// `runanywhere.v1.AudioFormat` starts at PCM = 1. Applying one decoder to the
+// other's values is off by one for every member, which is exactly the bug that
+// made `tts.synthesize` report PCM output as WAV.
+
+/** `rac_audio_format_enum_t` ordinals (`rac/features/stt/rac_stt_types.h:73-79`). */
+const RAC_AUDIO_FORMAT_ORDINAL: Readonly<Record<AudioFormat, number>> = Object.freeze({
+  [AudioFormat.PCM]: 0,
+  [AudioFormat.WAV]: 1,
+  [AudioFormat.MP3]: 2,
+  [AudioFormat.OPUS]: 3,
+  [AudioFormat.AAC]: 4,
+  [AudioFormat.FLAC]: 5,
+});
+
+const RAC_AUDIO_FORMAT_NAME = new Map<number, AudioFormat>(
+  (Object.entries(RAC_AUDIO_FORMAT_ORDINAL) as Array<[AudioFormat, number]>).map(
+    ([name, ordinal]) => [ordinal, name]
+  )
+);
+
+/**
+ * Decode a `rac_audio_format_enum_t` ordinal — the C ABI's numbering, as the
+ * addon's own N-API bindings report it.
+ *
+ * NOT for a proto `AudioFormat` value: use {@link audioFormatFromProto} for
+ * anything that arrived inside a generated message.
+ */
+export function audioFormatFromRacOrdinal(ordinal: number): AudioFormat {
+  return RAC_AUDIO_FORMAT_NAME.get(ordinal) ?? AudioFormat.PCM;
+}
+
+/** Encode a public {@link AudioFormat} as its `rac_audio_format_enum_t` ordinal. */
+export function audioFormatToRacOrdinal(format: AudioFormat): number {
+  return RAC_AUDIO_FORMAT_ORDINAL[format] ?? RAC_AUDIO_FORMAT_ORDINAL[AudioFormat.PCM];
+}
+
+// ---------------------------------------------------------------------------
+// Legacy N-API option shapes
+// ---------------------------------------------------------------------------
+//
+// These describe the addon's OWN key spelling for the handful of verbs that
+// still take a plain JS object rather than proto bytes. They are the wire shape
+// of `RaBackend`'s speech/embedding/diarization methods, which is why they live
+// here beside the public option types they are built from.
+//
+// They carry NO defaults: a field left absent is a field commons fills from its
+// own `rac_default` annotation. Building a default in here is how the SDK and
+// the IDL drift apart.
+
 /** STT options in the addon's own key spelling. */
 export interface NativeSttOptions {
   language?: string;
@@ -321,37 +402,7 @@ export interface NativeSttOptions {
   sampleRate?: number;
 }
 
-/** Map {@link SttOptions} onto the addon's keys, applying spec defaults. */
-export function toNativeSttOptions(o: SttOptions = {}, sampleRate?: number): NativeSttOptions {
-  const native: NativeSttOptions = {
-    punctuation: o.punctuation ?? STT_DEFAULTS.punctuation,
-    wordTimestamps: o.wordTimestamps ?? STT_DEFAULTS.wordTimestamps,
-    diarization: o.diarization ?? STT_DEFAULTS.diarization,
-  };
-  if (o.language !== undefined) native.language = o.language;
-  else native.detectLanguage = true;
-  if (o.maxSpeakers !== undefined) native.maxSpeakers = o.maxSpeakers;
-  if (sampleRate) native.sampleRate = sampleRate;
-  return native;
-}
-
-// rac_audio_format_enum_t ordinals (rac_stt_types.h). The addon takes the int.
-const AUDIO_FORMAT_ORDINAL: Record<string, number> = {
-  PCM: 0,
-  WAV: 1,
-  MP3: 2,
-  OPUS: 3,
-  AAC: 4,
-  FLAC: 5,
-};
-
-/** Decode a rac_audio_format_enum_t ordinal back to the public name. */
-export function audioFormatFromOrdinal(n: number): AudioFormat {
-  const found = Object.entries(AUDIO_FORMAT_ORDINAL).find(([, v]) => v === n);
-  return (found ? found[0] : 'PCM') as AudioFormat;
-}
-
-/** TTS options in the addon's own key spelling. */
+/** TTS options in the addon's own key spelling. `audioFormat` is a rac ordinal. */
 export interface NativeTtsOptions {
   voice?: string;
   language?: string;
@@ -361,55 +412,21 @@ export interface NativeTtsOptions {
   sampleRate?: number;
 }
 
-/** Map {@link TtsOptions} onto the addon's keys, applying spec defaults. */
-export function toNativeTtsOptions(o: TtsOptions = {}): NativeTtsOptions {
-  const native: NativeTtsOptions = {
-    language: o.language ?? TTS_DEFAULTS.language,
-    speed: o.speed ?? TTS_DEFAULTS.speed,
-    pitch: o.pitch ?? TTS_DEFAULTS.pitch,
-    audioFormat: AUDIO_FORMAT_ORDINAL[o.format ?? TTS_DEFAULTS.format] ?? 0,
-    sampleRate: o.sampleRate ?? TTS_DEFAULTS.sampleRate,
-  };
-  if (o.voice !== undefined) native.voice = o.voice;
-  return native;
-}
-
-// rac_embeddings_{normalize,pooling}_t ordinals (rac_embeddings_types.h).
-const NORMALIZE_ORDINAL: Record<NormalizeMode, number> = { NONE: 0, L2: 1 };
-const POOLING_ORDINAL: Record<PoolingMode, number> = { MEAN: 0, CLS: 1, LAST: 2 };
-
-/** Embedding options in the addon's own key spelling. */
+/**
+ * Embedding options in the addon's own key spelling. `normalize` and `pooling`
+ * are `rac_embeddings_{normalize,pooling}_t` ordinals.
+ */
 export interface NativeEmbedOptions {
   normalize?: number;
   pooling?: number;
 }
 
-/** Map {@link EmbedOptions} onto the addon's keys, applying spec defaults. */
-export function toNativeEmbedOptions(o: EmbedOptions = {}): NativeEmbedOptions {
-  return {
-    normalize: NORMALIZE_ORDINAL[o.normalize ?? EMBED_DEFAULTS.normalize],
-    pooling: POOLING_ORDINAL[o.pooling ?? EMBED_DEFAULTS.pooling],
-  };
-}
-
-/** VAD config in the addon's own key spelling. */
+/** VAD config in the addon's `createVad` spelling. */
 export interface NativeVadConfig {
   activationThreshold?: number;
   sampleRate?: number;
   frameLength?: number;
   modelPath?: string;
-}
-
-/** Map {@link VadOptions} onto the addon's createVad config. */
-export function toNativeVadConfig(
-  o: VadOptions = {},
-  extra: { sampleRate?: number; modelPath?: string } = {}
-): NativeVadConfig {
-  const native: NativeVadConfig = {};
-  if (o.activationThreshold !== undefined) native.activationThreshold = o.activationThreshold;
-  if (extra.sampleRate) native.sampleRate = extra.sampleRate;
-  if (extra.modelPath) native.modelPath = extra.modelPath;
-  return native;
 }
 
 /** Diarization options in the addon's own key spelling. */
@@ -420,15 +437,44 @@ export interface NativeDiarizationOptions {
   sampleRate?: number;
 }
 
-/** Map {@link DiarizationOptions} onto the addon's keys. */
-export function toNativeDiarizationOptions(
-  o: DiarizationOptions = {},
-  sampleRate?: number
-): NativeDiarizationOptions {
-  const native: NativeDiarizationOptions = {};
-  if (o.threshold !== undefined) native.threshold = o.threshold;
-  if (o.minimumDurationMs !== undefined) native.minimumDurationMs = o.minimumDurationMs;
-  if (o.mergeGapMs !== undefined) native.mergeGapMs = o.mergeGapMs;
-  if (sampleRate) native.sampleRate = sampleRate;
-  return native;
+/**
+ * Decode a proto `runanywhere.v1.AudioFormat` to the public name — the decoder
+ * every generated message's `audio_format` field needs. `PCM_S16LE`, `OGG`, and
+ * `M4A` have no public member, and the public surface only ever hands back
+ * float32 samples, so they report as PCM (mirrors the Web SDK's
+ * `Mapping.ts:414-418`).
+ */
+export function audioFormatFromProto(format: ProtoAudioFormat): AudioFormat {
+  switch (format) {
+    case ProtoAudioFormat.AUDIO_FORMAT_WAV:
+      return AudioFormat.WAV;
+    case ProtoAudioFormat.AUDIO_FORMAT_MP3:
+      return AudioFormat.MP3;
+    case ProtoAudioFormat.AUDIO_FORMAT_OPUS:
+      return AudioFormat.OPUS;
+    case ProtoAudioFormat.AUDIO_FORMAT_AAC:
+      return AudioFormat.AAC;
+    case ProtoAudioFormat.AUDIO_FORMAT_FLAC:
+      return AudioFormat.FLAC;
+    default:
+      return AudioFormat.PCM;
+  }
+}
+
+/** Encode a public {@link AudioFormat} as its proto `AudioFormat` value. */
+export function audioFormatToProto(format: AudioFormat): ProtoAudioFormat {
+  switch (format) {
+    case AudioFormat.WAV:
+      return ProtoAudioFormat.AUDIO_FORMAT_WAV;
+    case AudioFormat.MP3:
+      return ProtoAudioFormat.AUDIO_FORMAT_MP3;
+    case AudioFormat.OPUS:
+      return ProtoAudioFormat.AUDIO_FORMAT_OPUS;
+    case AudioFormat.AAC:
+      return ProtoAudioFormat.AUDIO_FORMAT_AAC;
+    case AudioFormat.FLAC:
+      return ProtoAudioFormat.AUDIO_FORMAT_FLAC;
+    default:
+      return ProtoAudioFormat.AUDIO_FORMAT_PCM;
+  }
 }

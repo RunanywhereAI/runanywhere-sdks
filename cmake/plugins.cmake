@@ -31,6 +31,32 @@
 include_guard(GLOBAL)
 
 # -----------------------------------------------------------------------------
+# rac_apply_shared_sidecar_rpath(target)
+#
+# Shared commons + plugin dylibs / the Electron .node are staged beside each
+# other for Option A packaging. Append @loader_path (Apple) / $ORIGIN (ELF) to
+# BUILD_RPATH so CMake's automatic absolute build-tree dependency paths stay,
+# and set INSTALL_RPATH to the same relative token for the install/stage tree.
+# -----------------------------------------------------------------------------
+function(rac_apply_shared_sidecar_rpath target)
+    if(NOT TARGET "${target}")
+        return()
+    endif()
+    get_target_property(_rac_rpath_type "${target}" TYPE)
+    if(NOT _rac_rpath_type STREQUAL "SHARED_LIBRARY"
+       AND NOT _rac_rpath_type STREQUAL "MODULE_LIBRARY")
+        return()
+    endif()
+    if(APPLE)
+        set_property(TARGET "${target}" APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties("${target}" PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET "${target}" APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties("${target}" PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
+endfunction()
+
+# -----------------------------------------------------------------------------
 # rac_add_engine_plugin(name
 #                       SOURCES <s1> <s2> ...
 #                       [TARGET_NAME <override>]      # e.g. rac_backend_onnx
@@ -144,6 +170,12 @@ function(rac_add_engine_plugin name)
                 VISIBILITY_INLINES_HIDDEN ON
             )
         endif()
+        # Windows shared-plugin entry export: rac_plugin_entry_<name> must be
+        # dllexport even though the target inherits RAC_USING_SHARED (dllimport)
+        # from rac_commons. See RAC_PLUGIN_API in rac_types.h.
+        if(_kind STREQUAL "SHARED_LIBRARY")
+            target_compile_definitions(${P_TARGET_NAME} PRIVATE RAC_BUILDING_PLUGIN=1)
+        endif()
         target_include_directories(${P_TARGET_NAME} PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
         )
@@ -167,6 +199,9 @@ function(rac_add_engine_plugin name)
         target_link_libraries(${P_TARGET_NAME} PUBLIC rac_commons)
         if(P_LINK_LIBRARIES)
             target_link_libraries(${P_TARGET_NAME} PUBLIC ${P_LINK_LIBRARIES})
+        endif()
+        if(RAC_BUILD_SHARED)
+            rac_apply_shared_sidecar_rpath(${P_TARGET_NAME})
         endif()
         install(TARGETS ${P_TARGET_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
         message(STATUS "  Engine plugin '${name}' (target ${P_TARGET_NAME}): "

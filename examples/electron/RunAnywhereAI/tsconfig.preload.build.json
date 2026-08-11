@@ -1,0 +1,15 @@
+{
+  // Emit config for the preload. Same CommonJS reasoning as the main process:
+  // a preload with sandbox:false is CJS-loaded by Electron.
+  "extends": "./tsconfig.preload.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "outDir": "out",
+    "rootDir": "src",
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src/preload/**/*.ts", "src/shared/**/*.ts"]
+}

@@ -206,16 +206,25 @@ if(RAC_STATIC_PLUGINS)
 else()
     add_library(runanywhere_onnx SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_onnx.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_onnx.cpp
     )
     set_target_properties(runanywhere_onnx PROPERTIES
         OUTPUT_NAME           runanywhere_onnx
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
+    target_compile_definitions(runanywhere_onnx PRIVATE RAC_BUILDING_PLUGIN=1)
     target_link_libraries(runanywhere_onnx PUBLIC
         rac_backend_onnx
         rac_commons
     )
+    if(APPLE)
+        set_property(TARGET runanywhere_onnx APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties(runanywhere_onnx PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET runanywhere_onnx APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties(runanywhere_onnx PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
     rac_apply_android_page_alignment(runanywhere_onnx)
     install(TARGETS runanywhere_onnx LIBRARY DESTINATION lib)
 endif()

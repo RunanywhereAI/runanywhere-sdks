@@ -19,6 +19,8 @@ import {
   ModelDiscoveryResult,
   ModelGetRequest,
   ModelGetResult,
+  ModelImportRequest,
+  ModelImportResult,
   ModelInfo as ProtoModelInfo,
   ModelListRequest,
   ModelListResult,
@@ -33,6 +35,7 @@ import {
   RegisterModelFromUrlRequest,
   RegisterMultiFileModelRequest,
 } from '@runanywhere/proto-ts/model_types';
+import { ComponentLifecycleSnapshot, SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import type { SDKError } from '@runanywhere/proto-ts/errors';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
@@ -239,6 +242,30 @@ export class ModelAbi {
     );
   }
 
+  /**
+   * Adopt a model already on disk. Commons owns what import means — normalize
+   * the path, optionally copy it into the managed store, validate the format
+   * and expected files, then write the row — which is why this is not
+   * `register()` with a path.
+   */
+  import(request: ModelImportRequest): Promise<ModelImportResult> {
+    return invokeProto(
+      (bytes) => this.backend.modelRegistryImport(bytes),
+      ModelImportRequest,
+      request,
+      ModelImportResult
+    );
+  }
+
+  /**
+   * What commons' lifecycle store holds for one component. An unloaded
+   * component is an answer, not a failure: the snapshot comes back with
+   * `COMPONENT_LIFECYCLE_STATE_NOT_LOADED` and no model id.
+   */
+  async componentSnapshot(component: SDKComponent): Promise<ComponentLifecycleSnapshot> {
+    return ComponentLifecycleSnapshot.decode(await this.backend.modelComponentSnapshot(component));
+  }
+
   registerFromUrl(request: RegisterModelFromUrlRequest): Promise<ProtoModelInfo> {
     return invokeProto(
       (bytes) => this.backend.modelRegisterFromUrl(bytes),
@@ -258,5 +285,13 @@ export class ModelAbi {
   }
 }
 
-export { ModelRegistryStatus };
-export type { ProtoModelInfo };
+// `ModelImportRequest` is re-exported as a VALUE, not just a type: `models.import`
+// takes the generated message, so a caller needs its `fromPartial` to build one —
+// the same reason the storage request messages are values.
+export {
+  ComponentLifecycleSnapshot,
+  ModelImportRequest,
+  ModelRegistryStatus,
+  SDKComponent,
+};
+export type { ModelImportResult, ProtoModelInfo };

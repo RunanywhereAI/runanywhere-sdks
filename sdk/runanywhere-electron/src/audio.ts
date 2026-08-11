@@ -14,7 +14,15 @@
 // and call the same commons-backed converters. They reference browser globals
 // only inside methods so importing this module in Node is safe.
 
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+
 import { ErrorCategory, ErrorCode, SDKException } from './errors';
+
+/**
+ * `AudioCaptureDefaults.mic_sample_rate_hz` from `idl/sdk_defaults.proto` — the
+ * rate every speech path in this SDK normalizes to.
+ */
+const CAPTURE_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 /** Sync DSP surface exported by runanywhere_native.node (audio_bridge.cpp). */
 export interface AudioNative {
@@ -69,9 +77,9 @@ export function bindAudioBackend(dsp: AudioDspBackend | null): void {
 
 function audioUnavailable(): never {
   throw SDKException.of(
-    ErrorCode.SERVICE_NOT_AVAILABLE,
+    ErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
     'audio DSP unavailable — inference utility not connected (bindAudioBackend / setAudioNativeForTests)',
-    { category: ErrorCategory.COMPONENT }
+    { category: ErrorCategory.ERROR_CATEGORY_COMPONENT }
   );
 }
 
@@ -204,7 +212,7 @@ function getAudioContextCtor(): AudioCtor {
 }
 
 export interface MicRecorderOptions {
-  /** Target rate for the captured PCM16 (default 16000, what STT wants). */
+  /** Target rate for the captured PCM16; defaults to the IDL capture rate, which is what STT wants. */
   targetSampleRate?: number;
 }
 
@@ -221,7 +229,7 @@ export class MicRecorder {
   private readonly targetRate: number;
 
   constructor(opts: MicRecorderOptions = {}) {
-    this.targetRate = opts.targetSampleRate ?? 16000;
+    this.targetRate = opts.targetSampleRate ?? CAPTURE_SAMPLE_RATE;
   }
 
   /** Open the mic and begin buffering audio. */

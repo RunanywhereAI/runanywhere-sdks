@@ -2,10 +2,16 @@
 //
 // Fills the mandatory rac_platform_adapter_t slots (file I/O, secure store, log,
 // clock) plus the optional memory-info + directory-enumeration slots using
-// std::filesystem + Win32 (GlobalMemoryStatusEx). HTTP download / archive
-// extraction / vendor-id are left NULL. This is the M0 desktop adapter the
-// runanywhere-electron N-API addon builds on; the secure store uses DPAPI
-// (CryptProtectData). HTTP transport remains a later upgrade (WinHTTP/undici).
+// std::filesystem + Win32 (GlobalMemoryStatusEx). The secure store uses DPAPI
+// (CryptProtectData).
+//
+// http_download / http_download_cancel stay NULL on purpose. Desktop downloads
+// use the process-wide HTTP *transport* vtable registered in addon init
+// (`rac_desktop_http_transport_register` when RAC_DESKTOP_ADAPTER=ON / libcurl) —
+// not the async adapter download slot (that slot is for Web/Emscripten). Do not
+// fill http_download here with WinHTTP/undici. extract_archive / get_vendor_id
+// also stay NULL (commons extracts via rac_extract_archive_native; vendor-id is
+// Apple-only).
 #ifndef RAC_ELECTRON_WIN32_PLATFORM_ADAPTER_H
 #define RAC_ELECTRON_WIN32_PLATFORM_ADAPTER_H
 

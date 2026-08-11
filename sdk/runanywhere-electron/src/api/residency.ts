@@ -15,7 +15,7 @@
 import { SDKException } from '../errors';
 import type { RaBackend } from './backend';
 import type { ModelAbi } from './model-abi';
-import type { ModelCategory } from './types';
+import type { ModelCategory, ModelCompatibility } from './types';
 
 /** A model holding a slot right now. */
 export interface ResidentModel {
@@ -35,6 +35,20 @@ export interface ResidencyDecision {
   availableBytes: number;
   /** Commons' explanation when the verdict is still negative. */
   reasons: string[];
+}
+
+/** The memory half of a compatibility verdict, in the shape a load reports. */
+function decisionOf(
+  verdict: ModelCompatibility,
+  evicted: ResidentModel[]
+): ResidencyDecision {
+  return {
+    fits: verdict.canRun,
+    evicted,
+    requiredBytes: verdict.requiredMemoryBytes,
+    availableBytes: verdict.availableMemoryBytes,
+    reasons: verdict.reasons,
+  };
 }
 
 /** The policy's view of what is loaded and how to release it. */
@@ -64,20 +78,26 @@ export class ResidencyPolicy {
   ): Promise<ResidencyDecision> {
     const evicted: ResidentModel[] = [];
     let verdict = await this.check(modelId);
-    if (verdict.fits) return { ...verdict, evicted };
+    if (verdict.canRun) return decisionOf(verdict, evicted);
 
     const keepSet = new Set<ModelCategory>([category, ...keep]);
     for (const victim of await this.releaseOrder(keepSet)) {
       await this.slots.release(victim);
       evicted.push(victim);
       verdict = await this.check(modelId);
-      if (verdict.fits) break;
+      if (verdict.canRun) break;
     }
-    return { ...verdict, evicted };
+    return decisionOf(verdict, evicted);
   }
 
-  /** What commons says about `modelId` against the machine as it stands now. */
-  async check(modelId: string): Promise<Omit<ResidencyDecision, 'evicted'>> {
+  /**
+   * What commons says about `modelId` against the machine as it stands now.
+   *
+   * The whole verdict, not just the memory half: `models.compatibility(id)` is
+   * this same call, so the RAM and disk probes have one place to happen rather
+   * than two that can disagree.
+   */
+  async check(modelId: string): Promise<ModelCompatibility> {
     const [memory, storage] = await Promise.all([
       this.backend.memoryInfo(),
       this.backend.storage(),
@@ -89,9 +109,13 @@ export class ResidencyPolicy {
     });
     if (result.error) throw SDKException.fromProto(result.error);
     return {
-      fits: result.canRun,
-      requiredBytes: result.requiredMemoryBytes,
-      availableBytes: result.availableMemoryBytes,
+      compatible: result.isCompatible,
+      canRun: result.canRun,
+      canFit: result.canFit,
+      requiredMemoryBytes: result.requiredMemoryBytes,
+      availableMemoryBytes: result.availableMemoryBytes,
+      requiredStorageBytes: result.requiredStorageBytes,
+      availableStorageBytes: result.availableStorageBytes,
       reasons: result.reasons,
     };
   }

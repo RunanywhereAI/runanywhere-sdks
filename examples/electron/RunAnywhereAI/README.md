@@ -32,16 +32,19 @@ and a native prebuild present under `sdk/runanywhere-electron/prebuilds/`.
 
 ## Layout
 
-| File | Purpose |
+TypeScript-only. Source under `src/`; build emits CommonJS main/preload and an ESM
+renderer bundle under `out/`. `"main"` is `out/main/index.cjs`.
+
+| Path | Purpose |
 | --- | --- |
-| `main.js` | Electron main: forks the utility host (native addon), owns the window + local JSON store |
-| `preload.js` | Loads the SDK preload (`window.runanywhere`) and exposes `window.appStore` |
-| `model-catalog.js` | The app's model table. Staged into the SDK by `preload.js` and by the utility host (`main.js` passes it as `catalogPath`), which is what makes a catalog id resolvable in both processes |
-| `renderer.js` / `index.html` | The UI — Chat, Models, Settings, Structured, Tools, Vision, Embeddings, Knowledge, Voice, VAD |
-| `assets/make-icon.js` | Regenerates `assets/icon.ico` + `icon.png` (zero deps) — `npm run icon` |
+| `src/main/` | Electron main: forks the utility host (native addon), owns the window + local JSON store |
+| `src/preload/` | Loads the SDK preload (`window.runanywhere`) and exposes `window.appStore` |
+| `src/shared/model-catalog.ts` | The app's model table. Staged into the SDK by preload and by the utility host (`catalogPath`), which is what makes a catalog id resolvable in both processes |
+| `src/renderer/` | The UI — Vite entry (`index.html` / `settings.html`) + feature views |
+| `assets/make-icon.ts` | Regenerates `assets/icon.ico` + `icon.png` — `npm run icon` |
 
 Conversations, settings, and custom models persist as JSON under
-`%APPDATA%\RunAnywhere AI\`.
+`%APPDATA%\RunAnywhere AI\` (or `~/Library/Application Support/RunAnywhere AI/` on macOS).
 
 ## Compute device
 
@@ -57,8 +60,24 @@ Runs the real code paths headlessly and exits 0/1:
 set RA_SELFTEST=1 && npx electron .
 ```
 
-## Packaging (not wired yet)
+## Packaging
 
-Publishing to the Microsoft Store goes through a Win32 NSIS installer built with
-electron-builder. When that lands, the native `.node` and its sidecar DLLs must be
-`asarUnpack`ed — native modules cannot be loaded from inside `app.asar`.
+electron-builder config lives in `electron-builder.yml`:
+
+| Platform | Targets |
+| --- | --- |
+| macOS | `dmg` + `zip`, arm64 |
+| Windows | NSIS, x64 + arm64 |
+
+```bash
+npm run package        # host platform
+npm run package:mac    # dmg + zip (arm64)
+npm run package:win    # nsis (x64 + arm64)
+```
+
+Native artifacts under `@runanywhere/electron/prebuilds/` (and any future
+`.node` / `.dylib` / `.dll` / `.so` / `plugins/`) are `asarUnpack`ed — they
+cannot load from inside `app.asar`. Stage a prebuild first
+(`cd sdk/runanywhere-electron && npm run bundle:native`).
+
+Publishing / code signing is not wired yet; local packages are unsigned.

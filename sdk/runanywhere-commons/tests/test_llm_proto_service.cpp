@@ -87,10 +87,25 @@ rac_result_t mock_initialize(void* impl, const char* model_path) {
     return RAC_SUCCESS;
 }
 
+// The prompt exactly as the engine received it, plus the disable_thinking flag
+// that rode alongside it. Both are needed to tell "the request was honored" from
+// "commons edited the prompt": the flag must always reach the backend, while the
+// "/no_think" prefix must appear only for a model that speaks it.
+std::mutex g_prompt_mutex;
+std::string g_last_prompt;
+bool g_last_disable_thinking = false;
+
+void record_prompt(const char* prompt, const rac_llm_options_t* options) {
+    std::lock_guard<std::mutex> lock(g_prompt_mutex);
+    g_last_prompt = prompt != nullptr ? prompt : "";
+    g_last_disable_thinking = options != nullptr && options->disable_thinking == RAC_TRUE;
+}
+
 rac_result_t mock_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
                            rac_llm_result_t* out_result) {
     if (!impl || !prompt || !out_result)
         return RAC_ERROR_NULL_POINTER;
+    record_prompt(prompt, options);
     const char* text = std::strstr(prompt, "empty response") != nullptr
                            ? " \n\t "
                            : "<think>plan</think>final {\"ok\":true}";

@@ -167,20 +167,17 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 
 ## Example application
 
-From the repo root on Windows:
+TypeScript app under `examples/electron/RunAnywhereAI/`:
 
-```cmd
-examples\electron\RunAnywhereAI\run-demo.cmd
+```bash
+cd examples/electron/RunAnywhereAI
+npm install
+npm start          # CPU
+npm run start:gpu  # CUDA (when the GPU prebuild is present)
 ```
 
-Or:
-
-```cmd
-set RUNANYWHERE_NATIVE_PATH=sdk\runanywhere-electron\prebuilds\win32-x64\runanywhere_native.node
-npx electron examples/electron/RunAnywhereAI
-```
-
-The example covers chat/streaming, vision, embeddings, and a mic → STT → LLM → TTS → speaker voice loop. Source: `examples/electron/RunAnywhereAI/`.
+On Windows you can also double-click `RunAnywhere AI.cmd` / `RunAnywhere AI (GPU).cmd`.
+The example covers chat/streaming, vision, embeddings, and a mic → STT → LLM → TTS → speaker voice loop.
 
 ## Errors
 

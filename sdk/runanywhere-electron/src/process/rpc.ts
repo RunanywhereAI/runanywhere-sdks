@@ -75,7 +75,12 @@ export const STREAMING_METHODS = new Set<string>([
   // Download progress is one process-wide subscription: it opens on the first
   // download and its terminal reply lands when downloadUnwatch closes it.
   'v3.downloadWatch',
+  // Commons VAD stream events (SPEECH_ACTIVITY / FRAME) — utility host owns the
+  // native callback; the client only consumes mapped VadEvents.
   'v3.vadSetStreamCallback',
+  // Log records are the same shape: one subscription for the process, opened by
+  // the first `logging` destination and closed by the last.
+  'v3.loggingWatch',
 ]);
 
 /**

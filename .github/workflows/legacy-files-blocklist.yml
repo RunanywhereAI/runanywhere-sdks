@@ -25,6 +25,20 @@ jobs:
             "sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceSession.ts"
             "sdk/runanywhere-react-native/scripts/build-react-native.sh"
             "sdk/runanywhere-web/scripts/build-web.sh"
+            # Pre-TS Electron example / SDK entrypoints (replaced by src/ + packages/)
+            "examples/electron/RunAnywhereAI/main.js"
+            "examples/electron/RunAnywhereAI/preload.js"
+            "examples/electron/RunAnywhereAI/renderer.js"
+            "examples/electron/RunAnywhereAI/index.html"
+            "examples/electron/RunAnywhereAI/store.js"
+            "examples/electron/RunAnywhereAI/model-catalog.js"
+            "examples/electron/RunAnywhereAI/run-demo.sh"
+            "examples/electron/RunAnywhereAI/test/unit/store.test.js"
+            "sdk/runanywhere-electron/scripts/bundle-native.js"
+            "sdk/runanywhere-electron/native/test_addon.js"
+            "sdk/runanywhere-electron/native/test_embed.js"
+            "sdk/runanywhere-electron/native/test_speech.js"
+            "sdk/runanywhere-electron/native/test_vlm.js"
           )
           # T1.4 (PR #494): sdk/runanywhere-web/.../RunAnywhere+VoiceAgent.ts was
           # erroneously on this blocklist - it is the canonical v2 VoiceAgent

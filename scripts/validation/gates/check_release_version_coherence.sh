@@ -236,8 +236,9 @@ for package_json in \
   sdk/runanywhere-web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/web\": \">=${VERSION} <1\""
 done
+# core + llamacpp + onnx each declare the published peer/dep range.
 expect_count "sdk/runanywhere-web/package-lock.json" \
-  "\"@runanywhere/proto-ts\": \"^${VERSION}\"" 2
+  "\"@runanywhere/proto-ts\": \"^${VERSION}\"" 3
 expect_count "sdk/runanywhere-web/package-lock.json" \
   "\"@runanywhere/web\": \">=${VERSION} <1\"" 2
 

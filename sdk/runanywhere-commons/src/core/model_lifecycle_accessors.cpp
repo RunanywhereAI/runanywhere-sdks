@@ -21,6 +21,7 @@
 namespace rac::llm {
 
 #if defined(RAC_HAVE_PROTOBUF)
+using rac::core::model_lifecycle::detail::c_framework_from_proto;
 using rac::core::model_lifecycle::detail::g_lifecycle_cv;
 using rac::core::model_lifecycle::detail::g_lifecycle_mutex;
 using rac::core::model_lifecycle::detail::g_loaded;
@@ -52,6 +53,7 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         out_ref->impl = (*token)->impl;
         out_ref->model_id = (*token)->model_id.c_str();
         out_ref->framework_name = (*token)->framework_name.c_str();
+        out_ref->framework = c_framework_from_proto((*token)->framework);
         // LoRA support is a backend capability: any engine whose vtable exposes
         // load_lora (llama.cpp) can attach adapters, regardless of whether the
         // registry entry declared it — dynamically registered hf/URL models

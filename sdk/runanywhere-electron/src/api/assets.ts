@@ -32,19 +32,40 @@ import type { ResidentModel } from './residency';
 import {
   ModelFileRole,
   ModelFormat,
+  ModelImportRequest,
   ModelRegistryStatus,
   ModelSource,
   ModelInfo as ProtoModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import type { ModelLoadResult } from '@runanywhere/proto-ts/model_types';
-import { DevicePlacement, InferenceFramework, ModelCategory, requireOneOf } from './types';
+import type { ModelImportResult, ModelLoadResult } from '@runanywhere/proto-ts/model_types';
+import {
+  LoraAdapterCatalogEntry,
+  LoraAdapterCatalogQuery,
+  LoraAdapterConfig,
+} from '@runanywhere/proto-ts/lora_options';
 import type {
+  LoraAdapterCatalogListResult,
+  LoraCompatibilityResult,
+  LoraState as ProtoLoraState,
+} from '@runanywhere/proto-ts/lora_options';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
+import {
+  DevicePlacement,
+  InferenceFramework,
+  ModelCategory,
+  requireOneOf,
+  toProtoError,
+} from './types';
+import type {
+  DiscoveredModel,
   DownloadEvent,
+  DownloadProgressSnapshot,
   ImageEvent,
   ImageInput,
   ImageResult,
   LoadedModel,
   LoraState,
+  ModelCompatibility,
   ModelFilter,
   ModelInfo,
   ModelRegistration,
@@ -86,10 +107,29 @@ const LIFECYCLE_CATEGORIES: ReadonlySet<ModelCategory> = new Set([
   ModelCategory.EMBEDDING,
   ModelCategory.DIARIZATION,
   ModelCategory.SEGMENTATION,
+  // VOICE_ACTIVITY has no addon slot at all — `rac_vad_*_proto` is handle-free
+  // like stt/tts, and commons maps the category onto SDK_COMPONENT_VAD in its
+  // lifecycle store (`model_lifecycle_translation.cpp`). It is here so a voice
+  // session can make the catalogued Silero VAD resident instead of refusing to
+  // open; before this, `models.load` of a VAD threw "not implemented".
+  ModelCategory.VOICE_ACTIVITY,
   // RERANK is deliberately absent: rac_rerank_component_rerank_proto is the
   // only rerank entry point commons exposes and it takes a component handle,
   // so the reranker stays in an addon slot.
 ]);
+
+/**
+ * Every category the SDK can hold resident, whichever store it lives in.
+ *
+ * `SLOT_OF_CATEGORY` used to stand in for this, which silently excluded any
+ * lifecycle-only category from residency accounting and from `state().loaded`.
+ */
+const MANAGED_CATEGORIES: readonly ModelCategory[] = [
+  ...LIFECYCLE_CATEGORIES,
+  ...(Object.keys(SLOT_OF_CATEGORY) as ModelCategory[]).filter(
+    (category) => !LIFECYCLE_CATEGORIES.has(category)
+  ),
+];
 
 const FORMAT_OF_CATEGORY: Partial<Record<ModelCategory, ModelFormat>> = {
   [ModelCategory.LANGUAGE]: ModelFormat.MODEL_FORMAT_GGUF,
@@ -108,6 +148,22 @@ export interface RefreshOptions {
   rescanLocal?: boolean;
   /** Clear downloaded state for rows whose files are gone. On by default. */
   pruneOrphans?: boolean;
+}
+
+/** What {@link ModelsNamespace.discover} should sweep. */
+export interface DiscoverOptions {
+  /** Extra roots to walk on top of the model store. */
+  searchRoots?: string[];
+  /** Walk each root's subdirectories. Off by default. */
+  recursive?: boolean;
+  /** Point a matching registry row at what was found. On by default. */
+  linkDownloaded?: boolean;
+  /** Include the built-in catalog rows in the sweep. Off by default. */
+  includeBuiltIn?: boolean;
+  /** Include models a previous `import` adopted. On by default. */
+  includeUserImports?: boolean;
+  /** Clear rows whose artifacts turned out to be gone. Off by default. */
+  purgeInvalid?: boolean;
 }
 
 /** Model discovery, download, and placement. */
@@ -159,8 +215,52 @@ export interface ModelsNamespace {
   cancel(id: string): Promise<void>;
   /** Models this machine left mid-download, from the persisted task table. */
   interrupted(): Promise<string[]>;
-  /** Remove a model's files from the store. */
+  /**
+   * Whether an interrupted download left bytes on disk that the next
+   * {@link download} continues from instead of refetching.
+   *
+   * Starting a download *is* resuming it, so this says nothing about how to
+   * resume — only whether resuming would save work. It exists so a UI can label
+   * the button honestly: offering "Resume" when the bytes are gone is a lie, and
+   * offering "Download" when 90% of a 3 GB file is already here understates it.
+   *
+   * Answered from bytes on disk rather than from session state, so it stays
+   * right across a relaunch — which is the case that matters, because an
+   * interrupted multi-gigabyte transfer is usually discovered on the next
+   * launch and not in the run that started it.
+   */
+  isResumable(id: string): Promise<boolean>;
+  /**
+   * Remove a model's files from the store, keeping its registry row so it goes
+   * back to "not downloaded" rather than disappearing from {@link list}.
+   * Dropping the row is {@link unregister}'s job.
+   */
   delete(id: string): Promise<void>;
+  /**
+   * Adopt a model already on disk: normalize its path, optionally copy it into
+   * the managed store, validate it, and write the registry row — all in commons.
+   *
+   * This is the local-file entry point a file picker feeds. `register({path})`
+   * only writes a row and validates nothing.
+   */
+  import(request: ModelImportRequest): Promise<ModelImportResult>;
+  /**
+   * Sweep the model store for artifacts and report what is there, linking each
+   * one to its registry row. {@link refresh} is the same sweep expressed as
+   * "reconcile the registry"; this one hands back what was found.
+   */
+  discover(options?: DiscoverOptions): Promise<DiscoveredModel[]>;
+  /**
+   * Whether this machine can run and store `id`, straight from commons.
+   *
+   * The same check {@link load} runs before it admits a model, exposed so a
+   * Models list can badge a row before the user commits to a multi-gigabyte
+   * download.
+   *
+   * @throws SDKException when `id` has no registry row — an unknown model has no
+   *   declared requirement, and answering "compatible" for one would be a guess.
+   */
+  compatibility(id: string): Promise<ModelCompatibility>;
   /**
    * Load a model into residency now, returning an ownership handle.
    *
@@ -313,6 +413,13 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     return current.found && current.modelId ? current.modelId : null;
   };
 
+  /** What occupies `category` right now, from whichever store owns it. */
+  const residentModelId = async (category: ModelCategory): Promise<string | null> => {
+    if (LIFECYCLE_CATEGORIES.has(category)) return residentLifecycleModel(category);
+    const slot = SLOT_OF_CATEGORY[category];
+    return slot ? (await deps.backend.loaded(slot))?.id ?? null : null;
+  };
+
   const unloadLifecycleModel = async (category: ModelCategory): Promise<string | null> => {
     const id = await residentLifecycleModel(category);
     if (!id) return null;
@@ -326,14 +433,10 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
   const residency = new ResidencyPolicy(deps.backend, abi, {
     async resident() {
       const entries = await Promise.all(
-        (Object.entries(SLOT_OF_CATEGORY) as Array<[ModelCategory, LoadSlot]>).map(
-          async ([category, slot]) => {
-            const id = LIFECYCLE_CATEGORIES.has(category)
-              ? await residentLifecycleModel(category)
-              : (await deps.backend.loaded(slot))?.id ?? null;
-            return id ? { category, id } : null;
-          }
-        )
+        MANAGED_CATEGORIES.map(async (category) => {
+          const id = await residentModelId(category);
+          return id ? { category, id } : null;
+        })
       );
       return entries.filter((e): e is ResidentModel => e !== null);
     },
@@ -472,16 +575,35 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
 
     download(id) {
       return bridgeStream<DownloadEvent>(async (sink) => {
+        // Every arm carries the same operationId and a monotonically increasing
+        // sequence, so a consumer that received events out of band (over an RPC
+        // port, say) can order and correlate them without keeping its own
+        // counter. The model id stands in until commons reports the task id it
+        // actually assigned.
+        let operationId = id;
+        let sequence = 0;
+        const next = (): number => {
+          sequence += 1;
+          return sequence;
+        };
         // Already here: commons plans a fresh transfer into its own model folder
         // and has no "this is already downloaded" short circuit, so asking it
         // would refetch a model the caller can already load.
         const present = await rowFor(id);
         if (present?.localPath && (await deps.backend.pathExists(present.localPath))) {
-          sink.push({ type: 'completed', model: toPublicModelInfo(present) });
+          sink.push({ type: 'started', operationId, sequence: next() });
+          sink.push({
+            type: 'completed',
+            operationId,
+            sequence: next(),
+            model: toPublicModelInfo(present),
+          });
           return;
         }
         const started = await startDownload(id);
-        let extracting = false;
+        operationId = started.taskId || operationId;
+        let announced = false;
+        let verifying = false;
         let last: DownloadProgress | null = null;
         const poll = (): Promise<DownloadProgress> =>
           downloads.poll(
@@ -489,6 +611,11 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
           );
         await watcher.follow(id, async (progress) => {
           last = progress;
+          if (progress.taskId) operationId = progress.taskId;
+          if (!announced) {
+            announced = true;
+            sink.push({ type: 'started', operationId, sequence: next() });
+          }
           // Only a live transfer belongs in the table. A terminal state's
           // bookkeeping is owned by whoever caused it — pause keeps the row,
           // cancel and completion drop it — so writing here would race them.
@@ -505,38 +632,96 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
               baseDir()
             );
           }
-          if (progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING) {
-            // Extraction reports its own stage progress, but a UI only needs to
-            // be told once that the bytes are in and the archive is unpacking.
-            if (!extracting) {
-              extracting = true;
-              sink.push({ type: 'extracting' });
-            }
-            return;
+          switch (progress.state) {
+            case DownloadState.DOWNLOAD_STATE_VALIDATING:
+              // Checksum / expected-files verification. Announced once: it is a
+              // phase rather than a measurement, and commons reports no progress
+              // within it.
+              if (!verifying) {
+                verifying = true;
+                sink.push({ type: 'verifying', operationId, sequence: next() });
+              }
+              return;
+            case DownloadState.DOWNLOAD_STATE_EXTRACTING:
+              // Extraction does report its own stage progress, so unlike
+              // verification every tick is forwarded — a multi-gigabyte archive
+              // takes long enough that a frozen bar reads as a hang.
+              sink.push({
+                type: 'extracting',
+                operationId,
+                sequence: next(),
+                percent: progress.stageProgress > 0 ? progress.stageProgress * 100 : undefined,
+              });
+              return;
+            // The three terminal states are named so they cannot fall into the
+            // progress arm: each is re-reported below as the stream's own
+            // terminal event, and a progress snapshot alongside would announce a
+            // live byte count for a transfer that has already stopped.
+            case DownloadState.DOWNLOAD_STATE_COMPLETED:
+            case DownloadState.DOWNLOAD_STATE_FAILED:
+            case DownloadState.DOWNLOAD_STATE_CANCELLED:
+              return;
+            default:
+              // Everything else — pending, downloading, retrying, paused,
+              // resuming — is a transfer still in motion and reads as progress.
+              // Percent / fraction come from commons (`rac_download_progress_percent`).
+              sink.push({
+                type: 'progress',
+                snapshot: await downloads.snapshot(progress, operationId, next()),
+              });
+              return;
           }
-          sink.push({
-            type: 'progress',
-            bytesDone: Number(progress.bytesDownloaded),
-            bytesTotal: Number(progress.totalBytes),
-            percent: await downloads.percent(progress),
-          });
         }, poll);
         const terminal = last as DownloadProgress | null;
         await downloads.cleanup();
+        if (!announced) sink.push({ type: 'started', operationId, sequence: next() });
         if (terminal?.state === DownloadState.DOWNLOAD_STATE_FAILED) {
           dropDownloadTask(id, baseDir());
           notify('Download failed', `${id}: ${terminal.error?.message ?? 'unknown error'}`);
-          throw terminal.error
-            ? SDKException.fromProto(terminal.error)
-            : SDKException.of(ErrorCode.STORAGE_ERROR, `download failed for ${id}`);
+          // A terminal event rather than a throw: a consumer that has been
+          // rendering a progress bar needs to know the transfer failed without a
+          // `try` wrapped around its render loop, and the retry affordance it
+          // shows is driven by which arm arrived.
+          sink.push({
+            type: 'failed',
+            operationId,
+            sequence: next(),
+            error: toProtoError(
+              terminal.error
+                ? SDKException.fromProto(terminal.error)
+                : SDKException.of(ErrorCode.ERROR_CODE_STORAGE_ERROR, `download failed for ${id}`)
+            ),
+          });
+          return;
         }
         if (terminal?.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
-          return; // pause() and cancel() own the bookkeeping; just end the stream
+          // pause() and cancel() own the persisted bookkeeping; the stream owes
+          // the caller only the terminal arm that says which way it ended.
+          sink.push({ type: 'cancelled', operationId, sequence: next() });
+          return;
+        }
+        if (terminal?.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+          // The watcher only returns on a terminal state, so reaching here means
+          // the transfer stopped without commons reporting one. The grammar has
+          // no silent finish, and claiming `completed` for bytes nothing verified
+          // is exactly the lie the terminal arms exist to prevent.
+          sink.push({
+            type: 'failed',
+            operationId,
+            sequence: next(),
+            error: toProtoError(
+              SDKException.of(
+                ErrorCode.ERROR_CODE_STORAGE_ERROR,
+                `the download of ${id} ended without a terminal state from commons`
+              )
+            ),
+          });
+          return;
         }
         dropDownloadTask(id, baseDir());
-        const info = await markDownloaded(id, terminal?.localPath ?? '');
+        const info = await markDownloaded(id, terminal.localPath ?? '');
         notify('Download complete', info.name || id);
-        sink.push({ type: 'completed', model: info });
+        sink.push({ type: 'completed', operationId, sequence: next(), model: info });
       });
     },
 
@@ -576,6 +761,28 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
       return readDownloadTasks(baseDir()).map((t) => t.modelId);
     },
 
+    async isResumable(id) {
+      deps.requireReady();
+      const row = await rowFor(id);
+      if (!row) return false;
+      // Already here: there is nothing to continue. Offering "Resume" for a
+      // complete model is the same lie in the other direction.
+      if (row.localPath && (await deps.backend.pathExists(row.localPath))) return false;
+      // Commons owns the storage layout, so it is the only thing that can say
+      // where this model's ".part" sidecars live; planning measures them and
+      // reports `canResume`/`resumeFromBytes` whatever else it concludes about
+      // the transfer. That is the disk-truth answer, and it survives a relaunch.
+      const plan = await downloads
+        .plan(DownloadPlanRequest.fromPartial({ modelId: id, model: row }))
+        .catch(() => null);
+      if (plan) return plan.canResume && Number(plan.resumeFromBytes) > 0;
+      // Planning HEADs each file for a definitive size, so it needs the network
+      // — and an offline launch is exactly when a UI has to label the button.
+      // Fall back to what the last run recorded about this transfer.
+      const task = readDownloadTasks(baseDir()).find((t) => t.modelId === id);
+      return !!task && task.bytesDownloaded > 0;
+    },
+
     async delete(id) {
       const category = await categoryOf(id).catch(() => null);
       // Deleting the files under a resident model would leave the engine reading
@@ -595,15 +802,56 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
       // rather than silently left on disk with its registry entry gone.
       if (row?.localPath && (await deps.backend.pathExists(row.localPath))) {
         throw SDKException.of(
-          ErrorCode.STORAGE_ERROR,
+          ErrorCode.ERROR_CODE_STORAGE_ERROR,
           `commons deleted the model store folder for ${id} but ${row.localPath} is still on ` +
             'disk: this row points outside the commons model store, so its files have to be ' +
             'removed by whatever put them there'
         );
       }
-      await abi.remove(id).catch(() => undefined);
+      // The registry ROW stays. Commons' delete already cleared its local path,
+      // and clearing that is what flips `registry_status` back to REGISTERED —
+      // so the model reads as available-to-download instead of vanishing from
+      // `list()` until the next process start reseeds the catalog. Removing the
+      // row is `unregister`'s job, and doing both here was `delete` quietly
+      // being `delete` + `unregister`.
       dropDownloadTask(id, baseDir());
       deps.hub.emit({ type: 'modelUnloaded', id });
+    },
+
+    async import(request) {
+      deps.requireReady();
+      // Normalized before encoding: the nested `ModelInfo` is a full proto
+      // message, and encoding one whose scalars are absent throws out of the
+      // writer rather than defaulting them the way proto3 means.
+      const result = await abi.import(ModelImportRequest.fromPartial(request));
+      if (result.error) throw SDKException.fromProto(result.error);
+      return result;
+    },
+
+    async discover(options = {}) {
+      deps.requireReady();
+      const result = await abi.discover({
+        searchRoots: options.searchRoots ?? [],
+        recursive: options.recursive ?? false,
+        linkDownloaded: options.linkDownloaded ?? true,
+        includeBuiltIn: options.includeBuiltIn ?? false,
+        includeUserImports: options.includeUserImports ?? true,
+        purgeInvalid: options.purgeInvalid ?? false,
+      });
+      if (result.error) throw SDKException.fromProto(result.error);
+      return result.discoveredModels.map((found) => ({
+        id: found.modelId,
+        localPath: found.localPath,
+        matchedRegistry: found.matchedRegistry,
+        sizeBytes: Number(found.sizeBytes),
+        model: found.model ? toPublicModelInfo(found.model) : undefined,
+        warnings: found.warnings,
+      }));
+    },
+
+    compatibility(id) {
+      deps.requireReady();
+      return residency.check(id);
     },
 
     async load(id, options = {}) {
@@ -611,7 +859,6 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
       const row = await rowFor(id);
       const category = row ? categoryFromProto(row.category) : undefined;
       if (!category) throw SDKException.modelNotFound(id);
-      const slot = slotFor(category);
       // Make room before the load rather than after the machine is already out
       // of memory. Nothing is released while commons says the model fits.
       const decision = await residency.admit(id, category, options.keepResident ?? []);
@@ -627,12 +874,14 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
       }
 
       if (LIFECYCLE_CATEGORIES.has(category)) {
-        // Commons resolves the artifact from the registry row, so the file has
-        // to be on disk and the row has to point at it before the load. A VLM's
-        // projector rides along in the row's VISION_PROJECTOR file descriptor,
-        // which is what commons' resolver matches on.
-        const resolved = await deps.backend.resolveModel(await resolveSource(id));
-        await markDownloaded(id, resolved.primary);
+        // `validateAvailability` is what makes this one call satisfy the whole
+        // documented contract: commons checks its own storage layout, and when
+        // the artifact is not there it runs plan → start → poll on the download
+        // orchestrator and re-reads the row before resolving the path. Fetching
+        // here instead would be a second downloader writing to a second layout,
+        // which is exactly what left `load()` pointed at a file that was never
+        // going to exist. A VLM's projector rides along in the row's
+        // VISION_PROJECTOR descriptor, which is what commons' resolver matches.
         const result = await abi.load({
           modelId: id,
           category: categoryToProto(category),
@@ -653,7 +902,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
         return model;
       }
 
-      const loaded = await deps.backend.ensure(slot, await resolveSource(id), {
+      const loaded = await deps.backend.ensure(slotFor(category), await resolveSource(id), {
         framework: options.framework,
         contextLength: options.contextLength,
         threads: options.threads,
@@ -719,22 +968,17 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
         deps.backend.memoryInfo(),
       ]);
       const loaded: Partial<Record<ModelCategory, ModelInfo>> = {};
-      for (const [category, slot] of Object.entries(SLOT_OF_CATEGORY) as Array<
-        [ModelCategory, LoadSlot]
-      >) {
-        const entry = LIFECYCLE_CATEGORIES.has(category)
-          ? await residentLifecycleModel(category).then((id) => (id ? { id, path: '' } : null))
-          : await deps.backend.loaded(slot);
-        if (!entry) continue;
+      for (const category of MANAGED_CATEGORIES) {
+        const residentId = await residentModelId(category);
+        if (!residentId) continue;
         loaded[category] =
-          (await infoFor(entry.id)) ??
+          (await infoFor(residentId)) ??
           ({
-            id: entry.id,
-            name: entry.id,
+            id: residentId,
+            name: residentId,
             category,
             downloaded: true,
             sizeBytes: 0,
-            localPath: entry.path,
           } as ModelInfo);
       }
       return {
@@ -760,7 +1004,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     if (plan.error) throw SDKException.fromProto(plan.error);
     if (!plan.canStart) {
       throw SDKException.of(
-        ErrorCode.STORAGE_ERROR,
+        ErrorCode.ERROR_CODE_STORAGE_ERROR,
         `commons refused to plan a download for ${id}` +
           (plan.warnings.length ? `: ${plan.warnings.join('; ')}` : '')
       );
@@ -770,7 +1014,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     );
     if (started.error) throw SDKException.fromProto(started.error);
     if (!started.accepted) {
-      throw SDKException.of(ErrorCode.STORAGE_ERROR, `commons refused to start ${id}`);
+      throw SDKException.of(ErrorCode.ERROR_CODE_STORAGE_ERROR, `commons refused to start ${id}`);
     }
     putDownloadTask(
       {
@@ -817,12 +1061,35 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
 // lora
 // ---------------------------------------------------------------------------
 
-/** LoRA adapters on the loaded language model. */
+/**
+ * The tag that marks a registry row as adapter bytes rather than a loadable
+ * base model, and the id prefix those rows carry. Both match Swift's
+ * `LoRAArtifactMetadata` exactly, so an adapter downloaded by one SDK is
+ * recognizable to the others reading the same store.
+ */
+const LORA_ADAPTER_TAG = 'lora-adapter';
+const LORA_ARTIFACT_ID_PREFIX = 'lora-adapter:';
+
+/** The registry id an adapter's downloadable bytes are filed under. */
+function loraArtifactModelId(adapterId: string): string {
+  return adapterId.startsWith(LORA_ARTIFACT_ID_PREFIX)
+    ? adapterId
+    : LORA_ARTIFACT_ID_PREFIX + adapterId;
+}
+
+/** LoRA adapters: the catalog of them, and the ones applied to the loaded LLM. */
 export interface LoraNamespace {
   /**
    * Apply an adapter to the loaded language model.
    *
-   * @throws SDKException when no language model is loaded.
+   * A catalog id is resolved through {@link getCatalogEntry} to the file on
+   * disk, because commons has no id→path resolver on the apply path — its
+   * `LoraAdapterConfig.adapter_path` is documented as "commons still loads
+   * strictly from this path". A value that looks like a path is used as one, so
+   * a loose adapter that was never catalogued still works.
+   *
+   * @throws SDKException when no language model is loaded, when `adapterId` is
+   *   not a registered adapter, or when that adapter has no local file yet.
    * @example
    * await RunAnywhere.lora.apply('/models/style-lora.gguf', 0.8);
    */
@@ -836,46 +1103,155 @@ export interface LoraNamespace {
   remove(adapterId?: string): Promise<void>;
   /** Remove every applied adapter. */
   removeAll(): Promise<void>;
-  /** Which adapters are applied. */
+  /** Which adapters are applied to the loaded model. */
   list(): Promise<LoraState>;
+  /**
+   * The LoRA service's own snapshot: every adapter loaded into the base model's
+   * context, applied or not, with the rank/alpha/size each one reports.
+   * {@link list} is the same read narrowed to what is actually applied.
+   */
+  state(): Promise<ProtoLoraState>;
+  /**
+   * Whether an adapter can be applied to the loaded base model.
+   *
+   * Never throws for "nothing is loaded": commons answers with
+   * `isCompatible: false` and the reason inside the result, so a UI can badge a
+   * row without a `try`.
+   */
+  checkCompatibility(config: LoraAdapterConfig): Promise<LoraCompatibilityResult>;
+
+  // ---- catalog ----
+
+  /** Add or replace one catalog entry, and read back the canonical row. */
+  register(entry: LoraAdapterCatalogEntry): Promise<LoraAdapterCatalogEntry>;
+  /**
+   * Register the entry AND the model-registry row describing where its bytes
+   * come from, so {@link download} can fetch them on the ordinary model
+   * download path — with resume, checksums, and progress — instead of an
+   * app-side transfer into an app-invented layout.
+   *
+   * `artifact.id` defaults to the adapter's `lora-adapter:<id>` registry id.
+   */
+  registerArtifact(
+    entry: LoraAdapterCatalogEntry,
+    artifact: ProtoModelInfo
+  ): Promise<ProtoModelInfo>;
+  /**
+   * Register and fetch an adapter in one call, resolving to its path on disk.
+   *
+   * The catalog entry's `localPath` is filled in on success, which is what
+   * makes {@link apply} work by id afterwards — a non-empty `local_path` is the
+   * proto's single definition of "downloaded".
+   */
+  download(
+    entry: LoraAdapterCatalogEntry,
+    artifact: ProtoModelInfo,
+    onProgress?: (snapshot: DownloadProgressSnapshot) => void
+  ): Promise<string>;
+  /**
+   * Adopt an adapter file the user picked, copying it into managed storage and
+   * registering it as adapter bytes. Does NOT associate it with a catalog
+   * entry — call {@link register} with the matching entry once the caller knows
+   * which adapter the file is.
+   */
+  importAdapter(sourcePath: string): Promise<ModelImportResult>;
+  /** Every catalog entry, with unfiltered and downloaded counts. */
+  listCatalog(query?: LoraAdapterCatalogQuery): Promise<LoraAdapterCatalogListResult>;
+  /** Catalog entries matching `query` (by model, tags, text, or downloaded-ness). */
+  queryCatalog(query: LoraAdapterCatalogQuery): Promise<LoraAdapterCatalogListResult>;
+  /** One catalog entry, or null when `adapterId` is not registered. */
+  getCatalogEntry(adapterId: string): Promise<LoraAdapterCatalogEntry | null>;
+  /** The adapters declared compatible with `modelId`. */
+  adaptersForModel(modelId: string): Promise<LoraAdapterCatalogEntry[]>;
+  /** Every registered adapter. */
+  allRegistered(): Promise<LoraAdapterCatalogEntry[]>;
+}
+
+/** What the lora namespace needs beyond {@link AssetDeps}. */
+export interface LoraDeps extends AssetDeps {
+  /**
+   * The facade's own `models`, not a second one: {@link LoraNamespace.download}
+   * runs on the model download path, and a namespace built here would open a
+   * second process-wide progress subscription that displaces the first.
+   */
+  models: ModelsNamespace;
 }
 
 /**
- * Build the `lora` namespace over the lifecycle LoRA ABI.
+ * Build the `lora` namespace over the LoRA ABI.
  *
- * These act on whatever language model `rac_model_lifecycle_load_proto` made
- * resident, which is what makes them work at all: the component handle
- * `rac_llm_component_load_lora` needed stopped existing in F4.
+ * The runtime verbs act on whatever language model
+ * `rac_model_lifecycle_load_proto` made resident, which is what makes them work
+ * at all: the component handle `rac_llm_component_load_lora` needed stopped
+ * existing in F4. The catalog verbs act on the process-wide LoRA registry,
+ * which outlives any loaded model.
  */
-export function createLoraNamespace(deps: AssetDeps): LoraNamespace {
+export function createLoraNamespace(deps: LoraDeps): LoraNamespace {
   const lora = new LoraAbi(deps.backend);
+  const abi = new ModelAbi(deps.backend);
 
-  const toPublic = (state: { loadedAdapters: Array<{ adapterId: string; scale?: number }> }) => ({
-    applied: state.loadedAdapters.map((a) => ({ id: a.adapterId, scale: a.scale ?? 1 })),
+  // Swift filters on `applied`; mapping every loaded adapter over-reports the
+  // ones commons loaded but did not attach.
+  const toPublic = (state: ProtoLoraState): LoraState => ({
+    applied: state.loadedAdapters
+      .filter((a) => a.applied)
+      .map((a) => ({ id: a.adapterId, scale: a.scale ?? 1 })),
   });
 
-  return {
+  const orThrow = <T extends { error?: SDKError | undefined }>(result: T): T => {
+    if (result.error) throw SDKException.fromProto(result.error);
+    return result;
+  };
+
+  const getEntry = async (adapterId: string): Promise<LoraAdapterCatalogEntry | null> => {
+    const result = await lora.getCatalogEntry({ adapterId });
+    // An unknown id comes back `found: false` carrying a "not found" envelope,
+    // which is an answer and not a failure — the same shape `ModelAbi.get`
+    // reads. Anything that actually went wrong arrives as a rejected promise
+    // from the addon's proto-buffer status.
+    if (!result.found) return null;
+    return orThrow(result).entry ?? null;
+  };
+
+  /** The adapter config `apply` sends, with the path commons insists on. */
+  const resolveAdapter = async (
+    adapterId: string,
+    scale: number | undefined
+  ): Promise<LoraAdapterConfig> => {
+    if (isLikelyPath(adapterId)) {
+      return LoraAdapterConfig.fromPartial({ adapterId, adapterPath: adapterId, scale });
+    }
+    const entry = await getEntry(adapterId);
+    if (!entry) throw SDKException.modelNotFound(`LoRA adapter '${adapterId}'`);
+    if (!entry.localPath) {
+      throw SDKException.invalidState(
+        `LoRA adapter '${adapterId}' is registered but has no local file — call lora.download() ` +
+          'or lora.importAdapter() first'
+      );
+    }
+    return LoraAdapterConfig.fromPartial({
+      adapterId: entry.id,
+      adapterPath: entry.localPath,
+      // The publisher's recommended strength is the catalog's job to remember.
+      scale: scale ?? entry.defaultScale,
+    });
+  };
+
+  const api: LoraNamespace = {
     async apply(adapterId, scale) {
       deps.requireReady();
-      // Commons resolves an adapter id through the LoRA catalog and a path
-      // straight from disk, so both forms of the public argument work without
-      // the SDK having to tell them apart.
       const result = await lora.apply({
-        adapters: [
-          isLikelyPath(adapterId)
-            ? { adapterId, adapterPath: adapterId, scale }
-            : { adapterId, scale },
-        ],
+        adapters: [await resolveAdapter(adapterId, scale)],
         // The public verb has always read as "add this one"; commons' default
         // is SET, which would silently detach everything else.
         keepExisting: true,
       });
-      if (result.error) throw SDKException.fromProto(result.error);
+      orThrow(result);
     },
 
     async remove(adapterId) {
       deps.requireReady();
-      if (!adapterId) return this.removeAll();
+      if (!adapterId) return api.removeAll();
       await lora.remove({ adapterIds: [adapterId], clearAll: false });
     },
 
@@ -886,11 +1262,108 @@ export function createLoraNamespace(deps: AssetDeps): LoraNamespace {
 
     async list() {
       deps.requireReady();
-      const state = await lora.state();
-      if (state.error) throw SDKException.fromProto(state.error);
-      return toPublic(state);
+      return toPublic(orThrow(await lora.list()));
+    },
+
+    async state() {
+      deps.requireReady();
+      return orThrow(await lora.state());
+    },
+
+    checkCompatibility(config) {
+      deps.requireReady();
+      return lora.checkCompatibility(config);
+    },
+
+    async register(entry) {
+      deps.requireReady();
+      return lora.register(entry);
+    },
+
+    async registerArtifact(entry, artifact) {
+      deps.requireReady();
+      await lora.register(entry);
+      const tags = artifact.metadata?.tags ?? [];
+      const tagged = ProtoModelInfo.fromPartial({
+        ...artifact,
+        id: artifact.id || loraArtifactModelId(entry.id),
+        name: artifact.name || entry.name || entry.id,
+        metadata: {
+          ...artifact.metadata,
+          tags: tags.includes(LORA_ADAPTER_TAG) ? tags : [...tags, LORA_ADAPTER_TAG],
+        },
+      });
+      return abi.register(tagged);
+    },
+
+    async download(entry, artifact, onProgress) {
+      deps.requireReady();
+      const registered = await api.registerArtifact(entry, artifact);
+      let localPath = '';
+      for await (const event of deps.models.download(registered.id)) {
+        if (event.type === 'progress') onProgress?.(event.snapshot);
+        else if (event.type === 'completed') localPath = event.model.localPath ?? '';
+        else if (event.type === 'failed') throw SDKException.fromProto(event.error);
+        else if (event.type === 'cancelled') {
+          throw SDKException.invalidState(`the download of LoRA adapter '${entry.id}' was cancelled`);
+        }
+      }
+      if (!localPath) {
+        // The transfer completed but the terminal event carried no path — the
+        // registry row is the record of where it landed.
+        localPath = (await abi.get(registered.id))?.localPath ?? '';
+      }
+      if (!localPath) {
+        throw SDKException.of(
+          ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          `LoRA adapter '${entry.id}' downloaded but no local path was recorded`
+        );
+      }
+      // Commons has no verb left that writes this back (the LoRA-domain
+      // download bookkeeping messages were deleted from the IDL), and a
+      // non-empty local_path is the proto's only "downloaded" signal — so the
+      // catalog is completed here, or `apply(entry.id)` could never resolve.
+      await lora.register(LoraAdapterCatalogEntry.fromPartial({ ...entry, localPath }));
+      return localPath;
+    },
+
+    importAdapter(sourcePath) {
+      deps.requireReady();
+      return deps.models.import(
+        ModelImportRequest.fromPartial({
+          model: { metadata: { tags: [LORA_ADAPTER_TAG] } },
+          sourcePath,
+          copyIntoManagedStorage: true,
+          validateBeforeRegister: true,
+        })
+      );
+    },
+
+    async listCatalog(query) {
+      deps.requireReady();
+      return orThrow(await lora.listCatalog({ query }));
+    },
+
+    async queryCatalog(query) {
+      deps.requireReady();
+      return orThrow(await lora.queryCatalog(query));
+    },
+
+    async getCatalogEntry(adapterId) {
+      deps.requireReady();
+      return getEntry(adapterId);
+    },
+
+    async adaptersForModel(modelId) {
+      return (await api.queryCatalog(LoraAdapterCatalogQuery.fromPartial({ modelId }))).entries;
+    },
+
+    async allRegistered() {
+      return (await api.listCatalog()).entries;
     },
   };
+
+  return api;
 }
 
 // An adapter the caller named by path rather than by catalog id. Commons

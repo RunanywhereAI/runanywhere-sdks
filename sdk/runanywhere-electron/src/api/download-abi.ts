@@ -27,6 +27,7 @@ import {
 } from '@runanywhere/proto-ts/download_service';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
+import type { DownloadProgressSnapshot } from './types';
 
 /** A task commons will not move any further on its own. */
 export function isTerminalState(state: DownloadState): boolean {
@@ -46,14 +47,58 @@ export async function percentOf(
   percentFn: (
     overall: number,
     downloaded: number,
-    total: number,
-  ) => number | Promise<number>,
+    total: number
+  ) => number | Promise<number>
 ): Promise<number> {
   return percentFn(
     progress.overallProgress,
     Number(progress.bytesDownloaded),
-    Number(progress.totalBytes),
+    Number(progress.totalBytes)
   );
+}
+
+/**
+ * One `DownloadProgress` as the public snapshot, carrying every field commons
+ * measured. `percent` / `fraction` come from {@link percentOf} (commons), not a
+ * local bytes-ratio multiply.
+ *
+ * The normalizations for throughput / ETA are all "absent means unknown":
+ * commons writes 0 into `bytes_per_second` before it has a sample and leaves
+ * `eta_seconds` unset (or negative) when it cannot project one. Mapping those
+ * to absent lets a caller show nothing instead of "0 B/s · 0s left" while the
+ * connection is still opening.
+ */
+export async function toProgressSnapshot(
+  progress: DownloadProgress,
+  operationId: string,
+  sequence: number,
+  percentFn: (
+    overall: number,
+    downloaded: number,
+    total: number
+  ) => number | Promise<number>
+): Promise<DownloadProgressSnapshot> {
+  const percent = await percentOf(progress, percentFn);
+  const sizeKnown = progress.totalBytes > 0 || progress.overallProgress > 0;
+  const fraction = sizeKnown || percent > 0 ? Math.min(Math.max(percent / 100, 0), 1) : undefined;
+  return {
+    operationId,
+    sequence,
+    bytesDone: Number(progress.bytesDownloaded),
+    bytesTotal: Number(progress.totalBytes),
+    file: progress.currentFileName || undefined,
+    bytesPerSecond: progress.bytesPerSecond > 0 ? progress.bytesPerSecond : undefined,
+    etaSeconds:
+      progress.etaSeconds !== undefined && progress.etaSeconds >= 0
+        ? Number(progress.etaSeconds)
+        : undefined,
+    retryAttempt: progress.retryAttempt,
+    currentFileIndex: progress.currentFileIndex,
+    totalFiles: Math.max(progress.totalFiles, 1),
+    fraction,
+    percent: fraction === undefined ? undefined : percent,
+    isIndeterminate: fraction === undefined,
+  };
 }
 
 /** The commons download workflow: plan, start, cancel, poll, and purge. */
@@ -63,6 +108,17 @@ export class DownloadAbi {
   /** Percent helper bound to this backend's commons ABI (sync or RPC). */
   percent(progress: DownloadProgress): Promise<number> {
     return percentOf(progress, (o, d, t) => this.backend.downloadProgressPercent(o, d, t));
+  }
+
+  /** Public progress snapshot with commons-owned percent. */
+  snapshot(
+    progress: DownloadProgress,
+    operationId: string,
+    sequence: number
+  ): Promise<DownloadProgressSnapshot> {
+    return toProgressSnapshot(progress, operationId, sequence, (o, d, t) =>
+      this.backend.downloadProgressPercent(o, d, t)
+    );
   }
 
   plan(request: DownloadPlanRequest): Promise<DownloadPlanResult> {

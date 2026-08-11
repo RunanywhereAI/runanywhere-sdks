@@ -38,6 +38,7 @@ import {
   type VoiceLifecycleEvent as ProtoVoiceLifecycleEvent,
 } from '@runanywhere/proto-ts/sdk_events';
 import type { VoiceEvent as ProtoVoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import { iterableFromSubscription } from '@runanywhere/proto-ts/streams/push';
 import {
   SDKEventStreamAdapter,
   type SDKEventHandler,
@@ -305,7 +306,7 @@ export class EventBus {
    * behaviour of Swift's `AsyncStream` and Kotlin's `SharedFlow`.
    */
   eventsFor(category: EventCategory): AsyncIterable<ProtoSDKEvent> {
-    return EventBus.iterableFromSubscription((listener) => this.onCategory(category, listener));
+    return iterableFromSubscription((listener) => this.onCategory(category, listener));
   }
 
   /**
@@ -315,7 +316,7 @@ export class EventBus {
    * (`EventBus+ModelLifecycle.ts`) decode from.
    */
   get protoEvents(): AsyncIterable<ProtoSDKEvent> {
-    return EventBus.iterableFromSubscription((listener) => this.onProtoEvent(listener));
+    return iterableFromSubscription((listener) => this.onProtoEvent(listener));
   }
 
   // ---------------------------------------------------------------------------
@@ -396,7 +397,7 @@ export class EventBus {
   private eventsOfPayload<Payload>(
     selector: (event: ProtoSDKEvent) => Payload | undefined,
   ): AsyncIterable<Payload> {
-    return EventBus.iterableFromSubscription((listener) =>
+    return iterableFromSubscription((listener) =>
       this.onProtoEvent((event) => {
         const payload = selector(event);
         if (payload !== undefined) listener(payload);
@@ -410,63 +411,6 @@ export class EventBus {
     this.protoListeners.add(listener);
     return () => {
       this.protoListeners.delete(listener);
-    };
-  }
-
-  /**
-   * Build an `AsyncIterable` over a push subscription.
-   *
-   * Multiple concurrent `next()` calls are safe: each call enqueues a waiter
-   * and is resolved in FIFO order when events arrive, matching the behaviour
-   * of Swift's `AsyncStream` and Kotlin's `SharedFlow`. The subscription is
-   * created per-iterator and released via `return()`.
-   */
-  private static iterableFromSubscription<T>(
-    subscribe: (listener: (value: T) => void) => Unsubscribe,
-  ): AsyncIterable<T> {
-    return {
-      [Symbol.asyncIterator](): AsyncIterator<T> {
-        const queue: T[] = [];
-        const waiters: Array<(value: IteratorResult<T>) => void> = [];
-        let closed = false;
-
-        const unsubscribe = subscribe((value) => {
-          if (waiters.length > 0) {
-            waiters.shift()!({ value, done: false });
-          } else {
-            queue.push(value);
-          }
-        });
-
-        return {
-          next(): Promise<IteratorResult<T>> {
-            if (queue.length > 0) {
-              return Promise.resolve({ value: queue.shift()!, done: false });
-            }
-            if (closed) {
-              return Promise.resolve({
-                value: undefined as unknown as T,
-                done: true,
-              });
-            }
-            return new Promise((resolve) => {
-              waiters.push(resolve);
-            });
-          },
-          return(): Promise<IteratorResult<T>> {
-            closed = true;
-            unsubscribe();
-            const doneResult: IteratorResult<T> = {
-              value: undefined as unknown as T,
-              done: true,
-            };
-            for (const waiter of waiters.splice(0)) {
-              waiter(doneResult);
-            }
-            return Promise.resolve(doneResult);
-          },
-        };
-      },
     };
   }
 

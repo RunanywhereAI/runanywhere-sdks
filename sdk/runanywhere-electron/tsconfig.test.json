@@ -1,0 +1,17 @@
+{
+  // The test project. `rootDir: "test"` is load-bearing: every test imports the
+  // COMPILED SDK as `../../dist/<module>`, so the emitted file has to sit at the
+  // same depth relative to dist/. With rootDir "." the output would land at
+  // dist-test/test/unit/x.js and `../../dist` would resolve to dist-test/dist,
+  // which does not exist.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "test",
+    "outDir": "dist-test",
+    "declaration": false,
+    "sourceMap": true,
+    "noEmitOnError": true,
+    "types": ["node"]
+  },
+  "include": ["test/**/*.ts"]
+}
