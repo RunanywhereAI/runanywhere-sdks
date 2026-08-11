@@ -1,6 +1,10 @@
-# CI for @runanywhere/electron. The unit suite is hermetic (pure TS/JS — no native
-# addon, no models), so it builds and runs anywhere. The native addon + the
-# integration suite need MSVC + the compiled commons/engines and run separately.
+# CI for @runanywhere/electron. The unit suite is hermetic (pure TypeScript — no
+# native addon, no models), so it builds and runs anywhere. The native addon + the
+# feature suite need MSVC + the compiled commons/engines and run separately.
+#
+# Everything in the package is TypeScript, including the tests and the build
+# scripts. The tests compile to dist-test/ (tsconfig.test.json) and `node --test`
+# runs that output, which is why the glob below is dist-test/unit rather than test/.
 name: electron-sdk-ci
 
 on:
@@ -34,13 +38,19 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          # 22+ so `node --test` expands the "test/unit/**/*.test.js" glob
+          # 22+ so `node --test` expands the "dist-test/unit/**/*.test.js" glob
           # (glob support landed in Node 21; Node 20 treats it as a literal path).
           node-version: '22'
       - name: Install dependencies
         run: npm install
       - name: Type-check + build
         run: npm run build
+      # Every project including the tests and the build scripts, so a test file
+      # that lies about a type fails here with a clear signal rather than inside
+      # the test run.
+      - name: Type-check (all projects)
+        run: npm run typecheck
+      # Runs `pretest` first, which builds src/ -> dist/ and test/ -> dist-test/.
       - name: Unit tests
         run: npm test
 
