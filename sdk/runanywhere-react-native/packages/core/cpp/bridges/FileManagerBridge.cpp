@@ -60,6 +60,10 @@ static rac_result_t posixCreateDirectory(const char* path, int recursive, void* 
         if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
             return RAC_SUCCESS;
         }
+        // EEXIST on a non-directory entry (or one we cannot stat) is a real
+        // failure: accepting it would let commons treat a regular file as a
+        // usable directory and fail later, opaquely, on a model/cache write.
+        LOGE("Failed to create directory '%s': path exists but is not a directory", path);
     }
     return RAC_ERROR_DIRECTORY_CREATION_FAILED;
 }
