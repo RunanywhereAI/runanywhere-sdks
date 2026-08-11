@@ -81,8 +81,12 @@ export interface CatalogEntry {
    * `actualBackend` meaningful after load — commons reports what it routed to,
    * so a row that pinned QHEXRT and came back LLAMA_CPP is a visible fallback
    * rather than a silent one.
+   *
+   * The generated proto enum, not a local string union: this value is written
+   * straight onto the `ModelInfo` commons stores, so anything hand-written here
+   * could drift from the IDL and pin a backend that does not exist.
    */
-  framework?: 'llamacpp' | 'onnx' | 'sherpa' | 'qhexrt';
+  framework?: InferenceFramework;
 }
 
 /** A model table: catalog id -> entry. */
@@ -142,21 +146,8 @@ const FRAMEWORK_OF_TYPE: Record<ModelType, InferenceFramework> = {
   segmentation: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
 };
 
-/** Engine names a catalog row may pin, as the proto enum commons stores. */
-const FRAMEWORK_BY_NAME: Record<
-  NonNullable<CatalogEntry['framework']>,
-  InferenceFramework
-> = {
-  llamacpp: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  onnx: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  sherpa: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  qhexrt: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-};
-
 function frameworkOf(entry: CatalogEntry): InferenceFramework {
-  return entry.framework !== undefined
-    ? FRAMEWORK_BY_NAME[entry.framework]
-    : FRAMEWORK_OF_TYPE[entry.type];
+  return entry.framework ?? FRAMEWORK_OF_TYPE[entry.type];
 }
 
 function formatOf(entry: CatalogEntry): ModelFormat {
@@ -166,7 +157,9 @@ function formatOf(entry: CatalogEntry): ModelFormat {
   // plain folder. Commons rejects that pairing at registration — the row simply
   // never appears in models.list(), so the model is invisible in a picker with
   // no error anywhere to explain it.
-  if (entry.framework === 'qhexrt') return ModelFormat.MODEL_FORMAT_QNN_CONTEXT;
+  if (entry.framework === InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT) {
+    return ModelFormat.MODEL_FORMAT_QNN_CONTEXT;
+  }
   if (entry.archive) return ModelFormat.MODEL_FORMAT_FOLDER;
   if (/\.gguf$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_GGUF;
   if (/\.onnx$/i.test(entry.primary)) return ModelFormat.MODEL_FORMAT_ONNX;

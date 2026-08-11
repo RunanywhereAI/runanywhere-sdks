@@ -17,6 +17,8 @@
  * family's chat model and its vision variant sit together.
  */
 
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+
 /** What a model is for. Drives which SDK namespace loads it. */
 export type ModelType =
   | 'llm'
@@ -56,8 +58,11 @@ export interface CatalogEntry {
    * Pin the engine instead of inferring it from `type`. Needed for weights only
    * one backend can read — a QHexRT bundle is a prebuilt QNN context binary, and
    * the `llm` default would hand it to llama.cpp.
+   *
+   * The generated proto enum, never a hand-written string: the SDK writes this
+   * value straight onto the `ModelInfo` commons stores.
    */
-  readonly framework?: 'llamacpp' | 'onnx' | 'sherpa' | 'qhexrt';
+  readonly framework?: InferenceFramework;
 }
 
 export type Catalog = Readonly<Record<string, CatalogEntry>>;
@@ -174,7 +179,7 @@ function npu(
   }));
   return {
     type: 'llm',
-    framework: 'qhexrt',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
     files,
     primary: manifest,
     label,

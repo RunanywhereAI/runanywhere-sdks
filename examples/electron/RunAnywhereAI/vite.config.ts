@@ -17,7 +17,15 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 // value import fails as MISSING_EXPORT (`audioCaptureDefaults` was the first).
 // Aliasing to the emitted JS keeps the bundle on exactly the module the package
 // `exports` map points at, while typecheck keeps reading the same declarations.
-const protoTsDist = path.resolve(dir, '../../../sdk/shared/proto-ts/dist');
+//
+// The alias points INTO node_modules, and `preserveSymlinks` below keeps it
+// there. A generated MESSAGE module (`model_types`, which carries the domain
+// enums) also imports `@bufbuild/protobuf/wire`; resolving that needs proto-ts
+// to stay under a `node_modules` that has the runtime beside it. Aliased to the
+// source tree — or realpathed out of the link, which rolldown does by default —
+// it lands in `sdk/shared/proto-ts/`, which has no `node_modules`, and the build
+// fails on the protobuf runtime rather than on anything this app wrote.
+const protoTsDist = path.resolve(dir, 'node_modules/@runanywhere/proto-ts/dist');
 
 export default defineConfig({
   root: path.resolve(dir, 'src/renderer'),
@@ -30,6 +38,10 @@ export default defineConfig({
       { find: /^@runanywhere\/proto-ts$/, replacement: path.join(protoTsDist, 'index.js') },
       { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: path.join(protoTsDist, '$1.js') },
     ],
+    // `file:` workspace deps are symlinks. Realpathing them moves resolution out
+    // of this app's node_modules, so a linked package can no longer find its own
+    // dependencies. Keep the link path.
+    preserveSymlinks: true,
   },
   build: {
     outDir: path.resolve(dir, 'out/renderer'),
