@@ -590,7 +590,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterConfig final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_adapter_id();
 
   public:
-  // optional float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
+  // optional float scale = 2;
   [[nodiscard]] bool has_scale()
       const;
   void clear_scale() ;
@@ -3593,7 +3593,7 @@ inline void LoraAdapterConfig::set_allocated_adapter_path(::std::string* PROTOBU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterConfig.adapter_path)
 }
 
-// optional float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
+// optional float scale = 2;
 inline bool LoraAdapterConfig::has_scale() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;

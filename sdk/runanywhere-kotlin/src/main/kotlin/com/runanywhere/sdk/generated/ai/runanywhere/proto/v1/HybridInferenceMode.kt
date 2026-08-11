@@ -37,8 +37,8 @@ public enum class HybridInferenceMode(
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridInferenceMode> =
         object : EnumAdapter<HybridInferenceMode>(
-      HybridInferenceMode::class, 
-      PROTO_3, 
+      HybridInferenceMode::class,
+      PROTO_3,
       HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): HybridInferenceMode? = HybridInferenceMode.fromValue(`value`)

@@ -7,6 +7,7 @@
 
 import { catalogEntries, catalogModelInfo } from '../catalog';
 import { ErrorCategory, SDKException, asSDKException } from '../errors';
+import { bindAudioBackend } from '../audio';
 import { ModelAbi } from './model-abi';
 import type { ComponentLifecycleSnapshot, SDKComponent } from './model-abi';
 import {
@@ -343,7 +344,6 @@ async function readEngineRegistry(backend: RaBackend): Promise<EngineRegistrySna
   return { thinAddon, pluginNames };
 }
 
-const DEVICE_ID_KEY = 'runanywhere.deviceId';
 // A bearer token is a credential, so it lives in the platform secure store and
 // never in a settings file next to the app's window geometry. What that store
 // is differs by platform and this SDK does not overstate it: Win32 is DPAPI
@@ -509,6 +509,10 @@ async function seedCatalog(backend: RaBackend): Promise<void> {
 
 /** Build the public surface over `backend`. */
 export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
+  // Audio DSP + embeddings math are owned by whichever process holds the
+  // native addon. Binding here means preload/RpcBackend never resolveAddon.
+  bindAudioBackend(backend);
+
   const hub = new SdkEventHub();
 
   let ready = false;
@@ -601,16 +605,9 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       // its name says. Nothing between `backend.initialize` and here needs `ready`
       // (ModelAbi does not go through `requireReady`), so ordering it last is free.
       ready = true;
-      // A stable install identifier, minted locally. With no control plane there is
-      // nothing to register it with; it exists so logs and telemetry have a key.
+      // Commons owns the stable install identifier even when no control plane is configured.
       try {
-        const stored = await backend.secureGet(DEVICE_ID_KEY);
-        if (stored) {
-          deviceId = stored;
-        } else {
-          deviceId = `electron-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-          await backend.secureSet(DEVICE_ID_KEY, deviceId);
-        }
+        deviceId = await backend.devicePersistentId();
       } catch {
         // A secure store that is unavailable must not block local inference.
         deviceId = '';

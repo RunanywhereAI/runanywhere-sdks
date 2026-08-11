@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
+#include "finish_reason.pb.h"
 #include "tool_calling.pb.h"
 #include "llm_options.pb.h"
 #include "chat.pb.h"

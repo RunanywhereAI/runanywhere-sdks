@@ -6,8 +6,6 @@
 //  forwarders keep the proto-typed shapes they always returned.
 //
 
-import Foundation
-
 public extension RunAnywhere {
 
     /// Synthesize text to speech.
@@ -25,42 +23,29 @@ public extension RunAnywhere {
         _ text: String,
         options: RATTSOptions = .defaults()
     ) -> AsyncStream<RATTSOutput> {
+        // Keep the legacy RATTSOptions / AsyncStream<RATTSOutput> surface.
+        // `tts.synthesizeStream` is the v3 API (`TtsOptions` →
+        // `AsyncThrowingStream<AudioChunk, Error>`); do not forward into it.
         AsyncStream { continuation in
             let task = Task {
-                guard let snapshot = try? requireTTSVoice() else {
-                    continuation.finish()
-                    return
-                }
                 do {
+                    let snapshot = try requireTTSVoice()
                     try await ensureServicesReady()
-                } catch {
-                    continuation.finish()
-                    return
-                }
-                var request = RATTSSynthesisRequest()
-                request.text = text
-                request.options = options
-                do {
-                    let stream = try await CppBridge.TTS.shared.synthesizeSessionStream(
+                    var request = RATTSSynthesisRequest()
+                    request.text = text
+                    request.options = options
+                    let outputs = try await CppBridge.TTS.shared.synthesizeSessionStream(
                         request,
                         loadedModel: snapshot
                     )
-                    for await output in stream {
+                    for await output in outputs {
                         if Task.isCancelled { break }
                         continuation.yield(output)
                     }
+                    continuation.finish()
                 } catch {
-                    var failure = RATTSOutput()
-                    failure.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
-                    failure.isFinal = true
-                    failure.error = RASDKError.make(
-                        code: .internal,
-                        message: "TTS stream failed: \(error)",
-                        category: .internal
-                    )
-                    continuation.yield(failure)
+                    continuation.finish()
                 }
-                continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }
         }

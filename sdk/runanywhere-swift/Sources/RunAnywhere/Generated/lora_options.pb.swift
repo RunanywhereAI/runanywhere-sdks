@@ -50,8 +50,10 @@ public nonisolated struct RALoraAdapterConfig: Sendable {
   public mutating func clearAdapterPath() {self._adapterPath = nil}
 
   /// 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
-  /// subtract. Unbounded and signed. Unset falls back to the catalog entry's
-  /// default_scale, then to 1.0.
+  /// subtract. Unbounded and signed. Presence is authoritative: an explicit
+  /// 0.0 is honoured. Unset falls back to the catalog entry's default_scale
+  /// (including an explicit catalog 0.0), then to 1.0. Commons owns this
+  /// resolution — SDKs must not coerce unset/0 to 1.0 locally.
   public var scale: Float {
     get {_scale ?? 0}
     set {_scale = newValue}

@@ -868,7 +868,7 @@ class _DeviceRegistrationInfoSnapshot {
 
   factory _DeviceRegistrationInfoSnapshot.defaults({String? deviceId}) {
     final coreCount = Platform.numberOfProcessors;
-    final coreSplit = _coreDistribution(coreCount, '');
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId ?? '',
       deviceModel: 'unknown',
@@ -953,8 +953,9 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final info = await plugin.androidInfo;
     final model = _joinDistinct([info.manufacturer, info.model]);
     final coreCount = Platform.numberOfProcessors;
-    final coreSplit = _coreDistribution(coreCount, model);
     final chipName = _nonEmpty(info.hardware) ?? 'unknown';
+    // Probe sysfs max-freq → commons P/E split (parity with CppBridgeHardware).
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
       deviceModel: model,
@@ -969,9 +970,9 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       chipName: chipName,
       totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
       availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
-      hasNeuralEngine: _androidHasNeuralEngine(chipName, info.manufacturer),
+      hasNeuralEngine: _commonsHasNpu(info.manufacturer, chipName, chipName),
       neuralEngineCores: 0,
-      gpuFamily: _inferAndroidGpuFamily(chipName, info.manufacturer),
+      gpuFamily: _commonsClassifyGpuFamily(info.manufacturer, chipName, chipName),
       batteryLevel: battery.level,
       batteryState: battery.state,
       isLowPowerMode: battery.isLowPowerMode,
@@ -988,7 +989,8 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final coreCount = Platform.numberOfProcessors;
     final machine = _nonEmpty(info.utsname.machine) ?? 'unknown';
     final chipName = _appleChipName(machine);
-    final coreSplit = _coreDistribution(coreCount, model, chip: chipName);
+    // No sysfs freqs on Apple → commons returns UNKNOWN (0,0); never invent.
+    final coreSplit = _commonsSplitPerformanceCores(coreCount);
     final hasNeuralEngine =
         info.isPhysicalDevice &&
         (machine.startsWith('iPhone') || machine.startsWith('iPad'));
@@ -1026,7 +1028,7 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final chipName = hasNeuralEngine
         ? _appleChipName(_nonEmpty(info.model) ?? 'unknown')
         : _nonEmpty(info.model) ?? 'unknown';
-    final coreSplit = _coreDistribution(info.activeCPUs, model, chip: chipName);
+    final coreSplit = _commonsSplitPerformanceCores(info.activeCPUs);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
       deviceModel: model,
@@ -1138,28 +1140,67 @@ int _memoryBytes(int bytes) {
   return bytes > 0 ? bytes : 0;
 }
 
-(int, int) _coreDistribution(int coreCount, String model, {String chip = ''}) {
-  if (coreCount <= 0) return (0, 0);
-  int performance;
-  if (RegExp(r'^A\d').hasMatch(chip)) {
-    // A-series (A11-A19): 2 performance cores; A12X/A12Z: 4.
-    performance = chip.startsWith('A12X') || chip.startsWith('A12Z') ? 4 : 2;
-  } else if (RegExp(r'^M\d').hasMatch(chip)) {
-    // M-series: 4 efficiency cores on base/Pro/Max variants.
-    performance = coreCount - 4;
-    if (performance < 2) performance = coreCount ~/ 2;
-  } else {
-    final lowerModel = model.toLowerCase();
-    if (lowerModel.startsWith('iphone')) {
-      performance = 2;
-    } else if (lowerModel.startsWith('ipad') || lowerModel.startsWith('mac')) {
-      performance = (coreCount * 2 ~/ 5).clamp(2, coreCount).toInt();
-    } else {
-      performance = (coreCount ~/ 3).clamp(1, coreCount).toInt();
+/// Probe Android sysfs `cpuinfo_max_freq` samples (same inputs as Kotlin
+/// `CppBridgeHardware.defaultCoreSplit`). Incomplete/missing → empty list so
+/// commons returns UNKNOWN (0,0).
+List<int>? _probeAndroidMaxFreqs(int coreCount) {
+  if (!Platform.isAndroid || coreCount <= 0) return null;
+  final freqs = <int>[];
+  for (var cpu = 0; cpu < coreCount; cpu++) {
+    try {
+      final raw = File(
+        '/sys/devices/system/cpu/cpu$cpu/cpufreq/cpuinfo_max_freq',
+      ).readAsStringSync().trim();
+      freqs.add(int.tryParse(raw) ?? 0);
+    } catch (_) {
+      freqs.add(0);
     }
   }
-  performance = performance.clamp(0, coreCount).toInt();
-  return (performance, coreCount - performance);
+  return freqs;
+}
+
+/// P/E core split via `rac_device_split_performance_cores`.
+///
+/// Platforms gather per-core max frequencies; commons owns the split policy
+/// (UNKNOWN = 0/0 when samples are incomplete). Never invents a half/half split.
+(int, int) _commonsSplitPerformanceCores(int coreCount) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(
+        Pointer<Int64>,
+        IntPtr,
+        Pointer<Int32>,
+        Pointer<Int32>,
+      ),
+      int Function(
+        Pointer<Int64>,
+        int,
+        Pointer<Int32>,
+        Pointer<Int32>,
+      )>('rac_device_split_performance_cores');
+
+  final outPerf = calloc<Int32>();
+  final outEff = calloc<Int32>();
+  Pointer<Int64> freqsPtr = nullptr;
+  var count = 0;
+  final probed = _probeAndroidMaxFreqs(coreCount);
+  if (probed != null && probed.isNotEmpty) {
+    count = probed.length;
+    freqsPtr = calloc<Int64>(count);
+    for (var i = 0; i < count; i++) {
+      freqsPtr[i] = probed[i];
+    }
+  }
+  try {
+    fn(freqsPtr, count, outPerf, outEff);
+    return (outPerf.value, outEff.value);
+  } finally {
+    if (freqsPtr != nullptr) {
+      calloc.free(freqsPtr);
+    }
+    calloc.free(outPerf);
+    calloc.free(outEff);
+  }
 }
 
 const Map<String, String> _appleExactChipById = {
@@ -1231,27 +1272,62 @@ int _appleNeuralEngineCores(String chip) {
   return 0;
 }
 
-/// NPU heuristic from the SoC/hardware string: Snapdragon SM8/SM7/QCM,
-/// Google Tensor, Exynos 2xxx (s5e9xxx), MediaTek Dimensity.
-bool _androidHasNeuralEngine(String chipName, String manufacturer) {
-  final chip = chipName.toLowerCase();
-  if (RegExp(r'sm[78]\d{3}').hasMatch(chip) || chip.contains('qcm')) {
-    return true;
+/// NPU heuristic via `rac_device_heuristic_has_npu`.
+bool _commonsHasNpu(String? manufacturer, String? socModel, String chipName) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+      int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>(
+    'rac_device_heuristic_has_npu',
+  );
+  final mfr = (manufacturer ?? '').toNativeUtf8();
+  final model = (socModel ?? '').toNativeUtf8();
+  final chip = chipName.toNativeUtf8();
+  try {
+    return fn(mfr, model, chip) != 0;
+  } finally {
+    malloc.free(mfr);
+    malloc.free(model);
+    malloc.free(chip);
   }
-  if (chip.contains('tensor') ||
-      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
-      chip.contains('zuma') ||
-      manufacturer.toLowerCase().contains('google')) {
-    return true;
+}
+
+/// GPU family via `rac_device_classify_gpu_family`.
+String _commonsClassifyGpuFamily(
+  String? manufacturer,
+  String? socModel,
+  String chipName,
+) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        IntPtr,
+      ),
+      int Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        int,
+      )>('rac_device_classify_gpu_family');
+  final mfr = (manufacturer ?? '').toNativeUtf8();
+  final model = (socModel ?? '').toNativeUtf8();
+  final chip = chipName.toNativeUtf8();
+  final out = calloc<Uint8>(64);
+  try {
+    final rc = fn(mfr, model, chip, out.cast<Utf8>(), 64);
+    if (rc != 0) return 'unknown';
+    return out.cast<Utf8>().toDartString();
+  } finally {
+    malloc.free(mfr);
+    malloc.free(model);
+    malloc.free(chip);
+    calloc.free(out);
   }
-  if (RegExp(r'exynos\s?2\d{3}').hasMatch(chip) ||
-      RegExp(r's5e9[89]\d{2}').hasMatch(chip)) {
-    return true;
-  }
-  if (chip.contains('dimensity') || RegExp(r'mt6[89]\d{2}').hasMatch(chip)) {
-    return true;
-  }
-  return false;
 }
 
 String _defaultFormFactor() {
@@ -1273,38 +1349,4 @@ String _androidFormFactor(List<String> systemFeatures) {
     return 'tablet';
   }
   return 'phone';
-}
-
-String _inferAndroidGpuFamily(String chipName, String manufacturer) {
-  final chip = chipName.toLowerCase();
-  final maker = manufacturer.toLowerCase();
-  if (chip.contains('snapdragon') ||
-      chip.contains('qualcomm') ||
-      chip.contains('qcom') ||
-      chip.contains('qcm') ||
-      chip.contains('sdm') ||
-      RegExp(r'sm[4-8]\d{3}').hasMatch(chip) ||
-      chip.contains('msm') ||
-      maker.contains('qualcomm')) {
-    return 'adreno';
-  }
-  // Exynos 2200+ (s5e992x/s5e994x) use AMD Xclipse; earlier Exynos use Mali.
-  if (RegExp(r's5e9(9[24]|4\d)\d').hasMatch(chip)) return 'xclipse';
-  if (chip.contains('exynos') || chip.contains('s5e')) return 'mali';
-  if (chip.contains('tensor') ||
-      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
-      chip.contains('zuma') ||
-      maker.contains('google')) {
-    return 'mali';
-  }
-  if (chip.contains('mediatek') ||
-      chip.contains('dimensity') ||
-      chip.contains('helio') ||
-      RegExp(r'\bmt\d{4}').hasMatch(chip)) {
-    return 'mali';
-  }
-  if (chip.contains('kirin') || maker.contains('samsung')) return 'mali';
-  if (chip.contains('intel')) return 'intel';
-  if (chip.contains('nvidia') || chip.contains('tegra')) return 'nvidia';
-  return 'unknown';
 }

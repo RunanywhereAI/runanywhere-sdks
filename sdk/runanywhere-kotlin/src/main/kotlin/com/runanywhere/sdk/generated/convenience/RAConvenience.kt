@@ -534,12 +534,6 @@ public fun LoggingConfiguration.Companion.defaults(): LoggingConfiguration =
         enable_local_logging = true,
     )
 
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun LoraAdapterConfig.Companion.defaults(): LoraAdapterConfig =
-    LoraAdapterConfig(
-        scale = 1.0f,
-    )
-
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun LoraAdapterConfig.validate() {
     if (adapter_id.isEmpty()) {

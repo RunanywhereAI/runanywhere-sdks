@@ -188,6 +188,18 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
 // =============================================================================
 
 /**
+ * @brief Engine-reported token totals for the most recent LLM stream.
+ *
+ * Engines populate this from their tokenizer/runtime after generation.
+ * Commons marks fallback estimates through TokenUsage.counts_estimated when
+ * `rac_llm_service_ops_t::get_stream_token_counts` is NULL or fails.
+ */
+typedef struct rac_llm_token_counts {
+    int32_t prompt_tokens;
+    int32_t completion_tokens;
+} rac_llm_token_counts_t;
+
+/**
  * @brief LLM generation result
  */
 typedef struct rac_llm_result {
@@ -240,6 +252,10 @@ typedef struct rac_llm_info {
 } rac_llm_info_t;
 
 // =============================================================================
+// STREAM TOKEN COUNTS (ABI v9)
+// =============================================================================
+
+// =============================================================================
 // CALLBACKS
 // =============================================================================
 
@@ -256,11 +272,15 @@ typedef struct rac_llm_info {
  * @param token The generated token string (may be empty on the final call)
  * @param is_final RAC_TRUE on the terminal event
  * @param finish_reason NULL until final; then a NUL-terminated reason string
+ * @param tokens_in_delta Engine-reported token count represented by this
+ *        callback. May be >1 when the backend coalesces tokens (e.g. stop-
+ *        sequence buffering). Pass 0 when the engine cannot count.
  * @param user_data User-provided context
  * @return RAC_TRUE to continue, RAC_FALSE to stop generation
  */
 typedef rac_bool_t (*rac_llm_stream_callback_fn)(const char* token, rac_bool_t is_final,
-                                                 const char* finish_reason, void* user_data);
+                                                 const char* finish_reason, int32_t tokens_in_delta,
+                                                 void* user_data);
 
 // =============================================================================
 // MEMORY MANAGEMENT

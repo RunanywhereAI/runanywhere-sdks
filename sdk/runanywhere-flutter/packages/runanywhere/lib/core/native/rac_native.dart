@@ -1989,6 +1989,14 @@ class RacBindings {
                   RacVoiceAgentProcessTurnProto2Dart
                 >('rac_voice_agent_process_turn_proto'),
           ),
+      rac_voice_agent_feed_audio_proto =
+          _lookupOptional<RacVoiceAgentHelperProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentHelperProtoNative,
+                  RacVoiceAgentHelperProtoDart
+                >('rac_voice_agent_feed_audio_proto'),
+          ),
       rac_voice_agent_cancel_turn_proto =
           _lookupOptional<RacVoiceAgentCancelTurnProtoDart>(
             () =>
@@ -2465,6 +2473,10 @@ class RacBindings {
   // Voice agent proto APIs -----------------------------------------
 
   final RacVoiceAgentProcessTurnProto2Dart? rac_voice_agent_process_turn_proto;
+
+  /// `rac_voice_agent_feed_audio_proto(handle, VoiceAgentAudioFrame, out)` —
+  /// streaming raw-frame ingress with in-core segmentation/endpointing.
+  final RacVoiceAgentHelperProtoDart? rac_voice_agent_feed_audio_proto;
 
   /// `rac_voice_agent_cancel_turn_proto(handle, VoiceAgentTurnRequest)` —
   /// request-scoped cooperative cancellation for a blocking voice turn.

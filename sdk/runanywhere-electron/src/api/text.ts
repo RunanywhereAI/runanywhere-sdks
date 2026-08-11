@@ -18,6 +18,7 @@ import {
   LlmAbi,
   LLMStreamEventKind,
   toPublicFinishReason,
+  toPublicGenerationMetrics,
   toPublicMetrics,
   toProtoMessages,
   toProtoOptions,
@@ -48,7 +49,7 @@ import type { LlmOptions } from './options';
 import type { ChatMessage as ProtoChatMessage } from '@runanywhere/proto-ts/chat';
 import { MessageRole } from '@runanywhere/proto-ts/chat';
 import { ModelCategory as ProtoModelCategory } from '@runanywhere/proto-ts/model_types';
-import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import { FinishReason, ReasoningMode, newRequestId, toProtoError } from './types';
 import type {
   ChatMessage,
@@ -289,19 +290,11 @@ class GenerationEmitter {
 
 /**
  * The token accounting for a finished generation, as the generated
- * `TokenUsage`. Built from the public result rather than re-read from the proto
- * so the `usage` event and `completed.result` can never disagree; `prefillMs`
- * stays 0 because the public result does not carry the prefill split.
+ * `TokenUsage`. Copied from the public result's complete commons usage so the
+ * `usage` event and `completed.result` never disagree and no field is invented.
  */
 function usageOf(result: GenerationResult): TokenUsage {
-  return {
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
-    totalTokens: result.inputTokens + result.outputTokens,
-    decodeTokensPerSecond: result.tokensPerSecond,
-    prefillMs: 0,
-    ttftMs: result.timeToFirstTokenMs,
-  };
+  return TokenUsage.fromPartial(result.usage);
 }
 
 // ---------------------------------------------------------------------------
@@ -511,13 +504,8 @@ export function createLlmNamespace(deps: LlmDeps): LlmNamespace {
       text: result.text,
       thinkingText: result.thinkingContent || undefined,
       toolCalls: calls,
-      finishReason: calls.length ? FinishReason.TOOL_CALLS : FinishReason.STOP,
-      inputTokens: result.usage?.inputTokens ?? 0,
-      outputTokens: result.usage?.outputTokens ?? 0,
-      timeToFirstTokenMs: result.usage?.ttftMs ?? 0,
-      tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
-      requestId,
-      model,
+      finishReason: toPublicFinishReason(result.finishReason),
+      ...toPublicGenerationMetrics(result.usage, requestId, model),
     };
   }
 

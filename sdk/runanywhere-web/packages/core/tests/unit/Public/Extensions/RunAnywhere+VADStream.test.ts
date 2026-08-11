@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   VADOptions,
   VADResult,
@@ -13,6 +13,10 @@ import {
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
 import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
+
+vi.mock('../../../../src/Public/Extensions/RunAnywhere+AudioConvert.js', () => ({
+  float32ToPcm16: (samples: Float32Array) => new Uint8Array(samples.length * 2),
+}));
 
 interface VADStreamCounters {
   componentCreates: number;

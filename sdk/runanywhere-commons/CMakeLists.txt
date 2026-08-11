@@ -843,6 +843,9 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
     src/infrastructure/device/device_identity.cpp
+    # Device-fact classifiers (chip / GPU / NPU / P-E / available-memory
+    # coalesce) — pure policy previously duplicated in Kotlin/Flutter/RN.
+    src/infrastructure/device/device_facts.cpp
     src/infrastructure/extraction/rac_extraction.cpp
     # DAG streaming runtime. The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
@@ -874,6 +877,9 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/rac_llm_service.cpp
     src/features/llm/streaming_metrics.cpp
     src/features/llm/structured_output.cpp
+    # JSON Schema → GBNF constrained-decoding compiler (replaces per-SDK
+    # grammar.py / grammar.ts copies).
+    src/features/llm/json_schema_to_gbnf.cpp
     # JSONSchema-proto -> JSON Schema text canonical writer (replaces
     # Swift JSONSchemaWriter / per-SDK serializers).
     src/features/llm/schema_to_json.cpp
@@ -963,6 +969,7 @@ set(RAC_FEATURES_SOURCES
     # W4: unified module — merges embeddings_component.cpp +
     # rac_embeddings_proto_abi.cpp + Embeddings slice of
     # rac_nonllm_lifecycle_proto_abi.cpp.
+    src/features/embeddings/rac_embeddings_math.cpp
     src/features/embeddings/rac_embeddings_service.cpp
     src/features/embeddings/embeddings_module.cpp
     # W4: rac_nonllm_lifecycle_proto_abi.cpp removed — every lifecycle verb it
@@ -1418,6 +1425,10 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/hardware_profile.pb.cc
     ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
     ${_RAC_PROTO_GEN_DIR}/llm_options.pb.cc
+    # Shared FinishReason vocabulary (LLMGenerationResult / LLMStreamEvent /
+    # ToolCallingResult). Extracted from llm_options.proto so tool_calling
+    # can import it without a cycle.
+    ${_RAC_PROTO_GEN_DIR}/finish_reason.pb.cc
     ${_RAC_PROTO_GEN_DIR}/chat.pb.cc
     ${_RAC_PROTO_GEN_DIR}/tool_calling.pb.cc
     ${_RAC_PROTO_GEN_DIR}/structured_output.pb.cc

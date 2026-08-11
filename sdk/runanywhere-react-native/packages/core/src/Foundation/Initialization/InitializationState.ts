@@ -66,15 +66,6 @@ export interface InitializationState {
    */
   error: Error | null;
 
-  /**
-   * Timestamp when Phase 1 completed
-   */
-  coreInitTimestamp: number | null;
-
-  /**
-   * Timestamp when Phase 2 completed
-   */
-  servicesInitTimestamp: number | null;
 }
 
 /**
@@ -90,8 +81,6 @@ export function createInitialState(): InitializationState {
     environment: null,
     initParams: null,
     error: null,
-    coreInitTimestamp: null,
-    servicesInitTimestamp: null,
   };
 }
 
@@ -108,7 +97,6 @@ export function markCoreInitialized(
     isCoreInitialized: true,
     environment: params.environment ?? null,
     initParams: params,
-    coreInitTimestamp: Date.now(),
     error: null,
   };
 }
@@ -148,7 +136,6 @@ export function markServicesInitialized(
     hasCompletedServicesInit: true,
     hasCompletedHTTPSetup: httpConfigured,
     httpSetupApplicable: httpApplicable,
-    servicesInitTimestamp: Date.now(),
   };
 }
 

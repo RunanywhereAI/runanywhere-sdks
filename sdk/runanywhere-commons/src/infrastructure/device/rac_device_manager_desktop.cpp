@@ -43,6 +43,7 @@
 #include "rac/core/rac_sdk_state.h"
 #include "desktop/desktop_internal.h"
 #include "rac/desktop/rac_desktop.h"
+#include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -137,6 +138,7 @@ struct CallbackStrings {
     std::string device_id;
     std::string device_name;
     std::string chip_name;
+    std::string gpu_family;
     std::string response_body;
     std::string response_error;
 };
@@ -168,11 +170,25 @@ void device_get_info(rac_device_registration_info_t* out_info, void* /*user_data
     if (adapter != nullptr && adapter->get_memory_info != nullptr &&
         adapter->get_memory_info(&memory, adapter->user_data) == RAC_SUCCESS) {
         out_info->total_memory = static_cast<int64_t>(memory.total_bytes);
-        out_info->available_memory = static_cast<int64_t>(memory.available_bytes);
+        // 0 = UNKNOWN — never invent total/2 when the probe fails.
+        out_info->available_memory =
+            rac_device_coalesce_available_memory(static_cast<int64_t>(memory.available_bytes));
     }
 
+    char gpu_buf[64] = {};
+    if (rac_device_classify_gpu_family(/*soc_manufacturer=*/nullptr, /*soc_model=*/nullptr,
+                                      state.chip_name.empty() ? nullptr : state.chip_name.c_str(),
+                                      gpu_buf, sizeof(gpu_buf)) == RAC_SUCCESS &&
+        gpu_buf[0] != '\0' && std::strcmp(gpu_buf, "unknown") != 0) {
+        state.gpu_family = gpu_buf;
+        out_info->gpu_family = state.gpu_family.c_str();
+    }
 #if defined(__APPLE__) && (defined(__arm64__) || defined(__aarch64__))
-    out_info->gpu_family = "apple";
+    // Apple Silicon without a brand_string still reports the Apple GPU family.
+    if (out_info->gpu_family == nullptr) {
+        state.gpu_family = "apple";
+        out_info->gpu_family = state.gpu_family.c_str();
+    }
 #endif
     // Desktop exposes no portable battery or NPU inventory: report unavailable
     // rather than guessing. -1 battery becomes null on the wire.

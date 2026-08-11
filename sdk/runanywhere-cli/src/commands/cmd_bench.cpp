@@ -11,13 +11,19 @@
  *     → 1 measured pass → sample avail RAM → per-trial metrics }
  *   → aggregate trials by MEDIAN, report [min,max] where useful.
  *
- * Metrics come from the SDK result protos (LLMGenerationResult / STTOutput /
- * TTSOutput / VLMResult) with wall-clock fallbacks, matching the Android
- * BenchmarkMetricPolicy. No telemetry is emitted (matches Android — the
- * benchmark is a pure measurement).
+ * Metrics come from commons result protos (TokenUsage + measured phase times).
+ * Missing values stay zero — no tok/s, decode_ms, RTF, or chars/s
+ * reconstruction. Harness wall clocks cover load / warmup / measured e2e only.
+ * No telemetry.
  */
 
-#include "commands/commands.h"
+#include "chat.pb.h"
+#include "llm_options.pb.h"
+#include "llm_service.pb.h"
+#include "model_types.pb.h"
+#include "stt_options.pb.h"
+#include "tts_options.pb.h"
+#include "vlm_options.pb.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,13 +34,12 @@
 #include <string>
 #include <vector>
 
-#include "chat.pb.h"
-#include "llm_options.pb.h"
-#include "llm_service.pb.h"
-#include "model_types.pb.h"
-#include "stt_options.pb.h"
-#include "tts_options.pb.h"
-#include "vlm_options.pb.h"
+#include "catalog/model_ref.h"
+#include "commands/bench_metrics.h"
+#include "commands/commands.h"
+#include "commands/engine_options.h"
+#include "io/output.h"
+#include "io/proto.h"
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_model_lifecycle.h"
@@ -43,11 +48,6 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-
-#include "catalog/model_ref.h"
-#include "commands/engine_options.h"
-#include "io/output.h"
-#include "io/proto.h"
 
 namespace rcli::commands {
 
@@ -58,18 +58,24 @@ namespace v1 = runanywhere::v1;
 // Prompts / text mirror the Android BenchmarkRunner constants so numbers are
 // comparable across the CLI and the app.
 constexpr const char* kLlmSystemPrompt =
-    "You are a helpful assistant. Always give extremely detailed, thorough responses. Never stop "
-    "early. Use the full response length available to you. Elaborate on every point with examples "
+    "You are a helpful assistant. Always give extremely detailed, thorough "
+    "responses. Never stop "
+    "early. Use the full response length available to you. Elaborate on every "
+    "point with examples "
     "and explanations.";
 constexpr const char* kLlmPrompt =
-    "Write a very long and detailed explanation of how neural networks work, covering perceptrons, "
-    "activation functions, backpropagation, gradient descent, loss functions, convolutional "
-    "layers, recurrent layers, transformers, attention mechanisms, and training procedures. Be as "
+    "Write a very long and detailed explanation of how neural networks work, "
+    "covering perceptrons, "
+    "activation functions, backpropagation, gradient descent, loss functions, "
+    "convolutional "
+    "layers, recurrent layers, transformers, attention mechanisms, and "
+    "training procedures. Be as "
     "thorough as possible.";
 constexpr const char* kVlmPrompt = "Describe this image in detail.";
 constexpr const char* kTtsShort = "Hello, this is a test.";
 constexpr const char* kTtsMedium =
-    "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from "
+    "The quick brown fox jumps over the lazy dog. Machine learning models can "
+    "generate speech from "
     "text with remarkable quality and natural intonation.";
 constexpr double kPi = 3.14159265358979323846;
 
@@ -394,29 +400,16 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.usage().output_tokens();
-    if (out_tokens <= 0) {
+    bench_metrics::LlmVlmMetrics filled;
+    if (!bench_metrics::fill_llm(r, measured_e2e, &filled)) {
         *err = "no output tokens";
         return false;
     }
-    const double e2e = r.generation_time_ms() > 0.0 ? r.generation_time_ms() : measured_e2e;
-    const double explicit_decode =
-        r.decode_time_ms() > 0 ? static_cast<double>(r.decode_time_ms()) : 0.0;
-    double tps = r.usage().decode_tokens_per_second() > 0.0 ? r.usage().decode_tokens_per_second()
-                                                            : 0.0;
-    if (tps <= 0.0 && explicit_decode > 0.0) {
-        tps = out_tokens * 1000.0 / explicit_decode;
-    }
-    if (tps <= 0.0 && e2e > 0.0) {
-        tps = out_tokens * 1000.0 / e2e;
-    }
-    m->end_to_end_ms = e2e;
-    m->tokens_per_second = tps;
-    m->decode_ms = explicit_decode > 0.0 ? explicit_decode : (tps > 0.0 ? out_tokens * 1000.0 / tps
-                                                                        : 0.0);
-    m->prompt_eval_ms = r.prompt_eval_time_ms() > 0 ? static_cast<double>(r.prompt_eval_time_ms())
-                        : static_cast<double>(r.usage().ttft_ms());
-    m->output_tokens = out_tokens;
+    m->end_to_end_ms = filled.end_to_end_ms;
+    m->tokens_per_second = filled.tokens_per_second;
+    m->decode_ms = filled.decode_ms;
+    m->prompt_eval_ms = filled.prompt_eval_ms;
+    m->output_tokens = filled.output_tokens;
     return true;
 }
 
@@ -428,7 +421,8 @@ bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
         return false;
     }
     v1::STTOutput warm;
-    (void)stt_transcribe(make_pcm16(0.5, false), &warm, err);  // warmup, errors ignored
+    (void)stt_transcribe(make_pcm16(0.5, false), &warm,
+                         err);  // warmup, errors ignored
 
     const int64_t t0 = rac_monotonic_now_ms();
     v1::STTOutput r;
@@ -440,18 +434,12 @@ bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    // TranscriptionMetadata.audio_length_ms is gone -- STTOutput.duration_ms
-    // is the canonical spelling now.
-    const double meta_rtf =
-        r.has_metadata() && r.duration_ms() > 0
-            ? static_cast<double>(r.metadata().processing_time_ms()) /
-                  static_cast<double>(r.duration_ms())
-            : 0.0;
-    m->real_time_factor = meta_rtf > 0.0
-                              ? meta_rtf
-                              : (c.scenario.seconds > 0.0
-                                     ? m->end_to_end_ms / (c.scenario.seconds * 1000.0)
-                                     : 0.0);
+    if (r.text().empty()) {
+        *err = "no transcript";
+        return false;
+    }
+    // RTF is commons-owned; do not derive from wall / scenario / duration.
+    m->real_time_factor = 0.0;
     return true;
 }
 
@@ -477,10 +465,8 @@ bool tts_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(c.category);
 
     m->audio_duration_ms = static_cast<double>(r.duration_ms());
-    const int32_t chars = r.has_metadata() && r.metadata().input_bytes() > 0
-                              ? r.metadata().input_bytes()
-                              : static_cast<int32_t>(text.size());
-    m->chars_per_second = m->end_to_end_ms > 0.0 ? chars * 1000.0 / m->end_to_end_ms : 0.0;
+    // chars/s is commons-owned; do not derive from wall / input bytes.
+    m->chars_per_second = 0.0;
     return true;
 }
 
@@ -505,16 +491,16 @@ bool vlm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.usage().output_tokens();
-    m->end_to_end_ms = r.total_time_ms() > 0 ? static_cast<double>(r.total_time_ms())
-                                            : measured_e2e;
-    m->tokens_per_second = r.usage().decode_tokens_per_second();
-    m->prompt_eval_ms = static_cast<double>(r.usage().ttft_ms());
-    m->output_tokens = out_tokens;
-    if (m->tokens_per_second <= 0.0 && out_tokens > 0 && m->end_to_end_ms > 0.0) {
-        m->tokens_per_second = out_tokens * 1000.0 / m->end_to_end_ms;
+    bench_metrics::LlmVlmMetrics filled;
+    if (!bench_metrics::fill_vlm(r, measured_e2e, &filled)) {
+        *err = "no output tokens";
+        return false;
     }
-    m->decode_ms = m->tokens_per_second > 0.0 ? out_tokens * 1000.0 / m->tokens_per_second : 0.0;
+    m->end_to_end_ms = filled.end_to_end_ms;
+    m->tokens_per_second = filled.tokens_per_second;
+    m->decode_ms = filled.decode_ms;
+    m->prompt_eval_ms = filled.prompt_eval_ms;
+    m->output_tokens = filled.output_tokens;
     return true;
 }
 
@@ -747,7 +733,8 @@ int run_bench(const GlobalOptions& options, const std::string& model_ref_arg, in
 
     out::result_line("");
     out::result_line(
-        "MODEL                          MOD  SCENARIO         PRIMARY                 LOAD     MEMΔ");
+        "MODEL                          MOD  SCENARIO         "
+        "PRIMARY                 LOAD     MEMΔ");
     for (const BenchRow& r : rows) {
         char line[256];
         if (r.success) {
@@ -768,14 +755,15 @@ int run_bench(const GlobalOptions& options, const std::string& model_ref_arg, in
 }  // namespace
 
 void register_bench(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand(
-        "bench", "Measure throughput and load time of downloaded models");
+    CLI::App* cmd =
+        app.add_subcommand("bench", "Measure throughput and load time of downloaded models");
     auto model = std::make_shared<std::string>();
     auto trials = std::make_shared<int>(3);
     auto vlm_image = std::make_shared<std::string>("docs/gifs/npu-model-tag-screenshot.png");
     auto engine = std::make_shared<std::string>();
     cmd->add_option("model", *model,
-                    "Model id, local bundle path, hf.co/... or URL (default: all downloaded)");
+                    "Model id, local bundle path, hf.co/... or URL (default: all "
+                    "downloaded)");
     cmd->add_option("--engine", *engine,
                     "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--trials,-n", *trials, "Measured trials per scenario (median reported)")

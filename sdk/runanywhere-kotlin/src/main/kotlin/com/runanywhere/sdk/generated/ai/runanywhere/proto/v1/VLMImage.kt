@@ -199,11 +199,11 @@ public class VLMImage(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMImage> = object : ProtoAdapter<VLMImage>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      VLMImage::class, 
-      "type.googleapis.com/runanywhere.v1.VLMImage", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      VLMImage::class,
+      "type.googleapis.com/runanywhere.v1.VLMImage",
+      PROTO_3,
+      null,
       "vlm_options.proto"
     ) {
       override fun encodedSize(`value`: VLMImage): Int {

@@ -205,31 +205,10 @@ void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
             payload.total_tokens = (metrics.input_tokens > 0 ? metrics.input_tokens : 0) +
                                    metrics.output_tokens;
         }
-        // LLM/VLM timing probes: derive coherent values from processing_ms +
-        // output tokens so quality SQL can assert non-null TPS/TTFT/etc.
-        const bool token_modality =
-            std::string(spec.name) == "llm" || std::string(spec.name) == "vlm";
-        if (token_modality && metrics.processing_ms > 0 && metrics.output_tokens > 0) {
-            const double prompt_ms = metrics.processing_ms * 0.30;
-            const double gen_ms = metrics.processing_ms - prompt_ms;
-            payload.prompt_eval_time_ms = prompt_ms;
-            payload.generation_time_ms = gen_ms;
-            payload.time_to_first_token_ms = prompt_ms;
-            payload.tokens_per_second =
-                static_cast<double>(metrics.output_tokens) / (gen_ms / 1000.0);
-            payload.context_length = 4096;
-            payload.temperature = 0.7;
-            payload.max_tokens = metrics.output_tokens;
-        }
+        // Emit only caller-supplied metrics. Do not fabricate TTFT/TPS/context
+        // or STT audio-length/RTF/word-count from processing_ms.
         if (metrics.audio_duration_ms >= 0) {
             payload.audio_duration_ms = metrics.audio_duration_ms;
-        } else if (std::string(spec.name) == "stt" && metrics.processing_ms > 0) {
-            // Default STT audio length when not specified (RTF-friendly probe).
-            payload.audio_duration_ms = metrics.processing_ms * 10.0;
-            payload.real_time_factor = 0.1;
-            payload.word_count = 12;
-            payload.confidence = 0.91;
-            payload.language = "en";
         }
         rac_telemetry_manager_track(manager, &payload);
     }

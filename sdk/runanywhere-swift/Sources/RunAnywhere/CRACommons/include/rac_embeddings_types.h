@@ -174,6 +174,39 @@ typedef struct rac_embeddings_info {
 } rac_embeddings_info_t;
 
 // =============================================================================
+// VECTOR MATH
+// =============================================================================
+
+/**
+ * @brief Compute the L2 norm of a dense float vector.
+ *
+ * An empty vector has norm 0. The input remains caller-owned.
+ *
+ * @param vector    Dense float vector. May be NULL only when dimension is 0.
+ * @param dimension Number of vector elements.
+ * @param out_norm  Output L2 norm.
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER for an invalid pointer.
+ */
+RAC_API rac_result_t rac_embeddings_norm(const float* vector, size_t dimension, float* out_norm);
+
+/**
+ * @brief Compute cosine similarity between two dense float vectors.
+ *
+ * Returns 0 for empty vectors, mismatched dimensions, or when either vector
+ * has zero L2 norm. The inputs remain caller-owned.
+ *
+ * @param lhs            First dense float vector. May be NULL only when lhs_dimension is 0.
+ * @param lhs_dimension  Number of elements in lhs.
+ * @param rhs            Second dense float vector. May be NULL only when rhs_dimension is 0.
+ * @param rhs_dimension  Number of elements in rhs.
+ * @param out_similarity Output cosine similarity.
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER for an invalid pointer.
+ */
+RAC_API rac_result_t rac_embeddings_similarity(const float* lhs, size_t lhs_dimension,
+                                               const float* rhs, size_t rhs_dimension,
+                                               float* out_similarity);
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

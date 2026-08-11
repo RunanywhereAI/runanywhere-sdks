@@ -57,12 +57,11 @@ object NpuMetrics {
         return out
     }
 
-    /** Strip hidden reasoning before answer-keyword scoring. */
-    fun answerText(s: String): String =
-        Regex(
-            "<think\\b[^>]*>.*?(?:</think\\s*>|\\z)",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        ).replace(s, " ").trim()
+    /**
+     * Answer text for keyword scoring. LLMGenerationResult.text is already
+     * reasoning-free from commons; this is a trim-only display/harness helper.
+     */
+    fun answerText(s: String): String = s.trim()
 
     /** Exact contiguous token/phrase match; substrings such as comparison!=Paris do not pass. */
     fun containsKeyword(text: String, keyword: String): Boolean {

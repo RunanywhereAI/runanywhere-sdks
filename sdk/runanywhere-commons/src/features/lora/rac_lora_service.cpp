@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -314,6 +315,8 @@ rac_result_t parse_message(const uint8_t* bytes, size_t size, Message* out,
     return RAC_SUCCESS;
 }
 
+float resolve_effective_lora_scale(const runanywhere::v1::LoraAdapterConfig& config);
+
 runanywhere::v1::LoraAdapterInfo make_info(const runanywhere::v1::LoraAdapterConfig& config,
                                            bool applied, const char* error_message = nullptr,
                                            rac_result_t error_code = RAC_SUCCESS) {
@@ -323,7 +326,7 @@ runanywhere::v1::LoraAdapterInfo make_info(const runanywhere::v1::LoraAdapterCon
     if (!config.adapter_id().empty())
         info.set_adapter_id(config.adapter_id());
     info.set_adapter_path(config.adapter_path());
-    info.set_scale(config.scale() > 0.0f ? config.scale() : 1.0f);
+    info.set_scale(resolve_effective_lora_scale(config));
     info.set_applied(applied);
     if (applied)
         info.set_loaded_at_ms(now_ms());
@@ -390,6 +393,28 @@ std::string base_model_id_for_message(const rac::llm::LifecycleLlmRef& ref) {
 
 bool config_has_adapter_id(const runanywhere::v1::LoraAdapterConfig& config) {
     return !config.adapter_id().empty();
+}
+
+// Explicit request → catalog default_scale (including 0.0) → 1.0.
+// Never coerce an explicit or catalog 0.0 to 1.0.
+float resolve_effective_lora_scale(const runanywhere::v1::LoraAdapterConfig& config) {
+    if (config.has_scale()) {
+        return config.scale();
+    }
+    if (!config_has_adapter_id(config)) {
+        return 1.0f;
+    }
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    rac_lora_entry_t* entry = nullptr;
+    const rac_result_t rc = rac_lora_registry_get(registry, config.adapter_id().c_str(), &entry);
+    if (rc != RAC_SUCCESS || entry == nullptr) {
+        return 1.0f;
+    }
+    // Registry materializes unset catalog default_scale as 1.0 at register
+    // time (rac_lora_entry_from_proto); an explicit catalog 0.0 is preserved.
+    const float catalog_scale = entry->default_scale;
+    rac_lora_entry_free(entry);
+    return std::isfinite(catalog_scale) ? catalog_scale : 1.0f;
 }
 
 bool catalog_entry_supports_model(const rac_lora_entry_t* entry, const std::string& model_id) {
@@ -650,7 +675,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
     }
 
     for (const auto& config : request.adapters()) {
-        const float scale = config.scale() > 0.0f ? config.scale() : 1.0f;
+        const float scale = resolve_effective_lora_scale(config);
         rc = ref.ops->load_lora(ref.impl, config.adapter_path().c_str(), scale);
         if (rc != RAC_SUCCESS) {
             auto* info = result.add_adapters();

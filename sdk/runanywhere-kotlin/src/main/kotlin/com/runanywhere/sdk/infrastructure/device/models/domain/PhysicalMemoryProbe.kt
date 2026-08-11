@@ -38,22 +38,17 @@ internal object PhysicalMemoryProbe {
     }
 
     /**
-     * Convenience: same value in megabytes (integer division, floored).
-     */
-    fun totalPhysicalMemoryMB(): Long = totalPhysicalMemoryBytes() / (1024L * 1024L)
-
-    /**
      * Return RAM currently available to the OS, in bytes.
      *
      * Android's `ActivityManager.MemoryInfo.availMem` is the authoritative
      * source. `/proc/meminfo`'s `MemAvailable` is the context-free fallback.
-     * The final total/2 fallback mirrors the device-info bridge and remains
-     * conservative on a plain JVM where neither Android source exists.
+     * When neither probe works, return 0 (UNKNOWN per ModelCompatibilityRequest
+     * / DeviceInfo contracts) — never invent half of total RAM.
      */
     fun availablePhysicalMemoryBytes(): Long {
         activityManagerMemoryField("availMem")?.takeIf { it > 0L }?.let { return it }
         procMemInfoBytes("MemAvailable:")?.takeIf { it > 0L }?.let { return it }
-        return totalPhysicalMemoryBytes() / 2L
+        return 0L
     }
 
     /**

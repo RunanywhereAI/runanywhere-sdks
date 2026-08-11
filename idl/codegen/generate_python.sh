@@ -42,12 +42,18 @@ if ! "${PYTHON_BIN}" -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
 fi
 # rag.proto and its transitive import closure, plus sdk_init.proto (two-phase
 # init request/result the desktop bridges serialize for rac_sdk_init_phase*_proto).
+# finish_reason.proto is imported by llm_options.proto and tool_calling.proto
+# (shared FinishReason enum); omit it and imports of those modules fail at
+# runtime with ModuleNotFoundError: finish_reason_pb2.
 PROTOS=(
   rag.proto
   rac_options.proto
   errors.proto
   sdk_init.proto
+  finish_reason.proto
   llm_options.proto
+  llm_service.proto
+  chat.proto
   model_types.proto
   hardware_profile.proto
   storage_types.proto
@@ -55,6 +61,8 @@ PROTOS=(
   thinking_tag_pattern.proto
   token_usage.proto
   tool_calling.proto
+  vad_options.proto
+  lora_options.proto
 )
 
 "${PYTHON_BIN}" -m grpc_tools.protoc \

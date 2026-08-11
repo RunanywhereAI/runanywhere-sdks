@@ -46,6 +46,10 @@ struct Session {
     // 1 = text-to-image. Lazily derived from manifest_path; deterministic, so a
     // benign race just recomputes the same value.
     std::atomic<int> diffusion_kind{-1};
+
+    // Last LLM stream's true tokenizer counts (from qhx_output after stream).
+    int32_t last_stream_prompt_tokens = 0;
+    int32_t last_stream_completion_tokens = 0;
 };
 
 // Acquire the process runtime, load `manifest_path`, create a session.

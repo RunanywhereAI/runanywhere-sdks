@@ -1,7 +1,8 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import { FinishReason, LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
+import { FinishReason } from "./finish_reason";
+import { LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
 import { ToolCall } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {

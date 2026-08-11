@@ -65,6 +65,13 @@ export interface ThinkingTagPattern {
   openTag: string;
   /** Empty defaults to "</think>". */
   closeTag: string;
+  /**
+   * When true, the model's generation template already emits the open tag
+   * (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+   * starts inside reasoning and commons must not arm the bounded hold.
+   * optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+   */
+  templatePrefillsOpenTag?: boolean | undefined;
 }
 
 export interface ReasoningOptions {
@@ -79,7 +86,7 @@ export interface ReasoningOptions {
 }
 
 function createBaseThinkingTagPattern(): ThinkingTagPattern {
-  return { openTag: "", closeTag: "" };
+  return { openTag: "", closeTag: "", templatePrefillsOpenTag: undefined };
 }
 
 export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
@@ -89,6 +96,9 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
     }
     if (message.closeTag !== "") {
       writer.uint32(18).string(message.closeTag);
+    }
+    if (message.templatePrefillsOpenTag !== undefined) {
+      writer.uint32(24).bool(message.templatePrefillsOpenTag);
     }
     return writer;
   },
@@ -116,6 +126,14 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
           message.closeTag = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.templatePrefillsOpenTag = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -137,6 +155,11 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
         : isSet(object.close_tag)
         ? globalThis.String(object.close_tag)
         : "",
+      templatePrefillsOpenTag: isSet(object.templatePrefillsOpenTag)
+        ? globalThis.Boolean(object.templatePrefillsOpenTag)
+        : isSet(object.template_prefills_open_tag)
+        ? globalThis.Boolean(object.template_prefills_open_tag)
+        : undefined,
     };
   },
 
@@ -148,6 +171,9 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
     if (message.closeTag !== "") {
       obj.closeTag = message.closeTag;
     }
+    if (message.templatePrefillsOpenTag !== undefined) {
+      obj.templatePrefillsOpenTag = message.templatePrefillsOpenTag;
+    }
     return obj;
   },
 
@@ -158,6 +184,7 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
     const message = createBaseThinkingTagPattern();
     message.openTag = object.openTag ?? "";
     message.closeTag = object.closeTag ?? "";
+    message.templatePrefillsOpenTag = object.templatePrefillsOpenTag ?? undefined;
     return message;
   },
 };

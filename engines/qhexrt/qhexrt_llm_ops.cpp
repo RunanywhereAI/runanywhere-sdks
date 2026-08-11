@@ -132,6 +132,7 @@ struct StreamCtx {
     uint64_t request_id;
     bool cancelled = false;
     std::string buf;  // reused per chunk to NUL-terminate
+    int32_t completion_tokens = 0;
 };
 
 int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, int is_final) {
@@ -150,7 +151,7 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     if (is_final != 0) {
         rac_llm_stream_report_final_signal();
         const char* reason = c->cancelled ? "cancelled" : "stop";
-        if (c->cb("", RAC_TRUE, reason, c->user) == RAC_FALSE) {
+        if (c->cb("", RAC_TRUE, reason, /*tokens_in_delta*/ 0, c->user) == RAC_FALSE) {
             c->cancelled = true;
             return 0;
         }
@@ -159,8 +160,10 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     if (utf8 == nullptr) {
         return 1;
     }
+    // QHexRT invokes the trampoline once per generated token.
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));
-    if (c->cb(c->buf.c_str(), RAC_FALSE, nullptr, c->user) == RAC_FALSE) {
+    c->completion_tokens += 1;
+    if (c->cb(c->buf.c_str(), RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, c->user) == RAC_FALSE) {
         c->cancelled = true;
         return 0;
     }
@@ -312,10 +315,15 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
         StopCtx stop_ctx{c, request.id()};
         generate_options.should_cancel = should_cancel_trampoline;
         generate_options.should_cancel_user = &stop_ctx;
-        StreamCtx ctx{callback, user_data, c, request.id(), false, std::string()};
+        StreamCtx ctx{callback, user_data, c, request.id(), false, std::string(), 0};
         qhx_output out{};
         qhx_status st = qhx_generate_ex(c->sess, &in, &cfg, &generate_options, stream_trampoline,
                                         &ctx, &out);
+        // Prefer engine-reported totals; fall back to trampoline accumulation for
+        // completion when the output counters are unset.
+        c->last_stream_prompt_tokens = out.n_prompt;
+        c->last_stream_completion_tokens =
+            out.n_generated > 0 ? out.n_generated : ctx.completion_tokens;
         if (ctx.cancelled || request.cancelled()) {
             RAC_LOG_INFO(LOG_CAT, "LLM request %llu cancelled during streaming generation",
                          static_cast<unsigned long long>(request.id()));
@@ -378,6 +386,19 @@ rac_result_t qhexrt_llm_cleanup(void* impl) {
 
 void qhexrt_llm_destroy(void* impl) { session_close(as_session(impl)); }
 
+rac_result_t qhexrt_llm_get_stream_token_counts(void* impl, rac_llm_token_counts_t* out) {
+    if (out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    auto* c = as_session(impl);
+    if (c == nullptr) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    out->prompt_tokens = c->last_stream_prompt_tokens;
+    out->completion_tokens = c->last_stream_completion_tokens;
+    return RAC_SUCCESS;
+}
+
 }  // namespace
 
 // Consumed by rac_plugin_entry_qhexrt.cpp (external linkage; visibility limited
@@ -400,4 +421,5 @@ extern "C" const rac_llm_service_ops_t g_qhexrt_llm_ops = {
     /* .generate_from_context = */ nullptr,
     /* .clear_context         = */ nullptr,
     /* .create                = */ qhexrt_llm_create,
+    .get_stream_token_counts = qhexrt_llm_get_stream_token_counts,
 };

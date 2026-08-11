@@ -276,6 +276,7 @@ class PortableNvidiaE2ETest {
             val text = StringBuilder()
             var promptTokens = 0
             var completionTokens = 0
+            var decodeTokensPerSecond = 0.0
             val inferStarted = System.currentTimeMillis()
             withTimeout(900_000) {
                 RunAnywhere.generateStream(prompt, options).collect { event ->
@@ -286,6 +287,7 @@ class PortableNvidiaE2ETest {
                         event.result?.let {
                             promptTokens = it.usage?.input_tokens ?: 0
                             completionTokens = it.usage?.output_tokens ?: 0
+                            decodeTokensPerSecond = it.usage?.decode_tokens_per_second ?: 0.0
                         }
                     }
                 }
@@ -295,8 +297,10 @@ class PortableNvidiaE2ETest {
             fields["inferMs"] = inferMs.toString()
             fields["promptTokens"] = promptTokens.toString()
             fields["completionTokens"] = completionTokens.toString()
-            if (completionTokens > 0) {
-                fields["tokensPerSecond"] = String.format("%.2f", completionTokens * 1000.0 / inferMs)
+            // TokenUsage.decode_tokens_per_second owns throughput; do not invent
+            // completionTokens*1000/inferMs in the harness.
+            if (decodeTokensPerSecond > 0.0) {
+                fields["tokensPerSecond"] = String.format("%.2f", decodeTokensPerSecond)
             }
             val out = text.toString().trim().replace('\n', ' ')
             fields["output"] = out.take(600)

@@ -122,9 +122,9 @@ data class ShareCardData(
         }
 
         private fun BenchmarkResult.charsPerSecond(): Double? {
-            val chars = metrics.charactersProcessed ?: return null
-            val seconds = metrics.endToEndLatencyMs / 1000.0
-            return if (seconds > 0) chars / seconds else null
+            // No commons chars/s field on TTS results. Do not invent
+            // charactersProcessed / wall-latency in the example app.
+            return null
         }
 
         private fun BenchmarkResult.toRow(): ShareCardRow {

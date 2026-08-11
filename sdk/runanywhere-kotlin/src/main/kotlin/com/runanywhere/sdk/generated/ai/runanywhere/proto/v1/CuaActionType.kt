@@ -50,8 +50,8 @@ public enum class CuaActionType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<CuaActionType> = object : EnumAdapter<CuaActionType>(
-      CuaActionType::class, 
-      PROTO_3, 
+      CuaActionType::class,
+      PROTO_3,
       CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): CuaActionType? = CuaActionType.fromValue(`value`)

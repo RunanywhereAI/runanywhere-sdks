@@ -213,13 +213,6 @@ export class STTProtoAdapter {
         )
       )),
       (event) => event.isFinal,
-      undefined,
-      // Swift parity (ModalityProtoABI+Generated.swift:394-398): terminal
-      // final partial instead of rejecting the iterator.
-      (rc) => STTPartialResult.fromPartial({
-        isFinal: true,
-        text: `STT stream failed: ${rc}`,
-      }),
     );
   }
 
@@ -240,7 +233,6 @@ function lifecycleRequest(
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate,
       channels: 1,
-      durationMs: Math.round((audioData.byteLength / 2 / sampleRate) * 1000),
     },
     options,
   });

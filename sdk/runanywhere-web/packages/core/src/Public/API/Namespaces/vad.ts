@@ -7,6 +7,7 @@ import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
 import { detectVoice, streamVoiceActivity } from '../../Extensions/RunAnywhere+VAD.js';
+import { pcm16ToFloat32 } from '../../Extensions/RunAnywhere+AudioConvert.js';
 import { audioInputToFloat32, type AudioFormatSpec, type AudioFrame, type AudioInput } from '../Inputs.js';
 import type { VadOptions } from '../Options.js';
 import type { VadEvent } from '../Events.js';
@@ -40,11 +41,7 @@ function frameToFloat32(frame: AudioFrame, format: AudioFormatSpec): Float32Arra
     for (let i = 0; i < count; i += 1) out[i] = view.getFloat32(i * 4, true);
     return out;
   }
-  const count = Math.floor(frame.samples.byteLength / 2);
-  const view = new DataView(frame.samples.buffer, frame.samples.byteOffset, count * 2);
-  const out = new Float32Array(count);
-  for (let i = 0; i < count; i += 1) out[i] = view.getInt16(i * 2, true) / 0x8000;
-  return out;
+  return pcm16ToFloat32(frame.samples);
 }
 
 /**

@@ -18,6 +18,8 @@ import type {
 } from '@runanywhere/proto-ts/events/public_events';
 import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 
+export type { TokenUsage };
+
 import { SDKException, asSDKException } from '../errors';
 
 /**
@@ -51,6 +53,8 @@ export const FinishReason = {
   LENGTH: 'LENGTH',
   TOOL_CALLS: 'TOOL_CALLS',
   CANCELLED: 'CANCELLED',
+  ERROR: 'ERROR',
+  UNKNOWN: 'UNKNOWN',
 } as const;
 export type FinishReason = (typeof FinishReason)[keyof typeof FinishReason];
 
@@ -341,11 +345,24 @@ export type ToolExecutor = (
 // Results
 // ---------------------------------------------------------------------------
 
-/** Throughput and token accounting carried by every generation result. */
+/**
+ * Throughput and token accounting carried by every generation result.
+ *
+ * `usage` is the complete commons {@link TokenUsage} (input/output/total,
+ * decode TPS, prefill, TTFT, first-content latency, content TPS,
+ * batchBuffered, countsEstimated). Flat fields are convenience projections of
+ * that message — never a second source of truth.
+ */
 export interface GenerationMetrics {
+  /** Complete commons token accounting; the stream `usage` event copies this. */
+  usage: TokenUsage;
+  /** `usage.inputTokens` */
   inputTokens: number;
+  /** `usage.outputTokens` */
   outputTokens: number;
+  /** `usage.ttftMs` */
   timeToFirstTokenMs: number;
+  /** `usage.decodeTokensPerSecond` */
   tokensPerSecond: number;
   requestId: string;
   model: string;

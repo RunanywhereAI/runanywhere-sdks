@@ -20,6 +20,7 @@ import {
 } from '@runanywhere/proto-ts/vlm_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
+import { toPublicGenerationMetrics } from './llm-abi';
 import { invokeProto } from './proto-abi';
 import { requireOneOf } from './types';
 import type { GenerationMetrics, ImageInput } from './types';
@@ -114,21 +115,13 @@ export function toPublicVlmFinishReason(reason: string): 'STOP' | 'LENGTH' | 'CA
   return 'STOP';
 }
 
-/** Throughput and token accounting, straight out of the result. */
+/** Throughput and token accounting, straight out of the VLM result. */
 export function toPublicVlmMetrics(
   result: VLMResult,
   requestId: string,
   model: string
 ): GenerationMetrics {
-  const usage = result.usage;
-  return {
-    inputTokens: usage?.inputTokens ?? 0,
-    outputTokens: usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: usage?.ttftMs ?? 0,
-    tokensPerSecond: usage?.decodeTokensPerSecond ?? 0,
-    requestId,
-    model,
-  };
+  return toPublicGenerationMetrics(result.usage, requestId, model);
 }
 
 function orThrow<T extends { error?: { message?: string } | undefined }>(result: T): T {

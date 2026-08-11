@@ -26,11 +26,26 @@ import type {
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter.js';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 
 const logger = new SDKLogger('Embeddings');
 let activeEmbedding: { modelID: string; framework?: InferenceFramework } | null = null;
+
+interface EmbeddingsMathModule extends EmscriptenRunanywhereModule {
+  _rac_embeddings_norm?(vectorPtr: number, dimension: number, outNormPtr: number): number;
+  _rac_embeddings_similarity?(
+    lhsPtr: number,
+    lhsDimension: number,
+    rhsPtr: number,
+    rhsDimension: number,
+    outSimilarityPtr: number,
+  ): number;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -209,45 +224,111 @@ function currentModelID(): string | null {
 
 // ---------------------------------------------------------------------------
 // EmbeddingVector helpers — Swift parity: EmbeddingsProto+Helpers.swift
+// Norm / cosine similarity are owned by commons
+// (`rac_embeddings_norm` / `rac_embeddings_similarity`) via WASM.
 // ---------------------------------------------------------------------------
 
-function l2Norm(values: number[]): number {
-  let sumSquares = 0;
-  for (const value of values) sumSquares += value * value;
-  return Math.sqrt(sumSquares);
+function requireEmbeddingsMathModule(): EmbeddingsMathModule {
+  const module = (getModuleForCapability('embedding') ??
+    getModuleForCapability('commons') ??
+    getModuleForCapability('llm')) as EmbeddingsMathModule | null;
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      'Embeddings',
+      'No WASM module exporting rac_embeddings_* is registered. Call RunAnywhere.initialize() first.',
+    );
+  }
+  return module;
+}
+
+function floatValuesToOwnedBytes(values: number[]): Uint8Array {
+  const floats = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i += 1) floats[i] = values[i]!;
+  const owned = new Uint8Array(floats.byteLength);
+  owned.set(new Uint8Array(floats.buffer, floats.byteOffset, floats.byteLength));
+  return owned;
+}
+
+function allocCopy(module: EmbeddingsMathModule, bytes: Uint8Array): number {
+  const ptr = module._malloc(bytes.byteLength || 1);
+  if (!ptr) throw SDKException.processingFailed('Failed to allocate WASM embedding buffer.');
+  if (bytes.byteLength > 0) module.HEAPU8.set(bytes, ptr);
+  return ptr;
+}
+
+function readFloatOut(
+  module: EmbeddingsMathModule,
+  fnName: string,
+  invoke: (outPtr: number) => number,
+): number {
+  const outPtr = module._malloc(4);
+  try {
+    if (!outPtr) throw SDKException.processingFailed(`Failed to allocate ${fnName} output.`);
+    const rc = invoke(outPtr);
+    if (rc !== 0) {
+      throw SDKException.processingFailed(`${fnName} failed (${rc}).`);
+    }
+    return module.getValue(outPtr, 'float');
+  } finally {
+    if (outPtr) module._free(outPtr);
+  }
 }
 
 /**
- * Cosine similarity between two embedding vectors. `EmbeddingVector` carries
- * no precomputed norm on the wire, so both L2 norms are always recomputed.
- * Returns 0 for mismatched/empty vectors or zero norms.
+ * Cosine similarity between two embedding vectors via
+ * `rac_embeddings_similarity`. Returns 0 for mismatched/empty vectors or
+ * zero norms (commons contract).
  * Swift parity: `RAEmbeddingVector.cosineSimilarity(with:)`
- * (EmbeddingsProto+Helpers.swift:18).
  */
 export function embeddingCosineSimilarity(a: EmbeddingVector, b: EmbeddingVector): number {
-  if (a.values.length !== b.values.length || a.values.length === 0) return 0;
-  let dot = 0;
-  for (let i = 0; i < a.values.length; i += 1) dot += a.values[i]! * b.values[i]!;
-  const aNorm = l2Norm(a.values);
-  const bNorm = l2Norm(b.values);
-  if (aNorm <= 0 || bNorm <= 0) return 0;
-  return dot / (aNorm * bNorm);
+  const module = requireEmbeddingsMathModule();
+  if (typeof module._rac_embeddings_similarity !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'Embeddings',
+      'WASM build missing _rac_embeddings_similarity.',
+    );
+  }
+  const lhsBytes = floatValuesToOwnedBytes(a.values);
+  const rhsBytes = floatValuesToOwnedBytes(b.values);
+  const lhsPtr = allocCopy(module, lhsBytes);
+  const rhsPtr = allocCopy(module, rhsBytes);
+  try {
+    return readFloatOut(module, 'rac_embeddings_similarity', (outPtr) => (
+      module._rac_embeddings_similarity!(
+        lhsPtr,
+        a.values.length,
+        rhsPtr,
+        b.values.length,
+        outPtr,
+      )
+    ));
+  } finally {
+    module._free(lhsPtr);
+    module._free(rhsPtr);
+  }
 }
 
 /**
- * L2 norm of the vector's values.
- * Swift parity: `RAEmbeddingVector.computeNorm()` (EmbeddingsProto+Helpers.swift:28).
+ * L2 norm of the vector's values via `rac_embeddings_norm`.
+ * Swift parity: `RAEmbeddingVector.computeNorm()`
  */
 export function embeddingComputeNorm(vector: EmbeddingVector): number {
-  return l2Norm(vector.values);
-}
-
-/**
- * Processing time in seconds (from `processingTimeMs`).
- * Swift parity: `RAEmbeddingsResult.processingTime` (EmbeddingsProto+Helpers.swift:40).
- */
-export function embeddingsResultProcessingTime(result: EmbeddingsResult): number {
-  return result.processingTimeMs / 1000;
+  const module = requireEmbeddingsMathModule();
+  if (typeof module._rac_embeddings_norm !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'Embeddings',
+      'WASM build missing _rac_embeddings_norm.',
+    );
+  }
+  const bytes = floatValuesToOwnedBytes(vector.values);
+  const vectorPtr = allocCopy(module, bytes);
+  try {
+    return readFloatOut(module, 'rac_embeddings_norm', (outPtr) => (
+      module._rac_embeddings_norm!(vectorPtr, vector.values.length, outPtr)
+    ));
+  } finally {
+    module._free(vectorPtr);
+  }
 }
 
 // ---------------------------------------------------------------------------

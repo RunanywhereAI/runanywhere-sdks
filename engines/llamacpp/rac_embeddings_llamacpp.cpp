@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -558,7 +559,7 @@ rac_result_t llamacpp_embeddings_create(const char* model_id, const char* /*conf
 
 }  // namespace
 
-extern "C" const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops = {
+extern "C" RAC_LLAMACPP_API const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops = {
     .initialize = llamacpp_embeddings_initialize,
     .embed = llamacpp_embeddings_embed,
     .embed_batch = llamacpp_embeddings_embed_batch,

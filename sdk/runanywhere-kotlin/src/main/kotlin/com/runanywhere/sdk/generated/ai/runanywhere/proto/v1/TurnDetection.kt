@@ -162,11 +162,11 @@ public class TurnDetection(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TurnDetection> = object : ProtoAdapter<TurnDetection>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      TurnDetection::class, 
-      "type.googleapis.com/runanywhere.v1.TurnDetection", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      TurnDetection::class,
+      "type.googleapis.com/runanywhere.v1.TurnDetection",
+      PROTO_3,
+      null,
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: TurnDetection): Int {
@@ -285,8 +285,8 @@ public class TurnDetection(
     public companion object {
       @JvmField
       public val ADAPTER: ProtoAdapter<Type> = object : EnumAdapter<Type>(
-        Type::class, 
-        PROTO_3, 
+        Type::class,
+        PROTO_3,
         Type.TURN_DETECTION_TYPE_UNSPECIFIED
       ) {
         override fun fromValue(`value`: Int): Type? = Type.fromValue(`value`)

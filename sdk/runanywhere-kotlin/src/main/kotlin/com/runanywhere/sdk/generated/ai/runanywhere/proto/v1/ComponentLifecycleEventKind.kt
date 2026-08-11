@@ -53,8 +53,8 @@ public enum class ComponentLifecycleEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentLifecycleEventKind> =
         object : EnumAdapter<ComponentLifecycleEventKind>(
-      ComponentLifecycleEventKind::class, 
-      PROTO_3, 
+      ComponentLifecycleEventKind::class,
+      PROTO_3,
       ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ComponentLifecycleEventKind? = ComponentLifecycleEventKind.fromValue(`value`)

@@ -59,8 +59,15 @@ def get_manager(request: Request) -> ModelManager:
 
 
 # --------------------------------------------------------------------------- generic helpers
-def _approx_tokens(text: str) -> int:
-    return max(1, len(text) // 4)  # rough; the bridge reports no prompt-token count
+def _token_usage(*, input_tokens: int = 0, output_tokens: int = 0) -> dict:
+    """OpenAI usage block from commons/engine TokenUsage fields (0 if absent)."""
+    prompt = int(input_tokens or 0)
+    completion = int(output_tokens or 0)
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": prompt + completion,
+    }
 
 
 def _gen_opts(req: Any, model: str) -> LlmOptions:
@@ -145,20 +152,21 @@ def _error_line(exc: Exception) -> str:
 
 
 def _chat_completion(
-    cid: str, model: str, message: dict, finish: str, prompt: str, completion: str
+    cid: str,
+    model: str,
+    message: dict,
+    finish: str,
+    *,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
 ) -> dict:
-    prompt_tokens, completion_tokens = _approx_tokens(prompt), _approx_tokens(completion)
     return {
         "id": cid,
         "object": "chat.completion",
         "created": int(time.time()),
         "model": model,
         "choices": [{"index": 0, "message": message, "finish_reason": finish}],
-        "usage": {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens,
-        },
+        "usage": _token_usage(input_tokens=input_tokens, output_tokens=output_tokens),
     }
 
 
@@ -651,7 +659,12 @@ def create_app(
         async with lock:
             result = await ra.llm.agenerate(prompt, options)
         return _chat_completion(
-            cid, model, {"role": "assistant", "content": result.text}, "stop", prompt, result.text
+            cid,
+            model,
+            {"role": "assistant", "content": result.text},
+            "stop",
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
         )
 
     async def _handle_tools(lock, prompt, options, req, cid, model):
@@ -660,15 +673,21 @@ def create_app(
         if result.tool_calls:
             message = _tool_calls_message(result.tool_calls)
             finish = "tool_calls"
-            completion = json.dumps([call.arguments for call in result.tool_calls])
         else:
             message = {"role": "assistant", "content": result.text}
-            finish, completion = "stop", result.text
+            finish = "stop"
         if req.stream:
             return StreamingResponse(
                 _final_sse(cid, model, message, finish), media_type="text/event-stream"
             )
-        return _chat_completion(cid, model, message, finish, prompt, completion)
+        return _chat_completion(
+            cid,
+            model,
+            message,
+            finish,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+        )
 
     async def _handle_vision(mgr, req, image_ref, cid):
         prompt = _last_user_text(req.messages) or "Describe the image."
@@ -706,7 +725,12 @@ def create_app(
             if is_temp:
                 _safe_unlink(path)
         return _chat_completion(
-            cid, model, {"role": "assistant", "content": result.text}, "stop", prompt, result.text
+            cid,
+            model,
+            {"role": "assistant", "content": result.text},
+            "stop",
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
         )
 
     # -- completions (legacy) ----------------------------------------------
@@ -726,15 +750,13 @@ def create_app(
             )
         async with lock:
             result = await ra.llm.agenerate(prompt, options)
-        prompt_tokens, completion_tokens = _approx_tokens(prompt), _approx_tokens(result.text)
         return {
             "id": cid, "object": "text_completion", "created": int(time.time()), "model": model,
             "choices": [{"index": 0, "text": result.text, "finish_reason": "stop", "logprobs": None}],
-            "usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": prompt_tokens + completion_tokens,
-            },
+            "usage": _token_usage(
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+            ),
         }
 
     # -- embeddings ---------------------------------------------------------
@@ -760,9 +782,10 @@ def create_app(
             }
             for vector in vectors
         ]
-        total = sum(_approx_tokens(text) for text in inputs)
+        total = 0
         return {
             "object": "list", "data": data, "model": model,
+            # Embeddings have no TokenUsage on this path — report 0, never chars/4.
             "usage": {"prompt_tokens": total, "total_tokens": total},
         }
 

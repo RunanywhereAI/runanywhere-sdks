@@ -161,6 +161,13 @@ typedef struct rac_mlx_callbacks {
     void* user_data;
 } rac_mlx_callbacks_t;
 
+/**
+ * Record true prompt/completion counts for the active MLX stream on this
+ * thread. Called from Swift after generateStream finishes; read by
+ * get_stream_token_counts. No-op when no stream is active on the calling thread.
+ */
+RAC_API void rac_mlx_note_stream_token_counts(int32_t prompt_tokens, int32_t completion_tokens);
+
 RAC_API rac_result_t rac_mlx_set_callbacks(const rac_mlx_callbacks_t* callbacks);
 RAC_API rac_bool_t rac_mlx_is_available(void);
 

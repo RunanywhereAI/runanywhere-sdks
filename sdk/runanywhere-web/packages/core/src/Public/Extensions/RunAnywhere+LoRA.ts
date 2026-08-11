@@ -154,7 +154,9 @@ export async function applyLoraCatalogAdapter(
       {
         adapterPath,
         adapterId: entry.id,
-        scale: options.scale ?? ((entry.defaultScale ?? 0) > 0 ? entry.defaultScale : 1.0),
+        // Leave unset when omitted so commons resolve_effective_lora_scale
+        // owns catalog (including 0.0) → 1.0.
+        ...(options.scale !== undefined ? { scale: options.scale } : {}),
       },
     ],
     keepExisting: !replaceExisting,

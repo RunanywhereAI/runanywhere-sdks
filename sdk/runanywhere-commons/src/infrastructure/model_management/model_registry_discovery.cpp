@@ -287,7 +287,8 @@ bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
         free(model->local_path);
     }
     model->local_path = rac_strdup(folder_str.c_str());
-    model->updated_at = rac_get_current_time_ms() / 1000;
+    // Proto ModelInfo.updated_at_unix_ms — milliseconds, not seconds.
+    model->updated_at = rac_get_current_time_ms();
 
     // Update proto snapshot
     ModelInfo snapshot = model_snapshot_locked(handle, model_id, model);

@@ -278,6 +278,16 @@ export interface RaBackend {
   downloadProgress(requestBytes: Uint8Array): Promise<Uint8Array>;
   /** Purge terminal task slots; resolves the number commons erased. */
   downloadCleanup(): Promise<number>;
+  /**
+   * Sync `rac_download_progress_percent`. NativeBackend calls the C ABI;
+   * RpcBackend forwards to the utility host (Promise) so bytes-ratio policy
+   * is never re-derived in the renderer.
+   */
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number | Promise<number>;
   downloadWatch(onProgress: (progressBytes: Uint8Array) => void): Promise<void>;
   downloadUnwatch(): Promise<void>;
 
@@ -410,6 +420,13 @@ export interface RaBackend {
   vadProcess(samples: Float32Array): Promise<boolean>;
   vadReset(): Promise<void>;
   vadClose(): Promise<void>;
+  /** Register SPEECH_ACTIVITY stream callback (sync on native; RPC may await). */
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): void | Promise<void>;
+  vadUnsetStreamCallback(): Promise<void>;
+  vadStreamStart(optionsBytes: Uint8Array): Promise<number>;
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void>;
+  vadStreamStop(sessionId: number): Promise<void>;
+  vadStreamCancel(sessionId: number): Promise<void>;
 
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
   //
@@ -424,6 +441,36 @@ export interface RaBackend {
   // ---- embeddings and rerank ----
   embed(texts: string[], options: NativeEmbedOptions): Promise<Float32Array[]>;
   rerank(query: string, documents: string[], topN?: number): Promise<NativeRanked[]>;
+
+  /**
+   * Sync commons vector math (`rac_embeddings_norm` / `rac_embeddings_similarity`)
+   * owned by the process that holds the native addon. Always Promise-shaped so
+   * the preload can RPC them; NativeBackend resolves immediately.
+   */
+  embeddingsNorm(vector: Float32Array): Promise<number>;
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): Promise<number>;
+
+  /**
+   * Sync commons audio DSP (`rac_audio_*`) owned by the process that holds the
+   * native addon. Preload/renderer must reach these over RPC — never by loading
+   * `runanywhere_native.node` in the renderer.
+   */
+  audioFloat32ToPcm16(samples: Float32Array): Promise<Int16Array>;
+  audioPcm16ToFloat32(samples: Int16Array): Promise<Float32Array>;
+  audioResampleF32(
+    samples: Float32Array,
+    inRate: number,
+    outRate: number
+  ): Promise<Float32Array>;
+  audioComputeRms(samples: Float32Array): Promise<number>;
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array>;
+  audioWavToFloat32(
+    bytes: Uint8Array
+  ): Promise<{ sampleRate: number; samples: Float32Array }>;
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): Promise<number>;
 
   // ---- diarization and segmentation ----
   diarize(samples: Float32Array, options: NativeDiarizationOptions): Promise<NativeDiarization>;
@@ -532,6 +579,7 @@ export const BACKEND_STREAMING_METHODS: ReadonlySet<string> = new Set([
   'voiceProcessTurn',
   'ragQueryStream',
   'downloadWatch',
+  'vadSetStreamCallback',
   'loggingWatch',
 ]);
 
@@ -562,6 +610,7 @@ export const BACKEND_METHODS: readonly string[] = [
   'downloadCancel',
   'downloadProgress',
   'downloadCleanup',
+  'downloadProgressPercent',
   'downloadWatch',
   'downloadUnwatch',
   'storageInfoProto',
@@ -648,8 +697,23 @@ export const BACKEND_METHODS: readonly string[] = [
   'vadProcess',
   'vadReset',
   'vadClose',
+  'vadSetStreamCallback',
+  'vadUnsetStreamCallback',
+  'vadStreamStart',
+  'vadStreamFeed',
+  'vadStreamStop',
+  'vadStreamCancel',
   'embed',
   'rerank',
+  'embeddingsNorm',
+  'embeddingsSimilarity',
+  'audioFloat32ToPcm16',
+  'audioPcm16ToFloat32',
+  'audioResampleF32',
+  'audioComputeRms',
+  'audioFloat32ToWav',
+  'audioWavToFloat32',
+  'audioPcmBytesToMs',
   'diarize',
   'segment',
   'embedBatchProto',

@@ -7,20 +7,18 @@
  *   - Per-handle CallbackSlot registry guarded by a mutex.
  *   - Session map indexed by monotonically-increasing 64-bit ids.
  *
- * MVP scope:
- *   - Callback registration and session create/stop/cancel are fully wired.
- *   - feed_audio_proto forwards Int16 mono PCM bytes to
- *     rac_vad_component_process(), then dispatches a
- *     VAD_STREAM_EVENT_KIND_FRAME event with a VADResult payload via
- *     dispatch_vad_stream_event(). Energy is the RMS of the converted
- *     samples; speech-activity transitions continue to flow through the
- *     existing per-handle proto activity callback registered separately.
+ * feed_audio_proto forwards Int16 mono PCM bytes to
+ * rac_vad_component_process(), dispatches a VAD_STREAM_EVENT_KIND_FRAME
+ * result, and applies the session's VADOptions timing policy to the detector
+ * verdict. Confirmed onset/offset transitions are emitted as complete
+ * SpeechActivityEvent payloads on the same stream callback.
  */
 
 #include "rac/features/vad/rac_vad_stream.h"
 
 #include "vad_threshold_registry.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -34,9 +32,10 @@
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "rac/foundation/rac_proto_adapters.h"
+#include "rac/rac_defaults_generated.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "vad_options.pb.h"
@@ -71,7 +70,7 @@ struct StreamSession {
     rac_handle_t handle = nullptr;
     std::string request_id;
     std::atomic<bool> is_cancelled{false};
-    int32_t sample_rate = 16000;
+    int32_t sample_rate = RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE;
     // Per-session VAD threshold override
     // captured from VADOptions.threshold (0.0f = no override → use the
     // component's configured threshold). Applied per-frame in
@@ -79,6 +78,26 @@ struct StreamSession {
     // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041), so
     // streaming and one-shot proto callers honor the same per-call threshold.
     float threshold_override = 0.0f;
+    // Session-owned endpointing policy. The detector supplies one speech
+    // verdict per fed frame; these fields turn that verdict into stable
+    // utterance boundaries without asking each SDK to rebuild the state
+    // machine.
+    int32_t min_speech_ms = RAC_DEFAULT_VAD_OPTIONS_MIN_SPEECH_DURATION_MS;
+    int32_t min_silence_ms = RAC_DEFAULT_VAD_OPTIONS_MIN_SILENCE_DURATION_MS;
+    int32_t max_speech_ms = 0;
+    int32_t prefix_padding_ms = RAC_DEFAULT_VAD_OPTIONS_PREFIX_PADDING_MS;
+    uint64_t audio_samples = 0;
+    uint64_t next_segment = 1;
+    bool segment_candidate = false;
+    bool onset_emitted = false;
+    int32_t speech_ms = 0;
+    int32_t silence_ms = 0;
+    int64_t candidate_start_ms = 0;
+    int64_t segment_start_ms = 0;
+    std::string segment_id;
+    // Serialize feeds for one session while still allowing different sessions
+    // on the same component to make progress independently.
+    std::shared_ptr<std::recursive_mutex> feed_mutex = std::make_shared<std::recursive_mutex>();
 };
 
 std::mutex& g_mu() {
@@ -107,6 +126,105 @@ int64_t now_us() {
                std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
+
+struct EndpointingOutcome {
+    std::vector<runanywhere::v1::SpeechActivityEvent> events;
+};
+
+int32_t positive_or_default(int32_t value, int32_t default_value) {
+    return value > 0 ? value : default_value;
+}
+
+int64_t audio_position_ms(const StreamSession& session) {
+    if (session.sample_rate <= 0) {
+        return 0;
+    }
+    return static_cast<int64_t>(session.audio_samples * 1000U /
+                                static_cast<uint64_t>(session.sample_rate));
+}
+
+std::string next_segment_id(StreamSession& session) {
+    return session.request_id + "-segment-" + std::to_string(session.next_segment++);
+}
+
+void reset_endpoint_candidate(StreamSession& session) {
+    session.segment_candidate = false;
+    session.onset_emitted = false;
+    session.speech_ms = 0;
+    session.silence_ms = 0;
+    session.candidate_start_ms = 0;
+    session.segment_start_ms = 0;
+    session.segment_id.clear();
+}
+
+runanywhere::v1::SpeechActivityEvent make_activity_event(const StreamSession& session,
+                                                         runanywhere::v1::SpeechActivityKind kind,
+                                                         int64_t audio_end_ms) {
+    runanywhere::v1::SpeechActivityEvent event;
+    event.set_event_type(kind);
+    event.set_timestamp_ms(rac_get_current_time_ms());
+    event.set_audio_start_ms(session.segment_start_ms);
+    event.set_audio_end_ms(audio_end_ms);
+    event.set_segment_id(session.segment_id);
+    return event;
+}
+
+EndpointingOutcome update_endpointing(StreamSession& session, bool is_speech, size_t sample_count) {
+    const int64_t frame_start_ms = audio_position_ms(session);
+    session.audio_samples += sample_count;
+    const int64_t frame_end_ms = audio_position_ms(session);
+    const int32_t frame_ms = static_cast<int32_t>(frame_end_ms - frame_start_ms);
+
+    EndpointingOutcome outcome;
+    if (!session.segment_candidate) {
+        if (!is_speech) {
+            return outcome;
+        }
+        session.segment_candidate = true;
+        session.candidate_start_ms = frame_start_ms;
+        session.segment_start_ms = std::max<int64_t>(0, frame_start_ms - session.prefix_padding_ms);
+        session.segment_id = next_segment_id(session);
+    }
+
+    if (is_speech) {
+        session.speech_ms += frame_ms;
+        session.silence_ms = 0;
+    } else {
+        session.silence_ms += frame_ms;
+    }
+
+    if (!session.onset_emitted && session.speech_ms >= session.min_speech_ms) {
+        session.onset_emitted = true;
+        outcome.events.push_back(
+            make_activity_event(session, runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED, 0));
+    }
+
+    const bool reached_hangover = session.silence_ms >= session.min_silence_ms;
+    const bool reached_duration_cap =
+        session.max_speech_ms > 0 &&
+        frame_end_ms - session.candidate_start_ms >= session.max_speech_ms;
+    if (!reached_hangover && !reached_duration_cap) {
+        return outcome;
+    }
+
+    if (session.onset_emitted) {
+        outcome.events.push_back(make_activity_event(
+            session, runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_ENDED, frame_end_ms));
+    }
+    reset_endpoint_candidate(session);
+    return outcome;
+}
+
+EndpointingOutcome finish_endpointing(StreamSession& session) {
+    EndpointingOutcome outcome;
+    if (session.segment_candidate && session.onset_emitted) {
+        outcome.events.push_back(
+            make_activity_event(session, runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_ENDED,
+                                audio_position_ms(session)));
+    }
+    reset_endpoint_candidate(session);
+    return outcome;
+}
 #endif
 
 }  // namespace
@@ -125,7 +243,8 @@ namespace rac::vad {
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const char* error_message, int error_code, uint64_t session_id = 0);
+                               const char* error_message, int error_code, uint64_t session_id = 0,
+                               const std::string* request_id_override = nullptr);
 }  // namespace rac::vad
 #endif
 
@@ -193,17 +312,20 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.handle = handle;
         s.request_id = "vad-" + std::to_string(id);
         s.is_cancelled.store(false, std::memory_order_relaxed);
-        // VADOptions does not carry a sample rate today; default to 16 kHz
-        // which matches RAC_VAD_DEFAULT_SAMPLE_RATE / Silero / energy VAD.
-        s.sample_rate = 16000;
+        s.sample_rate =
+            positive_or_default(parsed.sample_rate(), RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE);
         // Capture the per-call energy threshold override (0.0f = use the
         // component's configured value).
-        // The min_speech_duration_ms / min_silence_duration_ms /
-        // max_speech_duration_ms / include_statistics fields on VADOptions
-        // are debounce gates owned by the VAD backend itself; the streaming
-        // ABI cannot retune the backend per session today, so they are
-        // intentionally not propagated.
-        s.threshold_override = parsed.activation_threshold() > 0.0f ? parsed.activation_threshold() : 0.0f;
+        s.threshold_override =
+            parsed.activation_threshold() > 0.0f ? parsed.activation_threshold() : 0.0f;
+        s.min_speech_ms = positive_or_default(parsed.min_speech_duration_ms(),
+                                              RAC_DEFAULT_VAD_OPTIONS_MIN_SPEECH_DURATION_MS);
+        s.min_silence_ms = positive_or_default(parsed.min_silence_duration_ms(),
+                                               RAC_DEFAULT_VAD_OPTIONS_MIN_SILENCE_DURATION_MS);
+        s.max_speech_ms =
+            parsed.has_max_speech_duration_ms() ? std::max(0, parsed.max_speech_duration_ms()) : 0;
+        s.prefix_padding_ms = positive_or_default(parsed.prefix_padding_ms(),
+                                                  RAC_DEFAULT_VAD_OPTIONS_PREFIX_PADDING_MS);
     }
     *out_session_id = id;
     return RAC_SUCCESS;
@@ -227,8 +349,10 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // The request_id is stamped onto the dispatched event by
     // dispatch_vad_stream_event() via its own session-table lookup.
     rac_handle_t component_handle = nullptr;
-    int32_t sample_rate = 16000;
+    int32_t sample_rate = RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE;
     float threshold_override = 0.0f;
+    std::shared_ptr<std::recursive_mutex> feed_mutex;
+    std::string request_id;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -240,12 +364,23 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         component_handle = it->second.handle;
         sample_rate = it->second.sample_rate;
         threshold_override = it->second.threshold_override;
+        feed_mutex = it->second.feed_mutex;
+        request_id = it->second.request_id;
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     if (audio_size == 0) {
         return RAC_SUCCESS;
+    }
+
+    std::unique_lock<std::recursive_mutex> feed_lock(*feed_mutex);
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        const auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end() || it->second.is_cancelled.load(std::memory_order_relaxed)) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
     }
 
     // Convert PCM Int16 mono -> float [-1.0, 1.0]. We accept only complete
@@ -313,10 +448,11 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         err_payload.set_timestamp_ms(rac_get_current_time_ms());
         rac::foundation::populate_sdk_error(err_payload.mutable_error(), rc);
         const char* msg = "VAD frame processing failed";
+        feed_lock.unlock();
         rac::vad::dispatch_vad_stream_event(component_handle,
                                             runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR,
                                             /*result=*/nullptr,
-                                            /*activity=*/nullptr, msg, rc, session_id);
+                                            /*activity=*/nullptr, msg, rc, session_id, &request_id);
         return rc;
     }
 
@@ -333,11 +469,28 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     payload.set_duration_ms(duration_ms);
     payload.set_timestamp_ms(rac_get_current_time_ms());
 
+    EndpointingOutcome endpointing;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end() || it->second.is_cancelled.load(std::memory_order_relaxed)) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        endpointing = update_endpointing(it->second, is_speech == RAC_TRUE, num_samples);
+    }
+    feed_lock.unlock();
+
     rac::vad::dispatch_vad_stream_event(component_handle,
                                         runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME, &payload,
                                         /*activity=*/nullptr,
                                         /*error_message=*/nullptr,
-                                        /*error_code=*/0, session_id);
+                                        /*error_code=*/0, session_id, &request_id);
+    for (const auto& activity : endpointing.events) {
+        rac::vad::dispatch_vad_stream_event(
+            component_handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+            /*result=*/nullptr, &activity, /*error_message=*/nullptr,
+            /*error_code=*/0, session_id, &request_id);
+    }
     return RAC_SUCCESS;
 #endif
 }
@@ -345,17 +498,60 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
 rac_result_t rac_vad_stream_stop_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lock(g_mu());
-    auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end())
-        return RAC_ERROR_INVALID_ARGUMENT;
-    g_sessions().erase(it);
+    std::shared_ptr<std::recursive_mutex> feed_mutex;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end())
+            return RAC_ERROR_INVALID_ARGUMENT;
+        feed_mutex = it->second.feed_mutex;
+    }
+
+#if defined(RAC_HAVE_PROTOBUF)
+    EndpointingOutcome endpointing;
+#endif
+    rac_handle_t component_handle = nullptr;
+    std::string request_id;
+    {
+        std::lock_guard<std::recursive_mutex> feed_lock(*feed_mutex);
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end())
+            return RAC_ERROR_INVALID_ARGUMENT;
+        it->second.is_cancelled.store(true, std::memory_order_relaxed);
+        component_handle = it->second.handle;
+        request_id = it->second.request_id;
+#if defined(RAC_HAVE_PROTOBUF)
+        endpointing = finish_endpointing(it->second);
+#endif
+        g_sessions().erase(it);
+    }
+#if defined(RAC_HAVE_PROTOBUF)
+    for (const auto& activity : endpointing.events) {
+        rac::vad::dispatch_vad_stream_event(
+            component_handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+            /*result=*/nullptr, &activity, /*error_message=*/nullptr,
+            /*error_code=*/0, session_id, &request_id);
+    }
+#else
+    (void)component_handle;
+    (void)request_id;
+#endif
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_vad_stream_cancel_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
+    std::shared_ptr<std::recursive_mutex> feed_mutex;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end())
+            return RAC_ERROR_INVALID_ARGUMENT;
+        feed_mutex = it->second.feed_mutex;
+    }
+    std::lock_guard<std::recursive_mutex> feed_lock(*feed_mutex);
     std::lock_guard<std::mutex> lock(g_mu());
     auto it = g_sessions().find(session_id);
     if (it == g_sessions().end())
@@ -382,14 +578,15 @@ namespace rac::vad {
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const char* error_message, int error_code, uint64_t session_id) {
+                               const char* error_message, int error_code, uint64_t session_id,
+                               const std::string* request_id_override) {
     // Hold the InFlightGuard across the whole
     // dispatch so rac_vad_proto_quiesce() can spin-wait on the counter
     // before user_data is freed by a concurrent teardown thread.
     VadInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq = 0;
-    std::string request_id;
+    std::string request_id = request_id_override ? *request_id_override : std::string();
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
@@ -434,9 +631,9 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
         *proto_event.mutable_activity() = *activity;
     }
     if (error_code != 0 || (error_message && error_message[0] != '\0')) {
-        rac::foundation::populate_sdk_error(
-            proto_event.mutable_error(),
-            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        rac::foundation::populate_sdk_error(proto_event.mutable_error(),
+                                            error_code != 0 ? static_cast<rac_result_t>(error_code)
+                                                            : RAC_ERROR_UNKNOWN);
         if (error_message && error_message[0] != '\0') {
             proto_event.mutable_error()->set_message(error_message);
         }

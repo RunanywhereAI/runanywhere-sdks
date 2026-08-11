@@ -40,8 +40,8 @@ import com.runanywhere.runanywhereai.ui.theme.primaryGreen
  * Collapsed by default. The four facts — model, chip, memory, NPU — explain a
  * recommendation but do not make one, and a reader who came to the picker to
  * choose a model does not need a spec sheet to do it. The summary line carries
- * the only part that changes their decision ("High-performance • NPU
- * accelerated"); the table stays one tap away for anyone who wants to know why.
+ * the only part that changes their decision (NPU presence, or "Capabilities
+ * unknown"); the table stays one tap away for anyone who wants to know why.
  */
 @Composable
 fun DeviceStatusCard(info: DeviceInfo, modifier: Modifier = Modifier) {

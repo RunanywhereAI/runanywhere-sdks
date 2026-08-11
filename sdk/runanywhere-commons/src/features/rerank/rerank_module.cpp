@@ -214,7 +214,8 @@ rac_result_t result_to_proto(const rac_rerank_result_t& source, size_t candidate
         // RerankScoredItem.id and .rank were both deleted: id echoed a
         // RerankCandidate.id that no longer exists (RerankCandidate is gone),
         // and rank always equalled this item's position in
-        // RerankResult.items (already sorted by score descending).
+        // RerankResult.items. Ordering is enforced at rac_rerank_rerank
+        // (stable_sort by score descending) before this copy.
         auto* destination = out->add_items();
         destination->set_relevance_score(item.score);
         destination->set_index(item.original_index);

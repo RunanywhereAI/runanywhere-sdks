@@ -20,6 +20,7 @@ public enum class FinishReason {
     TOOL_CALLS,
     CANCELLED,
     CONTENT_FILTER,
+    ERROR,
     UNKNOWN,
 }
 
@@ -174,6 +175,8 @@ public data class Match(
 public data class RagResult(
     val answer: String,
     val sources: List<Match>,
+    /** Commons-split reasoning channel (`RAGResult.thinking_content`); null when absent. */
+    val thinkingText: String? = null,
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
     val timeToFirstTokenMs: Long = 0L,

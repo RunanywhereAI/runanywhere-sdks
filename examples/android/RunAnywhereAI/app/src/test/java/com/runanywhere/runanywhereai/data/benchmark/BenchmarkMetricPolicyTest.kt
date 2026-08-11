@@ -25,22 +25,25 @@ class BenchmarkMetricPolicyTest {
 
         assertEquals(256, metrics.outputTokens)
         assertEquals(12.8, metrics.tokensPerSecond!!, 0.001)
-        assertEquals(20_000.0, metrics.decodeMs!!, 1.0)
-        assertEquals(500.0, metrics.promptEvalMs!!, 0.0001)
+        assertEquals(500.0, metrics.ttftMs!!, 0.0001)
+        // Prefill/decode phase durations are not on public GenerationResult —
+        // leave unset rather than inventing from TTFT or tokens÷rate.
+        assertNull(metrics.decodeMs)
+        assertNull(metrics.promptEvalMs)
         assertEquals(21_000.0, metrics.endToEndLatencyMs, 0.0001)
     }
 
     @Test
-    fun `throughput falls back to the measured wall clock when the backend omits it`() {
-        val metrics = llmBenchmarkMetrics(
-            result = GenerationResult(text = "hello", outputTokens = 256, tokensPerSecond = 0f),
-            loadTimeMs = 0.0,
-            warmupTimeMs = 0.0,
-            measuredEndToEndMs = 20_000.0,
-            memoryDeltaBytes = 0L,
-        )
-
-        assertEquals(12.8, metrics.tokensPerSecond!!, 0.0001)
+    fun `missing decode throughput fails rather than inventing wall tok-s`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            llmBenchmarkMetrics(
+                result = GenerationResult(text = "hello", outputTokens = 256, tokensPerSecond = 0f),
+                loadTimeMs = 0.0,
+                warmupTimeMs = 0.0,
+                measuredEndToEndMs = 20_000.0,
+                memoryDeltaBytes = 0L,
+            )
+        }
     }
 
     @Test

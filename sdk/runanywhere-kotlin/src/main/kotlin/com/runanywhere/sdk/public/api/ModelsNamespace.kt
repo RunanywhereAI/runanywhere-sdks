@@ -19,24 +19,26 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * [LoadOptions] fields the commons load ABI has no wire path for yet.
+ * [LoadOptions] fields the commons load ABI cannot honor.
  *
- * `ModelLoadRequest` only carries a framework pin; `contextLength`, `threads`,
- * and `accelerator` are accepted here for cross-SDK API parity but cannot be
- * honored until the native load ABI grows placement fields (tracked as a
- * follow-up — see PR #605 review follow-up issue 8). Per the v4 contract,
- * "every accepted field is implemented end to end or fails preflight" —
- * silently dropping them is forbidden, so [ModelsNamespace.load] throws
- * instead of warning.
+ * `threads` was retired from ModelLoadRequest (reserved tag 7) and never
+ * became a hard runtime guarantee. Other LoadOptions knobs (contextLength,
+ * accelerator, backend preferences) are carried by the native load path —
+ * rejecting them here was a false preflight.
  */
 internal fun LoadOptions?.unsupportedLoadKnobs(): List<String> =
     listOfNotNull(
-        "contextLength".takeIf { this?.contextLength != null },
         "threads".takeIf { this?.threads != null },
-        "accelerator".takeIf { this?.resolvedAccelerator != null },
-        "backendPreferences (only the first preference reaches commons; ordered fallback is not carried)"
-            .takeIf { (this?.resolvedBackendPreferences?.size ?: 0) > 1 },
     )
+
+/** Maps the public placement enum onto the wire [ai.runanywhere.proto.v1.AcceleratorPolicy]. */
+private fun AcceleratorPolicy.toProto(): ai.runanywhere.proto.v1.AcceleratorPolicy =
+    when (this) {
+        AcceleratorPolicy.AUTO -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_AUTO
+        AcceleratorPolicy.CPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_CPU
+        AcceleratorPolicy.GPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_GPU
+        AcceleratorPolicy.NPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_NPU
+    }
 
 private val LOADABLE_CATEGORIES =
     listOf(
@@ -167,7 +169,7 @@ public class ModelsNamespace internal constructor() {
                                     retryAttempt = progress.retry_attempt,
                                     overallProgress = progress.overall_progress.takeIf { it > 0f },
                                     currentFileIndex = progress.current_file_index,
-                                    totalFiles = progress.total_files.coerceAtLeast(1),
+                                    totalFiles = progress.total_files,
                                 ),
                             )
                     }
@@ -193,10 +195,9 @@ public class ModelsNamespace internal constructor() {
     /**
      * Make [id] resident now, downloading it first when its bytes are absent.
      *
-     * Only [LoadOptions.backendPreferences]'s first entry (equivalently the
-     * deprecated `framework`) reaches commons today. `contextLength`,
-     * `threads`, and a real `accelerator` choice are not yet carried by the
-     * native load ABI, so passing them throws rather than being silently dropped.
+     * Placement knobs (`contextLength`, `accelerator`/`useGpu`,
+     * `backendPreferences`) are forwarded on [ModelLoadRequest] for commons to
+     * honor. `threads` was retired from the load ABI and still fails preflight.
      *
      * @throws SDKException when the model cannot be loaded, or when [options]
      *   sets a placement knob the load ABI cannot honor yet.
@@ -215,7 +216,8 @@ public class ModelsNamespace internal constructor() {
         if (registered.local_path.isEmpty()) {
             legacyDownloadModel(registered)
         }
-        val requestedBackend = options?.resolvedBackendPreferences?.firstOrNull()
+        val preferences = options?.resolvedBackendPreferences.orEmpty()
+        val requestedBackend = preferences.firstOrNull()
         val result =
             legacyLoadModel(
                 ModelLoadRequest(
@@ -224,6 +226,9 @@ public class ModelsNamespace internal constructor() {
                     framework = requestedBackend?.backend ?: registered.framework.takeIf { it.value != 0 },
                     force_reload = options?.forceReload ?: false,
                     validate_availability = true,
+                    context_length = options?.contextLength,
+                    backend_preferences = preferences.map { it.backend },
+                    accelerator_policy = options?.resolvedAccelerator?.toProto(),
                 ),
             )
         result.error?.let { throw SDKException(it) }

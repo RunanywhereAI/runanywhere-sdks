@@ -41,6 +41,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
@@ -3974,4 +3975,26 @@ rac_bool_t rac_download_requires_extraction(const char* download_url) {
 
     rac_archive_type_t type;
     return rac_archive_type_from_path(download_url, &type);
+}
+
+int32_t rac_download_progress_percent(float overall_progress, int64_t bytes_downloaded,
+                                      int64_t total_bytes) {
+    auto clamp_pct = [](double raw) -> int32_t {
+        if (raw < 0.0) {
+            return 0;
+        }
+        if (raw > 100.0) {
+            return 100;
+        }
+        return static_cast<int32_t>(std::lround(raw));
+    };
+
+    if (std::isfinite(overall_progress) && overall_progress >= 0.0f && overall_progress <= 1.0f) {
+        return clamp_pct(static_cast<double>(overall_progress) * 100.0);
+    }
+    if (total_bytes > 0 && bytes_downloaded >= 0) {
+        return clamp_pct(100.0 * static_cast<double>(bytes_downloaded) /
+                         static_cast<double>(total_bytes));
+    }
+    return 0;
 }

@@ -41,7 +41,7 @@ generate(request: LLMGenerateRequest): Promise<LLMGenerationResult>;
 generateStream(prompt: string, options?: LLMGenerationOptions): AsyncIterable<LLMStreamEvent>;
 generateStream(request: LLMGenerateRequest): AsyncIterable<LLMStreamEvent>;
 cancelGeneration(): Promise<void>;
-aggregateStream(prompt: string, iterable: AsyncIterable<LLMStreamEvent>, onToken?: (t: string) => void | Promise<void>): Promise<LLMGenerationResult>;
+// Collect llm.generateStream and read GenerationEvent.Completed — aggregateStream deleted (D3)
 
 // --- Structured output ---
 generateStructured<T>(prompt: string, schema: JSONSchema, options?: StructuredOutputOptions): Promise<StructuredOutputResult>;

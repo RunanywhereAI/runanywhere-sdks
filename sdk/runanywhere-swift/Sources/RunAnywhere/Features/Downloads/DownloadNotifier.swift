@@ -8,6 +8,7 @@
 
 import Foundation
 import UserNotifications
+import CRACommons
 
 actor DownloadNotifier {
     static let shared = DownloadNotifier()
@@ -27,7 +28,7 @@ actor DownloadNotifier {
     }
 
     func notifyProgress(modelID: String, fraction: Double) async {
-        let percent = max(0, min(100, Int(fraction * 100)))
+        let percent = Int(rac_download_progress_percent(Float(fraction), 0, 0))
         // Throttle to whole 5% steps so the delegate's per-chunk callbacks don't
         // flood the notification center.
         if let previous = lastPercent[modelID], abs(percent - previous) < 5, percent < 100 { return }

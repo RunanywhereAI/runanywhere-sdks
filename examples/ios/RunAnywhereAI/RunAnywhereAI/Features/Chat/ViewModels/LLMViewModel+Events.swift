@@ -91,44 +91,11 @@ extension LLMViewModel {
         }
     }
 
-    /// Decode generation-analytics signals (TTFT, completion metrics) from
-    /// the raw event bus.
+    /// Generation events no longer drive chat analytics — TTFT / tok/s come
+    /// from GenerationResult via buildMessageAnalytics.
     private func handleGenerationEvent(_ event: RASDKEvent) {
         guard event.category == .llm || event.component == .llm else { return }
-
-        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
-        let generationId = event.generation.sessionID.isEmpty ? event.operationID : event.generation.sessionID
-
-        switch event.generation.kind {
-        case .firstTokenGenerated:
-            // `firstTokenLatencyMs` was deleted outright (idl/sdk_events.proto):
-            // `timeToFirstTokenMs` ("Time to first token, whichever kind
-            // reports it.") is the single field for both FIRST_TOKEN_GENERATED
-            // and COMPLETED now.
-            let ttft = Double(event.generation.timeToFirstTokenMs)
-            handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
-
-        case .completed:
-            // `tokensUsed`/`latencyMs` were renamed `outputTokens`/`totalDurationMs`
-            // (idl/sdk_events.proto); `streamCompleted` was deleted outright —
-            // `.completed` is the single success terminal for both paths now.
-            let outputTokens = Int(event.generation.outputTokens)
-            let durationMs = Double(event.generation.totalDurationMs)
-            let tps = durationMs > 0 && outputTokens > 0
-                ? Double(outputTokens) / (durationMs / 1000.0)
-                : 0
-            handleGenerationCompleted(
-                generationId: generationId,
-                modelId: modelId,
-                inputTokens: Int(event.generation.inputTokens),
-                outputTokens: outputTokens,
-                durationMs: durationMs,
-                tokensPerSecond: tps
-            )
-
-        default:
-            break
-        }
+        _ = event
     }
 
     func handleModelLoadCompleted(modelId: String) {
@@ -154,32 +121,5 @@ extension LLMViewModel {
     func handleModelUnloaded(modelId: String) {
         updateModelLoadedState(isLoaded: false)
         clearLoadedModelInfo()
-    }
-
-    func handleFirstToken(generationId: String, timeToFirstTokenMs: Double) {
-        recordFirstTokenLatency(generationId: generationId, latency: timeToFirstTokenMs)
-    }
-
-    // swiftlint:disable:next function_parameter_count
-    func handleGenerationCompleted(
-        generationId: String,
-        modelId: String,
-        inputTokens: Int,
-        outputTokens: Int,
-        durationMs: Double,
-        tokensPerSecond: Double
-    ) {
-        let ttft = getFirstTokenLatency(for: generationId)
-        let metrics = GenerationMetricsFromSDK(
-            generationId: generationId,
-            modelId: modelId,
-            inputTokens: inputTokens,
-            outputTokens: outputTokens,
-            durationMs: durationMs,
-            tokensPerSecond: tokensPerSecond,
-            timeToFirstTokenMs: ttft
-        )
-        recordGenerationMetrics(generationId: generationId, metrics: metrics)
-        cleanupOldMetricsIfNeeded()
     }
 }

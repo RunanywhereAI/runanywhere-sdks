@@ -105,6 +105,16 @@ export interface NativeAddon {
     recentMax?: number;
   };
   unloadVad(handle: number): Promise<void>;
+  /**
+   * Register a SPEECH_ACTIVITY/FRAME callback for a VAD handle. Sync — the
+   * callback is live before this returns. Cleared by {@link vadUnsetStreamCallback}.
+   */
+  vadSetStreamCallback(handle: number, onEvent: (eventBytes: Uint8Array) => void): void;
+  vadUnsetStreamCallback(handle: number): Promise<void>;
+  vadStreamStart(handle: number, optionsBytes: Uint8Array): Promise<number>;
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void>;
+  vadStreamStop(sessionId: number): Promise<void>;
+  vadStreamCancel(sessionId: number): Promise<void>;
   loadModel(
     modelPath: string,
     id?: string,
@@ -335,6 +345,10 @@ export interface NativeAddon {
   rerankProto(handle: number, requestBytes: Uint8Array): Promise<Uint8Array>;
   diarizeProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   segmentProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  /** Sync `rac_embeddings_norm` — L2 norm of a dense float vector. */
+  embeddingsNorm(vector: Float32Array): number;
+  /** Sync `rac_embeddings_similarity` — cosine similarity of two dense vectors. */
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): number;
 
   // Downloads and storage (native/download_bridge.cpp). Downloads are keyed by
   // model/task id inside commons; progress arrives on one process-wide callback.
@@ -347,6 +361,12 @@ export interface NativeAddon {
   downloadCleanupProto(): Promise<number>;
   downloadSubscribeProgress(onProgress: (progressBytes: Uint8Array) => void): void;
   downloadUnsubscribeProgress(): void;
+  /** Sync `rac_download_progress_percent` — overall preferred when in [0,1]. */
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number;
   storageInfoProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageAvailabilityProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageDeletePlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;
@@ -356,6 +376,19 @@ export interface NativeAddon {
   // (rac_file_manager_clear_cache / _clear_temp).
   fileManagerClearCache(): Promise<void>;
   fileManagerClearTemp(): Promise<void>;
+
+  // Audio DSP over commons (native/audio_bridge.cpp). Sync — same shape as
+  // downloadProgressPercent so TypeScript helpers never re-derive PCM math.
+  audioFloat32ToPcm16(samples: Float32Array): Int16Array;
+  audioPcm16ToFloat32(samples: Int16Array): Float32Array;
+  audioResampleF32(samples: Float32Array, inRate: number, outRate: number): Float32Array;
+  audioComputeRms(samples: Float32Array): number;
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Uint8Array;
+  audioWavToFloat32(bytes: Uint8Array): { sampleRate: number; samples: Float32Array };
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): number;
 
   // LoRA over the lifecycle ABI (native/lora_bridge.cpp). Handle-free: these
   // act on the language model rac_model_lifecycle_load_proto made resident.

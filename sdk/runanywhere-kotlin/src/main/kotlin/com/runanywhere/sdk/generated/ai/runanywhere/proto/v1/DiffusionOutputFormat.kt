@@ -43,8 +43,8 @@ public enum class DiffusionOutputFormat(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionOutputFormat> =
         object : EnumAdapter<DiffusionOutputFormat>(
-      DiffusionOutputFormat::class, 
-      PROTO_3, 
+      DiffusionOutputFormat::class,
+      PROTO_3,
       DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionOutputFormat? = DiffusionOutputFormat.fromValue(`value`)

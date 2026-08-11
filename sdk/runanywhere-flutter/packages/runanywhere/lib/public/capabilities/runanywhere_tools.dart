@@ -16,6 +16,8 @@ import 'dart:convert';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
+import 'package:runanywhere/generated/finish_reason.pbenum.dart'
+    show FinishReason;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
 import 'package:runanywhere/generated/thinking_tag_pattern.pbenum.dart'
@@ -316,6 +318,7 @@ class RunAnywhereTools {
                     toolCalls: collectedCalls,
                     toolResults: collectedResults,
                     isComplete: false,
+                    finishReason: FinishReason.FINISH_REASON_TOOL_CALLS,
                   ),
                 );
               }

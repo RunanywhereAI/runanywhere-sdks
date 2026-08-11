@@ -139,25 +139,6 @@ public class GenerationEvent(
   )
   public val model_id: String = "",
   /**
-   * For COST_CALCULATED — Dart SDKGenerationCostCalculated.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "costAmount",
-    schemaIndex = 9,
-  )
-  public val cost_amount: Double = 0.0,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "costSavedAmount",
-    schemaIndex = 10,
-  )
-  public val cost_saved_amount: Double = 0.0,
-  /**
    * For ROUTING_DECISION.
    */
   @field:WireField(
@@ -165,7 +146,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "routingTarget",
-    schemaIndex = 11,
+    schemaIndex = 9,
   )
   public val routing_target: String = "",
   @field:WireField(
@@ -173,7 +154,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "routingReason",
-    schemaIndex = 12,
+    schemaIndex = 10,
   )
   public val routing_reason: String = "",
   /**
@@ -184,7 +165,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "cancelReason",
-    schemaIndex = 13,
+    schemaIndex = 11,
   )
   public val cancel_reason: String = "",
   @field:WireField(
@@ -192,7 +173,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "toolCallId",
-    schemaIndex = 14,
+    schemaIndex = 12,
   )
   public val tool_call_id: String = "",
   @field:WireField(
@@ -200,7 +181,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "toolName",
-    schemaIndex = 15,
+    schemaIndex = 13,
   )
   public val tool_name: String = "",
   @field:WireField(
@@ -208,7 +189,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "toolPayloadJson",
-    schemaIndex = 16,
+    schemaIndex = 14,
   )
   public val tool_payload_json: String = "",
   @field:WireField(
@@ -216,7 +197,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "structuredSchemaJson",
-    schemaIndex = 17,
+    schemaIndex = 15,
   )
   public val structured_schema_json: String = "",
   @field:WireField(
@@ -224,7 +205,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "structuredOutputJson",
-    schemaIndex = 18,
+    schemaIndex = 16,
   )
   public val structured_output_json: String = "",
   @field:WireField(
@@ -232,7 +213,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "thinkingText",
-    schemaIndex = 19,
+    schemaIndex = 17,
   )
   public val thinking_text: String = "",
   /**
@@ -243,7 +224,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "inputTokens",
-    schemaIndex = 20,
+    schemaIndex = 18,
   )
   public val input_tokens: Int = 0,
   /**
@@ -256,7 +237,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokensPerSecond",
-    schemaIndex = 21,
+    schemaIndex = 19,
   )
   public val tokens_per_second: Double = 0.0,
   /**
@@ -267,7 +248,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timeToFirstTokenMs",
-    schemaIndex = 22,
+    schemaIndex = 20,
   )
   public val time_to_first_token_ms: Long = 0L,
   @field:WireField(
@@ -275,14 +256,14 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isStreaming",
-    schemaIndex = 23,
+    schemaIndex = 21,
   )
   public val is_streaming: Boolean = false,
   @field:WireField(
     tag = 25,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 24,
+    schemaIndex = 22,
   )
   public val temperature: Float = 0f,
   @field:WireField(
@@ -290,7 +271,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxTokens",
-    schemaIndex = 25,
+    schemaIndex = 23,
   )
   public val max_tokens: Int = 0,
   @field:WireField(
@@ -298,7 +279,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "contextLength",
-    schemaIndex = 26,
+    schemaIndex = 24,
   )
   public val context_length: Int = 0,
   @field:WireField(
@@ -306,7 +287,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelName",
-    schemaIndex = 27,
+    schemaIndex = 25,
   )
   public val model_name: String = "",
   /**
@@ -317,14 +298,14 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalDurationMs",
-    schemaIndex = 28,
+    schemaIndex = 26,
   )
   public val total_duration_ms: Long = 0L,
   @field:WireField(
     tag = 30,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 29,
+    schemaIndex = 27,
   )
   public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   /**
@@ -335,7 +316,7 @@ public class GenerationEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "prefillDurationMs",
-    schemaIndex = 30,
+    schemaIndex = 28,
   )
   public val prefill_duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -359,8 +340,6 @@ public class GenerationEvent(
     if (response != other.response) return false
     if (error != other.error) return false
     if (model_id != other.model_id) return false
-    if (cost_amount != other.cost_amount) return false
-    if (cost_saved_amount != other.cost_saved_amount) return false
     if (routing_target != other.routing_target) return false
     if (routing_reason != other.routing_reason) return false
     if (cancel_reason != other.cancel_reason) return false
@@ -397,8 +376,6 @@ public class GenerationEvent(
       result = result * 37 + response.hashCode()
       result = result * 37 + error.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + cost_amount.hashCode()
-      result = result * 37 + cost_saved_amount.hashCode()
       result = result * 37 + routing_target.hashCode()
       result = result * 37 + routing_reason.hashCode()
       result = result * 37 + cancel_reason.hashCode()
@@ -435,8 +412,6 @@ public class GenerationEvent(
     result += """response=${sanitize(response)}"""
     result += """error=${sanitize(error)}"""
     result += """model_id=${sanitize(model_id)}"""
-    result += """cost_amount=$cost_amount"""
-    result += """cost_saved_amount=$cost_saved_amount"""
     result += """routing_target=${sanitize(routing_target)}"""
     result += """routing_reason=${sanitize(routing_reason)}"""
     result += """cancel_reason=${sanitize(cancel_reason)}"""
@@ -470,8 +445,6 @@ public class GenerationEvent(
     response: String = this.response,
     error: String = this.error,
     model_id: String = this.model_id,
-    cost_amount: Double = this.cost_amount,
-    cost_saved_amount: Double = this.cost_saved_amount,
     routing_target: String = this.routing_target,
     routing_reason: String = this.routing_reason,
     cancel_reason: String = this.cancel_reason,
@@ -493,16 +466,16 @@ public class GenerationEvent(
     framework: InferenceFramework = this.framework,
     prefill_duration_ms: Long = this.prefill_duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, output_tokens, response, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, total_duration_ms, framework, prefill_duration_ms, unknownFields)
+  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, output_tokens, response, error, model_id, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, total_duration_ms, framework, prefill_duration_ms, unknownFields)
 
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<GenerationEvent> = object : ProtoAdapter<GenerationEvent>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      GenerationEvent::class, 
-      "type.googleapis.com/runanywhere.v1.GenerationEvent", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      GenerationEvent::class,
+      "type.googleapis.com/runanywhere.v1.GenerationEvent",
+      PROTO_3,
+      null,
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: GenerationEvent): Int {
@@ -533,12 +506,6 @@ public class GenerationEvent(
         }
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.model_id)
-        }
-        if (!value.cost_amount.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(10, value.cost_amount)
-        }
-        if (!value.cost_saved_amount.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(11, value.cost_saved_amount)
         }
         if (value.routing_target != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.routing_target)
@@ -630,12 +597,6 @@ public class GenerationEvent(
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.model_id)
-        }
-        if (!value.cost_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.cost_amount)
-        }
-        if (!value.cost_saved_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.cost_saved_amount)
         }
         if (value.routing_target != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.routing_target)
@@ -762,12 +723,6 @@ public class GenerationEvent(
         if (value.routing_target != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.routing_target)
         }
-        if (!value.cost_saved_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.cost_saved_amount)
-        }
-        if (!value.cost_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.cost_amount)
-        }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.model_id)
         }
@@ -807,8 +762,6 @@ public class GenerationEvent(
         var response: String = ""
         var error: String = ""
         var model_id: String = ""
-        var cost_amount: Double = 0.0
-        var cost_saved_amount: Double = 0.0
         var routing_target: String = ""
         var routing_reason: String = ""
         var cancel_reason: String = ""
@@ -844,8 +797,6 @@ public class GenerationEvent(
             7 -> response = ProtoAdapter.STRING.decode(reader)
             8 -> error = ProtoAdapter.STRING.decode(reader)
             9 -> model_id = ProtoAdapter.STRING.decode(reader)
-            10 -> cost_amount = ProtoAdapter.DOUBLE.decode(reader)
-            11 -> cost_saved_amount = ProtoAdapter.DOUBLE.decode(reader)
             12 -> routing_target = ProtoAdapter.STRING.decode(reader)
             13 -> routing_reason = ProtoAdapter.STRING.decode(reader)
             14 -> cancel_reason = ProtoAdapter.STRING.decode(reader)
@@ -883,8 +834,6 @@ public class GenerationEvent(
           response = response,
           error = error,
           model_id = model_id,
-          cost_amount = cost_amount,
-          cost_saved_amount = cost_saved_amount,
           routing_target = routing_target,
           routing_reason = routing_reason,
           cancel_reason = cancel_reason,

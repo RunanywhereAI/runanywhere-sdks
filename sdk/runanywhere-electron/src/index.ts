@@ -103,6 +103,7 @@ export type {
   SttState,
   SttStream,
   StructuredResult,
+  TokenUsage,
   ToolCall,
   ToolCapabilities,
   ToolDefinition,
@@ -187,12 +188,15 @@ export type { RagSession } from './api/data';
 
 // ---- errors, platform helpers, and the model store ----
 // Not a second API surface: these are the pieces a host application needs that
-// have no namespace of their own — typed errors, renderer-side audio DSP, and
-// the staged catalog it hands the SDK before initialize().
+// have no namespace of their own — typed errors, renderer-side audio helpers
+// (commons DSP via the utility-host / N-API addon), and the staged catalog it
+// hands the SDK before initialize().
 // `ErrorCode` / `ErrorCategory` / `ErrorSeverity` are the generated proto enums,
 // so their members read `ERROR_CODE_MODEL_NOT_FOUND`. `ErrorCodes` /
 // `ErrorCategories` are short-name alias objects derived from them, for app code
 // that would rather write `ErrorCodes.MODEL_NOT_FOUND`.
+// Local JSON-schema→GBNF (`grammar.ts`) is intentionally not exported: structured
+// output grammar is commons-owned on the wire.
 export {
   SDKException,
   ErrorCode,
@@ -206,10 +210,8 @@ export {
   raiseForRac,
 } from './errors';
 export type { ErrorCategoryName, ErrorCodeName, SDKErrorFields } from './errors';
-export { jsonSchemaToGrammar } from './grammar';
-export type { JsonSchema } from './grammar';
+export type { JsonSchema } from './api/types';
 export { speakableText } from './speech';
-export { streamWithMetrics } from './stream';
 export {
   float32ToPcm16,
   pcm16ToFloat32,
@@ -218,10 +220,14 @@ export {
   rms,
   encodeWav,
   decodeWav,
+  pcmDurationMs,
+  float32DurationMs,
   MicRecorder,
   SpeakerPlayer,
+  bindAudioBackend,
+  setAudioNativeForTests,
 } from './audio';
-export type { MicRecorderOptions } from './audio';
+export type { MicRecorderOptions, AudioNative, AudioDspBackend } from './audio';
 export type { NativeAddon } from './bridge';
 export {
   registerCatalog,

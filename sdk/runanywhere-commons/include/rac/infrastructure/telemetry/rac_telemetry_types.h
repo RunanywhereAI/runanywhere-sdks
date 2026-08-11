@@ -176,6 +176,13 @@ typedef struct rac_telemetry_payload {
     rac_bool_t voice_interrupted;  // turn ended via caller cancel / barge-out
     rac_bool_t has_voice_interrupted;
 
+    // Model-free control-plane probe marker. When true, metric fields on this
+    // payload were not produced by inference and must not enter quality SQL
+    // aggregates as real rows. Callers that invent metrics (e.g. rcli telemetry
+    // emit|blast) MUST set this; absence means a real observation.
+    rac_bool_t is_probe;
+    rac_bool_t has_is_probe;
+
     // SDK lifecycle fields
     int32_t count;
 

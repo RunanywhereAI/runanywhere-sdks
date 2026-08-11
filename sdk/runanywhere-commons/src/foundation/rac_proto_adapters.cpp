@@ -793,7 +793,7 @@ bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
             out->add_compatible_models(in->compatible_model_ids[i]);
         }
     }
-    out->set_default_scale(in->default_scale > 0.0f ? in->default_scale : 1.0f);
+    out->set_default_scale(in->default_scale);
     // description/url/filename/size_bytes were deleted from
     // LoraAdapterCatalogEntry outright (idl/lora_options.proto -- adapter
     // files are now acquired through the models domain's download/import
@@ -811,7 +811,8 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     std::memset(out, 0, sizeof(*out));
     out->id = copy_string(in.id());
     out->name = copy_string(in.name());
-    out->default_scale = in.default_scale() > 0.0f ? in.default_scale() : 1.0f;
+    // Preserve an explicit catalog 0.0; only absent default_scale falls back.
+    out->default_scale = in.has_default_scale() ? in.default_scale() : 1.0f;
     if (in.compatible_models_size() > 0) {
         out->compatible_model_count = static_cast<size_t>(in.compatible_models_size());
         out->compatible_model_ids =

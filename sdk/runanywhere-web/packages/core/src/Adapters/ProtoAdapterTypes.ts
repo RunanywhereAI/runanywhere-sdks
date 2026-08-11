@@ -168,6 +168,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     audioSize: number,
     outResult: number,
   ): number;
+  _rac_voice_agent_feed_audio_proto?(
+    handle: number,
+    frameBytes: number,
+    frameSize: number,
+    outResult: number,
+  ): number;
   _rac_voice_agent_set_proto_callback?(
     handle: number,
     callbackPtr: number,

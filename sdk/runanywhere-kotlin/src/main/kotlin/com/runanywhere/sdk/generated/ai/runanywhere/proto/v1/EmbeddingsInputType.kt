@@ -31,8 +31,8 @@ public enum class EmbeddingsInputType(
     @JvmField
     public val ADAPTER: ProtoAdapter<EmbeddingsInputType> =
         object : EnumAdapter<EmbeddingsInputType>(
-      EmbeddingsInputType::class, 
-      PROTO_3, 
+      EmbeddingsInputType::class,
+      PROTO_3,
       EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): EmbeddingsInputType? = EmbeddingsInputType.fromValue(`value`)

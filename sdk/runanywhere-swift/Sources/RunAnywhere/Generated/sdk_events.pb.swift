@@ -2102,17 +2102,6 @@ public nonisolated struct RAGenerationEvent: @unchecked Sendable {
     set {_uniqueStorage()._modelID = newValue}
   }
 
-  /// For COST_CALCULATED — Dart SDKGenerationCostCalculated.
-  public var costAmount: Double {
-    get {_storage._costAmount}
-    set {_uniqueStorage()._costAmount = newValue}
-  }
-
-  public var costSavedAmount: Double {
-    get {_storage._costSavedAmount}
-    set {_uniqueStorage()._costSavedAmount = newValue}
-  }
-
   /// For ROUTING_DECISION.
   public var routingTarget: String {
     get {_storage._routingTarget}
@@ -3999,7 +3988,7 @@ nonisolated extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}output_tokens\0\u{1}response\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0\u{3}tokens_per_second\0\u{3}time_to_first_token_ms\0\u{3}is_streaming\0\u{1}temperature\0\u{3}max_tokens\0\u{3}context_length\0\u{3}model_name\0\u{3}total_duration_ms\0\u{1}framework\0\u{3}prefill_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}output_tokens\0\u{1}response\0\u{1}error\0\u{3}model_id\0\u{4}\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0\u{3}tokens_per_second\0\u{3}time_to_first_token_ms\0\u{3}is_streaming\0\u{1}temperature\0\u{3}max_tokens\0\u{3}context_length\0\u{3}model_name\0\u{3}total_duration_ms\0\u{1}framework\0\u{3}prefill_duration_ms\0\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}")
 
   fileprivate class _StorageClass {
     var _kind: RAGenerationEventKind = .unspecified
@@ -4011,8 +4000,6 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
     var _response: String = String()
     var _error: String = String()
     var _modelID: String = String()
-    var _costAmount: Double = 0
-    var _costSavedAmount: Double = 0
     var _routingTarget: String = String()
     var _routingReason: String = String()
     var _cancelReason: String = String()
@@ -4052,8 +4039,6 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
       _response = source._response
       _error = source._error
       _modelID = source._modelID
-      _costAmount = source._costAmount
-      _costSavedAmount = source._costSavedAmount
       _routingTarget = source._routingTarget
       _routingReason = source._routingReason
       _cancelReason = source._cancelReason
@@ -4101,8 +4086,6 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
         case 7: try { try decoder.decodeSingularStringField(value: &_storage._response) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 10: try { try decoder.decodeSingularDoubleField(value: &_storage._costAmount) }()
-        case 11: try { try decoder.decodeSingularDoubleField(value: &_storage._costSavedAmount) }()
         case 12: try { try decoder.decodeSingularStringField(value: &_storage._routingTarget) }()
         case 13: try { try decoder.decodeSingularStringField(value: &_storage._routingReason) }()
         case 14: try { try decoder.decodeSingularStringField(value: &_storage._cancelReason) }()
@@ -4157,12 +4140,6 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
       }
       if !_storage._modelID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 9)
-      }
-      if _storage._costAmount.bitPattern != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._costAmount, fieldNumber: 10)
-      }
-      if _storage._costSavedAmount.bitPattern != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._costSavedAmount, fieldNumber: 11)
       }
       if !_storage._routingTarget.isEmpty {
         try visitor.visitSingularStringField(value: _storage._routingTarget, fieldNumber: 12)
@@ -4242,8 +4219,6 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._response != rhs_storage._response {return false}
         if _storage._error != rhs_storage._error {return false}
         if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._costAmount != rhs_storage._costAmount {return false}
-        if _storage._costSavedAmount != rhs_storage._costSavedAmount {return false}
         if _storage._routingTarget != rhs_storage._routingTarget {return false}
         if _storage._routingReason != rhs_storage._routingReason {return false}
         if _storage._cancelReason != rhs_storage._cancelReason {return false}

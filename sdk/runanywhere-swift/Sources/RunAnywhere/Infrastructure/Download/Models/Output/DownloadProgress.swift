@@ -36,18 +36,6 @@ public extension RADownloadState {
         }
     }
 
-    /// Weight of this state for overall progress calculation.
-    /// Download: 0-80%, Extraction: 80-95%, Validation: 95-99%, Completed: 100%.
-    var progressRange: (start: Double, end: Double) {
-        switch self {
-        case .downloading, .retrying, .resuming: return (0.0, 0.80)
-        case .extracting: return (0.80, 0.95)
-        case .validating: return (0.95, 0.99)
-        case .completed: return (1.0, 1.0)
-        default: return (0.0, 0.0)
-        }
-    }
-
     /// Human-readable error text for the `.failed` state (mirrors the
     /// previous hand-rolled enum case's associated `Error`).
     var errorDescription: String? { nil }
@@ -67,22 +55,6 @@ public extension RADownloadProgress {
     }
 
     // MARK: - Factories
-
-    /// Progress for the extraction stage.
-    static func extraction(
-        modelId: String,
-        progress: Double,
-        totalBytes: Int64 = 0
-    ) -> RADownloadProgress {
-        var msg = RADownloadProgress()
-        msg.modelID = modelId
-        msg.state = .extracting
-        msg.bytesDownloaded = Int64(progress * Double(totalBytes))
-        msg.totalBytes = totalBytes
-        msg.stageProgress = Float(progress)
-        msg.etaSeconds = -1
-        return msg
-    }
 
     /// Completed progress.
     static func completed(modelId: String = "", totalBytes: Int64) -> RADownloadProgress {

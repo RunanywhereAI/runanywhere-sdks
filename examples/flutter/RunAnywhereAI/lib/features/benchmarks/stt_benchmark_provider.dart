@@ -57,17 +57,17 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
       // Transcribe raw PCM Int16 mono @ 16 kHz. Audio properties live on the
       // SDK-built STTAudioSource; the SDK detects the encoding from the bytes.
       final benchStopwatch = Stopwatch()..start();
-      final result = await sdk.RunAnywhere.stt.transcribe(
+      await sdk.RunAnywhere.stt.transcribe(
         sdk.AudioInput.pcm16(audioData),
       );
-      final elapsedMs = benchStopwatch.elapsedMicroseconds / 1000.0;
-      metrics.endToEndLatencyMs = elapsedMs;
+      // Harness e2e only — not a model metric.
+      metrics.endToEndLatencyMs =
+          benchStopwatch.elapsedMicroseconds / 1000.0;
 
       metrics.audioLengthSeconds = audioDuration;
-      final transcribedMs = result.durationMs > 0
-          ? result.durationMs
-          : (audioDuration * 1000).round();
-      metrics.realTimeFactor = elapsedMs / transcribedMs;
+      // Public Transcription has no commons real_time_factor; leave unset
+      // rather than inventing wall elapsed / audioDuration (or durationMs).
+      metrics.realTimeFactor = null;
 
       // memoryDeltaBytes stays 0: no portable Dart available-memory probe.
       return metrics;
@@ -92,6 +92,7 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
   }
 
   /// Sine-wave PCM Int16 little-endian mono audio buffer.
+  /// Explicit input/fixture synthesis only — not model-output math.
   static Uint8List _sineWaveAudio({
     required double durationSeconds,
     double frequencyHz = 440.0,
@@ -99,7 +100,8 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
   }) {
     final sampleCount = (durationSeconds * sampleRate).round();
     final bytes = ByteData(sampleCount * 2);
-    const amplitude = 32767 / 2; // Int16.max / 2, matching iOS.
+    // Fixture amplitude (Int16.max / 2), matching iOS SyntheticInputGenerator.
+    const amplitude = 32767 / 2;
     for (var i = 0; i < sampleCount; i++) {
       final time = i / sampleRate;
       final value =

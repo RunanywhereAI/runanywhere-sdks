@@ -39,11 +39,13 @@ def _opts(gguf: str, **kwargs) -> LlmOptions:
 def test_generate_returns_text_and_metrics(sdk, gguf) -> None:
     result = ra.llm.generate("Capital of France?", _opts(gguf))
     assert result.text == "Paris"
-    assert result.output_tokens == 2
-    assert result.finish_reason == FinishReason.STOP
+    # FakeCore streams tokens only; metrics stay at 0 until terminal commons usage is plumbed.
+    assert result.output_tokens == 0
+    assert result.finish_reason == FinishReason.UNSPECIFIED
     assert result.model == gguf
     assert result.request_id
-    assert result.tokens_per_second >= 0.0
+    assert result.tokens_per_second == 0.0
+    assert result.time_to_first_token_ms == 0.0
 
 
 def test_generate_auto_loads_the_named_model(sdk, gguf) -> None:
@@ -108,8 +110,9 @@ def test_stop_sequences_truncate_host_side(sdk, gguf) -> None:
     assert result.text == "Hello world"
 
 
-def test_reaching_max_output_tokens_reports_length(sdk, gguf) -> None:
+def test_commons_finish_reason_is_forwarded(sdk, gguf) -> None:
     sdk.tokens = ["a", "b", "c"]
+    sdk.finish_reason = int(FinishReason.LENGTH)
     result = ra.llm.generate("hi", _opts(gguf, max_output_tokens=3))
     assert result.finish_reason == FinishReason.LENGTH
 
@@ -125,7 +128,7 @@ def test_generate_stream_follows_the_event_grammar(sdk, gguf) -> None:
 
 
 def test_thoughts_are_only_streamed_when_requested(sdk, gguf) -> None:
-    sdk.tokens = ["<think>", "why", "</think>", "Paris"]
+    sdk.stream_deltas = [("why", True), ("Paris", False)]
     quiet = list(ra.llm.generate_stream("hi", _opts(gguf)))
     assert all(e.token_kind == TokenKind.TEXT for e in quiet if e.is_token)
     assert quiet[-1].result.text == "Paris"
@@ -173,7 +176,7 @@ def test_concurrent_generation_on_one_model_raises(sdk, gguf) -> None:
 # --------------------------------------------------------------------------- messages
 def test_single_user_message_passes_through_verbatim(sdk, gguf) -> None:
     ra.llm.generate([ChatMessage(role=Role.USER, content="Capital of France?")], _opts(gguf))
-    _handle, prompt = sdk.args_of("generate")
+    _handle, prompt = sdk.args_of("generate_typed")
     assert prompt == "Capital of France?"
 
 
@@ -187,7 +190,7 @@ def test_multi_turn_messages_become_a_transcript(sdk, gguf) -> None:
         ],
         _opts(gguf),
     )
-    _handle, prompt = sdk.args_of("generate")
+    _handle, prompt = sdk.args_of("generate_typed")
     assert prompt == "User: hi\nAssistant: hello\nUser: and now?\nAssistant:"
     assert sdk.last_kwargs["system_prompt"] == "be terse"
 
@@ -204,7 +207,8 @@ def test_generate_structured_constrains_and_parses(sdk, gguf) -> None:
     result = ra.llm.generate_structured("Where?", schema, _opts(gguf))
     assert result.valid is True
     assert result.value == {"city": "Paris"}
-    assert "grammar" in sdk.last_kwargs
+    assert "structured_schema" in sdk.last_kwargs
+    assert '"type":"object"' in sdk.last_kwargs["structured_schema"]
 
 
 def test_generate_structured_reports_invalid_output(sdk, gguf) -> None:
@@ -243,13 +247,13 @@ def test_registered_tool_is_executed_and_the_loop_continues(sdk, gguf) -> None:
         # First reply is a tool call; after the observation the model answers.
         replies = [['{"name": "get_weather", "arguments": {"city": "Paris"}}'], ["21C"], ["21C"]]
 
-        def next_tokens(_handle, prompt, on_token, **kwargs):
-            sdk.calls.append(("generate", (_handle, prompt)))
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            sdk.calls.append(("generate_typed", (_handle, prompt)))
             sdk.last_kwargs = kwargs
             for token in replies.pop(0) if replies else ["done"]:
-                on_token(token)
+                on_delta(token, False)
 
-        sdk.generate = next_tokens  # type: ignore[method-assign]
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
         result = ra.llm.generate("Weather in Paris?", _opts(gguf))
         assert calls == [{"city": "Paris"}]
         assert result.tool_calls and result.tool_calls[0].result == {"temp_c": 21}

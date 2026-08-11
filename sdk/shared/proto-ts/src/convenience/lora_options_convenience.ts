@@ -17,11 +17,6 @@
 import { LoraAdapterCatalogEntry, LoraAdapterConfig } from '../lora_options';
 import { ValidationError } from './_errors';
 
-export const loraAdapterConfigDefaults = (): LoraAdapterConfig => ({
-  adapterId: '',
-  scale: 1.0,
-});
-
 export const validateLoraAdapterConfig = (m: LoraAdapterConfig): void => {
   if (m.adapterId === '') {
     throw new ValidationError({

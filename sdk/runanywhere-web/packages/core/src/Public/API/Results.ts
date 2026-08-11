@@ -159,6 +159,8 @@ export interface Match {
 /** Completed RAG answer with the context it was grounded in. */
 export interface RagResult extends GenerationMetrics {
   answer: string;
+  /** Commons-split reasoning channel from RAGResult.thinking_content. */
+  thinkingText?: string;
   sources: Match[];
 }
 

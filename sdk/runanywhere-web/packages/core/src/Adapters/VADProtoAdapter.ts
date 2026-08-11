@@ -32,6 +32,7 @@ import {
   type ProtoEventHandler,
 } from './ProtoAdapterTypes.js';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { float32ToPcm16 } from '../Public/Extensions/RunAnywhere+AudioConvert.js';
 
 function requireLiveOnnxWorkerOrMain(operation: string) {
   const host = getActiveBackendWorkerHost('onnx');
@@ -363,7 +364,7 @@ export class VADProtoAdapter {
 
           for await (const chunk of audio) {
             if (chunk.length === 0) continue;
-            const pcmBytes = float32ToPCM16Bytes(chunk);
+            const pcmBytes = float32ToPcm16(chunk);
             const feedRc = bridge.withHeapBytes(pcmBytes, (audioPtr, audioSize) => (
               module._rac_vad_stream_feed_audio_proto!(sessionId, audioPtr, audioSize)
             ));
@@ -497,18 +498,6 @@ export class VADProtoAdapter {
       functionName,
     );
   }
-}
-
-/** Convert browser-native Float32 PCM to the PCM_S16_LE stream ABI. */
-function float32ToPCM16Bytes(samples: Float32Array): Uint8Array {
-  const buffer = new ArrayBuffer(samples.length * Int16Array.BYTES_PER_ELEMENT);
-  const view = new DataView(buffer);
-  for (let index = 0; index < samples.length; index += 1) {
-    const sample = Math.max(-1, Math.min(1, samples[index] ?? 0));
-    const pcm = sample < 0 ? Math.round(sample * 32_768) : Math.round(sample * 32_767);
-    view.setInt16(index * Int16Array.BYTES_PER_ELEMENT, pcm, true);
-  }
-  return new Uint8Array(buffer);
 }
 
 /** Encode PCM explicitly as little-endian f32, independent of host byte order. */

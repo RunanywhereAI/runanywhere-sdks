@@ -28,9 +28,6 @@ extension WordTimestampHelpers on WordTimestamp {
 
   /// Word end position as a [Duration].
   Duration get end => Duration(milliseconds: endMs.toInt());
-
-  /// Word duration (`end - start`) as a [Duration].
-  Duration get duration => end - start;
 }
 
 /// Helpers on the proto [TranscriptionMetadata] message — convert the

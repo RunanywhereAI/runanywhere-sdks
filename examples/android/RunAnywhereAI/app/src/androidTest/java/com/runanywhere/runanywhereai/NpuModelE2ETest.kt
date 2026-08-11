@@ -579,7 +579,7 @@ class NpuModelE2ETest {
     private data class Gen(val text: String, val outputTokenCount: Int, val ttftMs: Double, val decodeToks: Double,
                            val prefillToks: Double, val tokensPerS: Double, val totalMs: Double, val outTok: Int)
 
-    /** Greedy (temp=0) generation collecting text + perf metrics. */
+    /** Greedy (temp=0) generation collecting text + commons TokenUsage/generation fields. */
     private suspend fun greedyGenerate(prompt: String, maxNew: Int): Gen {
         val opts = RALLMGenerationOptions(
             max_output_tokens = maxNew,
@@ -587,50 +587,23 @@ class NpuModelE2ETest {
             top_p = 1f,
             reasoning = ReasoningOptions(include_in_output = true, pattern = THINKING_TAGS),
         )
-        var tokenCount = 0; val sb = StringBuilder()
-        val t0 = System.currentTimeMillis(); var ttftWall = 0.0
-        var ttft = 0.0; var tps = 0.0; var decMs = 0.0; var preMs = 0.0; var totMs = 0.0; var outTok = 0; var inTok = 0
+        val sb = StringBuilder()
+        var ttft = 0.0; var tps = 0.0; var totMs = 0.0; var outTok = 0
         RunAnywhere.generateStream(prompt, opts).collect { ev ->
             val tk = ev.token
-            if (!tk.isNullOrEmpty()) {
-                if (ttftWall == 0.0) ttftWall = (System.currentTimeMillis() - t0).toDouble()
-                sb.append(tk); tokenCount++
-            }
+            if (!tk.isNullOrEmpty()) sb.append(tk)
             if (ev.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                 ev.result?.let { r ->
-                    // Top-level LLMGenerationResult.time_to_first_token_ms/total_time_ms
-                    // and TokenUsage.tokens_per_second were deleted/renamed: TokenUsage.ttft_ms
-                    // and .decode_tokens_per_second are canonical now, and generation_time_ms
-                    // is the sole wall-clock field left on the result.
-                    ttft = (r.usage?.ttft_ms ?: 0L).toDouble(); tps = r.usage?.decode_tokens_per_second ?: 0.0
-                    decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
-                    totMs = r.generation_time_ms; outTok = r.usage?.output_tokens ?: 0; inTok = r.usage?.input_tokens ?: 0
+                    // TokenUsage + generation_time_ms only — missing stays zero.
+                    ttft = (r.usage?.ttft_ms ?: 0L).toDouble()
+                    tps = r.usage?.decode_tokens_per_second ?: 0.0
+                    totMs = r.generation_time_ms
+                    outTok = r.usage?.output_tokens ?: 0
                 }
             }
         }
-        val totalWall = (System.currentTimeMillis() - t0).toDouble()
-        if (outTok == 0) outTok = tokenCount
-        val ttftF = if (ttft > 0) ttft else ttftWall
-        val total = if (totMs > 0) totMs else totalWall
-        val wallTps = if (total > 0) outTok * 1000.0 / total else 0.0
-        // A batch-style backend can finish generation before it emits its buffered
-        // stream events. In that case first-token and terminal timestamps are only
-        // milliseconds apart, so deriving "decode throughput" from that interval
-        // produces impossible five-digit tok/s. Use end-to-end wall throughput unless
-        // the backend provides a real decode duration or the stream exposes a
-        // meaningful post-TTFT decode window.
-        val hasDecodeWindow =
-            ttftF > 0 && total - ttftF >= maxOf(50.0, total * 0.05)
-        val decToks =
-            if (decMs > 0) {
-                outTok * 1000.0 / decMs
-            } else if (tps > 0 && hasDecodeWindow) {
-                tps
-            } else {
-                wallTps
-            }
-        val preToks = if (preMs > 0) inTok * 1000.0 / preMs else 0.0
-        return Gen(sb.toString().trim(), tokenCount, ttftF, decToks, preToks, decToks, total, outTok)
+        // TokenUsage.prefill_tokens_per_second is not on the wire; leave 0.
+        return Gen(sb.toString().trim(), outTok, ttft, tps, 0.0, tps, totMs, outTok)
     }
 
     // ---------------------------------------------------------------- VLM ----
@@ -736,7 +709,6 @@ class NpuModelE2ETest {
             val expectedHeight = case.expectedHeight.takeIf { it > 0 } ?: 512
             val imageBytes = testAsset(case.imageAsset!!)
             val maskBytes = testAsset(case.maskAsset!!)
-            val started = System.currentTimeMillis()
             val result =
                 withTimeout(INFER_TIMEOUT_MS) {
                     RunAnywhere.inpaint(
@@ -747,8 +719,7 @@ class NpuModelE2ETest {
                         height = expectedHeight,
                     )
                 }
-            val wallMs = (System.currentTimeMillis() - started).toDouble()
-            val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
+            val latencyMs = result.total_time_ms.toDouble()
             totalLatencyMs += latencyMs
             // DiffusionResult now carries `images` (a list, one entry per requested
             // image) instead of flat image_data/width/height/image_media_type
@@ -904,7 +875,6 @@ class NpuModelE2ETest {
         for ((index, case) in cases.withIndex()) {
             val expectedWidth = case.expectedWidth.takeIf { it > 0 } ?: 256
             val expectedHeight = case.expectedHeight.takeIf { it > 0 } ?: 256
-            val started = System.currentTimeMillis()
             val result =
                 withTimeout(INFER_TIMEOUT_MS) {
                     RunAnywhere.generateImage(
@@ -918,8 +888,7 @@ class NpuModelE2ETest {
                             ),
                     )
                 }
-            val wallMs = (System.currentTimeMillis() - started).toDouble()
-            val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
+            val latencyMs = result.total_time_ms.toDouble()
             totalLatencyMs += latencyMs
             // DiffusionResult now carries `images` (a list, one entry per requested
             // image) instead of flat image_data/width/height/image_media_type
@@ -1003,11 +972,9 @@ class NpuModelE2ETest {
             val ref = case.goldText
             val pcm = testAsset(asset)
             val audioS = pcm.size / 2.0 / 16000.0
-            val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.transcribe(pcm) }
-            val wallMs = (System.currentTimeMillis() - start).toDouble()
-            val procMs = r.metadata?.processing_time_ms?.takeIf { it > 0 }?.toDouble() ?: wallMs
-            val rtf = procMs / 1000.0 / audioS
+            val procMs = (r.metadata?.processing_time_ms ?: 0L).toDouble()
+            val rtf = if (audioS > 0) procMs / 1000.0 / audioS else 0.0
             val text = r.text.trim()
             val wer = NpuMetrics.wer(ref, text)
             val artifacts = NpuMetrics.tokenizerArtifacts(text)
@@ -1163,15 +1130,13 @@ class NpuModelE2ETest {
         var rtfSum = 0.0; var n = 0; var passed = 0
         for ((i, case) in cases.withIndex()) {
             val text = requireNotNull(case.text)
-            val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.synthesize(text) }
-            val wallMs = (System.currentTimeMillis() - start).toDouble()
             val raw = r.audio_data.toByteArray()
             val floats = if (r.audio_format.name.contains("S16") || r.audio_format.name.contains("PCM16"))
                 NpuMetrics.pcm16leToFloat(raw) else NpuMetrics.float32leToFloat(raw)
             val durS = if (r.duration_ms > 0) r.duration_ms / 1000.0 else floats.size.toDouble() / maxOf(1, r.sample_rate)
             val rms = NpuMetrics.rms(floats)
-            val procMs = r.metadata?.processing_time_ms?.takeIf { it > 0 }?.toDouble() ?: wallMs
+            val procMs = (r.metadata?.processing_time_ms ?: 0L).toDouble()
             val rtf = if (durS > 0) procMs / 1000.0 / durS else 0.0
             val rateOk = r.sample_rate == expectedRate
             val pass =

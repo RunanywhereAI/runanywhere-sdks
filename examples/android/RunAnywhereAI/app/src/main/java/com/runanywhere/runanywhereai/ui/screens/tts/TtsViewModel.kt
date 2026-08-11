@@ -75,8 +75,10 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
                 val elapsed = System.currentTimeMillis() - start
                 metrics = TtsMetrics(
                     durationSec = audio.durationMs.takeIf { it > 0 }?.let { it / 1000.0 },
+                    // Wall wait for this call. TTSSynthesisMetadata.processing_time_ms
+                    // is not mapped onto public Audio yet — do not invent chars/s.
                     processingMs = elapsed,
-                    charsPerSec = if (elapsed > 0) content.length * 1000.0 / elapsed else null,
+                    charsPerSec = null,
                     sizeBytes = audio.data.size.toLong().takeIf { it > 0 },
                     sampleRate = audio.sampleRate.takeIf { it > 0 },
                 )

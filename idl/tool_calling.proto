@@ -22,6 +22,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "finish_reason.proto";
 import "rac_options.proto";
 import "token_usage.proto";
 
@@ -269,6 +270,9 @@ message ToolCallingResult {
     // (including the final synthesis turn). Lets a plain generate() that routed
     // through the tool loop report the same usage a non-tool generate would.
     TokenUsage usage                 = 9;
+    // Terminal reason for the last model turn the loop observed. Never inferred
+    // from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+    FinishReason finish_reason       = 10;
 }
 
 message ToolParseRequest {

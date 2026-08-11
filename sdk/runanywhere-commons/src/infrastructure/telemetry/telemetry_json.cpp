@@ -283,6 +283,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("error_message", payload->error_message);
     json.add_string("error_code", payload->error_code);
     json.add_bool("is_streaming", payload->is_streaming, payload->has_is_streaming);
+    json.add_bool("is_probe", payload->is_probe, payload->has_is_probe);
 
     // ---- SDK origin + live device state (stamped by the manager) ----------
     json.add_string("sdk_binding", payload->sdk_binding);

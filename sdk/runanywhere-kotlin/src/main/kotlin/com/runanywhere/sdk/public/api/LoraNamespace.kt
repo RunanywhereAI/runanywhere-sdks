@@ -56,7 +56,10 @@ public class LoraNamespace internal constructor() {
                             LoraAdapterConfig(
                                 adapter_path = path,
                                 adapter_id = adapterId,
-                                scale = scale ?: entry.default_scale?.takeIf { it > 0f } ?: 1f,
+                                // Leave unset when caller omits scale so commons
+                                // resolve_effective_lora_scale owns catalog/1.0 fallback
+                                // (including honoring explicit catalog 0.0).
+                                scale = scale,
                             ),
                         ),
                 ),

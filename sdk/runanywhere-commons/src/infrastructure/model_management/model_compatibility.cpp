@@ -53,10 +53,14 @@ rac_result_t rac_model_check_compatibility(rac_model_registry_handle_t registry_
                   static_cast<long long>(required_storage));
 
     // Determine compatibility
-    // can_run:  available RAM >= required memory (or requirement is 0/unknown)
+    // can_run:  available RAM >= required memory (or requirement is 0/unknown).
+    //           available_ram <= 0 means UNKNOWN (device_info.proto: 0 = UNKNOWN) —
+    //           never refuse a load because the platform could not probe free RAM.
     // can_fit:  available storage >= required storage (or requirement is 0/unknown)
     rac_bool_t can_run =
-        (required_memory <= 0 || available_ram >= required_memory) ? RAC_TRUE : RAC_FALSE;
+        (required_memory <= 0 || available_ram <= 0 || available_ram >= required_memory)
+            ? RAC_TRUE
+            : RAC_FALSE;
     rac_bool_t can_fit =
         (required_storage <= 0 || available_storage >= required_storage) ? RAC_TRUE : RAC_FALSE;
 

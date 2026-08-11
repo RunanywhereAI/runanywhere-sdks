@@ -52,7 +52,14 @@ struct MlxSession {
     bool initialized = false;
     bool operation_active = false;
     bool closing = false;
+    int32_t last_stream_prompt_tokens = 0;
+    int32_t last_stream_completion_tokens = 0;
 };
+
+// Active LLM stream session for this thread — Swift reports true prompt /
+// completion totals via rac_mlx_note_stream_token_counts while generate_stream
+// is blocked in syncWait.
+thread_local MlxSession* g_active_mlx_stream_session = nullptr;
 
 MlxSession* as_session(void* impl) {
     return static_cast<MlxSession*>(impl);
@@ -343,8 +350,27 @@ rac_result_t llm_generate_stream(void* impl, const char* prompt, const rac_llm_o
     if (rc != RAC_SUCCESS) {
         return rc;
     }
-    return callbacks.llm_generate_stream(operation.swift_handle(), prompt, options, callback,
-                                         user_data, callbacks.user_data);
+    MlxSession* session = as_session(impl);
+    session->last_stream_prompt_tokens = 0;
+    session->last_stream_completion_tokens = 0;
+    g_active_mlx_stream_session = session;
+    const rac_result_t stream_rc = callbacks.llm_generate_stream(
+        operation.swift_handle(), prompt, options, callback, user_data, callbacks.user_data);
+    g_active_mlx_stream_session = nullptr;
+    return stream_rc;
+}
+
+rac_result_t llm_get_stream_token_counts(void* impl, rac_llm_token_counts_t* out) {
+    if (!out) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    MlxSession* session = as_session(impl);
+    if (!session) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    out->prompt_tokens = session->last_stream_prompt_tokens;
+    out->completion_tokens = session->last_stream_completion_tokens;
+    return RAC_SUCCESS;
 }
 
 rac_result_t llm_get_info(void* impl, rac_llm_info_t* out_info) {
@@ -755,6 +781,14 @@ rac_bool_t rac_mlx_is_available(void) {
                : RAC_FALSE;
 }
 
+void rac_mlx_note_stream_token_counts(int32_t prompt_tokens, int32_t completion_tokens) {
+    if (g_active_mlx_stream_session == nullptr) {
+        return;
+    }
+    g_active_mlx_stream_session->last_stream_prompt_tokens = prompt_tokens;
+    g_active_mlx_stream_session->last_stream_completion_tokens = completion_tokens;
+}
+
 const rac_llm_service_ops_t g_mlx_llm_ops = {
     .initialize = llm_initialize,
     .generate = llm_generate,
@@ -772,6 +806,7 @@ const rac_llm_service_ops_t g_mlx_llm_ops = {
     .generate_from_context = nullptr,
     .clear_context = nullptr,
     .create = llm_create,
+    .get_stream_token_counts = llm_get_stream_token_counts,
 };
 
 const rac_vlm_service_ops_t g_mlx_vlm_ops = {

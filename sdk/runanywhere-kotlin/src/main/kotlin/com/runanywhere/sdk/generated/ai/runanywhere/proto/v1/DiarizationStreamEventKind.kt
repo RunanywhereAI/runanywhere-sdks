@@ -30,8 +30,8 @@ public enum class DiarizationStreamEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiarizationStreamEventKind> =
         object : EnumAdapter<DiarizationStreamEventKind>(
-      DiarizationStreamEventKind::class, 
-      PROTO_3, 
+      DiarizationStreamEventKind::class,
+      PROTO_3,
       DiarizationStreamEventKind.DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiarizationStreamEventKind? = DiarizationStreamEventKind.fromValue(`value`)

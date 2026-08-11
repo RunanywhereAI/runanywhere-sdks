@@ -115,6 +115,13 @@ typedef struct rac_llm_service_ops {
      * @return RAC_SUCCESS on success; out_impl is NULL on failure.
      */
     rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
+
+    /**
+     * Report terminal tokenizer totals for the most recent generate_stream on
+     * this impl (ABI v9). MAY be NULL — commons then estimates and sets
+     * TokenUsage.counts_estimated.
+     */
+    rac_result_t (*get_stream_token_counts)(void* impl, rac_llm_token_counts_t* out);
 } rac_llm_service_ops_t;
 
 // =============================================================================

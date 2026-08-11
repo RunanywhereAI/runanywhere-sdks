@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.LLMGenerateRequest
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
@@ -250,12 +251,9 @@ public class LlmNamespace internal constructor() {
             inputTokens = result.usage?.input_tokens ?: 0,
             outputTokens = result.usage?.output_tokens ?: 0,
             tokensPerSecond = result.usage?.decode_tokens_per_second?.toFloat() ?: 0f,
-            finishReason =
-                if (result.tool_calls.isNotEmpty() && !result.is_complete) {
-                    FinishReason.TOOL_CALLS
-                } else {
-                    FinishReason.STOP
-                },
+            // Commons owns finish_reason — never infer from tool_calls / is_complete.
+            finishReason = finishReasonOf(result.finish_reason),
+            rawFinishReason = result.finish_reason.name,
             requestId = newRequestId(),
             model = model,
         )
@@ -429,15 +427,14 @@ internal fun mapLLMStreamEvents(
                     emit(
                         GenerationEvent.Completed(
                             requestId,
-                            raw.result?.toGenerationResult(requestId)
-                                ?: GenerationResult(
-                                    text = answer.toString(),
-                                    thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
-                                    finishReason = finishReasonOf(raw.finish_reason),
-                                    rawFinishReason = raw.finish_reason.name,
-                                    requestId = requestId,
-                                    model = model,
-                                ),
+                            generationResultFromStreamTerminal(
+                                proto = raw.result,
+                                accumulatedText = answer.toString(),
+                                accumulatedThinking = thinking.toString(),
+                                finishReason = raw.finish_reason,
+                                requestId = requestId,
+                                model = model,
+                            ),
                         ),
                     )
                     throw StreamTerminalReached()
@@ -460,6 +457,58 @@ internal fun mapLLMStreamEvents(
             )
         }
     }
+
+/**
+ * Prefer commons terminal metrics; keep streamed text/thinking only when the
+ * terminal payload is empty or weaker. Never invent wall-clock rates.
+ * Mirrors Swift `RunAnywhere.generationResultFromStreamTerminal`.
+ */
+internal fun generationResultFromStreamTerminal(
+    proto: LLMGenerationResult?,
+    accumulatedText: String,
+    accumulatedThinking: String,
+    finishReason: ai.runanywhere.proto.v1.FinishReason,
+    requestId: String,
+    model: String,
+): GenerationResult {
+    if (proto != null) {
+        val text =
+            if (preferStreamedContent(accumulatedText, over = proto.text)) {
+                accumulatedText
+            } else {
+                proto.text
+            }
+        val terminalThinking = proto.thinking_content.orEmpty()
+        val thinking =
+            if (preferStreamedContent(accumulatedThinking, over = terminalThinking)) {
+                accumulatedThinking
+            } else {
+                terminalThinking
+            }
+        return proto
+            .copy(
+                text = text,
+                thinking_content = thinking.takeIf { it.isNotEmpty() },
+            ).toGenerationResult(requestId)
+            .copy(model = proto.model_used.ifEmpty { model })
+    }
+    return GenerationResult(
+        text = accumulatedText,
+        thinkingText = accumulatedThinking.takeIf { it.isNotEmpty() },
+        finishReason = finishReasonOf(finishReason),
+        rawFinishReason = finishReason.name,
+        inputTokens = 0,
+        outputTokens = 0,
+        timeToFirstTokenMs = 0L,
+        tokensPerSecond = 0f,
+        requestId = requestId,
+        model = model,
+    )
+}
+
+/** Transport-integrity fallback: keep the longer non-empty stream transcript. */
+private fun preferStreamedContent(streamed: String, over: String): Boolean =
+    streamed.isNotEmpty() && (over.isEmpty() || streamed.length > over.length)
 
 private fun LLMStreamEvent.tokenEventOrNull(
     requestId: String,

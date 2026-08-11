@@ -316,7 +316,6 @@ async function* outputsFromLifecycleEvents(
     if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
       yield TTSOutput.fromPartial({
         isFinal: true,
-        timestampMs: Date.now(),
         error: event.error ?? SDKException.processingFailed('TTS lifecycle stream failed').proto,
       });
     }

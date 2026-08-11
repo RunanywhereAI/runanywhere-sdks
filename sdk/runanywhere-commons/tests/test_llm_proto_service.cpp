@@ -128,23 +128,23 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
     auto* mock = static_cast<MockLlm*>(impl);
     if (std::strstr(prompt, "hidden-thinking-stream") != nullptr) {
         for (const char* token : {"<think>alpha", "beta", "gamma"}) {
-            if (callback(token, RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+            if (callback(token, RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
                 return RAC_ERROR_STREAM_CANCELLED;
             }
         }
         return RAC_SUCCESS;
     }
     if (std::strstr(prompt, "thinking-stream") != nullptr) {
-        if (callback("<think>plan</think>done", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+        if (callback("<think>plan</think>done", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
         return RAC_SUCCESS;
     }
     if (std::strstr(prompt, "structured-stream-json") != nullptr) {
-        if (callback("{\"ok\"", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+        if (callback("{\"ok\"", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
-        if (callback(":true}", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+        if (callback(":true}", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
         return RAC_SUCCESS;
@@ -153,15 +153,15 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
     // genuine producer terminal signal. Default path intentionally does NOT
     // emit a final so finish_reason stays "unknown" with no native signal.
     if (std::strstr(prompt, "native-final-stop") != nullptr) {
-        if (callback("alpha", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+        if (callback("alpha", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
-        if (callback("", RAC_TRUE, "stop", user_data) != RAC_TRUE) {
+        if (callback("", RAC_TRUE, "stop", /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
         return RAC_SUCCESS;
     }
-    if (callback("alpha", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+    if (callback("alpha", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
         return RAC_ERROR_STREAM_CANCELLED;
     }
 
@@ -177,7 +177,7 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
         return RAC_ERROR_CANCELLED;
     }
 
-    if (callback("beta", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+    if (callback("beta", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
         return RAC_ERROR_STREAM_CANCELLED;
     }
     return RAC_SUCCESS;

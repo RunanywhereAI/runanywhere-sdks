@@ -25,7 +25,7 @@ import {
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
-import { FinishReason } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { MessageRole } from '@runanywhere/proto-ts/chat';
 
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
@@ -139,7 +139,12 @@ function makeStructuredOutputModule(
     ): number {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
       const request = StructuredOutputParseRequest.decode(requestBytes);
-      const resultBytes = StructuredOutputResult.encode(handlers.parse(request)).finish();
+      // fromPartial fills commons-owned defaults (repairAttempted/repairAttempts,
+      // etc.) so fixture stubs that omit new int32 fields do not throw
+      // "invalid int32: undefined" on encode.
+      const resultBytes = StructuredOutputResult.encode(
+        StructuredOutputResult.fromPartial(handlers.parse(request)),
+      ).finish();
       writeResult(outResult, resultBytes);
       return 0;
     },
@@ -152,7 +157,9 @@ function makeStructuredOutputModule(
     ): number => {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
       const request = StructuredOutputParseRequest.decode(requestBytes);
-      const resultBytes = StructuredOutputPromptResult.encode(handlers.prepare!(request)).finish();
+      const resultBytes = StructuredOutputPromptResult.encode(
+        StructuredOutputPromptResult.fromPartial(handlers.prepare!(request)),
+      ).finish();
       writeResult(outResult, resultBytes);
       return 0;
     };
@@ -165,7 +172,9 @@ function makeStructuredOutputModule(
     ): number => {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
       const request = StructuredOutputParseRequest.decode(requestBytes);
-      const resultBytes = StructuredOutputValidation.encode(handlers.validate!(request)).finish();
+      const resultBytes = StructuredOutputValidation.encode(
+        StructuredOutputValidation.fromPartial(handlers.validate!(request)),
+      ).finish();
       writeResult(outResult, resultBytes);
       return 0;
     };

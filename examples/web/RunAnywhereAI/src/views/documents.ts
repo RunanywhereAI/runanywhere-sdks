@@ -919,34 +919,11 @@ async function closeRAGSession(): Promise<void> {
 }
 
 /**
- * Split built-in thinking tags out of the answer into a collapsible
- * section (iOS parity: RAGViewModel.swift:145-149 thinkingContent +
- * DocumentRAGView.swift:473-543 thinkingSection).
+ * Render a RAG answer with citations. Reasoning is commons-owned
+ * (RAGResult.thinking_content); the public RagResult mapping does not yet
+ * expose it, so this view does not re-parse `<think>` tags from the answer.
  */
-function splitThinking(text: string): { answer: string; thinking: string | null } {
-  const match = /<(think|thinking)>([\s\S]*?)<\/\1>/i.exec(text);
-  if (!match) {
-    // Tolerate an unterminated opening tag (model cut off mid-thought).
-    const open = /<(think|thinking)>([\s\S]*)$/i.exec(text);
-    if (open) {
-      return { answer: text.slice(0, open.index).trim(), thinking: open[2].trim() || null };
-    }
-    return { answer: text, thinking: null };
-  }
-  const thinking = match[2].trim();
-  const answer = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
-  return { answer, thinking: thinking || null };
-}
-
 function formatAnswer(text: string, sources: Match[]): string {
-  const split = splitThinking(text);
-  const thinking = split.thinking;
-  const thinkingHtml = thinking
-    ? `<details class="docs-thinking" style="margin-bottom:8px;">
-        <summary style="cursor:pointer; font-size:0.8rem; opacity:0.7;">Reasoning</summary>
-        <pre style="white-space:pre-wrap; font-size:0.8rem; opacity:0.8;">${escapeHtml(thinking)}</pre>
-      </details>`
-    : '';
   const sourcesHtml = sources.map((source, i) => `
     <div class="docs-source">
       <strong>Source ${i + 1}: ${escapeHtml(source.metadata.docName ?? 'Document')}</strong>
@@ -958,7 +935,7 @@ function formatAnswer(text: string, sources: Match[]): string {
   // answer with numbered steps or a heading showed its `1.` and `###` markers
   // as literal characters while the identical text rendered properly one tab
   // over in Chat. `renderMarkdown` escapes every span itself.
-  return `${thinkingHtml}<div class="docs-answer-text">${renderMarkdown(split.answer)}</div>`
+  return `<div class="docs-answer-text">${renderMarkdown(text)}</div>`
     + `<div class="docs-sources">${sourcesHtml}</div>`;
 }
 

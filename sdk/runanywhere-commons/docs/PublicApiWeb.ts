@@ -43,7 +43,7 @@ generate(options: TextGenerationOptions, extra?: CancellableCall): Promise<LLMGe
 generateStream(options, extra?): Promise<LLMStreamingResult>;                                     // [DIVERGE] returns { events, stream, result, cancel } not bare iterable
 cancelGeneration(): void;
 // textGeneration.generate(request) / generate(options) overloads exist under RunAnywhere.textGeneration
-// aggregateStream(prompt, streaming, onToken?, onThinking?) — [DIVERGE] only under RunAnywhere.textGeneration, not flat
+// Collect llm.generateStream and read GenerationEvent.Completed — aggregateStream deleted (D3)
 
 // --- Structured output (flat) ---
 generateStructured(prompt: string, schema: StructuredOutputSchema, options?): Promise<StructuredOutputResult>;

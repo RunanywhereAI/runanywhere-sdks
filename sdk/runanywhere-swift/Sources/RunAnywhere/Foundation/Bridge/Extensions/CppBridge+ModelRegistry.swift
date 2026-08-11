@@ -365,30 +365,49 @@ extension CppBridge {
 
         // MARK: - Update Operations
 
-        /// Update download status for a model
+        /// Update download status for a model.
+        ///
+        /// Commons owns `updated_at_unix_ms` via
+        /// `rac_model_registry_update_download_status` — platforms must not
+        /// stamp the clock before `update_proto`.
         public func updateDownloadStatus(modelId: String, localPath: URL?) throws {
-            guard var model = get(modelId: modelId) else {
-                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
+            guard let handle = handle else {
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
 
-            model.setLocalPath(localPath)
-            model.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-            try update(model)
-            logger.debug("Updated download status via proto registry for: \(modelId)")
+            let result = modelId.withCString { mid -> rac_result_t in
+                if let localPath {
+                    return localPath.path.withCString { path in
+                        rac_model_registry_update_download_status(handle, mid, path)
+                    }
+                }
+                return rac_model_registry_update_download_status(handle, mid, nil)
+            }
+
+            guard result == RAC_SUCCESS else {
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
+            }
+            logger.debug("Updated download status via commons registry mutator for: \(modelId)")
         }
 
-        /// Update last used timestamp
+        /// Update last used timestamp.
+        ///
+        /// Commons owns `last_used_at_unix_ms` via
+        /// `rac_model_registry_update_last_used` — platforms must not stamp
+        /// the clock before `update_proto`. `usage_count` (tag 35) remains
+        /// reserved off the wire.
         public func updateLastUsed(modelId: String) throws {
-            guard var model = get(modelId: modelId) else {
-                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
+            guard let handle = handle else {
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
 
-            // usageCount (tag 35) was reserved off the wire outright
-            // (idl/model_types.proto / model_registry_convert.cpp) — the C
-            // struct field has no proto source to read from or write to
-            // anymore, so lastUsedAtUnixMs alone now records "last used".
-            model.lastUsedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-            try update(model)
+            let result = modelId.withCString { mid in
+                rac_model_registry_update_last_used(handle, mid)
+            }
+
+            guard result == RAC_SUCCESS else {
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
+            }
         }
 
         // MARK: - Remove Operations

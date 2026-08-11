@@ -7,6 +7,9 @@
  * lifecycle-aware ABI `rac_embeddings_embed_batch_lifecycle_proto` so embed
  * calls resolve the model loaded via `RunAnywhere.loadModel(category=EMBEDDING)`
  * instead of spinning up a parallel per-handle engine.
+ *
+ * Vector math (`norm` / `similarity`) is a thin JNI pass-through to
+ * `rac_embeddings_norm` / `rac_embeddings_similarity`.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -35,6 +38,13 @@ object CppBridgeEmbeddings {
             ),
             "racEmbeddingsEmbedBatchLifecycleProto",
         )
+
+    /** L2 norm via `rac_embeddings_norm`. */
+    fun norm(vector: FloatArray): Float = RunAnywhereBridge.racEmbeddingsNorm(vector)
+
+    /** Cosine similarity via `rac_embeddings_similarity`. */
+    fun similarity(lhs: FloatArray, rhs: FloatArray): Float =
+        RunAnywhereBridge.racEmbeddingsSimilarity(lhs, rhs)
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,

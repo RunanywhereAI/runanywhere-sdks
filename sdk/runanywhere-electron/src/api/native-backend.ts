@@ -350,6 +350,14 @@ export class NativeBackend implements RaBackend {
     return this.addon.downloadCleanupProto();
   }
 
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number {
+    return this.addon.downloadProgressPercent(overallProgress, bytesDownloaded, totalBytes);
+  }
+
   // The commons progress callback is process-wide, so this promise stands in
   // for a stream that has no natural end: it settles when downloadUnwatch runs,
   // which is also what the RPC transport needs to close the channel.
@@ -717,6 +725,33 @@ export class NativeBackend implements RaBackend {
     await this.addon.unloadVad(handle);
   }
 
+  vadSetStreamCallback(onEvent: (eventBytes: Uint8Array) => void): void {
+    if (this.vadHandle == null) throw SDKException.invalidState('no VAD is open');
+    this.addon.vadSetStreamCallback(this.vadHandle, onEvent);
+  }
+
+  async vadUnsetStreamCallback(): Promise<void> {
+    if (this.vadHandle == null) return;
+    await this.addon.vadUnsetStreamCallback(this.vadHandle);
+  }
+
+  async vadStreamStart(optionsBytes: Uint8Array): Promise<number> {
+    if (this.vadHandle == null) throw SDKException.invalidState('no VAD is open');
+    return this.addon.vadStreamStart(this.vadHandle, optionsBytes);
+  }
+
+  vadStreamFeed(sessionId: number, audioBytes: Uint8Array): Promise<void> {
+    return this.addon.vadStreamFeed(sessionId, audioBytes);
+  }
+
+  vadStreamStop(sessionId: number): Promise<void> {
+    return this.addon.vadStreamStop(sessionId);
+  }
+
+  vadStreamCancel(sessionId: number): Promise<void> {
+    return this.addon.vadStreamCancel(sessionId);
+  }
+
   // ---- embeddings / rerank / diarization / segmentation over the proto ABI ----
 
   embedBatchProto(requestBytes: Uint8Array): Promise<Uint8Array> {
@@ -746,6 +781,53 @@ export class NativeBackend implements RaBackend {
 
   async rerank(query: string, documents: string[], topN?: number): Promise<NativeRanked[]> {
     return this.addon.rerank(this.handleFor('rerank'), query, documents, topN);
+  }
+
+  embeddingsNorm(vector: Float32Array): Promise<number> {
+    return Promise.resolve(this.addon.embeddingsNorm(vector));
+  }
+
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): Promise<number> {
+    return Promise.resolve(this.addon.embeddingsSimilarity(lhs, rhs));
+  }
+
+  // ---- audio DSP (commons `rac_audio_*`; sync on the addon, Promise for RPC) ----
+
+  audioFloat32ToPcm16(samples: Float32Array): Promise<Int16Array> {
+    return Promise.resolve(this.addon.audioFloat32ToPcm16(samples));
+  }
+
+  audioPcm16ToFloat32(samples: Int16Array): Promise<Float32Array> {
+    return Promise.resolve(this.addon.audioPcm16ToFloat32(samples));
+  }
+
+  audioResampleF32(
+    samples: Float32Array,
+    inRate: number,
+    outRate: number
+  ): Promise<Float32Array> {
+    return Promise.resolve(this.addon.audioResampleF32(samples, inRate, outRate));
+  }
+
+  audioComputeRms(samples: Float32Array): Promise<number> {
+    return Promise.resolve(this.addon.audioComputeRms(samples));
+  }
+
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array> {
+    return Promise.resolve(this.addon.audioFloat32ToWav(samples, sampleRate));
+  }
+
+  audioWavToFloat32(
+    bytes: Uint8Array
+  ): Promise<{ sampleRate: number; samples: Float32Array }> {
+    return Promise.resolve(this.addon.audioWavToFloat32(bytes));
+  }
+
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): Promise<number> {
+    return Promise.resolve(this.addon.audioPcmBytesToMs(byteCount, format));
   }
 
   // ---- diarization and segmentation ----

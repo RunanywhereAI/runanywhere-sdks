@@ -20,7 +20,8 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
-import java.util.Locale
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import java.io.File
 
 /**
  * Hardware profile bridge wrapping the `rac_hardware_profile_*` ABI.
@@ -135,143 +136,82 @@ object CppBridgeHardware {
     }
 
     /**
-     * Get default chip name based on architecture and device info.
+     * Resolve chip name via `rac_device_resolve_chip_name`.
      *
-     * On API 31+ prefers `Build.SOC_MODEL` (+ `Build.SOC_MANUFACTURER` prefix,
-     * e.g. "Qualcomm SM7635"). Below 31 falls back to `Build.HARDWARE` and
-     * `/proc/cpuinfo`. Vendor-only values ("qcom") are never returned bare.
+     * Platforms gather OS-readable candidates (SOC_MODEL / HARDWARE /
+     * /proc/cpuinfo); commons owns the four-tier policy.
      */
     fun defaultChipName(architecture: String): String {
+        var socManufacturer: String? = null
+        var socModel: String? = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
-                val socModel = Build.SOC_MODEL.takeIf { it.isNotBlank() && !it.equals(Build.UNKNOWN, ignoreCase = true) }
-                if (socModel != null) {
-                    val socManufacturer =
-                        Build.SOC_MANUFACTURER.takeIf {
-                            it.isNotBlank() && !it.equals(Build.UNKNOWN, ignoreCase = true)
-                        }
-                    return if (socManufacturer != null && !socModel.contains(socManufacturer, ignoreCase = true)) {
-                        "$socManufacturer $socModel"
-                    } else {
-                        socModel
+                socModel =
+                    Build.SOC_MODEL.takeIf {
+                        it.isNotBlank() && !it.equals(Build.UNKNOWN, ignoreCase = true)
                     }
-                }
-            } catch (e: Exception) {
+                socManufacturer =
+                    Build.SOC_MANUFACTURER.takeIf {
+                        it.isNotBlank() && !it.equals(Build.UNKNOWN, ignoreCase = true)
+                    }
+            } catch (_: Exception) {
+                // Fall through with nulls
+            }
+        }
+        val buildHardware =
+            try {
+                Build.HARDWARE.takeIf { !it.isNullOrEmpty() && it != "unknown" }
+            } catch (_: Exception) {
+                null
+            }
+        val cpuinfoHardware =
+            try {
+                File("/proc/cpuinfo")
+                    .readText()
+                    .lines()
+                    .find { it.startsWith("Hardware", ignoreCase = true) }
+                    ?.substringAfter(":")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+            } catch (_: Exception) {
+                null
+            }
+        return RunAnywhereBridge.racDeviceResolveChipName(
+            socManufacturer,
+            socModel,
+            buildHardware,
+            cpuinfoHardware,
+            architecture,
+        )
+    }
+
+    /**
+     * Classify GPU family via `rac_device_classify_gpu_family`.
+     */
+    fun defaultGpuFamily(chipName: String): String {
+        var socManufacturer: String? = null
+        var socModel: String? = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                socManufacturer = Build.SOC_MANUFACTURER
+                socModel = Build.SOC_MODEL
+            } catch (_: Exception) {
                 // Fall through
             }
         }
-
-        // Try to get from Build.HARDWARE (skip bare vendor strings like "qcom")
-        try {
-            val hardware = Build.HARDWARE
-            if (!hardware.isNullOrEmpty() && hardware != "unknown" && !hardware.equals("qcom", ignoreCase = true)) {
-                return hardware
-            }
-        } catch (e: Exception) {
-            // Fall through
-        }
-
-        // Try to read from /proc/cpuinfo
-        try {
-            val cpuInfo = java.io.File("/proc/cpuinfo").readText()
-            // Look for "Hardware" line
-            val hardwareLine = cpuInfo.lines().find { it.startsWith("Hardware", ignoreCase = true) }
-            if (hardwareLine != null) {
-                val chipName = hardwareLine.substringAfter(":").trim()
-                if (chipName.isNotEmpty() && !chipName.equals("qcom", ignoreCase = true)) {
-                    return chipName
-                }
-            }
-        } catch (e: Exception) {
-            // Fall through
-        }
-
-        // Fallback to architecture as last resort
-        return architecture
+        return RunAnywhereBridge.racDeviceClassifyGpuFamily(socManufacturer, socModel, chipName)
     }
 
     /**
-     * Get default GPU family based on chip name.
+     * Available RAM coalesce via `rac_device_coalesce_available_memory`.
      *
-     * Infers GPU vendor from known chip manufacturers:
-     * - Samsung Exynos -> Mali
-     * - Qualcomm Snapdragon -> Adreno
-     * - MediaTek -> Mali (mostly)
-     * - HiSilicon Kirin -> Mali
-     * - Google Tensor -> Mali
-     * - Apple -> Apple
+     * Platforms probe ActivityManager / MemAvailable; commons maps non-positive
+     * probes to 0 (UNKNOWN) and never invents total/2.
      */
-    fun defaultGpuFamily(chipName: String): String {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                val socManufacturer = Build.SOC_MANUFACTURER.lowercase(Locale.ROOT)
-                val socModel = Build.SOC_MODEL.lowercase(Locale.ROOT)
-                when {
-                    socManufacturer.contains("qualcomm") -> return "adreno"
-                    // Exynos 2200+ ship AMD Xclipse; earlier Exynos use Mali
-                    socManufacturer.contains("samsung") ->
-                        return if (Regex("2[2-9]\\d\\d").containsMatchIn(socModel)) "xclipse" else "mali"
-                    socManufacturer.contains("google") -> return "mali"
-                    // Dimensity 9xxx flagships ship Immortalis; the rest use Mali
-                    socManufacturer.contains("mediatek") ->
-                        return if (Regex("9\\d{3}").containsMatchIn(socModel)) "immortalis" else "mali"
-                }
-            } catch (e: Exception) {
-                // Fall through to chip-name inference
-            }
-        }
-
-        val chipLower = chipName.lowercase()
-
-        return when {
-            // Samsung Exynos uses Mali GPUs
-            chipLower.contains("exynos") -> "mali"
-            chipLower.startsWith("s5e") -> "mali" // Samsung internal chip naming (e.g., s5e8535)
-            chipLower.contains("samsung") -> "mali"
-
-            // Qualcomm Snapdragon uses Adreno GPUs
-            chipLower.contains("snapdragon") -> "adreno"
-            chipLower.contains("qualcomm") -> "adreno"
-            chipLower.contains("sdm") -> "adreno" // SDM845, SDM855, etc.
-            chipLower.contains("sm8") -> "adreno" // SM8150, SM8250, etc.
-            chipLower.contains("sm7") -> "adreno" // SM7150, etc.
-            chipLower.contains("sm6") -> "adreno" // SM6150, etc.
-            chipLower.contains("msm") -> "adreno" // Older MSM chips
-
-            // MediaTek uses Mali GPUs (mostly)
-            chipLower.contains("mediatek") -> "mali"
-            chipLower.contains("mt6") -> "mali" // MT6xxx series
-            chipLower.contains("mt8") -> "mali" // MT8xxx series
-            chipLower.contains("dimensity") -> "mali"
-            chipLower.contains("helio") -> "mali"
-
-            // HiSilicon Kirin uses Mali GPUs
-            chipLower.contains("kirin") -> "mali"
-            chipLower.contains("hisilicon") -> "mali"
-
-            // Google Tensor uses Mali GPUs
-            chipLower.contains("tensor") -> "mali"
-            chipLower.contains("gs1") -> "mali" // GS101 (Tensor)
-            chipLower.contains("gs2") -> "mali" // GS201 (Tensor G2)
-
-            // Intel/x86 GPUs
-            chipLower.contains("intel") -> "intel"
-
-            // NVIDIA (rare on mobile)
-            chipLower.contains("nvidia") -> "nvidia"
-            chipLower.contains("tegra") -> "nvidia"
-
-            else -> "unknown"
-        }
-    }
-
-    /**
-     * Get currently available (free) memory in bytes.
-     *
-     * Uses `ActivityManager.MemoryInfo.availMem`; falls back to
-     * `/proc/meminfo` `MemAvailable`, then to `totalMemory / 2`.
-     */
-    fun defaultAvailableMemory(totalMemory: Long): Long {
+    fun defaultAvailableMemory(
+        @Suppress("UNUSED_PARAMETER") totalMemory: Long,
+    ): Long {
+        var probed = 0L
         try {
             val context =
                 if (AndroidPlatformContext.isInitialized()) {
@@ -284,88 +224,74 @@ object CppBridgeHardware {
                 val memInfo = ActivityManager.MemoryInfo()
                 activityManager.getMemoryInfo(memInfo)
                 if (memInfo.availMem > 0) {
-                    return memInfo.availMem
+                    probed = memInfo.availMem
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fall through to /proc/meminfo
         }
 
-        try {
-            java.io.File("/proc/meminfo").useLines { lines ->
-                val memAvailable = lines.find { it.startsWith("MemAvailable:") }
-                val kb =
-                    memAvailable
-                        ?.substringAfter(":")
-                        ?.trim()
-                        ?.removeSuffix(" kB")
-                        ?.trim()
-                        ?.toLongOrNull()
-                if (kb != null && kb > 0) {
-                    return kb * 1024L
+        if (probed <= 0L) {
+            try {
+                java.io.File("/proc/meminfo").useLines { lines ->
+                    val memAvailable = lines.find { it.startsWith("MemAvailable:") }
+                    val kb =
+                        memAvailable
+                            ?.substringAfter(":")
+                            ?.trim()
+                            ?.removeSuffix(" kB")
+                            ?.trim()
+                            ?.toLongOrNull()
+                    if (kb != null && kb > 0) {
+                        probed = kb * 1024L
+                    }
                 }
+            } catch (_: Exception) {
+                // Fall through
             }
-        } catch (e: Exception) {
-            // Fall through
         }
 
-        return totalMemory / 2
+        return RunAnywhereBridge.racDeviceCoalesceAvailableMemory(probed)
     }
 
     /**
-     * Heuristic NPU presence check: Qualcomm 8/7-series Hexagon, Google
-     * Tensor, Exynos 2xxx, and MediaTek Dimensity all ship dedicated NPUs.
+     * NPU presence via `rac_device_heuristic_has_npu`.
      */
     fun defaultHasNeuralEngine(chipName: String): Boolean {
-        val soc =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                try {
-                    "${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}"
-                } catch (e: Exception) {
-                    ""
-                }
-            } else {
-                ""
+        var socManufacturer: String? = null
+        var socModel: String? = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                socManufacturer = Build.SOC_MANUFACTURER
+                socModel = Build.SOC_MODEL
+            } catch (_: Exception) {
+                // Fall through
             }
-        val haystack = "$soc $chipName".lowercase(Locale.ROOT)
-        return haystack.contains("sm8") ||
-            haystack.contains("sm7") ||
-            haystack.contains("qcm") ||
-            haystack.contains("tensor") ||
-            haystack.contains("gs1") ||
-            haystack.contains("gs2") ||
-            haystack.contains("dimensity") ||
-            Regex("(exynos|s5e)\\s*2\\d{3}").containsMatchIn(haystack)
+        }
+        return RunAnywhereBridge.racDeviceHeuristicHasNpu(socManufacturer, socModel, chipName)
     }
 
     /**
-     * Split cores into (performance, efficiency) by reading per-core
-     * `cpuinfo_max_freq` sysfs entries: cores at the shared maximum
-     * frequency count as performance cores. Falls back to a half/half
-     * split when sysfs is unreadable.
+     * P/E core split via `rac_device_split_performance_cores`.
+     *
+     * Platforms read sysfs `cpuinfo_max_freq`; commons owns the max-frequency
+     * split policy (UNKNOWN = 0/0 when samples are incomplete).
      */
     fun defaultCoreSplit(coreCount: Int): Pair<Int, Int> {
-        if (coreCount > 0) {
-            try {
-                val freqs =
-                    (0 until coreCount).mapNotNull { cpu ->
-                        try {
-                            val sysfs = java.io.File("/sys/devices/system/cpu/cpu$cpu/cpufreq/cpuinfo_max_freq")
-                            sysfs.readText().trim().toLongOrNull()
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }
-                if (freqs.size == coreCount) {
-                    val maxFreq = freqs.max()
-                    val performance = freqs.count { it == maxFreq }
-                    return performance to (coreCount - performance)
-                }
-            } catch (e: Exception) {
-                // Fall through to heuristic
-            }
+        if (coreCount <= 0) {
+            val split = RunAnywhereBridge.racDeviceSplitPerformanceCores(null)
+            return split[0] to split[1]
         }
-        val performance = coreCount / 2
-        return performance to (coreCount - performance)
+        val freqs =
+            LongArray(coreCount) { cpu ->
+                try {
+                    val sysfs = java.io.File("/sys/devices/system/cpu/cpu$cpu/cpufreq/cpuinfo_max_freq")
+                    sysfs.readText().trim().toLongOrNull() ?: 0L
+                } catch (_: Exception) {
+                    0L
+                }
+            }
+        val split = RunAnywhereBridge.racDeviceSplitPerformanceCores(freqs)
+        return split[0] to split[1]
     }
 }

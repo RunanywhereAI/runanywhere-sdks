@@ -37,7 +37,6 @@ class RAGViewModel extends ChangeNotifier {
 
   bool _isDocumentLoaded = false;
   bool get isDocumentLoaded => _isDocumentLoaded;
-  bool _llmSupportsThinking = false;
 
   bool _isLoadingDocument = false;
   bool get isLoadingDocument => _isLoadingDocument;
@@ -99,7 +98,6 @@ class RAGViewModel extends ChangeNotifier {
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
-      _llmSupportsThinking = llmModel.supportsThinking;
     } catch (e) {
       _error = e.toString();
       // Tear down any partially-created session so a failed ingest doesn't
@@ -134,16 +132,15 @@ class RAGViewModel extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final thinkingModeEnabled =
           prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
-      // RAG answers never render thinking, so a thinking-capable model with
-      // the toggle off gets reasoning explicitly switched off; otherwise the
-      // pipeline defaults apply (thoughts stripped from the answer).
+      // RAG answers never render thinking. Commons decides whether the selected
+      // model supports the requested reasoning mode.
       final session = _session;
       if (session == null) {
         throw StateError('No RAG session is open');
       }
       final result = await session.query(
         question,
-        options: _llmSupportsThinking && !thinkingModeEnabled
+        options: !thinkingModeEnabled
             ? RagQueryOptions(
                 generation: LlmOptions(
                   reasoning: const ReasoningOptions(
@@ -191,7 +188,6 @@ class RAGViewModel extends ChangeNotifier {
     _error = null;
     _currentQuestion = '';
     _lastResult = null;
-    _llmSupportsThinking = false;
     notifyListeners();
   }
 

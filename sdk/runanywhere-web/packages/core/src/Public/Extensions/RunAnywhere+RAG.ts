@@ -26,6 +26,7 @@ import type {
 } from '@runanywhere/proto-ts/rag';
 import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
 import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
+import { TokenUsage as TokenUsageMessage } from '@runanywhere/proto-ts/token_usage';
 import {
   rAGConfigurationDefaults,
   rAGRetrievalOptionsDefaults,
@@ -665,7 +666,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     );
 
     this.lifecycleVersion += 1;
-    this.config = { ...createDefaultRAGConfiguration(), ...config };
+    this.config = createDefaultRAGConfiguration(config);
     this.chunks = [];
     this.documents.clear();
     this.lastUpdatedMs = Date.now();
@@ -692,8 +693,8 @@ class CrossWasmRAGProvider implements RAGProvider {
     const normalized = normalizeCrossWasmDocument(document);
     const textChunks = splitRAGText(
       normalized.text,
-      this.config.chunkSize ?? 512,
-      this.config.chunkOverlap ?? 64,
+      this.config.chunkSize!,
+      this.config.chunkOverlap!,
     );
     if (textChunks.length === 0) {
       throw SDKException.fromCode(
@@ -903,17 +904,15 @@ class CrossWasmRAGProvider implements RAGProvider {
     const prepared = await this.prepareQuery(question, options, 'RAG.query');
     if (!prepared.grounded) return prepared.result;
 
-    const generationStarted = nowMs();
     const generated = await TextGeneration.generate(prepared.request);
     this.assertCurrent(prepared.version, 'RAG.query');
-    const generationTimeMs = nowMs() - generationStarted;
     this.lastQueryMs = Date.now();
     return {
       answer: generated.text,
       retrievedChunks: prepared.retrievedChunks,
       contextUsed: prepared.context,
       retrievalTimeMs: prepared.retrievalTimeMs,
-      generationTimeMs,
+      generationTimeMs: generated.generationTimeMs ?? 0,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
@@ -959,14 +958,11 @@ class CrossWasmRAGProvider implements RAGProvider {
       },
     };
 
-    const generationStarted = nowMs();
     const streaming = await TextGeneration.generateStream(prepared.request);
-    let answer = '';
     let nativeStreamDone = false;
     try {
       for await (const token of streaming.stream) {
         if (!token) continue;
-        answer += token;
         yield {
           timestampUs: nowUs(),
           requestId,
@@ -995,11 +991,11 @@ class CrossWasmRAGProvider implements RAGProvider {
     this.assertCurrent(prepared.version, 'RAG.queryStream');
     this.lastQueryMs = Date.now();
     yield ragStreamCompleted({
-      answer: generated.text || answer,
+      answer: generated.text,
       retrievedChunks: prepared.retrievedChunks,
       contextUsed: prepared.context,
       retrievalTimeMs: prepared.retrievalTimeMs,
-      generationTimeMs: nowMs() - generationStarted,
+      generationTimeMs: generated.generationTimeMs ?? 0,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId,
       thinkingContent: generated.thinkingContent,
@@ -1343,14 +1339,7 @@ function nowUs(): number {
 
 /** `TokenUsage` zero value — used where a RAG result has no real usage to report. */
 function emptyTokenUsage(): TokenUsage {
-  return {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    decodeTokensPerSecond: 0,
-    prefillMs: 0,
-    ttftMs: 0,
-  };
+  return TokenUsageMessage.create();
 }
 
 function assertNativeHandle(handle: number, feature: string): number {
@@ -1383,9 +1372,12 @@ export function createDefaultRAGConfiguration(
   // are honored end-to-end because RAGConfiguration numeric fields are proto3
   // `optional` — commons distinguishes "unset" from "explicit zero" via
   // `has_*()` in `build_backend_config` (rac_rag_proto_abi.cpp).
+  const definedOverrides = Object.fromEntries(
+    Object.entries(overrides).filter(([, value]) => value !== undefined),
+  ) as Partial<RAGConfiguration>;
   return {
     ...rAGConfigurationDefaults(),
-    ...overrides,
+    ...definedOverrides,
   };
 }
 

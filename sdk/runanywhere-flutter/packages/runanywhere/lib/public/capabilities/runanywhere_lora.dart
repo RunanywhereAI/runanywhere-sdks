@@ -65,18 +65,15 @@ class RunAnywhereLoRACapability {
       );
     }
 
-    final effectiveScale =
-        scale ??
-        (entry.hasDefaultScale() && entry.defaultScale > 0
-            ? entry.defaultScale
-            : 1.0);
+    // Leave scale unset when omitted so commons resolve_effective_lora_scale
+    // owns catalog (including 0.0) → 1.0. Proto ctor only sets when non-null.
     return apply(
       LoraApplyRequest(
         adapters: [
           LoraAdapterConfig(
             adapterPath: adapterPath,
             adapterId: entry.id,
-            scale: effectiveScale,
+            scale: scale,
           ),
         ],
         keepExisting: !replaceExisting,

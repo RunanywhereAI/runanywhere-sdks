@@ -169,15 +169,13 @@ async function runSTTScenario(
 
     const benchStart = Date.now();
     await RunAnywhere.stt.transcribe(AudioInputs.wav(wav), { language: 'en' });
-    const latencyMs = Date.now() - benchStart;
+    const e2eLatencyMs = Date.now() - benchStart;
 
-    // The SDK no longer reports a real-time factor, so derive it from the
-    // measured wall latency over the known synthetic audio duration.
-    const rtf = latencyMs / (durationSeconds * 1000);
+    // Harness e2e only — not a model metric. Public Transcription has no
+    // commons real_time_factor; do not invent wall / audioDuration.
     const parts = [
-      `${latencyMs.toFixed(0)} ms`,
+      `e2e ${e2eLatencyMs.toFixed(0)} ms`,
       `${durationSeconds}s audio`,
-      `RTF ${rtf.toFixed(2)}`,
     ];
     return { loadTimeMs, metricSummary: parts.join(' · ') };
   } finally {
@@ -201,9 +199,11 @@ async function runTTSScenario(
     const text = TTS_TEXTS[length];
     const benchStart = Date.now();
     const result = await RunAnywhere.tts.synthesize(text);
-    const latencyMs = Date.now() - benchStart;
+    const e2eLatencyMs = Date.now() - benchStart;
 
-    const parts = [`${latencyMs.toFixed(0)} ms`];
+    // Harness e2e only — not a model metric. Audio duration from commons
+    // TTSOutput.duration_ms when present; never derive from PCM bytes.
+    const parts = [`e2e ${e2eLatencyMs.toFixed(0)} ms`];
     if (result.durationMs > 0) {
       parts.push(`${(result.durationMs / 1000).toFixed(1)}s audio`);
     }

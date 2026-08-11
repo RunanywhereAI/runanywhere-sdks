@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "finish_reason.pb.h"
 #include "rac_options.pb.h"
 #include "token_usage.pb.h"
 // @@protoc_insertion_point(includes)
@@ -3346,6 +3347,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
     kIsCompleteFieldNumber = 4,
     kIterationsUsedFieldNumber = 5,
     kErrorCodeFieldNumber = 7,
+    kFinishReasonFieldNumber = 10,
   };
   // repeated .runanywhere.v1.ToolCall tool_calls = 2;
   [[nodiscard]] int tool_calls_size()
@@ -3484,11 +3486,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
   void _internal_set_error_code(::int32_t value);
 
   public:
+  // .runanywhere.v1.FinishReason finish_reason = 10;
+  void clear_finish_reason() ;
+  [[nodiscard]] ::runanywhere::v1::FinishReason finish_reason() const;
+  void set_finish_reason(::runanywhere::v1::FinishReason value);
+
+  private:
+  ::runanywhere::v1::FinishReason _internal_finish_reason() const;
+  void _internal_set_finish_reason(::runanywhere::v1::FinishReason value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
+      ::google::protobuf::internal::TcParseTable<4, 10,
                           3, 82,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -3526,6 +3538,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
     bool is_complete_;
     ::int32_t iterations_used_;
     ::int32_t error_code_;
+    int finish_reason_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -7847,6 +7860,30 @@ inline void ToolCallingResult::set_allocated_usage(::runanywhere::v1::TokenUsage
 
   _impl_.usage_ = reinterpret_cast<::runanywhere::v1::TokenUsage*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingResult.usage)
+}
+
+// .runanywhere.v1.FinishReason finish_reason = 10;
+inline void ToolCallingResult::clear_finish_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.finish_reason_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline ::runanywhere::v1::FinishReason ToolCallingResult::finish_reason() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingResult.finish_reason)
+  return _internal_finish_reason();
+}
+inline void ToolCallingResult::set_finish_reason(::runanywhere::v1::FinishReason value) {
+  _internal_set_finish_reason(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingResult.finish_reason)
+}
+inline ::runanywhere::v1::FinishReason ToolCallingResult::_internal_finish_reason() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::FinishReason>(_impl_.finish_reason_);
+}
+inline void ToolCallingResult::_internal_set_finish_reason(::runanywhere::v1::FinishReason value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.finish_reason_ = value;
 }
 
 // -------------------------------------------------------------------

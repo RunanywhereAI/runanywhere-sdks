@@ -88,11 +88,11 @@ public class CustomFilter(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<CustomFilter> = object : ProtoAdapter<CustomFilter>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      CustomFilter::class, 
-      "type.googleapis.com/runanywhere.v1.CustomFilter", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      CustomFilter::class,
+      "type.googleapis.com/runanywhere.v1.CustomFilter",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: CustomFilter): Int {

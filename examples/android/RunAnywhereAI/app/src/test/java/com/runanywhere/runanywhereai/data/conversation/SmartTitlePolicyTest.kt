@@ -30,12 +30,14 @@ class SmartTitlePolicyTest {
     }
 
     @Test
-    fun `thinking markup cannot become a title`() {
+    fun `normalizedTitle uses the first line of commons answer text`() {
+        // LLMGenerationResult.text is already reasoning-free; titles must not
+        // re-parse think tags.
         assertEquals(
             "Useful Kotlin Tips",
-            SmartTitlePolicy.normalizedTitle("<think>private plan</think>\nUseful Kotlin Tips"),
+            SmartTitlePolicy.normalizedTitle("Useful Kotlin Tips\nMore detail"),
         )
-        assertNull(SmartTitlePolicy.normalizedTitle("<think>still reasoning at token cap"))
+        assertNull(SmartTitlePolicy.normalizedTitle("   "))
     }
 
     @Test

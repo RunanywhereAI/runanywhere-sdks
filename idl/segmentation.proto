@@ -63,11 +63,17 @@ message SegmentationRequest {
 // SegmentationResult.height). Commons rejects any result whose pixel_counts
 // do not sum to that product before encoding it into a SegmentationResult, so
 // within this message the summaries partition the image and the division is
-// exact.
+// exact. `fraction` is that share, computed once by commons (tag 5).
 message SegmentationClassSummary {
     uint32 class_id = 1;
     uint64 pixel_count = 2;
     string label = 3;
+    // Tag 4 historically held `string label` before label moved to tag 3.
+    // Do not reuse it (would be a second wire-type flip on the same tag).
+    reserved 4;
+    // Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+    // Zero when width or height is zero (rejected upstream before encode).
+    float fraction = 5;
 }
 
 message SegmentationResult {

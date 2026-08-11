@@ -38,7 +38,6 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.archiveArtifact
 import com.runanywhere.sdk.public.extensions.Models.setArchiveArtifact
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - Model Registration
 
@@ -157,10 +156,9 @@ suspend fun RunAnywhere.registerModel(
     val archive =
         model.archiveArtifact
             ?: ArchiveArtifact(type = archiveType ?: ArchiveType.ARCHIVE_TYPE_UNSPECIFIED)
-    model =
-        model
-            .setArchiveArtifact(archive.copy(structure = structure))
-            .copy(updated_at_unix_ms = getCurrentTimeMillis())
+    // Preserve structure only — commons owns updated_at on registry write /
+    // mutator paths. Do not invent a platform compatibility timestamp here.
+    model = model.setArchiveArtifact(archive.copy(structure = structure))
     CppBridgeModelRegistry.save(model)
     return model
 }

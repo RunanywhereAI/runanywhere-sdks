@@ -88,8 +88,20 @@ extern "C" {
  *                 and wire/slot 10 to semantic segmentation
  *                 (`RAC_PRIMITIVE_SEGMENT` / `segmentation_ops`). Engines
  *                 compiled against v6 are rejected until rebuilt.
+ *   8u — revived reranking as a first-class primitive: promoted reserved
+ *                 primitive wire value 11 to `RAC_PRIMITIVE_RERANK` and
+ *                 renamed vtable reserved_slot_2 → `rerank_ops` (same binary
+ *                 offset). This is wire value 11, NOT the original rerank
+ *                 wire value 6, which stays permanently retired. Engines
+ *                 compiled against v7 are rejected until rebuilt.
+ *   9u — LLM streaming token accounting: `rac_llm_stream_callback_fn` gains
+ *                 `int32_t tokens_in_delta`, and `rac_llm_service_ops_t` gains
+ *                 `get_stream_token_counts` (+ `rac_llm_token_counts_t`).
+ *                 Engines compiled against v8 are rejected until rebuilt;
+ *                 NULL `get_stream_token_counts` means counts must be marked
+ *                 estimated. Engine-vtable reserved_slot_3 is unchanged.
  */
-#define RAC_PLUGIN_API_VERSION 7u
+#define RAC_PLUGIN_API_VERSION 9u
 
 /* ===========================================================================
  * Plugin entry-point signature
@@ -200,9 +212,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                                          \
     namespace rac_plugin_autoreg_##name {                                                         \
         struct Registrar {                                                                        \
-            Registrar() noexcept {                                                                \
-                (void)::rac_plugin_register(::rac_plugin_entry_##name());                         \
-            }                                                                                     \
+            Registrar() noexcept { (void)::rac_plugin_register(::rac_plugin_entry_##name()); }    \
         };                                                                                        \
         /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
          * still has to ask the linker not to drop the .o file (see header                        \
@@ -244,9 +254,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
     extern "C" rac_result_t rac_backend_##name##_register(void);                                  \
     namespace rac_plugin_autoreg_##name {                                                         \
         struct Registrar {                                                                        \
-            Registrar() noexcept {                                                                \
-                (void)::rac_backend_##name##_register();                                          \
-            }                                                                                     \
+            Registrar() noexcept { (void)::rac_backend_##name##_register(); }                     \
         };                                                                                        \
         /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
          * still has to ask the linker not to drop the .o file (see header                        \
@@ -354,8 +362,8 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-RAC_API rac_result_t
-rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.

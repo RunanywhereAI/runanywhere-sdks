@@ -39,14 +39,4 @@ class ChatGenerationCleanupPolicyTest {
         assertEquals("Stopped.", stopped.text)
         assertEquals("partial reasoning", stopped.thinking)
     }
-
-    @Test
-    fun `stop strips an unterminated raw thinking block and terminalizes the row`() {
-        val stopped = ChatGenerationCleanupPolicy.afterStop(
-            ChatMessage(text = "<think>private partial reasoning", isUser = false),
-        )
-
-        assertEquals("Stopped.", stopped.text)
-        assertEquals("private partial reasoning", stopped.thinking)
-    }
 }

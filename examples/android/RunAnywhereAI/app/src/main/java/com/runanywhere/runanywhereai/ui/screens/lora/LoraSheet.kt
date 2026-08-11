@@ -31,7 +31,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -93,7 +93,7 @@ fun LoraSheet(viewModel: LoraViewModel, onDismiss: () -> Unit) {
                         isBusy = state.busyId == entry.id,
                         progress = if (state.busyId == entry.id) state.progress else null,
                         onDownload = { viewModel.download(entry) },
-                        onApply = { scale -> viewModel.apply(entry, scale) },
+                        onApply = { scale -> viewModel.apply(entry, scale) }, // null → commons resolves
                         onRemove = viewModel::clear,
                     )
                 }
@@ -126,12 +126,15 @@ private fun LoraRow(
     isBusy: Boolean,
     progress: DownloadProgressInfo?,
     onDownload: () -> Unit,
-    onApply: (Float) -> Unit,
+    onApply: (Float?) -> Unit,
     onRemove: () -> Unit,
 ) {
     val dimens = LocalDimens.current
+    // Catalog default when present (incl. 0.0); null means unset — Apply passes
+    // null so commons resolve_effective_lora_scale owns the 1.0 fallback.
+    // Never invent an effective scale in the example app.
     var scale by rememberSaveable(entry.id) {
-        mutableFloatStateOf(entry.default_scale?.takeIf { it > 0f } ?: 1f)
+        mutableStateOf(entry.default_scale)
     }
     Box(
         modifier = Modifier
@@ -155,7 +158,7 @@ private fun LoraRow(
                     // entry itself no longer carries display/size metadata to show here.
                 }
 
-                Spacer(Modifier.size(dimens.spacingMd))
+                Spacer(modifier = Modifier.size(dimens.spacingMd))
 
                 LoraAction(
                     isActive = isActive,
@@ -175,7 +178,8 @@ private fun LoraRow(
                 StrengthControl(scale = scale, onScaleChange = { scale = it })
             } else if (isActive) {
                 Text(
-                    text = "Strength ${String.format(Locale.US, "%.2fx", scale)}",
+                    text = scale?.let { "Strength ${String.format(Locale.US, "%.2fx", it)}" }
+                        ?: "Strength (SDK default)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -185,8 +189,11 @@ private fun LoraRow(
 }
 
 @Composable
-private fun StrengthControl(scale: Float, onScaleChange: (Float) -> Unit) {
+private fun StrengthControl(scale: Float?, onScaleChange: (Float) -> Unit) {
     val dimens = LocalDimens.current
+    // Slider requires a concrete thumb position; 1f here is chrome only when
+    // scale is unset — Apply still sends null so commons resolves.
+    val sliderValue = (scale ?: 1f).coerceIn(0.1f, 2.0f)
     Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -199,13 +206,13 @@ private fun StrengthControl(scale: Float, onScaleChange: (Float) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = String.format(Locale.US, "%.2fx", scale),
+                text = scale?.let { String.format(Locale.US, "%.2fx", it) } ?: "SDK default",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
         Slider(
-            value = scale,
+            value = sliderValue,
             onValueChange = onScaleChange,
             valueRange = 0.1f..2.0f,
             steps = 18,
@@ -280,7 +287,7 @@ private fun CenterNote(text: String, showSpinner: Boolean = false) {
     ) {
         if (showSpinner) {
             CircularProgressIndicator(modifier = Modifier.size(dimens.iconSm), strokeWidth = 2.dp)
-            Spacer(Modifier.height(dimens.spacingSm))
+            Spacer(modifier = Modifier.height(dimens.spacingSm))
         }
         Text(
             text = text,

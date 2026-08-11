@@ -31,6 +31,57 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// How commons applies StructuredOutputOptions on the ordinary LLM generate
+/// path. Platform SDKs must not invent a second policy.
+public nonisolated enum RAStructuredOutputMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+
+  /// Compile schema→GBNF (or honor grammar/regex) and constrain decoding.
+  case constrained // = 1
+
+  /// Do not constrain decoding; validate the free-text result against schema.
+  case validationOnly // = 2
+
+  /// Constrained (when a decoder arm is present), then one repair retry if
+  /// the first answer fails schema validation.
+  case repair // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .constrained
+    case 2: self = .validationOnly
+    case 3: self = .repair
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .constrained: return 1
+    case .validationOnly: return 2
+    case .repair: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAStructuredOutputMode] = [
+    .unspecified,
+    .constrained,
+    .validationOnly,
+    .repair,
+  ]
+
+}
+
 public nonisolated struct RAStructuredOutputOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -54,6 +105,7 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
   public var constraint: RAStructuredOutputOptions.OneOf_Constraint? = nil
 
   /// A JSON Schema document, verbatim. Unsupported keywords are rejected.
+  /// Commons compiles this to GBNF on the generate path (mode permitting).
   public var schema: String {
     get {
       if case .schema(let v)? = constraint {return v}
@@ -80,6 +132,16 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
     set {constraint = .regex(newValue)}
   }
 
+  /// Unset = CONSTRAINED when a constraint arm is present, else free text.
+  public var mode: RAStructuredOutputMode {
+    get {_mode ?? .unspecified}
+    set {_mode = newValue}
+  }
+  /// Returns true if `mode` has been explicitly set.
+  public var hasMode: Bool {self._mode != nil}
+  /// Clears the value of `mode`. Subsequent reads from it will return its default value.
+  public mutating func clearMode() {self._mode = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// Exactly one arm; the arm selects the constraint kind. Absent = free text.
@@ -87,6 +149,7 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
   /// arm it was given fails the call; it never degrades to free generation.
   public nonisolated enum OneOf_Constraint: Equatable, Sendable {
     /// A JSON Schema document, verbatim. Unsupported keywords are rejected.
+    /// Commons compiles this to GBNF on the generate path (mode permitting).
     case schema(String)
     /// GBNF/EBNF grammar text. On-device only.
     case grammar(String)
@@ -98,6 +161,7 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
   public init() {}
 
   fileprivate var _includeSchemaInPrompt: Bool? = nil
+  fileprivate var _mode: RAStructuredOutputMode? = nil
 }
 
 public nonisolated struct RAStructuredOutputValidation: @unchecked Sendable {
@@ -151,6 +215,18 @@ public nonisolated struct RAStructuredOutputValidation: @unchecked Sendable {
   public var hasError: Bool {_storage._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  /// True when commons issued the single repair retry (mode=REPAIR).
+  public var repairAttempted: Bool {
+    get {_storage._repairAttempted}
+    set {_uniqueStorage()._repairAttempted = newValue}
+  }
+
+  /// 0 = first pass only; 1 = repair pass produced the reported verdict.
+  public var repairAttempts: Int32 {
+    get {_storage._repairAttempts}
+    set {_uniqueStorage()._repairAttempts = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -297,9 +373,13 @@ public nonisolated struct RAStructuredOutputPromptResult: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
+nonisolated extension RAStructuredOutputMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STRUCTURED_OUTPUT_MODE_UNSPECIFIED\0\u{1}STRUCTURED_OUTPUT_MODE_CONSTRAINED\0\u{1}STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY\0\u{1}STRUCTURED_OUTPUT_MODE_REPAIR\0")
+}
+
 nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_schema_in_prompt\0\u{1}schema\0\u{1}grammar\0\u{1}regex\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_schema_in_prompt\0\u{1}schema\0\u{1}grammar\0\u{1}regex\0\u{1}mode\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -332,6 +412,7 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
           self.constraint = .regex(v)
         }
       }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._mode) }()
       default: break
       }
     }
@@ -360,12 +441,16 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
     }()
     case nil: break
     }
+    try { if let v = self._mode {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAStructuredOutputOptions, rhs: RAStructuredOutputOptions) -> Bool {
     if lhs._includeSchemaInPrompt != rhs._includeSchemaInPrompt {return false}
     if lhs.constraint != rhs.constraint {return false}
+    if lhs._mode != rhs._mode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -373,7 +458,7 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}raw_output\0\u{3}extracted_json\0\u{3}validation_errors\0\u{3}validation_time_ms\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}raw_output\0\u{3}extracted_json\0\u{3}validation_errors\0\u{3}validation_time_ms\0\u{1}error\0\u{3}repair_attempted\0\u{3}repair_attempts\0")
 
   fileprivate class _StorageClass {
     var _isValid: Bool = false
@@ -383,6 +468,8 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
     var _validationErrors: [String] = []
     var _validationTimeMs: Int64 = 0
     var _error: RASDKError? = nil
+    var _repairAttempted: Bool = false
+    var _repairAttempts: Int32 = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -400,6 +487,8 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
       _validationErrors = source._validationErrors
       _validationTimeMs = source._validationTimeMs
       _error = source._error
+      _repairAttempted = source._repairAttempted
+      _repairAttempts = source._repairAttempts
     }
   }
 
@@ -425,6 +514,8 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
         case 5: try { try decoder.decodeRepeatedStringField(value: &_storage._validationErrors) }()
         case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._validationTimeMs) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._repairAttempted) }()
+        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._repairAttempts) }()
         default: break
         }
       }
@@ -458,6 +549,12 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
+      if _storage._repairAttempted != false {
+        try visitor.visitSingularBoolField(value: _storage._repairAttempted, fieldNumber: 8)
+      }
+      if _storage._repairAttempts != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._repairAttempts, fieldNumber: 9)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -474,6 +571,8 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
         if _storage._validationErrors != rhs_storage._validationErrors {return false}
         if _storage._validationTimeMs != rhs_storage._validationTimeMs {return false}
         if _storage._error != rhs_storage._error {return false}
+        if _storage._repairAttempted != rhs_storage._repairAttempted {return false}
+        if _storage._repairAttempts != rhs_storage._repairAttempts {return false}
         return true
       }
       if !storagesAreEqual {return false}

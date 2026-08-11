@@ -129,7 +129,7 @@ All AI calls go through `RunAnywhere`:
 
 ### Feature-Specific Notes
 
-- **Chat**: streaming generation appends tokens to a placeholder message at a fixed list index via `setState`. Tool calling detects `lfm2`+`tool` in the model name to select `ToolCallFormatNames.lfm2`. Thinking content parsed from `<think>...</think>` blocks.
+- **Chat**: streaming generation appends tokens to a placeholder message at a fixed list index via `setState`. Tool calling detects `lfm2`+`tool` in the model name to select `ToolCallFormatNames.lfm2`. Thinking content comes from the SDK (`thinkingText` / stream thought deltas) — the app does not parse `<think>` tags.
 - **VLM**: `VLMViewModel` (non-singleton, created per view) uses a `Timer.periodic` at 2.5s for auto-streaming mode. Camera frames are BGRA→file→`VLMImage(filePath:)`.
 - **Voice Assistant**: subscribes to `voice.eventStream()` which emits protobuf `VoiceEvent` messages. Event payload types: `state`, `vad`, `userSaid`, `assistantToken`, `audio`, `error`.
 - **RAG**: `DocumentService` uses `syncfusion_flutter_pdf` for PDF text extraction. The RAG model selection flow does NOT pre-load models into memory — it only passes paths to `RAGConfiguration`.

@@ -33,6 +33,7 @@
 #include "google/protobuf/map_type_handler.h"  // IWYU pragma: export
 #include "google/protobuf/map_entry.h"
 #include "google/protobuf/map_field.h"
+#include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
 #include "rac_options.pb.h"
@@ -61,6 +62,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_stru
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum StructuredOutputMode : int;
+extern const uint32_t StructuredOutputMode_internal_data_[];
 class StructuredOutputOptions;
 struct StructuredOutputOptionsGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -113,11 +116,58 @@ extern const StructuredOutputValidationGlobalsTypeInternal StructuredOutputValid
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::StructuredOutputMode_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::StructuredOutputMode>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
+enum StructuredOutputMode : int {
+  STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
+  STRUCTURED_OUTPUT_MODE_CONSTRAINED = 1,
+  STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY = 2,
+  STRUCTURED_OUTPUT_MODE_REPAIR = 3,
+  StructuredOutputMode_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  StructuredOutputMode_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t StructuredOutputMode_internal_data_[];
+inline constexpr StructuredOutputMode StructuredOutputMode_MIN =
+    static_cast<StructuredOutputMode>(0);
+inline constexpr StructuredOutputMode StructuredOutputMode_MAX =
+    static_cast<StructuredOutputMode>(3);
+[[nodiscard]] inline bool StructuredOutputMode_IsValid(int value) {
+  return 0 <= value && value <= 3;
+}
+inline constexpr int StructuredOutputMode_ARRAYSIZE = 3 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+StructuredOutputMode_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(StructuredOutputMode) {
+  return StructuredOutputMode_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& StructuredOutputMode_Name(T value) {
+  static_assert(::std::is_same<T, StructuredOutputMode>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to StructuredOutputMode_Name().");
+  return StructuredOutputMode_Name(static_cast<StructuredOutputMode>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& StructuredOutputMode_Name(StructuredOutputMode value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<StructuredOutputMode_descriptor, 0, 3>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool StructuredOutputMode_Parse(
+    ::absl::string_view name, StructuredOutputMode* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<StructuredOutputMode>(StructuredOutputMode_descriptor(), name,
+                                           value);
+}
+using ::google::protobuf::internal::generated_enum::AbslParseFlag;
+using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
@@ -328,6 +378,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
   // accessors -------------------------------------------------------
   enum : int {
     kIncludeSchemaInPromptFieldNumber = 1,
+    kModeFieldNumber = 5,
     kSchemaFieldNumber = 2,
     kGrammarFieldNumber = 3,
     kRegexFieldNumber = 4,
@@ -342,6 +393,18 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
   private:
   bool _internal_include_schema_in_prompt() const;
   void _internal_set_include_schema_in_prompt(bool value);
+
+  public:
+  // optional .runanywhere.v1.StructuredOutputMode mode = 5;
+  [[nodiscard]] bool has_mode()
+      const;
+  void clear_mode() ;
+  [[nodiscard]] ::runanywhere::v1::StructuredOutputMode mode() const;
+  void set_mode(::runanywhere::v1::StructuredOutputMode value);
+
+  private:
+  ::runanywhere::v1::StructuredOutputMode _internal_mode() const;
+  void _internal_set_mode(::runanywhere::v1::StructuredOutputMode value);
 
   public:
   // string schema = 2;
@@ -406,7 +469,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
   [[nodiscard]] inline bool has_constraint() const;
   inline void clear_has_constraint();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 4,
+      ::google::protobuf::internal::TcParseTable<3, 5,
                           0, 65,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -436,6 +499,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputOptions final : pub
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     bool include_schema_in_prompt_;
+    int mode_;
     union ConstraintUnion {
       constexpr ConstraintUnion() : _constinit_{} {}
       ::google::protobuf::internal::ConstantInitialized _constinit_;
@@ -603,9 +667,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
     kRawOutputFieldNumber = 3,
     kExtractedJsonFieldNumber = 4,
     kErrorFieldNumber = 7,
-    kValidationTimeMsFieldNumber = 6,
     kIsValidFieldNumber = 1,
     kContainsJsonFieldNumber = 2,
+    kRepairAttemptedFieldNumber = 8,
+    kRepairAttemptsFieldNumber = 9,
+    kValidationTimeMsFieldNumber = 6,
   };
   // repeated string validation_errors = 5;
   [[nodiscard]] int validation_errors_size()
@@ -684,16 +750,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
   ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
-  // int64 validation_time_ms = 6;
-  void clear_validation_time_ms() ;
-  [[nodiscard]] ::int64_t validation_time_ms() const;
-  void set_validation_time_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_validation_time_ms() const;
-  void _internal_set_validation_time_ms(::int64_t value);
-
-  public:
   // bool is_valid = 1;
   void clear_is_valid() ;
   [[nodiscard]] bool is_valid() const;
@@ -714,12 +770,42 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
   void _internal_set_contains_json(bool value);
 
   public:
+  // bool repair_attempted = 8;
+  void clear_repair_attempted() ;
+  [[nodiscard]] bool repair_attempted() const;
+  void set_repair_attempted(bool value);
+
+  private:
+  bool _internal_repair_attempted() const;
+  void _internal_set_repair_attempted(bool value);
+
+  public:
+  // int32 repair_attempts = 9;
+  void clear_repair_attempts() ;
+  [[nodiscard]] ::int32_t repair_attempts() const;
+  void set_repair_attempts(::int32_t value);
+
+  private:
+  ::int32_t _internal_repair_attempts() const;
+  void _internal_set_repair_attempts(::int32_t value);
+
+  public:
+  // int64 validation_time_ms = 6;
+  void clear_validation_time_ms() ;
+  [[nodiscard]] ::int64_t validation_time_ms() const;
+  void set_validation_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_validation_time_ms() const;
+  void _internal_set_validation_time_ms(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.StructuredOutputValidation)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
-                          1, 91,
+      ::google::protobuf::internal::TcParseTable<4, 9,
+                          1, 99,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -751,9 +837,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StructuredOutputValidation final : 
     ::google::protobuf::internal::ArenaStringPtr raw_output_;
     ::google::protobuf::internal::ArenaStringPtr extracted_json_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
-    ::int64_t validation_time_ms_;
     bool is_valid_;
     bool contains_json_;
+    bool repair_attempted_;
+    ::int32_t repair_attempts_;
+    ::int64_t validation_time_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1861,6 +1949,34 @@ inline void StructuredOutputOptions::set_allocated_regex(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputOptions.regex)
 }
 
+// optional .runanywhere.v1.StructuredOutputMode mode = 5;
+inline bool StructuredOutputOptions::has_mode() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void StructuredOutputOptions::clear_mode() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.mode_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline ::runanywhere::v1::StructuredOutputMode StructuredOutputOptions::mode() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputOptions.mode)
+  return _internal_mode();
+}
+inline void StructuredOutputOptions::set_mode(::runanywhere::v1::StructuredOutputMode value) {
+  _internal_set_mode(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputOptions.mode)
+}
+inline ::runanywhere::v1::StructuredOutputMode StructuredOutputOptions::_internal_mode() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::StructuredOutputMode>(_impl_.mode_);
+}
+inline void StructuredOutputOptions::_internal_set_mode(::runanywhere::v1::StructuredOutputMode value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.mode_ = value;
+}
+
 inline bool StructuredOutputOptions::has_constraint() const {
   return constraint_case() != CONSTRAINT_NOT_SET;
 }
@@ -1878,7 +1994,7 @@ inline StructuredOutputOptions::ConstraintCase StructuredOutputOptions::constrai
 inline void StructuredOutputValidation::clear_is_valid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_valid_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline bool StructuredOutputValidation::is_valid() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.is_valid)
@@ -1886,7 +2002,7 @@ inline bool StructuredOutputValidation::is_valid() const {
 }
 inline void StructuredOutputValidation::set_is_valid(bool value) {
   _internal_set_is_valid(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.is_valid)
 }
 inline bool StructuredOutputValidation::_internal_is_valid() const {
@@ -1902,7 +2018,7 @@ inline void StructuredOutputValidation::_internal_set_is_valid(bool value) {
 inline void StructuredOutputValidation::clear_contains_json() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.contains_json_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline bool StructuredOutputValidation::contains_json() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.contains_json)
@@ -1910,7 +2026,7 @@ inline bool StructuredOutputValidation::contains_json() const {
 }
 inline void StructuredOutputValidation::set_contains_json(bool value) {
   _internal_set_contains_json(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.contains_json)
 }
 inline bool StructuredOutputValidation::_internal_contains_json() const {
@@ -2134,7 +2250,7 @@ StructuredOutputValidation::_internal_mutable_validation_errors() {
 inline void StructuredOutputValidation::clear_validation_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validation_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::int64_t StructuredOutputValidation::validation_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.validation_time_ms)
@@ -2142,7 +2258,7 @@ inline ::int64_t StructuredOutputValidation::validation_time_ms() const {
 }
 inline void StructuredOutputValidation::set_validation_time_ms(::int64_t value) {
   _internal_set_validation_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.validation_time_ms)
 }
 inline ::int64_t StructuredOutputValidation::_internal_validation_time_ms() const {
@@ -2245,6 +2361,54 @@ inline void StructuredOutputValidation::set_allocated_error(::runanywhere::v1::S
 
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StructuredOutputValidation.error)
+}
+
+// bool repair_attempted = 8;
+inline void StructuredOutputValidation::clear_repair_attempted() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.repair_attempted_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline bool StructuredOutputValidation::repair_attempted() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.repair_attempted)
+  return _internal_repair_attempted();
+}
+inline void StructuredOutputValidation::set_repair_attempted(bool value) {
+  _internal_set_repair_attempted(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.repair_attempted)
+}
+inline bool StructuredOutputValidation::_internal_repair_attempted() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.repair_attempted_;
+}
+inline void StructuredOutputValidation::_internal_set_repair_attempted(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.repair_attempted_ = value;
+}
+
+// int32 repair_attempts = 9;
+inline void StructuredOutputValidation::clear_repair_attempts() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.repair_attempts_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline ::int32_t StructuredOutputValidation::repair_attempts() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.StructuredOutputValidation.repair_attempts)
+  return _internal_repair_attempts();
+}
+inline void StructuredOutputValidation::set_repair_attempts(::int32_t value) {
+  _internal_set_repair_attempts(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.StructuredOutputValidation.repair_attempts)
+}
+inline ::int32_t StructuredOutputValidation::_internal_repair_attempts() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.repair_attempts_;
+}
+inline void StructuredOutputValidation::_internal_set_repair_attempts(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.repair_attempts_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -3278,6 +3442,19 @@ inline void StructuredOutputPromptResult::set_allocated_error(::runanywhere::v1:
 }  // namespace v1
 }  // namespace runanywhere
 
+
+namespace google {
+namespace protobuf {
+
+template <>
+struct is_proto_enum<::runanywhere::v1::StructuredOutputMode> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::StructuredOutputMode>() {
+  return ::runanywhere::v1::StructuredOutputMode_descriptor();
+}
+
+}  // namespace protobuf
+}  // namespace google
 
 // @@protoc_insertion_point(global_scope)
 

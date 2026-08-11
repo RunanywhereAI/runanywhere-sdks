@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
+#include "finish_reason.pb.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
 #include "structured_output.pb.h"
@@ -65,8 +66,6 @@ namespace runanywhere {
 namespace v1 {
 enum ExecutionTarget : int;
 extern const uint32_t ExecutionTarget_internal_data_[];
-enum FinishReason : int;
-extern const uint32_t FinishReason_internal_data_[];
 class LLMConfiguration;
 struct LLMConfigurationGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -114,60 +113,11 @@ namespace protobuf {
 template <>
 internal::EnumTraitsT<::runanywhere::v1::ExecutionTarget_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ExecutionTarget>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::FinishReason_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::FinishReason>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
-enum FinishReason : int {
-  FINISH_REASON_UNSPECIFIED = 0,
-  FINISH_REASON_STOP = 1,
-  FINISH_REASON_LENGTH = 2,
-  FINISH_REASON_STOP_SEQUENCE = 3,
-  FINISH_REASON_TOOL_CALLS = 4,
-  FINISH_REASON_CANCELLED = 5,
-  FINISH_REASON_CONTEXT_OVERFLOW = 6,
-  FINISH_REASON_ERROR = 7,
-  FinishReason_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  FinishReason_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t FinishReason_internal_data_[];
-inline constexpr FinishReason FinishReason_MIN =
-    static_cast<FinishReason>(0);
-inline constexpr FinishReason FinishReason_MAX =
-    static_cast<FinishReason>(7);
-[[nodiscard]] inline bool FinishReason_IsValid(int value) {
-  return 0 <= value && value <= 7;
-}
-inline constexpr int FinishReason_ARRAYSIZE = 7 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-FinishReason_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(FinishReason) {
-  return FinishReason_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& FinishReason_Name(T value) {
-  static_assert(::std::is_same<T, FinishReason>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to FinishReason_Name().");
-  return FinishReason_Name(static_cast<FinishReason>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& FinishReason_Name(FinishReason value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<FinishReason_descriptor, 0, 7>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool FinishReason_Parse(
-    ::absl::string_view name, FinishReason* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<FinishReason>(FinishReason_descriptor(), name,
-                                           value);
-}
 enum ExecutionTarget : int {
   EXECUTION_TARGET_UNSPECIFIED = 0,
   EXECUTION_TARGET_ON_DEVICE = 1,
@@ -4271,12 +4221,6 @@ inline void PerformanceMetrics::set_allocated_usage(::runanywhere::v1::TokenUsag
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::FinishReason> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::FinishReason>() {
-  return ::runanywhere::v1::FinishReason_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::ExecutionTarget> : std::true_type {};
 template <>

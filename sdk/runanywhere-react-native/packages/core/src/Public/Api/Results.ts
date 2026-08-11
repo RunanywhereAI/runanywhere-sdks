@@ -7,7 +7,7 @@
  * object.
  */
 
-import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 import type { STTOutput, STTServiceState } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
@@ -63,15 +63,23 @@ function throwIfFailed(result: { error?: SDKError }): void {
  * `VLMResult.finishReason` stays a plain string on the wire ("stop" |
  * "length" | "stop_sequence"), unlike the LLM path's `FinishReason` enum.
  */
-function toFinishReason(raw: string, toolCallCount: number): FinishReason {
-  if (toolCallCount > 0) return 'toolCalls';
+function toFinishReason(raw: string): FinishReason {
   switch (raw.toLowerCase()) {
     case 'length':
     case 'max_tokens':
       return 'length';
+    case 'tool_calls':
+    case 'toolcalls':
+      return 'toolCalls';
     case 'cancelled':
     case 'canceled':
       return 'cancelled';
+    case 'error':
+      return 'error';
+    case '':
+    case 'unspecified':
+    case 'unknown':
+      return 'unknown';
     default:
       return 'stop';
   }
@@ -79,28 +87,26 @@ function toFinishReason(raw: string, toolCallCount: number): FinishReason {
 
 /**
  * Map the wire `FinishReason` enum onto the public union.
- *
- * `finish_reason` moved from a raw string to this typed enum on the wire
- * (idl API-realignment); this replaces the old string-lowercasing
- * `toFinishReason` for every LLM result path.
+ * Never invents `toolCalls` / `stop` from tool-call counts or local state;
+ * `UNSPECIFIED` stays `unknown`.
  */
-function fromFinishReason(
-  raw: ProtoFinishReason,
-  toolCallCount: number
-): FinishReason {
-  if (toolCallCount > 0 || raw === ProtoFinishReason.FINISH_REASON_TOOL_CALLS) {
-    return 'toolCalls';
-  }
+export function fromFinishReason(raw: ProtoFinishReason): FinishReason {
   switch (raw) {
+    case ProtoFinishReason.FINISH_REASON_STOP:
+    case ProtoFinishReason.FINISH_REASON_STOP_SEQUENCE:
+      return 'stop';
     case ProtoFinishReason.FINISH_REASON_LENGTH:
     case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
       return 'length';
+    case ProtoFinishReason.FINISH_REASON_TOOL_CALLS:
+      return 'toolCalls';
     case ProtoFinishReason.FINISH_REASON_CANCELLED:
       return 'cancelled';
     case ProtoFinishReason.FINISH_REASON_ERROR:
-      return 'unknown';
+      return 'error';
+    case ProtoFinishReason.FINISH_REASON_UNSPECIFIED:
     default:
-      return 'stop';
+      return 'unknown';
   }
 }
 
@@ -114,7 +120,7 @@ export function toGenerationResult(
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: result.toolCalls,
-    finishReason: fromFinishReason(result.finishReason, result.toolCalls.length),
+    finishReason: fromFinishReason(result.finishReason),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
@@ -150,7 +156,7 @@ export function toGenerationResultFromVlm(
   return {
     text: result.text,
     toolCalls: [],
-    finishReason: toFinishReason(result.finishReason, 0),
+    finishReason: toFinishReason(result.finishReason),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
@@ -160,7 +166,11 @@ export function toGenerationResultFromVlm(
   };
 }
 
-/** Fill a generation result for callers that only aggregated tokens. */
+/**
+ * Empty metrics shell for a terminal stream event that carries no
+ * `LLMGenerationResult`. Metrics stay zero — never wall-clock fabricated.
+ * Callers may overlay accumulated transport text/thinking as content only.
+ */
 export function emptyGenerationResult(
   requestId: string,
   model: string
@@ -179,39 +189,19 @@ export function emptyGenerationResult(
 }
 
 /**
- * Build a wall-clock generation result for a stream whose native side ended
- * without a terminal `isFinal` event.
- *
- * Native backends may legitimately close the stream after tokens without
- * emitting a final proto event (mirrors Swift's `RunAnywhere.synthesizeResult`,
- * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`).
- * That is not an error at the native boundary: the caller already received
- * every token, so `llm.generateStream` reports a synthesized `completed`
- * event instead of leaving the iterator to stop with no terminal event.
+ * Terminal stream completion without a commons result: preserve accumulated
+ * text/thinking as transport content only. Metrics remain zero.
  */
-export function synthesizeStreamResult(
+export function generationResultFromAccumulated(
   requestId: string,
   model: string,
   text: string,
-  thinking: string,
-  tokenCount: number,
-  startedAtMs: number,
-  firstTokenAtMs: number | null
+  thinking = ''
 ): GenerationResult {
-  const totalSeconds = (Date.now() - startedAtMs) / 1000;
-  const ttft = firstTokenAtMs !== null ? Math.round(firstTokenAtMs - startedAtMs) : 0;
-  const tokensPerSecond = totalSeconds > 0 ? tokenCount / totalSeconds : 0;
   return {
+    ...emptyGenerationResult(requestId, model),
     text,
     ...(thinking ? { thinkingText: thinking } : {}),
-    toolCalls: [],
-    finishReason: toFinishReason('', 0),
-    inputTokens: 0,
-    outputTokens: tokenCount,
-    timeToFirstTokenMs: ttft,
-    tokensPerSecond,
-    requestId,
-    model,
   };
 }
 
@@ -399,8 +389,7 @@ export function toDiarizationResult(
 /**
  * Project a segmentation result onto the public mask.
  *
- * `SegmentationClassSummary.fraction` is deleted outright; derive it from
- * `pixelCount / (width * height)` instead.
+ * Commons owns `SegmentationClassSummary.fraction` (tag 5).
  */
 export function toSegmentationResult(
   result: SegmentationResultProto
@@ -409,7 +398,6 @@ export function toSegmentationResult(
   const classMask = new Uint16Array(
     mask.buffer.slice(mask.byteOffset, mask.byteOffset + mask.byteLength)
   );
-  const totalPixels = result.width * result.height;
   return {
     classMask,
     width: result.width,
@@ -418,7 +406,7 @@ export function toSegmentationResult(
       id: summary.classId,
       label: summary.label,
       pixelCount: Number(summary.pixelCount),
-      fraction: totalPixels > 0 ? Number(summary.pixelCount) / totalPixels : 0,
+      fraction: summary.fraction,
     })),
     ...(result.diagnosticRgba && result.diagnosticRgba.byteLength > 0
       ? { diagnosticImage: result.diagnosticRgba }
@@ -438,8 +426,6 @@ export function toMatch(chunk: RAGSearchResult): Match {
 /** Project a RAG result onto the public answer plus sources and metrics. */
 export function toRagResult(result: RAGResult): RagResult {
   throwIfFailed(result);
-  const outputTokens = result.usage?.outputTokens ?? 0;
-  const totalMs = Number(result.generationTimeMs);
   return {
     answer: result.answer,
     sources: result.retrievedChunks.map(toMatch),
@@ -448,9 +434,10 @@ export function toRagResult(result: RAGResult): RagResult {
     toolCalls: [],
     finishReason: 'stop',
     inputTokens: result.usage?.inputTokens ?? 0,
-    outputTokens,
-    timeToFirstTokenMs: Number(result.retrievalTimeMs),
-    tokensPerSecond: totalMs > 0 ? outputTokens / (totalMs / 1000) : 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
+    // Commons TokenUsage only — never map retrievalTimeMs→TTFT or derive tok/s.
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId: result.requestId,
     model: '',
   };

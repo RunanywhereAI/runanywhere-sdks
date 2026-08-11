@@ -4,14 +4,17 @@ The bridge (``native/module.cpp``) accepts a subset of the spec's knobs. Fields 
 carry are never silently dropped: setting one raises ``SDKException.not_implemented`` naming
 the bridge parameter that is missing, so a caller is never told a knob took effect when it
 did not.
+
+Structured JSON Schema is forwarded as typed ``StructuredOutputOptions`` for commons to
+compile to GBNF — this bridge never hosts a schema→grammar compiler.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+import json
+from typing import Any, Optional
 
 from .errors import SDKException
-from .grammar import json_schema_to_grammar
 from .options import (
     EmbedOptions,
     LlmOptions,
@@ -43,12 +46,19 @@ def _reject(field: str, parameter: str) -> None:
     raise SDKException.not_implemented(
         f"{field}: the Python bridge's generate() has no {parameter} parameter "
         "(native/module.cpp binds max_tokens/temperature/top_p/top_k/system_prompt/"
-        "grammar/disable_thinking only)"
+        "structured_schema/disable_thinking only)"
     )
 
 
+def _schema_json(schema: Any) -> str:
+    """Serialize a public JSON-schema value for ``StructuredOutputOptions.schema``."""
+    if isinstance(schema, str):
+        return schema
+    return json.dumps(schema, separators=(",", ":"), ensure_ascii=False)
+
+
 def llm_kwargs(options: Optional[LlmOptions], *, vlm: bool = False) -> dict:
-    """Build the ``_core.generate`` keyword arguments for ``options``.
+    """Build the ``_core.generate`` / proto-stream keyword arguments for ``options``.
 
     Raises:
         SDKException: an option is set that the bridge cannot carry.
@@ -80,14 +90,16 @@ def llm_kwargs(options: Optional[LlmOptions], *, vlm: bool = False) -> dict:
     if structured is not None:
         if vlm:
             raise SDKException.not_implemented(
-                "structured_output on vlm: the bridge's generate_vlm() has no grammar parameter"
+                "structured_output on vlm: the bridge's generate_vlm() has no "
+                "StructuredOutputOptions parameter"
             )
         if not structured.strict:
             raise SDKException.not_implemented(
-                "structured_output.strict=False: grammar-constrained decoding is the only "
-                "output constraint the bridge exposes, and it is always strict"
+                "structured_output.strict=False: only constrained decoding "
+                "(StructuredOutputMode.CONSTRAINED) is exposed on this bridge"
             )
-        kwargs["grammar"] = json_schema_to_grammar(structured.schema)
+        # Commons owns schema→GBNF; pass the typed schema arm only.
+        kwargs["structured_schema"] = _schema_json(structured.schema)
     return kwargs
 
 

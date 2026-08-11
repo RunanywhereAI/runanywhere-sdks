@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
     stop: vi.fn(),
     dispose: vi.fn(),
   },
-  processVoiceTurn: vi.fn(),
+  feedVoiceAgentAudio: vi.fn(),
+  supportsVoiceAgentFeedAudio: vi.fn(() => true),
+  float32ToPcm16: vi.fn((samples: Float32Array) => new Uint8Array(samples.length * 2)),
 }));
 
 vi.mock('../../../src/Infrastructure/AudioCapture', () => ({
@@ -57,8 +59,13 @@ vi.mock('../../../src/Infrastructure/AudioPlayback', () => ({
   },
 }));
 
+vi.mock('../../../src/Public/Extensions/RunAnywhere+AudioConvert', () => ({
+  float32ToPcm16: mocks.float32ToPcm16,
+}));
+
 vi.mock('../../../src/Public/Extensions/RunAnywhere+VoiceAgent', () => ({
-  processVoiceTurn: mocks.processVoiceTurn,
+  feedVoiceAgentAudio: mocks.feedVoiceAgentAudio,
+  supportsVoiceAgentFeedAudio: mocks.supportsVoiceAgentFeedAudio,
 }));
 
 import { VoiceAgentMicDriver } from '../../../src/Infrastructure/VoiceAgentMicDriver';
@@ -91,18 +98,11 @@ function turnResult() {
   };
 }
 
-function emitUtterance(capture: (typeof mocks.captures)[number]): void {
-  for (let index = 0; index < 4; index += 1) {
-    capture.emit(new Float32Array(1_600).fill(0.2));
-  }
-  for (let index = 0; index < 8; index += 1) {
-    capture.emit(new Float32Array(1_600));
-  }
-}
-
 async function flush(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 25));
 }
 
 describe('VoiceAgentMicDriver', () => {
@@ -113,48 +113,63 @@ describe('VoiceAgentMicDriver', () => {
     mocks.playback.playEncoded.mockReset();
     mocks.playback.stop.mockReset();
     mocks.playback.dispose.mockReset();
-    mocks.processVoiceTurn.mockReset();
+    mocks.feedVoiceAgentAudio.mockReset();
+    mocks.supportsVoiceAgentFeedAudio.mockReset();
+    mocks.supportsVoiceAgentFeedAudio.mockReturnValue(true);
+    mocks.float32ToPcm16.mockClear();
   });
 
-  it('keeps capture gated until synthesized reply playback completes', async () => {
+  it('fails explicitly when commons feed audio is unavailable', async () => {
+    mocks.supportsVoiceAgentFeedAudio.mockReturnValue(false);
+    const driver = new VoiceAgentMicDriver();
+    await expect(driver.start()).rejects.toMatchObject({
+      message: expect.stringContaining('VoiceAgentMicDriver'),
+      proto: {
+        nestedMessage: expect.stringContaining('rac_voice_agent_feed_audio_proto'),
+      },
+    });
+  });
+
+  it('feeds captured PCM into commons and plays synthesized replies', async () => {
     const playback = deferred<void>();
-    mocks.processVoiceTurn.mockResolvedValue(turnResult());
-    // synthesizedAudio is a self-describing WAV container (commons wraps
-    // the raw TTS PCM before returning it) -- playback goes through
-    // playEncoded, not play (see VoiceAgentMicDriver.playResultAudio).
+    mocks.feedVoiceAgentAudio
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(turnResult());
     mocks.playback.playEncoded.mockReturnValue(playback.promise);
     const phases: string[] = [];
+    const turns: Array<{ userText: string; assistantText: string }> = [];
     const driver = new VoiceAgentMicDriver();
-    await driver.start({ onPhase: (phase) => phases.push(phase) });
+    await driver.start({
+      onPhase: (phase) => phases.push(phase),
+      onTurn: (turn) => { turns.push(turn); },
+    });
 
     const capture = mocks.captures.at(-1)!;
-    emitUtterance(capture);
+    capture.emit(new Float32Array(1_600).fill(0.1));
+    await flush();
+    capture.emit(new Float32Array(1_600).fill(0.2));
     await flush();
 
+    expect(mocks.float32ToPcm16).toHaveBeenCalled();
+    expect(mocks.feedVoiceAgentAudio).toHaveBeenCalled();
+    expect(turns).toEqual([{ userText: 'hello', assistantText: 'hi there' }]);
     expect(mocks.playback.playEncoded).toHaveBeenCalledOnce();
-    // While the reply is audible the phase is `speaking`, not `processing`.
-    // The driver owns playout, so it is the only layer that knows when sound is
-    // actually leaving the speaker — the pipeline's own states are emitted
-    // around synthesis, before any of it is played. Asserting `processing` here
-    // pinned the behaviour that put "Listening" on screen over an audible reply
-    // and hid the interrupt control mounted on the speaking state.
-    expect(phases).toContain('processing');
-    expect(phases.at(-1)).toBe('speaking');
-    expect(capture.clearCount).toBe(12);
+    expect(phases).toContain('listening');
+    expect(phases).toContain('speaking');
 
     playback.resolve();
     await flush();
     expect(phases.at(-1)).toBe('listening');
   });
 
-  it('drops an in-flight turn after stop/restart instead of leaking old playback', async () => {
-    const inference = deferred<ReturnType<typeof turnResult>>();
-    mocks.processVoiceTurn.mockReturnValue(inference.promise);
+  it('drops an in-flight playout after stop/restart instead of leaking old playback', async () => {
+    const inference = deferred<ReturnType<typeof turnResult> | null>();
+    mocks.feedVoiceAgentAudio.mockReturnValue(inference.promise);
     mocks.playback.playEncoded.mockResolvedValue(undefined);
     const onTurn = vi.fn();
     const driver = new VoiceAgentMicDriver();
     await driver.start({ onTurn });
-    emitUtterance(mocks.captures.at(-1)!);
+    mocks.captures.at(-1)!.emit(new Float32Array(1_600).fill(0.2));
     await flush();
 
     driver.stop();

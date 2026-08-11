@@ -107,11 +107,11 @@ public class RAGDeleteResponse(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGDeleteResponse> = object : ProtoAdapter<RAGDeleteResponse>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      RAGDeleteResponse::class, 
-      "type.googleapis.com/runanywhere.v1.RAGDeleteResponse", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      RAGDeleteResponse::class,
+      "type.googleapis.com/runanywhere.v1.RAGDeleteResponse",
+      PROTO_3,
+      null,
       "rag.proto"
     ) {
       override fun encodedSize(`value`: RAGDeleteResponse): Int {

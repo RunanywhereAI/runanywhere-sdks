@@ -12,12 +12,10 @@ import org.junit.Test
 
 /**
  * Characterizes which [LoadOptions] fields `models.load()` rejects at
- * preflight because the commons load ABI has no wire path for them yet
- * (PR #605 review issue 8). Per the v4 public API spec, "every accepted
- * field is implemented end to end or fails preflight" — silently dropping
- * them is forbidden, so unsupported knobs throw instead of merely warning.
- * `framework`/`backendPreferences` (single entry) are excluded because they
- * do reach commons.
+ * preflight. Commons owns `contextLength`, `accelerator`/`useGpu`, and
+ * ordered `backendPreferences` via [ai.runanywhere.proto.v1.ModelLoadRequest];
+ * only `threads` (retired from the load ABI, reserved tag 7) still fails
+ * preflight rather than being silently dropped.
  */
 class LoadOptionsIgnoredKnobsTest {
     @Test
@@ -38,15 +36,15 @@ class LoadOptionsIgnoredKnobsTest {
     }
 
     @Test
-    fun `contextLength threads and accelerator are each reported`() {
-        assertEquals(listOf("contextLength"), LoadOptions(contextLength = 4096).unsupportedLoadKnobs())
+    fun `commons-owned knobs are not reported and only threads is`() {
+        assertTrue(LoadOptions(contextLength = 4096).unsupportedLoadKnobs().isEmpty())
         assertEquals(listOf("threads"), LoadOptions(threads = 4).unsupportedLoadKnobs())
-        assertEquals(listOf("accelerator"), LoadOptions(accelerator = AcceleratorPolicy.GPU).unsupportedLoadKnobs())
-        assertEquals(listOf("accelerator"), LoadOptions(useGpu = true).unsupportedLoadKnobs())
+        assertTrue(LoadOptions(accelerator = AcceleratorPolicy.GPU).unsupportedLoadKnobs().isEmpty())
+        assertTrue(LoadOptions(useGpu = true).unsupportedLoadKnobs().isEmpty())
     }
 
     @Test
-    fun `multiple backendPreferences entries are reported`() {
+    fun `multiple backendPreferences entries are not reported as unsupported`() {
         val options =
             LoadOptions(
                 backendPreferences =
@@ -55,12 +53,12 @@ class LoadOptionsIgnoredKnobsTest {
                         BackendPreference(InferenceFramework.INFERENCE_FRAMEWORK_ONNX),
                     ),
             )
-        assertTrue(options.unsupportedLoadKnobs().single().startsWith("backendPreferences"))
+        assertTrue(options.unsupportedLoadKnobs().isEmpty())
     }
 
     @Test
-    fun `all placement knobs combine in a stable order`() {
+    fun `combined knobs only report retired threads`() {
         val options = LoadOptions(contextLength = 4096, threads = 4, accelerator = AcceleratorPolicy.CPU)
-        assertEquals(listOf("contextLength", "threads", "accelerator"), options.unsupportedLoadKnobs())
+        assertEquals(listOf("threads"), options.unsupportedLoadKnobs())
     }
 }

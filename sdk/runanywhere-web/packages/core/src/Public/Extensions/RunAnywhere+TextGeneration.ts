@@ -16,22 +16,18 @@ import {
 } from '@runanywhere/proto-ts/llm_service';
 import { ChatMessage as ChatMessageMessage, MessageRole, type ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
-  FinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
+import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import type {
   StructuredOutputOptions,
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
-import {
-  inferenceFrameworkToJSON,
-  ModelCategory,
-  type ModelInfo,
-} from '@runanywhere/proto-ts/model_types';
 import type { LLMStreamingResult } from '../../types/index.js';
 import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
 import { SDKException } from '../../Foundation/SDKException.js';
@@ -40,7 +36,6 @@ import {
   getLlamaBackendWorkerDeadReason,
   mustUseLlamaBackendWorker,
 } from '../../runtime/BackendWorkerModelOwnership.js';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
@@ -144,8 +139,6 @@ function streamingResultFromEvents(
   let started = false;
   let cancelled = false;
   let fullText = '';
-  let thinkingText = '';
-  let tokenCount = 0;
   let finalEvent: LLMStreamEvent | undefined;
   // pass2-syn-010-followup-web: surface LLMStreamEvent.toolCall (proto field 18)
   // on the final LLMGenerationResult.toolCalls list so callers driving tool
@@ -154,8 +147,6 @@ function streamingResultFromEvents(
   // backend supports streamed tool-call deltas (libprotobuf-enabled builds);
   // on WASM the field is currently always absent (see syn-010 evidence).
   const accumulatedToolCalls: ToolCall[] = [];
-  const startedAt = performance.now();
-
   const result = new Promise<LLMGenerationResult>((resolve, reject) => {
     const start = (): void => {
       if (started) return;
@@ -166,11 +157,8 @@ function streamingResultFromEvents(
             finalEvent = event;
             eventQueue.push(event);
             if (event.token) {
-              if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
-                thinkingText += event.token;
-              } else {
+              if (event.eventKind !== LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
                 fullText += event.token;
-                tokenCount += 1;
                 queue.push(event.token);
               }
             }
@@ -186,9 +174,6 @@ function streamingResultFromEvents(
           resolve(
             finalLLMResult(
               fullText,
-              thinkingText,
-              tokenCount,
-              startedAt,
               finalEvent,
               accumulatedToolCalls,
             ),
@@ -231,45 +216,28 @@ function streamingResultFromEvents(
 
 function finalLLMResult(
   fullText: string,
-  thinkingText: string,
-  tokenCount: number,
-  startedAt: number,
   finalEvent?: LLMStreamEvent,
   streamedToolCalls: ToolCall[] = [],
 ): LLMGenerationResult {
   const final = finalEvent?.result;
-  const generationTimeMs = final?.generationTimeMs ?? performance.now() - startedAt;
-  const inputTokens = final?.usage?.inputTokens ?? 0;
-  const outputTokens = final?.usage?.outputTokens ?? tokenCount;
+  const generationTimeMs = final?.generationTimeMs ?? 0;
   // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
   const toolCalls = final?.toolCalls?.length ? final.toolCalls : streamedToolCalls;
-  const thinkingContent = final?.thinkingContent || thinkingText || undefined;
-  // Thinking-only / length-truncated replies must still settle with observable
-  // text so UI consumers never remain stuck on an empty answer channel.
+  const thinkingContent = final?.thinkingContent || undefined;
   const answerText = (final?.text ?? fullText).trim();
-  const text = answerText || thinkingContent || '';
-  const decodeMs = generationTimeMs - (final?.promptEvalTimeMs ?? 0);
   return {
-    text,
-    thinkingContent: answerText ? thinkingContent : undefined,
+    text: answerText,
+    thinkingContent,
     modelUsed: '',
     generationTimeMs,
     finishReason: finalEvent?.finishReason
       || final?.finishReason
       || FinishReason.FINISH_REASON_UNSPECIFIED,
-    thinkingTokens: 0,
-    responseTokens: outputTokens,
-    usage: {
-      inputTokens,
-      outputTokens,
-      totalTokens: final?.usage?.totalTokens ?? inputTokens + outputTokens,
-      decodeTokensPerSecond: final?.usage?.decodeTokensPerSecond
-        ?? (decodeMs > 0 ? (outputTokens / decodeMs) * 1000 : 0),
-      prefillMs: final?.usage?.prefillMs ?? 0,
-      ttftMs: final?.usage?.ttftMs ?? 0,
-    },
+    thinkingTokens: final?.thinkingTokens ?? 0,
+    responseTokens: final?.responseTokens ?? 0,
+    usage: final?.usage ?? TokenUsage.create(),
     error: final?.error ?? finalEvent?.error,
     cachedPromptTokens: 0,
     promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
@@ -337,108 +305,6 @@ async function generateStream(
   return streamingResultFromEvents(events, () => {
     adapter.cancel();
   });
-}
-
-// ---------------------------------------------------------------------------
-// `aggregateStream` — fold a streaming handle into a final result
-// ---------------------------------------------------------------------------
-
-/**
- * Fold an `LLMStreamingResult` into a canonical final `LLMGenerationResult`.
- *
- * Port of Swift `RunAnywhere.aggregateStream(prompt:events:onToken:)`
- * (RunAnywhere+TextGeneration.swift:129-198): consumes the canonical event
- * stream when available, invoking `onToken` and `onThinking` with their
- * separate aggregated transcripts, then awaits the
- * terminal aggregate and applies the Swift fallback chain: `text` falls back
- * to the concatenated tokens, `inputTokens` to the `max(1, prompt/4)`
- * estimate, `totalTokens` to `inputTokens + outputTokens`, timing and
- * throughput to local wall-clock measurements, while `promptEvalTimeMs` /
- * `decodeTimeMs` carry the backend's terminal metrics (0 when absent).
- * `modelUsed`/`framework` resolve from the currently-loaded language model
- * (Swift `currentModel(_:)`; RN `modelInfoForCategory`).
- */
-export async function aggregateStream(
-  prompt: string,
-  streaming: LLMStreamingResult,
-  onToken?: (transcript: string) => void | Promise<void>,
-  onThinking?: (transcript: string) => void | Promise<void>,
-): Promise<LLMGenerationResult> {
-  let fullResponse = '';
-  let fullThinking = '';
-  let tokenCount = 0;
-  let firstTokenAtMs: number | undefined;
-  const startedAtMs = performance.now();
-
-  if (streaming.events) {
-    for await (const event of streaming.events) {
-      if (!event.token) continue;
-      // Record TTFT for the first token of EITHER kind (thinking or response),
-      // matching the C++ backend — a reasoning-first model must not report a
-      // delayed TTFT just because its thinking tokens arrive before any response.
-      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
-      if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
-        fullThinking += event.token;
-        if (onThinking) await onThinking(fullThinking);
-        continue;
-      }
-      fullResponse += event.token;
-      tokenCount += 1;
-      if (onToken) await onToken(fullResponse);
-    }
-  } else {
-    for await (const token of streaming.stream) {
-      if (!token) continue;
-      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
-      fullResponse += token;
-      tokenCount += 1;
-      if (onToken) await onToken(fullResponse);
-    }
-  }
-
-  // Terminal aggregate — already prefers the backend's final-event metrics
-  // and falls back to the queue-tracked tokens (see finalLLMResult).
-  const result = await streaming.result;
-
-  const totalLatencyMs = performance.now() - startedAtMs;
-  const ttftMs = firstTokenAtMs === undefined ? undefined : firstTokenAtMs - startedAtMs;
-
-  // Swift resolves the loaded language model via `currentModel(_:)`
-  // (RunAnywhere+TextGeneration.swift:162-168).
-  let model: ModelInfo | null = null;
-  try {
-    model = WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  } catch {
-    model = null;
-  }
-
-  // Swift parity (RunAnywhere+TextGeneration.swift:179-182): estimate
-  // inputTokens as max(1, prompt/4) when the backend did not report them and
-  // recompute totalTokens from that estimate when absent.
-  const inputTokens = (result.usage?.inputTokens ?? 0) || Math.max(1, Math.floor(prompt.length / 4));
-  const outputTokens = (result.usage?.outputTokens ?? 0) || tokenCount;
-  const generationTimeMs = result.generationTimeMs || totalLatencyMs;
-  const decodeMs = generationTimeMs - (result.promptEvalTimeMs ?? 0);
-  return {
-    ...result,
-    text: result.text || fullResponse,
-    thinkingContent: result.thinkingContent || fullThinking || undefined,
-    responseTokens: outputTokens,
-    usage: {
-      inputTokens,
-      outputTokens,
-      totalTokens: (result.usage?.totalTokens ?? 0) || inputTokens + outputTokens,
-      decodeTokensPerSecond: (result.usage?.decodeTokensPerSecond ?? 0)
-        || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
-      prefillMs: result.usage?.prefillMs ?? 0,
-      ttftMs: result.usage?.ttftMs ?? (ttftMs ?? 0),
-    },
-    modelUsed: model?.id ?? '',
-    framework: model ? inferenceFrameworkToJSON(model.framework) : '',
-    generationTimeMs,
-    promptEvalTimeMs: result.promptEvalTimeMs ?? 0,
-    decodeTimeMs: result.decodeTimeMs || decodeMs,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -559,8 +425,6 @@ export const TextGeneration = {
   generate,
 
   generateStream,
-
-  aggregateStream,
 
   cancelGeneration(): void {
     LLMProtoAdapter.tryDefault()?.cancel();

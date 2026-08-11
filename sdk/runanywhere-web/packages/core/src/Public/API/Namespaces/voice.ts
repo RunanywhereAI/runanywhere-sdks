@@ -155,9 +155,6 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
       })();
 
       await driver.start({
-        silenceDurationMs: options.turnHandling?.endpointing?.minDelayMs,
-        maxRecordingDurationMs: options.turnHandling?.endpointing?.maxDelayMs,
-        speechThreshold: options.vad?.activationThreshold,
         // The driver owns playout, so it is the only layer that can say
         // "speaking" while sound is actually leaving the speaker. Mirrors
         // Swift/Kotlin, where the same phase is merged into `session.events`.
@@ -171,9 +168,8 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
           }
           if (turn.assistantText) publish({ type: 'agentResponse', text: turn.assistantText });
         },
-        // The user took the turn back while the reply was audible. The driver
-        // has already cut playout and will report the phase change; this is the
-        // event that says *why* the answer stopped short.
+        // Commons owns barge-in inside feed_audio and emits it on the native
+        // voice-event stream (pumped above). Keep this hook for API parity.
         onBargeIn: () => publish({ type: 'speechStarted' }),
         onError: (error) => publish({ type: 'error', message: error.message, recoverable: true }),
       });

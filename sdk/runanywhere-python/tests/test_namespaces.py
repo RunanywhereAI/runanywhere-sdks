@@ -60,8 +60,11 @@ def _wav(seconds: float = 1.0, rate: int = 16000, amplitude: float = 0.0) -> Aud
 def test_transcribe_returns_text_and_duration(sdk, sherpa_dir) -> None:
     result = ra.stt.transcribe(_wav(0.5), SttOptions(model=sherpa_dir))
     assert result.text == "hello there"
-    assert 400 <= result.duration_ms <= 600
+    # Text-only bridge does not carry STTOutput.duration_ms; do not invent from input length.
+    assert result.duration_ms == 0
     assert result.words == []  # the bridge returns text only
+    # Input length remains available on AudioInput for request formatting only.
+    assert 400 <= _wav(0.5).duration_ms() <= 600
 
 
 def test_transcribe_accepts_pcm16_and_float32_inputs(sdk, sherpa_dir) -> None:
@@ -389,9 +392,8 @@ def test_diarize_passes_options_through(sdk, sortformer_dir) -> None:
 
 
 # --------------------------------------------------------------------------- lora
-# native/module.cpp binds lora_apply/lora_remove/lora_remove_all (rac_llm_component_
-# {load,remove,clear}_lora) — same smoke-vs-stub split as diarization above. list() has
-# no native read-back, so it mirrors the applied set client-side (see _handles.LLMModel).
+# native/module.cpp binds lora_*_proto (rac_lora_*_proto). Commons owns optional
+# scale resolution — unset scale is forwarded without coercing to 1.0.
 def test_lora_apply_remove_and_list_round_trip(sdk, gguf) -> None:
     ra.llm.generate("hi", LlmOptions(model=gguf))  # a resident LLM is required
     assert ra.lora.list().applied == []
@@ -400,18 +402,27 @@ def test_lora_apply_remove_and_list_round_trip(sdk, gguf) -> None:
     state = ra.lora.list()
     assert len(state.applied) == 1
     assert state.applied[0].id == "adapter.gguf" and state.applied[0].scale == 0.5
-    handle, adapter_path, scale = sdk.args_of("lora_apply")
-    assert adapter_path == "adapter.gguf" and scale == 0.5
+    _nbytes, recorded, keep_existing = sdk.args_of("lora_apply_proto")
+    assert keep_existing is True
+    assert recorded == (("adapter.gguf", "adapter.gguf", True, 0.5),)
 
     ra.lora.remove("adapter.gguf")
     assert ra.lora.list().applied == []
-    assert sdk.args_of("lora_remove") == (handle, "adapter.gguf")
+    _nbytes, adapter_ids, clear_all = sdk.args_of("lora_remove_proto")
+    assert adapter_ids == ["adapter.gguf"] and clear_all is False
 
     ra.lora.apply("a.gguf")
     ra.lora.apply("b.gguf")
+    # Unset scale must reach commons without a host-side 1.0 default.
+    _nbytes, recorded, _keep = [
+        args for name, args in sdk.calls if name == "lora_apply_proto"
+    ][-1]
+    assert recorded == (("b.gguf", "b.gguf", False, None),)
     ra.lora.remove_all()
     assert ra.lora.list().applied == []
-    assert sdk.count("lora_remove_all") == 1
+    assert any(
+        name == "lora_remove_proto" and args[2] is True for name, args in sdk.calls
+    )
 
 
 def test_lora_list_is_empty_without_a_resident_llm(sdk) -> None:

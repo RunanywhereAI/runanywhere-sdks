@@ -5,7 +5,6 @@
  * WebGPU, SharedArrayBuffer (for pthreads), WASM SIMD, etc.
  */
 
-import { FormFactor, Platform, type DeviceInfo } from '@runanywhere/proto-ts/device_info';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import type { AccelerationMode } from '../Foundation/WASMBridge.js';
 
@@ -93,38 +92,6 @@ export async function detectCapabilities(): Promise<WebCapabilities> {
   return capabilities;
 }
 
-/**
- * Build a proto-ts {@link DeviceInfo} from detected browser capabilities.
- *
- * Generic fields map directly onto the cross-SDK proto shape; the two
- * browser-only flags (`has_webgpu`, `has_shared_array_buffer`) are carried in
- * `platformExtras` per the proto's documented web convention.
- */
-export async function getDeviceInfo(): Promise<DeviceInfo> {
-  const caps = await detectCapabilities();
-
-  return {
-    deviceModel: getBrowserName(caps.userAgent),
-    platform: Platform.PLATFORM_WEB,
-    osVersion: getOSVersion(caps.userAgent),
-    formFactor: FormFactor.FORM_FACTOR_DESKTOP,
-    architecture: 'wasm32',
-    chipName: '',
-    totalMemoryBytes: caps.deviceMemoryGB * 1024 * 1024 * 1024,
-    availableMemoryBytes: 0,
-    hasNpu: false,
-    npuCores: 0,
-    gpuFamily: caps.gpuAdapterInfo?.architecture ?? '',
-    isLowPowerMode: false,
-    coreCount: caps.hardwareConcurrency,
-    performanceCores: 0,
-    platformExtras: {
-      has_webgpu: String(caps.hasWebGPU),
-      has_shared_array_buffer: String(caps.hasSharedArrayBuffer),
-    },
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -140,23 +107,6 @@ function detectWASMSIMD(): boolean {
   } catch {
     return false;
   }
-}
-
-function getBrowserName(ua: string): string {
-  if (ua.includes('Firefox')) return 'Firefox';
-  if (ua.includes('Edg/')) return 'Edge';
-  if (ua.includes('Chrome')) return 'Chrome';
-  if (ua.includes('Safari')) return 'Safari';
-  return 'Unknown Browser';
-}
-
-function getOSVersion(ua: string): string {
-  if (ua.includes('Windows')) return 'Windows';
-  if (ua.includes('Mac OS X')) return 'macOS';
-  if (ua.includes('Linux')) return 'Linux';
-  if (ua.includes('Android')) return 'Android';
-  if (ua.includes('iOS')) return 'iOS';
-  return 'Unknown OS';
 }
 
 interface NavigatorWithDeviceMemory extends Navigator {

@@ -522,46 +522,48 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_llm_5fservice_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021llm_service.proto\022\016runanywhere.v1\032\014err"
-    "ors.proto\032\022tool_calling.proto\032\021llm_optio"
-    "ns.proto\032\nchat.proto\"\367\001\n\022LLMGenerateRequ"
-    "est\022\022\n\nrequest_id\030\016 \001(\t\022\020\n\010model_id\030\017 \001("
-    "\t\022\027\n\017conversation_id\030\020 \001(\t\022:\n\007options\030\032 "
-    "\001(\0132$.runanywhere.v1.LLMGenerationOption"
-    "sH\000\210\001\001\022-\n\010messages\030\034 \003(\0132\033.runanywhere.v"
-    "1.ChatMessageB\n\n\010_optionsJ\004\010\001\020\002J\004\010\031\020\032J\004\010"
-    "\033\020\034R\006promptR\010metadataR\007history\"\350\004\n\016LLMSt"
-    "reamEvent\022\013\n\003seq\030\001 \001(\004\022\r\n\005token\030\003 \001(\t\0226\n"
-    "\nevent_kind\030\014 \001(\0162\".runanywhere.v1.LLMSt"
-    "reamEventKind\022\022\n\nrequest_id\030\r \001(\t\0223\n\rfin"
-    "ish_reason\030\025 \001(\0162\034.runanywhere.v1.Finish"
-    "Reason\0228\n\006result\030\026 \001(\0132#.runanywhere.v1."
-    "LLMGenerationResultH\000\210\001\001\0220\n\ttool_call\030\022 "
-    "\001(\0132\030.runanywhere.v1.ToolCallH\001\210\001\001\022,\n\005er"
-    "ror\030\023 \001(\0132\030.runanywhere.v1.SDKErrorH\002\210\001\001"
-    "\022\031\n\014partial_json\030\024 \001(\tH\003\210\001\001B\t\n\007_resultB\014"
-    "\n\n_tool_callB\010\n\006_errorB\017\n\r_partial_jsonJ"
-    "\004\010\002\020\003J\004\010\004\020\005J\004\010\005\020\006J\004\010\006\020\007J\004\010\007\020\010J\004\010\010\020\tJ\004\010\t\020"
-    "\nJ\004\010\n\020\013J\004\010\013\020\014J\004\010\016\020\017J\004\010\017\020\020J\004\010\020\020\021J\004\010\021\020\022R\014t"
-    "imestamp_usR\010is_finalR\004kindR\010token_idR\007l"
-    "ogprobR\017conversation_idR\027prompt_tokens_p"
-    "rocessedR\033completion_tokens_generatedR\ne"
-    "lapsed_ms*\262\002\n\022LLMStreamEventKind\022%\n!LLM_"
-    "STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035LLM_S"
-    "TREAM_EVENT_KIND_STARTED\020\001\022\037\n\033LLM_STREAM"
-    "_EVENT_KIND_TOKEN\020\002\022\"\n\036LLM_STREAM_EVENT_"
-    "KIND_THINKING\020\003\022#\n\037LLM_STREAM_EVENT_KIND"
-    "_TOOL_CALL\020\004\022\"\n\036LLM_STREAM_EVENT_KIND_PR"
-    "OGRESS\020\005\022#\n\037LLM_STREAM_EVENT_KIND_COMPLE"
-    "TED\020\006\022\037\n\033LLM_STREAM_EVENT_KIND_ERROR\020\007B\212"
-    "\001\n\027ai.runanywhere.proto.v1B\017LLMServicePr"
-    "otoP\001Z<github.com/runanywhere/runanywher"
-    "e-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016"
-    "Runanywhere.V1\272\002\002RAb\006proto3"
+    "ors.proto\032\023finish_reason.proto\032\022tool_cal"
+    "ling.proto\032\021llm_options.proto\032\nchat.prot"
+    "o\"\367\001\n\022LLMGenerateRequest\022\022\n\nrequest_id\030\016"
+    " \001(\t\022\020\n\010model_id\030\017 \001(\t\022\027\n\017conversation_i"
+    "d\030\020 \001(\t\022:\n\007options\030\032 \001(\0132$.runanywhere.v"
+    "1.LLMGenerationOptionsH\000\210\001\001\022-\n\010messages\030"
+    "\034 \003(\0132\033.runanywhere.v1.ChatMessageB\n\n\010_o"
+    "ptionsJ\004\010\001\020\002J\004\010\031\020\032J\004\010\033\020\034R\006promptR\010metada"
+    "taR\007history\"\350\004\n\016LLMStreamEvent\022\013\n\003seq\030\001 "
+    "\001(\004\022\r\n\005token\030\003 \001(\t\0226\n\nevent_kind\030\014 \001(\0162\""
+    ".runanywhere.v1.LLMStreamEventKind\022\022\n\nre"
+    "quest_id\030\r \001(\t\0223\n\rfinish_reason\030\025 \001(\0162\034."
+    "runanywhere.v1.FinishReason\0228\n\006result\030\026 "
+    "\001(\0132#.runanywhere.v1.LLMGenerationResult"
+    "H\000\210\001\001\0220\n\ttool_call\030\022 \001(\0132\030.runanywhere.v"
+    "1.ToolCallH\001\210\001\001\022,\n\005error\030\023 \001(\0132\030.runanyw"
+    "here.v1.SDKErrorH\002\210\001\001\022\031\n\014partial_json\030\024 "
+    "\001(\tH\003\210\001\001B\t\n\007_resultB\014\n\n_tool_callB\010\n\006_er"
+    "rorB\017\n\r_partial_jsonJ\004\010\002\020\003J\004\010\004\020\005J\004\010\005\020\006J\004"
+    "\010\006\020\007J\004\010\007\020\010J\004\010\010\020\tJ\004\010\t\020\nJ\004\010\n\020\013J\004\010\013\020\014J\004\010\016\020\017"
+    "J\004\010\017\020\020J\004\010\020\020\021J\004\010\021\020\022R\014timestamp_usR\010is_fin"
+    "alR\004kindR\010token_idR\007logprobR\017conversatio"
+    "n_idR\027prompt_tokens_processedR\033completio"
+    "n_tokens_generatedR\nelapsed_ms*\262\002\n\022LLMSt"
+    "reamEventKind\022%\n!LLM_STREAM_EVENT_KIND_U"
+    "NSPECIFIED\020\000\022!\n\035LLM_STREAM_EVENT_KIND_ST"
+    "ARTED\020\001\022\037\n\033LLM_STREAM_EVENT_KIND_TOKEN\020\002"
+    "\022\"\n\036LLM_STREAM_EVENT_KIND_THINKING\020\003\022#\n\037"
+    "LLM_STREAM_EVENT_KIND_TOOL_CALL\020\004\022\"\n\036LLM"
+    "_STREAM_EVENT_KIND_PROGRESS\020\005\022#\n\037LLM_STR"
+    "EAM_EVENT_KIND_COMPLETED\020\006\022\037\n\033LLM_STREAM"
+    "_EVENT_KIND_ERROR\020\007B\212\001\n\027ai.runanywhere.p"
+    "roto.v1B\017LLMServiceProtoP\001Z<github.com/r"
+    "unanywhere/runanywhere-sdks/idl/v1;runan"
+    "ywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA"
+    "b\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_llm_5fservice_2eproto_deps[4] = {
+    descriptor_table_llm_5fservice_2eproto_deps[5] = {
         &::descriptor_table_chat_2eproto,
         &::descriptor_table_errors_2eproto,
+        &::descriptor_table_finish_5freason_2eproto,
         &::descriptor_table_llm_5foptions_2eproto,
         &::descriptor_table_tool_5fcalling_2eproto,
 };
@@ -569,12 +571,12 @@ static ::absl::once_flag descriptor_table_llm_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5fservice_2eproto = {
     false,
     false,
-    1427,
+    1448,
     descriptor_table_protodef_llm_5fservice_2eproto,
     "llm_service.proto",
     &descriptor_table_llm_5fservice_2eproto_once,
     descriptor_table_llm_5fservice_2eproto_deps,
-    4,
+    5,
     2,
     schemas,
     file_message_globals,

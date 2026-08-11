@@ -27,10 +27,13 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
   factory ThinkingTagPattern({
     $core.String? openTag,
     $core.String? closeTag,
+    $core.bool? templatePrefillsOpenTag,
   }) {
     final result = create();
     if (openTag != null) result.openTag = openTag;
     if (closeTag != null) result.closeTag = closeTag;
+    if (templatePrefillsOpenTag != null)
+      result.templatePrefillsOpenTag = templatePrefillsOpenTag;
     return result;
   }
 
@@ -49,6 +52,7 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'openTag')
     ..aOS(2, _omitFieldNames ? '' : 'closeTag')
+    ..aOB(3, _omitFieldNames ? '' : 'templatePrefillsOpenTag')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -89,6 +93,19 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
   $core.bool hasCloseTag() => $_has(1);
   @$pb.TagNumber(2)
   void clearCloseTag() => $_clearField(2);
+
+  /// When true, the model's generation template already emits the open tag
+  /// (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+  /// starts inside reasoning and commons must not arm the bounded hold.
+  /// optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+  @$pb.TagNumber(3)
+  $core.bool get templatePrefillsOpenTag => $_getBF(2);
+  @$pb.TagNumber(3)
+  set templatePrefillsOpenTag($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTemplatePrefillsOpenTag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTemplatePrefillsOpenTag() => $_clearField(3);
 }
 
 class ReasoningOptions extends $pb.GeneratedMessage {

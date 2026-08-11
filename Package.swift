@@ -454,16 +454,22 @@ let package = Package(
             dependencies: [
                 "CRACommons",
             ],
-            path: "sdk/runanywhere-commons/src/desktop",
+            // Path is src/ (not src/desktop/) so we can compile the desktop
+            // device-manager TU that lives under infrastructure/device/. CMake
+            // already groups both under RAC_DESKTOP_SOURCES; SPM must match or
+            // RunAnywhereMLXCLI fails to link install_device_manager_provider /
+            // rac_desktop_{platform_name,device_model,os_version}.
+            path: "sdk/runanywhere-commons/src",
             sources: [
-                "desktop_adapter.cpp",
-                "desktop_secure_store.cpp",
-                "http_transport_curl.cpp",
+                "desktop/desktop_adapter.cpp",
+                "desktop/desktop_secure_store.cpp",
+                "desktop/http_transport_curl.cpp",
+                "infrastructure/device/rac_device_manager_desktop.cpp",
             ],
-            publicHeadersPath: ".",
+            publicHeadersPath: "desktop",
             cxxSettings: [
-                .headerSearchPath(".."),
-                .headerSearchPath("../../include"),
+                .headerSearchPath("."),
+                .headerSearchPath("../include"),
             ],
             linkerSettings: [
                 .linkedLibrary("curl"),

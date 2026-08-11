@@ -103,11 +103,11 @@ public class ToolCallingHistoryTurn(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingHistoryTurn> =
         object : ProtoAdapter<ToolCallingHistoryTurn>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ToolCallingHistoryTurn::class, 
-      "type.googleapis.com/runanywhere.v1.ToolCallingHistoryTurn", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ToolCallingHistoryTurn::class,
+      "type.googleapis.com/runanywhere.v1.ToolCallingHistoryTurn",
+      PROTO_3,
+      null,
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCallingHistoryTurn): Int {

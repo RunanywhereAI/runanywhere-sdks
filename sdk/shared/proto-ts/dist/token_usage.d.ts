@@ -22,13 +22,37 @@ export interface TokenUsage {
      */
     prefillMs: number;
     /**
-     * Request start to first output token. The canonical spelling for every
-     * result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
-     * report TTFT here and nowhere else. SDKEvent's own telemetry fields
-     * (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
-     * their separate event-stream spelling.
+     * Request start to first output token of any kind (reasoning or content).
+     * The canonical spelling for every result type: LLMGenerationResult and
+     * VLMResult report TTFT here and nowhere else. SDKEvent's own telemetry
+     * fields (GenerationEvent.time_to_first_token_ms, first_token_latency_ms)
+     * keep their separate event-stream spelling.
      */
     ttftMs: number;
+    /**
+     * Request start to the first CONTENT delta — what the user actually waits
+     * for when the model reasons first. 0 when no content token was ever
+     * delivered. Distinct from ttft_ms; do not alias the two.
+     */
+    timeToFirstContentTokenMs: number;
+    /**
+     * Content-only throughput over first-content-delta → last delta. Excludes
+     * reasoning tokens the accelerator also decoded. 0 when content count or
+     * window is unavailable.
+     */
+    contentTokensPerSecond: number;
+    /**
+     * True when the backend buffered the whole generation and flushed deltas
+     * at once, so the decode window is an artifact of the flush. Platforms
+     * must not re-derive this heuristic.
+     */
+    batchBuffered: boolean;
+    /**
+     * True when input_tokens / output_tokens were estimated (e.g. chars/4)
+     * rather than reported by the engine. Absence of the flag (false) means
+     * the counts are engine-measured.
+     */
+    countsEstimated: boolean;
 }
 export declare const TokenUsage: MessageFns<TokenUsage>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

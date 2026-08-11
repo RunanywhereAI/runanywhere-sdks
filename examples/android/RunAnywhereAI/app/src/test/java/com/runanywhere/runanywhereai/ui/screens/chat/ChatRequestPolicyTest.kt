@@ -4,7 +4,6 @@ import ai.runanywhere.proto.v1.MessageRole
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatRequestPolicyTest {
@@ -70,13 +69,14 @@ class ChatRequestPolicyTest {
     }
 
     @Test
-    fun `windowHistory is a no-op when the context size is unknown`() {
+    fun `windowHistory is a no-op — no local token estimates`() {
         val turn = ChatRequestPolicy.snapshot(
             "q",
             listOf(ChatMessage("a", isUser = true), ChatMessage("b", isUser = false)),
         )
-        // 0 context (model never reported one) -> never trim; behave exactly like today.
+        // No app-side chars/token budget; commons owns TokenUsage. Always pass-through.
         assertEquals(turn, ChatRequestPolicy.windowHistory(turn, contextTokens = 0, outputTokens = 256, systemPrompt = null))
+        assertEquals(turn, ChatRequestPolicy.windowHistory(turn, contextTokens = 512, outputTokens = 256, systemPrompt = "sys"))
     }
 
     @Test
@@ -86,7 +86,7 @@ class ChatRequestPolicyTest {
     }
 
     @Test
-    fun `windowHistory keeps the full history when it fits the context`() {
+    fun `windowHistory keeps the full history without local trimming`() {
         val turn = ChatRequestPolicy.snapshot(
             "what is my name?",
             listOf(
@@ -96,14 +96,13 @@ class ChatRequestPolicyTest {
                 ChatMessage("Blue is a nice colour.", isUser = false),
             ),
         )
-        // Qwen3.5-0.8B: 1024 ctx, 512 output budget -> ample room for a short chat, nothing trimmed.
         val windowed = ChatRequestPolicy.windowHistory(turn, contextTokens = 1024, outputTokens = 512, systemPrompt = "You are helpful.")
         assertEquals(turn.history, windowed.history)
         assertEquals(turn.prompt, windowed.prompt)
     }
 
     @Test
-    fun `windowHistory trims the oldest turns to fit a small context, keeping the recent suffix in order`() {
+    fun `windowHistory does not invent token budgets on a small context`() {
         val history = (1..16).map { i ->
             ChatMessage(
                 text = "turn $i: a reasonably long conversational message with enough words to matter",
@@ -111,13 +110,9 @@ class ChatRequestPolicyTest {
             )
         }
         val turn = ChatRequestPolicy.snapshot("what did i first say?", history)
-        // Llama-3.2-1B on v79: 512 ctx, ~256 output budget -> only a few recent turns fit.
         val windowed = ChatRequestPolicy.windowHistory(turn, contextTokens = 512, outputTokens = 256, systemPrompt = "You are helpful.")
 
-        assertTrue("expected history to be trimmed", windowed.history.size < turn.history.size)
-        assertTrue("expected at least one kept turn", windowed.history.isNotEmpty())
-        // Kept turns are the most-recent contiguous suffix, never reordered and never pulled from the middle.
-        assertEquals(turn.history.takeLast(windowed.history.size), windowed.history)
+        assertEquals(turn.history, windowed.history)
         assertEquals(turn.prompt, windowed.prompt)
     }
 
@@ -161,33 +156,29 @@ class ChatRequestPolicyTest {
     }
 
     @Test
-    fun `windowHistory keeps a short user turn even when the newest reply is too big to fit`() {
-        // The LFM2.5-2.6B (512 ctx) failure: a reasoning model's reply alone exceeds the whole history
-        // budget, so the old `break` discarded the short user turn behind it and the model answered
-        // "I don't have information about your name" one turn after being told it.
+    fun `windowHistory preserves short facts even when a later reply is huge`() {
         val fact = ChatMessage("My name is Aman and I love pizza", isUser = true)
-        val hugeReply = ChatMessage("word ".repeat(200), isUser = false) // ~1000 chars, far over budget
+        val hugeReply = ChatMessage("word ".repeat(200), isUser = false)
         val turn = ChatRequestPolicy.snapshot("what is my name and which food do i love?", listOf(fact, hugeReply))
 
         val windowed = ChatRequestPolicy.windowHistory(
             turn, contextTokens = 512, outputTokens = 256, systemPrompt = "You are a helpful assistant.",
         )
 
-        // history is the proto shape, so compare on role+content: the fact survives, only the reply is dropped.
-        assertEquals(1, windowed.history.size)
-        assertEquals("My name is Aman and I love pizza", windowed.history.single().content)
-        assertEquals(MessageRole.MESSAGE_ROLE_USER, windowed.history.single().role)
+        // No local estimate trimming — full history is forwarded to commons.
+        assertEquals(turn.history, windowed.history)
+        assertEquals(2, windowed.history.size)
     }
 
     @Test
-    fun `windowHistory drops all history when the current prompt alone fills the context`() {
-        val hugePrompt = "word ".repeat(400) // ~2000 chars -> far exceeds a 512-token window on its own
+    fun `windowHistory never drops history for a huge current prompt`() {
+        val hugePrompt = "word ".repeat(400)
         val turn = ChatRequestPolicy.snapshot(
             hugePrompt,
             listOf(ChatMessage("older", isUser = true), ChatMessage("older reply", isUser = false)),
         )
         val windowed = ChatRequestPolicy.windowHistory(turn, contextTokens = 512, outputTokens = 128, systemPrompt = "sys")
-        assertTrue(windowed.history.isEmpty())
-        assertEquals(hugePrompt, windowed.prompt) // the current turn is never dropped
+        assertEquals(turn.history, windowed.history)
+        assertEquals(hugePrompt, windowed.prompt)
     }
 }

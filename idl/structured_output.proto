@@ -25,6 +25,19 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
+// How commons applies StructuredOutputOptions on the ordinary LLM generate
+// path. Platform SDKs must not invent a second policy.
+enum StructuredOutputMode {
+    STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0;
+    // Compile schema→GBNF (or honor grammar/regex) and constrain decoding.
+    STRUCTURED_OUTPUT_MODE_CONSTRAINED = 1;
+    // Do not constrain decoding; validate the free-text result against schema.
+    STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY = 2;
+    // Constrained (when a decoder arm is present), then one repair retry if
+    // the first answer fails schema validation.
+    STRUCTURED_OUTPUT_MODE_REPAIR = 3;
+}
+
 message StructuredOutputOptions {
     // Also render the schema into the system prompt, not just constrain
     // decoding. Costs input tokens and invalidates the thread's prompt cache.
@@ -38,12 +51,16 @@ message StructuredOutputOptions {
     // arm it was given fails the call; it never degrades to free generation.
     oneof constraint {
         // A JSON Schema document, verbatim. Unsupported keywords are rejected.
+        // Commons compiles this to GBNF on the generate path (mode permitting).
         string schema  = 2;
         // GBNF/EBNF grammar text. On-device only.
         string grammar = 3;
         // Regular expression the whole output must match. On-device only.
         string regex   = 4;
     }
+
+    // Unset = CONSTRAINED when a constraint arm is present, else free text.
+    optional StructuredOutputMode mode = 5;
 }
 
 message StructuredOutputValidation {
@@ -54,6 +71,10 @@ message StructuredOutputValidation {
     repeated string validation_errors = 5;
     int64           validation_time_ms = 6;
     optional SDKError error            = 7;
+    // True when commons issued the single repair retry (mode=REPAIR).
+    bool            repair_attempted   = 8;
+    // 0 = first pass only; 1 = repair pass produced the reported verdict.
+    int32           repair_attempts    = 9;
 }
 
 message StructuredOutputResult {

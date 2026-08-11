@@ -5,6 +5,8 @@
 import {
   ModelArtifactType,
   ModelCategory,
+  ModelCompatibilityRequest,
+  ModelCompatibilityResult,
   ModelFileRole,
   ModelRegistryStatus,
   type InferenceFramework,
@@ -12,6 +14,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { DownloadState, type DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import { SDKException } from '../../../Foundation/SDKException.js';
+import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { Runtime } from '../../../Foundation/RuntimeConfig.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
 import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
@@ -27,6 +30,44 @@ import { backendToFramework, frameworkToBackend } from '../Mapping.js';
 import type { DownloadEvent } from '../Events.js';
 import type { LoadedModel, ModelsState } from '../Results.js';
 import { ensureReady } from '../Runtime/Prerequisites.js';
+import { ProtoWasmBridge } from '../../../runtime/ProtoWasm.js';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../../runtime/EmscriptenModule.js';
+
+const BYTES_PER_GIB = 1024 * 1024 * 1024;
+const modelsLogger = new SDKLogger('models');
+
+interface CompatibilityModule extends EmscriptenRunanywhereModule {
+  _rac_model_compatibility_check_proto?(
+    requestPtr: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+}
+
+/** Browser-reported available RAM in bytes, or 0 when unknown (commons contract). */
+function probeAvailableRamBytes(): number {
+  if (typeof navigator === 'undefined') return 0;
+  const deviceMemoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (typeof deviceMemoryGiB !== 'number' || !(deviceMemoryGiB > 0)) return 0;
+  return Math.trunc(deviceMemoryGiB * BYTES_PER_GIB);
+}
+
+/** OPFS/quota free bytes when the browser reports them; else 0 (unknown). */
+async function probeAvailableStorageBytes(): Promise<number> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return 0;
+  try {
+    const estimate = await navigator.storage.estimate();
+    const quota = Number(estimate.quota ?? 0);
+    const usage = Number(estimate.usage ?? 0);
+    if (!(quota > 0)) return 0;
+    return Math.max(0, Math.trunc(quota - usage));
+  } catch {
+    return 0;
+  }
+}
 
 const FILE_ROLES = {
   primary: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
@@ -391,11 +432,87 @@ export const models = {
       storageFreeBytes: Math.max(0, quota - usage),
     };
   },
+
+  /**
+   * Evaluate one registered model against available RAM / free storage.
+   * Verdict (`canRun` / `canFit` / `isCompatible`) is owned by commons.
+   *
+   * Pass a model id for the default probe, or a full
+   * {@link ModelCompatibilityRequest} when the caller already measured
+   * available bytes. Missing WASM export or a native failure throws
+   * `SDKException` — callers must not invent a local budget substitute.
+   */
+  async checkCompatibility(
+    idOrRequest: string | ModelCompatibilityRequest,
+  ): Promise<ModelCompatibilityResult> {
+    await ensureReady();
+    const module = getModuleForCapability('commons') as CompatibilityModule | null;
+    if (!module || typeof module._rac_model_compatibility_check_proto !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'models.checkCompatibility',
+        'Loaded WASM module does not export _rac_model_compatibility_check_proto. Rebuild the commons WASM.',
+      );
+    }
+
+    const request: ModelCompatibilityRequest = typeof idOrRequest === 'string'
+      ? ModelCompatibilityRequest.fromPartial({
+          modelId: idOrRequest,
+          availableRamBytes: probeAvailableRamBytes(),
+          availableStorageBytes: await probeAvailableStorageBytes(),
+        })
+      : ModelCompatibilityRequest.fromPartial({
+          modelId: idOrRequest.modelId,
+          availableRamBytes: idOrRequest.availableRamBytes,
+          availableStorageBytes: idOrRequest.availableStorageBytes,
+          acceleratorPreference: idOrRequest.acceleratorPreference,
+          preferredFramework: idOrRequest.preferredFramework,
+        });
+
+    if (!request.modelId) {
+      throw SDKException.validationFailed({
+        fieldPath: 'modelId',
+        message: 'models.checkCompatibility requires a model id',
+      });
+    }
+
+    const result = new ProtoWasmBridge(module, modelsLogger).withEncodedRequest(
+      request,
+      ModelCompatibilityRequest,
+      ModelCompatibilityResult,
+      (requestPtr, requestSize, outResult) => (
+        module._rac_model_compatibility_check_proto!(requestPtr, requestSize, outResult)
+      ),
+      'rac_model_compatibility_check_proto',
+    );
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'models.checkCompatibility',
+        'rac_model_compatibility_check_proto returned no result',
+      );
+    }
+    if (result.error) throw new SDKException(result.error);
+    return result;
+  },
 };
 
+/**
+ * Map a commons `DownloadProgress` onto the public progress event.
+ *
+ * C++ reports 0 for "not measured yet" on throughput / overall fraction, and
+ * leaves `eta_seconds` absent (or negative) for unknown. Those sentinels become
+ * `undefined` here so a UI can omit "0 B/s" while the transfer spins up — same
+ * normalisation as Kotlin / Swift. Callers must not re-derive rate, ETA, or
+ * overall fraction from successive byte counts.
+ */
 function toProgressEvent(progress: DownloadProgress, operationId: string, sequence: number): DownloadEvent {
   const bytesTotal = Number(progress.totalBytes ?? 0);
   const bytesDone = Number(progress.bytesDownloaded ?? 0);
+  const bytesPerSecond = progress.bytesPerSecond > 0 ? progress.bytesPerSecond : undefined;
+  const etaSeconds =
+    progress.etaSeconds !== undefined && progress.etaSeconds >= 0
+      ? Number(progress.etaSeconds)
+      : undefined;
+  const overallProgress = progress.overallProgress > 0 ? progress.overallProgress : undefined;
   return {
     type: 'progress',
     operationId,
@@ -403,5 +520,14 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
     bytesDone,
     bytesTotal,
     file: progress.currentFileName || undefined,
+    bytesPerSecond,
+    etaSeconds,
+    retryAttempt: progress.retryAttempt ?? 0,
+    overallProgress,
+    currentFileIndex: progress.currentFileIndex ?? 0,
+    totalFiles: Math.max(progress.totalFiles ?? 1, 1),
   };
 }
+
+/** Test seam for the download progress mapping. */
+export const __testing__ = { toProgressEvent };

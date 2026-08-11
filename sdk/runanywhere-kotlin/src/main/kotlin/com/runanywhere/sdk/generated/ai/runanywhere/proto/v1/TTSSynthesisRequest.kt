@@ -104,11 +104,11 @@ public class TTSSynthesisRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSSynthesisRequest> =
         object : ProtoAdapter<TTSSynthesisRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      TTSSynthesisRequest::class, 
-      "type.googleapis.com/runanywhere.v1.TTSSynthesisRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      TTSSynthesisRequest::class,
+      "type.googleapis.com/runanywhere.v1.TTSSynthesisRequest",
+      PROTO_3,
+      null,
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSSynthesisRequest): Int {

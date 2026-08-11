@@ -163,21 +163,18 @@ public:
     bool holding_ambiguous_prefix() const { return holding_; }
 
     /** Assert that the stream begins inside reasoning — correct ONLY when the
-     *  caller knows the chat template prefilled the opening tag into the prompt.
+     *  caller knows the chat template prefilled the opening tag into the prompt
+     *  (`ThinkingTagPattern.template_prefills_open_tag`, stamped from the qhexrt
+     *  bundle's `gen_prefill` or the DeepSeek-R1-Distill name heuristic).
      *
-     *  Commons cannot know that today. `ModelInfo.supports_thinking` and the
-     *  `ThinkingTagPattern` that `normalize_thinking_capability()` derives from
-     *  it are a CAPABILITY ("this model can reason"), not a statement about the
-     *  template; the prefill lives in the model bundle's own manifest
-     *  (`gen_prefill`), which never reaches commons and has no field in
-     *  `idl/thinking_tag_pattern.proto`. Calling this on the capability alone
-     *  sends the entire output of a reasoning-capable model that answered
-     *  WITHOUT reasoning to the reasoning channel, where `emit_thoughts == false`
-     *  drops it: no deltas, empty answer. Production uses
-     *  `set_hold_ambiguous_prefix()` instead, which survives being wrong.
-     *
-     *  Kept because it is the correct call the day a typed prefill signal
-     *  exists, and because the unit test needs to pin the failure mode. */
+     *  `ModelInfo.supports_thinking` and the default `ThinkingTagPattern` that
+     *  `normalize_thinking_capability()` derives from it are a CAPABILITY ("this
+     *  model can reason"), not a statement about the template. Calling this on
+     *  the capability alone sends the entire output of a reasoning-capable model
+     *  that answered WITHOUT reasoning to the reasoning channel, where
+     *  `emit_thoughts == false` drops it: no deltas, empty answer. Production
+     *  therefore calls this only when the typed prefill signal is set; otherwise
+     *  it uses `set_hold_ambiguous_prefix()`, which survives being wrong. */
     void start_inside_reasoning() {
         inside_reasoning_ = true;
         holding_ = false;

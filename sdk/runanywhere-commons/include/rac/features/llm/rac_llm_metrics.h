@@ -110,6 +110,12 @@ typedef struct rac_streaming_result {
 
     /** Response tokens (excluding thinking) */
     int32_t response_tokens;
+
+    /**
+     * RAC_TRUE when input_tokens/output_tokens came from a chars/4 estimate
+     * rather than backend-reported counts (via rac_streaming_metrics_set_token_counts).
+     */
+    rac_bool_t counts_estimated;
 } rac_streaming_result_t;
 
 /**
@@ -124,7 +130,8 @@ static const rac_streaming_result_t RAC_STREAMING_RESULT_DEFAULT = {.text = RAC_
                                                                     .tokens_per_second = 0.0,
                                                                     .ttft_ms = 0.0,
                                                                     .thinking_tokens = 0,
-                                                                    .response_tokens = 0};
+                                                                    .response_tokens = 0,
+                                                                    .counts_estimated = RAC_FALSE};
 
 // =============================================================================
 // OPAQUE HANDLES

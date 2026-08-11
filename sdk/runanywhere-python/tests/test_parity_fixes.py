@@ -1,8 +1,7 @@
 """Regression tests for divergences the broader unit suite does not cover.
 
-Grammar JSON-stringify parity (non-ASCII / integer-float / boolean maxItems), the
-HuggingFace source-classifier regex (trailing newline / non-ASCII word chars), and listener
-isolation in the event bus.
+The HuggingFace source-classifier regex (trailing newline / non-ASCII word chars)
+and listener isolation in the event bus.
 """
 from __future__ import annotations
 
@@ -18,30 +17,6 @@ import pytest  # noqa: E402
 
 from runanywhere.download import is_remote_source  # noqa: E402
 from runanywhere.events import EventBus, SdkEvent, SdkEventKind  # noqa: E402
-from runanywhere.grammar import json_schema_to_grammar  # noqa: E402
-
-
-# --------------------------------------------------------------------------
-# grammar.py — JSON.stringify parity in const/enum literals
-# --------------------------------------------------------------------------
-def test_grammar_non_ascii_const_is_raw_not_escaped():
-    # JS JSON.stringify never \u-escapes; the é must stay a raw character.
-    g = json_schema_to_grammar({"const": "café"})
-    assert "café" in g
-    assert "u00e9" not in g
-
-
-def test_grammar_integer_valued_float_renders_like_js():
-    # JS has no int/float split: JSON.stringify(5.0) === "5".
-    g = json_schema_to_grammar({"const": 5.0})
-    assert '"5"' in g
-    assert "5.0" not in g
-
-
-def test_grammar_boolean_max_items_is_unbounded():
-    # `maxItems: true` is not a number in JS -> unbounded; bool must not read as 1.
-    g = json_schema_to_grammar({"type": "array", "items": {"type": "string"}, "maxItems": True})
-    assert ")*" in g  # the unbounded `( ws "," ws item )*` form, not a bounded chain
 
 
 # --------------------------------------------------------------------------

@@ -234,6 +234,34 @@ class DartBridgeVoiceAgent {
     }
   }
 
+  /// Push one raw mic frame into the in-core segmenter.
+  ///
+  /// Invokes `rac_voice_agent_feed_audio_proto`. Commons owns energy VAD /
+  /// hangover / pre-roll; this call may block for a full STT→LLM→TTS turn when
+  /// an utterance closes. Returns the native status plus a decoded result (null
+  /// when the status is non-success). Empty `synthesizedAudio` means no turn
+  /// closed on this frame. Runs on a worker isolate so the main isolate can
+  /// keep delivering VoiceEvents posted by the native-port callback.
+  Future<({int status, voice_agent_pb.VoiceAgentResult? result})>
+  feedAudioProto(voice_agent_pb.VoiceAgentAudioFrame frame) async {
+    final fn = RacNative.bindings.rac_voice_agent_feed_audio_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_voice_agent_feed_audio_proto is unavailable');
+    }
+    final handle = await getHandle();
+    final frameBytes = frame.writeToBuffer();
+    final outcome = await Isolate.run(
+      () => _feedAudioWorker(handle.address, frameBytes),
+    );
+    if (outcome.status != RAC_SUCCESS) {
+      return (status: outcome.status, result: null);
+    }
+    return (
+      status: outcome.status,
+      result: voice_agent_pb.VoiceAgentResult.fromBuffer(outcome.resultBytes),
+    );
+  }
+
   /// Streaming turn processing. Invokes `rac_voice_agent_process_turn_proto`
   /// on a short-lived WORKER isolate and pipes each decoded `VoiceEvent` onto
   /// the returned stream as it is emitted.
@@ -615,5 +643,42 @@ int _voiceTurnNativePortWorker(
     );
   } finally {
     calloc.free(requestPtr);
+  }
+}
+
+/// Worker-isolate entry for `rac_voice_agent_feed_audio_proto`. Returns the
+/// native status plus owned result bytes (empty when no utterance closed).
+({int status, Uint8List resultBytes}) _feedAudioWorker(
+  int handleAddress,
+  Uint8List frameBytes,
+) {
+  final fn = RacNative.bindings.rac_voice_agent_feed_audio_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_voice_agent_feed_audio_proto is unavailable');
+  }
+
+  final handle = Pointer<Void>.fromAddress(handleAddress);
+  final framePtr = DartBridgeProtoUtils.copyBytes(frameBytes);
+  final out = calloc<RacProtoBuffer>();
+  final bindings = RacNative.bindings;
+  try {
+    bindings.rac_proto_buffer_init(out);
+    final code = fn(handle, framePtr, frameBytes.length, out);
+    if (code != RAC_SUCCESS) {
+      return (status: code, resultBytes: Uint8List(0));
+    }
+    if (out.ref.data == nullptr || out.ref.size == 0) {
+      return (status: RAC_SUCCESS, resultBytes: Uint8List(0));
+    }
+    return (
+      status: RAC_SUCCESS,
+      resultBytes: Uint8List.fromList(
+        out.ref.data.asTypedList(out.ref.size),
+      ),
+    );
+  } finally {
+    bindings.rac_proto_buffer_free(out);
+    calloc.free(framePtr);
+    calloc.free(out);
   }
 }

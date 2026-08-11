@@ -18,6 +18,7 @@ import com.runanywhere.sdk.public.api.RagDocument
 import com.runanywhere.sdk.public.api.RagQueryOptions
 import com.runanywhere.sdk.public.api.RagEvent
 import com.runanywhere.sdk.public.api.RagSession
+import com.runanywhere.sdk.public.api.TokenKind
 import com.runanywhere.sdk.public.api.rag
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +45,8 @@ internal fun buildRagAnswerMessage(
     elapsedMs: Long,
 ): RagMessage =
     RagMessage(
-        text = RagAnswerNormalizer.visibleAnswer(rawAnswer)
+        // RAGResult.answer is already thinking-stripped by commons.
+        text = rawAnswer.trim()
             .ifBlank { "I couldn't produce a concise answer. Try asking more specifically." },
         isUser = false,
         sources = sources,
@@ -190,13 +192,16 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     when (event) {
                         is RagEvent.TextDelta -> {
+                            // Answer channel only — never parse tags; thoughts stay on THOUGHT.
+                            if (event.kind != TokenKind.TEXT) return@collect
                             streamed.append(event.text)
                             messages[answerIndex] = RagMessage(
-                                text = RagAnswerNormalizer.visibleAnswer(streamed.toString()),
+                                text = streamed.toString(),
                                 isUser = false,
                             )
                         }
                         is RagEvent.Completed -> {
+                            // Commons-split answer (and thinkingText on the result if needed).
                             messages[answerIndex] = buildRagAnswerMessage(
                                 rawAnswer = event.result.answer,
                                 sources = event.result.sources.map {

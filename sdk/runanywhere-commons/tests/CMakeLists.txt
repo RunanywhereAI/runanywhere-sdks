@@ -462,6 +462,18 @@ target_compile_features(test_structured_output PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_structured_output)
 add_test(NAME structured_output_tests COMMAND test_structured_output)
 
+# --- JSON Schema → GBNF compiler (W1-G) --------------------------------
+add_executable(test_json_schema_to_gbnf test_json_schema_to_gbnf.cpp)
+target_include_directories(test_json_schema_to_gbnf PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_link_libraries(test_json_schema_to_gbnf PRIVATE rac_commons)
+rac_link_archive_deps(test_json_schema_to_gbnf)
+target_compile_features(test_json_schema_to_gbnf PRIVATE cxx_std_17)
+add_test(NAME json_schema_to_gbnf_tests COMMAND test_json_schema_to_gbnf)
+
 # --- JSONSchema-proto -> JSON Schema text canonical-writer parity ----
 # Verifies rac_structured_output_schema_to_json_proto produces byte-exact
 # output matching Swift's JSONSchemaWriter

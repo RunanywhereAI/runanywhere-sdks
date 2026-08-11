@@ -5,6 +5,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "errors.proto";
+import "finish_reason.proto";
 import "tool_calling.proto";
 import "llm_options.proto";
 import "chat.proto";

@@ -22,7 +22,6 @@ import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
   getFrameworkIcon,
-  getModelDownloadSizeBytes,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
 import { listDownloadedCatalogModels } from '../services/ModelRegistryQueries';
@@ -152,6 +151,9 @@ export const StorageScreen: React.FC = () => {
                 DEFAULT_INFERENCE_FRAMEWORK
               );
               const frameworkColor = getFrameworkColor(framework);
+              const storedModel = storageInfo?.models.find(
+                (stored) => stored.modelId === model.id
+              );
               return (
                 <View key={model.id} style={styles.modelRow}>
                   <View style={styles.modelText}>
@@ -160,7 +162,9 @@ export const StorageScreen: React.FC = () => {
                     </Text>
                     <View style={styles.modelMeta}>
                       <Text style={styles.modelSize}>
-                        {formatBytes(getModelDownloadSizeBytes(model))}
+                        {storedModel
+                          ? formatBytes(storedModel.sizeOnDiskBytes)
+                          : '—'}
                       </Text>
                       <View
                         style={[
