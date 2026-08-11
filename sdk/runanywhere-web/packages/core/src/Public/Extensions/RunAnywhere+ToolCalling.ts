@@ -67,6 +67,7 @@ import {
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { SDKError as SDKErrorMessage } from '@runanywhere/proto-ts/errors';
+import { RAC_OK } from '../../Foundation/RACErrors.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
@@ -571,6 +572,11 @@ async function generateWithToolsInBackendWorker(
     if (sessionHandle === 0n || cancelDispatched) return;
     cancelDispatched = true;
     void host.infer('tool.sessionCancel', { sessionHandle }).catch((error) => {
+      // Unlike the in-process export, this RPC has real failure paths: the
+      // worker rejects on a missing export or a non-zero rac_result_t, and
+      // the message channel itself can fail. Release the latch so a later
+      // abort retries instead of treating a failed cancel as delivered.
+      cancelDispatched = false;
       logger.warning(
         `worker tool session cancel failed: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -887,11 +893,16 @@ export const ToolCalling = {
         typeof module._rac_tool_calling_session_cancel_proto === 'function'
       ) {
         try {
-          // The export returns rac_result_t (0 = success). Latching
+          // Defensive, not a live failure path: every branch of
+          // `rac_tool_calling_session_cancel_proto` returns RAC_SUCCESS today
+          // (zero / stale / already-destroyed handles are documented
+          // idempotent no-ops), so this check cannot currently fire. Honour
+          // the declared `rac_result_t` return anyway — latching
           // `cancelDispatched` on a non-zero code would record a cancel that
-          // never happened and stop every later abort from retrying it.
+          // never happened and turn every later abort into a no-op if the C
+          // contract ever grows a rejecting branch.
           const rc = module._rac_tool_calling_session_cancel_proto(sessionHandle);
-          if (rc === 0) {
+          if (rc === RAC_OK) {
             cancelDispatched = true;
           } else {
             logger.warning(
