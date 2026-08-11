@@ -342,12 +342,12 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
         out->body_bytes = nullptr;
         out->body_len = 0;
         // Finished with fetch resources regardless of status.
-        const bool http_ok = fetch->status >= 200 && fetch->status < 400;
+        const bool network_failure = fetch->status == 0;
         emscripten_fetch_close(fetch);
         if (cancelled) {
             return RAC_ERROR_CANCELLED;
         }
-        if (!http_ok && fetch->status == 0) {
+        if (network_failure) {
             return RAC_ERROR_NETWORK_ERROR;
         }
         return RAC_SUCCESS;
