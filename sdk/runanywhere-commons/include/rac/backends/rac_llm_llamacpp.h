@@ -24,6 +24,11 @@ extern "C" {
 // EXPORT MACRO
 // =============================================================================
 
+// When building rac_backend_llamacpp.dll: dllexport / default visibility.
+// When a shared consumer (thin runanywhere_llamacpp carrier, JNI, tests)
+// links that DLL on Windows: dllimport — required for DATA symbols
+// (g_llamacpp_*_ops); functions also benefit. RAC_USING_SHARED is the
+// INTERFACE define from shared rac_commons (electron / desktop presets).
 #if defined(RAC_LLAMACPP_BUILDING)
 #if defined(_WIN32)
 #define RAC_LLAMACPP_API __declspec(dllexport)
@@ -32,6 +37,8 @@ extern "C" {
 #else
 #define RAC_LLAMACPP_API
 #endif
+#elif defined(_WIN32) && defined(RAC_USING_SHARED)
+#define RAC_LLAMACPP_API __declspec(dllimport)
 #else
 #define RAC_LLAMACPP_API
 #endif

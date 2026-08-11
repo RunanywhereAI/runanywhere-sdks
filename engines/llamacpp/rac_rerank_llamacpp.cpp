@@ -32,6 +32,7 @@
 #include "core/internal/platform_compat.h"
 #include <sys/stat.h>
 
+#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/rerank/rac_rerank_service.h"
@@ -502,7 +503,7 @@ rac_result_t llamacpp_rerank_create(const char* model_id, const char* /*config_j
 
 }  // namespace
 
-extern "C" const rac_rerank_service_ops_t g_llamacpp_rerank_ops = {
+extern "C" RAC_LLAMACPP_API const rac_rerank_service_ops_t g_llamacpp_rerank_ops = {
     .initialize = llamacpp_rerank_initialize,
     .rerank = llamacpp_rerank_rerank,
     .cleanup = llamacpp_rerank_cleanup,

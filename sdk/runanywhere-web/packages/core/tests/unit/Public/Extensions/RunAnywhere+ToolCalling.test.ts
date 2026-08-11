@@ -893,8 +893,10 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     expect(result.toolCallId).toBe('tc-3');
     expect(result.name).toBe('echo');
     expect(result.resultJson).toBe('{"echoed":true}');
-    expect(result.completedAtMs).toBeGreaterThan(0);
-    expect(result.startedAtMs).toBeGreaterThan(0);
+    // Timestamps are commons-owned. Local executeTool does not fabricate
+    // startedAtMs/completedAtMs — proto3 zero remains until commons sets them.
+    expect(result.completedAtMs).toBe(0);
+    expect(result.startedAtMs).toBe(0);
   });
 });
 

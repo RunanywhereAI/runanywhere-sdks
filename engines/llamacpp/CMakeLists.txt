@@ -370,6 +370,12 @@ else()
     # is a real export of THIS image — required for Windows GetProcAddress
     # (Darwin's dlsym walks dependents, which hid the missing export) and
     # for the CI `nm`/`dumpbin` gate.
+    #
+    # Windows: the entry TU dllimports g_llamacpp_*_ops /
+    # rac_llamacpp_cpu_runtime_{register,unregister} from
+    # rac_backend_llamacpp.dll (RAC_LLAMACPP_API + WINDOWS_EXPORT_ALL_SYMBOLS
+    # on the SHARED_ONLY backend — see cmake/plugins.cmake). macOS/ELF resolve
+    # those via default visibility without import attributes.
     add_library(runanywhere_llamacpp SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_llamacpp.cpp

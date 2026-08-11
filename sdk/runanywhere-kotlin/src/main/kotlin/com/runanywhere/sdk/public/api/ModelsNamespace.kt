@@ -31,6 +31,15 @@ internal fun LoadOptions?.unsupportedLoadKnobs(): List<String> =
         "threads".takeIf { this?.threads != null },
     )
 
+/** Maps the public placement enum onto the wire [ai.runanywhere.proto.v1.AcceleratorPolicy]. */
+private fun AcceleratorPolicy.toProto(): ai.runanywhere.proto.v1.AcceleratorPolicy =
+    when (this) {
+        AcceleratorPolicy.AUTO -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_AUTO
+        AcceleratorPolicy.CPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_CPU
+        AcceleratorPolicy.GPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_GPU
+        AcceleratorPolicy.NPU -> ai.runanywhere.proto.v1.AcceleratorPolicy.ACCELERATOR_POLICY_NPU
+    }
+
 private val LOADABLE_CATEGORIES =
     listOf(
         ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -186,10 +195,9 @@ public class ModelsNamespace internal constructor() {
     /**
      * Make [id] resident now, downloading it first when its bytes are absent.
      *
-     * Only [LoadOptions.backendPreferences]'s first entry (equivalently the
-     * deprecated `framework`) reaches commons today. `contextLength`,
-     * `threads`, and a real `accelerator` choice are not yet carried by the
-     * native load ABI, so passing them throws rather than being silently dropped.
+     * Placement knobs (`contextLength`, `accelerator`/`useGpu`,
+     * `backendPreferences`) are forwarded on [ModelLoadRequest] for commons to
+     * honor. `threads` was retired from the load ABI and still fails preflight.
      *
      * @throws SDKException when the model cannot be loaded, or when [options]
      *   sets a placement knob the load ABI cannot honor yet.
@@ -208,7 +216,8 @@ public class ModelsNamespace internal constructor() {
         if (registered.local_path.isEmpty()) {
             legacyDownloadModel(registered)
         }
-        val requestedBackend = options?.resolvedBackendPreferences?.firstOrNull()
+        val preferences = options?.resolvedBackendPreferences.orEmpty()
+        val requestedBackend = preferences.firstOrNull()
         val result =
             legacyLoadModel(
                 ModelLoadRequest(
@@ -217,6 +226,9 @@ public class ModelsNamespace internal constructor() {
                     framework = requestedBackend?.backend ?: registered.framework.takeIf { it.value != 0 },
                     force_reload = options?.forceReload ?: false,
                     validate_availability = true,
+                    context_length = options?.contextLength,
+                    backend_preferences = preferences.map { it.backend },
+                    accelerator_policy = options?.resolvedAccelerator?.toProto(),
                 ),
             )
         result.error?.let { throw SDKException(it) }

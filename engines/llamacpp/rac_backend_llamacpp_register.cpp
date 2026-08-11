@@ -349,7 +349,9 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id, const char* /*config
 // produces a SHARED library when RAC_BUILD_SHARED=ON or SHARED_ONLY is set,
 // which surfaces the linkage mismatch as undefined-symbol at link time.
 // Wrapping in extern "C" makes the definition match the declaration.
-extern "C" const rac_llm_service_ops_t g_llamacpp_ops = {
+// RAC_LLAMACPP_API exports it from rac_backend_llamacpp.dll on Windows so the
+// thin runanywhere_llamacpp carrier can dllimport it.
+extern "C" RAC_LLAMACPP_API const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
     .generate = llamacpp_vtable_generate,
     .generate_stream = llamacpp_vtable_generate_stream,
@@ -401,11 +403,11 @@ LlamaCPPRegistryState& get_state() {
 
 extern "C" {
 
-rac_result_t rac_llamacpp_cpu_runtime_register(void) {
+RAC_LLAMACPP_API rac_result_t rac_llamacpp_cpu_runtime_register(void) {
     return rac_cpu_runtime_register_provider(&k_llamacpp_cpu_provider);
 }
 
-void rac_llamacpp_cpu_runtime_unregister(void) {
+RAC_LLAMACPP_API void rac_llamacpp_cpu_runtime_unregister(void) {
     rac_cpu_runtime_unregister_provider(k_llamacpp_cpu_provider.name);
 }
 
