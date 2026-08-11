@@ -17,7 +17,15 @@
  * family's chat model and its vision variant sit together.
  */
 
-import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+// TYPE-only, and it has to stay that way. This table is imported by the
+// renderer, and a value import would pull real code into the browser bundle:
+// `@runanywhere/electron`'s barrel drags the Node-flavoured SDK, and
+// `@runanywhere/proto-ts/model_types` drags `@bufbuild/protobuf/wire`, which
+// cannot even resolve here (proto-ts is a linked dependency, so resolution
+// realpaths out of this app's node_modules). A `import type` is erased, and the
+// literals below are still checked against the SDK's enum — a typo or a renamed
+// engine is a compile error, not a silent bad row.
+import type { InferenceFramework } from '@runanywhere/electron';
 
 /** What a model is for. Drives which SDK namespace loads it. */
 export type ModelType =
@@ -179,7 +187,7 @@ function npu(
   }));
   return {
     type: 'llm',
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+    framework: 'QHEXRT',
     files,
     primary: manifest,
     label,

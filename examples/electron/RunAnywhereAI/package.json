@@ -29,13 +29,11 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/electron": "file:../../../sdk/runanywhere-electron",
     "@runanywhere/electron-llamacpp": "file:../../../sdk/runanywhere-electron/packages/llamacpp",
     "@runanywhere/electron-onnx": "file:../../../sdk/runanywhere-electron/packages/onnx",
     "@runanywhere/electron-qhexrt": "file:../../../sdk/runanywhere-electron/packages/qhexrt",
-    "@runanywhere/electron-sherpa": "file:../../../sdk/runanywhere-electron/packages/sherpa",
-    "@runanywhere/proto-ts": "file:../../../sdk/shared/proto-ts"
+    "@runanywhere/electron-sherpa": "file:../../../sdk/runanywhere-electron/packages/sherpa"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

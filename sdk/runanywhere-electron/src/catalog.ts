@@ -17,7 +17,7 @@
 
 import {
   ArchiveType,
-  InferenceFramework,
+  InferenceFramework as ProtoInferenceFramework,
   ModelCategory,
   ModelFileRole,
   ModelFormat,
@@ -25,6 +25,9 @@ import {
   ModelRegistryStatus,
   ModelSource,
 } from '@runanywhere/proto-ts/model_types';
+
+import { frameworkToProto } from './api/model-abi';
+import { InferenceFramework } from './api/types';
 
 export type ModelType =
   | 'llm'
@@ -82,9 +85,20 @@ export interface CatalogEntry {
    * so a row that pinned QHEXRT and came back LLAMA_CPP is a visible fallback
    * rather than a silent one.
    *
-   * The generated proto enum, not a local string union: this value is written
-   * straight onto the `ModelInfo` commons stores, so anything hand-written here
-   * could drift from the IDL and pin a backend that does not exist.
+   * The SDK's {@link InferenceFramework} — the same domain enum
+   * `models.register({ framework })` and `load({ framework })` take — never a
+   * hand-written string. {@link frameworkToProto} is the ONE place it becomes
+   * the generated IDL value commons stores, so a catalog row cannot drift from
+   * the rest of the surface or from the proto.
+   *
+   * Deliberately NOT the generated enum itself. A catalog table is authored by
+   * the APP and this one is loaded by the utility host through a plain
+   * `require()`; importing a generated MESSAGE module there pulls in
+   * `@bufbuild/protobuf/wire`, and `@runanywhere/proto-ts` is a linked
+   * dependency, so Node realpaths it out of the app's `node_modules` and the
+   * runtime cannot be resolved — MODULE_NOT_FOUND before the first window
+   * appears. Typecheck, lint, unit tests and the renderer bundle all pass while
+   * that is broken, so keep the app-facing value a plain string.
    */
   framework?: InferenceFramework;
 }
@@ -136,18 +150,20 @@ const CATEGORY_OF_TYPE: Record<ModelType, ModelCategory> = {
   segmentation: ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
 };
 
-const FRAMEWORK_OF_TYPE: Record<ModelType, InferenceFramework> = {
-  llm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  vlm: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  embedder: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  stt: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  tts: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  diarization: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  segmentation: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+const FRAMEWORK_OF_TYPE: Record<ModelType, ProtoInferenceFramework> = {
+  llm: ProtoInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  vlm: ProtoInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  embedder: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  stt: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  tts: ProtoInferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  diarization: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  segmentation: ProtoInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
 };
 
-function frameworkOf(entry: CatalogEntry): InferenceFramework {
-  return entry.framework ?? FRAMEWORK_OF_TYPE[entry.type];
+function frameworkOf(entry: CatalogEntry): ProtoInferenceFramework {
+  return entry.framework !== undefined
+    ? frameworkToProto(entry.framework)
+    : FRAMEWORK_OF_TYPE[entry.type];
 }
 
 function formatOf(entry: CatalogEntry): ModelFormat {
@@ -157,7 +173,7 @@ function formatOf(entry: CatalogEntry): ModelFormat {
   // plain folder. Commons rejects that pairing at registration — the row simply
   // never appears in models.list(), so the model is invisible in a picker with
   // no error anywhere to explain it.
-  if (entry.framework === InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT) {
+  if (entry.framework === InferenceFramework.QHEXRT) {
     return ModelFormat.MODEL_FORMAT_QNN_CONTEXT;
   }
   if (entry.archive) return ModelFormat.MODEL_FORMAT_FOLDER;
