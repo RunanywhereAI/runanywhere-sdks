@@ -486,10 +486,18 @@ else()
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
+    target_compile_definitions(runanywhere_sherpa PRIVATE RAC_BUILDING_PLUGIN=1)
     target_link_libraries(runanywhere_sherpa PUBLIC
         rac_backend_sherpa
         rac_commons
     )
+    if(APPLE)
+        set_property(TARGET runanywhere_sherpa APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties(runanywhere_sherpa PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET runanywhere_sherpa APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties(runanywhere_sherpa PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
     rac_apply_android_page_alignment(runanywhere_sherpa)
     install(TARGETS runanywhere_sherpa LIBRARY DESTINATION lib)
 endif()

@@ -51,12 +51,25 @@ extern "C" {
 #else
 #define RAC_API
 #endif
+// Plugin entry symbols (`rac_plugin_entry_<name>`) live in *engine* DLLs, not
+// in rac_commons.dll. When a plugin target links shared commons it inherits
+// RAC_USING_SHARED → RAC_API becomes dllimport, which would wrongly decorate
+// the plugin's own entry. RAC_PLUGIN_API is dllexport only while building a
+// plugin (RAC_BUILDING_PLUGIN); hosts that LoadLibrary/GetProcAddress need no
+// import attribute.
+#if defined(RAC_BUILDING_PLUGIN)
+#define RAC_PLUGIN_API __declspec(dllexport)
+#else
+#define RAC_PLUGIN_API
+#endif
 #elif defined(__GNUC__) || defined(__clang__)
 // Always use default visibility for FFI compatibility
 // This ensures dlsym() can find symbols even in static libraries
 #define RAC_API __attribute__((visibility("default")))
+#define RAC_PLUGIN_API RAC_API
 #else
 #define RAC_API
+#define RAC_PLUGIN_API
 #endif
 
 // =============================================================================
