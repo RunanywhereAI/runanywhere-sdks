@@ -102,7 +102,13 @@ $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
 # Install native/ node deps first (node-addon-api).
 Push-Location sdk/runanywhere-electron/native; npm install; Pop-Location
 
-cmake --preset electron-windows "-DRAC_NODE_DEV_DIR=$dir"
+# libcurl for RAC_DESKTOP_ADAPTER (same as CI — static MSVC triplet).
+& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+
+cmake --preset electron-windows `
+  "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+  "-DRAC_NODE_DEV_DIR=$dir"
 # Optional: -DRAC_BACKEND_SHERPA=OFF if the Windows Sherpa-ONNX archive is missing.
 cmake --build --preset electron-windows `
   --target rac_commons runanywhere_llamacpp runanywhere_onnx runanywhere_sherpa runanywhere_native

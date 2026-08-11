@@ -117,6 +117,18 @@ jobs:
           if (!(Test-Path "$dir/x64/node.lib")) { throw "node.lib missing under $dir" }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      # RAC_DESKTOP_ADAPTER=ON needs libcurl. macOS has system curl; Windows MSVC
+      # gets a static vcpkg package (no libcurl.dll sidecar for the loadPlugin smoke).
+      - name: Install static libcurl (Windows MSVC)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not $env:VCPKG_INSTALLATION_ROOT) {
+            throw "VCPKG_INSTALLATION_ROOT is unset on this runner"
+          }
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl:x64-windows-static install failed" }
+
       - name: Configure thin preset
         shell: bash
         run: |
@@ -125,6 +137,8 @@ jobs:
           # array as unbound (macOS runners).
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             cmake --preset "${{ matrix.preset }}" \
+              -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_TARGET_TRIPLET=x64-windows-static \
               -DRAC_BACKEND_SHERPA=OFF \
               -DRAC_NODE_DEV_DIR="${{ steps.nodedev.outputs.dir }}"
           else
