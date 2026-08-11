@@ -47,27 +47,6 @@ export interface DataDeps {
 // embeddings
 // ---------------------------------------------------------------------------
 
-/** Sync commons vector math exported by runanywhere_native.node (data_bridge.cpp). */
-interface EmbeddingsMathNative {
-  embeddingsNorm(vector: Float32Array): number;
-  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): number;
-}
-
-let embeddingsMathInjected: EmbeddingsMathNative | null = null;
-
-/** Test hook — unit tests inject a fake so they do not need the .node. */
-export function setEmbeddingsMathNativeForTests(native: EmbeddingsMathNative | null): void {
-  embeddingsMathInjected = native;
-}
-
-function embeddingsMathNative(): EmbeddingsMathNative {
-  if (embeddingsMathInjected) return embeddingsMathInjected;
-  // Lazy require: bridge.ts throws at import when the .node is missing.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { addon } = require('../bridge') as { addon: EmbeddingsMathNative };
-  return addon;
-}
-
 function asFloat32Vector(input: Embedding | Float32Array, fieldPath: string): Float32Array {
   if (input instanceof Float32Array) return input;
   if (input?.vector instanceof Float32Array) return input.vector;
@@ -90,11 +69,12 @@ export interface EmbeddingsNamespace {
   embed(texts: string[], options?: EmbedOptions): Promise<Embedding[]>;
   /**
    * Cosine similarity via commons (`rac_embeddings_similarity`). Returns 0 for
-   * mismatched lengths, empty vectors, or zero norms.
+   * mismatched lengths, empty vectors, or zero norms. Routed through the
+   * backend so the preload never loads the native addon.
    */
-  cosineSimilarity(a: Embedding | Float32Array, b: Embedding | Float32Array): number;
+  cosineSimilarity(a: Embedding | Float32Array, b: Embedding | Float32Array): Promise<number>;
   /** L2 norm via commons (`rac_embeddings_norm`). */
-  computeNorm(vector: Embedding | Float32Array): number;
+  computeNorm(vector: Embedding | Float32Array): Promise<number>;
 }
 
 /** Build the `embeddings` namespace over a backend. */
@@ -123,12 +103,12 @@ export function createEmbeddingsNamespace(deps: DataDeps): EmbeddingsNamespace {
     cosineSimilarity(a, b) {
       const lhs = asFloat32Vector(a, 'a');
       const rhs = asFloat32Vector(b, 'b');
-      return embeddingsMathNative().embeddingsSimilarity(lhs, rhs);
+      return deps.backend.embeddingsSimilarity(lhs, rhs);
     },
-    computeNorm(vector) {
+    async computeNorm(vector) {
       const values = asFloat32Vector(vector, 'vector');
       if (!values.length) return 0;
-      return embeddingsMathNative().embeddingsNorm(values);
+      return deps.backend.embeddingsNorm(values);
     },
   };
 }

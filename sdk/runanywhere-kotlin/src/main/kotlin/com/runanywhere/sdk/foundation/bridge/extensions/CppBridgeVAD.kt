@@ -261,6 +261,81 @@ object CppBridgeVAD {
         }
     }
 
+    // MARK: - Streaming session (rac_vad_stream_*)
+    //
+    // Commons owns min-speech / min-silence / prefix-padding endpointing and
+    // emits SPEECH_ACTIVITY onset/offset events on the registered callback.
+    // The SDK only feeds PCM_S16_LE and maps events — no local edge machine.
+
+    /**
+     * Install the per-handle `VADStreamEvent` callback for
+     * `rac_vad_stream_*` sessions. Pass `null` to clear without quiescing;
+     * prefer [unsetStreamCallback] for teardown.
+     */
+    suspend fun setStreamCallback(callback: ((ByteArray) -> Unit)?) {
+        val handle = actor.getHandle()
+        val listener: NativeProtoProgressListener? =
+            callback?.let { onBytes ->
+                NativeProtoProgressListener { bytes ->
+                    onBytes(bytes)
+                    true
+                }
+            }
+        checkRc(
+            RunAnywhereBridge.racVadSetStreamProtoCallback(handle, listener),
+            "racVadSetStreamProtoCallback",
+        )
+    }
+
+    /**
+     * Unregister the stream callback and quiesce in-flight dispatches.
+     * No-op when the handle has not been created.
+     */
+    suspend fun unsetStreamCallback() {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racVadUnsetStreamProtoCallback(handle)
+        RunAnywhereBridge.racVadProtoQuiesce()
+    }
+
+    /** Start a commons VAD stream session; returns the positive session id. */
+    suspend fun streamStart(options: RAVADOptions): Long {
+        val handle = actor.getHandle()
+        val sessionId =
+            RunAnywhereBridge.racVadStreamStartProto(
+                handle,
+                RAVADOptions.ADAPTER.encode(options),
+            )
+        if (sessionId <= 0L) {
+            throw SDKException.operation("racVadStreamStartProto failed with sessionId=$sessionId")
+        }
+        return sessionId
+    }
+
+    /** Feed raw mono PCM_S16_LE bytes into an open stream session. */
+    fun streamFeed(sessionId: Long, pcm16: ByteArray) {
+        checkRc(
+            RunAnywhereBridge.racVadStreamFeedAudioProto(sessionId, pcm16),
+            "racVadStreamFeedAudioProto",
+        )
+    }
+
+    /** Stop a stream session, flushing a confirmed open segment. */
+    fun streamStop(sessionId: Long) {
+        checkRc(
+            RunAnywhereBridge.racVadStreamStopProto(sessionId),
+            "racVadStreamStopProto",
+        )
+    }
+
+    /** Cancel a stream session without flushing. */
+    fun streamCancel(sessionId: Long) {
+        checkRc(
+            RunAnywhereBridge.racVadStreamCancelProto(sessionId),
+            "racVadStreamCancelProto",
+        )
+    }
+
     // MARK: - Service Lifecycle (lifecycle-owned VAD service)
     //
     // Mirrors Swift's `initialize`/`start`/`stop`/`reset` actor methods on

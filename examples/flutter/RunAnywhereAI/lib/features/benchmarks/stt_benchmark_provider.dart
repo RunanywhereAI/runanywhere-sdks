@@ -57,18 +57,17 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
       // Transcribe raw PCM Int16 mono @ 16 kHz. Audio properties live on the
       // SDK-built STTAudioSource; the SDK detects the encoding from the bytes.
       final benchStopwatch = Stopwatch()..start();
-      final result = await sdk.RunAnywhere.stt.transcribe(
+      await sdk.RunAnywhere.stt.transcribe(
         sdk.AudioInput.pcm16(audioData),
       );
-      final elapsedMs = benchStopwatch.elapsedMicroseconds / 1000.0;
-      metrics.endToEndLatencyMs = elapsedMs;
+      // Harness e2e only — not a model metric.
+      metrics.endToEndLatencyMs =
+          benchStopwatch.elapsedMicroseconds / 1000.0;
 
       metrics.audioLengthSeconds = audioDuration;
-      // Commons owns transcribed duration (STTResult.durationMs). Never fall back
-      // to the fixture length — omit RTF when the engine did not report duration.
-      if (result.durationMs > 0) {
-        metrics.realTimeFactor = elapsedMs / result.durationMs;
-      }
+      // Public Transcription has no commons real_time_factor; leave unset
+      // rather than inventing wall elapsed / audioDuration (or durationMs).
+      metrics.realTimeFactor = null;
 
       // memoryDeltaBytes stays 0: no portable Dart available-memory probe.
       return metrics;

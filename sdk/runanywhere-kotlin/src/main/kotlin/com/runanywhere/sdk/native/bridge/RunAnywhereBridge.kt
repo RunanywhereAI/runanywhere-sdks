@@ -475,6 +475,12 @@ object RunAnywhereBridge {
     ): Int
 
     @JvmStatic
+    external fun racVadUnsetStreamProtoCallback(handle: Long): Int
+
+    @JvmStatic
+    external fun racVadProtoQuiesce()
+
+    @JvmStatic
     external fun racVadStreamStartProto(handle: Long, optionsProto: ByteArray?): Long
 
     @JvmStatic
@@ -569,10 +575,11 @@ object RunAnywhereBridge {
     // Download + non-proto model-registry thunks removed. All of
     // `racDownloadStart` /
     // `racDownloadCancel` / `racDownloadGetProgress` /
-    // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove,UpdateDownloadStatus}`
+    // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove}`
     // had zero Kotlin callers; the proto-backed siblings below
-    // (`racDownloadStartProto`, `racModelRegistry*Proto`) are the canonical
-    // surface.
+    // (`racDownloadStartProto`, `racModelRegistry*Proto`) plus the commons
+    // mutators (`racModelRegistryUpdateDownloadStatus` /
+    // `racModelRegistryUpdateLastUsed`) are the canonical surface.
 
     // MODEL REGISTRY - Direct C++ registry access (mirrors Swift CppBridge+ModelRegistry)
 
@@ -629,6 +636,24 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryRemoveProto(modelId: String): Int
+
+    /**
+     * Update download status (local path) via the commons registry mutator.
+     *
+     * Forwards to `rac_model_registry_update_download_status`, which stamps
+     * `updated_at_unix_ms` in commons. Pass null [localPath] to clear.
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
+
+    /**
+     * Touch last-used via the commons registry mutator.
+     *
+     * Forwards to `rac_model_registry_update_last_used`, which stamps
+     * `last_used_at_unix_ms` in commons.
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateLastUsed(modelId: String): Int
 
     /**
      * Refresh the C++ model registry using serialized runanywhere.v1.ModelRegistryRefreshRequest bytes.

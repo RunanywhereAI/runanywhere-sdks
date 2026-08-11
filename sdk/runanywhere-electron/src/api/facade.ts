@@ -10,6 +10,7 @@ import * as path from 'path';
 import { catalogEntries, catalogModelInfo } from '../catalog';
 import { modelsRoot } from '../download';
 import { ErrorCategory, SDKException, asSDKException } from '../errors';
+import { bindAudioBackend } from '../audio';
 import { ModelAbi } from './model-abi';
 import {
   IMAGES_GAP,
@@ -389,6 +390,10 @@ async function seedCatalog(backend: RaBackend, baseDir?: string): Promise<void> 
 
 /** Build the public surface over `backend`. */
 export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
+  // Audio DSP + embeddings math are owned by whichever process holds the
+  // native addon. Binding here means preload/RpcBackend never resolveAddon.
+  bindAudioBackend(backend);
+
   const hub = new SdkEventHub();
 
   let ready = false;

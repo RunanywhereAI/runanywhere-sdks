@@ -192,11 +192,12 @@ contextBridge.exposeInMainWorld('runanywhere', {
         initArgs = { secureDir, baseDir, cp: controlPlane };
       }),
 
-  // ---- audio helpers (commons DSP via the N-API addon; lazy-loaded) ----
+  // ---- audio helpers (commons DSP via utility-host RPC) ----
   // Rate conversion + PCM16 packing for the mic -> STT path. Commons owns the
-  // math (`rac_audio_resample_f32` / `rac_audio_float32_to_pcm16` /
-  // `rac_audio_compute_rms`); these just forward typed arrays.
-  downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
+  // math; these forward typed arrays over the same MessagePort as v3.* — never
+  // by loading runanywhere_native.node in the preload/renderer.
+  downsample: (samples: Float32Array, inRate: number, outRate: number) =>
+    downsample(samples, inRate, outRate),
   pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
   rms: (samples: Float32Array) => rms(samples),
 

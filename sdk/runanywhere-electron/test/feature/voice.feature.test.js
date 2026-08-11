@@ -130,7 +130,7 @@ async function spokenPcm16(sdk, text) {
   const at16k =
     spoken.sampleRate === SAMPLE_RATE
       ? spoken.data
-      : downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
+      : await downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
   return pcm16Bytes(at16k);
 }
 

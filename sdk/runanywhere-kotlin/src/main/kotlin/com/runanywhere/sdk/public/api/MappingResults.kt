@@ -128,22 +128,17 @@ internal fun TTSOutput.toAudioChunk(): AudioChunk =
     )
 
 /**
- * `VADResult.confidence`/`.start_time_ms`/`.end_time_ms` were deleted outright
- * (idl/vad_options.proto): `confidence` is renamed `probability`, and the
- * start/end pair has no replacement -- the result now only carries
- * `timestamp_ms` (frame start) + `duration_ms` (frame length). Derive the
- * one segment this frame represents from that pair instead of a span.
+ * Map a one-shot frame [VADResult] onto the public [VadResult] surface.
+ *
+ * Segments are owned by commons `rac_vad_stream_*` SPEECH_ACTIVITY pairs
+ * (see [VadSegmentAccumulator]); a single frame verdict does not invent a
+ * segment span.
  */
 internal fun VADResult.toVadResult(): VadResult =
     VadResult(
         isSpeech = is_speech,
         probability = probability,
-        segments =
-            if (is_speech && duration_ms > 0) {
-                listOf(Segment(startMs = timestamp_ms, endMs = timestamp_ms + duration_ms))
-            } else {
-                emptyList()
-            },
+        segments = emptyList(),
     )
 
 internal fun EmbeddingsResult.toEmbeddings(): List<Embedding> =

@@ -113,6 +113,16 @@ async function pump(port, replies = {}) {
   }
 }
 
+test.afterEach(() => {
+  try {
+    const { bindAudioBackend, setAudioNativeForTests } = require('../../dist/audio');
+    setAudioNativeForTests(null);
+    bindAudioBackend(null);
+  } catch {
+    /* dist may be absent in odd skip paths */
+  }
+});
+
 test('exposes window.runanywhere as the v3 surface', { skip: SKIP }, () => {
   const { exposed } = freshPreload();
   const api = exposed.runanywhere;

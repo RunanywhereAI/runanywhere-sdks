@@ -391,6 +391,36 @@ export interface RaBackend {
   embed(texts: string[], options: NativeEmbedOptions): Promise<Float32Array[]>;
   rerank(query: string, documents: string[], topN?: number): Promise<NativeRanked[]>;
 
+  /**
+   * Sync commons vector math (`rac_embeddings_norm` / `rac_embeddings_similarity`)
+   * owned by the process that holds the native addon. Always Promise-shaped so
+   * the preload can RPC them; NativeBackend resolves immediately.
+   */
+  embeddingsNorm(vector: Float32Array): Promise<number>;
+  embeddingsSimilarity(lhs: Float32Array, rhs: Float32Array): Promise<number>;
+
+  /**
+   * Sync commons audio DSP (`rac_audio_*`) owned by the process that holds the
+   * native addon. Preload/renderer must reach these over RPC — never by loading
+   * `runanywhere_native.node` in the renderer.
+   */
+  audioFloat32ToPcm16(samples: Float32Array): Promise<Int16Array>;
+  audioPcm16ToFloat32(samples: Int16Array): Promise<Float32Array>;
+  audioResampleF32(
+    samples: Float32Array,
+    inRate: number,
+    outRate: number
+  ): Promise<Float32Array>;
+  audioComputeRms(samples: Float32Array): Promise<number>;
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array>;
+  audioWavToFloat32(
+    bytes: Uint8Array
+  ): Promise<{ sampleRate: number; samples: Float32Array }>;
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): Promise<number>;
+
   // ---- diarization and segmentation ----
   diarize(samples: Float32Array, options: NativeDiarizationOptions): Promise<NativeDiarization>;
   segment(
@@ -594,6 +624,15 @@ export const BACKEND_METHODS: readonly string[] = [
   'vadStreamCancel',
   'embed',
   'rerank',
+  'embeddingsNorm',
+  'embeddingsSimilarity',
+  'audioFloat32ToPcm16',
+  'audioPcm16ToFloat32',
+  'audioResampleF32',
+  'audioComputeRms',
+  'audioFloat32ToWav',
+  'audioWavToFloat32',
+  'audioPcmBytesToMs',
   'diarize',
   'segment',
   'embedBatchProto',

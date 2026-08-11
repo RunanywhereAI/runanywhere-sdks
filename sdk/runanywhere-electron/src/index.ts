@@ -153,8 +153,10 @@ export {
   float32DurationMs,
   MicRecorder,
   SpeakerPlayer,
+  bindAudioBackend,
+  setAudioNativeForTests,
 } from './audio';
-export type { MicRecorderOptions } from './audio';
+export type { MicRecorderOptions, AudioNative, AudioDspBackend } from './audio';
 export type { NativeAddon } from './bridge';
 export {
   registerCatalog,

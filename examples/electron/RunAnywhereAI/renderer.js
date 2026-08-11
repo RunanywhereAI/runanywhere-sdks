@@ -779,7 +779,7 @@ async function runEmbeddings(a, b) {
   // SDK bridge — the app never computes the formula.
   await loadSelected('embedder');
   const [ea, eb] = await ra.embeddings.embed([a, b]);
-  return ra.embeddings.cosineSimilarity(ea, eb);
+  return await ra.embeddings.cosineSimilarity(ea, eb);
 }
 // ---- RAG (Knowledge tab) ----
 // Lazy singleton: memoize the in-flight promise so concurrent first-use (ingest
@@ -1320,21 +1320,22 @@ function wireVad() {
   let pending = []; let listening = false; let inFlight = false; let timer = 0;
   let windows = 0, speech = 0;
   $('vadth').addEventListener('input', () => { $('vadthval').textContent = $('vadth').value; });
-  const takeWindow = () => {
+  const takeWindow = async () => {
     if (!pending.length) return null;
+    const frames = await Promise.all(pending);
+    pending = [];
     let n = 0;
-    for (const c of pending) n += c.length;
+    for (const c of frames) n += c.length;
     const merged = new Float32Array(n);
     let o = 0;
-    for (const c of pending) { merged.set(c, o); o += c.length; }
-    pending = [];
+    for (const c of frames) { merged.set(c, o); o += c.length; }
     return merged;
   };
   const poll = async () => {
     // One window at a time: detect() arms the detector for the call, so two
     // overlapping calls would reconfigure it underneath each other.
     if (inFlight) return;
-    const window = takeWindow();
+    const window = await takeWindow();
     if (!window || window.length < 1600) return;
     inFlight = true;
     try {
@@ -1354,7 +1355,12 @@ function wireVad() {
     listening = true; windows = 0; speech = 0; pending = [];
     setStatus('listening…'); $('vadout').textContent = 'listening…';
     await cc.start();
-    cc.onFrame((f, rate) => { pending.push(rate === 16000 ? f : ra.downsample(f, rate, 16000)); });
+    cc.onFrame((f, rate) => {
+      // downsample is async (utility-host RPC); queue the promise and settle in poll.
+      pending.push(
+        rate === 16000 ? Promise.resolve(f) : ra.downsample(f, rate, 16000)
+      );
+    });
     timer = setInterval(poll, VAD_WINDOW_MS);
   };
   const end = () => {
@@ -1408,7 +1414,7 @@ function wireDiarization() {
       // .onnx cannot be routed to llama.cpp by a registry rescan.
       await loadSelected('diarization', { framework: 'ONNX' });
       setStatus('diarizing…'); $('diarout').textContent = 'diarizing…';
-      const samples = rec.rate === 16000 ? rec.samples : ra.downsample(rec.samples, rec.rate, 16000);
+      const samples = rec.rate === 16000 ? rec.samples : await ra.downsample(rec.samples, rec.rate, 16000);
       const result = await ra.diarization.diarize(ra.audio.float32(samples, 16000));
       const segments = result.segments || [];
       const speakers = [...new Set(segments.map((s) => s.speakerId))];

@@ -90,16 +90,18 @@ function bytesToFloat32(bytes: Uint8Array): Float32Array {
 }
 
 /** PCM16 little-endian bytes decoded to float32 in [-1, 1]. */
-function pcm16BytesToFloat32(bytes: Uint8Array): Float32Array {
+async function pcm16BytesToFloat32(bytes: Uint8Array): Promise<Float32Array> {
   const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
   return pcm16ToFloat32(pcm);
 }
 
 /** Float32 mono samples at 16 kHz, whichever shape the caller supplied. */
-function toMono16k(input: AudioInput): Float32Array {
+async function toMono16k(input: AudioInput): Promise<Float32Array> {
   if (input.samples) {
     const rate = input.format.sampleRate || STT_SAMPLE_RATE;
-    return rate === STT_SAMPLE_RATE ? input.samples : downsample(input.samples, rate, STT_SAMPLE_RATE);
+    return rate === STT_SAMPLE_RATE
+      ? input.samples
+      : downsample(input.samples, rate, STT_SAMPLE_RATE);
   }
   let bytes = input.bytes;
   if (!bytes && input.path) bytes = fs.readFileSync(input.path);
@@ -115,19 +117,21 @@ function toMono16k(input: AudioInput): Float32Array {
         `decoding ${input.format.container} audio (supply PCM16, float32, or WAV)`
       );
     }
-    const decoded = decodeWav(bytes);
+    const decoded = await decodeWav(bytes);
     return decoded.sampleRate === STT_SAMPLE_RATE
       ? decoded.samples
       : downsample(decoded.samples, decoded.sampleRate, STT_SAMPLE_RATE);
   }
   const samples =
-    input.format.encoding === AudioEncoding.PCM_F32_LE ? bytesToFloat32(bytes) : pcm16BytesToFloat32(bytes);
+    input.format.encoding === AudioEncoding.PCM_F32_LE
+      ? bytesToFloat32(bytes)
+      : await pcm16BytesToFloat32(bytes);
   const rate = input.format.sampleRate || STT_SAMPLE_RATE;
   return rate === STT_SAMPLE_RATE ? samples : downsample(samples, rate, STT_SAMPLE_RATE);
 }
 
 /** PCM16 bytes at 16 kHz, whichever shape the caller supplied. */
-function toPcm16At16k(input: AudioInput): Uint8Array {
+async function toPcm16At16k(input: AudioInput): Promise<Uint8Array> {
   // PCM16 already at the target rate passes through without a float round-trip.
   if (
     input.bytes &&
@@ -137,20 +141,21 @@ function toPcm16At16k(input: AudioInput): Uint8Array {
   ) {
     return input.bytes;
   }
-  return pcm16Bytes(toMono16k(input));
+  return pcm16Bytes(await toMono16k(input));
 }
 
 /** Float32 samples of one pushed {@link AudioFrame}, in the stream's established encoding. */
-function frameToFloat32(frame: AudioFrame, format: AudioFormatSpec): Float32Array {
+async function frameToFloat32(frame: AudioFrame, format: AudioFormatSpec): Promise<Float32Array> {
   return format.encoding === AudioEncoding.PCM_F32_LE
     ? bytesToFloat32(frame.samples)
     : pcm16BytesToFloat32(frame.samples);
 }
 
 /** Adapt one {@link AudioInput} chunk into an {@link AudioFrame} matching `format`. */
-function frameOfAudioInput(input: AudioInput, format: AudioFormatSpec): AudioFrame {
+async function frameOfAudioInput(input: AudioInput, format: AudioFormatSpec): Promise<AudioFrame> {
   if (format.encoding === AudioEncoding.PCM_F32_LE) {
-    const samples = input.samples ?? (input.bytes ? pcm16BytesToFloat32(input.bytes) : undefined);
+    const samples =
+      input.samples ?? (input.bytes ? await pcm16BytesToFloat32(input.bytes) : undefined);
     if (!samples) {
       throw SDKException.validationFailed({ fieldPath: 'audio', message: 'audio needs bytes or samples' });
     }
@@ -159,7 +164,7 @@ function frameOfAudioInput(input: AudioInput, format: AudioFormatSpec): AudioFra
       sampleCount: samples.length,
     };
   }
-  const bytes = input.bytes ?? (input.samples ? pcm16Bytes(input.samples) : undefined);
+  const bytes = input.bytes ?? (input.samples ? await pcm16Bytes(input.samples) : undefined);
   if (!bytes) {
     throw SDKException.validationFailed({ fieldPath: 'audio', message: 'audio needs bytes or samples' });
   }
@@ -262,14 +267,20 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
     events.push({ type: 'started', requestId });
   }
 
-  function frameToMono(frame: AudioFrame): Float32Array {
-    const floats = frameToFloat32(frame, format);
+  async function frameToMono(frame: AudioFrame): Promise<Float32Array> {
+    const floats = await frameToFloat32(frame, format);
     const rate = format.sampleRate || STT_SAMPLE_RATE;
-    return rate === STT_SAMPLE_RATE ? floats : downsample(floats, rate, STT_SAMPLE_RATE);
+    return rate === STT_SAMPLE_RATE
+      ? floats
+      : downsample(floats, rate, STT_SAMPLE_RATE);
   }
+
+  // Frames must be converted in push order; each push chains onto this promise.
+  let pushChain = Promise.resolve();
 
   async function runNativePass(): Promise<void> {
     try {
+      await pushChain;
       let total = 0;
       for (const c of chunks) total += c.length;
       if (!total) {
@@ -282,7 +293,7 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
         merged.set(c, offset);
         offset += c.length;
       }
-      const pcm = pcm16Bytes(merged);
+      const pcm = await pcm16Bytes(merged);
       // One native pass now, not two. The STTStreamEvent envelope carries the
       // partials AND the final STTOutput with its word timings, so the second
       // non-streaming pass the component ABI needed is gone.
@@ -345,7 +356,14 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
     pushFrame(frame) {
       if (closed || finished) return;
       announce();
-      chunks.push(frameToMono(frame));
+      pushChain = pushChain
+        .then(async () => {
+          if (closed || finished) return;
+          chunks.push(await frameToMono(frame));
+        })
+        .catch((e) => {
+          if (!closed) events.push({ type: 'failed', requestId, error: asSDKException(e) });
+        });
     },
     flush() {
       // No incremental partial buffer on Electron: nothing buffered client-side to flush early.
@@ -404,7 +422,7 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
       );
     }
     await requireLifecycle(deps, ModelCategory.SPEECH_TO_TEXT);
-    const pcm = toPcm16At16k(input);
+    const pcm = await toPcm16At16k(input);
     return buildTranscription(await stt.transcribe(toSttRequest(pcm, options)));
   }
 
@@ -438,7 +456,7 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
             message: 'stt.transcribeStream requires every chunk to share one audio format.',
           });
         }
-        stream!.pushFrame(frameOfAudioInput(chunk, format));
+        stream!.pushFrame(await frameOfAudioInput(chunk, format));
       }
       if (!stream) return;
       stream.finish();
@@ -742,12 +760,12 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
   // Feeds must reach commons in push order; each push chains onto this promise.
   let chain = Promise.resolve();
 
-  function frameToPcm16(frame: AudioFrame): Uint8Array {
+  async function frameToPcm16(frame: AudioFrame): Promise<Uint8Array> {
     if (format.encoding === AudioEncoding.PCM_S16_LE && rate === STT_SAMPLE_RATE) {
       return frame.samples;
     }
-    let floats = frameToFloat32(frame, format);
-    if (rate !== STT_SAMPLE_RATE) floats = downsample(floats, rate, STT_SAMPLE_RATE);
+    let floats = await frameToFloat32(frame, format);
+    if (rate !== STT_SAMPLE_RATE) floats = await downsample(floats, rate, STT_SAMPLE_RATE);
     return pcm16Bytes(floats);
   }
 
@@ -784,8 +802,8 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
     events,
     pushFrame(frame) {
       if (closed || finished) return;
-      const pcm = frameToPcm16(frame);
       chainNext(async () => {
+        const pcm = await frameToPcm16(frame);
         await ready;
         if (closed || finished || sessionId == null) return;
         await deps.backend.vadStreamFeed(sessionId, pcm);
@@ -830,7 +848,7 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
 
   async function detect(input: AudioInput, options: VadOptions = {}): Promise<VadResult> {
     deps.requireReady();
-    const pcm16 = toPcm16At16k(input);
+    const pcm16 = await toPcm16At16k(input);
     const { segments, probability } = await vad.detect(pcm16, options);
     return {
       isSpeech: segments.length > 0,
@@ -868,7 +886,7 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
             message: 'vad.detectStream requires every chunk to share one audio format.',
           });
         }
-        stream!.pushFrame(frameOfAudioInput(chunk, format));
+        stream!.pushFrame(await frameOfAudioInput(chunk, format));
       }
       if (!stream) return;
       stream.finish();
@@ -911,7 +929,7 @@ export function createDiarizationNamespace(deps: SpeechDeps): DiarizationNamespa
       // rate it accepts and it does not resample, which is why the input is
       // brought to that rate here first.
       const native = await data.diarize(
-        toDiarizationRequest(toMono16k(input), options, STT_SAMPLE_RATE)
+        toDiarizationRequest(await toMono16k(input), options, STT_SAMPLE_RATE)
       );
       return {
         segments: native.segments.map((s) => ({
@@ -1113,7 +1131,9 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
 
       const capture = new FrameCapture();
       const playback = new Playback();
-      let pending: Uint8Array[] = [];
+      // Raw mic frames — DSP (resample + PCM16) runs in feedLoop over RPC so the
+      // renderer never loads the native addon on the audio callback path.
+      let pending: { samples: Float32Array; rate: number }[] = [];
       let running = false;
       let closed = false;
       let loop: Promise<void> | null = null;
@@ -1137,8 +1157,7 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
 
       const onFrame = (frame: Float32Array, rate: number): void => {
         if (!running || closed) return;
-        const mono = rate === STT_SAMPLE_RATE ? frame : downsample(frame, rate, STT_SAMPLE_RATE);
-        pending.push(pcm16Bytes(mono));
+        pending.push({ samples: new Float32Array(frame), rate });
         if (pending.length > VOICE_FRAME_BACKLOG) {
           pending.splice(0, pending.length - VOICE_FRAME_BACKLOG);
         }
@@ -1156,16 +1175,21 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
             if (!running || closed) return;
             let reply: Uint8Array | undefined;
             try {
+              const mono =
+                chunk.rate === STT_SAMPLE_RATE
+                  ? chunk.samples
+                  : await downsample(chunk.samples, chunk.rate, STT_SAMPLE_RATE);
+              const pcm = await pcm16Bytes(mono);
               // This blocks for the whole turn when the utterance closes, and
               // comes back with the synthesized reply as self-describing WAV.
-              reply = (await agent.feed(toAudioFrame(chunk))).synthesizedAudio;
+              reply = (await agent.feed(toAudioFrame(pcm))).synthesizedAudio;
             } catch (e) {
               emitError(e, true);
               continue;
             }
             if (!reply?.byteLength || closed) continue;
             try {
-              const decoded = decodeWav(reply);
+              const decoded = await decodeWav(reply);
               await playback.play(decoded.samples, decoded.sampleRate);
             } catch (e) {
               emitError(e, true);

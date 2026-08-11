@@ -141,7 +141,7 @@ test('stt: synthesized speech transcribes, with the timings commons measured',
       const resampled =
         spoken.sampleRate === SAMPLE_RATE
           ? spoken.data
-          : require('../../dist/audio').downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
+          : await require('../../dist/audio').downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
 
       const result = await sdk.stt.transcribe(pcmInput(resampled), { wordTimestamps: true });
       assert.ok(result.text.trim().length > 0, `something was transcribed: ${result.text}`);
@@ -164,7 +164,7 @@ test('stt: a push stream emits started, a final transcript, then completed',
       const resampled =
         spoken.sampleRate === SAMPLE_RATE
           ? spoken.data
-          : require('../../dist/audio').downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
+          : await require('../../dist/audio').downsample(spoken.data, spoken.sampleRate, SAMPLE_RATE);
 
       const stream = await sdk.stt.openStream({ encoding: 'PCM_F32_LE', sampleRate: SAMPLE_RATE });
       stream.pushFrame({ samples: resampled, sampleCount: resampled.length });

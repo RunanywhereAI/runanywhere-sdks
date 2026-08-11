@@ -2293,6 +2293,65 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRemoveP
     return static_cast<jint>(result);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateDownloadStatus(
+    JNIEnv* env, jclass clazz, jstring modelId, jstring localPath) {
+    if (!modelId) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryUpdateDownloadStatus: model registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    const char* path_str = nullptr;
+    if (localPath) {
+        path_str = env->GetStringUTFChars(localPath, nullptr);
+        if (!path_str) {
+            env->ReleaseStringUTFChars(modelId, id_str);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    rac_result_t result = rac_model_registry_update_download_status(registry, id_str, path_str);
+
+    if (path_str) {
+        env->ReleaseStringUTFChars(localPath, path_str);
+    }
+    env->ReleaseStringUTFChars(modelId, id_str);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateLastUsed(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    if (!modelId) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryUpdateLastUsed: model registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    if (!id_str) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    rac_result_t result = rac_model_registry_update_last_used(registry, id_str);
+    env->ReleaseStringUTFChars(modelId, id_str);
+    return static_cast<jint>(result);
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefreshProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
@@ -5683,11 +5742,36 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCal
     uintptr_t key = static_cast<uintptr_t>(handle);
     RAC_JNI_TRY {
         vadStreamListeners().set(env, key, listener);
-        return static_cast<jint>(rac_vad_set_stream_proto_callback(
+        rac_result_t rc = rac_vad_set_stream_proto_callback(
             handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
-            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr);
+        if (RAC_FAILED(rc)) {
+            vadStreamListeners().erase(env, key);
+        }
+        return static_cast<jint>(rc);
     }
     RAC_JNI_CATCH_INT()
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadUnsetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L)
+        return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    rac_result_t rc = rac_vad_unset_stream_proto_callback(handleFromJLong(handle));
+    rac_vad_proto_quiesce();
+    vadStreamListeners().erase(env, key);
+    return static_cast<jint>(rc);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadProtoQuiesce(JNIEnv* env,
+                                                                           jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_vad_proto_quiesce();
 }
 
 extern "C" JNIEXPORT jlong JNICALL

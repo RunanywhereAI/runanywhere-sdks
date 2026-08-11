@@ -4,11 +4,17 @@
 // (`rac_audio_*`) and reached through the N-API addon. This module only
 // forwards typed arrays — it does not re-implement DSP.
 //
+// Ownership of the native addon stays in the utility process (or an in-process
+// NativeBackend). Callers bind a {@link AudioDspBackend} via
+// {@link bindAudioBackend} (done by `createRunAnywhere`); the preload never
+// `require`s `./bridge` / `resolveAddon`. Unit tests may inject a sync fake
+// with {@link setAudioNativeForTests}.
+//
 // Renderer-only helpers (MicRecorder / SpeakerPlayer) sit on top of Web Audio
 // and call the same commons-backed converters. They reference browser globals
 // only inside methods so importing this module in Node is safe.
 
-import { SDKException } from './errors';
+import { ErrorCategory, ErrorCode, SDKException } from './errors';
 
 /** Sync DSP surface exported by runanywhere_native.node (audio_bridge.cpp). */
 export interface AudioNative {
@@ -25,35 +31,78 @@ export interface AudioNative {
   ): number;
 }
 
+/** Promise-shaped DSP surface — NativeBackend or RpcBackend. */
+export interface AudioDspBackend {
+  audioFloat32ToPcm16(samples: Float32Array): Promise<Int16Array>;
+  audioPcm16ToFloat32(samples: Int16Array): Promise<Float32Array>;
+  audioResampleF32(
+    samples: Float32Array,
+    inRate: number,
+    outRate: number
+  ): Promise<Float32Array>;
+  audioComputeRms(samples: Float32Array): Promise<number>;
+  audioFloat32ToWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array>;
+  audioWavToFloat32(
+    bytes: Uint8Array
+  ): Promise<{ sampleRate: number; samples: Float32Array }>;
+  audioPcmBytesToMs(
+    byteCount: number,
+    format: { sampleRate: number; channels?: number; bitsPerSample?: number }
+  ): Promise<number>;
+}
+
 let injected: AudioNative | null = null;
+let backend: AudioDspBackend | null = null;
 
 /** Test hook — unit tests inject a fake so they do not need the .node. */
 export function setAudioNativeForTests(native: AudioNative | null): void {
   injected = native;
 }
 
-function audioNative(): AudioNative {
-  if (injected) return injected;
-  // Lazy require: bridge.ts throws at import when the .node is missing, and
-  // stream/audio unit tests must stay runnable without it.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { addon } = require('./bridge') as { addon: AudioNative };
-  return addon;
+/**
+ * Bind the process that owns `rac_audio_*` (utility host via RpcBackend, or
+ * in-process NativeBackend). Called by `createRunAnywhere`.
+ */
+export function bindAudioBackend(dsp: AudioDspBackend | null): void {
+  backend = dsp;
+}
+
+function audioUnavailable(): never {
+  throw SDKException.of(
+    ErrorCode.SERVICE_NOT_AVAILABLE,
+    'audio DSP unavailable — inference utility not connected (bindAudioBackend / setAudioNativeForTests)',
+    { category: ErrorCategory.COMPONENT }
+  );
+}
+
+async function withAudioDsp<T>(
+  syncCall: (native: AudioNative) => T,
+  asyncCall: (dsp: AudioDspBackend) => Promise<T>
+): Promise<T> {
+  if (injected) return syncCall(injected);
+  if (backend) return asyncCall(backend);
+  audioUnavailable();
 }
 
 /** Clamp+scale float32 samples in [-1,1] to signed 16-bit PCM via commons. */
-export function float32ToPcm16(input: Float32Array): Int16Array {
-  return audioNative().audioFloat32ToPcm16(input);
+export function float32ToPcm16(input: Float32Array): Promise<Int16Array> {
+  return withAudioDsp(
+    (n) => n.audioFloat32ToPcm16(input),
+    (b) => b.audioFloat32ToPcm16(input)
+  );
 }
 
 /** Convert signed 16-bit PCM samples back to float32 in [-1,1] via commons. */
-export function pcm16ToFloat32(input: Int16Array): Float32Array {
-  return audioNative().audioPcm16ToFloat32(input);
+export function pcm16ToFloat32(input: Int16Array): Promise<Float32Array> {
+  return withAudioDsp(
+    (n) => n.audioPcm16ToFloat32(input),
+    (b) => b.audioPcm16ToFloat32(input)
+  );
 }
 
 /** Little-endian int16 bytes for float32 samples — the shape STT.transcribe wants. */
-export function pcm16Bytes(input: Float32Array): Uint8Array {
-  const pcm = float32ToPcm16(input);
+export async function pcm16Bytes(input: Float32Array): Promise<Uint8Array> {
+  const pcm = await float32ToPcm16(input);
   return new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength);
 }
 
@@ -61,53 +110,77 @@ export function pcm16Bytes(input: Float32Array): Uint8Array {
  * Resample mono float32 audio from `inRate` to `outRate` via commons
  * (`rac_audio_resample_f32`, linear interpolation).
  */
-export function downsample(input: Float32Array, inRate: number, outRate: number): Float32Array {
+export function downsample(
+  input: Float32Array,
+  inRate: number,
+  outRate: number
+): Promise<Float32Array> {
   if (outRate <= 0 || inRate <= 0) {
-    throw SDKException.validationFailed({
-      fieldPath: inRate <= 0 ? 'inRate' : 'outRate',
-      message: 'downsample: sample rates must be positive',
-    });
+    return Promise.reject(
+      SDKException.validationFailed({
+        fieldPath: inRate <= 0 ? 'inRate' : 'outRate',
+        message: 'downsample: sample rates must be positive',
+      })
+    );
   }
-  return audioNative().audioResampleF32(input, inRate, outRate);
+  return withAudioDsp(
+    (n) => n.audioResampleF32(input, inRate, outRate),
+    (b) => b.audioResampleF32(input, inRate, outRate)
+  );
 }
 
 /** Root-mean-square level of a frame via commons (`rac_audio_compute_rms`). */
-export function rms(input: Float32Array): number {
+export async function rms(input: Float32Array): Promise<number> {
   if (!input.length) return 0;
-  return audioNative().audioComputeRms(input);
+  return withAudioDsp(
+    (n) => n.audioComputeRms(input),
+    (b) => b.audioComputeRms(input)
+  );
 }
 
 /** Encode mono float32 samples as a 16-bit PCM WAV via commons. */
-export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
-  return audioNative().audioFloat32ToWav(samples, sampleRate);
+export function encodeWav(samples: Float32Array, sampleRate: number): Promise<Uint8Array> {
+  return withAudioDsp(
+    (n) => n.audioFloat32ToWav(samples, sampleRate),
+    (b) => b.audioFloat32ToWav(samples, sampleRate)
+  );
 }
 
 /**
  * Decode a 16-bit PCM WAV byte array to `{ sampleRate, samples }` (mono float32)
  * via commons (`rac_audio_wav_to_float32`).
  */
-export function decodeWav(bytes: Uint8Array): { sampleRate: number; samples: Float32Array } {
-  return audioNative().audioWavToFloat32(bytes);
+export function decodeWav(
+  bytes: Uint8Array
+): Promise<{ sampleRate: number; samples: Float32Array }> {
+  return withAudioDsp(
+    (n) => n.audioWavToFloat32(bytes),
+    (b) => b.audioWavToFloat32(bytes)
+  );
 }
 
 /**
  * Duration of a raw PCM payload in milliseconds via commons
  * (`rac_audio_pcm_bytes_to_ms`). Returns 0 when the format is missing/invalid.
  */
-export function pcmDurationMs(
+export async function pcmDurationMs(
   byteCount: number,
   format: { sampleRate: number; channels?: number; bitsPerSample?: number }
-): number {
+): Promise<number> {
   if (byteCount <= 0 || !format?.sampleRate) return 0;
-  return audioNative().audioPcmBytesToMs(byteCount, format) || 0;
+  const ms = await withAudioDsp(
+    (n) => n.audioPcmBytesToMs(byteCount, format),
+    (b) => b.audioPcmBytesToMs(byteCount, format)
+  );
+  return ms || 0;
 }
 
 /**
  * Duration of mono float32 samples in milliseconds via commons.
  * Returns 0 when the rate is missing.
  */
-export function float32DurationMs(samples: number, sampleRate: number): number {
-  if (samples <= 0 || sampleRate <= 0) return 0;
+export function float32DurationMs(samples: number, sampleRate: number): Promise<number> {
+  if (samples <= 0 || sampleRate <= 0) return Promise.resolve(0);
   return pcmDurationMs(samples * 4, { sampleRate, channels: 1, bitsPerSample: 32 });
 }
 
@@ -173,7 +246,7 @@ export class MicRecorder {
   }
 
   /** Stop capture and return the utterance as 16 kHz mono PCM16 bytes. */
-  stop(): Uint8Array {
+  async stop(): Promise<Uint8Array> {
     this.node?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
     let total = 0;
@@ -184,7 +257,7 @@ export class MicRecorder {
       merged.set(c, off);
       off += c.length;
     }
-    const resampled = downsample(merged, this.inRate, this.targetRate);
+    const resampled = await downsample(merged, this.inRate, this.targetRate);
     this.chunks = [];
     void this.ctx?.close();
     this.ctx = null;

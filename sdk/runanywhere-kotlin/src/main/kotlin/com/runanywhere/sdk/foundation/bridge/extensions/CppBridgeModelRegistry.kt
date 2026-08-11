@@ -295,48 +295,46 @@ object CppBridgeModelRegistry {
     /**
      * Update download status in C++ registry (in-memory only).
      *
+     * Commons owns `updated_at_unix_ms` via
+     * `rac_model_registry_update_download_status` — platforms must not stamp
+     * the clock before `update_proto`.
+     *
      * @param modelId The model ID
      * @param localPath The local path (or null to clear download)
      * @return true if updated successfully
      */
     fun updateDownloadStatus(modelId: String, localPath: String?): Boolean {
-        log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Updating download status: $modelId -> ${localPath ?: "null"}")
-        val current = getProto(modelId) ?: return false
-        val updated =
-            current.copy(
-                local_path = localPath.orEmpty(),
-                updated_at_unix_ms = System.currentTimeMillis(),
-            )
-        val protoResult = updateProto(updated)
-        if (protoResult == RunAnywhereBridge.RAC_SUCCESS) {
+        log(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            "Updating download status: $modelId -> ${localPath ?: "null"}",
+        )
+        val result = RunAnywhereBridge.racModelRegistryUpdateDownloadStatus(modelId, localPath)
+        if (result == RunAnywhereBridge.RAC_SUCCESS) {
             return true
         }
-        log(CppBridgePlatformAdapter.LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
+        log(
+            CppBridgePlatformAdapter.LogLevel.WARN,
+            "Commons download status update failed for $modelId: $result",
+        )
         return false
     }
 
     /**
      * Update last-used timestamp for a model.
      *
-     * `usage_count` (tag 35) is reserved off the wire outright
-     * (idl/model_types.proto: "a 'use' was never defined") -- there is no
-     * proto source to read from or write to any more, so
-     * `last_used_at_unix_ms` alone now records "last used". Mirrors Swift
+     * Commons owns `last_used_at_unix_ms` via
+     * `rac_model_registry_update_last_used`. `usage_count` (tag 35) remains
+     * reserved off the wire. Mirrors Swift
      * `CppBridge.ModelRegistry.updateLastUsed(modelId:)`.
      *
      * @param modelId The model ID whose usage metadata should be touched.
      * @throws SDKException if the model is not found in the registry.
      */
     fun updateLastUsed(modelId: String) {
-        val current =
-            getProto(modelId)
-                ?: throw SDKException.modelNotFound(modelId)
-
-        val updated =
-            current.copy(
-                last_used_at_unix_ms = System.currentTimeMillis(),
-            )
-        update(updated)
+        val result = RunAnywhereBridge.racModelRegistryUpdateLastUsed(modelId)
+        if (result != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.modelNotFound(modelId)
+        }
     }
 
     // Proto ABI

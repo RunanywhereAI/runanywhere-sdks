@@ -3,10 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public v4 surface: `RunAnywhere.vad`.
+ *
+ * Endpointing (min-speech / min-silence / prefix padding) is owned by commons
+ * `rac_vad_stream_*`. This namespace only captures/feeds PCM and maps
+ * SPEECH_ACTIVITY onset/offset events — no local isSpeech edge machine.
  */
 
 package com.runanywhere.sdk.public.api
 
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,64 +25,75 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 private val vadStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
- * Live VAD push stream backing `vad.openStream`. Each pushed frame is
- * processed immediately against one persistent detector, so speech
- * transitions are reported as they happen rather than buffered.
+ * Live VAD push stream backed by commons `rac_vad_stream_*`.
+ * Commons emits SPEECH_ACTIVITY onset/offset; FRAME events surface as
+ * [VadEvent.Activity].
  */
-private class KotlinVadStream(
+private class CommonsVadStream(
     private val format: AudioFormatSpec,
-    options: VadOptions?,
+    private val options: VadOptions,
 ) : VadStream {
     private val inbox = Channel<AudioFrame>(Channel.UNLIMITED)
     private val outbox = Channel<VadEvent>(Channel.UNLIMITED)
     private val closed = AtomicBoolean(false)
-    private var speaking = false
+    private val finished = AtomicBoolean(false)
+    private val sessionId = AtomicLong(0L)
 
     override val events: Flow<VadEvent> = outbox.receiveAsFlow()
 
     init {
         vadStreamScope.launch {
             try {
-                for (frame in inbox) {
-                    val bytes =
-                        when (format.encoding) {
-                            AudioEncoding.PCM16 ->
-                                AudioInput.pcm16(frame.samples, format.sampleRate, format.channels).normalizedBytes()
-                            AudioEncoding.FLOAT32, AudioEncoding.CONTAINER -> frame.samples
+                CppBridgeVAD.setStreamCallback { raw ->
+                    if (closed.get()) return@setStreamCallback
+                    for (event in decodeVadStreamEvent(raw)) {
+                        if (event is VadEvent.Failed) {
+                            finished.set(true)
                         }
-                    val verdict = legacyDetectVoiceActivity(bytes, options.orDefault().toProto()).toVadResult()
-                    when {
-                        verdict.isSpeech && !speaking -> {
-                            speaking = true
-                            outbox.trySend(VadEvent.SpeechStarted(frame.timestampMs))
-                        }
-                        !verdict.isSpeech && speaking -> {
-                            speaking = false
-                            outbox.trySend(VadEvent.SpeechEnded(frame.timestampMs))
-                        }
+                        outbox.trySend(event)
                     }
-                    outbox.trySend(VadEvent.Activity(verdict.isSpeech, verdict.probability, frame.timestampMs))
                 }
-                outbox.trySend(VadEvent.Completed)
+                val started = CppBridgeVAD.streamStart(options.toProto(format.sampleRate))
+                sessionId.set(started)
+                for (frame in inbox) {
+                    if (closed.get() || finished.get()) break
+                    CppBridgeVAD.streamFeed(started, frameToPcm16(frame, format))
+                }
+                if (!closed.get() && !finished.get()) {
+                    finished.set(true)
+                    CppBridgeVAD.streamStop(started)
+                    sessionId.set(0L)
+                    outbox.trySend(VadEvent.Completed)
+                }
             } catch (error: SDKException) {
+                finished.set(true)
                 outbox.trySend(VadEvent.Failed(error))
+            } catch (error: Exception) {
+                finished.set(true)
+                outbox.trySend(VadEvent.Failed(SDKException.from(error)))
             } finally {
+                val open = sessionId.getAndSet(0L)
+                if (open > 0L && !finished.get()) {
+                    runCatching { CppBridgeVAD.streamCancel(open) }
+                }
+                runCatching { CppBridgeVAD.unsetStreamCallback() }
                 outbox.close()
             }
         }
     }
 
     override fun pushFrame(frame: AudioFrame) {
-        if (closed.get()) return
+        if (closed.get() || finished.get()) return
         inbox.trySend(frame)
     }
 
     override fun flush() {
-        // Every pushed frame is already processed as it arrives; nothing buffered to flush.
+        // Commons processes each feed as it arrives.
     }
 
     override fun finish() {
@@ -87,9 +103,21 @@ private class KotlinVadStream(
     override suspend fun close() {
         if (!closed.compareAndSet(false, true)) return
         inbox.close()
-        outbox.close()
+        val open = sessionId.getAndSet(0L)
+        if (open > 0L) {
+            finished.set(true)
+            runCatching { CppBridgeVAD.streamCancel(open) }
+        }
+        // Worker `finally` unsets the stream callback and closes [outbox].
     }
 }
+
+private fun frameToPcm16(frame: AudioFrame, format: AudioFormatSpec): ByteArray =
+    when (format.encoding) {
+        AudioEncoding.PCM16 -> frame.samples
+        AudioEncoding.FLOAT32, AudioEncoding.CONTAINER ->
+            AudioInput(frame.samples, format).pcm16Bytes()
+    }
 
 /**
  * Voice-activity detection over raw audio.
@@ -101,12 +129,38 @@ private class KotlinVadStream(
  */
 public class VadNamespace internal constructor() {
     /**
-     * Decide whether [audio] contains speech.
+     * Find the speech segments in a piece of audio.
+     *
+     * Endpointing is applied by commons `rac_vad_stream_*`; this method only
+     * feeds PCM and maps SPEECH_ACTIVITY onset/offset into [VadResult.segments].
      *
      * @throws SDKException when the buffer is empty or the SDK is not initialized.
      */
-    public suspend fun detect(audio: AudioInput, options: VadOptions? = null): VadResult =
-        legacyDetectVoiceActivity(audio.normalizedBytes(), options.orDefault().toProto()).toVadResult()
+    public suspend fun detect(audio: AudioInput, options: VadOptions? = null): VadResult {
+        val opts = options.orDefault()
+        val pcm16 = audio.pcm16Bytes()
+        val accumulator = VadSegmentAccumulator()
+        CppBridgeVAD.setStreamCallback { raw ->
+            for (event in decodeVadStreamEvent(raw)) {
+                accumulator.onEvent(event)
+            }
+        }
+        var sessionId = 0L
+        try {
+            sessionId = CppBridgeVAD.streamStart(opts.toProto(audio.format.sampleRate))
+            if (pcm16.isNotEmpty()) {
+                CppBridgeVAD.streamFeed(sessionId, pcm16)
+            }
+            CppBridgeVAD.streamStop(sessionId)
+            sessionId = 0L
+        } finally {
+            if (sessionId > 0L) {
+                runCatching { CppBridgeVAD.streamCancel(sessionId) }
+            }
+            runCatching { CppBridgeVAD.unsetStreamCallback() }
+        }
+        return accumulator.toResult()
+    }
 
     /**
      * Open a live voice-activity stream with one audio format established up front.
@@ -120,7 +174,7 @@ public class VadNamespace internal constructor() {
                 "vad.openStream needs raw PCM audio; container formats are batch-only — use vad.detect.",
             )
         }
-        return KotlinVadStream(format, options)
+        return CommonsVadStream(format, options.orDefault())
     }
 
     /**
@@ -135,11 +189,6 @@ public class VadNamespace internal constructor() {
         options: VadOptions? = null,
     ): Flow<VadEvent> =
         channelFlow {
-            // Transitions are forwarded as the detector reports them, concurrently with the
-            // audio still arriving. The previous shape drained `audio.collect { … }` first
-            // and only then `emitAll(live.events)`, so speech-started/ended could not
-            // surface until the microphone had already closed — and a caller that cancels
-            // on stop (the usual shape) never saw a single event at all.
             var stream: VadStream? = null
             var format: AudioFormatSpec? = null
             var forwarder: Job? = null
