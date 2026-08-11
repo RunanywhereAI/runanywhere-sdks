@@ -421,5 +421,10 @@ extern "C" const rac_llm_service_ops_t g_qhexrt_llm_ops = {
     /* .generate_from_context = */ nullptr,
     /* .clear_context         = */ nullptr,
     /* .create                = */ qhexrt_llm_create,
-    .get_stream_token_counts = qhexrt_llm_get_stream_token_counts,
+    // Positional, like every entry above it: MSVC rejects mixing a designated
+    // initializer into a positional list (C7556), which broke the ARM64 Windows
+    // build of this engine. `get_stream_token_counts` is the last member of
+    // rac_llm_service_ops_t and immediately follows `create`, so the slot is the
+    // same one the designated form named.
+    /* .get_stream_token_counts = */ qhexrt_llm_get_stream_token_counts,
 };
