@@ -28,6 +28,13 @@ export default defineConfig({
     // sourcemap would break the app outright rather than merely be unhelpful.
     sourcemap: true,
     target: 'chrome128', // Electron 43 ships Chromium 128+
+    rollupOptions: {
+      // Main shell + preferences window (Swift Settings scene, 560×460).
+      input: {
+        main: path.resolve(dir, 'src/renderer/index.html'),
+        settings: path.resolve(dir, 'src/renderer/settings.html'),
+      },
+    },
   },
   server: {
     port: 5173,

@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import { BrowserWindow, nativeTheme, type WebContents } from 'electron';
 
-import { APP_ROOT, IS_DEV, IS_SELFTEST } from './paths';
+import { APP_ROOT, IS_SELFTEST } from './paths';
 import { installNavigationGuards } from './security';
 import { loadRenderer } from './window';
 
@@ -96,10 +96,4 @@ export function getSettingsWindow(): BrowserWindow | null {
 
 export function closeSettingsWindow(): void {
   if (settingsWin !== null && !settingsWin.isDestroyed()) settingsWin.close();
-}
-
-/** True when the Vite / production settings entry is what we would load. */
-export function settingsRendererUrl(): string {
-  if (IS_DEV) return 'http://localhost:5173/settings.html';
-  return path.join(APP_ROOT, 'out', 'renderer', 'settings.html');
 }

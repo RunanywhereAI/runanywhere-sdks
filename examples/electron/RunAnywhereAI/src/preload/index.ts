@@ -68,6 +68,8 @@ const bridge: AppBridge = {
 
   onMenuCommand: (listener) => subscribe<MenuCommand>(IpcEvent.MenuCommand, listener),
   setMenuCapabilities: (caps) => ipcRenderer.send(IpcChannel.MenuCapabilities, caps),
+  openSettings: () => ipcRenderer.invoke(IpcChannel.OpenSettingsWindow) as Promise<void>,
+  onSettingsChanged: (listener) => subscribe<AppSettings>(IpcEvent.SettingsChanged, listener),
 
   pickFiles: (request: PickFilesRequest) => ipcRenderer.invoke(IpcChannel.PickFiles, request) as Promise<string[]>,
   // Modern Electron removed File.path; webUtils.getPathForFile is the replacement.

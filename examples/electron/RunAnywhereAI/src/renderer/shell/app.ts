@@ -27,6 +27,16 @@ export interface ViewContext {
   /** Re-render the toolbar, e.g. after loading a model or renaming a chat. */
   readonly refreshChrome: () => void;
   readonly navigate: (route: Route) => void;
+  /** Push conversation chrome back to the sidebar (Chat owns the store). */
+  readonly setConversations: (
+    list: readonly ConversationRecord[],
+    currentId: string | null,
+  ) => void;
+  /** Snapshot of the sidebar's conversation list. */
+  readonly conversations: () => {
+    readonly list: readonly ConversationRecord[];
+    readonly currentId: string | null;
+  };
 }
 
 /** A view is a mount function returning its teardown. */
@@ -83,7 +93,9 @@ export class Shell {
 
     this.toolbar = new Toolbar({
       onToggleSidebar: () => this.toggleSidebar(),
-      onOpenSettings: () => this.emit('settings:open', null),
+      onOpenSettings: () => {
+        void window.appStore.openSettings();
+      },
       onOpenModelPicker: () => this.emit('models:pick', null),
       onShowChatDetails: () => this.emit('chat:details', null),
     });
@@ -151,6 +163,11 @@ export class Shell {
         root,
         refreshChrome: () => this.renderChrome(),
         navigate: (next) => this.navigate(next),
+        setConversations: (list, currentId) => this.setConversations(list, currentId),
+        conversations: () => ({
+          list: this.conversations,
+          currentId: this.currentConversationId,
+        }),
       });
     } catch (error) {
       showError(error, `The ${ROUTE_META[route].title} screen failed to load`);
@@ -209,7 +226,7 @@ export class Shell {
         this.emit('conversation:new', null);
         return;
       case MenuCommand.OpenSettings:
-        this.emit('settings:open', null);
+        void window.appStore.openSettings();
         return;
       // The rest belong to whichever view is focused.
       case MenuCommand.ShowChatDetails:

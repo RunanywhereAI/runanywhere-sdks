@@ -62,6 +62,10 @@ export interface AppBridge {
     readonly canShowChatDetails: boolean;
     readonly canPasteAttachment: boolean;
   }): void;
+  /** Open or focus the preferences BrowserWindow (main-owned singleton). */
+  openSettings(): Promise<void>;
+  /** Fires after any window saves settings. Returns an unsubscribe. */
+  onSettingsChanged(listener: (settings: AppSettings) => void): () => void;
 
   // ---- files and links ----
   /** Native open dialog. Returns [] when cancelled. */

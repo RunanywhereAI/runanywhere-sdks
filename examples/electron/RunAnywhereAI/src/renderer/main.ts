@@ -11,53 +11,48 @@ import './design/components.css';
 
 import { DEFAULT_SETTINGS, type AppSettings } from '@shared/settings';
 
-import { emptyState } from './components/empty-state-mark';
 import { showError, showToast } from './components/toast';
 import { logger } from './services/logger';
+import { loadAppSettings } from './services/settings';
 import { installTheme } from './services/theme';
 import { Shell, type ViewFactory } from './shell/app';
-import { Route, ROUTE_META } from './shell/routes';
+import { Route } from './shell/routes';
+import { createAdvancedView } from './views/advanced';
+import { createBenchmarksView } from './views/benchmarks';
+import { createChatView } from './views/chat';
+import { createDiarizationView } from './views/diarization';
+import { createEmbeddingsView } from './views/embeddings';
+import { createKnowledgeView } from './views/knowledge';
+import { createModelsView } from './views/models';
+import { createSegmentationView } from './views/segmentation';
+import { createSpeakView } from './views/speak';
+import { createStorageView } from './views/storage';
+import { createStructuredView } from './views/structured';
+import { createToolsView } from './views/tools';
+import { createTranscribeView } from './views/transcribe';
+import { createVadView } from './views/vad';
+import { createVisionView } from './views/vision';
+import { createVoiceView } from './views/voice';
 
 const log = logger('renderer');
 
-/**
- * Placeholder for a screen that has not been built yet.
- *
- * Deliberately honest: it names the screen and says it is not ready, rather than
- * rendering an empty panel that looks like a bug. Each one is replaced by its
- * real view as the feature lands.
- */
-function pendingView(route: Route): ViewFactory {
-  return ({ root }) => {
-    const meta = ROUTE_META[route];
-    root.append(
-      emptyState({
-        glyph: meta.icon,
-        title: meta.title,
-        message: 'This screen is not wired up yet.',
-      }),
-    );
-    return {};
-  };
-}
-
 const views: Record<Route, ViewFactory> = {
-  [Route.Chat]: pendingView(Route.Chat),
-  [Route.Models]: pendingView(Route.Models),
-  [Route.Advanced]: pendingView(Route.Advanced),
-  [Route.Voice]: pendingView(Route.Voice),
-  [Route.Transcribe]: pendingView(Route.Transcribe),
-  [Route.Speak]: pendingView(Route.Speak),
-  [Route.Vad]: pendingView(Route.Vad),
-  [Route.Diarization]: pendingView(Route.Diarization),
-  [Route.Vision]: pendingView(Route.Vision),
-  [Route.Segmentation]: pendingView(Route.Segmentation),
-  [Route.Knowledge]: pendingView(Route.Knowledge),
-  [Route.Embeddings]: pendingView(Route.Embeddings),
-  [Route.Structured]: pendingView(Route.Structured),
-  [Route.Tools]: pendingView(Route.Tools),
-  [Route.Benchmarks]: pendingView(Route.Benchmarks),
-  [Route.Storage]: pendingView(Route.Storage),
+  [Route.Chat]: createChatView,
+  [Route.Models]: createModelsView,
+  [Route.Advanced]: createAdvancedView,
+  [Route.Voice]: createVoiceView,
+  [Route.Transcribe]: createTranscribeView,
+  [Route.Speak]: createSpeakView,
+  [Route.Vad]: createVadView,
+  [Route.Diarization]: createDiarizationView,
+  [Route.Vision]: createVisionView,
+  [Route.Segmentation]: createSegmentationView,
+  [Route.Knowledge]: createKnowledgeView,
+  [Route.Embeddings]: createEmbeddingsView,
+  [Route.Structured]: createStructuredView,
+  [Route.Tools]: createToolsView,
+  [Route.Benchmarks]: createBenchmarksView,
+  [Route.Storage]: createStorageView,
 };
 
 async function boot(): Promise<void> {
@@ -80,7 +75,7 @@ async function boot(): Promise<void> {
   // Settings are needed before the first generation, not before the first paint.
   let settings: AppSettings = DEFAULT_SETTINGS;
   try {
-    settings = window.appStore.migrateSettings(await window.appStore.loadSettings(), DEFAULT_SETTINGS);
+    settings = await loadAppSettings();
   } catch (error) {
     log.warn('settings load failed, using defaults', error);
   }
@@ -97,7 +92,12 @@ async function boot(): Promise<void> {
   try {
     await window.runanywhere.ready();
     const backend = await window.appStore.backendConfig();
-    await window.runanywhere.initialize(undefined, undefined, {
+    // E2E: pin secure/base dirs under the isolated userData so the visual gate
+    // never discovers models from a developer machine (no downloads in CI).
+    const e2e = new URLSearchParams(window.location.search).get('e2e') === '1';
+    const secureDir = e2e ? `${platform.userDataDirectory}/secure` : undefined;
+    const baseDir = e2e ? platform.modelsDirectory : undefined;
+    await window.runanywhere.initialize(secureDir, baseDir, {
       apiKey: backend.apiKey,
       baseUrl: backend.baseUrl,
       environment: backend.environment,

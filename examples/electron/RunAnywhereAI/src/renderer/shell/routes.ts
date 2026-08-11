@@ -39,8 +39,21 @@ export function scopeOf(route: Route): Scope {
       return 'chat';
     case Route.Models:
       return 'models';
-    default:
-      // Every hub screen keeps Advanced highlighted; the user got there from it.
+    // Every hub screen keeps Advanced highlighted; the user got there from it.
+    case Route.Advanced:
+    case Route.Voice:
+    case Route.Transcribe:
+    case Route.Speak:
+    case Route.Vad:
+    case Route.Diarization:
+    case Route.Vision:
+    case Route.Segmentation:
+    case Route.Knowledge:
+    case Route.Embeddings:
+    case Route.Structured:
+    case Route.Tools:
+    case Route.Benchmarks:
+    case Route.Storage:
       return 'advanced';
   }
 }

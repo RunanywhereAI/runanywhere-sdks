@@ -15,8 +15,8 @@ import type { BackendConfig } from '../shared/ipc-contract';
 import { APP_ROOT } from './paths';
 
 /** Parse a minimal .env: `KEY=value`, `#` comments, optional surrounding quotes. */
-function readDotEnv(file: string): Record<string, string> {
-  const out: Record<string, string> = {};
+function readDotEnv(file: string): Partial<Record<string, string>> {
+  const out: Partial<Record<string, string>> = {};
   let raw: string;
   try {
     raw = fs.readFileSync(file, 'utf8');

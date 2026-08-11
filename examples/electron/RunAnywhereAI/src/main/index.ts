@@ -15,12 +15,15 @@ import path from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
 
 import { RunAnywhereMain } from '@runanywhere/electron/main';
+import { LlamaCPP } from '@runanywhere/electron-llamacpp';
+import { ONNX } from '@runanywhere/electron-onnx';
+import { Sherpa } from '@runanywhere/electron-sherpa';
 import { capConversations, EMPTY_CONVERSATIONS, type ConversationsFile } from '../shared/conversation';
 import {
   IpcChannel,
   IpcEvent,
+  MenuCommand,
   type LogRecord,
-  type MenuCommand,
   type PickFilesRequest,
   type PlatformInfo,
   type ResolvedTheme,
@@ -29,16 +32,41 @@ import {
 
 import { backendConfig } from './env';
 import { DEFAULT_CAPABILITIES, installAppMenu, type MenuCapabilities } from './menu';
-import { APP_ROOT, CATALOG_PATH, HOST_PATH, IS_SELFTEST, isGpuBuild, resolveNativePath, SDK_ROOT } from './paths';
+import {
+  APP_ROOT,
+  CATALOG_PATH,
+  HOST_PATH,
+  IS_E2E,
+  IS_SELFTEST,
+  isGpuBuild,
+  resolveNativePath,
+  SDK_ROOT,
+} from './paths';
 import { installNavigationGuards, installPermissionHandlers } from './security';
 import { createStore, STORE_FILES, type JsonStore } from './store';
 import { createSelftestHarness } from './selftest';
+import { getSettingsWindow, showSettingsWindow } from './settings-window';
 import { createMainWindow, loadRenderer } from './window';
+import { mergeSettingsPatch, type AppSettings } from '../shared/settings';
 
 // Identity must be set before `app.getPath('userData')` is read, so settings and
 // conversations land in "RunAnywhere AI" rather than Electron's default.
 app.setName('RunAnywhere AI');
 
+// Playwright sets RA_E2E=1. Redirect userData into a fresh temp dir so the gate
+// never reads the developer's conversations/settings or downloaded-model state.
+if (IS_E2E) {
+  const dir = path.join(app.getPath('temp'), `runanywhere-ai-e2e-${process.pid}`);
+  fs.mkdirSync(dir, { recursive: true });
+  app.setPath('userData', dir);
+}
+
+// Backend registration is main-process only (security): paths flow to the
+// utility host via RUNANYWHERE_PLUGIN_PATHS at fork — never over RPC.
+// Call before any RunAnywhereMain.connect() so re-forks replay the same queue.
+LlamaCPP.register();
+ONNX.register();
+Sherpa.register();
 // Resolve the addon at startup but keep the failure readable: an uncaught throw
 // here would close the app with no window and no message.
 let nativePath: string | null = null;
@@ -56,8 +84,27 @@ const useStore = (): JsonStore => (store ??= createStore(app.getPath('userData')
 
 let win: BrowserWindow | null = null;
 let capabilities: MenuCapabilities = DEFAULT_CAPABILITIES;
+/** Brokers the utility-host MessagePort into a BrowserWindow. Set once ready. */
+let connectHost: ((webContents: Electron.WebContents) => void) | null = null;
+
+function openSettings(): void {
+  if (connectHost === null) return;
+  showSettingsWindow(connectHost);
+}
+
+function broadcastSettingsChanged(settings: AppSettings): void {
+  for (const target of BrowserWindow.getAllWindows()) {
+    if (!target.isDestroyed()) target.webContents.send(IpcEvent.SettingsChanged, settings);
+  }
+}
 
 function sendMenuCommand(command: MenuCommand): void {
+  // Preferences live in their own window (Swift Settings scene), not as a
+  // detail-column route — handle here so ⌘, works even if no renderer is focused.
+  if (command === MenuCommand.OpenSettings) {
+    openSettings();
+    return;
+  }
   if (win !== null && !win.isDestroyed()) win.webContents.send(IpcEvent.MenuCommand, command);
 }
 
@@ -87,14 +134,25 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannel.ConversationsSave, (_event, data: ConversationsFile): boolean =>
     useStore().writeJson(STORE_FILES.conversations, {
       version: 1,
-      conversations: capConversations(data?.conversations),
+      conversations: capConversations(data.conversations),
     }),
   );
 
   ipcMain.handle(IpcChannel.SettingsLoad, (): unknown => useStore().readJson<unknown>(STORE_FILES.settings, {}));
-  ipcMain.handle(IpcChannel.SettingsSave, (_event, data: unknown): boolean =>
-    useStore().writeJson(STORE_FILES.settings, data),
-  );
+  ipcMain.handle(IpcChannel.SettingsSave, (_event, data: unknown): boolean => {
+    // Merge-not-replace: a pane that only writes temperature must not wipe
+    // per-modality model choices living in the same object.
+    const patch =
+      data !== null && typeof data === 'object' ? (data as Partial<AppSettings>) : ({} as Partial<AppSettings>);
+    const merged = mergeSettingsPatch(useStore().readJson<unknown>(STORE_FILES.settings, {}), patch);
+    const ok = useStore().writeJson(STORE_FILES.settings, merged);
+    if (ok) broadcastSettingsChanged(merged);
+    return ok;
+  });
+
+  ipcMain.handle(IpcChannel.OpenSettingsWindow, (): void => {
+    openSettings();
+  });
 
   ipcMain.handle(IpcChannel.CustomModelsLoad, (): unknown =>
     useStore().readJson<unknown[]>(STORE_FILES.customModels, []),
@@ -145,7 +203,9 @@ function registerIpc(): void {
 
 // One instance only: a second launch focuses the existing window instead of
 // forking a second utility host (which would load the models twice).
-if (!IS_SELFTEST && !app.requestSingleInstanceLock()) {
+// E2E / selftest use isolated userData (and their own lock key) so a developer
+// can keep the real app open while the gate runs.
+if (!IS_SELFTEST && !IS_E2E && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
@@ -181,16 +241,20 @@ if (!IS_SELFTEST && !app.requestSingleInstanceLock()) {
       // re-fork + reconnect so the app recovers on the next action.
       onExit: () => {
         if (!IS_SELFTEST && win !== null && !win.isDestroyed()) ra.connect(win.webContents);
+        const settings = getSettingsWindow();
+        if (!IS_SELFTEST && settings !== null) ra.connect(settings.webContents);
       },
     });
+    connectHost = (webContents) => ra.connect(webContents);
 
     win = createMainWindow();
     installNavigationGuards(win);
     selftest.attach(win);
 
     nativeTheme.on('updated', () => {
-      if (win !== null && !win.isDestroyed()) {
-        win.webContents.send(IpcEvent.ThemeChanged, nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
+      const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+      for (const target of BrowserWindow.getAllWindows()) {
+        if (!target.isDestroyed()) target.webContents.send(IpcEvent.ThemeChanged, theme);
       }
     });
 
@@ -204,6 +268,7 @@ if (!IS_SELFTEST && !app.requestSingleInstanceLock()) {
 
     loadRenderer(win, {
       device: isGpuBuild(nativePath) ? 'gpu' : 'cpu',
+      ...(IS_E2E ? { e2e: '1' } : {}),
       ...(IS_SELFTEST ? { selftest: '1', image: process.env.RA_TEST_IMAGE ?? '' } : {}),
     });
 
@@ -217,9 +282,17 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0 && nativeError === null && nativePath !== null) {
+  if (
+    BrowserWindow.getAllWindows().length === 0 &&
+    nativeError === null &&
+    nativePath !== null &&
+    connectHost !== null
+  ) {
     win = createMainWindow();
     installNavigationGuards(win);
+    win.webContents.on('did-finish-load', () => {
+      if (win !== null && !win.isDestroyed() && connectHost !== null) connectHost(win.webContents);
+    });
     loadRenderer(win, { device: isGpuBuild(nativePath) ? 'gpu' : 'cpu' });
   }
 });

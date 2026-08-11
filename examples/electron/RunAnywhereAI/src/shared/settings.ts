@@ -63,12 +63,19 @@ export const SUPERSEDED_SYSTEM_PROMPTS: readonly string[] = [
  * when an unrelated setting is saved.
  */
 export function migrateSettings(saved: unknown, defaults: AppSettings = DEFAULT_SETTINGS): AppSettings {
-  if (saved === null || typeof saved !== 'object') return { ...defaults, models: { ...defaults.models } };
+  if (saved === null || typeof saved !== 'object') {
+    return {
+      ...defaults,
+      models: { ...defaults.models },
+    };
+  }
 
   const record = saved as Partial<AppSettings>;
   const out: AppSettings = {
     ...defaults,
     ...record,
+    analyticsLogToLocal: record.analyticsLogToLocal ?? defaults.analyticsLogToLocal,
+    hfTokenConfigured: record.hfTokenConfigured ?? defaults.hfTokenConfigured,
     models: { ...defaults.models, ...(record.models ?? {}) },
   };
 
@@ -79,4 +86,21 @@ export function migrateSettings(saved: unknown, defaults: AppSettings = DEFAULT_
   }
 
   return out;
+}
+
+/**
+ * Merge a partial patch into existing settings. Used by the store save path so
+ * a single pane write cannot wipe unrelated keys (e.g. `models`).
+ */
+export function mergeSettingsPatch(
+  existing: unknown,
+  patch: Partial<AppSettings>,
+  defaults: AppSettings = DEFAULT_SETTINGS,
+): AppSettings {
+  const base = migrateSettings(existing, defaults);
+  return {
+    ...base,
+    ...patch,
+    models: { ...base.models, ...(patch.models ?? {}) },
+  };
 }

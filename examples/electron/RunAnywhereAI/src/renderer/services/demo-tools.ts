@@ -109,7 +109,7 @@ let registered = false;
 export function registerDemoTools(): void {
   if (registered) return;
   for (const tool of DEMO_TOOLS) {
-    window.runanywhere.llm.tools.register(tool.definition, (args) => tool.execute(args ?? {}));
+    window.runanywhere.llm.tools.register(tool.definition, (args) => tool.execute(args));
   }
   registered = true;
 }

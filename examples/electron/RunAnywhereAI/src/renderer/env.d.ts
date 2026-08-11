@@ -36,6 +36,8 @@ export interface RunAnywhereBridge extends SdkNamespaces {
    * about a model's STATE comes from `models`.
    */
   catalog(): Readonly<Record<string, import('@runanywhere/electron').CatalogEntry>>;
+  /** Hugging Face bearer for gated downloads — never stored in settings.json. */
+  setHfToken(token: string | null): Promise<void>;
 
   // Renderer-side audio DSP (no RPC): anti-aliased rate conversion and PCM16
   // packing for the mic -> STT path.
