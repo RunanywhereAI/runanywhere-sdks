@@ -128,11 +128,13 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, con
  *
  * @param token Generated token string
  * @param is_final Whether this is the final token
+ * @param tokens_in_delta Engine tokens represented by this callback (may be >1
+ *        when stop-sequence buffering coalesces pieces; 0 on terminal)
  * @param user_data User-provided context
  * @return RAC_TRUE to continue, RAC_FALSE to stop
  */
 typedef rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac_bool_t is_final,
-                                                          void* user_data);
+                                                          int32_t tokens_in_delta, void* user_data);
 
 /**
  * Generates text with streaming callback.
@@ -149,6 +151,14 @@ typedef rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_llamacpp_stream_callback_fn callback, void* user_data);
+
+/**
+ * True prompt/completion token counts from the most recent generate_stream.
+ * Prompt count comes from the tokenizer; completion is the sum of
+ * tokens_in_delta across non-final callbacks (exact, including coalesced stops).
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_stream_token_counts(
+    rac_handle_t handle, rac_llm_token_counts_t* out);
 
 /**
  * Cancels ongoing generation.

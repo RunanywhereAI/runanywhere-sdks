@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import CRACommons
 
 // MARK: - TokenKind
 
@@ -273,20 +274,24 @@ public struct DownloadProgressSnapshot: Sendable, Equatable {
     /// Fraction of the whole download that is done, 0...1, or `nil` when the
     /// size is unknown.
     ///
-    /// Prefers `overallProgress` because a multi-file model's byte counts are
-    /// per-file: reaching the end of file one of three is 100% of those bytes
-    /// but a third of the download, and a bar that fills and resets twice reads
-    /// as a stall or a restart. Falls back to the byte ratio for a single file,
-    /// and reports `nil` rather than a fake `0` so a caller can show an
-    /// indeterminate bar instead of one that looks stuck at the left edge.
+    /// Uses `rac_download_progress_percent` (overall preferred when in range;
+    /// else bytes). Reports `nil` rather than a fake `0` when both inputs are
+    /// unusable so a caller can show an indeterminate bar.
     public var fraction: Float? {
-        if let overallProgress { return overallProgress }
-        guard bytesTotal > 0 else { return nil }
-        return min(max(Float(bytesDone) / Float(bytesTotal), 0), 1)
+        percent.map { $0 / 100 }
     }
 
     /// `fraction` as 0–100, or `nil` when the size is unknown.
-    public var percent: Float? { fraction.map { $0 * 100 } }
+    public var percent: Float? {
+        let overall = overallProgress ?? -1
+        let pct = rac_download_progress_percent(
+            overall,
+            Int64(bytesDone),
+            Int64(bytesTotal)
+        )
+        if overallProgress == nil && bytesTotal <= 0 { return nil }
+        return Float(pct)
+    }
 
     /// True when the size is unknown, so the caller should show an
     /// indeterminate bar.

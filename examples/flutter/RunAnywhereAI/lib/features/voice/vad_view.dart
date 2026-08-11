@@ -171,7 +171,6 @@ class _MetricRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clamped = value.clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
       child: Column(
@@ -182,14 +181,14 @@ class _MetricRow extends StatelessWidget {
             children: [
               Text(label, style: AppTypography.subheadline(context)),
               Text(
-                clamped.toStringAsFixed(2),
+                value.toStringAsFixed(2),
                 style: AppTypography.caption(context),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.xSmall),
           LinearProgressIndicator(
-            value: clamped,
+            value: value,
             color: color,
             backgroundColor: AppColors.backgroundGray5(context),
           ),

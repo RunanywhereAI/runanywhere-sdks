@@ -23,7 +23,10 @@
  * string work with no init dependency (matching the Swift facade).
  */
 
-import { CuaAction as CuaActionProto } from '@runanywhere/proto-ts/cua';
+import {
+  CuaAction as CuaActionProto,
+  CuaActionType,
+} from '@runanywhere/proto-ts/cua';
 
 import {
   requireNativeModule,
@@ -36,38 +39,7 @@ import {
  */
 export const FARA_PROFILE = 'fara';
 
-/**
- * The action a CUA model wants to perform. Raw values match the commons
- * `rac_cua_action_type_t` enum (and Swift `CuaAction.Kind`).
- */
-export enum CuaActionKind {
-  Unknown = 0,
-  LeftClick = 1,
-  RightClick = 2,
-  DoubleClick = 3,
-  TripleClick = 4,
-  MouseMove = 5,
-  LeftClickDrag = 6,
-  Type = 7,
-  Key = 8,
-  Scroll = 9,
-  HScroll = 10,
-  VisitURL = 11,
-  HistoryBack = 12,
-  WebSearch = 13,
-  ReadPageAnswer = 14,
-  PauseMemorize = 15,
-  AskUser = 16,
-  Wait = 17,
-  Terminate = 18,
-}
-
-/** Map a raw native ordinal onto the enum, degrading to Unknown out of range. */
-function clampKind(raw: number): CuaActionKind {
-  return raw >= CuaActionKind.Unknown && raw <= CuaActionKind.Terminate
-    ? (raw as CuaActionKind)
-    : CuaActionKind.Unknown;
-}
+export { CuaActionType as CuaActionKind };
 
 /** A viewport-scaled pixel coordinate. */
 export interface CuaCoordinate {
@@ -82,7 +54,7 @@ export interface CuaCoordinate {
  */
 export interface CuaAction {
   /** The action the model wants to perform. */
-  kind: CuaActionKind;
+  kind: CuaActionType;
   /** Viewport-scaled pixel coordinate (for click / move / drag), else undefined. */
   coordinate?: CuaCoordinate;
   /**
@@ -113,8 +85,8 @@ export interface CuaDisplaySize {
   height: number;
 }
 
-/** The profile's native coordinate space for `fara` (1000x1000). */
-const DEFAULT_DISPLAY: CuaDisplaySize = { width: 1000, height: 1000 };
+/** Zero asks commons to use the selected profile's native coordinate space. */
+const DEFAULT_DISPLAY: CuaDisplaySize = { width: 0, height: 0 };
 
 /**
  * The system prompt (identity + `computer_use` tool schema) for a profile,
@@ -172,10 +144,7 @@ export function parseAction(
   }
   const proto = CuaActionProto.decode(new Uint8Array(bytes));
   return {
-    // Clamp like every other SDK (Swift `?? .unknown`, Kotlin `fromRawValue`,
-    // Web's range check): a value outside the enum must degrade to Unknown
-    // rather than produce a CuaActionKind that matches no member.
-    kind: clampKind(proto.type as number),
+    kind: proto.type,
     // `coordinateValid` is deleted outright — presence of `x`/`y` (both
     // optional int32) is itself "has a coordinate" now.
     coordinate:

@@ -403,7 +403,6 @@ function makeToolResult(params: {
   result?: Record<string, ToolValue>;
   error?: string;
   toolCallId?: string;
-  startedAtMs: number;
 }): ToolResult {
   return ToolResultMessage.fromPartial({
     name: params.name,
@@ -411,8 +410,6 @@ function makeToolResult(params: {
     resultJson: jsonStringFromObject(params.result ?? {}),
     error: params.error,
     toolCallId: params.toolCallId,
-    startedAtMs: params.startedAtMs,
-    completedAtMs: Date.now(),
   });
 }
 
@@ -691,7 +688,6 @@ export const ToolCalling = {
   },
 
   async executeTool(toolCall: ToolCall): Promise<ToolResult> {
-    const startedAtMs = Date.now();
     const toolCallId = toolCallIdentifier(toolCall);
     const registered = registeredTools.get(toolCall.name);
     if (!registered) {
@@ -700,7 +696,6 @@ export const ToolCalling = {
         success: false,
         error: `Unknown tool: ${toolCall.name}`,
         toolCallId,
-        startedAtMs,
       });
     }
 
@@ -716,7 +711,6 @@ export const ToolCalling = {
         success: false,
         error: `Failed to parse tool arguments: ${error instanceof Error ? error.message : String(error)}`,
         toolCallId,
-        startedAtMs,
       });
     }
 
@@ -726,7 +720,6 @@ export const ToolCalling = {
         success: true,
         result: await registered.executor(parsedArgs),
         toolCallId,
-        startedAtMs,
       });
     } catch (error) {
       return makeToolResult({
@@ -734,7 +727,6 @@ export const ToolCalling = {
         success: false,
         error: error instanceof Error ? error.message : String(error),
         toolCallId,
-        startedAtMs,
       });
     }
   },

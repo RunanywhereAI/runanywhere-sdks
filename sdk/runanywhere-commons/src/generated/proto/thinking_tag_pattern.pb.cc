@@ -50,11 +50,11 @@ constexpr ThinkingTagPattern::ParseTableT_ ThinkingTagPattern::InternalGenerateP
     {
       PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_._has_bits_),
       0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
+      3,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -64,14 +64,19 @@ constexpr ThinkingTagPattern::ParseTableT_ ThinkingTagPattern::InternalGenerateP
       ::_pbi::TcParser::GetTable<::runanywhere::v1::ThinkingTagPattern>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // string close_tag = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.close_tag_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // string open_tag = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.open_tag_)}},
+      // string close_tag = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.close_tag_)}},
+      // optional bool template_prefills_open_tag = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ThinkingTagPattern, _impl_.template_prefills_open_tag_), 2>(),
+       {24, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.template_prefills_open_tag_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -79,6 +84,8 @@ constexpr ThinkingTagPattern::ParseTableT_ ThinkingTagPattern::InternalGenerateP
       {PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.open_tag_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string close_tag = 2;
       {PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.close_tag_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional bool template_prefills_open_tag = 3;
+      {PROTOBUF_FIELD_OFFSET(ThinkingTagPattern, _impl_.template_prefills_open_tag_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
@@ -100,7 +107,8 @@ inline constexpr ThinkingTagPattern::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         close_tag_(
             &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()) {}
+            ::_pbi::ConstantInitialized()),
+        template_prefills_open_tag_{false} {}
 
 template <typename>
 constexpr ThinkingTagPattern::ThinkingTagPattern(::_pbi::ConstantInitialized,
@@ -367,11 +375,13 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_._has_bits_),
-        5, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.open_tag_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.close_tag_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.template_prefills_open_tag_),
         0,
         1,
+        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ReasoningOptions, _impl_._has_bits_),
         6, // hasbit index offset
@@ -386,7 +396,7 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::ThinkingTagPattern)},
-        {7, sizeof(::runanywhere::v1::ReasoningOptions)},
+        {9, sizeof(::runanywhere::v1::ReasoningOptions)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -396,24 +406,26 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_thinking_5ftag_5fpattern_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\032thinking_tag_pattern.proto\022\016runanywher"
-    "e.v1\"9\n\022ThinkingTagPattern\022\020\n\010open_tag\030\001"
-    " \001(\t\022\021\n\tclose_tag\030\002 \001(\t\"\240\001\n\020ReasoningOpt"
-    "ions\022+\n\004mode\030\001 \001(\0162\035.runanywhere.v1.Reas"
-    "oningMode\022\031\n\021include_in_output\030\002 \001(\010\0228\n\007"
-    "pattern\030\003 \001(\0132\".runanywhere.v1.ThinkingT"
-    "agPatternH\000\210\001\001B\n\n\010_pattern*^\n\rReasoningM"
-    "ode\022\036\n\032REASONING_MODE_UNSPECIFIED\020\000\022\026\n\022R"
-    "EASONING_MODE_OFF\020\001\022\025\n\021REASONING_MODE_ON"
-    "\020\002B\222\001\n\027ai.runanywhere.proto.v1B\027Thinking"
-    "TagPatternProtoP\001Z<github.com/runanywher"
-    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
-    "\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "e.v1\"\201\001\n\022ThinkingTagPattern\022\020\n\010open_tag\030"
+    "\001 \001(\t\022\021\n\tclose_tag\030\002 \001(\t\022\'\n\032template_pre"
+    "fills_open_tag\030\003 \001(\010H\000\210\001\001B\035\n\033_template_p"
+    "refills_open_tag\"\240\001\n\020ReasoningOptions\022+\n"
+    "\004mode\030\001 \001(\0162\035.runanywhere.v1.ReasoningMo"
+    "de\022\031\n\021include_in_output\030\002 \001(\010\0228\n\007pattern"
+    "\030\003 \001(\0132\".runanywhere.v1.ThinkingTagPatte"
+    "rnH\000\210\001\001B\n\n\010_pattern*^\n\rReasoningMode\022\036\n\032"
+    "REASONING_MODE_UNSPECIFIED\020\000\022\026\n\022REASONIN"
+    "G_MODE_OFF\020\001\022\025\n\021REASONING_MODE_ON\020\002B\222\001\n\027"
+    "ai.runanywhere.proto.v1B\027ThinkingTagPatt"
+    "ernProtoP\001Z<github.com/runanywhere/runan"
+    "ywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RA"
+    "V1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_thinking_5ftag_5fpattern_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_thinking_5ftag_5fpattern_2eproto = {
     false,
     false,
-    519,
+    592,
     descriptor_table_protodef_thinking_5ftag_5fpattern_2eproto,
     "thinking_tag_pattern.proto",
     &descriptor_table_thinking_5ftag_5fpattern_2eproto_once,
@@ -469,6 +481,7 @@ ThinkingTagPattern::ThinkingTagPattern(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.template_prefills_open_tag_ = from._impl_.template_prefills_open_tag_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ThinkingTagPattern)
 }
@@ -481,6 +494,7 @@ PROTOBUF_NDEBUG_INLINE ThinkingTagPattern::Impl_::Impl_(
 
 inline void ThinkingTagPattern::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.template_prefills_open_tag_ = {};
 }
 ThinkingTagPattern::~ThinkingTagPattern() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ThinkingTagPattern)
@@ -540,6 +554,7 @@ PROTOBUF_NOINLINE void ThinkingTagPattern::Clear() {
       _impl_.close_tag_.ClearNonDefaultToEmpty();
     }
   }
+  _impl_.template_prefills_open_tag_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -583,6 +598,13 @@ PROTOBUF_NOINLINE void ThinkingTagPattern::Clear() {
     }
   }
 
+  // optional bool template_prefills_open_tag = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(
+        3, this_._internal_template_prefills_open_tag(), target);
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -608,6 +630,7 @@ PROTOBUF_NOINLINE void ThinkingTagPattern::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
+  total_size += static_cast<bool>(0x00000004U & cached_has_bits) * 2;
   if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     // string open_tag = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -641,7 +664,7 @@ void ThinkingTagPattern::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_open_tag().empty()) {
         _this->_internal_set_open_tag(from._internal_open_tag());
@@ -659,6 +682,9 @@ void ThinkingTagPattern::MergeImpl(::google::protobuf::MessageLite& to_msg,
           _this->_internal_set_close_tag("");
         }
       }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_impl_.template_prefills_open_tag_ = from._impl_.template_prefills_open_tag_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -682,6 +708,7 @@ void ThinkingTagPattern::InternalSwap(ThinkingTagPattern* PROTOBUF_RESTRICT PROT
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.open_tag_, &other->_impl_.open_tag_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.close_tag_, &other->_impl_.close_tag_, arena);
+  swap(_impl_.template_prefills_open_tag_, other->_impl_.template_prefills_open_tag_);
 }
 
 ::google::protobuf::Metadata ThinkingTagPattern::GetMetadata() const {

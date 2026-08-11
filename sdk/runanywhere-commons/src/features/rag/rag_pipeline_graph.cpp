@@ -150,7 +150,8 @@ struct LLMStreamCtx {
 };
 
 rac_bool_t llm_stream_trampoline(const char* token, rac_bool_t is_final,
-                                 const char* /*finish_reason*/, void* user_data) {
+                                 const char* /*finish_reason*/, int32_t /*tokens_in_delta*/,
+                                 void* user_data) {
     auto* ctx = static_cast<LLMStreamCtx*>(user_data);
     if (!ctx)
         return RAC_TRUE;

@@ -685,19 +685,21 @@ int _getTotalMemoryBytes(int usedBytes) {
 }
 
 int _getAvailableMemoryBytes(int totalBytes, int usedBytes) {
+  var probed = 0;
   if (Platform.isAndroid) {
     final memInfo = _readProcMemInfo();
     final availableBytes = memInfo?['MemAvailable'] ?? 0;
     if (availableBytes > 0) {
-      return availableBytes > totalBytes ? totalBytes : availableBytes;
+      probed = availableBytes > totalBytes ? totalBytes : availableBytes;
     }
   }
 
-  if (totalBytes <= usedBytes) {
-    return 0;
-  }
-
-  return totalBytes - usedBytes;
+  // Never invent total-used. Coalesce probed → 0 UNKNOWN via commons.
+  final lib = PlatformLoader.loadCommons();
+  final coalesce = lib.lookupFunction<Int64 Function(Int64), int Function(int)>(
+    'rac_device_coalesce_available_memory',
+  );
+  return coalesce(probed);
 }
 
 /// Memory info callback - returns best-effort process and device RAM metrics.

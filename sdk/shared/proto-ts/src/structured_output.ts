@@ -10,6 +10,61 @@ import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
+/**
+ * How commons applies StructuredOutputOptions on the ordinary LLM generate
+ * path. Platform SDKs must not invent a second policy.
+ */
+export enum StructuredOutputMode {
+  STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
+  /** STRUCTURED_OUTPUT_MODE_CONSTRAINED - Compile schema→GBNF (or honor grammar/regex) and constrain decoding. */
+  STRUCTURED_OUTPUT_MODE_CONSTRAINED = 1,
+  /** STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY - Do not constrain decoding; validate the free-text result against schema. */
+  STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY = 2,
+  /**
+   * STRUCTURED_OUTPUT_MODE_REPAIR - Constrained (when a decoder arm is present), then one repair retry if
+   * the first answer fails schema validation.
+   */
+  STRUCTURED_OUTPUT_MODE_REPAIR = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function structuredOutputModeFromJSON(object: any): StructuredOutputMode {
+  switch (object) {
+    case 0:
+    case "STRUCTURED_OUTPUT_MODE_UNSPECIFIED":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED;
+    case 1:
+    case "STRUCTURED_OUTPUT_MODE_CONSTRAINED":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED;
+    case 2:
+    case "STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+    case 3:
+    case "STRUCTURED_OUTPUT_MODE_REPAIR":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return StructuredOutputMode.UNRECOGNIZED;
+  }
+}
+
+export function structuredOutputModeToJSON(object: StructuredOutputMode): string {
+  switch (object) {
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED:
+      return "STRUCTURED_OUTPUT_MODE_UNSPECIFIED";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED:
+      return "STRUCTURED_OUTPUT_MODE_CONSTRAINED";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY:
+      return "STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR:
+      return "STRUCTURED_OUTPUT_MODE_REPAIR";
+    case StructuredOutputMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface StructuredOutputOptions {
   /**
    * Also render the schema into the system prompt, not just constrain
@@ -19,7 +74,10 @@ export interface StructuredOutputOptions {
   includeSchemaInPrompt?:
     | boolean
     | undefined;
-  /** A JSON Schema document, verbatim. Unsupported keywords are rejected. */
+  /**
+   * A JSON Schema document, verbatim. Unsupported keywords are rejected.
+   * Commons compiles this to GBNF on the generate path (mode permitting).
+   */
   schema?:
     | string
     | undefined;
@@ -28,7 +86,11 @@ export interface StructuredOutputOptions {
     | string
     | undefined;
   /** Regular expression the whole output must match. On-device only. */
-  regex?: string | undefined;
+  regex?:
+    | string
+    | undefined;
+  /** Unset = CONSTRAINED when a constraint arm is present, else free text. */
+  mode?: StructuredOutputMode | undefined;
 }
 
 export interface StructuredOutputValidation {
@@ -38,7 +100,13 @@ export interface StructuredOutputValidation {
   extractedJson?: string | undefined;
   validationErrors: string[];
   validationTimeMs: number;
-  error?: SDKError | undefined;
+  error?:
+    | SDKError
+    | undefined;
+  /** True when commons issued the single repair retry (mode=REPAIR). */
+  repairAttempted: boolean;
+  /** 0 = first pass only; 1 = repair pass produced the reported verdict. */
+  repairAttempts: number;
 }
 
 export interface StructuredOutputResult {
@@ -71,7 +139,7 @@ export interface StructuredOutputPromptResult {
 }
 
 function createBaseStructuredOutputOptions(): StructuredOutputOptions {
-  return { includeSchemaInPrompt: undefined, schema: undefined, grammar: undefined, regex: undefined };
+  return { includeSchemaInPrompt: undefined, schema: undefined, grammar: undefined, regex: undefined, mode: undefined };
 }
 
 export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
@@ -87,6 +155,9 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
     }
     if (message.regex !== undefined) {
       writer.uint32(34).string(message.regex);
+    }
+    if (message.mode !== undefined) {
+      writer.uint32(40).int32(message.mode);
     }
     return writer;
   },
@@ -130,6 +201,14 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
           message.regex = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.mode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -149,6 +228,7 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
       schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
       grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
       regex: isSet(object.regex) ? globalThis.String(object.regex) : undefined,
+      mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : undefined,
     };
   },
 
@@ -166,6 +246,9 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
     if (message.regex !== undefined) {
       obj.regex = message.regex;
     }
+    if (message.mode !== undefined) {
+      obj.mode = structuredOutputModeToJSON(message.mode);
+    }
     return obj;
   },
 
@@ -178,6 +261,7 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
     message.schema = object.schema ?? undefined;
     message.grammar = object.grammar ?? undefined;
     message.regex = object.regex ?? undefined;
+    message.mode = object.mode ?? undefined;
     return message;
   },
 };
@@ -191,6 +275,8 @@ function createBaseStructuredOutputValidation(): StructuredOutputValidation {
     validationErrors: [],
     validationTimeMs: 0,
     error: undefined,
+    repairAttempted: false,
+    repairAttempts: 0,
   };
 }
 
@@ -216,6 +302,12 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     }
     if (message.error !== undefined) {
       SDKError.encode(message.error, writer.uint32(58).fork()).join();
+    }
+    if (message.repairAttempted !== false) {
+      writer.uint32(64).bool(message.repairAttempted);
+    }
+    if (message.repairAttempts !== 0) {
+      writer.uint32(72).int32(message.repairAttempts);
     }
     return writer;
   },
@@ -283,6 +375,22 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
           message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.repairAttempted = reader.bool();
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.repairAttempts = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -325,6 +433,16 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
         ? globalThis.Number(object.validation_time_ms)
         : 0,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      repairAttempted: isSet(object.repairAttempted)
+        ? globalThis.Boolean(object.repairAttempted)
+        : isSet(object.repair_attempted)
+        ? globalThis.Boolean(object.repair_attempted)
+        : false,
+      repairAttempts: isSet(object.repairAttempts)
+        ? globalThis.Number(object.repairAttempts)
+        : isSet(object.repair_attempts)
+        ? globalThis.Number(object.repair_attempts)
+        : 0,
     };
   },
 
@@ -351,6 +469,12 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     if (message.error !== undefined) {
       obj.error = SDKError.toJSON(message.error);
     }
+    if (message.repairAttempted !== false) {
+      obj.repairAttempted = message.repairAttempted;
+    }
+    if (message.repairAttempts !== 0) {
+      obj.repairAttempts = Math.round(message.repairAttempts);
+    }
     return obj;
   },
 
@@ -368,6 +492,8 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;
+    message.repairAttempted = object.repairAttempted ?? false;
+    message.repairAttempts = object.repairAttempts ?? 0;
     return message;
   },
 };

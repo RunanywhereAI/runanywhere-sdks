@@ -3169,8 +3169,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     kModelNameFieldNumber = 28,
     kKindFieldNumber = 1,
     kOutputTokensFieldNumber = 6,
-    kCostAmountFieldNumber = 10,
-    kCostSavedAmountFieldNumber = 11,
     kTokensPerSecondFieldNumber = 22,
     kInputTokensFieldNumber = 21,
     kIsStreamingFieldNumber = 24,
@@ -3457,26 +3455,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
   void _internal_set_output_tokens(::int32_t value);
 
   public:
-  // double cost_amount = 10;
-  void clear_cost_amount() ;
-  [[nodiscard]] double cost_amount() const;
-  void set_cost_amount(double value);
-
-  private:
-  double _internal_cost_amount() const;
-  void _internal_set_cost_amount(double value);
-
-  public:
-  // double cost_saved_amount = 11;
-  void clear_cost_saved_amount() ;
-  [[nodiscard]] double cost_saved_amount() const;
-  void set_cost_saved_amount(double value);
-
-  private:
-  double _internal_cost_saved_amount() const;
-  void _internal_set_cost_saved_amount(double value);
-
-  public:
   // double tokens_per_second = 22;
   void clear_tokens_per_second() ;
   [[nodiscard]] double tokens_per_second() const;
@@ -3581,7 +3559,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 31,
+      ::google::protobuf::internal::TcParseTable<5, 29,
                           0, 265,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -3629,8 +3607,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     ::google::protobuf::internal::ArenaStringPtr model_name_;
     int kind_;
     ::int32_t output_tokens_;
-    double cost_amount_;
-    double cost_saved_amount_;
     double tokens_per_second_;
     ::int32_t input_tokens_;
     bool is_streaming_;
@@ -12457,54 +12433,6 @@ inline void GenerationEvent::set_allocated_model_id(::std::string* PROTOBUF_NULL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.GenerationEvent.model_id)
 }
 
-// double cost_amount = 10;
-inline void GenerationEvent::clear_cost_amount() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.cost_amount_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
-}
-inline double GenerationEvent::cost_amount() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.cost_amount)
-  return _internal_cost_amount();
-}
-inline void GenerationEvent::set_cost_amount(double value) {
-  _internal_set_cost_amount(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.cost_amount)
-}
-inline double GenerationEvent::_internal_cost_amount() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.cost_amount_;
-}
-inline void GenerationEvent::_internal_set_cost_amount(double value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.cost_amount_ = value;
-}
-
-// double cost_saved_amount = 11;
-inline void GenerationEvent::clear_cost_saved_amount() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.cost_saved_amount_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
-}
-inline double GenerationEvent::cost_saved_amount() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.cost_saved_amount)
-  return _internal_cost_saved_amount();
-}
-inline void GenerationEvent::set_cost_saved_amount(double value) {
-  _internal_set_cost_saved_amount(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.cost_saved_amount)
-}
-inline double GenerationEvent::_internal_cost_saved_amount() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.cost_saved_amount_;
-}
-inline void GenerationEvent::_internal_set_cost_saved_amount(double value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.cost_saved_amount_ = value;
-}
-
 // string routing_target = 12;
 inline void GenerationEvent::clear_routing_target() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
@@ -13085,7 +13013,7 @@ inline void GenerationEvent::set_allocated_thinking_text(::std::string* PROTOBUF
 inline void GenerationEvent::clear_input_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.input_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
 }
 inline ::int32_t GenerationEvent::input_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.input_tokens)
@@ -13093,7 +13021,7 @@ inline ::int32_t GenerationEvent::input_tokens() const {
 }
 inline void GenerationEvent::set_input_tokens(::int32_t value) {
   _internal_set_input_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.input_tokens)
 }
 inline ::int32_t GenerationEvent::_internal_input_tokens() const {
@@ -13109,7 +13037,7 @@ inline void GenerationEvent::_internal_set_input_tokens(::int32_t value) {
 inline void GenerationEvent::clear_tokens_per_second() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tokens_per_second_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
 }
 inline double GenerationEvent::tokens_per_second() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.tokens_per_second)
@@ -13117,7 +13045,7 @@ inline double GenerationEvent::tokens_per_second() const {
 }
 inline void GenerationEvent::set_tokens_per_second(double value) {
   _internal_set_tokens_per_second(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.tokens_per_second)
 }
 inline double GenerationEvent::_internal_tokens_per_second() const {
@@ -13133,7 +13061,7 @@ inline void GenerationEvent::_internal_set_tokens_per_second(double value) {
 inline void GenerationEvent::clear_time_to_first_token_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.time_to_first_token_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x01000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
 }
 inline ::int64_t GenerationEvent::time_to_first_token_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.time_to_first_token_ms)
@@ -13141,7 +13069,7 @@ inline ::int64_t GenerationEvent::time_to_first_token_ms() const {
 }
 inline void GenerationEvent::set_time_to_first_token_ms(::int64_t value) {
   _internal_set_time_to_first_token_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x01000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.time_to_first_token_ms)
 }
 inline ::int64_t GenerationEvent::_internal_time_to_first_token_ms() const {
@@ -13157,7 +13085,7 @@ inline void GenerationEvent::_internal_set_time_to_first_token_ms(::int64_t valu
 inline void GenerationEvent::clear_is_streaming() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_streaming_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
 }
 inline bool GenerationEvent::is_streaming() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.is_streaming)
@@ -13165,7 +13093,7 @@ inline bool GenerationEvent::is_streaming() const {
 }
 inline void GenerationEvent::set_is_streaming(bool value) {
   _internal_set_is_streaming(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.is_streaming)
 }
 inline bool GenerationEvent::_internal_is_streaming() const {
@@ -13181,7 +13109,7 @@ inline void GenerationEvent::_internal_set_is_streaming(bool value) {
 inline void GenerationEvent::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x02000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
 }
 inline float GenerationEvent::temperature() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.temperature)
@@ -13189,7 +13117,7 @@ inline float GenerationEvent::temperature() const {
 }
 inline void GenerationEvent::set_temperature(float value) {
   _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x02000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.temperature)
 }
 inline float GenerationEvent::_internal_temperature() const {
@@ -13205,7 +13133,7 @@ inline void GenerationEvent::_internal_set_temperature(float value) {
 inline void GenerationEvent::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x04000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x01000000U);
 }
 inline ::int32_t GenerationEvent::max_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.max_tokens)
@@ -13213,7 +13141,7 @@ inline ::int32_t GenerationEvent::max_tokens() const {
 }
 inline void GenerationEvent::set_max_tokens(::int32_t value) {
   _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x04000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x01000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.max_tokens)
 }
 inline ::int32_t GenerationEvent::_internal_max_tokens() const {
@@ -13229,7 +13157,7 @@ inline void GenerationEvent::_internal_set_max_tokens(::int32_t value) {
 inline void GenerationEvent::clear_context_length() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.context_length_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x08000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x02000000U);
 }
 inline ::int32_t GenerationEvent::context_length() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.context_length)
@@ -13237,7 +13165,7 @@ inline ::int32_t GenerationEvent::context_length() const {
 }
 inline void GenerationEvent::set_context_length(::int32_t value) {
   _internal_set_context_length(value);
-  SetHasBit(_impl_._has_bits_[0], 0x08000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x02000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.context_length)
 }
 inline ::int32_t GenerationEvent::_internal_context_length() const {
@@ -13317,7 +13245,7 @@ inline void GenerationEvent::set_allocated_model_name(::std::string* PROTOBUF_NU
 inline void GenerationEvent::clear_total_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x20000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x08000000U);
 }
 inline ::int64_t GenerationEvent::total_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.total_duration_ms)
@@ -13325,7 +13253,7 @@ inline ::int64_t GenerationEvent::total_duration_ms() const {
 }
 inline void GenerationEvent::set_total_duration_ms(::int64_t value) {
   _internal_set_total_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x20000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x08000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.total_duration_ms)
 }
 inline ::int64_t GenerationEvent::_internal_total_duration_ms() const {
@@ -13341,7 +13269,7 @@ inline void GenerationEvent::_internal_set_total_duration_ms(::int64_t value) {
 inline void GenerationEvent::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x10000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x04000000U);
 }
 inline ::runanywhere::v1::InferenceFramework GenerationEvent::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.framework)
@@ -13349,7 +13277,7 @@ inline ::runanywhere::v1::InferenceFramework GenerationEvent::framework() const 
 }
 inline void GenerationEvent::set_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x10000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x04000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.framework)
 }
 inline ::runanywhere::v1::InferenceFramework GenerationEvent::_internal_framework() const {
@@ -13365,7 +13293,7 @@ inline void GenerationEvent::_internal_set_framework(::runanywhere::v1::Inferenc
 inline void GenerationEvent::clear_prefill_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prefill_duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x40000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x10000000U);
 }
 inline ::int64_t GenerationEvent::prefill_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.prefill_duration_ms)
@@ -13373,7 +13301,7 @@ inline ::int64_t GenerationEvent::prefill_duration_ms() const {
 }
 inline void GenerationEvent::set_prefill_duration_ms(::int64_t value) {
   _internal_set_prefill_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x40000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x10000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.prefill_duration_ms)
 }
 inline ::int64_t GenerationEvent::_internal_prefill_duration_ms() const {

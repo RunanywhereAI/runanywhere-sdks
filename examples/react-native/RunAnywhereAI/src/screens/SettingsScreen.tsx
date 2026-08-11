@@ -60,14 +60,6 @@ import {
 
 const STORAGE_KEYS = APP_STORAGE_KEYS;
 
-const DEFAULT_STORAGE_INFO: StorageInfo = {
-  totalStorage: 256 * 1024 * 1024 * 1024,
-  appStorage: 0,
-  modelsStorage: 0,
-  cacheSize: 0,
-  freeSpace: 100 * 1024 * 1024 * 1024,
-};
-
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -460,8 +452,7 @@ export const SettingsScreen: React.FC = () => {
     useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [storageInfo, setStorageInfo] =
-    useState<StorageInfo>(DEFAULT_STORAGE_INFO);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
@@ -1010,7 +1001,9 @@ export const SettingsScreen: React.FC = () => {
   }, []);
 
   // Storage summary text — matches Android "Models X · Y free"
-  const storageSummary = `Models ${formatBytes(storageInfo.modelsStorage)}  ·  ${formatBytes(storageInfo.freeSpace)} free`;
+  const storageSummary = storageInfo
+    ? `Models ${formatBytes(storageInfo.modelsStorage)}  ·  ${formatBytes(storageInfo.freeSpace)} free`
+    : 'Storage unavailable';
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>

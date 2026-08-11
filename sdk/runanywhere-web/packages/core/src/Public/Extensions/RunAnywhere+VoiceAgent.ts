@@ -23,7 +23,7 @@ import {
   EventCategory,
 } from '@runanywhere/proto-ts/component_types';
 import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
-import { pcm16ToWav } from './RunAnywhere+AudioConvert.js';
+import { float32ToWav, pcm16ToFloat32, pcm16ToWav } from './RunAnywhere+AudioConvert.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { STT, transcribe } from './RunAnywhere+STT.js';
 import { TTS, synthesize } from './RunAnywhere+TTS.js';
@@ -975,13 +975,8 @@ class VoiceTurnCancelledError extends Error {
 
 function toFloat32Audio(audio: Float32Array | Uint8Array): Float32Array {
   if (audio instanceof Float32Array) return audio;
-  const count = Math.floor(audio.byteLength / 2);
-  const view = new DataView(audio.buffer, audio.byteOffset, count * 2);
-  const samples = new Float32Array(count);
-  for (let index = 0; index < count; index += 1) {
-    samples[index] = view.getInt16(index * 2, true) / 0x8000;
-  }
-  return samples;
+  const copy = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength);
+  return pcm16ToFloat32(copy);
 }
 
 function rmsAudio(samples: Float32Array): number {
@@ -1078,14 +1073,9 @@ function ttsAudioToSelfDescribing(
     pcm.set(bytes);
     return pcm16ToWav(pcm.buffer, rate);
   }
-  // Float32 PCM: quantise to the Int16 the WAV header declares.
+  // Float32 PCM: commons rac_audio_float32_to_wav owns quantize + RIFF.
   const samples = ttsAudioToFloat32(bytes, format);
-  const int16 = new Int16Array(samples.length);
-  for (let i = 0; i < samples.length; i += 1) {
-    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0));
-    int16[i] = Math.round(clamped * (clamped < 0 ? 0x8000 : 0x7fff));
-  }
-  return pcm16ToWav(int16.buffer, rate);
+  return float32ToWav(samples, rate);
 }
 
 function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array {
@@ -1097,11 +1087,8 @@ function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array
     return samples;
   }
   if (format === AudioFormat.AUDIO_FORMAT_PCM_S16LE) {
-    const count = Math.floor(bytes.byteLength / 2);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, count * 2);
-    const samples = new Float32Array(count);
-    for (let i = 0; i < count; i += 1) samples[i] = view.getInt16(i * 2, true) / 0x8000;
-    return samples;
+    const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    return pcm16ToFloat32(copy);
   }
   throw SDKException.backendNotAvailable(
     'voiceAgentSynthesizeSpeech',

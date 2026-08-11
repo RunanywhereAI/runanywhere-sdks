@@ -569,7 +569,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 ]}
               >
                 {formatBytes(storage?.totalModelsBytes ?? 0)} in models ·{' '}
-                {onDeviceModels.length} on device
+                {storage?.models.length ?? 0} on device
               </Text>
             </View>
 

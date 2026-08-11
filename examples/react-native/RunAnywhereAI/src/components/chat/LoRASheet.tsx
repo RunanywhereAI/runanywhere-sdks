@@ -185,11 +185,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
 
   const isApplied = useCallback(
     (entry: LoraAdapterCatalogEntry) =>
-      loadedAdapters.some(
-        (adapter) =>
-          adapter.id === entry.id ||
-          (!!entry.localPath && adapter.id === entry.localPath)
-      ),
+      loadedAdapters.some((adapter) => adapter.id === entry.id),
     [loadedAdapters]
   );
 

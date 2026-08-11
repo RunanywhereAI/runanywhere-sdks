@@ -368,11 +368,11 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
     {
       PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967272,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
+      4,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -395,6 +395,13 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
       {::_pbi::TcParser::FastUS1,
        {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.label_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // float fraction = 5;
+      {::_pbi::TcParser::FastF32S1,
+       {45, 3, 0,
+        PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
@@ -404,6 +411,8 @@ constexpr SegmentationClassSummary::ParseTableT_ SegmentationClassSummary::Inter
       {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.pixel_count_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
       // string label = 3;
       {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.label_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // float fraction = 5;
+      {PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     }},
     // no aux_entries
     {{
@@ -423,7 +432,8 @@ inline constexpr SegmentationClassSummary::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         pixel_count_{::uint64_t{0u}},
-        class_id_{0u} {}
+        class_id_{0u},
+        fraction_{0} {}
 
 template <typename>
 constexpr SegmentationClassSummary::SegmentationClassSummary(::_pbi::ConstantInitialized,
@@ -938,13 +948,15 @@ const ::uint32_t
         0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_._has_bits_),
-        6, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.class_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.pixel_count_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.label_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationClassSummary, _impl_.fraction_),
         2,
         1,
         0,
+        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SegmentationResult, _impl_._has_bits_),
         11, // hasbit index offset
@@ -972,7 +984,7 @@ static const ::_pbi::MigrationSchema
         {11, sizeof(::runanywhere::v1::SegmentationOptions)},
         {18, sizeof(::runanywhere::v1::SegmentationRequest)},
         {27, sizeof(::runanywhere::v1::SegmentationClassSummary)},
-        {36, sizeof(::runanywhere::v1::SegmentationResult)},
+        {38, sizeof(::runanywhere::v1::SegmentationResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -996,25 +1008,25 @@ const char descriptor_table_protodef_segmentation_2eproto[] ABSL_ATTRIBUTE_SECTI
     "here.v1.SegmentationImage\0229\n\007options\030\002 \001"
     "(\0132#.runanywhere.v1.SegmentationOptionsH"
     "\000\210\001\001\022\025\n\010model_id\030\003 \001(\tH\001\210\001\001B\n\n\010_optionsB"
-    "\013\n\t_model_id\"P\n\030SegmentationClassSummary"
+    "\013\n\t_model_id\"h\n\030SegmentationClassSummary"
     "\022\020\n\010class_id\030\001 \001(\r\022\023\n\013pixel_count\030\002 \001(\004\022"
-    "\r\n\005label\030\003 \001(\t\"\251\002\n\022SegmentationResult\022\r\n"
-    "\005width\030\001 \001(\r\022\016\n\006height\030\002 \001(\r\022\031\n\021class_ma"
-    "sk_u16_le\030\003 \001(\014\022\034\n\017diagnostic_rgba\030\004 \001(\014"
-    "H\000\210\001\001\022A\n\017class_summaries\030\005 \003(\0132(.runanyw"
-    "here.v1.SegmentationClassSummary\022\032\n\022proc"
-    "essing_time_ms\030\006 \001(\003\022\020\n\010model_id\030\007 \001(\t\022\037"
-    "\n\022confidence_mask_u8\030\010 \001(\014H\001\210\001\001B\022\n\020_diag"
-    "nostic_rgbaB\025\n\023_confidence_mask_u8*\262\001\n\027S"
-    "egmentationPixelFormat\022)\n%SEGMENTATION_P"
-    "IXEL_FORMAT_UNSPECIFIED\020\000\022\"\n\036SEGMENTATIO"
-    "N_PIXEL_FORMAT_RGB8\020\001\022#\n\037SEGMENTATION_PI"
-    "XEL_FORMAT_RGBA8\020\002\022#\n\037SEGMENTATION_PIXEL"
-    "_FORMAT_BGRA8\020\003B\214\001\n\027ai.runanywhere.proto"
-    ".v1B\021SegmentationProtoP\001Z<github.com/run"
-    "anywhere/runanywhere-sdks/idl/v1;runanyw"
-    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
-    "proto3"
+    "\r\n\005label\030\003 \001(\t\022\020\n\010fraction\030\005 \001(\002J\004\010\004\020\005\"\251"
+    "\002\n\022SegmentationResult\022\r\n\005width\030\001 \001(\r\022\016\n\006"
+    "height\030\002 \001(\r\022\031\n\021class_mask_u16_le\030\003 \001(\014\022"
+    "\034\n\017diagnostic_rgba\030\004 \001(\014H\000\210\001\001\022A\n\017class_s"
+    "ummaries\030\005 \003(\0132(.runanywhere.v1.Segmenta"
+    "tionClassSummary\022\032\n\022processing_time_ms\030\006"
+    " \001(\003\022\020\n\010model_id\030\007 \001(\t\022\037\n\022confidence_mas"
+    "k_u8\030\010 \001(\014H\001\210\001\001B\022\n\020_diagnostic_rgbaB\025\n\023_"
+    "confidence_mask_u8*\262\001\n\027SegmentationPixel"
+    "Format\022)\n%SEGMENTATION_PIXEL_FORMAT_UNSP"
+    "ECIFIED\020\000\022\"\n\036SEGMENTATION_PIXEL_FORMAT_R"
+    "GB8\020\001\022#\n\037SEGMENTATION_PIXEL_FORMAT_RGBA8"
+    "\020\002\022#\n\037SEGMENTATION_PIXEL_FORMAT_BGRA8\020\003B"
+    "\214\001\n\027ai.runanywhere.proto.v1B\021Segmentatio"
+    "nProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_segmentation_2eproto_deps[1] = {
@@ -1024,7 +1036,7 @@ static ::absl::once_flag descriptor_table_segmentation_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_segmentation_2eproto = {
     false,
     false,
-    1206,
+    1230,
     descriptor_table_protodef_segmentation_2eproto,
     "segmentation.proto",
     &descriptor_table_segmentation_2eproto_once,
@@ -1887,9 +1899,9 @@ SegmentationClassSummary::SegmentationClassSummary(
                offsetof(Impl_, pixel_count_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, pixel_count_),
-           offsetof(Impl_, class_id_) -
+           offsetof(Impl_, fraction_) -
                offsetof(Impl_, pixel_count_) +
-               sizeof(Impl_::class_id_));
+               sizeof(Impl_::fraction_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SegmentationClassSummary)
 }
@@ -1904,9 +1916,9 @@ inline void SegmentationClassSummary::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, pixel_count_),
            0,
-           offsetof(Impl_, class_id_) -
+           offsetof(Impl_, fraction_) -
                offsetof(Impl_, pixel_count_) +
-               sizeof(Impl_::class_id_));
+               sizeof(Impl_::fraction_));
 }
 SegmentationClassSummary::~SegmentationClassSummary() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SegmentationClassSummary)
@@ -1960,10 +1972,10 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     _impl_.label_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
     ::memset(&_impl_.pixel_count_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.class_id_) -
-        reinterpret_cast<char*>(&_impl_.pixel_count_)) + sizeof(_impl_.class_id_));
+        reinterpret_cast<char*>(&_impl_.fraction_) -
+        reinterpret_cast<char*>(&_impl_.pixel_count_)) + sizeof(_impl_.fraction_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2016,6 +2028,15 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
     }
   }
 
+  // float fraction = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_fraction()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          5, this_._internal_fraction(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -2041,7 +2062,7 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     // string label = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_label().empty()) {
@@ -2063,6 +2084,12 @@ PROTOBUF_NOINLINE void SegmentationClassSummary::Clear() {
             this_._internal_class_id());
       }
     }
+    // float fraction = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_fraction()) != 0) {
+        total_size += 5;
+      }
+    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -2081,7 +2108,7 @@ void SegmentationClassSummary::MergeImpl(::google::protobuf::MessageLite& to_msg
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_label().empty()) {
         _this->_internal_set_label(from._internal_label());
@@ -2099,6 +2126,11 @@ void SegmentationClassSummary::MergeImpl(::google::protobuf::MessageLite& to_msg
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_class_id() != 0) {
         _this->_impl_.class_id_ = from._impl_.class_id_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_fraction()) != 0) {
+        _this->_impl_.fraction_ = from._impl_.fraction_;
       }
     }
   }
@@ -2123,8 +2155,8 @@ void SegmentationClassSummary::InternalSwap(SegmentationClassSummary* PROTOBUF_R
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.label_, &other->_impl_.label_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.class_id_)
-      + sizeof(SegmentationClassSummary::_impl_.class_id_)
+      PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.fraction_)
+      + sizeof(SegmentationClassSummary::_impl_.fraction_)
       - PROTOBUF_FIELD_OFFSET(SegmentationClassSummary, _impl_.pixel_count_)>(
           reinterpret_cast<char*>(&_impl_.pixel_count_),
           reinterpret_cast<char*>(&other->_impl_.pixel_count_));

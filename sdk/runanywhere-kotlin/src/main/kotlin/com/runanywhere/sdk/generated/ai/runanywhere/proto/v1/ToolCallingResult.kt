@@ -109,6 +109,18 @@ public class ToolCallingResult(
     schemaIndex = 8,
   )
   public val usage: TokenUsage? = null,
+  /**
+   * Terminal reason for the last model turn the loop observed. Never inferred
+   * from tool_calls.size(); UNSPECIFIED when the producer gave no signal.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.FinishReason#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "finishReason",
+    schemaIndex = 9,
+  )
+  public val finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -154,6 +166,7 @@ public class ToolCallingResult(
     if (error_code != other.error_code) return false
     if (thinking_content != other.thinking_content) return false
     if (usage != other.usage) return false
+    if (finish_reason != other.finish_reason) return false
     return true
   }
 
@@ -170,6 +183,7 @@ public class ToolCallingResult(
       result = result * 37 + error_code.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + (usage?.hashCode() ?: 0)
+      result = result * 37 + finish_reason.hashCode()
       super.hashCode = result
     }
     return result
@@ -186,6 +200,7 @@ public class ToolCallingResult(
     result += """error_code=$error_code"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     if (usage != null) result += """usage=$usage"""
+    result += """finish_reason=$finish_reason"""
     return result.joinToString(prefix = "ToolCallingResult{", separator = ", ", postfix = "}")
   }
 
@@ -199,8 +214,9 @@ public class ToolCallingResult(
     error_code: Int = this.error_code,
     thinking_content: String? = this.thinking_content,
     usage: TokenUsage? = this.usage,
+    finish_reason: FinishReason = this.finish_reason,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, iterations_used, error_message, error_code, thinking_content, usage, unknownFields)
+  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, iterations_used, error_message, error_code, thinking_content, usage, finish_reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -233,6 +249,9 @@ public class ToolCallingResult(
         if (value.usage != null) {
           size += TokenUsage.ADAPTER.encodedSizeWithTag(9, value.usage)
         }
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          size += FinishReason.ADAPTER.encodedSizeWithTag(10, value.finish_reason)
+        }
         return size
       }
 
@@ -256,11 +275,17 @@ public class ToolCallingResult(
         if (value.usage != null) {
           TokenUsage.ADAPTER.encodeWithTag(writer, 9, value.usage)
         }
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 10, value.finish_reason)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 10, value.finish_reason)
+        }
         if (value.usage != null) {
           TokenUsage.ADAPTER.encodeWithTag(writer, 9, value.usage)
         }
@@ -292,6 +317,7 @@ public class ToolCallingResult(
         var error_code: Int = 0
         var thinking_content: String? = null
         var usage: TokenUsage? = null
+        var finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -303,6 +329,11 @@ public class ToolCallingResult(
             7 -> error_code = ProtoAdapter.INT32.decode(reader)
             8 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             9 -> usage = TokenUsage.ADAPTER.decode(reader)
+            10 -> try {
+              finish_reason = FinishReason.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -316,6 +347,7 @@ public class ToolCallingResult(
           error_code = error_code,
           thinking_content = thinking_content,
           usage = usage,
+          finish_reason = finish_reason,
           unknownFields = unknownFields
         )
       }

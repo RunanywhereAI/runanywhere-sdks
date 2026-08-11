@@ -88,6 +88,7 @@ extern "C" const rac_llm_service_ops_t g_probe_llm_ops = {
     .generate_from_context = nullptr,
     .clear_context = nullptr,
     .create = probe_engine_create,
+    .get_stream_token_counts = nullptr,
 };
 
 const rac_runtime_id_t k_probe_runtimes[] = {RAC_RUNTIME_CPU};

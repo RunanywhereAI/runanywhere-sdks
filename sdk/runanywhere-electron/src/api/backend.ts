@@ -246,6 +246,16 @@ export interface RaBackend {
   downloadProgress(requestBytes: Uint8Array): Promise<Uint8Array>;
   /** Purge terminal task slots; resolves the number commons erased. */
   downloadCleanup(): Promise<number>;
+  /**
+   * Sync `rac_download_progress_percent`. NativeBackend calls the C ABI;
+   * RpcBackend prefers overall_progress when valid and never invents a
+   * bytes-first percent (renderer has no sync commons FFI).
+   */
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number;
   downloadWatch(onProgress: (progressBytes: Uint8Array) => void): Promise<void>;
   downloadUnwatch(): Promise<void>;
 

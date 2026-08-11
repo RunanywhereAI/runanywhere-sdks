@@ -46,6 +46,7 @@ public class StructuredOutputOptions(
   public val include_schema_in_prompt: Boolean? = null,
   /**
    * A JSON Schema document, verbatim. Unsupported keywords are rejected.
+   * Commons compiles this to GBNF on the generate path (mode permitting).
    */
   @field:WireField(
     tag = 2,
@@ -74,6 +75,15 @@ public class StructuredOutputOptions(
     schemaIndex = 3,
   )
   public val regex: String? = null,
+  /**
+   * Unset = CONSTRAINED when a constraint arm is present, else free text.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.StructuredOutputMode#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val mode: StructuredOutputMode? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputOptions, Nothing>(ADAPTER, unknownFields) {
   init {
@@ -96,6 +106,7 @@ public class StructuredOutputOptions(
     if (schema != other.schema) return false
     if (grammar != other.grammar) return false
     if (regex != other.regex) return false
+    if (mode != other.mode) return false
     return true
   }
 
@@ -107,6 +118,7 @@ public class StructuredOutputOptions(
       result = result * 37 + (schema?.hashCode() ?: 0)
       result = result * 37 + (grammar?.hashCode() ?: 0)
       result = result * 37 + (regex?.hashCode() ?: 0)
+      result = result * 37 + (mode?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -118,6 +130,7 @@ public class StructuredOutputOptions(
     if (schema != null) result += """schema=${sanitize(schema)}"""
     if (grammar != null) result += """grammar=${sanitize(grammar)}"""
     if (regex != null) result += """regex=${sanitize(regex)}"""
+    if (mode != null) result += """mode=$mode"""
     return result.joinToString(prefix = "StructuredOutputOptions{", separator = ", ", postfix = "}")
   }
 
@@ -126,8 +139,9 @@ public class StructuredOutputOptions(
     schema: String? = this.schema,
     grammar: String? = this.grammar,
     regex: String? = this.regex,
+    mode: StructuredOutputMode? = this.mode,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputOptions = StructuredOutputOptions(include_schema_in_prompt, schema, grammar, regex, unknownFields)
+  ): StructuredOutputOptions = StructuredOutputOptions(include_schema_in_prompt, schema, grammar, regex, mode, unknownFields)
 
   public companion object {
     @JvmField
@@ -146,11 +160,13 @@ public class StructuredOutputOptions(
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.schema)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.grammar)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.regex)
+        size += StructuredOutputMode.ADAPTER.encodedSizeWithTag(5, value.mode)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: StructuredOutputOptions) {
         ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.include_schema_in_prompt)
+        StructuredOutputMode.ADAPTER.encodeWithTag(writer, 5, value.mode)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.grammar)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex)
@@ -162,6 +178,7 @@ public class StructuredOutputOptions(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.grammar)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.schema)
+        StructuredOutputMode.ADAPTER.encodeWithTag(writer, 5, value.mode)
         ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.include_schema_in_prompt)
       }
 
@@ -170,12 +187,18 @@ public class StructuredOutputOptions(
         var schema: String? = null
         var grammar: String? = null
         var regex: String? = null
+        var mode: StructuredOutputMode? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> include_schema_in_prompt = ProtoAdapter.BOOL.decode(reader)
             2 -> schema = ProtoAdapter.STRING.decode(reader)
             3 -> grammar = ProtoAdapter.STRING.decode(reader)
             4 -> regex = ProtoAdapter.STRING.decode(reader)
+            5 -> try {
+              mode = StructuredOutputMode.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -184,6 +207,7 @@ public class StructuredOutputOptions(
           schema = schema,
           grammar = grammar,
           regex = regex,
+          mode = mode,
           unknownFields = unknownFields
         )
       }

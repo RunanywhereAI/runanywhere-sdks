@@ -321,13 +321,13 @@ typedef struct rac_model_info {
     /** Model source */
     rac_model_source_t source;
 
-    /** Created timestamp (Unix timestamp) */
+    /** Created timestamp (Unix epoch milliseconds; mirrors created_at_unix_ms) */
     int64_t created_at;
 
-    /** Updated timestamp (Unix timestamp) */
+    /** Updated timestamp (Unix epoch milliseconds; mirrors updated_at_unix_ms) */
     int64_t updated_at;
 
-    /** Last used timestamp (0 if never used) */
+    /** Last used timestamp in Unix epoch milliseconds (0 if never used) */
     int64_t last_used;
 
     /** Usage count */

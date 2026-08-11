@@ -730,12 +730,14 @@ private final class MLXSession: @unchecked Sendable {
         let input = llmUserInput(prompt: prompt, options: options)
         let metrics = try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
-            return token.withCString { callback($0, RAC_FALSE, nil, userData.rawValue) == RAC_TRUE }
+            return token.withCString {
+                callback($0, RAC_FALSE, nil, /*tokens_in_delta*/ 1, userData.rawValue) == RAC_TRUE
+            }
         }
         if let callback {
             _ = "stop".withCString { reason in
                 "".withCString { empty in
-                    callback(empty, RAC_TRUE, reason, userData.rawValue)
+                    callback(empty, RAC_TRUE, reason, /*tokens_in_delta*/ 0, userData.rawValue)
                 }
             }
         }
@@ -1782,7 +1784,8 @@ private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = { handle, pro
             userData: callbackUserData
         )
     }) {
-    case .success:
+    case .success(let metrics):
+        rac_mlx_note_stream_token_counts(Int32(metrics.promptTokens), Int32(metrics.completionTokens))
         return RAC_SUCCESS
     case .failure(let error):
         if error is CancellationError {

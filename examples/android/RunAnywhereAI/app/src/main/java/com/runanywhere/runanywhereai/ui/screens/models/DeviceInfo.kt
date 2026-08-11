@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
+import ai.runanywhere.proto.v1.HexagonArch
 import android.os.Build
+import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import java.io.File
 
 // Coarse hardware capability bucket used to size model recommendations. Resolved
@@ -30,17 +32,16 @@ data class DeviceInfo(
         private const val HIGH_END_MEMORY_MB = 7_500L
         private const val MID_RANGE_MEMORY_MB = 3_500L
 
-        // Device info is a UI display concern, not SDK business logic, so it reads
-        // Android platform APIs directly. (The SDK's hardware-profile API was removed
-        // when the routing scorer was retired — the engine router no longer needs a
-        // hardware profile, so the SDK no longer surfaces one.)
+        // Device card display: RAM from /proc/meminfo; NPU from QHexRT.probeNpu()
+        // (commons-owned Hexagon capability), not SOC_MODEL string heuristics.
         fun current(): DeviceInfo {
             val soc = socModel()
             val chip = soc?.ifBlank { null }
                 ?: Build.HARDWARE.ifBlank { null }
                 ?: "Unknown"
             val memoryMb = totalMemoryMb()
-            val npuName = detectHexagonNpu(soc)
+            val npu = runCatching { QHexRT.probeNpu() }.getOrNull()
+            val npuName = npu?.takeIf { it.supported }?.let { hexagonDisplayName(it.hexagon_arch) }
             val hasNpu = npuName != null
             return DeviceInfo(
                 model = Build.MODEL ?: "Unknown",
@@ -55,34 +56,10 @@ data class DeviceInfo(
         private fun socModel(): String? =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null
 
-        private fun socManufacturer(): String? =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER else null
-
-        // Heuristic Qualcomm Hexagon NPU detection. Device-only truth is only known at
-        // runtime — QHexRT's native bundle resolver ultimately gates real support — so
-        // this errs toward flagship Snapdragon SoCs we know ship a Hexagon v79/v81 NPU.
-        // Returns a friendly NPU name, or null when no Hexagon NPU is inferred.
-        private fun detectHexagonNpu(soc: String?): String? {
-            val manufacturer = socManufacturer()?.trim().orEmpty()
-            val isQualcomm = manufacturer.equals("QTI", ignoreCase = true) ||
-                manufacturer.equals("Qualcomm", ignoreCase = true)
-            val model = soc?.trim().orEmpty().uppercase()
-
-            // SM8xxx is the flagship Snapdragon 8-series line (e.g. SM8750 = 8 Elite,
-            // SM8850 = next-gen) — all carry a Hexagon NPU. SM7550+ high-end 7-series
-            // parts also ship a capable Hexagon, so we treat those as NPU-capable too.
-            val isFlagshipSnapdragon = model.startsWith("SM8") ||
-                model.startsWith("SM7550") || model.startsWith("SM7635")
-
-            if (!isQualcomm && !isFlagshipSnapdragon) return null
-            return hexagonNameFor(model)
-        }
-
-        private fun hexagonNameFor(socModel: String): String = when {
-            socModel.startsWith("SM8850") -> "Hexagon v81 NPU"
-            socModel.startsWith("SM8750") -> "Hexagon v79 NPU"
-            socModel.startsWith("SM8650") -> "Hexagon v75 NPU"
-            socModel.startsWith("SM8") -> "Hexagon NPU"
+        private fun hexagonDisplayName(arch: HexagonArch): String = when (arch) {
+            HexagonArch.HEXAGON_ARCH_V81 -> "Hexagon v81 NPU"
+            HexagonArch.HEXAGON_ARCH_V79 -> "Hexagon v79 NPU"
+            HexagonArch.HEXAGON_ARCH_V75 -> "Hexagon v75 NPU"
             else -> "Hexagon NPU"
         }
 

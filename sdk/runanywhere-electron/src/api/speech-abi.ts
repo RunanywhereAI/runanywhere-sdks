@@ -68,7 +68,6 @@ export function toSttRequest(
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate: SPEECH_SAMPLE_RATE,
       channels: 1,
-      durationMs: Math.round((pcm16.byteLength / 2 / SPEECH_SAMPLE_RATE) * 1000),
     },
     options: {
       language: options.language,

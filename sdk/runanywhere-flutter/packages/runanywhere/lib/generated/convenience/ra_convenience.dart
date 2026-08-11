@@ -688,14 +688,6 @@ extension LoggingConfigurationConvenience on LoggingConfiguration {
   }
 }
 
-extension LoraAdapterConfigConvenience on LoraAdapterConfig {
-  static LoraAdapterConfig defaults() {
-    final r = LoraAdapterConfig();
-    r.scale = 1.0;
-    return r;
-  }
-}
-
 extension LoraAdapterConfigValidate on LoraAdapterConfig {
   void validate() {
     if (adapterId.isEmpty) {

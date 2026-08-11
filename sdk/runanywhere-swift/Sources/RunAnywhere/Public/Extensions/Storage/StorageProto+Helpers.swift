@@ -13,20 +13,11 @@ extension RADeviceStorageInfo {
         self.totalBytes = totalBytes
         self.freeBytes = freeBytes
         self.usedBytes = usedBytes
-        // usedPercent was deleted outright (idl/storage_types.proto): it
-        // was a pure derivation of totalBytes/usedBytes with no independent
-        // wire value, so `usagePercentage` below is the sole surviving
-        // computed accessor.
     }
 
     // Aliases `totalSpace` / `freeSpace` / `usedSpace` removed — shadowed
     // the canonical proto field names (`totalBytes`/`freeBytes`/`usedBytes`)
     // without semantic value. Per swift.md SWIFT-DUP-STORAGE-ALIASES.
-
-    public var usagePercentage: Double {
-        guard totalBytes > 0 else { return 0 }
-        return Double(usedBytes) / Double(totalBytes) * 100.0
-    }
 }
 
 // MARK: - RAAppStorageInfo
@@ -60,10 +51,6 @@ extension RAStorageInfo {
         return info
     }()
 
-    public var totalModelsSizeBytes: Int64 {
-        models.reduce(0) { $0 + $1.sizeOnDiskBytes }
-    }
-
     public var appStorage: RAAppStorageInfo {
         get { app }
         set { app = newValue }
@@ -75,7 +62,7 @@ extension RAStorageInfo {
     }
 
     public var totalModelsSize: Int64 {
-        totalModelsBytes > 0 ? totalModelsBytes : totalModelsSizeBytes
+        totalModelsBytes
     }
 
     public var modelCount: Int { models.count }

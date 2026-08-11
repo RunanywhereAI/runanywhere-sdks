@@ -374,15 +374,12 @@ public struct ClassInfo: Sendable {
     public let pixelCount: Int
     public let fraction: Float
 
-    // RASegmentationClassSummary.fraction was deleted outright
-    // (idl/segmentation.proto: class_id/pixel_count/label only) with no
-    // replacement field. Derive it locally from the mask's total pixel
-    // count instead of dropping it from the public surface.
-    init(proto: RASegmentationClassSummary, totalPixels: Int) {
+    // Commons owns SegmentationClassSummary.fraction (idl tag 5).
+    init(proto: RASegmentationClassSummary) {
         self.classId = Int(proto.classID)
         self.label = proto.label
         self.pixelCount = Int(proto.pixelCount)
-        self.fraction = totalPixels > 0 ? Float(proto.pixelCount) / Float(totalPixels) : 0
+        self.fraction = proto.fraction
     }
 }
 
@@ -398,8 +395,7 @@ public struct SegmentationResult: Sendable {
         self.classMask = proto.classMaskU16Le
         self.width = Int(proto.width)
         self.height = Int(proto.height)
-        let totalPixels = Int(proto.width) * Int(proto.height)
-        self.classes = proto.classSummaries.map { ClassInfo(proto: $0, totalPixels: totalPixels) }
+        self.classes = proto.classSummaries.map { ClassInfo(proto: $0) }
     }
 }
 

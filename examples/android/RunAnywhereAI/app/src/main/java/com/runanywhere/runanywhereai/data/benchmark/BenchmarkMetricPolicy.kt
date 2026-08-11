@@ -5,10 +5,10 @@ import com.runanywhere.sdk.public.api.GenerationResult
 /**
  * Converts the SDK generation result into benchmark metrics.
  *
- * The result's generated-token count is authoritative and is never replaced with
- * a chunk count or text-length estimate. The SDK metrics block reports
- * throughput and time-to-first-token; prompt-eval and decode durations are
- * recovered from those two identities.
+ * Token counts, decode throughput, and TTFT come from commons via
+ * [GenerationResult]. Prefill and decode phase durations are not on the public
+ * result yet — leave them unset rather than aliasing TTFT or reconstructing
+ * decode_ms from tokens÷rate (prefill_ms ≠ ttft_ms).
  */
 internal fun llmBenchmarkMetrics(
     result: GenerationResult,
@@ -21,7 +21,6 @@ internal fun llmBenchmarkMetrics(
     require(outputTokens > 0) { "LLM benchmark produced zero output tokens" }
 
     val tokensPerSecond = result.tokensPerSecond.toDouble().takeIf { it > 0 }
-        ?: (outputTokens * 1000.0 / measuredEndToEndMs).takeIf { measuredEndToEndMs > 0 }
     require(tokensPerSecond != null && tokensPerSecond.isFinite() && tokensPerSecond > 0) {
         "LLM benchmark did not report usable decode throughput"
     }
@@ -35,8 +34,8 @@ internal fun llmBenchmarkMetrics(
         ttftMs = ttftMs,
         inputTokens = result.inputTokens.takeIf { it > 0 },
         outputTokens = outputTokens,
-        promptEvalMs = ttftMs,
-        decodeMs = outputTokens * 1000.0 / tokensPerSecond,
+        promptEvalMs = null,
+        decodeMs = null,
         memoryDeltaBytes = memoryDeltaBytes,
     )
 }

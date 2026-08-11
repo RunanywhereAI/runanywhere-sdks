@@ -85,9 +85,24 @@ public nonisolated struct RAThinkingTagPattern: Sendable {
   /// Empty defaults to "</think>".
   public var closeTag: String = String()
 
+  /// When true, the model's generation template already emits the open tag
+  /// (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+  /// starts inside reasoning and commons must not arm the bounded hold.
+  /// optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+  public var templatePrefillsOpenTag: Bool {
+    get {_templatePrefillsOpenTag ?? false}
+    set {_templatePrefillsOpenTag = newValue}
+  }
+  /// Returns true if `templatePrefillsOpenTag` has been explicitly set.
+  public var hasTemplatePrefillsOpenTag: Bool {self._templatePrefillsOpenTag != nil}
+  /// Clears the value of `templatePrefillsOpenTag`. Subsequent reads from it will return its default value.
+  public mutating func clearTemplatePrefillsOpenTag() {self._templatePrefillsOpenTag = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _templatePrefillsOpenTag: Bool? = nil
 }
 
 public nonisolated struct RAReasoningOptions: Sendable {
@@ -128,7 +143,7 @@ nonisolated extension RAReasoningMode: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RAThinkingTagPattern: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ThinkingTagPattern"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}open_tag\0\u{3}close_tag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}open_tag\0\u{3}close_tag\0\u{3}template_prefills_open_tag\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -138,24 +153,33 @@ nonisolated extension RAThinkingTagPattern: SwiftProtobuf.Message, SwiftProtobuf
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.openTag) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.closeTag) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._templatePrefillsOpenTag) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.openTag.isEmpty {
       try visitor.visitSingularStringField(value: self.openTag, fieldNumber: 1)
     }
     if !self.closeTag.isEmpty {
       try visitor.visitSingularStringField(value: self.closeTag, fieldNumber: 2)
     }
+    try { if let v = self._templatePrefillsOpenTag {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAThinkingTagPattern, rhs: RAThinkingTagPattern) -> Bool {
     if lhs.openTag != rhs.openTag {return false}
     if lhs.closeTag != rhs.closeTag {return false}
+    if lhs._templatePrefillsOpenTag != rhs._templatePrefillsOpenTag {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

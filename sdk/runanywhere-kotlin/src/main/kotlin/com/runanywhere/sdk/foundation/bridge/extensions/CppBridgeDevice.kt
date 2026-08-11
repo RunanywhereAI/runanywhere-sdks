@@ -106,7 +106,8 @@ object CppBridgeDevice {
 
         fun getTotalMemory(): Long
 
-        fun getAvailableMemory(): Long = getTotalMemory() / 2
+        /** 0 = UNKNOWN (idl/device_info.proto). Never invent half of total RAM. */
+        fun getAvailableMemory(): Long = 0L
 
         fun hasNeuralEngine(): Boolean = false
 
@@ -122,10 +123,11 @@ object CppBridgeDevice {
 
         fun getCoreCount(): Int
 
-        fun getPerformanceCores(): Int = getCoreCount() / 2
+        /** 0 = UNKNOWN. Never invent a half/half P/E split. */
+        fun getPerformanceCores(): Int = 0
 
-        fun getEfficiencyCores(): Int = getCoreCount() - getPerformanceCores()
-    }
+        /** 0 = UNKNOWN. DeviceInfo has no efficiency_cores wire field today. */
+        fun getEfficiencyCores(): Int = 0
 
     // Public API
 

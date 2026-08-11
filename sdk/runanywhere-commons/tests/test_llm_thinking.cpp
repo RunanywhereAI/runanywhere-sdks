@@ -675,9 +675,11 @@ int test_declared_pattern_without_reasoning_keeps_the_whole_answer() {
 }
 
 int test_start_inside_reasoning_is_the_assertion_that_loses_the_answer() {
-    // Pins WHY the wiring no longer calls this on a declared pattern. The
-    // splitter is not wrong here — the caller would be. Kept as an executable
-    // statement of the failure mode so nobody re-derives it in production.
+    // Pins WHY the wiring must not call this on a mere declared pattern: the
+    // splitter is not wrong here — the caller would be. Production calls
+    // start_inside_reasoning() only when template_prefills_open_tag is set.
+    // Kept as an executable statement of the failure mode so nobody re-derives
+    // it by keying on supports_thinking / tag presence alone.
     rac::llm::ThinkingStreamSplitter splitter;
     splitter.start_inside_reasoning();
     std::vector<rac::llm::ThinkingStreamSegment> segments;
@@ -881,6 +883,8 @@ int test_metrics_known_timings() {
     rac::llm::StreamTimingMetrics m = rac::llm::compute_stream_timing(t);
     ASSERT_EQ_INT(static_cast<int>(m.wall_ms), 3100);
     ASSERT_EQ_INT(static_cast<int>(m.ttft_ms), 500);
+    // Prefill is unobserved here — must NOT alias TTFT (M2).
+    ASSERT_EQ_INT(static_cast<int>(m.prefill_ms), 0);
     // The number the old code called TTFT — and the reason its rate read 20x
     // high, since it then used (total − this) as the decode window.
     ASSERT_EQ_INT(static_cast<int>(m.time_to_first_content_token_ms), 2000);
@@ -893,6 +897,12 @@ int test_metrics_known_timings() {
     // content tokens over 1.0 s = (5 − 1) / 1.0 = 4.0.
     rac::llm::set_content_rate(&m, t, 5);
     ASSERT_EQ_INT(static_cast<int>(m.content_tokens_per_second * 100.0 + 0.5), 400);
+
+    // Engine-reported prefill is honored when present.
+    t.engine_prefill_ms = 420;
+    m = rac::llm::compute_stream_timing(t);
+    ASSERT_EQ_INT(static_cast<int>(m.prefill_ms), 420);
+    ASSERT_EQ_INT(static_cast<int>(m.ttft_ms), 500);
     return 0;
 }
 
@@ -952,8 +962,10 @@ int test_metrics_reasoning_only_reports_no_content_time() {
     return 0;
 }
 
-int test_metrics_batch_buffered_falls_back_to_wall_clock() {
-    // A backend that releases every delta at once has no real decode window.
+int test_metrics_batch_buffered_flag_does_not_flip_rate() {
+    // A short decode window is flagged batch_buffered, but the rate still uses
+    // the decode window (N-1)/decode_ms. Flipping to wall used to produce a
+    // 17.4× discontinuity across the threshold (C4).
     rac::llm::StreamTokenTiming t;
     t.started_ms = 0;
     t.first_token_ms = 4000;
@@ -964,9 +976,38 @@ int test_metrics_batch_buffered_falls_back_to_wall_clock() {
 
     rac::llm::StreamTimingMetrics m = rac::llm::compute_stream_timing(t);
     ASSERT_EQ_INT(m.batch_buffered ? 1 : 0, 1);
-    // 40 tokens over 4.02 s ≈ 9.95 — errs LOW, the safe direction for a floor.
-    // Over the 10 ms window it would have claimed 3900 tok/s.
-    ASSERT_EQ_INT(static_cast<int>(m.decode_tokens_per_second * 100.0 + 0.5), 995);
+    // (40 − 1) tokens over 0.010 s = 3900. Flag is informational only.
+    ASSERT_EQ_INT(static_cast<int>(m.decode_tokens_per_second + 0.5), 3900);
+    return 0;
+}
+
+int test_metrics_decode_ms_49_50_is_continuous() {
+    // The old formula flipped both numerator and denominator at the
+    // batch_buffered threshold: decode_ms=49 → ~35 tok/s, decode_ms=50 → ~620.
+    // After the fix the rate is continuous in decode_ms.
+    rac::llm::StreamTokenTiming base;
+    base.started_ms = 0;
+    base.first_token_ms = 100;
+    base.first_content_token_ms = 100;
+    base.completed_ms = 1000;
+    base.total_tokens = 32;
+
+    base.last_token_ms = base.first_token_ms + 49;
+    rac::llm::StreamTimingMetrics a = rac::llm::compute_stream_timing(base);
+    base.last_token_ms = base.first_token_ms + 50;
+    rac::llm::StreamTimingMetrics b = rac::llm::compute_stream_timing(base);
+
+    ASSERT_EQ_INT(static_cast<int>(a.decode_ms), 49);
+    ASSERT_EQ_INT(static_cast<int>(b.decode_ms), 50);
+    // (32-1)/0.049 ≈ 632.65; (32-1)/0.050 = 620. Ratio ~1.02, not 17×.
+    const double ratio = a.decode_tokens_per_second / b.decode_tokens_per_second;
+    if (ratio < 1.0 || ratio > 1.05) {
+        std::fprintf(stderr,
+                     "ASSERT FAIL @ %s:%d: rate discontinuity ratio %.4f (a=%.2f b=%.2f)\n",
+                     __FILE__, __LINE__, ratio, a.decode_tokens_per_second,
+                     b.decode_tokens_per_second);
+        return 1;
+    }
     return 0;
 }
 
@@ -1024,7 +1065,8 @@ int main() {
     RUN(test_metrics_single_token_does_not_divide_by_zero);
     RUN(test_metrics_no_reasoning_content_time_equals_ttft);
     RUN(test_metrics_reasoning_only_reports_no_content_time);
-    RUN(test_metrics_batch_buffered_falls_back_to_wall_clock);
+    RUN(test_metrics_batch_buffered_flag_does_not_flip_rate);
+    RUN(test_metrics_decode_ms_49_50_is_continuous);
     RUN(test_strip_multiple_blocks);
     RUN(test_strip_prefilled_open_tag_region);
     RUN(test_strip_never_leaves_a_bare_close_tag);

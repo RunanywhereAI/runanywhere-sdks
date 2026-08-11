@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "features/llm/json_schema_to_gbnf_internal.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/structured_output_internal.h"
@@ -994,6 +995,12 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
         }
         if (options.has_grammar() && !options.grammar().empty()) {
             result.set_grammar(options.grammar());
+        } else if (options.has_schema() && !options.schema().empty()) {
+            std::string gbnf;
+            std::string err;
+            if (rac::llm::json_schema_to_gbnf(options.schema(), &gbnf, &err) && !gbnf.empty()) {
+                result.set_grammar(gbnf);
+            }
         }
     }
 

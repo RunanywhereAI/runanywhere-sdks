@@ -163,7 +163,8 @@ static rac_result_t llamacpp_vtable_generate(void* impl, const char* prompt,
 // rac/plugin/rac_stream_adapter.h).
 using StreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;
 
-static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final, void* ctx) {
+static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final,
+                                          int32_t tokens_in_delta, void* ctx) {
     auto* adapter = static_cast<StreamAdapter*>(ctx);
     // Forward is_final + OpenAI-style finish_reason on the widened commons
     // callback. Keep the side channel as a belt-and-suspenders signal for
@@ -173,7 +174,7 @@ static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final
     }
     if (adapter && adapter->callback) {
         const char* reason = is_final ? "stop" : nullptr;
-        return adapter->callback(token, is_final, reason, adapter->user_data);
+        return adapter->callback(token, is_final, reason, tokens_in_delta, adapter->user_data);
     }
     return RAC_TRUE;
 }
@@ -276,6 +277,11 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
     return rac_llm_llamacpp_clear_context(legacy_handle(impl));
 }
 
+static rac_result_t llamacpp_vtable_get_stream_token_counts(void* impl,
+                                                            rac_llm_token_counts_t* out) {
+    return rac_llm_llamacpp_get_stream_token_counts(legacy_handle(impl), out);
+}
+
 // Static vtable for LlamaCpp
 //
 // This ops-struct is now also consumed by the unified engine
@@ -360,6 +366,7 @@ extern "C" const rac_llm_service_ops_t g_llamacpp_ops = {
     .generate_from_context = llamacpp_vtable_generate_from_context,
     .clear_context = llamacpp_vtable_clear_context,
     .create = llamacpp_llm_create_impl,
+    .get_stream_token_counts = llamacpp_vtable_get_stream_token_counts,
 };
 
 namespace {  // reopen for the next batch of static helpers

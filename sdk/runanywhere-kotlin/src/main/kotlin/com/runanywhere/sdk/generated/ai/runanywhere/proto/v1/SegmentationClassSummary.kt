@@ -22,6 +22,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -34,7 +35,7 @@ import okio.ByteString
  * SegmentationResult.height). Commons rejects any result whose pixel_counts
  * do not sum to that product before encoding it into a SegmentationResult, so
  * within this message the summaries partition the image and the division is
- * exact.
+ * exact. `fraction` is that share, computed once by commons (tag 5).
  */
 public class SegmentationClassSummary(
   @field:WireField(
@@ -60,6 +61,17 @@ public class SegmentationClassSummary(
     schemaIndex = 2,
   )
   public val label: String = "",
+  /**
+   * Dimensionless coverage in \[0.0, 1.0\]. Equals pixel_count / (width*height).
+   * Zero when width or height is zero (rejected upstream before encode).
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val fraction: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SegmentationClassSummary, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -75,6 +87,7 @@ public class SegmentationClassSummary(
     if (class_id != other.class_id) return false
     if (pixel_count != other.pixel_count) return false
     if (label != other.label) return false
+    if (fraction != other.fraction) return false
     return true
   }
 
@@ -85,6 +98,7 @@ public class SegmentationClassSummary(
       result = result * 37 + class_id.hashCode()
       result = result * 37 + pixel_count.hashCode()
       result = result * 37 + label.hashCode()
+      result = result * 37 + fraction.hashCode()
       super.hashCode = result
     }
     return result
@@ -95,6 +109,7 @@ public class SegmentationClassSummary(
     result += """class_id=$class_id"""
     result += """pixel_count=$pixel_count"""
     result += """label=${sanitize(label)}"""
+    result += """fraction=$fraction"""
     return result.joinToString(prefix = "SegmentationClassSummary{", separator = ", ", postfix = "}")
   }
 
@@ -102,8 +117,9 @@ public class SegmentationClassSummary(
     class_id: Int = this.class_id,
     pixel_count: Long = this.pixel_count,
     label: String = this.label,
+    fraction: Float = this.fraction,
     unknownFields: ByteString = this.unknownFields,
-  ): SegmentationClassSummary = SegmentationClassSummary(class_id, pixel_count, label, unknownFields)
+  ): SegmentationClassSummary = SegmentationClassSummary(class_id, pixel_count, label, fraction, unknownFields)
 
   public companion object {
     @JvmField
@@ -127,6 +143,9 @@ public class SegmentationClassSummary(
         if (value.label != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.label)
         }
+        if (!value.fraction.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.fraction)
+        }
         return size
       }
 
@@ -140,11 +159,17 @@ public class SegmentationClassSummary(
         if (value.label != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.label)
         }
+        if (!value.fraction.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.fraction)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SegmentationClassSummary) {
         writer.writeBytes(value.unknownFields)
+        if (!value.fraction.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.fraction)
+        }
         if (value.label != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.label)
         }
@@ -160,11 +185,13 @@ public class SegmentationClassSummary(
         var class_id: Int = 0
         var pixel_count: Long = 0L
         var label: String = ""
+        var fraction: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> class_id = ProtoAdapter.UINT32.decode(reader)
             2 -> pixel_count = ProtoAdapter.UINT64.decode(reader)
             3 -> label = ProtoAdapter.STRING.decode(reader)
+            5 -> fraction = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -172,6 +199,7 @@ public class SegmentationClassSummary(
           class_id = class_id,
           pixel_count = pixel_count,
           label = label,
+          fraction = fraction,
           unknownFields = unknownFields
         )
       }

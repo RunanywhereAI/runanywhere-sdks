@@ -24,8 +24,6 @@ import ai.runanywhere.proto.v1.DiarizationResult as ProtoDiarizationResult
 import ai.runanywhere.proto.v1.LoraState as ProtoLoraState
 import ai.runanywhere.proto.v1.SegmentationResult as ProtoSegmentationResult
 
-private const val MILLIS_PER_SECOND = 1_000.0
-
 /** Maps a generated [ai.runanywhere.proto.v1.FinishReason] onto the v3 [FinishReason]. */
 internal fun finishReasonOf(raw: ai.runanywhere.proto.v1.FinishReason): FinishReason =
     when (raw) {
@@ -110,10 +108,13 @@ internal fun STTServiceState.toSttState(): SttState =
         languages = supported_language_codes,
     )
 
+@Suppress("UNUSED_PARAMETER")
 internal fun TTSOutput.toAudio(fallbackSampleRate: Int): Audio =
     Audio(
         data = audio_data.toByteArray(),
-        sampleRate = if (sample_rate > 0) sample_rate else fallbackSampleRate,
+        // Commons always populates TTSOutput.sample_rate on success; surface 0
+        // when absent — never substitute the caller's request rate.
+        sampleRate = sample_rate,
         format = audio_format,
         durationMs = duration_ms,
     )
@@ -145,17 +146,15 @@ internal fun VADResult.toVadResult(): VadResult =
     )
 
 internal fun EmbeddingsResult.toEmbeddings(): List<Embedding> =
-    vectors.mapIndexed { position, vector ->
+    vectors.map { vector ->
         Embedding(
-            index = if (vector.input_index > 0) vector.input_index else position,
+            index = vector.input_index,
             vector = vector.values.toFloatArray(),
         )
     }
 
 internal fun RerankResult.toRankedResults(): List<RankedResult> =
-    items
-        .map { RankedResult(index = it.index.toInt(), relevanceScore = it.relevance_score) }
-        .sortedByDescending { it.relevanceScore }
+    items.map { RankedResult(index = it.index.toInt(), relevanceScore = it.relevance_score) }
 
 /**
  * `DiffusionResult` was reshaped from a flat width/height/imageData/
@@ -186,7 +185,7 @@ internal fun ProtoDiarizationResult.toDiarizationResult(): DiarizationResult =
         segments =
             segments.map { segment ->
                 SpeakerSegment(
-                    speakerId = segment.speaker_id.ifEmpty { "speaker_${segment.speaker_index}" },
+                    speakerId = segment.speaker_id,
                     startMs = segment.start_ms,
                     endMs = segment.end_ms,
                 )
@@ -205,7 +204,8 @@ internal fun ProtoSegmentationResult.toSegmentationResult(): SegmentationResult 
                     classId = summary.class_id,
                     label = summary.label,
                     pixelCount = summary.pixel_count,
-                    fraction = 0f,
+                    // Commons owns SegmentationClassSummary.fraction (tag 5).
+                    fraction = summary.fraction,
                 )
             },
         diagnosticImage = diagnostic_rgba?.toByteArray(),
@@ -218,24 +218,21 @@ internal fun RAGSearchResult.toMatch(): Match =
         metadata = metadata,
     )
 
-internal fun RAGResult.toRagResult(model: String): RagResult {
-    val generationSeconds = generation_time_ms.toDouble() / MILLIS_PER_SECOND
-    return RagResult(
+internal fun RAGResult.toRagResult(model: String): RagResult =
+    RagResult(
         answer = answer,
         sources = retrieved_chunks.map { it.toMatch() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
-        timeToFirstTokenMs = retrieval_time_ms,
-        tokensPerSecond =
-            if (generationSeconds > 0.0) {
-                ((usage?.output_tokens ?: 0) / generationSeconds).toFloat()
-            } else {
-                0f
-            },
+        // Never map retrieval_time_ms into TTFT — different quantity. Surface
+        // usage.ttft_ms when commons populates it; otherwise 0 (absence).
+        timeToFirstTokenMs = usage?.ttft_ms ?: 0L,
+        // Never recompute tok/s from generation_time_ms. Prefer commons'
+        // decode_tokens_per_second; 0 means absent (rag_backend currently zeroes it).
+        tokensPerSecond = (usage?.decode_tokens_per_second ?: 0.0).toFloat(),
         requestId = request_id,
         model = model,
     )
-}
 
 internal fun RAGStatistics.toRagStats(): RagStats =
     RagStats(

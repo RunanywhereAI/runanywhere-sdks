@@ -443,13 +443,13 @@ class SttViewModel : ViewModel() {
         )
         val elapsed = System.currentTimeMillis() - started
         val text = output.text.trim()
+        // STTOutput.duration_ms is populated for every non-empty buffer; never
+        // re-derive length from PCM bytes when the commons field is absent.
         val audioMs = output.durationMs.takeIf { it > 0 }
-            ?: (audio.size.toLong() / (AudioRecorder.SAMPLE_RATE * 2L / 1000L))
-        val processingMs = elapsed
         metrics = SttMetrics(
-            audioSec = audioMs / 1000.0,
-            processingMs = processingMs,
-            realTimeFactor = if (audioMs > 0) processingMs.toDouble() / audioMs else null,
+            audioSec = (audioMs ?: 0L) / 1000.0,
+            processingMs = elapsed,
+            realTimeFactor = audioMs?.let { elapsed.toDouble() / it },
             words = text.split(Regex("\\s+")).count { it.isNotBlank() },
         )
         text

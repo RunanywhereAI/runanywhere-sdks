@@ -25,6 +25,13 @@ struct LifecycleLlmRef {
      * no-op, it is unexplained text in the prompt.
      */
     bool supports_thinking = false;
+    /**
+     * True when ModelInfo.thinking_pattern.template_prefills_open_tag is set:
+     * the chat template already emitted the opening think tag into the prompt
+     * (qhexrt gen_prefill / DeepSeek-R1-Distill heuristic), so the stream
+     * begins inside reasoning.
+     */
+    bool template_prefills_open_tag = false;
     void* opaque = nullptr;
 };
 

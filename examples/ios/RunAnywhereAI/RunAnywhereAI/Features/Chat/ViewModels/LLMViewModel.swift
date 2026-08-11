@@ -80,8 +80,6 @@ final class LLMViewModel {
     var generationCancellable: AnyCancellable?
     /// Keeps the header's copy of the chat's name in step with the store's.
     var storedTitleCancellable: AnyCancellable?
-    private var firstTokenLatencies: [String: Double] = [:]
-    private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
     var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
     /// RAG session backing the chat's document questions. Held open across turns
     /// for the same document/model triple and closed before a new one opens.
@@ -101,11 +99,6 @@ final class LLMViewModel {
     /// Foundation Models path does (`platform_llm_vtable_generate_stream` emits
     /// the whole reply as one token and reports `completion_tokens = 0`).
     private(set) var generationStartedAt: Date?
-    /// TTFT (ms) reported by the SDK event bus for the generation in flight.
-    /// The event carries an SDK-side generation id the app never sees on the
-    /// result, so the single-generation-at-a-time chat keeps the latest value
-    /// and merges it into the persisted `MessageAnalytics`.
-    private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
     #if os(iOS)
     /// Tracks the in-flight hosted request so Stop can cancel by id.
@@ -168,28 +161,6 @@ final class LLMViewModel {
         updateSystemMessageAfterModelLoad()
     }
     #endif
-
-    func recordFirstTokenLatency(generationId: String, latency: Double) {
-        firstTokenLatencies[generationId] = latency
-        activeGenerationTTFTMs = latency
-    }
-
-    func getFirstTokenLatency(for generationId: String) -> Double? {
-        firstTokenLatencies[generationId]
-    }
-
-    func recordGenerationMetrics(generationId: String, metrics: GenerationMetricsFromSDK) {
-        generationMetrics[generationId] = metrics
-    }
-
-    func cleanupOldMetricsIfNeeded() {
-        if firstTokenLatencies.count > 10 {
-            firstTokenLatencies.removeAll()
-        }
-        if generationMetrics.count > 10 {
-            generationMetrics.removeAll()
-        }
-    }
 
     func updateMessage(at index: Int, with message: Message) {
         // Drop writes from a generation the user has navigated away from. Every
@@ -408,9 +379,7 @@ final class LLMViewModel {
     /// mint this generation's identity.
     ///
     /// Extracted so a regenerated turn (`LLMViewModel+MessageActions`) claims the
-    /// chat through exactly the same path as a typed one. Two copies of this
-    /// drifted in every previous chat app in this repo: one forgot to reset
-    /// `activeGenerationTTFTMs`, so the second reply reported the first's TTFT.
+    /// chat through exactly the same path as a typed one.
     func beginGeneration() {
         // The previous turn's epilogue may still be asking the model to name the
         // chat. One LLM component serves one generation, and the user's turn
@@ -419,7 +388,6 @@ final class LLMViewModel {
 
         isGenerating = true
         error = nil
-        activeGenerationTTFTMs = nil
         generationStartedAt = Date()
 
         // Create conversation on first message

@@ -30,6 +30,10 @@ class TokenUsage extends $pb.GeneratedMessage {
     $core.double? decodeTokensPerSecond,
     $fixnum.Int64? prefillMs,
     $fixnum.Int64? ttftMs,
+    $fixnum.Int64? timeToFirstContentTokenMs,
+    $core.double? contentTokensPerSecond,
+    $core.bool? batchBuffered,
+    $core.bool? countsEstimated,
   }) {
     final result = create();
     if (inputTokens != null) result.inputTokens = inputTokens;
@@ -39,6 +43,12 @@ class TokenUsage extends $pb.GeneratedMessage {
       result.decodeTokensPerSecond = decodeTokensPerSecond;
     if (prefillMs != null) result.prefillMs = prefillMs;
     if (ttftMs != null) result.ttftMs = ttftMs;
+    if (timeToFirstContentTokenMs != null)
+      result.timeToFirstContentTokenMs = timeToFirstContentTokenMs;
+    if (contentTokensPerSecond != null)
+      result.contentTokensPerSecond = contentTokensPerSecond;
+    if (batchBuffered != null) result.batchBuffered = batchBuffered;
+    if (countsEstimated != null) result.countsEstimated = countsEstimated;
     return result;
   }
 
@@ -61,6 +71,10 @@ class TokenUsage extends $pb.GeneratedMessage {
     ..aD(4, _omitFieldNames ? '' : 'decodeTokensPerSecond')
     ..aInt64(5, _omitFieldNames ? '' : 'prefillMs')
     ..aInt64(6, _omitFieldNames ? '' : 'ttftMs')
+    ..aInt64(7, _omitFieldNames ? '' : 'timeToFirstContentTokenMs')
+    ..aD(8, _omitFieldNames ? '' : 'contentTokensPerSecond')
+    ..aOB(9, _omitFieldNames ? '' : 'batchBuffered')
+    ..aOB(10, _omitFieldNames ? '' : 'countsEstimated')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -130,11 +144,11 @@ class TokenUsage extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearPrefillMs() => $_clearField(5);
 
-  /// Request start to first output token. The canonical spelling for every
-  /// result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
-  /// report TTFT here and nowhere else. SDKEvent's own telemetry fields
-  /// (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
-  /// their separate event-stream spelling.
+  /// Request start to first output token of any kind (reasoning or content).
+  /// The canonical spelling for every result type: LLMGenerationResult and
+  /// VLMResult report TTFT here and nowhere else. SDKEvent's own telemetry
+  /// fields (GenerationEvent.time_to_first_token_ms, first_token_latency_ms)
+  /// keep their separate event-stream spelling.
   @$pb.TagNumber(6)
   $fixnum.Int64 get ttftMs => $_getI64(5);
   @$pb.TagNumber(6)
@@ -143,6 +157,54 @@ class TokenUsage extends $pb.GeneratedMessage {
   $core.bool hasTtftMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearTtftMs() => $_clearField(6);
+
+  /// Request start to the first CONTENT delta — what the user actually waits
+  /// for when the model reasons first. 0 when no content token was ever
+  /// delivered. Distinct from ttft_ms; do not alias the two.
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get timeToFirstContentTokenMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set timeToFirstContentTokenMs($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasTimeToFirstContentTokenMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearTimeToFirstContentTokenMs() => $_clearField(7);
+
+  /// Content-only throughput over first-content-delta → last delta. Excludes
+  /// reasoning tokens the accelerator also decoded. 0 when content count or
+  /// window is unavailable.
+  @$pb.TagNumber(8)
+  $core.double get contentTokensPerSecond => $_getN(7);
+  @$pb.TagNumber(8)
+  set contentTokensPerSecond($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasContentTokensPerSecond() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearContentTokensPerSecond() => $_clearField(8);
+
+  /// True when the backend buffered the whole generation and flushed deltas
+  /// at once, so the decode window is an artifact of the flush. Platforms
+  /// must not re-derive this heuristic.
+  @$pb.TagNumber(9)
+  $core.bool get batchBuffered => $_getBF(8);
+  @$pb.TagNumber(9)
+  set batchBuffered($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasBatchBuffered() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearBatchBuffered() => $_clearField(9);
+
+  /// True when input_tokens / output_tokens were estimated (e.g. chars/4)
+  /// rather than reported by the engine. Absence of the flag (false) means
+  /// the counts are engine-measured.
+  @$pb.TagNumber(10)
+  $core.bool get countsEstimated => $_getBF(9);
+  @$pb.TagNumber(10)
+  set countsEstimated($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasCountsEstimated() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearCountsEstimated() => $_clearField(10);
 }
 
 const $core.bool _omitFieldNames =

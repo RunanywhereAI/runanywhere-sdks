@@ -245,7 +245,8 @@ struct StreamCallbackData {
     bool got_final = false;
 };
 
-static rac_bool_t stream_callback(const char* token, rac_bool_t is_final, void* user_data) {
+static rac_bool_t stream_callback(const char* token, rac_bool_t is_final, int32_t /*tokens_in_delta*/,
+                                  void* user_data) {
     auto* data = static_cast<StreamCallbackData*>(user_data);
     if (token && std::strlen(token) > 0) {
         data->token_count++;
@@ -303,7 +304,8 @@ struct CancelCallbackData {
     int token_count = 0;
 };
 
-static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/, void* user_data) {
+static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/,
+                                  int32_t /*tokens_in_delta*/, void* user_data) {
     auto* data = static_cast<CancelCallbackData*>(user_data);
     data->token_count++;
     // Stop after 3 tokens

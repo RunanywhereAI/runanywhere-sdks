@@ -121,6 +121,9 @@ struct ToolCallingSession {
     std::vector<runanywhere::v1::ToolResult> all_tool_results;
     std::string final_text;
     std::string final_thinking_content;
+    // Last producer/commons terminal reason. Never derived from tool call count.
+    runanywhere::v1::FinishReason last_finish_reason =
+        runanywhere::v1::FINISH_REASON_UNSPECIFIED;
 
     std::string pending_tool_call_id;
     std::string pending_tool_name;
@@ -377,6 +380,9 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
     }
     final_result->set_is_complete(is_complete);
     final_result->set_iterations_used(static_cast<int32_t>(session.iteration));
+    // Propagate the last producer/commons reason. Never invent TOOL_CALLS /
+    // STOP from the call-list size.
+    final_result->set_finish_reason(session.last_finish_reason);
     rac::llm::tool_calling::set_tool_result_usage(final_result, session.telemetry);
     rac::llm::tool_calling::ensure_web_search_attribution(final_result);
     emit_event(session, std::move(event));
@@ -658,13 +664,16 @@ void run_generate_loop(ToolCallingSession& session) {
         &session.generation_started};
     if (!rac::llm::tool_calling::run_generate_once(step_generation, cancel_binding,
                                                    session.current_prompt, &response, &rc,
-                                                   &session.telemetry)) {
+                                                   &session.telemetry,
+                                                   &session.last_finish_reason)) {
         // Distinguish cancel from other generate failures.
         // A cancel that landed before or during generate makes the session
         // terminal — emit a cancel error and mark state kCancelled so the
         // public step_with_result_proto guard rejects further steps.
         const bool cancelled = session.cancel_requested.load(std::memory_order_acquire);
         const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
+        session.last_finish_reason = cancelled ? runanywhere::v1::FINISH_REASON_CANCELLED
+                                               : runanywhere::v1::FINISH_REASON_ERROR;
         emit_error_event(session, static_cast<int32_t>(rc), msg);
         session.state = cancelled ? SessionState::kCancelled : SessionState::kFailed;
         return;

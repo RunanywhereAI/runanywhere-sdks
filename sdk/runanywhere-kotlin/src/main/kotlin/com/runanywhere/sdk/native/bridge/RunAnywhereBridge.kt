@@ -727,6 +727,56 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
 
+    /** Int16 PCM → Float32 samples via `rac_audio_pcm16_to_float32`. */
+    @JvmStatic
+    external fun racAudioPcm16ToFloat32(pcm16: ByteArray): FloatArray?
+
+    /** Float32 samples → Int16 PCM bytes via `rac_audio_float32_to_pcm16`. */
+    @JvmStatic
+    external fun racAudioFloat32ToPcm16(samples: FloatArray): ByteArray?
+
+    /** Canonical 0..100 download percent via `rac_download_progress_percent`. */
+    @JvmStatic
+    external fun racDownloadProgressPercent(
+        overallProgress: Float,
+        bytesDownloaded: Long,
+        totalBytes: Long,
+    ): Int
+
+    /** Chip-name resolution via `rac_device_resolve_chip_name`. */
+    @JvmStatic
+    external fun racDeviceResolveChipName(
+        socManufacturer: String?,
+        socModel: String?,
+        buildHardware: String?,
+        cpuinfoHardware: String?,
+        architectureFallback: String?,
+    ): String
+
+    /** GPU family token via `rac_device_classify_gpu_family`. */
+    @JvmStatic
+    external fun racDeviceClassifyGpuFamily(
+        socManufacturer: String?,
+        socModel: String?,
+        chipName: String?,
+    ): String
+
+    /** NPU presence heuristic via `rac_device_heuristic_has_npu`. */
+    @JvmStatic
+    external fun racDeviceHeuristicHasNpu(
+        socManufacturer: String?,
+        socModel: String?,
+        chipName: String?,
+    ): Boolean
+
+    /** P/E core split via `rac_device_split_performance_cores` → `[perf, eff]`. */
+    @JvmStatic
+    external fun racDeviceSplitPerformanceCores(maxFreqs: LongArray?): IntArray
+
+    /** Available-memory coalesce via `rac_device_coalesce_available_memory`. */
+    @JvmStatic
+    external fun racDeviceCoalesceAvailableMemory(probedAvailableBytes: Long): Long
+
     // DEVICE MANAGER (rac_device_manager.h)
     // Mirrors Swift SDK's CppBridge+Device.swift
 

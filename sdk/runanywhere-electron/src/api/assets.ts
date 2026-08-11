@@ -11,7 +11,7 @@ import {
   DownloadState,
   DownloadSubscribeRequest,
 } from '@runanywhere/proto-ts/download_service';
-import { DownloadAbi, isTerminalState, percentOf } from './download-abi';
+import { DownloadAbi, isTerminalState } from './download-abi';
 import type { LoadSlot, RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
@@ -514,7 +514,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
             type: 'progress',
             bytesDone: Number(progress.bytesDownloaded),
             bytesTotal: Number(progress.totalBytes),
-            percent: percentOf(progress),
+            percent: downloads.percent(progress),
           });
         }, poll);
         const terminal = last as DownloadProgress | null;

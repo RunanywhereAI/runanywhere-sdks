@@ -77,6 +77,28 @@ public class StructuredOutputValidation(
     schemaIndex = 6,
   )
   public val error: SDKError? = null,
+  /**
+   * True when commons issued the single repair retry (mode=REPAIR).
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "repairAttempted",
+    schemaIndex = 7,
+  )
+  public val repair_attempted: Boolean = false,
+  /**
+   * 0 = first pass only; 1 = repair pass produced the reported verdict.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "repairAttempts",
+    schemaIndex = 8,
+  )
+  public val repair_attempts: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputValidation, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -106,6 +128,8 @@ public class StructuredOutputValidation(
     if (validation_errors != other.validation_errors) return false
     if (validation_time_ms != other.validation_time_ms) return false
     if (error != other.error) return false
+    if (repair_attempted != other.repair_attempted) return false
+    if (repair_attempts != other.repair_attempts) return false
     return true
   }
 
@@ -120,6 +144,8 @@ public class StructuredOutputValidation(
       result = result * 37 + validation_errors.hashCode()
       result = result * 37 + validation_time_ms.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
+      result = result * 37 + repair_attempted.hashCode()
+      result = result * 37 + repair_attempts.hashCode()
       super.hashCode = result
     }
     return result
@@ -134,6 +160,8 @@ public class StructuredOutputValidation(
     if (validation_errors.isNotEmpty()) result += """validation_errors=${sanitize(validation_errors)}"""
     result += """validation_time_ms=$validation_time_ms"""
     if (error != null) result += """error=$error"""
+    result += """repair_attempted=$repair_attempted"""
+    result += """repair_attempts=$repair_attempts"""
     return result.joinToString(prefix = "StructuredOutputValidation{", separator = ", ", postfix = "}")
   }
 
@@ -145,8 +173,10 @@ public class StructuredOutputValidation(
     validation_errors: List<String> = this.validation_errors,
     validation_time_ms: Long = this.validation_time_ms,
     error: SDKError? = this.error,
+    repair_attempted: Boolean = this.repair_attempted,
+    repair_attempts: Int = this.repair_attempts,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, raw_output, extracted_json, validation_errors, validation_time_ms, error, unknownFields)
+  ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, raw_output, extracted_json, validation_errors, validation_time_ms, error, repair_attempted, repair_attempts, unknownFields)
 
   public companion object {
     @JvmField
@@ -174,6 +204,12 @@ public class StructuredOutputValidation(
           size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.validation_time_ms)
         }
         size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
+        if (value.repair_attempted != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.repair_attempted)
+        }
+        if (value.repair_attempts != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.repair_attempts)
+        }
         return size
       }
 
@@ -191,11 +227,23 @@ public class StructuredOutputValidation(
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.validation_time_ms)
         }
         SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
+        if (value.repair_attempted != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.repair_attempted)
+        }
+        if (value.repair_attempts != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.repair_attempts)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputValidation) {
         writer.writeBytes(value.unknownFields)
+        if (value.repair_attempts != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.repair_attempts)
+        }
+        if (value.repair_attempted != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.repair_attempted)
+        }
         SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         if (value.validation_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.validation_time_ms)
@@ -219,6 +267,8 @@ public class StructuredOutputValidation(
         val validation_errors = mutableListOf<String>()
         var validation_time_ms: Long = 0L
         var error: SDKError? = null
+        var repair_attempted: Boolean = false
+        var repair_attempts: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
@@ -228,6 +278,8 @@ public class StructuredOutputValidation(
             5 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
             6 -> validation_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> error = SDKError.ADAPTER.decode(reader)
+            8 -> repair_attempted = ProtoAdapter.BOOL.decode(reader)
+            9 -> repair_attempts = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -239,6 +291,8 @@ public class StructuredOutputValidation(
           validation_errors = validation_errors,
           validation_time_ms = validation_time_ms,
           error = error,
+          repair_attempted = repair_attempted,
+          repair_attempts = repair_attempts,
           unknownFields = unknownFields
         )
       }

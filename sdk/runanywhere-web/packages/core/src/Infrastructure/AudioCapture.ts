@@ -80,12 +80,6 @@ export class AudioCapture {
     return this.activeResources?.context.sampleRate ?? this.config.sampleRate;
   }
 
-  /** Duration of collected audio in seconds based on configured sample rate. */
-  get bufferDurationSeconds(): number {
-    const samples = this._pcmChunks.reduce((acc, c) => acc + c.length, 0);
-    return samples / this.config.sampleRate;
-  }
-
   /**
    * Start capturing microphone audio.
    *

@@ -326,6 +326,19 @@ Napi::Value StorageDelete(const Napi::CallbackInfo& info) {
                           RequireProtoBytes(info, 0, "storageDeleteProto(requestBytes)"));
 }
 
+Napi::Value ProgressPercent(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 3 || !info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()) {
+        Napi::TypeError::New(env, "downloadProgressPercent(overall, bytesDownloaded, totalBytes)")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    const float overall = info[0].As<Napi::Number>().FloatValue();
+    const int64_t downloaded = info[1].As<Napi::Number>().Int64Value();
+    const int64_t total = info[2].As<Napi::Number>().Int64Value();
+    return Napi::Number::New(env, rac_download_progress_percent(overall, downloaded, total));
+}
+
 }  // namespace
 
 void RegisterDownloadBridge(Napi::Env env, Napi::Object exports) {
@@ -336,6 +349,7 @@ void RegisterDownloadBridge(Napi::Env env, Napi::Object exports) {
     exports.Set("downloadCleanupProto", Napi::Function::New(env, CleanupTerminal));
     exports.Set("downloadSubscribeProgress", Napi::Function::New(env, SubscribeProgress));
     exports.Set("downloadUnsubscribeProgress", Napi::Function::New(env, UnsubscribeProgress));
+    exports.Set("downloadProgressPercent", Napi::Function::New(env, ProgressPercent));
     exports.Set("storageInfoProto", Napi::Function::New(env, StorageInfo));
     exports.Set("storageAvailabilityProto", Napi::Function::New(env, StorageAvailability));
     exports.Set("storageDeletePlanProto", Napi::Function::New(env, StorageDeletePlan));

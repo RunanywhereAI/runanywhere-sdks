@@ -23,18 +23,6 @@ enum LLMError: LocalizedError {
     }
 }
 
-// MARK: - Generation Metrics
-
-struct GenerationMetricsFromSDK: Sendable {
-    let generationId: String
-    let modelId: String
-    let inputTokens: Int
-    let outputTokens: Int
-    let durationMs: Double
-    let tokensPerSecond: Double
-    let timeToFirstTokenMs: Double?
-}
-
 // MARK: - Document RAG
 
 struct ChatDocumentRAGPipelineKey: Equatable {

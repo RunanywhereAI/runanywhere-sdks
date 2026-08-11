@@ -143,20 +143,21 @@ function toDownloadEventInput(
   if (progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING) {
     return { type: 'extracting', operationId, sequence: sequence() };
   }
-  const bytesTotal = Number(progress.totalBytes);
+    const bytesTotal = Number(progress.totalBytes);
   const bytesDone = Number(progress.bytesDownloaded);
+  const overall = progress.overallProgress;
+  // Consume overall_progress when commons stamps a usable 0..1; never invent a
+  // bytes-first percent (rac_download_progress_percent owns that policy — RN
+  // Nitro sync bind pending).
+  const percent =
+    Number.isFinite(overall) && overall >= 0 && overall <= 1 ? overall * 100 : 0;
   return {
     type: 'progress',
     operationId,
     sequence: sequence(),
     bytesDone,
     bytesTotal,
-    percent:
-      progress.overallProgress > 0
-        ? progress.overallProgress * 100
-        : bytesTotal > 0
-          ? (bytesDone / bytesTotal) * 100
-          : 0,
+    percent,
   };
 }
 

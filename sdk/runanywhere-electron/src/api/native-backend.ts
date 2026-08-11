@@ -319,6 +319,14 @@ export class NativeBackend implements RaBackend {
     return this.addon.downloadCleanupProto();
   }
 
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number {
+    return this.addon.downloadProgressPercent(overallProgress, bytesDownloaded, totalBytes);
+  }
+
   // The commons progress callback is process-wide, so this promise stands in
   // for a stream that has no natural end: it settles when downloadUnwatch runs,
   // which is also what the RPC transport needs to close the channel.

@@ -40,7 +40,9 @@ public extension RASTTOptions {
 // MARK: - RASTTOutput
 
 extension RASTTOutput {
-    public var timestamp: Date { Date() }
+    public var timestamp: Date {
+        Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
+    }
 }
 
 // Post-Phase-6h, STT transcription arrives as proto bytes via

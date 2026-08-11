@@ -39,6 +39,7 @@ import {
   TTSStreamEventKind,
 } from '@runanywhere/proto-ts/tts_options';
 import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
@@ -325,7 +326,9 @@ export async function speak(
     const playback = getAudioPlayback();
     await playback.play(
       bytesToBase64(output.audioData),
-      output.sampleRate || options?.sampleRate || 22050
+      output.sampleRate > 0
+        ? output.sampleRate
+        : audioCaptureDefaults.ttsSampleRateHz
     );
   }
 

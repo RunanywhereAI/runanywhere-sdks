@@ -160,7 +160,8 @@ rac_result_t fake_llm_generate_stream(rac_handle_t, const char *prompt,
   }
   g_mlx_state.stream_count++;
   const std::string token = "mlx-stub: " + std::string(prompt);
-  if (callback(token.c_str(), RAC_FALSE, nullptr, callback_user_data) != RAC_TRUE) {
+  if (callback(token.c_str(), RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, callback_user_data) !=
+      RAC_TRUE) {
     return RAC_ERROR_STREAM_CANCELLED;
   }
   return RAC_SUCCESS;

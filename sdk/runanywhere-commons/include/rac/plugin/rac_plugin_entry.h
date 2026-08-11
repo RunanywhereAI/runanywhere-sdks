@@ -94,8 +94,14 @@ extern "C" {
  *                 offset). This is wire value 11, NOT the original rerank
  *                 wire value 6, which stays permanently retired. Engines
  *                 compiled against v7 are rejected until rebuilt.
+ *   9u — LLM streaming token accounting: `rac_llm_stream_callback_fn` gains
+ *                 `int32_t tokens_in_delta`, and `rac_llm_service_ops_t` gains
+ *                 `get_stream_token_counts` (+ `rac_llm_token_counts_t`).
+ *                 Engines compiled against v8 are rejected until rebuilt;
+ *                 NULL `get_stream_token_counts` means counts must be marked
+ *                 estimated. Engine-vtable reserved_slot_3 is unchanged.
  */
-#define RAC_PLUGIN_API_VERSION 8u
+#define RAC_PLUGIN_API_VERSION 9u
 
 /* ===========================================================================
  * Plugin entry-point signature

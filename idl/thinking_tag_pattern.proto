@@ -25,6 +25,12 @@ message ThinkingTagPattern {
 
     // Empty defaults to "</think>".
     string close_tag = 2;
+
+    // When true, the model's generation template already emits the open tag
+    // (e.g. qhexrt bundle manifest gen_prefill = "<think>\n"), so the stream
+    // starts inside reasoning and commons must not arm the bounded hold.
+    // optional is load-bearing: unset ≠ false (TS useOptionals=messages).
+    optional bool template_prefills_open_tag = 3;
 }
 
 // The single home for reasoning control. Composed surfaces (tool calling, RAG,

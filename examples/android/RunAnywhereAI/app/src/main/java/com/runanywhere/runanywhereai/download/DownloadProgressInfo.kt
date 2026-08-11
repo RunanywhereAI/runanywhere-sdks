@@ -201,10 +201,7 @@ data class DownloadProgressInfo(
                 retryAttempt = progress.retry_attempt,
                 currentFileIndex = progress.current_file_index,
                 totalFiles = progress.total_files.coerceAtLeast(1),
-                fraction = progress.overall_progress.takeIf { it > 0f }
-                    ?: total.takeIf { it > 0 }?.let {
-                        (progress.bytes_downloaded.toFloat() / it).coerceIn(0f, 1f)
-                    },
+                fraction = progress.overall_progress.takeIf { it > 0f },
             )
         }
     }

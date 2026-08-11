@@ -21,6 +21,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -472,7 +473,9 @@ void stamp_live_device_state(rac_telemetry_manager_t* manager, rac_telemetry_pay
         if (adapter->get_memory_info(&mem, adapter->user_data) == RAC_SUCCESS &&
             mem.total_bytes > 0) {
             copy.total_memory = static_cast<int64_t>(mem.total_bytes);
-            copy.available_memory = static_cast<int64_t>(mem.available_bytes);
+            // 0 = UNKNOWN — never invent total/2 when the probe fails.
+            copy.available_memory =
+                rac_device_coalesce_available_memory(static_cast<int64_t>(mem.available_bytes));
         }
     }
 

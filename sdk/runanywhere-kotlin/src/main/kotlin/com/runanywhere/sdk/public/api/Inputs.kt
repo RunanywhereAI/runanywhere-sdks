@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.api
 
 import android.graphics.Bitmap
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -214,11 +215,14 @@ private fun readFileOrThrow(path: String, kind: String): ByteArray {
 }
 
 private fun pcm16ToFloat32Bytes(pcm16: ByteArray): ByteArray {
-    val sampleCount = pcm16.size / 2
-    if (sampleCount == 0) return ByteArray(0)
-    val input = ByteBuffer.wrap(pcm16).order(ByteOrder.LITTLE_ENDIAN)
-    val output = ByteBuffer.allocate(sampleCount * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
-    repeat(sampleCount) { output.putFloat(input.short.toFloat() / PCM16_FULL_SCALE) }
+    val samples =
+        RunAnywhereBridge.racAudioPcm16ToFloat32(pcm16)
+            ?: throw SDKException.invalidArgument("rac_audio_pcm16_to_float32 failed")
+    if (samples.isEmpty()) return ByteArray(0)
+    val output = ByteBuffer.allocate(samples.size * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+    for (sample in samples) {
+        output.putFloat(sample)
+    }
     return output.array()
 }
 
@@ -226,12 +230,7 @@ private fun float32ToPcm16Bytes(float32: ByteArray): ByteArray {
     val sampleCount = float32.size / Float.SIZE_BYTES
     if (sampleCount == 0) return ByteArray(0)
     val input = ByteBuffer.wrap(float32).order(ByteOrder.LITTLE_ENDIAN)
-    val output = ByteBuffer.allocate(sampleCount * 2).order(ByteOrder.LITTLE_ENDIAN)
-    repeat(sampleCount) {
-        val clamped = input.float.coerceIn(-1.0f, 1.0f)
-        output.putShort((clamped * 32_767.0f).toInt().toShort())
-    }
-    return output.array()
+    val samples = FloatArray(sampleCount) { input.float }
+    return RunAnywhereBridge.racAudioFloat32ToPcm16(samples)
+        ?: throw SDKException.invalidArgument("rac_audio_float32_to_pcm16 failed")
 }
-
-private const val PCM16_FULL_SCALE = 32_768.0f

@@ -678,27 +678,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 activeGenerationTTFTMs = generation.time_to_first_token_ms
             }
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
-                val outputTokens = generation.output_tokens
-                val durationMs = generation.total_duration_ms
-                val rawTtft = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs
-                val decodeWindow = if (rawTtft != null && rawTtft > 0) durationMs - rawTtft else durationMs
-                // Batch backends (Maple) emit first stream token only after the
-                // full generate — raw TTFT ≈ wall clock and must not be shown.
-                val batchBuffered =
-                    rawTtft != null && rawTtft > 0 &&
-                        decodeWindow < maxOf(50.0, durationMs * 0.05)
-                val ttftMs = if (batchBuffered) null else rawTtft
-                val tps = if (durationMs > 0 && outputTokens > 0) {
-                    outputTokens * 1000.0 / durationMs
-                } else {
-                    0.0
-                }
+                // Only token counts are read from sdkMetrics (when the result
+                // proto reports 0). Duration / tok/s / TTFT were write-only and
+                // duplicated GenerationEvent.tokens_per_second / result usage.
                 activeGenerationMetrics = SdkGenerationMetrics(
                     inputTokens = generation.input_tokens,
-                    outputTokens = outputTokens,
-                    durationMs = durationMs,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = ttftMs,
+                    outputTokens = generation.output_tokens,
                 )
                 if (firstTokenLatencies.size > MAX_TRACKED_GENERATIONS) firstTokenLatencies.clear()
             }
@@ -771,24 +756,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         tokens: Int,
         reportedTps: Double?,
         reportedTtftMs: Long?,
+        batchBuffered: Boolean,
         totalMs: Long,
         inputTokens: Int,
         modelName: String,
         framework: String?,
         mode: GenerationMode,
     ): GenerationStats {
-        val wallTps = if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
-        val tps = reportedTps?.takeIf { it > 0.0 } ?: wallTps
-        // Maple/Bonsai dump the full completion after DSP generate — stream
-        // intervals invent five-digit tok/s and a TTFT equal to wall clock.
-        val batchBuffered =
-            (reportedTtftMs != null && reportedTtftMs > 0 &&
-                totalMs - reportedTtftMs < maxOf(50L, (totalMs * 0.05).toLong())) ||
-                (tps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
-                (reportedTtftMs != null && totalMs > 0 && reportedTtftMs >= (totalMs * 0.95).toLong())
+        // TokenUsage owns decode rate + TTFT + batch_buffered. Do not invent
+        // wall tok/s or re-derive the flush heuristic — AnalyticsFooter must
+        // match BenchmarkRunner / commons for the same turn.
         return GenerationStats(
             tokens = tokens,
-            tokensPerSecond = if (batchBuffered) wallTps else tps,
+            tokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: 0.0,
             timeToFirstTokenMs = if (batchBuffered) null else reportedTtftMs?.takeIf { it > 0 },
             totalTimeMs = totalMs,
             inputTokens = inputTokens,
@@ -832,6 +812,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     tokens = tokens,
                     reportedTps = result.usage?.decode_tokens_per_second,
                     reportedTtftMs = result.usage?.ttft_ms,
+                    batchBuffered = result.usage?.batch_buffered == true,
                     totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens ?: 0,
                     modelName = model.displayName,
@@ -875,6 +856,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     tokens = outputTokens,
                     reportedTps = result.usage?.decode_tokens_per_second,
                     reportedTtftMs = result.usage?.ttft_ms,
+                    batchBuffered = result.usage?.batch_buffered == true,
                     totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
@@ -931,6 +913,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     tokens = tokens,
                     reportedTps = result.usage?.decode_tokens_per_second,
                     reportedTtftMs = result.usage?.ttft_ms,
+                    batchBuffered = result.usage?.batch_buffered == true,
                     totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
@@ -1441,13 +1424,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-// Completion metrics decoded from the SDK event bus (iOS GenerationMetricsFromSDK).
+// Token counts from the SDK event bus when the result proto omits them.
 private data class SdkGenerationMetrics(
     val inputTokens: Int,
     val outputTokens: Int,
-    val durationMs: Long,
-    val tokensPerSecond: Double,
-    val timeToFirstTokenMs: Long?,
 )
 
 private fun ChatMessage.toStored() = StoredMessage(

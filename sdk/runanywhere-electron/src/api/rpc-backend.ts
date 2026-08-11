@@ -137,6 +137,25 @@ export class RpcBackend implements RaBackend {
   downloadCleanup(): Promise<number> {
     return this.call('downloadCleanup', []);
   }
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number {
+    // Renderer has no sync commons FFI. Prefer overall when commons would;
+    // never invent a bytes-first percent (the historical bug). Byte-ratio
+    // when overall is unusable requires NativeBackend / utility-host path.
+    if (
+      Number.isFinite(overallProgress) &&
+      overallProgress >= 0 &&
+      overallProgress <= 1
+    ) {
+      return Math.max(0, Math.min(100, Math.round(overallProgress * 100)));
+    }
+    void bytesDownloaded;
+    void totalBytes;
+    return 0;
+  }
   downloadWatch(onProgress: (progressBytes: Uint8Array) => void): Promise<void> {
     return this.call('downloadWatch', [], onProgress as (c: unknown) => void);
   }

@@ -829,40 +829,6 @@ async function resolveBrowserAvailableStorageBytes(): Promise<number> {
   }
 }
 
-async function assertBrowserStorageQuota(
-  modelId: string,
-  plan: DownloadPlanResult,
-  requiredFreeBytesAfterDownload: number,
-  availableStorageBytes?: number,
-): Promise<void> {
-  const remaining = availableStorageBytes !== undefined && availableStorageBytes > 0
-    ? availableStorageBytes
-    : await resolveBrowserAvailableStorageBytes();
-  if (remaining <= 0) return;
-  const planWithSizes = plan as unknown as {
-    totalBytes?: number;
-    requiredBytes?: number;
-    files?: Array<{ totalBytes?: number; expectedBytes?: number; sizeBytes?: number; remainingBytes?: number }>;
-  };
-  const plannedBytes = planWithSizes.requiredBytes
-    ?? planWithSizes.totalBytes
-    ?? planWithSizes.files?.reduce(
-      (total, file) => total + (file.remainingBytes ?? file.expectedBytes ?? file.totalBytes ?? file.sizeBytes ?? 0),
-      0,
-    )
-    ?? 0;
-  const needed = plannedBytes + requiredFreeBytesAfterDownload;
-  // A plan without size metadata cannot be preflighted safely; commons still
-  // performs its native storage check before it starts the transfer.
-  if (needed > 0 && needed > remaining) {
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
-      `Insufficient browser storage for '${modelId}': need ${needed} bytes, only ${remaining} bytes remain.`,
-      'downloadModel',
-    );
-  }
-}
-
 /**
  * Whether a download that had already begun transferring and then stopped is
  * worth retrying. It is: the causes at that stage are a dropped connection, a
@@ -1652,21 +1618,12 @@ export const SDKCore = {
     // Prefer the browser OPFS/origin quota over MEMFS leftovers. Shipping a
     // real `availableStorageBytes` into the commons planner avoids the false
     // "only 2 GB is free" refusal on multi-GB models (Qwen3 4B, etc.).
-    let browserAvailableBytes = request.availableStorageBytes !== undefined
+    const browserAvailableBytes = request.availableStorageBytes !== undefined
       && request.availableStorageBytes > 0
       ? request.availableStorageBytes
       : storageReady.availableBytes > 0
         ? storageReady.availableBytes
         : await resolveBrowserAvailableStorageBytes();
-    // When estimate() is unavailable, still avoid the MEMFS ~2 GB figure that
-    // commons would otherwise read via fs::space. OPFS quota is enforced by the
-    // browser during the write; assertBrowserStorageQuota remains best-effort.
-    if (browserAvailableBytes <= 0 && OPFSBridge.isSupported) {
-      browserAvailableBytes = Number.MAX_SAFE_INTEGER;
-      logger.debug(
-        'navigator.storage.estimate() unavailable — skipping MEMFS free-space gate for OPFS download',
-      );
-    }
 
     // Plan defaults mirror Swift RunAnywhere+Storage.swift:187-189:
     // resumeExisting=true, validateExistingBytes=true,
@@ -1697,13 +1654,6 @@ export const SDKCore = {
         rejection.retryable,
       );
     }
-    await assertBrowserStorageQuota(
-      request.modelId,
-      plan,
-      request.requiredFreeBytesAfterDownload ?? 0,
-      browserAvailableBytes,
-    );
-
     // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
     // update the registry on completion; the explicit import below
     // (mirrorDownloadCompletionToRegistry — Web's RAModelImportRequest
@@ -2185,7 +2135,6 @@ setRegisterModelHydrateHook(() => {
 
 /** Focused test hooks for browser-only download safeguards. */
 export const __testing__ = {
-  assertBrowserStorageQuota,
   pollDownloadWithRetry,
   resolveBrowserAvailableStorageBytes,
   throwDownloadFailure,

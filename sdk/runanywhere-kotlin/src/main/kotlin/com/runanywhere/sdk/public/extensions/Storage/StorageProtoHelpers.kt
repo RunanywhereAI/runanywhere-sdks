@@ -24,10 +24,8 @@ import com.runanywhere.sdk.public.types.RAStorageInfo
 /**
  * Build a [DeviceStorageInfo] from the three canonical byte counters.
  *
- * `used_percent` is deleted outright (idl/storage_types.proto): it was a
- * pure derivation of `total_bytes`/`used_bytes` with no independent wire
- * value, so [usagePercentage] below is the sole surviving computed
- * accessor. Matches Swift's `RADeviceStorageInfo.init(totalBytes:freeBytes:usedBytes:)`.
+ * Matches Swift's
+ * `RADeviceStorageInfo.init(totalBytes:freeBytes:usedBytes:)`.
  */
 fun DeviceStorageInfo.Companion.create(
     totalBytes: Long,
@@ -39,18 +37,6 @@ fun DeviceStorageInfo.Companion.create(
         free_bytes = freeBytes,
         used_bytes = usedBytes,
     )
-
-/**
- * Recomputed usage percentage as a Double (0.0–100.0). Equivalent to
- * `used_percent` but returned as `Double` to match the Swift API.
- */
-val DeviceStorageInfo.usagePercentage: Double
-    get() =
-        if (total_bytes > 0L) {
-            used_bytes.toDouble() / total_bytes.toDouble() * 100.0
-        } else {
-            0.0
-        }
 
 // MARK: - AppStorageInfo
 
@@ -81,8 +67,6 @@ fun AppStorageInfo.Companion.create(
  * An empty [StorageInfo] with default device/app sub-records and no
  * per-model rows. Matches Swift's `RAStorageInfo.empty` static.
  */
-// `total_models` is deleted outright (idl/storage_types.proto): `modelCount`
-// below (models.size) is the sole count now.
 val StorageInfo.Companion.empty: RAStorageInfo
     get() =
         RAStorageInfo(
@@ -91,21 +75,6 @@ val StorageInfo.Companion.empty: RAStorageInfo
             models = emptyList(),
             total_models_bytes = 0L,
         )
-
-/** Sum of `size_on_disk_bytes` across all per-model rows. */
-val RAStorageInfo.totalModelsSizeBytes: Long
-    get() = models.sumOf { it.size_on_disk_bytes }
-
-/**
- * Aggregate "models size" — prefers the denormalized `total_models_bytes`
- * counter, falls back to a fresh sum over the rows when the counter is 0.
- */
-val RAStorageInfo.totalModelsSize: Long
-    get() = if (total_models_bytes > 0L) total_models_bytes else totalModelsSizeBytes
-
-/** Number of model rows currently in the storage view. */
-val RAStorageInfo.modelCount: Int
-    get() = models.size
 
 // MARK: - ModelStorageMetrics
 

@@ -426,20 +426,18 @@ internal fun mapLLMStreamEvents(
                 }
                 if (raw.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                     sawTerminal = true
-                    emit(
-                        GenerationEvent.Completed(
-                            requestId,
-                            raw.result?.toGenerationResult(requestId)
-                                ?: GenerationResult(
-                                    text = answer.toString(),
-                                    thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
-                                    finishReason = finishReasonOf(raw.finish_reason),
-                                    rawFinishReason = raw.finish_reason.name,
-                                    requestId = requestId,
-                                    model = model,
-                                ),
-                        ),
-                    )
+                    val mapped = raw.result?.toGenerationResult(requestId)
+                    if (mapped == null) {
+                        emit(
+                            GenerationEvent.Failed(
+                                requestId,
+                                partialOrNull(),
+                                SDKException.operation("Generation completed without LLMGenerationResult"),
+                            ),
+                        )
+                    } else {
+                        emit(GenerationEvent.Completed(requestId, mapped))
+                    }
                     throw StreamTerminalReached()
                 }
             }

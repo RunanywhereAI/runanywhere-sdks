@@ -102,11 +102,11 @@ static rac_result_t platform_llm_vtable_generate_stream(void* impl, const char* 
     if (result == RAC_SUCCESS && response) {
         // One-shot Foundation Models path: emit the full response as a
         // non-final token, then a terminal with finish_reason="stop".
-        if (callback(response, RAC_FALSE, nullptr, user_data) == RAC_FALSE) {
+        if (callback(response, RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) == RAC_FALSE) {
             free(response);
             return RAC_ERROR_CANCELLED;
         }
-        callback("", RAC_TRUE, "stop", user_data);
+        callback("", RAC_TRUE, "stop", /*tokens_in_delta*/ 1, user_data);
         free(response);
     }
 
@@ -193,6 +193,7 @@ extern "C" const rac_llm_service_ops_t g_platform_llm_ops = {
     .generate_from_context = nullptr,
     .clear_context = nullptr,
     .create = platform_llm_create_impl,
+    .get_stream_token_counts = nullptr,
 };
 
 namespace {

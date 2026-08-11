@@ -2,7 +2,7 @@
  * @file rac_audio_utils.cpp
  * @brief RunAnywhere Commons - Audio Utility Functions Implementation
  *
- * Provides audio format conversion utilities used across the SDK.
+ * Provides audio format conversion and level-meter utilities used across the SDK.
  */
 
 #include "rac/core/rac_audio_utils.h"
@@ -10,11 +10,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 
 #include "rac/core/rac_error.h"
-#include "rac/core/rac_logger.h"
 
 // WAV file constants
 static constexpr size_t WAV_HEADER_SIZE = 44;
@@ -107,6 +105,41 @@ static void build_wav_header(uint8_t* header, int32_t sample_rate, uint32_t data
     write_uint32_le(&header[40], data_size);
 }
 
+static int16_t quantize_float_to_pcm16(float sample) {
+    if (!std::isfinite(sample)) {
+        return 0;
+    }
+    const float clamped = std::clamp(sample, -1.0f, 1.0f);
+    const float scaled = std::round(clamped * RAC_AUDIO_PCM16_SCALE);
+    return static_cast<int16_t>(std::clamp(scaled, -32768.0f, 32767.0f));
+}
+
+rac_result_t rac_audio_pcm16_to_float32(const int16_t* in, size_t n_samples, float* out) {
+    if (n_samples == 0) {
+        return RAC_SUCCESS;
+    }
+    if (in == nullptr || out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    for (size_t i = 0; i < n_samples; ++i) {
+        out[i] = static_cast<float>(in[i]) / RAC_AUDIO_PCM16_SCALE;
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_audio_float32_to_pcm16(const float* in, size_t n_samples, int16_t* out) {
+    if (n_samples == 0) {
+        return RAC_SUCCESS;
+    }
+    if (in == nullptr || out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    for (size_t i = 0; i < n_samples; ++i) {
+        out[i] = quantize_float_to_pcm16(in[i]);
+    }
+    return RAC_SUCCESS;
+}
+
 rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size, int32_t sample_rate,
                                       void** out_wav_data, size_t* out_wav_size) {
     // Validate arguments
@@ -137,7 +170,7 @@ rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size, int
     const size_t wav_size = WAV_HEADER_SIZE + int16_data_size;
 
     // Allocate output buffer
-    uint8_t* wav_data = static_cast<uint8_t*>(malloc(wav_size));
+    uint8_t* wav_data = static_cast<uint8_t*>(rac_alloc(wav_size));
     if (!wav_data) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -145,19 +178,13 @@ rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size, int
     // Build WAV header
     build_wav_header(wav_data, sample_rate, int16_data_size);
 
-    // Convert Float32 to Int16
-    // Use __restrict to guarantee no aliasing, enabling auto-vectorization.
-    // The loop body is kept simple (multiply + clamp) so compilers can emit
-    // NEON (ARM) or SSE/AVX (x86) vector instructions with -O2.
-    const float* __restrict float_samples = static_cast<const float*>(pcm_data);
-    int16_t* __restrict int16_samples = reinterpret_cast<int16_t*>(wav_data + WAV_HEADER_SIZE);
-
-    for (size_t i = 0; i < num_samples; ++i) {
-        // Multiply first, then clamp to Int16 range in one step.
-        // Avoids two separate clamp operations and is auto-vectorizable.
-        // std::clamp produces branchless vmin/vmax on ARM NEON, minps/maxps on SSE.
-        const float scaled = std::clamp(float_samples[i] * 32767.0f, -32768.0f, 32767.0f);
-        int16_samples[i] = static_cast<int16_t>(scaled);
+    // Single quantization rule via the public PCM16 encoder.
+    const float* float_samples = static_cast<const float*>(pcm_data);
+    int16_t* int16_samples = reinterpret_cast<int16_t*>(wav_data + WAV_HEADER_SIZE);
+    const rac_result_t qrc = rac_audio_float32_to_pcm16(float_samples, num_samples, int16_samples);
+    if (qrc != RAC_SUCCESS) {
+        rac_free(wav_data);
+        return qrc;
     }
 
     *out_wav_data = wav_data;
@@ -194,7 +221,7 @@ rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size, int32
     const size_t wav_size = WAV_HEADER_SIZE + data_size;
 
     // Allocate output buffer
-    uint8_t* wav_data = static_cast<uint8_t*>(malloc(wav_size));
+    uint8_t* wav_data = static_cast<uint8_t*>(rac_alloc(wav_size));
     if (!wav_data) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -232,5 +259,115 @@ rac_result_t rac_audio_compute_level_db(const float* samples, size_t count, floa
     // Silence floor: clamp -inf to -100 dB (well below the -60 dB normalisation
     // bottom used by audio meters in the platform SDKs).
     *out_db = (rms <= 1e-10) ? -100.0f : static_cast<float>(20.0 * std::log10(rms));
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_audio_compute_level_normalized(const float* samples, size_t count, float floor_db,
+                                                float* out_0_1) {
+    if (!out_0_1) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (!(floor_db < 0.0f) || !std::isfinite(floor_db)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    float db = 0.0f;
+    const rac_result_t rc = rac_audio_compute_level_db(samples, count, &db);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    // Map [floor_db, 0] → [0, 1]. Example floor_db=-60: (db + 60) / 60.
+    const float span = -floor_db;
+    *out_0_1 = std::clamp((db - floor_db) / span, 0.0f, 1.0f);
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_audio_resample_f32(const float* in, size_t in_frames, int32_t in_rate,
+                                    int32_t out_rate, float** out, size_t* out_frames) {
+    if (!out || !out_frames) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out = nullptr;
+    *out_frames = 0;
+
+    if (in_frames == 0) {
+        return RAC_SUCCESS;
+    }
+    if (in == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (in_rate <= 0 || out_rate <= 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    size_t out_len = 0;
+    if (in_rate == out_rate) {
+        out_len = in_frames;
+    } else {
+        const double scaled = static_cast<double>(in_frames) * static_cast<double>(out_rate) /
+                              static_cast<double>(in_rate);
+        if (scaled <= 0.0) {
+            return RAC_SUCCESS;
+        }
+        out_len = static_cast<size_t>(std::llround(scaled));
+        if (out_len == 0) {
+            return RAC_SUCCESS;
+        }
+    }
+
+    float* buffer = static_cast<float*>(rac_alloc(out_len * sizeof(float)));
+    if (!buffer) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (in_rate == out_rate) {
+        std::memcpy(buffer, in, out_len * sizeof(float));
+    } else {
+        const double ratio =
+            static_cast<double>(in_rate) / static_cast<double>(out_rate);
+        for (size_t i = 0; i < out_len; ++i) {
+            const double src_idx = static_cast<double>(i) * ratio;
+            size_t idx0 = static_cast<size_t>(src_idx);
+            size_t idx1 = idx0 + 1;
+            if (idx0 >= in_frames) {
+                idx0 = in_frames - 1;
+            }
+            if (idx1 >= in_frames) {
+                idx1 = in_frames - 1;
+            }
+            const double frac = src_idx - static_cast<double>(idx0);
+            buffer[i] = static_cast<float>(static_cast<double>(in[idx0]) * (1.0 - frac) +
+                                           static_cast<double>(in[idx1]) * frac);
+        }
+    }
+
+    *out = buffer;
+    *out_frames = out_len;
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_audio_pcm_bytes_to_ms(size_t byte_count, const rac_audio_format_t* format,
+                                       int64_t* out_ms) {
+    if (!format || !out_ms) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (format->sample_rate <= 0 || format->channels < 1) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (format->bits_per_sample != 16 && format->bits_per_sample != 32) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const size_t bytes_per_sample = static_cast<size_t>(format->bits_per_sample) / 8u;
+    const size_t bytes_per_frame = bytes_per_sample * static_cast<size_t>(format->channels);
+    if (bytes_per_frame == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *out_ms = static_cast<int64_t>(
+        (static_cast<double>(byte_count) / static_cast<double>(bytes_per_frame) /
+         static_cast<double>(format->sample_rate)) *
+        1000.0);
     return RAC_SUCCESS;
 }

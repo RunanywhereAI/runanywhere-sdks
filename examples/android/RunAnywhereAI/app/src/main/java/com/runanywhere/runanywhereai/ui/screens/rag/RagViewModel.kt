@@ -44,7 +44,8 @@ internal fun buildRagAnswerMessage(
     elapsedMs: Long,
 ): RagMessage =
     RagMessage(
-        text = RagAnswerNormalizer.visibleAnswer(rawAnswer)
+        // RAGResult.answer is already thinking-stripped by commons.
+        text = rawAnswer.trim()
             .ifBlank { "I couldn't produce a concise answer. Try asking more specifically." },
         isUser = false,
         sources = sources,

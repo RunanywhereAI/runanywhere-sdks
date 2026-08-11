@@ -196,7 +196,7 @@ export function toProtoHistory(messages: readonly ChatMessage[]): ProtoChatMessa
  * Map the proto `FinishReason` enum to the public string union. `finishReason`
  * is a typed enum now, not a raw string to substring-match against.
  */
-function finishReasonFrom(reason: ProtoFinishReason, cancelled: boolean): FinishReason {
+export function finishReasonFrom(reason: ProtoFinishReason, cancelled: boolean): FinishReason {
   if (cancelled) return 'cancelled';
   switch (reason) {
     case ProtoFinishReason.FINISH_REASON_STOP:
@@ -269,19 +269,17 @@ export function streamFinalToGenerationResult(
   final: LLMGenerationResult,
   requestId: string,
   model: string,
-  fallback: { text: string; thinkingText: string; outputTokens: number; ttftMs: number; tokensPerSecond: number },
 ): GenerationResult {
-  const outputTokens = (final.usage?.outputTokens ?? 0) || fallback.outputTokens;
   return {
-    text: final.text || fallback.text,
-    thinkingText: final.thinkingContent || fallback.thinkingText || undefined,
+    text: final.text,
+    thinkingText: final.thinkingContent || undefined,
     toolCalls: final.toolCalls,
     finishReason: finishReasonFrom(final.finishReason, false),
     rawFinishReason: final.finishReason ? String(final.finishReason) : undefined,
     inputTokens: final.usage?.inputTokens ?? 0,
-    outputTokens,
-    timeToFirstTokenMs: Math.round((final.usage?.ttftMs ?? 0) || fallback.ttftMs),
-    tokensPerSecond: (final.usage?.decodeTokensPerSecond ?? 0) || fallback.tokensPerSecond,
+    outputTokens: final.usage?.outputTokens ?? 0,
+    timeToFirstTokenMs: Math.round(final.usage?.ttftMs ?? 0),
+    tokensPerSecond: final.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model,
     actualDevice: currentDevicePlacement(),
@@ -473,17 +471,21 @@ export function toProtoEmbedOptions(options?: EmbedOptions): EmbeddingsOptions {
   const defaults = optionDefaults.embed();
   return {
     ...defaults,
-    normalize: options?.normalize ? options.normalize === 'l2' : true,
+    normalize: options?.normalize === undefined
+      ? defaults.normalize
+      : options.normalize === 'l2',
     pooling: options?.pooling
       ? POOLING_MODES[options.pooling]
-      : EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
+      : defaults.pooling,
   };
 }
 
 /** Convert a proto embeddings batch to the public per-input list. */
 export function toEmbeddings(result: EmbeddingsResult): Embedding[] {
-  return result.vectors.map((vector, index) => ({
-    index,
+  // Commons always sets EmbeddingVector.inputIndex (including 0). Never
+  // substitute the array position — that mislabels a genuine first input.
+  return result.vectors.map((vector) => ({
+    index: vector.inputIndex,
     vector: Float32Array.from(vector.values),
   }));
 }
@@ -558,7 +560,6 @@ export function toDiarizationResult(result: ProtoDiarizationResult): Diarization
 
 /** Convert a proto segmentation result to the public shape. */
 export function toSegmentationResult(result: ProtoSegmentationResult): SegmentationResult {
-  const totalPixels = result.width * result.height;
   return {
     classMask: result.classMaskU16Le,
     width: result.width,
@@ -568,16 +569,19 @@ export function toSegmentationResult(result: ProtoSegmentationResult): Segmentat
       id: summary.classId,
       label: summary.label,
       pixelCount: summary.pixelCount,
-      fraction: totalPixels > 0 ? summary.pixelCount / totalPixels : 0,
+      // Commons owns SegmentationClassSummary.fraction (tag 5).
+      fraction: summary.fraction,
     })),
   };
 }
 
 /** Convert a proto rerank result to the public index-pointer list. */
 export function toRankedResults(result: RerankResult): RankedResult[] {
-  return result.items
-    .map((item) => ({ index: item.index, relevanceScore: item.relevanceScore }))
-    .sort((a, b) => b.relevanceScore - a.relevanceScore);
+  // Commons owns rerank ordering; preserve its item order exactly.
+  return result.items.map((item) => ({
+    index: item.index,
+    relevanceScore: item.relevanceScore,
+  }));
 }
 
 /** Convert a proto RAG chunk to the public match shape. */
@@ -591,15 +595,14 @@ export function toMatch(chunk: RAGSearchResult): Match {
 
 /** Convert a proto RAG result to the public shape. */
 export function toRagResult(result: RAGResult): RagResult {
-  const totalMs = result.retrievalTimeMs + result.generationTimeMs;
   return {
     answer: result.answer,
+    thinkingText: result.thinkingContent || undefined,
     sources: result.retrievedChunks.map(toMatch),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
-    tokensPerSecond: result.usage?.decodeTokensPerSecond
-      ?? (totalMs > 0 ? ((result.usage?.outputTokens ?? 0) / totalMs) * 1000 : 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId: result.requestId ?? '',
     model: '',
   };

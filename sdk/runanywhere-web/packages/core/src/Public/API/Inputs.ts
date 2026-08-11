@@ -13,6 +13,10 @@ import {
   vlmImageFromRawRGBA,
 } from '../Extensions/RAVLMImage+Helpers.js';
 import { AudioFileLoader } from '../../Infrastructure/AudioFileLoader.js';
+import {
+  float32ToPcm16 as commonsFloat32ToPcm16,
+  pcm16ToFloat32 as commonsPcm16ToFloat32,
+} from '../Extensions/RunAnywhere+AudioConvert.js';
 
 /** Sample encoding of an [AudioFormatSpec]. `container` needs a decoder; live streams never use it. */
 export type AudioEncoding = 'pcmS16Le' | 'pcmF32Le' | 'container';
@@ -47,13 +51,7 @@ export interface AudioInput {
 const DEFAULT_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 function float32ToPcm16(samples: Float32Array): Uint8Array {
-  const out = new Uint8Array(samples.length * 2);
-  const view = new DataView(out.buffer);
-  for (let i = 0; i < samples.length; i += 1) {
-    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0));
-    view.setInt16(i * 2, Math.round(clamped * 0x7fff), true);
-  }
-  return out;
+  return commonsFloat32ToPcm16(samples);
 }
 
 /** Construct audio payloads from the shapes a browser can produce. */
@@ -142,10 +140,11 @@ export async function audioInputToFloat32(audio: AudioInput): Promise<Float32Arr
     return decodeContainerToFloat32(audio.bytes, audio.format.sampleRate);
   }
   const count = Math.floor(audio.bytes.byteLength / 2);
-  const view = new DataView(audio.bytes.buffer, audio.bytes.byteOffset, count * 2);
-  const out = new Float32Array(count);
-  for (let i = 0; i < count; i += 1) out[i] = view.getInt16(i * 2, true) / 0x8000;
-  return out;
+  const copy = audio.bytes.buffer.slice(
+    audio.bytes.byteOffset,
+    audio.bytes.byteOffset + count * 2,
+  );
+  return commonsPcm16ToFloat32(copy);
 }
 
 /**

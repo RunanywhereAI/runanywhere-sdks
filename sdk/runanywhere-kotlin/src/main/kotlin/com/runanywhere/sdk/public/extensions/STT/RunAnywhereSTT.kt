@@ -16,7 +16,6 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.STTServiceState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -76,12 +75,13 @@ suspend fun RunAnywhere.transcribe(
     if (!current.found) {
         throw SDKException.modelNotLoaded()
     }
-
-    val audioLengthSec = estimateAudioLength(audio.size)
-    sttLogger.debug("Transcribing audio: ${audio.size} bytes (${String.format("%.2f", audioLengthSec)}s)")
+    sttLogger.debug("Transcribing audio: ${audio.size} bytes")
 
     val result = CppBridgeSTT.transcribe(audio, options)
-    sttLogger.info("Transcription complete: ${result.text.take(50)}${if (result.text.length > 50) "..." else ""}")
+    sttLogger.info(
+        "Transcription complete (${result.duration_ms}ms): " +
+            "${result.text.take(50)}${if (result.text.length > 50) "..." else ""}",
+    )
     return result
 }
 
@@ -114,39 +114,18 @@ fun RunAnywhere.transcribeStream(
         // common case for view-models) this froze the UI and ANR'd the app.
         val streamJob =
             launch(Dispatchers.IO) {
-                var sawFinal = false
                 try {
                     CppBridgeSTT.transcribeSessionStream(audio, options, current) { partial ->
-                        if (partial.is_final) {
-                            sawFinal = true
-                        }
                         trySend(partial).isSuccess
-                    }
-                    if (!sawFinal) {
-                        trySend(RASTTPartialResult(is_final = true))
                     }
                     close()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    trySend(
-                        RASTTPartialResult(
-                            text = "STT stream failed: ${e.message ?: e::class.simpleName.orEmpty()}",
-                            is_final = true,
-                        ),
-                    )
-                    close()
+                    close(e)
                 }
             }
         awaitClose {
             streamJob.cancel()
         }
     }
-
-// Private helper
-private fun estimateAudioLength(dataSize: Int): Double {
-    val bytesPerSample = 2 // 16-bit
-    val sampleRate = RADefaults.AudioCapture.MIC_SAMPLE_RATE_HZ.toDouble()
-    val samples = dataSize.toDouble() / bytesPerSample.toDouble()
-    return samples / sampleRate
-}

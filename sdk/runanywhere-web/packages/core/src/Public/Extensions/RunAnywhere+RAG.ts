@@ -692,8 +692,8 @@ class CrossWasmRAGProvider implements RAGProvider {
     const normalized = normalizeCrossWasmDocument(document);
     const textChunks = splitRAGText(
       normalized.text,
-      this.config.chunkSize ?? 512,
-      this.config.chunkOverlap ?? 64,
+      this.config.chunkSize!,
+      this.config.chunkOverlap!,
     );
     if (textChunks.length === 0) {
       throw SDKException.fromCode(
@@ -903,17 +903,15 @@ class CrossWasmRAGProvider implements RAGProvider {
     const prepared = await this.prepareQuery(question, options, 'RAG.query');
     if (!prepared.grounded) return prepared.result;
 
-    const generationStarted = nowMs();
     const generated = await TextGeneration.generate(prepared.request);
     this.assertCurrent(prepared.version, 'RAG.query');
-    const generationTimeMs = nowMs() - generationStarted;
     this.lastQueryMs = Date.now();
     return {
       answer: generated.text,
       retrievedChunks: prepared.retrievedChunks,
       contextUsed: prepared.context,
       retrievalTimeMs: prepared.retrievalTimeMs,
-      generationTimeMs,
+      generationTimeMs: generated.generationTimeMs ?? 0,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
@@ -959,14 +957,11 @@ class CrossWasmRAGProvider implements RAGProvider {
       },
     };
 
-    const generationStarted = nowMs();
     const streaming = await TextGeneration.generateStream(prepared.request);
-    let answer = '';
     let nativeStreamDone = false;
     try {
       for await (const token of streaming.stream) {
         if (!token) continue;
-        answer += token;
         yield {
           timestampUs: nowUs(),
           requestId,
@@ -995,11 +990,11 @@ class CrossWasmRAGProvider implements RAGProvider {
     this.assertCurrent(prepared.version, 'RAG.queryStream');
     this.lastQueryMs = Date.now();
     yield ragStreamCompleted({
-      answer: generated.text || answer,
+      answer: generated.text,
       retrievedChunks: prepared.retrievedChunks,
       contextUsed: prepared.context,
       retrievalTimeMs: prepared.retrievalTimeMs,
-      generationTimeMs: nowMs() - generationStarted,
+      generationTimeMs: generated.generationTimeMs ?? 0,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId,
       thinkingContent: generated.thinkingContent,

@@ -399,8 +399,7 @@ export function toDiarizationResult(
 /**
  * Project a segmentation result onto the public mask.
  *
- * `SegmentationClassSummary.fraction` is deleted outright; derive it from
- * `pixelCount / (width * height)` instead.
+ * Commons owns `SegmentationClassSummary.fraction` (tag 5).
  */
 export function toSegmentationResult(
   result: SegmentationResultProto
@@ -409,7 +408,6 @@ export function toSegmentationResult(
   const classMask = new Uint16Array(
     mask.buffer.slice(mask.byteOffset, mask.byteOffset + mask.byteLength)
   );
-  const totalPixels = result.width * result.height;
   return {
     classMask,
     width: result.width,
@@ -418,7 +416,7 @@ export function toSegmentationResult(
       id: summary.classId,
       label: summary.label,
       pixelCount: Number(summary.pixelCount),
-      fraction: totalPixels > 0 ? Number(summary.pixelCount) / totalPixels : 0,
+      fraction: summary.fraction,
     })),
     ...(result.diagnosticRgba && result.diagnosticRgba.byteLength > 0
       ? { diagnosticImage: result.diagnosticRgba }

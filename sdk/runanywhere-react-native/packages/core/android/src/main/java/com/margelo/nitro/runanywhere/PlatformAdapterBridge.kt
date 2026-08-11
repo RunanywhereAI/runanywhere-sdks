@@ -511,8 +511,8 @@ object PlatformAdapterBridge {
             Log.w(TAG, "getAvailableMemory via /proc/meminfo failed: ${e.message}")
         }
 
-        // Last resort: Return half of total as estimate
-        return getTotalMemory() / 2
+        // Last resort: UNKNOWN (0). Never invent half of total RAM.
+        return 0L
     }
 
     /**
@@ -532,85 +532,14 @@ object PlatformAdapterBridge {
     }
 
     /**
-     * Get GPU family based on chip name
-     * Infers GPU vendor from known chip manufacturers:
-     * - Google Tensor/Pixel → Mali
-     * - Samsung Exynos → Mali
-     * - Qualcomm Snapdragon → Adreno
-     * - MediaTek → Mali (mostly)
-     * - HiSilicon Kirin → Mali
-     *
-     * Aligned with Kotlin SDK's CppBridgeDevice.getDefaultGPUFamily()
+     * GPU family classification is owned by commons
+     * (`rac_device_classify_gpu_family` in InitBridge.cpp). This JNI hook is
+     * retained for method-cache compatibility and returns the raw chip name
+     * so C++ can classify — do not reintroduce local vendor tables here.
      */
     @JvmStatic
     fun getGPUFamily(): String {
-        val chipName = getChipName().lowercase()
-        val manufacturer = android.os.Build.MANUFACTURER.lowercase()
-
-        return when {
-            // Google Pixel codenames (all use Mali GPUs from Samsung/Google Tensor)
-            chipName == "bluejay" -> "mali"      // Pixel 6a (Tensor)
-            chipName == "oriole" -> "mali"       // Pixel 6 (Tensor)
-            chipName == "raven" -> "mali"        // Pixel 6 Pro (Tensor)
-            chipName == "cheetah" -> "mali"      // Pixel 7 (Tensor G2)
-            chipName == "panther" -> "mali"      // Pixel 7 Pro (Tensor G2)
-            chipName == "lynx" -> "mali"         // Pixel 7a (Tensor G2)
-            chipName == "tangorpro" -> "mali"    // Pixel Tablet (Tensor G2)
-            chipName == "shiba" -> "mali"        // Pixel 8 (Tensor G3)
-            chipName == "husky" -> "mali"        // Pixel 8 Pro (Tensor G3)
-            chipName == "akita" -> "mali"        // Pixel 8a (Tensor G3)
-            chipName == "caiman" -> "mali"       // Pixel 9 (Tensor G4)
-            chipName == "komodo" -> "mali"       // Pixel 9 Pro (Tensor G4)
-            chipName == "comet" -> "mali"        // Pixel 9 Pro XL (Tensor G4)
-            chipName == "tokay" -> "mali"        // Pixel 9 Pro Fold (Tensor G4)
-
-            // Google Tensor generic patterns
-            chipName.contains("tensor") -> "mali"
-            chipName.contains("gs1") -> "mali"   // GS101 (Tensor)
-            chipName.contains("gs2") -> "mali"   // GS201 (Tensor G2)
-            chipName.contains("zuma") -> "mali"  // Zuma (Tensor G3)
-            manufacturer == "google" -> "mali"   // Default for Google devices
-
-            // Samsung Exynos uses Mali GPUs
-            chipName.contains("exynos") -> "mali"
-            chipName.startsWith("s5e") -> "mali" // Samsung internal naming (e.g., s5e8535)
-            chipName.contains("samsung") -> "mali"
-
-            // Qualcomm Snapdragon uses Adreno GPUs
-            chipName.contains("snapdragon") -> "adreno"
-            chipName.contains("qualcomm") -> "adreno"
-            chipName.contains("sdm") -> "adreno" // SDM845, SDM855, etc.
-            chipName.contains("sm8") -> "adreno" // SM8150, SM8250, etc.
-            chipName.contains("sm7") -> "adreno" // SM7150, etc.
-            chipName.contains("sm6") -> "adreno" // SM6150, etc.
-            chipName.contains("msm") -> "adreno" // Older MSM chips
-            chipName.contains("kona") -> "adreno" // Snapdragon 865
-            chipName.contains("lahaina") -> "adreno" // Snapdragon 888
-            chipName.contains("taro") -> "adreno" // Snapdragon 8 Gen 1
-            chipName.contains("kalama") -> "adreno" // Snapdragon 8 Gen 2
-            chipName.contains("pineapple") -> "adreno" // Snapdragon 8 Gen 3
-            manufacturer == "qualcomm" -> "adreno"
-
-            // MediaTek uses Mali GPUs (mostly)
-            chipName.contains("mediatek") -> "mali"
-            chipName.contains("mt6") -> "mali"   // MT6xxx series
-            chipName.contains("mt8") -> "mali"   // MT8xxx series
-            chipName.contains("dimensity") -> "mali"
-            chipName.contains("helio") -> "mali"
-
-            // HiSilicon Kirin uses Mali GPUs
-            chipName.contains("kirin") -> "mali"
-            chipName.contains("hisilicon") -> "mali"
-
-            // Intel/x86 GPUs
-            chipName.contains("intel") -> "intel"
-
-            // NVIDIA (rare on mobile)
-            chipName.contains("nvidia") -> "nvidia"
-            chipName.contains("tegra") -> "nvidia"
-
-            else -> "unknown"
-        }
+        return getChipName()
     }
 
     /**

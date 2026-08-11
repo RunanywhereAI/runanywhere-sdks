@@ -121,8 +121,7 @@ export const vlm = {
               });
             }
             const isTerminal =
-              event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
-              event.result !== undefined;
+              event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED;
             if (isTerminal) {
               controller.push({
                 type: 'completed',

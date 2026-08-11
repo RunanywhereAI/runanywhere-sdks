@@ -616,8 +616,7 @@ export const ChatScreen: React.FC = () => {
         }
 
         const wasStopped = wasStoppedRef.current;
-        const finalContent =
-          result?.text || streamedText || '(No response generated)';
+        const finalContent = result?.text || streamedText;
         const thinkingContent = result?.thinkingText || streamedThoughts;
 
         // Build the final message with analytics and persist to disk once
@@ -625,7 +624,7 @@ export const ChatScreen: React.FC = () => {
         const finalMessage: Message = {
           id: assistantMessageId,
           role: MessageRole.Assistant,
-          content: finalContent,
+          content: finalContent || '—',
           ...(thinkingContent ? { thinkingContent } : {}),
           timestamp: new Date(),
           modelInfo: messageModelInfo,
@@ -637,13 +636,16 @@ export const ChatScreen: React.FC = () => {
               usage: {
                 inputTokens: result?.inputTokens ?? 0,
                 outputTokens: result?.outputTokens ?? 0,
-                totalTokens: (result?.inputTokens ?? 0) + (result?.outputTokens ?? 0),
+                totalTokens:
+                  (result?.inputTokens ?? 0) + (result?.outputTokens ?? 0),
                 decodeTokensPerSecond: result?.tokensPerSecond ?? 0,
                 prefillMs: 0,
                 ttftMs: result?.timeToFirstTokenMs ?? 0,
               },
             },
-            ...(result ? { timeToFirstToken: result.timeToFirstTokenMs } : {}),
+            ...(result && result.timeToFirstTokenMs > 0
+              ? { timeToFirstToken: result.timeToFirstTokenMs }
+              : {}),
             completionStatus: wasStopped ? 'interrupted' : 'completed',
             wasThinkingMode,
             wasInterrupted: wasStopped,

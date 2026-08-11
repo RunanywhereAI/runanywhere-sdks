@@ -305,10 +305,32 @@ inline bool tool_decision_hint_this_turn(bool tools_live_this_turn, bool force_a
     return tools_live_this_turn && !force_a_call;
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+// Commons-owned unary finish-reason derivation (mirrors llm_module
+// set_result_from_raw). Never inferred from tool_calls.size().
+inline runanywhere::v1::FinishReason finish_reason_from_raw(const rac_llm_result_t& raw,
+                                                            int32_t requested_max_tokens) {
+    if (requested_max_tokens > 0 && raw.completion_tokens >= requested_max_tokens) {
+        return runanywhere::v1::FINISH_REASON_LENGTH;
+    }
+    return runanywhere::v1::FINISH_REASON_STOP;
+}
+#endif
+
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
-                              rac_result_t* out_rc, GenerationTelemetryAgg* agg = nullptr) {
+                              rac_result_t* out_rc, GenerationTelemetryAgg* agg = nullptr
+#if defined(RAC_HAVE_PROTOBUF)
+                              ,
+                              runanywhere::v1::FinishReason* out_finish_reason = nullptr
+#endif
+) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (out_finish_reason) {
+        *out_finish_reason = runanywhere::v1::FINISH_REASON_UNSPECIFIED;
+    }
+#endif
     LifecycleLlmRef ref;
     rac_result_t rc = acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -441,6 +463,11 @@ inline bool run_generate_once(GenerationState& generation,
     if (out_response) {
         *out_response = raw.text ? raw.text : "";
     }
+#if defined(RAC_HAVE_PROTOBUF)
+    if (out_finish_reason) {
+        *out_finish_reason = finish_reason_from_raw(raw, options.max_tokens);
+    }
+#endif
     if (agg) {
         agg->generations++;
         agg->input_tokens += raw.prompt_tokens;

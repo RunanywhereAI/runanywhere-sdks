@@ -953,7 +953,8 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final info = await plugin.androidInfo;
     final model = _joinDistinct([info.manufacturer, info.model]);
     final coreCount = Platform.numberOfProcessors;
-    final coreSplit = _coreDistribution(coreCount, model);
+    // No sysfs max-freq probe on this path → UNKNOWN split (never invent).
+    const coreSplit = (0, 0);
     final chipName = _nonEmpty(info.hardware) ?? 'unknown';
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
@@ -969,9 +970,9 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       chipName: chipName,
       totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
       availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
-      hasNeuralEngine: _androidHasNeuralEngine(chipName, info.manufacturer),
+      hasNeuralEngine: _commonsHasNpu(info.manufacturer, chipName, chipName),
       neuralEngineCores: 0,
-      gpuFamily: _inferAndroidGpuFamily(chipName, info.manufacturer),
+      gpuFamily: _commonsClassifyGpuFamily(info.manufacturer, chipName, chipName),
       batteryLevel: battery.level,
       batteryState: battery.state,
       isLowPowerMode: battery.isLowPowerMode,
@@ -1231,27 +1232,62 @@ int _appleNeuralEngineCores(String chip) {
   return 0;
 }
 
-/// NPU heuristic from the SoC/hardware string: Snapdragon SM8/SM7/QCM,
-/// Google Tensor, Exynos 2xxx (s5e9xxx), MediaTek Dimensity.
-bool _androidHasNeuralEngine(String chipName, String manufacturer) {
-  final chip = chipName.toLowerCase();
-  if (RegExp(r'sm[78]\d{3}').hasMatch(chip) || chip.contains('qcm')) {
-    return true;
+/// NPU heuristic via `rac_device_heuristic_has_npu`.
+bool _commonsHasNpu(String? manufacturer, String? socModel, String chipName) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+      int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>(
+    'rac_device_heuristic_has_npu',
+  );
+  final mfr = (manufacturer ?? '').toNativeUtf8();
+  final model = (socModel ?? '').toNativeUtf8();
+  final chip = chipName.toNativeUtf8();
+  try {
+    return fn(mfr, model, chip) != 0;
+  } finally {
+    malloc.free(mfr);
+    malloc.free(model);
+    malloc.free(chip);
   }
-  if (chip.contains('tensor') ||
-      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
-      chip.contains('zuma') ||
-      manufacturer.toLowerCase().contains('google')) {
-    return true;
+}
+
+/// GPU family via `rac_device_classify_gpu_family`.
+String _commonsClassifyGpuFamily(
+  String? manufacturer,
+  String? socModel,
+  String chipName,
+) {
+  final lib = PlatformLoader.loadCommons();
+  final fn = lib.lookupFunction<
+      Int32 Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        IntPtr,
+      ),
+      int Function(
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        Pointer<Utf8>,
+        int,
+      )>('rac_device_classify_gpu_family');
+  final mfr = (manufacturer ?? '').toNativeUtf8();
+  final model = (socModel ?? '').toNativeUtf8();
+  final chip = chipName.toNativeUtf8();
+  final out = calloc<Uint8>(64);
+  try {
+    final rc = fn(mfr, model, chip, out.cast<Utf8>(), 64);
+    if (rc != 0) return 'unknown';
+    return out.cast<Utf8>().toDartString();
+  } finally {
+    malloc.free(mfr);
+    malloc.free(model);
+    malloc.free(chip);
+    calloc.free(out);
   }
-  if (RegExp(r'exynos\s?2\d{3}').hasMatch(chip) ||
-      RegExp(r's5e9[89]\d{2}').hasMatch(chip)) {
-    return true;
-  }
-  if (chip.contains('dimensity') || RegExp(r'mt6[89]\d{2}').hasMatch(chip)) {
-    return true;
-  }
-  return false;
 }
 
 String _defaultFormFactor() {
@@ -1273,38 +1309,4 @@ String _androidFormFactor(List<String> systemFeatures) {
     return 'tablet';
   }
   return 'phone';
-}
-
-String _inferAndroidGpuFamily(String chipName, String manufacturer) {
-  final chip = chipName.toLowerCase();
-  final maker = manufacturer.toLowerCase();
-  if (chip.contains('snapdragon') ||
-      chip.contains('qualcomm') ||
-      chip.contains('qcom') ||
-      chip.contains('qcm') ||
-      chip.contains('sdm') ||
-      RegExp(r'sm[4-8]\d{3}').hasMatch(chip) ||
-      chip.contains('msm') ||
-      maker.contains('qualcomm')) {
-    return 'adreno';
-  }
-  // Exynos 2200+ (s5e992x/s5e994x) use AMD Xclipse; earlier Exynos use Mali.
-  if (RegExp(r's5e9(9[24]|4\d)\d').hasMatch(chip)) return 'xclipse';
-  if (chip.contains('exynos') || chip.contains('s5e')) return 'mali';
-  if (chip.contains('tensor') ||
-      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
-      chip.contains('zuma') ||
-      maker.contains('google')) {
-    return 'mali';
-  }
-  if (chip.contains('mediatek') ||
-      chip.contains('dimensity') ||
-      chip.contains('helio') ||
-      RegExp(r'\bmt\d{4}').hasMatch(chip)) {
-    return 'mali';
-  }
-  if (chip.contains('kirin') || maker.contains('samsung')) return 'mali';
-  if (chip.contains('intel')) return 'intel';
-  if (chip.contains('nvidia') || chip.contains('tegra')) return 'nvidia';
-  return 'unknown';
 }

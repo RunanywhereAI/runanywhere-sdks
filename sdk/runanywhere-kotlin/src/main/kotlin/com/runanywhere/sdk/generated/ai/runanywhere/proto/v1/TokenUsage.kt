@@ -86,11 +86,11 @@ public class TokenUsage(
   )
   public val prefill_ms: Long = 0L,
   /**
-   * Request start to first output token. The canonical spelling for every
-   * result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
-   * report TTFT here and nowhere else. SDKEvent's own telemetry fields
-   * (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
-   * their separate event-stream spelling.
+   * Request start to first output token of any kind (reasoning or content).
+   * The canonical spelling for every result type: LLMGenerationResult and
+   * VLMResult report TTFT here and nowhere else. SDKEvent's own telemetry
+   * fields (GenerationEvent.time_to_first_token_ms, first_token_latency_ms)
+   * keep their separate event-stream spelling.
    */
   @field:WireField(
     tag = 6,
@@ -100,6 +100,58 @@ public class TokenUsage(
     schemaIndex = 5,
   )
   public val ttft_ms: Long = 0L,
+  /**
+   * Request start to the first CONTENT delta — what the user actually waits
+   * for when the model reasons first. 0 when no content token was ever
+   * delivered. Distinct from ttft_ms; do not alias the two.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timeToFirstContentTokenMs",
+    schemaIndex = 6,
+  )
+  public val time_to_first_content_token_ms: Long = 0L,
+  /**
+   * Content-only throughput over first-content-delta → last delta. Excludes
+   * reasoning tokens the accelerator also decoded. 0 when content count or
+   * window is unavailable.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "contentTokensPerSecond",
+    schemaIndex = 7,
+  )
+  public val content_tokens_per_second: Double = 0.0,
+  /**
+   * True when the backend buffered the whole generation and flushed deltas
+   * at once, so the decode window is an artifact of the flush. Platforms
+   * must not re-derive this heuristic.
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "batchBuffered",
+    schemaIndex = 8,
+  )
+  public val batch_buffered: Boolean = false,
+  /**
+   * True when input_tokens / output_tokens were estimated (e.g. chars/4)
+   * rather than reported by the engine. Absence of the flag (false) means
+   * the counts are engine-measured.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "countsEstimated",
+    schemaIndex = 9,
+  )
+  public val counts_estimated: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TokenUsage, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -118,6 +170,10 @@ public class TokenUsage(
     if (decode_tokens_per_second != other.decode_tokens_per_second) return false
     if (prefill_ms != other.prefill_ms) return false
     if (ttft_ms != other.ttft_ms) return false
+    if (time_to_first_content_token_ms != other.time_to_first_content_token_ms) return false
+    if (content_tokens_per_second != other.content_tokens_per_second) return false
+    if (batch_buffered != other.batch_buffered) return false
+    if (counts_estimated != other.counts_estimated) return false
     return true
   }
 
@@ -131,6 +187,10 @@ public class TokenUsage(
       result = result * 37 + decode_tokens_per_second.hashCode()
       result = result * 37 + prefill_ms.hashCode()
       result = result * 37 + ttft_ms.hashCode()
+      result = result * 37 + time_to_first_content_token_ms.hashCode()
+      result = result * 37 + content_tokens_per_second.hashCode()
+      result = result * 37 + batch_buffered.hashCode()
+      result = result * 37 + counts_estimated.hashCode()
       super.hashCode = result
     }
     return result
@@ -144,6 +204,10 @@ public class TokenUsage(
     result += """decode_tokens_per_second=$decode_tokens_per_second"""
     result += """prefill_ms=$prefill_ms"""
     result += """ttft_ms=$ttft_ms"""
+    result += """time_to_first_content_token_ms=$time_to_first_content_token_ms"""
+    result += """content_tokens_per_second=$content_tokens_per_second"""
+    result += """batch_buffered=$batch_buffered"""
+    result += """counts_estimated=$counts_estimated"""
     return result.joinToString(prefix = "TokenUsage{", separator = ", ", postfix = "}")
   }
 
@@ -154,8 +218,12 @@ public class TokenUsage(
     decode_tokens_per_second: Double = this.decode_tokens_per_second,
     prefill_ms: Long = this.prefill_ms,
     ttft_ms: Long = this.ttft_ms,
+    time_to_first_content_token_ms: Long = this.time_to_first_content_token_ms,
+    content_tokens_per_second: Double = this.content_tokens_per_second,
+    batch_buffered: Boolean = this.batch_buffered,
+    counts_estimated: Boolean = this.counts_estimated,
     unknownFields: ByteString = this.unknownFields,
-  ): TokenUsage = TokenUsage(input_tokens, output_tokens, total_tokens, decode_tokens_per_second, prefill_ms, ttft_ms, unknownFields)
+  ): TokenUsage = TokenUsage(input_tokens, output_tokens, total_tokens, decode_tokens_per_second, prefill_ms, ttft_ms, time_to_first_content_token_ms, content_tokens_per_second, batch_buffered, counts_estimated, unknownFields)
 
   public companion object {
     @JvmField
@@ -187,6 +255,18 @@ public class TokenUsage(
         if (value.ttft_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.ttft_ms)
         }
+        if (value.time_to_first_content_token_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.time_to_first_content_token_ms)
+        }
+        if (!value.content_tokens_per_second.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(8, value.content_tokens_per_second)
+        }
+        if (value.batch_buffered != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.batch_buffered)
+        }
+        if (value.counts_estimated != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.counts_estimated)
+        }
         return size
       }
 
@@ -209,11 +289,35 @@ public class TokenUsage(
         if (value.ttft_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.ttft_ms)
         }
+        if (value.time_to_first_content_token_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.time_to_first_content_token_ms)
+        }
+        if (!value.content_tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.content_tokens_per_second)
+        }
+        if (value.batch_buffered != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.batch_buffered)
+        }
+        if (value.counts_estimated != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.counts_estimated)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TokenUsage) {
         writer.writeBytes(value.unknownFields)
+        if (value.counts_estimated != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.counts_estimated)
+        }
+        if (value.batch_buffered != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.batch_buffered)
+        }
+        if (!value.content_tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.content_tokens_per_second)
+        }
+        if (value.time_to_first_content_token_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.time_to_first_content_token_ms)
+        }
         if (value.ttft_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.ttft_ms)
         }
@@ -241,6 +345,10 @@ public class TokenUsage(
         var decode_tokens_per_second: Double = 0.0
         var prefill_ms: Long = 0L
         var ttft_ms: Long = 0L
+        var time_to_first_content_token_ms: Long = 0L
+        var content_tokens_per_second: Double = 0.0
+        var batch_buffered: Boolean = false
+        var counts_estimated: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> input_tokens = ProtoAdapter.INT32.decode(reader)
@@ -249,6 +357,10 @@ public class TokenUsage(
             4 -> decode_tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
             5 -> prefill_ms = ProtoAdapter.INT64.decode(reader)
             6 -> ttft_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> time_to_first_content_token_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> content_tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
+            9 -> batch_buffered = ProtoAdapter.BOOL.decode(reader)
+            10 -> counts_estimated = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -259,6 +371,10 @@ public class TokenUsage(
           decode_tokens_per_second = decode_tokens_per_second,
           prefill_ms = prefill_ms,
           ttft_ms = ttft_ms,
+          time_to_first_content_token_ms = time_to_first_content_token_ms,
+          content_tokens_per_second = content_tokens_per_second,
+          batch_buffered = batch_buffered,
+          counts_estimated = counts_estimated,
           unknownFields = unknownFields
         )
       }

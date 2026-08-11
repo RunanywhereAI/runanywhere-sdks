@@ -15,12 +15,16 @@
 namespace rac::llm {
 
 inline bool model_thinking_tags_from_registry(const char* model_id, std::string* out_open_tag,
-                                              std::string* out_close_tag) {
+                                              std::string* out_close_tag,
+                                              bool* out_template_prefills_open_tag = nullptr) {
     if (out_open_tag) {
         out_open_tag->clear();
     }
     if (out_close_tag) {
         out_close_tag->clear();
+    }
+    if (out_template_prefills_open_tag) {
+        *out_template_prefills_open_tag = false;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)model_id;
@@ -66,6 +70,10 @@ inline bool model_thinking_tags_from_registry(const char* model_id, std::string*
     }
     *out_open_tag = pattern.open_tag();
     *out_close_tag = pattern.close_tag();
+    if (out_template_prefills_open_tag) {
+        *out_template_prefills_open_tag = pattern.has_template_prefills_open_tag() &&
+                                          pattern.template_prefills_open_tag();
+    }
     return true;
 #endif
 }

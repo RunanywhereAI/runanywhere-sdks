@@ -22,80 +22,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// One declared vocabulary, used in every place a finish reason is reported
-/// on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
-public nonisolated enum RAFinishReason: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-
-  /// End-of-turn token. OpenAI "stop" / Anthropic "end_turn".
-  case stop // = 1
-
-  /// Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens".
-  case length // = 2
-
-  /// One of options.stop_sequences fired; see `stop_sequence`.
-  case stopSequence // = 3
-
-  /// Model wants a tool run before it can continue.
-  case toolCalls // = 4
-
-  /// Caller cancelled. No cloud analogue.
-  case cancelled // = 5
-
-  /// Conversation exceeded the allocated context window.
-  case contextOverflow // = 6
-
-  /// Generation failed; see `error`.
-  case error // = 7
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .stop
-    case 2: self = .length
-    case 3: self = .stopSequence
-    case 4: self = .toolCalls
-    case 5: self = .cancelled
-    case 6: self = .contextOverflow
-    case 7: self = .error
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .stop: return 1
-    case .length: return 2
-    case .stopSequence: return 3
-    case .toolCalls: return 4
-    case .cancelled: return 5
-    case .contextOverflow: return 6
-    case .error: return 7
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAFinishReason] = [
-    .unspecified,
-    .stop,
-    .length,
-    .stopSequence,
-    .toolCalls,
-    .cancelled,
-    .contextOverflow,
-    .error,
-  ]
-
-}
-
 public nonisolated enum RAExecutionTarget: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -551,10 +477,6 @@ public nonisolated struct RAPerformanceMetrics: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RAFinishReason: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FINISH_REASON_UNSPECIFIED\0\u{1}FINISH_REASON_STOP\0\u{1}FINISH_REASON_LENGTH\0\u{1}FINISH_REASON_STOP_SEQUENCE\0\u{1}FINISH_REASON_TOOL_CALLS\0\u{1}FINISH_REASON_CANCELLED\0\u{1}FINISH_REASON_CONTEXT_OVERFLOW\0\u{1}FINISH_REASON_ERROR\0")
-}
-
 nonisolated extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EXECUTION_TARGET_UNSPECIFIED\0\u{1}EXECUTION_TARGET_ON_DEVICE\0\u{1}EXECUTION_TARGET_CLOUD\0\u{1}EXECUTION_TARGET_AUTO\0")
 }
@@ -750,7 +672,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{2}\u{3}framework\0\u{4}\u{2}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0\u{3}finish_reason\0\u{3}stop_sequence\0\u{c}\u{a}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{2}\u{3}framework\0\u{4}\u{2}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0\u{3}finish_reason\0\u{3}stop_sequence\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}\u{c}\u{7}\u{1}\u{c}\u{8}\u{1}\u{c}\u{11}\u{1}\u{c}\u{12}\u{1}\u{c}\u{13}\u{1}\u{c}\u{a}\u{1}")
 
   fileprivate class _StorageClass {
     var _text: String = String()
@@ -1042,7 +964,7 @@ nonisolated extension RAStreamToken: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 nonisolated extension RAPerformanceMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PerformanceMetrics"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}latency_ms\0\u{3}memory_bytes\0\u{2}\u{4}usage\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}latency_ms\0\u{3}memory_bytes\0\u{2}\u{4}usage\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

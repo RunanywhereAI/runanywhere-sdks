@@ -138,6 +138,7 @@
 #include "rac_file_manager.h"
 
 // Device
+#include "rac_device_facts.h" // chip / GPU / NPU / P-E / available-memory coalesce
 #include "rac_device_identity.h" // rac_device_get_or_create_persistent_id
 #include "rac_device_manager.h"
 

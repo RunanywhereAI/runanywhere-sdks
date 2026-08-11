@@ -6,8 +6,6 @@
 //  forwarders keep the proto-typed shapes they always returned.
 //
 
-import Foundation
-
 public extension RunAnywhere {
 
     /// Synthesize text to speech.
@@ -25,45 +23,7 @@ public extension RunAnywhere {
         _ text: String,
         options: RATTSOptions = .defaults()
     ) -> AsyncStream<RATTSOutput> {
-        AsyncStream { continuation in
-            let task = Task {
-                guard let snapshot = try? requireTTSVoice() else {
-                    continuation.finish()
-                    return
-                }
-                do {
-                    try await ensureServicesReady()
-                } catch {
-                    continuation.finish()
-                    return
-                }
-                var request = RATTSSynthesisRequest()
-                request.text = text
-                request.options = options
-                do {
-                    let stream = try await CppBridge.TTS.shared.synthesizeSessionStream(
-                        request,
-                        loadedModel: snapshot
-                    )
-                    for await output in stream {
-                        if Task.isCancelled { break }
-                        continuation.yield(output)
-                    }
-                } catch {
-                    var failure = RATTSOutput()
-                    failure.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
-                    failure.isFinal = true
-                    failure.error = RASDKError.make(
-                        code: .internal,
-                        message: "TTS stream failed: \(error)",
-                        category: .internal
-                    )
-                    continuation.yield(failure)
-                }
-                continuation.finish()
-            }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
-        }
+        tts.synthesizeStream(text, options: options)
     }
 
     /// Stop current TTS synthesis.

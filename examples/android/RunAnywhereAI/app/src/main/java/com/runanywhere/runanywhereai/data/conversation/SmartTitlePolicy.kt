@@ -31,26 +31,8 @@ internal object SmartTitlePolicy {
         )
 
     fun normalizedTitle(raw: String): String? {
-        var visible = raw
-        // Strip complete blocks first, including the alternate tag pair used by commons.
-        val complete = Regex(
-            pattern = "<\\s*(?:think|thinking)\\b[^>]*>.*?<\\s*/\\s*(?:think|thinking)\\s*>",
-            options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        )
-        visible = complete.replace(visible, "")
-
-        // A token-capped title often ends inside an unclosed reasoning block.
-        // Everything from that opening marker is reasoning-only, matching the
-        // shared commons strip policy rather than saving it as a conversation title.
-        val unclosedOpen = Regex(
-            pattern = "<\\s*(?:think|thinking)\\b[^>]*(?:>|$)",
-            options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
-        ).find(visible)
-        if (unclosedOpen != null) visible = visible.substring(0, unclosedOpen.range.first)
-
-        visible = Regex("<\\s*/?\\s*(?:think|thinking)\\b[^>]*>?", RegexOption.IGNORE_CASE)
-            .replace(visible, "")
-        return visible
+        // LLMGenerationResult.text is already reasoning-free from commons.
+        return raw
             .trim()
             .trim('"', '\'', '`')
             .lineSequence()

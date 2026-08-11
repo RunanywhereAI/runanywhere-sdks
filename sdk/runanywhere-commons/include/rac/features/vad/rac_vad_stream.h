@@ -12,11 +12,16 @@
  *      a serialized `runanywhere.v1.VADOptions` payload. C++ returns a
  *      session id which is owned by the lifecycle manager.
  *   3. SDK feeds raw PCM frames via `rac_vad_stream_feed_audio_proto()`.
- *      Each frame produces zero or more `VADStreamEvent` proto bytes
- *      (frame results, speech-activity transitions, statistics) on the
- *      registered callback.
- *   4. SDK terminates the session via `rac_vad_stream_stop_proto()` or
- *      `rac_vad_stream_cancel_proto()`.
+ *      Each frame produces a frame result and may produce a debounced
+ *      speech-activity transition on the registered callback. The session
+ *      applies the timing policy in `runanywhere.v1.VADOptions`; activity
+ *      events carry session-relative audio boundaries and a stable segment id.
+ *   4. SDK terminates the session via `rac_vad_stream_stop_proto()` (flushes
+ *      a confirmed open segment) or `rac_vad_stream_cancel_proto()` (silent).
+ *
+ * Adaptive energy endpointing, barge-in grace, and echo-residual estimation
+ * stay on `rac_voice_agent_feed_audio_proto` — do not reimplement them beside
+ * this stream.
  *
  * Lifetime: the buffer passed to the callback is valid only for the
  * duration of the callback invocation. Retainers must copy the bytes out.
@@ -105,7 +110,8 @@ RAC_API void rac_vad_proto_quiesce(void);
  * @retval RAC_ERROR_INVALID_HANDLE        @p handle is null or invalid.
  * @retval RAC_ERROR_NULL_POINTER          @p out_session_id is null.
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE Library was built without Protobuf.
- * @retval RAC_ERROR_NOT_IMPLEMENTED       Session backend not yet wired (stub).
+ * @retval RAC_ERROR_DECODING_ERROR        @p options_proto_bytes is not a
+ *                                         valid `VADOptions` payload.
  */
 RAC_API rac_result_t rac_vad_stream_start_proto(rac_handle_t handle,
                                                 const uint8_t* options_proto_bytes,
@@ -115,15 +121,19 @@ RAC_API rac_result_t rac_vad_stream_start_proto(rac_handle_t handle,
 /**
  * @brief Feed a PCM audio frame into a streaming VAD session.
  *
+ * Detector verdicts are converted into onset/offset events using the
+ * min-speech debounce, min-silence hangover, maximum duration, and prefix
+ * padding captured from the session's VADOptions at start.
+ *
  * @param session_id Session id returned by rac_vad_stream_start_proto().
- * @param audio_bytes Raw PCM samples; encoding follows the session options.
+ * @param audio_bytes Raw mono PCM_S16_LE samples at VADOptions.sample_rate.
  * @param audio_size  Number of bytes at @p audio_bytes.
  */
 RAC_API rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id,
                                                      const uint8_t* audio_bytes, size_t audio_size);
 
 /**
- * @brief Stop a VAD streaming session, flushing pending events.
+ * @brief Stop a VAD streaming session, closing a confirmed open segment.
  */
 RAC_API rac_result_t rac_vad_stream_stop_proto(uint64_t session_id);
 

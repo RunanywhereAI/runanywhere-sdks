@@ -285,6 +285,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ThinkingTagPattern final : public :
   enum : int {
     kOpenTagFieldNumber = 1,
     kCloseTagFieldNumber = 2,
+    kTemplatePrefillsOpenTagFieldNumber = 3,
   };
   // string open_tag = 1;
   void clear_open_tag() ;
@@ -316,11 +317,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ThinkingTagPattern final : public :
   ::std::string* PROTOBUF_NONNULL _internal_mutable_close_tag();
 
   public:
+  // optional bool template_prefills_open_tag = 3;
+  [[nodiscard]] bool has_template_prefills_open_tag()
+      const;
+  void clear_template_prefills_open_tag() ;
+  [[nodiscard]] bool template_prefills_open_tag() const;
+  void set_template_prefills_open_tag(bool value);
+
+  private:
+  bool _internal_template_prefills_open_tag() const;
+  void _internal_set_template_prefills_open_tag(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ThinkingTagPattern)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
+      ::google::protobuf::internal::TcParseTable<2, 3,
                           0, 59,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -351,6 +364,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ThinkingTagPattern final : public :
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr open_tag_;
     ::google::protobuf::internal::ArenaStringPtr close_tag_;
+    bool template_prefills_open_tag_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -730,6 +744,34 @@ inline void ThinkingTagPattern::set_allocated_close_tag(::std::string* PROTOBUF_
     _impl_.close_tag_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ThinkingTagPattern.close_tag)
+}
+
+// optional bool template_prefills_open_tag = 3;
+inline bool ThinkingTagPattern::has_template_prefills_open_tag() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void ThinkingTagPattern::clear_template_prefills_open_tag() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.template_prefills_open_tag_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline bool ThinkingTagPattern::template_prefills_open_tag() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ThinkingTagPattern.template_prefills_open_tag)
+  return _internal_template_prefills_open_tag();
+}
+inline void ThinkingTagPattern::set_template_prefills_open_tag(bool value) {
+  _internal_set_template_prefills_open_tag(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ThinkingTagPattern.template_prefills_open_tag)
+}
+inline bool ThinkingTagPattern::_internal_template_prefills_open_tag() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.template_prefills_open_tag_;
+}
+inline void ThinkingTagPattern::_internal_set_template_prefills_open_tag(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.template_prefills_open_tag_ = value;
 }
 
 // -------------------------------------------------------------------

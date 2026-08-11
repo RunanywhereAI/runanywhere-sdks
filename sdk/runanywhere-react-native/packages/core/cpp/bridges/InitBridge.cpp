@@ -15,6 +15,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
+#include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -2176,7 +2177,11 @@ std::string InitBridge::getGPUFamily() {
     }
     return "apple"; // Default GPU family for iOS/macOS
 #elif defined(ANDROID) || defined(__ANDROID__)
-    return AndroidBridge::getGPUFamily();
+    const std::string chip = AndroidBridge::getChipName();
+    char out[64];
+    (void)rac_device_classify_gpu_family(/*soc_manufacturer=*/nullptr, /*soc_model=*/nullptr,
+                                        chip.c_str(), out, sizeof(out));
+    return std::string(out);
 #else
     return "unknown";
 #endif

@@ -325,6 +325,12 @@ export interface NativeAddon {
   downloadCleanupProto(): Promise<number>;
   downloadSubscribeProgress(onProgress: (progressBytes: Uint8Array) => void): void;
   downloadUnsubscribeProgress(): void;
+  /** Sync `rac_download_progress_percent` — overall preferred when in [0,1]. */
+  downloadProgressPercent(
+    overallProgress: number,
+    bytesDownloaded: number,
+    totalBytes: number,
+  ): number;
   storageInfoProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageAvailabilityProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageDeletePlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;

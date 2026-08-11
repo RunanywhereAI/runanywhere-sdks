@@ -249,8 +249,6 @@ function capabilitiesSnapshot(): SDKCapabilities {
   };
 }
 
-const DEVICE_ID_KEY = 'runanywhere.deviceId';
-
 /** The host OS as the backend's platform enum (macos/linux/windows) — NOT the
  * SDK binding name. The binding ("electron") is reported separately as sdk_binding. */
 function osPlatform(): string {
@@ -448,16 +446,9 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       // list or load. Commons' registry is in-memory per process, so this runs on
       // every start — the same reseed Swift does in ModelCatalogBootstrap.
       await seedCatalog(backend, options.baseDir);
-      // A stable install identifier, minted locally. With no control plane there is
-      // nothing to register it with; it exists so logs and telemetry have a key.
+      // Commons owns the stable install identifier even when no control plane is configured.
       try {
-        const stored = await backend.secureGet(DEVICE_ID_KEY);
-        if (stored) {
-          deviceId = stored;
-        } else {
-          deviceId = `electron-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-          await backend.secureSet(DEVICE_ID_KEY, deviceId);
-        }
+        deviceId = await backend.devicePersistentId();
       } catch {
         // A secure store that is unavailable must not block local inference.
         deviceId = '';

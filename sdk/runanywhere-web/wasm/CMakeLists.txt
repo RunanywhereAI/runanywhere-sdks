@@ -331,6 +331,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # required by the canonical commons device manager.
     "_rac_device_manager_set_callbacks"
     "_rac_device_manager_clear_callbacks"
+    # Device-fact classifiers (platforms supply OS strings/freqs; commons owns policy).
+    "_rac_device_resolve_chip_name"
+    "_rac_device_classify_gpu_family"
+    "_rac_device_heuristic_has_npu"
+    "_rac_device_split_performance_cores"
+    "_rac_device_coalesce_available_memory"
     "_rac_wasm_sizeof_device_callbacks"
     "_rac_wasm_offsetof_device_callbacks_get_device_info"
     "_rac_wasm_offsetof_device_callbacks_get_device_id"
@@ -744,6 +750,17 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_diarization_stream_stop_proto"
     "_rac_diarization_stream_cancel_proto"
 
+    # Audio utilities (rac_audio_utils.h) — PCM/WAV/level/resample for Web FFI.
+    "_rac_audio_compute_level_db"
+    "_rac_audio_compute_level_normalized"
+    "_rac_audio_float32_to_pcm16"
+    "_rac_audio_float32_to_wav"
+    "_rac_audio_int16_to_wav"
+    "_rac_audio_pcm16_to_float32"
+    "_rac_audio_pcm_bytes_to_ms"
+    "_rac_audio_resample_f32"
+    "_rac_audio_wav_header_size"
+
     # Voice Agent
     "_rac_audio_pipeline_state_name"
     "_rac_audio_pipeline_can_activate_microphone"
@@ -794,6 +811,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_download_cancel_proto"
     "_rac_download_resume_proto"
     "_rac_download_progress_poll_proto"
+    "_rac_download_progress_percent"
 
     # Storage analyzer proto ABI. The browser supplies storage/file callbacks
     # locally; commons owns availability, delete planning and deletion policy.
@@ -884,7 +902,9 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_create_proto"
     "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_embed_batch_lifecycle_proto"
+    "_rac_embeddings_norm"
     "_rac_embeddings_result_free"
+    "_rac_embeddings_similarity"
 
     # Lifecycle-owned semantic segmentation. The symbol is in commons; the
     # ONNX bundle claims the capability and supplies the provider at runtime.

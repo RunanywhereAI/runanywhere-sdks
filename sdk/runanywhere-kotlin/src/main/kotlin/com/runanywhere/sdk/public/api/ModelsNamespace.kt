@@ -19,23 +19,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * [LoadOptions] fields the commons load ABI has no wire path for yet.
+ * [LoadOptions] fields the commons load ABI cannot honor.
  *
- * `ModelLoadRequest` only carries a framework pin; `contextLength`, `threads`,
- * and `accelerator` are accepted here for cross-SDK API parity but cannot be
- * honored until the native load ABI grows placement fields (tracked as a
- * follow-up — see PR #605 review follow-up issue 8). Per the v4 contract,
- * "every accepted field is implemented end to end or fails preflight" —
- * silently dropping them is forbidden, so [ModelsNamespace.load] throws
- * instead of warning.
+ * `threads` was retired from ModelLoadRequest (reserved tag 7) and never
+ * became a hard runtime guarantee. Other LoadOptions knobs (contextLength,
+ * accelerator, backend preferences) are carried by the native load path —
+ * rejecting them here was a false preflight.
  */
 internal fun LoadOptions?.unsupportedLoadKnobs(): List<String> =
     listOfNotNull(
-        "contextLength".takeIf { this?.contextLength != null },
         "threads".takeIf { this?.threads != null },
-        "accelerator".takeIf { this?.resolvedAccelerator != null },
-        "backendPreferences (only the first preference reaches commons; ordered fallback is not carried)"
-            .takeIf { (this?.resolvedBackendPreferences?.size ?: 0) > 1 },
     )
 
 private val LOADABLE_CATEGORIES =
@@ -167,7 +160,7 @@ public class ModelsNamespace internal constructor() {
                                     retryAttempt = progress.retry_attempt,
                                     overallProgress = progress.overall_progress.takeIf { it > 0f },
                                     currentFileIndex = progress.current_file_index,
-                                    totalFiles = progress.total_files.coerceAtLeast(1),
+                                    totalFiles = progress.total_files,
                                 ),
                             )
                     }

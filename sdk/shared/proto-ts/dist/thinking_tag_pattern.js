@@ -56,7 +56,7 @@ function reasoningModeToJSON(object) {
     }
 }
 function createBaseThinkingTagPattern() {
-    return { openTag: "", closeTag: "" };
+    return { openTag: "", closeTag: "", templatePrefillsOpenTag: undefined };
 }
 exports.ThinkingTagPattern = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -65,6 +65,9 @@ exports.ThinkingTagPattern = {
         }
         if (message.closeTag !== "") {
             writer.uint32(18).string(message.closeTag);
+        }
+        if (message.templatePrefillsOpenTag !== undefined) {
+            writer.uint32(24).bool(message.templatePrefillsOpenTag);
         }
         return writer;
     },
@@ -89,6 +92,13 @@ exports.ThinkingTagPattern = {
                     message.closeTag = reader.string();
                     continue;
                 }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.templatePrefillsOpenTag = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -109,6 +119,11 @@ exports.ThinkingTagPattern = {
                 : isSet(object.close_tag)
                     ? globalThis.String(object.close_tag)
                     : "",
+            templatePrefillsOpenTag: isSet(object.templatePrefillsOpenTag)
+                ? globalThis.Boolean(object.templatePrefillsOpenTag)
+                : isSet(object.template_prefills_open_tag)
+                    ? globalThis.Boolean(object.template_prefills_open_tag)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -119,6 +134,9 @@ exports.ThinkingTagPattern = {
         if (message.closeTag !== "") {
             obj.closeTag = message.closeTag;
         }
+        if (message.templatePrefillsOpenTag !== undefined) {
+            obj.templatePrefillsOpenTag = message.templatePrefillsOpenTag;
+        }
         return obj;
     },
     create(base) {
@@ -128,6 +146,7 @@ exports.ThinkingTagPattern = {
         const message = createBaseThinkingTagPattern();
         message.openTag = object.openTag ?? "";
         message.closeTag = object.closeTag ?? "";
+        message.templatePrefillsOpenTag = object.templatePrefillsOpenTag ?? undefined;
         return message;
     },
 };

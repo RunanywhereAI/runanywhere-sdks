@@ -70,6 +70,14 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         // (normalize_thinking_capability, model_registry.cpp): a row that says
         // it reasons also carries the tag pair the splitter uses.
         out_ref->supports_thinking = (*token)->model.supports_thinking();
+        // Optional prefill signal stamped at QHexRT load from the bundle
+        // manifest (gen_prefill) or the DeepSeek-R1-Distill name heuristic.
+        // Unset ≠ false: only has_template_prefills_open_tag() && value arms
+        // start_inside_reasoning() in the stream gate.
+        out_ref->template_prefills_open_tag =
+            (*token)->model.has_thinking_pattern() &&
+            (*token)->model.thinking_pattern().has_template_prefills_open_tag() &&
+            (*token)->model.thinking_pattern().template_prefills_open_tag();
     }
     out_ref->opaque = token.release();
     return RAC_SUCCESS;

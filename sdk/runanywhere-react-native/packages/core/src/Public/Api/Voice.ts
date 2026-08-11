@@ -131,12 +131,10 @@ function toSessionConfig(
   vad: VadOptions | undefined
 ): TurnDetection {
   const vadOptions = toVadOptions(vad);
-  const threshold = vadOptions.activationThreshold ?? 0;
   return TurnDetection.fromPartial({
     ...(turnHandling?.endpointing?.minDelayMs !== undefined
       ? { silenceDurationMs: turnHandling.endpointing.minDelayMs }
       : { silenceDurationMs: vadOptions.minSilenceDurationMs }),
-    ...(threshold > 0 ? { threshold } : {}),
   });
 }
 
@@ -180,7 +178,6 @@ export const voice = {
     await ensureDefaultVAD(options.vad?.model);
 
     const vadOptions = toVadOptions(options.vad);
-    const activationThreshold = vadOptions.activationThreshold ?? 0;
     await initializeVoiceAgent(
       VoiceAgentComposeConfig.fromPartial({
         sttModelId: options.stt.id,
@@ -188,7 +185,7 @@ export const voice = {
         ...(options.tts.voice ? { ttsVoiceId: options.tts.voice } : {}),
         llmGeneration: toLlmOptions(options.generation),
         vadConfig: VADConfiguration.fromPartial({
-          ...(activationThreshold > 0 ? { activationThreshold } : {}),
+          activationThreshold: vadOptions.activationThreshold,
         }),
         turnDetection: toSessionConfig(options.turnHandling, options.vad),
       })

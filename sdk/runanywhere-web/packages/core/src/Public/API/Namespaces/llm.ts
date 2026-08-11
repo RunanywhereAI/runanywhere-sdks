@@ -21,6 +21,7 @@ import type { GenerationEvent } from '../Events.js';
 import type { GenerationResult, StructuredResult } from '../Results.js';
 import {
   currentDevicePlacement,
+  finishReasonFrom,
   frameworkToBackend,
   streamFinalToGenerationResult,
   toGenerationResult,
@@ -124,7 +125,7 @@ async function generateWithToolLoop(
     text: result.text,
     thinkingText: result.thinkingContent,
     toolCalls: result.toolCalls,
-    finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
+    finishReason: finishReasonFrom(result.finishReason, false),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
@@ -202,11 +203,8 @@ export const llm = {
       let announced = false;
       let text = '';
       let thinking = '';
-      let tokens = 0;
       let terminal = false;
       let sequence = 0;
-      const startedAt = performance.now();
-      let firstTokenAt: number | undefined;
 
       function partial(): Partial<GenerationResult> {
         return { text, thinkingText: thinking || undefined };
@@ -225,7 +223,6 @@ export const llm = {
             break;
           }
           if (event.token) {
-            firstTokenAt ??= performance.now();
             const thought = event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING;
             if (thought) {
               thinking += event.token;
@@ -234,7 +231,6 @@ export const llm = {
               };
             } else {
               text += event.token;
-              tokens += 1;
               yield {
                 type: 'textDelta', requestId, sequence: sequence++, itemId, index: 0, text: event.token,
               };
@@ -259,20 +255,12 @@ export const llm = {
           }
           if (event.result) {
             terminal = true;
-            const elapsed = performance.now() - startedAt;
             const result = withPlacement(streamFinalToGenerationResult(
               event.result,
               requestId,
               options?.model
                 ?? WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)?.id
                 ?? '',
-              {
-                text,
-                thinkingText: thinking,
-                outputTokens: tokens,
-                ttftMs: firstTokenAt === undefined ? 0 : firstTokenAt - startedAt,
-                tokensPerSecond: elapsed > 0 ? (tokens / elapsed) * 1000 : 0,
-              },
             ));
             yield {
               type: 'usage',
@@ -281,9 +269,9 @@ export const llm = {
               usage: {
                 inputTokens: result.inputTokens,
                 outputTokens: result.outputTokens,
-                totalTokens: result.inputTokens + result.outputTokens,
+                totalTokens: event.result.usage?.totalTokens ?? 0,
                 decodeTokensPerSecond: result.tokensPerSecond,
-                prefillMs: 0,
+                prefillMs: event.result.promptEvalTimeMs ?? 0,
                 ttftMs: result.timeToFirstTokenMs,
               },
             };

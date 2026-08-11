@@ -305,7 +305,8 @@ public enum DeviceInfoFactory {
         if result == KERN_SUCCESS {
             return max(0, totalMemory - Int(taskInfo.resident_size))
         }
-        return totalMemory / 2
+        // 0 = UNKNOWN (idl/device_info.proto). Never invent half of total RAM.
+        return 0
     }
 
     #if os(macOS)

@@ -198,26 +198,32 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
         ttft_ms = static_cast<double>(handle->first_token_time_ms - handle->start_time_ms);
     }
 
-    // Use actual token counts from backend if available, otherwise estimate
+    // Prefer backend-reported counts (rac_streaming_metrics_set_token_counts).
+    // chars/4 is last resort and MUST set counts_estimated — never present an
+    // estimate as a measurement without the flag.
     int32_t input_tokens;
     int32_t output_tokens;
+    bool counts_estimated = false;
 
     if (handle->actual_input_tokens > 0) {
         input_tokens = handle->actual_input_tokens;
     } else {
-        // Fallback: estimate ~4 chars per token
-        input_tokens = handle->prompt_length > 0 ? (handle->prompt_length / 4) : 1;
+        input_tokens = handle->prompt_length > 0
+                           ? static_cast<int32_t>((handle->prompt_length + 3) / 4)
+                           : 1;
         if (input_tokens < 1)
             input_tokens = 1;
+        counts_estimated = true;
     }
 
     if (handle->actual_output_tokens > 0) {
         output_tokens = handle->actual_output_tokens;
     } else {
-        // Fallback: estimate ~4 chars per token
-        output_tokens = static_cast<int32_t>(handle->full_text.length() / 4);
-        if (output_tokens < 1)
+        const size_t len = handle->full_text.length();
+        output_tokens = len > 0 ? static_cast<int32_t>((len + 3) / 4) : 0;
+        if (output_tokens < 1 && len > 0)
             output_tokens = 1;
+        counts_estimated = true;
     }
 
     // Tokens/sec over decode time only — subtracting TTFT keeps the figure a
@@ -240,6 +246,7 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
     out_result->ttft_ms = ttft_ms;
     out_result->thinking_tokens = 0;
     out_result->response_tokens = output_tokens;
+    out_result->counts_estimated = counts_estimated ? RAC_TRUE : RAC_FALSE;
 
     return RAC_SUCCESS;
 }

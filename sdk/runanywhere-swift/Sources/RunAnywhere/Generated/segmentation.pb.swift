@@ -155,7 +155,7 @@ public nonisolated struct RASegmentationRequest: Sendable {
 /// SegmentationResult.height). Commons rejects any result whose pixel_counts
 /// do not sum to that product before encoding it into a SegmentationResult, so
 /// within this message the summaries partition the image and the division is
-/// exact.
+/// exact. `fraction` is that share, computed once by commons (tag 5).
 public nonisolated struct RASegmentationClassSummary: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -166,6 +166,10 @@ public nonisolated struct RASegmentationClassSummary: Sendable {
   public var pixelCount: UInt64 = 0
 
   public var label: String = String()
+
+  /// Dimensionless coverage in [0.0, 1.0]. Equals pixel_count / (width*height).
+  /// Zero when width or height is zero (rejected upstream before encode).
+  public var fraction: Float = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -355,7 +359,7 @@ nonisolated extension RASegmentationRequest: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationClassSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}class_id\0\u{3}pixel_count\0\u{1}label\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}class_id\0\u{3}pixel_count\0\u{1}label\0\u{2}\u{2}fraction\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -366,6 +370,7 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.classID) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.pixelCount) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self.fraction) }()
       default: break
       }
     }
@@ -381,6 +386,9 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
     if !self.label.isEmpty {
       try visitor.visitSingularStringField(value: self.label, fieldNumber: 3)
     }
+    if self.fraction.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.fraction, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -388,6 +396,7 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
     if lhs.classID != rhs.classID {return false}
     if lhs.pixelCount != rhs.pixelCount {return false}
     if lhs.label != rhs.label {return false}
+    if lhs.fraction != rhs.fraction {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

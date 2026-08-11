@@ -32,18 +32,11 @@ class VoiceTtsChunkPolicyTest {
     }
 
     @Test
-    fun `drainSentences strips a complete think block and never speaks it`() {
-        val buf = StringBuilder("Say <think>secret reasoning</think>the answer. ")
+    fun `drainSentences speaks answer-channel text already split by commons`() {
+        // THINKING events never enter this buffer; sentence-split only.
+        val buf = StringBuilder("Say the answer. ")
         val out = VoiceTtsChunkPolicy.drainSentences(buf, flush = false)
         assertEquals(listOf("Say the answer."), out)
-    }
-
-    @Test
-    fun `drainSentences holds an unclosed think block instead of speaking it`() {
-        val buf = StringBuilder("Answer here. <think>still reasoning")
-        val out = VoiceTtsChunkPolicy.drainSentences(buf, flush = false)
-        assertEquals(listOf("Answer here."), out)
-        assertEquals("<think>still reasoning", buf.toString()) // held, not read aloud
     }
 
     // --- sanitizeForTts ------------------------------------------------------

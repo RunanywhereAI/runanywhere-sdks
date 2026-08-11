@@ -622,12 +622,7 @@ async function onAnalyze(): Promise<void> {
   setStatus('Looking at the picture…');
   lastResult = '';
 
-  const events = RunAnywhere.vlm.generateStream(image, effectivePrompt, {
-    maxOutputTokens: 200,
-    temperature: 0.7,
-    topP: 0.9,
-    topK: 40,
-  });
+  const events = RunAnywhere.vlm.generateStream(image, effectivePrompt);
   const iterator = events[Symbol.asyncIterator]();
   // Abandoning the iterator is the cancellation contract for every v3 stream.
   let cancellationRequested = false;
