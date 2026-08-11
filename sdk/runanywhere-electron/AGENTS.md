@@ -102,8 +102,19 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
   `begin_op` leases so unload-during-generate cannot UAF.
 - Win32 file/secure paths use wide UTF-16 (`_wfopen`); validate secure keys against
   traversal (`secure_key_ok`).
-- Optional backends link via the CMake `foreach` / `RAC_HAVE_BACKEND_*` loop — no
-  hard-coded "always link QHexRT" claims on desktop.
+- Dual packaging path for backends:
+  - **FAT (default today):** optional backends link via the CMake `foreach` /
+    `RAC_HAVE_BACKEND_*` loop — no hard-coded "always link QHexRT" claims on desktop.
+  - **THIN (`-DRAC_ELECTRON_THIN_ADDON=ON` or `RAC_STATIC_PLUGINS=OFF`):** the `.node`
+    links only `rac_commons`; engines load at runtime via N-API `loadPlugin` /
+    `RUNANYWHERE_PLUGIN_PATHS` (`rac_registry_load_plugin`). Never expose
+    `loadPlugin` / `registerBackendPlugin` on the renderer RPC allowlist.
+- Backend packages (`packages/{llamacpp,onnx,sherpa}`) use
+  `LlamaCPP|ONNX|Sherpa.register()` to record paths; main copies them into
+  `RUNANYWHERE_PLUGIN_PATHS` at utility fork only (no RPC).
+- **HTTP downloads (D4):** keep `platform_adapter.http_download` NULL. With
+  `RAC_DESKTOP_ADAPTER=ON`, `initialize()` registers the libcurl transport via
+  `rac_desktop_http_transport_register()` — do not fill the adapter download slot.
 
 ### Testing and CI
 

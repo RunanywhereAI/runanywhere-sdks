@@ -568,13 +568,26 @@ Configured hooks: gitleaks (secrets), trailing-whitespace, end-of-file-fixer, ch
 
 ---
 
-## Active Issues (`thoughts/shared/issues/`)
+## Active Issues
 
-On `feat/v2-architecture` branch, 4 tracked regressions relative to `main`:
-- **001/002/005** (HIGH): Swift, Kotlin, and Web SDKs collapsed backends into monolithic artifacts, losing per-backend selective linking.
-- **003** (MEDIUM): React Native backend packages are TypeScript-only, missing native plumbing.
+> The old `thoughts/shared/issues/` directory (regressions 001/002/003/005 on
+> `feat/v2-architecture`) **does not exist** in this tree. Those bullets claimed
+> Swift/Kotlin/Web had collapsed backends into monoliths; those SDKs already ship
+> split backend packages. Do not revive that section from memory.
 
-Live state document: `thoughts/shared/plans/sdk_current_state.md`
+### Electron (`smonga/electron_upgrade`) — in progress
+
+Work is active on branch `smonga/electron_upgrade`. **Do not claim packaging or
+per-backend Electron packages are done.** Entry points:
+
+- [`thoughts/shared/plans/electron_HANDOFF.md`](thoughts/shared/plans/electron_HANDOFF.md) — master state
+- [`thoughts/shared/plans/electron_takeover.md`](thoughts/shared/plans/electron_takeover.md) — remaining executable plan
+
+Current shape (honest): TypeScript SDK + example shell are far along; feature
+views, visual gate, electron-builder packaging, and the backend packaging split
+(#9 / `RAC_HAVE_BACKEND_*` fat addon → runtime plugins) remain open. Parallel
+Tracks A/B/C plus Phase 0 commits may be in flight — check the HANDOFF status
+pointer before assuming anything landed.
 
 ---
 
