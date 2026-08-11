@@ -1,0 +1,10 @@
+# Authoring is TypeScript only. Codegen writes `.ts` into `src/`; `tsc`
+# emits into `dist/`. Never keep compiled JS next to the sources — a stray
+# in-place emit (wrong cwd / missing outDir) has already staged these once.
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
+
+# Local install noise; the published package ships `dist/` only.
+node_modules/
