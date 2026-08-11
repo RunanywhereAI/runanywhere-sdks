@@ -343,36 +343,49 @@ int test_null_inputs_rejected() {
     return 0;
 }
 
-// RUN-81: the no-think directive is an ALLOWLIST — only QHexRT suppresses
-// natively; every other/unknown engine keeps injecting so llama.cpp/onnx/cloud
-// still receive the Qwen "/no_think" token. This locks the multi-engine safety
-// guarantee at the helper level.
+// RUN-81: the no-think directive passes TWO gates. The engine gate is an
+// ALLOWLIST — only QHexRT suppresses natively, so llama.cpp/onnx/cloud still
+// receive the Qwen "/no_think" token. The model gate is the decisive one: the
+// token is a Qwen control sequence, so a model that does not reason must never
+// see it (LFM2.5-230M answers it with "\n\n" and stops). This locks both at the
+// helper level.
 int test_no_think_directive_engine_gated() {
     using rac::llm::apply_no_think_directive;
     using rac::llm::engine_handles_disable_thinking_natively;
 
-    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_QHEXRT"), true);
-    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_LLAMA_CPP"), false);
-    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_ONNX"), false);
-    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_CLOUD"), false);
-    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(nullptr), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(RAC_FRAMEWORK_QHEXRT), true);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(RAC_FRAMEWORK_LLAMACPP), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(RAC_FRAMEWORK_ONNX), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(RAC_FRAMEWORK_MLX), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(RAC_FRAMEWORK_UNKNOWN), false);
 
-    // disable=false is a passthrough regardless of engine.
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, "INFERENCE_FRAMEWORK_LLAMA_CPP").c_str(),
+    // disable=false is a passthrough regardless of engine or model.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, RAC_FRAMEWORK_LLAMACPP, true).c_str(),
                   "hi");
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, "INFERENCE_FRAMEWORK_QHEXRT").c_str(),
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, RAC_FRAMEWORK_QHEXRT, true).c_str(),
                   "hi");
 
-    // disable=true: injected for non-native engines + unknown, skipped for QHexRT.
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_LLAMA_CPP").c_str(),
+    // disable=true on a REASONING model: injected for non-native engines,
+    // skipped for QHexRT.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_LLAMACPP, true).c_str(),
                   "/no_think\nhi");
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_ONNX").c_str(),
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_ONNX, true).c_str(),
                   "/no_think\nhi");
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, nullptr).c_str(), "/no_think\nhi");
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_QHEXRT").c_str(),
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_UNKNOWN, true).c_str(),
+                  "/no_think\nhi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_QHEXRT, true).c_str(),
                   "hi");
-    // 2-arg overload (no framework in scope) injects — the safe default.
-    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE).c_str(), "/no_think\nhi");
+
+    // disable=true on a NON-REASONING model: never injected, on any engine and
+    // whether or not the framework is even known. This is what makes
+    // ReasoningMode.OFF safe to send from every SDK.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_LLAMACPP, false).c_str(),
+                  "hi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_ONNX, false).c_str(), "hi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_QHEXRT, false).c_str(),
+                  "hi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, RAC_FRAMEWORK_UNKNOWN, false).c_str(),
+                  "hi");
     return 0;
 }
 
