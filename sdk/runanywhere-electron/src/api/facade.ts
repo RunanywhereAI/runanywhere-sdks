@@ -569,7 +569,6 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     initializing = (async () => {
       await backend.initialize({ baseDir: options.baseDir, secureDir: options.secureDir });
       version = await backend.version();
-      ready = true;
       // A token a previous run stored is re-applied before anything can reach
       // HuggingFace, so a gated model still downloads on a cold start instead of
       // making the app ask for the token again. Nothing stored leaves commons on
@@ -585,6 +584,23 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       // list or load. Commons' registry is in-memory per process, so this runs on
       // every start — the same reseed Swift does in ModelCatalogBootstrap.
       await seedCatalog(backend);
+      // READY IS SET HERE, AFTER SEEDING — not before it.
+      //
+      // `ready` was set immediately after `backend.version()`, which made
+      // `isReady` true ~40 ms into a start whose registry stays EMPTY for several
+      // more seconds while `seedCatalog` pushes one `abi.register` per row over
+      // RPC. Every consumer that lists on ready — a model picker, a Models view,
+      // an `await initialize()` followed by `models.list()` — therefore saw ZERO
+      // models and had no way to know more were coming. Measured on the Electron
+      // example app: `isReady()` true at 43 ms with `models.list()` == 0, then 28
+      // rows at +5.3 s, with nothing in between to react to. It reads exactly like
+      // "the catalog never reached the host", which is the wrong thing to go and
+      // debug — the catalog arrives fine, just after the app was told to look.
+      //
+      // Initialization now costs what seeding costs, and the promise means what
+      // its name says. Nothing between `backend.initialize` and here needs `ready`
+      // (ModelAbi does not go through `requireReady`), so ordering it last is free.
+      ready = true;
       // A stable install identifier, minted locally. With no control plane there is
       // nothing to register it with; it exists so logs and telemetry have a key.
       try {
