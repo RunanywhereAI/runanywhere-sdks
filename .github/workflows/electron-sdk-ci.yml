@@ -82,6 +82,10 @@ jobs:
           npm install
           # Tests import ../../dist; typecheck of tsconfig.test.json needs dist/.
           npm run build
+          # Example path aliases point at packages/*/dist/*.d.ts — build backends too.
+          for pkg in packages/llamacpp packages/onnx packages/sherpa; do
+            (cd "$pkg" && npm install && npm run build)
+          done
           npm run typecheck
           npm test
 
