@@ -19,12 +19,23 @@ import Foundation
 // Min platforms: iOS 17.5 / macOS 14.5 (matches the root package).
 // =============================================================================
 
-// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
-// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS and
-// speaker-diarization provider plumbing are available to the Apple MLX runtime
-// while upstream release tags catch up.
+// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut an
+// upstream tag compatible with mlx-swift-lm 3.x, so MLX STT/TTS and
+// speaker-diarization provider plumbing come from one specific upstream commit.
+//
+// Consumed through the RunanywhereAI mirror by version — NOT by `revision:` —
+// to stay identical to the published root manifest, which cannot carry revision
+// pins (SwiftPM refuses to resolve a package by version when its manifest pins
+// any dependency to a revision or branch). See the root Package.swift for the
+// full rationale.
+//
+//   https://github.com/RunanywhereAI/mlx-audio-swift  tag 0.1.4
+//       == Blaizzy/mlx-audio-swift @ 580e952adda0cd6bdc5c04f402822adbb61525c8
+//
+// The tag number is fork-local bookkeeping, NOT upstream 0.1.4 — the commit
+// predates upstream v0.1.3.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.4"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -33,10 +44,21 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 // PrismML's Bonsai 1-bit weights require kernels that are not yet available
-// in upstream mlx-swift. This revision is the maintained Prism delta applied
-// directly on top of upstream mlx-swift 0.31.6, which keeps mlx-swift-lm
-// 3.31.x API-compatible while enabling bits=1 / group_size=128 models.
-let prismMLXSwiftRevision = "563961dfcfd4589755190d285555e4f9eface890"
+// in upstream mlx-swift. PrismML-Eng/mlx-swift @ 563961d is the maintained
+// Prism delta applied directly on top of upstream mlx-swift 0.31.6, which keeps
+// mlx-swift-lm 3.31.x API-compatible while enabling bits=1 / group_size=128
+// models. Consumed through the RunanywhereAI mirror by version to match the
+// published root manifest (see root Package.swift for the full rationale):
+//
+//   https://github.com/RunanywhereAI/mlx-swift  tag 0.31.7
+//       == PrismML-Eng/mlx-swift @ 563961dfcfd4589755190d285555e4f9eface890
+//
+// 0.31.7 is fork-local bookkeeping, NOT an upstream ml-explore release; it sits
+// inside mlx-swift-lm 3.31.x's `.upToNextMinor(from: "0.31.4")` window and
+// exists only in our mirror, so a mis-resolution to upstream mlx-swift (which
+// shares the `mlx-swift` package identity) fails loudly instead of silently
+// dropping the Prism 1-bit kernels.
+let prismMLXSwiftVersion: Version = "0.31.7"
 
 let package = Package(
     name: "RunAnywhere",
@@ -90,8 +112,8 @@ let package = Package(
         // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
         .package(
-            url: "https://github.com/PrismML-Eng/mlx-swift.git",
-            revision: prismMLXSwiftRevision
+            url: "https://github.com/RunanywhereAI/mlx-swift.git",
+            exact: prismMLXSwiftVersion
         ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS/VAD/diarization.

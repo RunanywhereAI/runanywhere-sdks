@@ -1,5 +1,5 @@
 {
-  "originHash" : "f7aba2f3e37967a812669cba2f50cd360185e636ba89495e795e21296c86c8e4",
+  "originHash" : "e4abf80bc44e08aa295a17237e062af52849e21ed8b56aa32ca2c6629fc966c1",
   "pins" : [
     {
       "identity" : "devicekit",
@@ -31,17 +31,19 @@
     {
       "identity" : "mlx-audio-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Blaizzy/mlx-audio-swift.git",
+      "location" : "https://github.com/RunanywhereAI/mlx-audio-swift.git",
       "state" : {
-        "revision" : "580e952adda0cd6bdc5c04f402822adbb61525c8"
+        "revision" : "580e952adda0cd6bdc5c04f402822adbb61525c8",
+        "version" : "0.1.4"
       }
     },
     {
       "identity" : "mlx-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/PrismML-Eng/mlx-swift.git",
+      "location" : "https://github.com/RunanywhereAI/mlx-swift.git",
       "state" : {
-        "revision" : "563961dfcfd4589755190d285555e4f9eface890"
+        "revision" : "563961dfcfd4589755190d285555e4f9eface890",
+        "version" : "0.31.7"
       }
     },
     {
