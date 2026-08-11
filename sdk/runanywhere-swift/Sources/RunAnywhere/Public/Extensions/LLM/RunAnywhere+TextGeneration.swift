@@ -285,6 +285,11 @@ private extension RunAnywhere {
         let wallTps = generationTimeMs > 0 && outputTokens > 0
             ? Double(outputTokens) / (generationTimeMs / 1000.0) : 0
         let decodeWindow = reportedTtft.map { generationTimeMs - Double($0) } ?? generationTimeMs
+        // Rate over the decode window, matching commons' llm_module.cpp. Falls
+        // back to the full span when TTFT is unknown, in which case
+        // `decodeWindow` already IS the full span, so this is wallTps.
+        let decodeTps = decodeWindow > 0 && outputTokens > 0
+            ? Double(outputTokens) / (decodeWindow / 1000.0) : wallTps
         let batchBuffered =
             reportedTtft != nil && decodeWindow < max(50.0, generationTimeMs * 0.05)
         if batchBuffered {
@@ -293,7 +298,7 @@ private extension RunAnywhere {
             result.promptEvalTimeMs = 0
             result.decodeTimeMs = Int64(generationTimeMs.rounded())
         } else {
-            result.usage.decodeTokensPerSecond = reportedTps > 0 ? reportedTps : wallTps
+            result.usage.decodeTokensPerSecond = reportedTps > 0 ? reportedTps : decodeTps
             if let reportedTtft { result.usage.ttftMs = reportedTtft }
             result.promptEvalTimeMs = final?.promptEvalTimeMs ?? (reportedTtft ?? 0)
             result.decodeTimeMs = final?.decodeTimeMs ?? 0
