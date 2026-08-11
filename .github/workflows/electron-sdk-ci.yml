@@ -184,7 +184,8 @@ jobs:
             done
 
             # dumpbin export gate
-            vswhere="${PROGRAMFILES(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+            # Bash cannot expand ${PROGRAMFILES(x86)} (parens); use printenv.
+            vswhere="$(printenv 'PROGRAMFILES(x86)')/Microsoft Visual Studio/Installer/vswhere.exe"
             test -f "$vswhere" || { echo "vswhere.exe not found"; exit 1; }
             vs="$("$vswhere" -latest -products '*' \
               -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \

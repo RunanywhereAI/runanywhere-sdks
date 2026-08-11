@@ -21,6 +21,7 @@ import android.content.Context
 import android.os.Build
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import java.io.File
 
 /**
  * Hardware profile bridge wrapping the `rac_hardware_profile_*` ABI.
@@ -165,7 +166,7 @@ object CppBridgeHardware {
             }
         val cpuinfoHardware =
             try {
-                java.io.File("/proc/cpuinfo")
+                File("/proc/cpuinfo")
                     .readText()
                     .lines()
                     .find { it.startsWith("Hardware", ignoreCase = true) }
@@ -207,7 +208,9 @@ object CppBridgeHardware {
      * Platforms probe ActivityManager / MemAvailable; commons maps non-positive
      * probes to 0 (UNKNOWN) and never invents total/2.
      */
-    fun defaultAvailableMemory(@Suppress("UNUSED_PARAMETER") totalMemory: Long): Long {
+    fun defaultAvailableMemory(
+        @Suppress("UNUSED_PARAMETER") totalMemory: Long,
+    ): Long {
         var probed = 0L
         try {
             val context =

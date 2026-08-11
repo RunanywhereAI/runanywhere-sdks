@@ -8,10 +8,10 @@
 
 package com.runanywhere.sdk.public.api
 
-import ai.runanywhere.proto.v1.FinishReason as ProtoFinishReason
 import ai.runanywhere.proto.v1.ToolCallingResult
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import ai.runanywhere.proto.v1.FinishReason as ProtoFinishReason
 
 class FinishReasonMappingTest {
     @Test
