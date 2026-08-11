@@ -256,6 +256,17 @@ export const CATALOG: Catalog = {
     ['lfm230_pf_512_w8.bin', 'lfm230_dec_512_w8.bin', 'lfm230_lmh_w8.bin', 'lfm_embed_f16.bin', 'tokenizer.json'],
     'LFM2.5 230M (NPU)', '230M', 539,
   ),
+  // A REASONING bundle: it opens <think> itself and answers only after closing
+  // it, so nothing is emitted for the first few seconds of a request (measured:
+  // 4.6 s to the first visible token on a short prompt, at 21.3 ms/tok). It also
+  // ships decode + lmhead only — no prefill graph — so the prompt is run through
+  // decode and TTFT grows with prompt length (268 ms at 14 tokens, 779 ms at 41).
+  // Decode throughput is unaffected.
+  'lfm2.5-1.2b-thinking-npu': npu(
+    'runanywhere/lfm2_5_1_2b_thinking_HNPU', 'v81', 'lfm2-5-1.2b-thinking.json',
+    ['lfm2512bthinking_decode_w8.bin', 'lfm2512bthinking_lmhead_w8.bin', 'lfm2512bthinking_embed_f16.bin', 'tokenizer.json'],
+    'LFM2.5 1.2B Thinking (NPU)', '1.2B', 1454,
+  ),
 
   // ---- Gemma 4 (Google) — weights carry use restrictions, see LICENSES.gemma ----
   'gemma-4-e2b': llm('unsloth/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_K_M.gguf', 'Gemma 4 E2B', '2B eff.', 2963, true, 'gemma', 'gemma'),
