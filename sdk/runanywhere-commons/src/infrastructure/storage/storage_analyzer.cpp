@@ -669,6 +669,16 @@ rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
                 metrics->local_path = strdup(path_buffer);
             }
         }
+        // Same contract the id/name copies above enforce: a failed duplication drops
+        // the row instead of publishing it with a null field. `path_to_use` is
+        // non-null exactly when a duplication was attempted, so this only fires on
+        // an allocation failure and never on the legitimate no-path case.
+        if (path_to_use && !metrics->local_path) {
+            free(const_cast<char*>(metrics->model_id));
+            free(const_cast<char*>(metrics->model_name));
+            memset(metrics, 0, sizeof(rac_model_storage_metrics_t));
+            continue;
+        }
 
         // Calculate size via callback
         if (path_to_use) {
