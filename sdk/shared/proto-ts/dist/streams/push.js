@@ -309,6 +309,10 @@ class AsyncQueue {
     }
     /** Bridge-safe view that drains this queue's buffer. */
     stream() {
+        // Walking away stops delivery but does not end the queue: the producer
+        // is outside it and may still be pushing. Keep this comment off the
+        // argument-list comma — tsc otherwise emits a trailing space that
+        // fights the trailing-whitespace pre-commit hook / IDL drift gate.
         return bridgeIterator(async () => {
             for (;;) {
                 if (this.buffer.length > 0) {
@@ -325,10 +329,7 @@ class AsyncQueue {
                     this.wake = resolve;
                 });
             }
-        },
-        // Walking away stops delivery but does not end the queue: the producer
-        // is outside it and may still be pushing.
-        async () => doneResult());
+        }, async () => doneResult());
     }
 }
 exports.AsyncQueue = AsyncQueue;

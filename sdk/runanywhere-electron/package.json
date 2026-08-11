@@ -63,7 +63,7 @@
     "test:feature": "node --enable-source-maps --test \"dist-test/feature/**/*.test.js\"",
     "pretest:all": "npm run build && npm run build:test",
     "test:all": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\" \"dist-test/feature/**/*.test.js\"",
-    "check:proto-ts": "node -e \"const peer=require('./package.json').peerDependencies['@runanywhere/proto-ts']; const v=require('@runanywhere/proto-ts/package.json').version; const m=/^\\\\^(\\\\d+)\\\\.(\\\\d+)\\\\.(\\\\d+)$/.exec(peer); if(!m){console.error('Invalid peerDependencies[@runanywhere/proto-ts]:', peer); process.exit(1);} const wantMaj=+m[1], wantMin=+m[2], wantPat=+m[3]; const parts=v.split('.').map(Number); if(parts.length<3||parts.some((n)=>Number.isNaN(n))){console.error('@runanywhere/proto-ts version drift: unreadable version', v); process.exit(1);} const [maj,min,pat]=parts; const ok=wantMaj===0?maj===0&&min===wantMin&&pat>=wantPat:maj===wantMaj&&(min>wantMin||(min===wantMin&&pat>=wantPat)); if(!ok){console.error('@runanywhere/proto-ts version drift: resolved', v, 'does not satisfy peer', peer); process.exit(1);} console.log('@runanywhere/proto-ts', v, 'satisfies', peer);\"",
+    "check:proto-ts": "node scripts/check-proto-ts.mjs",
     "typecheck": "npm run check:proto-ts && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.native.json --noEmit",
     "prepack": "npm run build && npm run bundle:native"
   },

@@ -344,6 +344,10 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
 
   /** Bridge-safe view that drains this queue's buffer. */
   stream(): AsyncIterableIterator<T> {
+    // Walking away stops delivery but does not end the queue: the producer
+    // is outside it and may still be pushing. Keep this comment off the
+    // argument-list comma — tsc otherwise emits a trailing space that
+    // fights the trailing-whitespace pre-commit hook / IDL drift gate.
     return bridgeIterator<T>(
       async (): Promise<IteratorResult<T>> => {
         for (;;) {
@@ -361,8 +365,6 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
           });
         }
       },
-      // Walking away stops delivery but does not end the queue: the producer
-      // is outside it and may still be pushing.
       async (): Promise<IteratorResult<T>> => doneResult<T>(),
     );
   }

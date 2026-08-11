@@ -45,7 +45,9 @@ jobs:
             plugin_name: runanywhere_llamacpp.dll
             commons_name: rac_commons.dll
             run_typescript: true
-          - os: macos-14
+          # macos-26 ships Xcode 26.6 (setup-toolchain platform:macos pin).
+          # macos-14 fails toolchain setup with "Could not find Xcode version 26.6".
+          - os: macos-26
             platform: macos
             preset: electron-macos
             prebuild_dir: prebuilds/darwin-arm64-thin
