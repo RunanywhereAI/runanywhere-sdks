@@ -20,45 +20,9 @@ import {
   SDKError as SDKErrorCodec,
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
+import { categoryForCode } from '@runanywhere/proto-ts/convenience/errors_category';
 import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 import { SDKLogger } from './SDKLogger.js';
-
-/**
- * Map a signed-negative `rac_result_t` code to the matching proto-ts `ErrorCategory`.
- *
- * Verbatim port of the canonical 18-range table in
- * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
- * Web cannot call the C++ helper synchronously before WASM is loaded, so the
- * table is replicated here; any change to the canonical mapping MUST be
- * mirrored in this function (and in the RN equivalent).
- */
-function categoryForCode(code: number): ProtoErrorCategory {
-  if (code === 0) return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
-  const abs = Math.abs(code);
-  if (abs >= 100 && abs <= 109) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
-  if (abs >= 110 && abs <= 129) return ProtoErrorCategory.ERROR_CATEGORY_MODEL;
-  if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  if (abs >= 150 && abs <= 179) return ProtoErrorCategory.ERROR_CATEGORY_NETWORK;
-  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) {
-    return ProtoErrorCategory.ERROR_CATEGORY_IO;
-  }
-  if (abs >= 220 && abs <= 229) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  if (abs >= 230 && abs <= 249) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
-  if (abs >= 250 && abs <= 279) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
-  if (abs >= 300 && abs <= 319) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
-  if (abs >= 320 && abs <= 329) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
-  if (abs >= 330 && abs <= 349) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
-  if (abs >= 350 && abs <= 369) return ProtoErrorCategory.ERROR_CATEGORY_IO;
-  if (abs >= 370 && abs <= 379) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
-  if (abs >= 380 && abs <= 389) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  if (abs >= 400 && abs <= 499) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
-  if (abs >= 500 && abs <= 599) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
-  if (abs >= 600 && abs <= 699) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
-  if (abs >= 700 && abs <= 799) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  if (abs >= 800 && abs <= 899) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  if (abs >= 900 && abs <= 999) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
-  return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
-}
 
 /**
  * Map a signed-negative `rac_result_t` code to the matching proto-ts ErrorCode
@@ -285,8 +249,8 @@ export class SDKException extends Error {
    * translation is routed through the canonical commons helper
    * `rac_result_to_proto_error` (mirroring Swift's `SDKException.from(rcResult:)`)
    * so code/category/message stay byte-identical across SDKs. Without a module
-   * (e.g. before WASM is loaded), it falls back to the local mapping table —
-   * the same behaviour as before this routing was added.
+   * (e.g. before WASM is loaded), it falls back to the shared
+   * `categoryForCode` table from `@runanywhere/proto-ts` (Web/RN 18-range table).
    */
   static fromRACResult(
     resultCode: number,

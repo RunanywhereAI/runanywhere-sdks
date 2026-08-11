@@ -66,6 +66,9 @@
   "peerDependencies": {
     "@runanywhere/web": ">=0.20.14 <1"
   },
+  "dependencies": {
+    "@runanywhere/proto-ts": "^0.20.14"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "eslint": "^9.39.4",
