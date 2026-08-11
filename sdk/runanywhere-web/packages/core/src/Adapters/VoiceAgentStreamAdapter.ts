@@ -165,6 +165,13 @@ class HandleFanOut {
             this.subscribers.delete(s);
           }
         }
+        // Dropping the last subscriber here leaves nobody to receive events,
+        // so release the native callback exactly as `detach()` does. Without
+        // this the C callback and its function-table entry stay installed on
+        // a fan-out with no subscribers.
+        if (this.subscribers.size === 0) {
+          this.tearDown();
+        }
       },
       'viii',
     );
