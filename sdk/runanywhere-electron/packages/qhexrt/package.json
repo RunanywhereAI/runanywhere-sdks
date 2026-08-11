@@ -19,8 +19,8 @@
     "prebuilds",
     "README.md"
   ],
-  "os": ["win32", "linux"],
-  "cpu": ["arm64"],
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"],
   "engines": {
     "node": ">=20"
   },
