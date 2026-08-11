@@ -5,6 +5,9 @@
 # Everything in the package is TypeScript, including the tests and the build
 # scripts. The tests compile to dist-test/ (tsconfig.test.json) and `node --test`
 # runs that output, which is why the glob below is dist-test/unit rather than test/.
+#
+# Native jobs build the addon and stage it into prebuilds/<platform>-<arch>/ for
+# packaging. They do not download models or require a GPU / CUDA toolkit.
 name: electron-sdk-ci
 
 on:
@@ -12,16 +15,25 @@ on:
     paths:
       - 'sdk/runanywhere-electron/**'
       - 'examples/electron/**'
+      - 'sdk/runanywhere-commons/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
       - '.github/workflows/electron-sdk-ci.yml'
   pull_request:
     paths:
       - 'sdk/runanywhere-electron/**'
       - 'examples/electron/**'
+      - 'sdk/runanywhere-commons/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
       - '.github/workflows/electron-sdk-ci.yml'
 
-# Least-privilege: this workflow only needs to read the repo contents.
+# contents:read for checkout; actions:write for upload-artifact of staged prebuilds.
 permissions:
   contents: read
+  actions: write
 
 jobs:
   unit:
@@ -56,6 +68,7 @@ jobs:
 
   # The demo app has its own hermetic unit tests (the JSON store: atomic writes,
   # corrupt-file recovery, conversation capping). They need no Electron runtime.
+  # Also gate typecheck + eslint so scaffold / view regressions fail closed.
   demo-app-unit:
     runs-on: windows-latest
     defaults:
@@ -68,6 +81,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Unit tests (no Electron, no models)
         run: npm test
 
@@ -84,6 +103,10 @@ jobs:
     # windows-2022, NOT windows-latest: the windows-release preset uses the
     # "Visual Studio 17 2022" generator, which newer runner images no longer
     # provide. This mirrors the rcli-windows job in pr-build.yml.
+    #
+    # CPU only — no CUDA toolkit, no model download. Sidecars that this configure
+    # actually produces are staged beside the .node; missing optional sidecars
+    # (e.g. sherpa when RAC_BACKEND_SHERPA=OFF) are skipped, not failures.
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -130,3 +153,402 @@ jobs:
           $node = "build/windows-release/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
           if (!(Test-Path $node)) { throw "the native addon was not produced" }
           Write-Host "addon built: $((Get-Item $node).Length) bytes"
+      - name: Stage native prebuild (win32-x64)
+        shell: pwsh
+        working-directory: sdk/runanywhere-electron
+        run: |
+          $nativeDir = Join-Path $env:GITHUB_WORKSPACE "build/windows-release/sdk/runanywhere-electron/native/Release"
+          $out = "prebuilds/win32-x64"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item (Join-Path $nativeDir "runanywhere_native.node") $out
+          # Sidecars when present. CI omits sherpa and never builds CUDA — do not
+          # fail closed on absent optional DLLs (bundle:native is stricter for
+          # local shipping bundles).
+          foreach ($name in @(
+            'onnxruntime.dll',
+            'onnxruntime_providers_shared.dll',
+            'sherpa-onnx-c-api.dll'
+          )) {
+            $src = Join-Path $nativeDir $name
+            if (Test-Path $src) {
+              Copy-Item $src $out
+              Write-Host "staged $name"
+            } else {
+              Write-Host "skipped (not built): $name"
+            }
+          }
+          Get-ChildItem $out | ForEach-Object { Write-Host ("  {0} ({1} bytes)" -f $_.Name, $_.Length) }
+          if (!(Test-Path (Join-Path $out "runanywhere_native.node"))) {
+            throw "staged prebuild is missing runanywhere_native.node"
+          }
+      - name: Upload staged native prebuild (win32-x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-native-win32-x64
+          path: sdk/runanywhere-electron/prebuilds/win32-x64/
+          if-no-files-found: error
+
+  # macOS arm64 lane — stages darwin-arm64 for electron-builder dmg/zip. Same
+  # contract as Windows: link the addon, stage prebuilds, no models, no GPU.
+  native-addon-build-macos:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the addon's node deps
+        working-directory: sdk/runanywhere-electron/native
+        run: npm install
+      - name: Configure
+        run: |
+          cmake --preset macos-release -B build/electron-macos \
+            -DRAC_BUILD_ELECTRON_ADDON=ON \
+            -DRAC_DESKTOP_ADAPTER=ON \
+            -DRAC_BUILD_BACKENDS=ON \
+            -DRAC_BACKEND_LLAMACPP=ON \
+            -DRAC_BACKEND_ONNX=ON \
+            -DRAC_RUNTIME_ONNXRT=ON \
+            -DRAC_BACKEND_SHERPA=OFF
+      - name: Build the addon
+        run: cmake --build build/electron-macos --target runanywhere_native -j "$(sysctl -n hw.logicalcpu)"
+      - name: Assert the addon was produced
+        run: |
+          node="build/electron-macos/sdk/runanywhere-electron/native/runanywhere_native.node"
+          test -f "$node" || { echo "the native addon was not produced"; exit 1; }
+          echo "addon built: $(wc -c < "$node") bytes"
+      - name: Stage native prebuild (darwin-arm64)
+        working-directory: sdk/runanywhere-electron
+        run: |
+          native_dir="${GITHUB_WORKSPACE}/build/electron-macos/sdk/runanywhere-electron/native"
+          out="prebuilds/darwin-arm64"
+          mkdir -p "$out"
+          cp "${native_dir}/runanywhere_native.node" "$out/"
+          # macOS ships a fat .node (backends linked in); no dylib sidecars today.
+          # Still accept any future .dylib dropped beside the addon.
+          shopt -s nullglob
+          for lib in "${native_dir}"/*.dylib; do
+            cp "$lib" "$out/"
+            echo "staged $(basename "$lib")"
+          done
+          ls -la "$out"
+          test -f "$out/runanywhere_native.node"
+      - name: Upload staged native prebuild (darwin-arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-native-darwin-arm64
+          path: sdk/runanywhere-electron/prebuilds/darwin-arm64/
+          if-no-files-found: error
+
+  # Track A7 — Option A thin path on Windows (electron-windows preset).
+  # Proves SHARED rac_commons.dll + plugin DLL exports + thin .node link.
+  # No model download / generate; dumpbin + loadPlugin smoke are the gate.
+  native-addon-build-thin-windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the addon's node deps
+        shell: pwsh
+        working-directory: sdk/runanywhere-electron/native
+        run: npm install
+      - name: Fetch the node headers + import lib the N-API link needs
+        id: nodedev
+        shell: pwsh
+        run: |
+          npx --yes node-gyp install
+          $ver = (node -p "process.versions.node")
+          $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
+          if (!(Test-Path "$dir/x64/node.lib")) { throw "node.lib missing under $dir" }
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Configure (electron-windows thin)
+        shell: pwsh
+        run: |
+          # Sherpa Windows archive is optional — keep CI green without it.
+          cmake --preset electron-windows `
+            -DRAC_BACKEND_SHERPA=OFF `
+            "-DRAC_NODE_DEV_DIR=${{ steps.nodedev.outputs.dir }}"
+      - name: Build thin .node + commons + llamacpp
+        shell: pwsh
+        run: |
+          cmake --build --preset electron-windows `
+            --target rac_commons runanywhere_llamacpp runanywhere_native
+      - name: Assert thin artifacts exist
+        shell: pwsh
+        run: |
+          $root = "build/electron-windows"
+          $node = "$root/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
+          $commons = "$root/sdk/runanywhere-commons/Release/rac_commons.dll"
+          $llama = "$root/engines/llamacpp/Release/runanywhere_llamacpp.dll"
+          foreach ($p in @($node, $commons, $llama)) {
+            if (!(Test-Path $p)) { throw "missing thin artifact: $p" }
+            Write-Host ("ok {0} ({1} bytes)" -f $p, (Get-Item $p).Length)
+          }
+      - name: dumpbin /EXPORTS — fail if expected symbols missing
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (!(Test-Path $vswhere)) { throw "vswhere.exe not found" }
+          $vs = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $vs) { throw "VS 2022 install path not found" }
+          $dumpbin = Get-ChildItem -Path "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -match '\\Hostx64\\x64\\dumpbin\.exe$' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dumpbin) { throw "dumpbin.exe not found under $vs" }
+          Write-Host "using $dumpbin"
+
+          function Assert-Exports([string]$Dll, [string[]]$Symbols) {
+            Write-Host "=== dumpbin /EXPORTS $Dll ==="
+            $out = & $dumpbin /EXPORTS $Dll 2>&1 | Out-String
+            Write-Host $out
+            foreach ($sym in $Symbols) {
+              # Match whole token so we do not accept accidental substrings.
+              if ($out -notmatch "(?m)^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+$([regex]::Escape($sym))\s*$" `
+                  -and $out -notmatch "(?m)\b$([regex]::Escape($sym))\b") {
+                throw "missing export '$sym' in $Dll"
+              }
+              Write-Host "  ok export: $sym"
+            }
+          }
+
+          $root = "build/electron-windows"
+          Assert-Exports "$root/sdk/runanywhere-commons/Release/rac_commons.dll" @(
+            'rac_init',
+            'rac_registry_load_plugin',
+            'rac_llm_extract_thinking'
+          )
+          Assert-Exports "$root/engines/llamacpp/Release/runanywhere_llamacpp.dll" @(
+            'rac_plugin_entry_llamacpp'
+          )
+      - name: Stage thin prebuild (win32-x64)
+        shell: pwsh
+        working-directory: sdk/runanywhere-electron
+        run: |
+          $ws = $env:GITHUB_WORKSPACE
+          $root = Join-Path $ws "build/electron-windows"
+          $nativeDir = Join-Path $root "sdk/runanywhere-electron/native/Release"
+          $commonsDir = Join-Path $root "sdk/runanywhere-commons/Release"
+          $llamaDir = Join-Path $root "engines/llamacpp/Release"
+          $out = "prebuilds/win32-x64-thin"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          Copy-Item (Join-Path $nativeDir "runanywhere_native.node") $out
+          Copy-Item (Join-Path $commonsDir "rac_commons.dll") $out
+
+          # Carrier + backend implementation DLL (LoadLibrary same-dir search).
+          Copy-Item (Join-Path $llamaDir "runanywhere_llamacpp.dll") $out
+          $backend = Join-Path $llamaDir "rac_backend_llamacpp.dll"
+          if (Test-Path $backend) {
+            Copy-Item $backend $out
+            Write-Host "staged rac_backend_llamacpp.dll"
+          } else {
+            Write-Host "note: rac_backend_llamacpp.dll not found as separate file (may be folded)"
+          }
+
+          # Any other Release DLLs beside the carrier (ggml, etc.).
+          Get-ChildItem $llamaDir -Filter "*.dll" | ForEach-Object {
+            $dest = Join-Path $out $_.Name
+            if (!(Test-Path $dest)) {
+              Copy-Item $_.FullName $out
+              Write-Host "staged $($_.Name)"
+            }
+          }
+
+          Get-ChildItem $out | ForEach-Object {
+            Write-Host ("  {0} ({1} bytes)" -f $_.Name, $_.Length)
+          }
+          if (!(Test-Path (Join-Path $out "runanywhere_native.node"))) {
+            throw "thin stage missing runanywhere_native.node"
+          }
+          if (!(Test-Path (Join-Path $out "rac_commons.dll"))) {
+            throw "thin stage missing rac_commons.dll"
+          }
+          if (!(Test-Path (Join-Path $out "runanywhere_llamacpp.dll"))) {
+            throw "thin stage missing runanywhere_llamacpp.dll"
+          }
+      - name: loadPlugin smoke (no models / no generate)
+        shell: pwsh
+        working-directory: sdk/runanywhere-electron
+        run: |
+          $stage = (Resolve-Path "prebuilds/win32-x64-thin").Path
+          $script = @'
+          const fs = require("fs");
+          const os = require("os");
+          const path = require("path");
+          const stage = process.env.RA_THIN_STAGE;
+          const nodePath = path.join(stage, "runanywhere_native.node");
+          const pluginPath = path.join(stage, "runanywhere_llamacpp.dll");
+          if (!fs.existsSync(nodePath)) throw new Error("missing " + nodePath);
+          if (!fs.existsSync(pluginPath)) throw new Error("missing " + pluginPath);
+
+          // Eager IAT: rac_commons.dll must resolve beside the .node (DELAYLOAD is node.exe only).
+          const addon = require(nodePath);
+          if (addon.thinAddon !== true) {
+            throw new Error("expected thinAddon === true, got " + addon.thinAddon);
+          }
+          console.log("thinAddon=true pluginApiVersion=" +
+            (typeof addon.pluginApiVersion === "function" ? addon.pluginApiVersion() : "n/a"));
+
+          const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ra-thin-ci-"));
+          async function main() {
+            await addon.initialize(tmp, tmp);
+            await addon.loadPlugin(pluginPath);
+            const listed = addon.listPlugins();
+            console.log("listPlugins=" + JSON.stringify(listed));
+            const ok = listed.map(String).some((n) => /llama/i.test(n));
+            if (!ok) throw new Error("llamacpp missing after loadPlugin: " + JSON.stringify(listed));
+            console.log("loadPlugin smoke OK");
+          }
+          main().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          '@
+          $tmpJs = Join-Path $env:RUNNER_TEMP "thin-loadplugin-smoke.js"
+          Set-Content -Path $tmpJs -Value $script -Encoding utf8
+          $env:RA_THIN_STAGE = $stage
+          # Ensure LoadLibrary finds rac_commons + backend next to the carrier.
+          $env:PATH = "$stage;$env:PATH"
+          node $tmpJs
+      - name: Upload staged thin native prebuild (win32-x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-native-win32-x64-thin
+          path: sdk/runanywhere-electron/prebuilds/win32-x64-thin/
+          if-no-files-found: error
+
+  # Track A7 — Option A thin path on macOS (electron-macos preset).
+  # Fat lane above stays on macos-release; this proves SHARED commons + plugins.
+  native-addon-build-thin-macos:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the addon's node deps
+        working-directory: sdk/runanywhere-electron/native
+        run: npm install
+      - name: Configure (electron-macos thin)
+        run: |
+          # Match Windows thin CI: skip Sherpa archive requirement.
+          cmake --preset electron-macos -DRAC_BACKEND_SHERPA=OFF
+      - name: Build thin .node + commons + llamacpp
+        run: |
+          cmake --build --preset electron-macos -j "$(sysctl -n hw.logicalcpu)" \
+            --target rac_commons runanywhere_llamacpp runanywhere_native
+      - name: Assert thin artifacts + nm entry symbols
+        run: |
+          set -euo pipefail
+          root="build/electron-macos"
+          node="$root/sdk/runanywhere-electron/native/runanywhere_native.node"
+          commons="$root/sdk/runanywhere-commons/librac_commons.dylib"
+          llama="$root/engines/llamacpp/librunanywhere_llamacpp.dylib"
+          for p in "$node" "$commons" "$llama"; do
+            test -f "$p" || { echo "missing thin artifact: $p"; exit 1; }
+            echo "ok $p ($(wc -c < "$p") bytes)"
+          done
+
+          echo "=== nm -gU librac_commons.dylib (filtered) ==="
+          nm -gU "$commons" | grep -E ' _rac_(init|registry_load_plugin|llm_extract_thinking)$' || {
+            echo "missing expected rac_* exports in librac_commons.dylib"
+            nm -gU "$commons" | grep ' _rac_' | head -40
+            exit 1
+          }
+
+          echo "=== nm -gU librunanywhere_llamacpp.dylib (entry) ==="
+          nm -gU "$llama" | grep -E ' _rac_plugin_entry_llamacpp$' || {
+            echo "missing rac_plugin_entry_llamacpp in librunanywhere_llamacpp.dylib"
+            nm -gU "$llama" | head -40
+            exit 1
+          }
+          echo "ok export: rac_plugin_entry_llamacpp"
+      - name: Stage thin prebuild (darwin-arm64)
+        working-directory: sdk/runanywhere-electron
+        run: |
+          set -euo pipefail
+          root="${GITHUB_WORKSPACE}/build/electron-macos"
+          native_dir="${root}/sdk/runanywhere-electron/native"
+          commons_dir="${root}/sdk/runanywhere-commons"
+          llama_dir="${root}/engines/llamacpp"
+          out="prebuilds/darwin-arm64-thin"
+          mkdir -p "$out"
+          cp "${native_dir}/runanywhere_native.node" "$out/"
+          cp "${commons_dir}/librac_commons.dylib" "$out/"
+          cp "${llama_dir}/librunanywhere_llamacpp.dylib" "$out/"
+          # Backend sidecar when present (@loader_path).
+          if [[ -f "${llama_dir}/librac_backend_llamacpp.dylib" ]]; then
+            cp "${llama_dir}/librac_backend_llamacpp.dylib" "$out/"
+            echo "staged librac_backend_llamacpp.dylib"
+          fi
+          ls -la "$out"
+          test -f "$out/runanywhere_native.node"
+          test -f "$out/librac_commons.dylib"
+          test -f "$out/librunanywhere_llamacpp.dylib"
+      - name: loadPlugin smoke (no models / no generate)
+        working-directory: sdk/runanywhere-electron
+        run: |
+          set -euo pipefail
+          stage="$(pwd)/prebuilds/darwin-arm64-thin"
+          export RA_THIN_STAGE="$stage"
+          node <<'EOF'
+          const fs = require("fs");
+          const os = require("os");
+          const path = require("path");
+          const stage = process.env.RA_THIN_STAGE;
+          const nodePath = path.join(stage, "runanywhere_native.node");
+          const pluginPath = path.join(stage, "librunanywhere_llamacpp.dylib");
+          const addon = require(nodePath);
+          if (addon.thinAddon !== true) {
+            throw new Error("expected thinAddon === true, got " + addon.thinAddon);
+          }
+          console.log(
+            "thinAddon=true pluginApiVersion=" +
+              (typeof addon.pluginApiVersion === "function" ? addon.pluginApiVersion() : "n/a")
+          );
+          const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ra-thin-ci-"));
+          (async () => {
+            await addon.initialize(tmp, tmp);
+            await addon.loadPlugin(pluginPath);
+            const listed = addon.listPlugins();
+            console.log("listPlugins=" + JSON.stringify(listed));
+            if (!listed.map(String).some((n) => /llama/i.test(n))) {
+              throw new Error("llamacpp missing after loadPlugin: " + JSON.stringify(listed));
+            }
+            console.log("loadPlugin smoke OK");
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          EOF
+      - name: Upload staged thin native prebuild (darwin-arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-native-darwin-arm64-thin
+          path: sdk/runanywhere-electron/prebuilds/darwin-arm64-thin/
+          if-no-files-found: error
