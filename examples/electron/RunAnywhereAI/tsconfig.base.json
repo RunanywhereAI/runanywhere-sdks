@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "noImplicitOverride": true,
+    // The SDK is consumed from source via path aliases, so it is typechecked
+    // under this config too. It is compiled with its own tsconfig (which does not
+    // set noUncheckedIndexedAccess), so enabling that here reports errors in SDK
+    // source that its own build does not — noise this app cannot act on.
+    // skipLibCheck covers .d.ts, not .ts, which is why it does not help here.
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "verbatimModuleSyntax": false,
+    "baseUrl": ".",
+    // The SDK is a real dependency (`file:` link in package.json) and resolves to
+    // its BUILT output — the same thing a published consumer gets, and the same
+    // thing `require()` finds at runtime.
+    //
+    // The `dist/**/*.d.ts` entries exist only because the main/preload emit uses
+    // `moduleResolution: node10`, which cannot read the SDK's package `exports`
+    // map. They point at exactly what `exports` points at, so this is a
+    // typecheck-time shim, not a different module graph. Node resolves the
+    // emitted `require()` through `exports` on its own.
+    //
+    // Deliberately NOT aliased to the SDK's `src`: that compiles SDK source into
+    // this app's emit (a rootDir violation) and hides packaging breakage a real
+    // consumer would hit. Rebuild the SDK to see its changes here.
+    "paths": {
+      "@runanywhere/electron": ["../../../sdk/runanywhere-electron/dist/index.d.ts"],
+      "@runanywhere/electron/main": ["../../../sdk/runanywhere-electron/dist/process/main.d.ts"],
+      "@runanywhere/electron/preload": ["../../../sdk/runanywhere-electron/dist/process/preload.d.ts"],
+      "@runanywhere/electron/host": ["../../../sdk/runanywhere-electron/dist/process/host.d.ts"],
+      "@runanywhere/electron/audio": ["../../../sdk/runanywhere-electron/dist/audio.d.ts"],
+      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/dist/*.d.ts"],
+      "@shared/*": ["src/shared/*"]
+    }
+  }
+}

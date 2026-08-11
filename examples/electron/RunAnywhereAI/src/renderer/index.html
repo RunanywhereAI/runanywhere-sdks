@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      No eval, no remote origins. `script-src 'self'` is why the demo calculator
+      has a hand-written arithmetic parser instead of `new Function`, and why the
+      production bundle must not use eval-based sourcemaps.
+      img-src allows data:/blob:/file: for canvas previews and attachment
+      thumbnails; media-src the same for TTS playback.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:; media-src 'self' data: blob:; connect-src 'self'"
+    />
+    <title>RunAnywhere AI</title>
+    <script>
+      // Resolve the theme before first paint so launch never flashes the wrong
+      // appearance. The stored preference wins; otherwise follow the OS.
+      (() => {
+        try {
+          const saved = localStorage.getItem('ra.theme');
+          const os = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : os;
+        } catch {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app" class="ra-shell" data-sidebar="visible"></div>
+    <div id="toasts" class="ra-toast-host" aria-live="polite"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

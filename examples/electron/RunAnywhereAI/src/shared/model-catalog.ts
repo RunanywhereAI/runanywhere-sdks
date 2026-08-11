@@ -1,25 +1,67 @@
-// model-catalog.js — THIS APP's model table.
-//
-// The catalog lives here, not in the SDK. The SDK owns the entry SHAPE and the
-// lookup surface (`registerCatalog` / `isCatalogId` in `src/catalog.ts`); the app
-// owns WHICH models it offers. Every other platform in this repo does the same —
-// iOS `ModelCatalogBootstrap.swift`, Android `ModelCatalog.kt`, web
-// `model-catalog.ts`, Flutter `model_catalog_bootstrap.dart`, React Native
-// `ModelCatalogBootstrap.ts` — all in `examples/`, none in an SDK. That split is
-// what lets two apps ship different model lists against one SDK build.
-//
-// Plain CommonJS on purpose: this app has no build step, and the SDK's tsc has
-// `rootDir: "src"` so it cannot compile a file that lives out here.
-//
-// Registration is PER PROCESS, and this app has two that resolve models: the
-// renderer preload (`preload.js`) and the forked utility host (which downloads
-// and resolves). `main.js` passes this file's path to `RunAnywhereMain` so the
-// host can register it too. See `registerCatalog` in the SDK for why.
-//
-// Rows are grouped BY FAMILY (matching the Swift catalog's organization), so a
-// family's chat model and its vision variant sit together.
+/**
+ * THIS APP's model table.
+ *
+ * The catalog lives here, not in the SDK. The SDK owns the entry SHAPE and the
+ * lookup surface (`registerCatalog` / `isCatalogId` in its `catalog.ts`); the app
+ * owns WHICH models it offers. Every other platform in this repo does the same —
+ * iOS `ModelCatalogBootstrap.swift`, Android `ModelCatalog.kt`, web
+ * `model-catalog.ts`, Flutter `model_catalog_bootstrap.dart`, RN
+ * `ModelCatalogBootstrap.ts` — all in `examples/`, none in an SDK. That split is
+ * what lets two apps ship different model lists against one SDK build.
+ *
+ * Registration is PER PROCESS, and this app has two processes that resolve
+ * models: the renderer preload and the forked utility host. The host receives it
+ * from the main process, so both see the same table.
+ *
+ * Rows are grouped BY FAMILY (matching the Swift catalog's organization), so a
+ * family's chat model and its vision variant sit together.
+ */
 
-const LICENSES = {
+/** What a model is for. Drives which SDK namespace loads it. */
+export type ModelType =
+  | 'llm'
+  | 'vlm'
+  | 'embedder'
+  | 'stt'
+  | 'tts'
+  | 'diarization'
+  | 'segmentation';
+
+/** One file a catalog entry needs on disk. */
+export interface CatalogFile {
+  readonly url: string;
+  /** Filename to save as. `primary`/`mmproj` refer to these names. */
+  readonly as: string;
+}
+
+export interface CatalogEntry {
+  readonly type: ModelType;
+  readonly files: readonly CatalogFile[];
+  /** The file (or, for archives, the extracted directory) to load. */
+  readonly primary: string;
+  /** Vision projector filename, for VLM entries. */
+  readonly mmproj?: string;
+  /** The download is an archive that must be extracted. */
+  readonly archive?: boolean;
+  readonly label: string;
+  readonly params?: string;
+  readonly sizeMB: number;
+  /** Wants more RAM than a small machine has; the UI badges it "heavy · CPU". */
+  readonly heavy?: boolean;
+  readonly license?: string;
+  readonly licenseUrl?: string;
+  /** Chat template family, when the model needs one commons cannot infer. */
+  readonly chatTemplate?: string;
+}
+
+export type Catalog = Readonly<Record<string, CatalogEntry>>;
+
+interface LicenseInfo {
+  readonly name: string;
+  readonly url: string;
+}
+
+export const LICENSES = {
   apache2: { name: 'Apache 2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0' },
   mit: { name: 'MIT', url: 'https://opensource.org/license/mit' },
   gemma: { name: 'Gemma Terms of Use', url: 'https://ai.google.dev/gemma/terms' },
@@ -31,23 +73,49 @@ const LICENSES = {
     name: 'NVIDIA Open Model License',
     url: 'https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/',
   },
-};
+} as const satisfies Record<string, LicenseInfo>;
+
+type LicenseKey = keyof typeof LICENSES;
 
 const HF = 'https://huggingface.co';
 const K2 = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 
-function llm(repo, file, label, params, sizeMB, heavy = false, license = 'apache2', chatTemplate = 'chatml') {
+function llm(
+  repo: string,
+  file: string,
+  label: string,
+  params: string,
+  sizeMB: number,
+  heavy = false,
+  license: LicenseKey = 'apache2',
+  chatTemplate = 'chatml',
+): CatalogEntry {
   const l = LICENSES[license];
   return {
     type: 'llm',
     files: [{ url: `${HF}/${repo}/resolve/main/${file}`, as: 'model.gguf' }],
     primary: 'model.gguf',
-    label, params, sizeMB, heavy,
-    license: l && l.name, licenseUrl: l && l.url, chatTemplate,
+    label,
+    params,
+    sizeMB,
+    heavy,
+    license: l.name,
+    licenseUrl: l.url,
+    chatTemplate,
   };
 }
 
-function vlm(repo, file, mm, label, params, sizeMB, heavy = false, license = 'apache2', chatTemplate = 'chatml') {
+function vlm(
+  repo: string,
+  file: string,
+  mm: string,
+  label: string,
+  params: string,
+  sizeMB: number,
+  heavy = false,
+  license: LicenseKey = 'apache2',
+  chatTemplate = 'chatml',
+): CatalogEntry {
   const l = LICENSES[license];
   return {
     type: 'vlm',
@@ -57,35 +125,42 @@ function vlm(repo, file, mm, label, params, sizeMB, heavy = false, license = 'ap
     ],
     primary: 'model.gguf',
     mmproj: 'mmproj.gguf',
-    label, params, sizeMB, heavy,
-    license: l && l.name, licenseUrl: l && l.url, chatTemplate,
+    label,
+    params,
+    sizeMB,
+    heavy,
+    license: l.name,
+    licenseUrl: l.url,
+    chatTemplate,
   };
 }
 
-function whisper(size, label, sizeMB) {
+function whisper(size: string, label: string, sizeMB: number): CatalogEntry {
   return {
     type: 'stt',
     files: [{ url: `${K2}/asr-models/sherpa-onnx-whisper-${size}.tar.bz2`, as: 'whisper.tar.bz2' }],
     archive: true,
     primary: `sherpa-onnx-whisper-${size}`,
-    label, sizeMB,
+    label,
+    sizeMB,
   };
 }
 
-function piper(voice, label, sizeMB) {
+function piper(voice: string, label: string, sizeMB: number): CatalogEntry {
   return {
     type: 'tts',
     files: [{ url: `${K2}/tts-models/vits-piper-en_US-${voice}-medium.tar.bz2`, as: 'piper.tar.bz2' }],
     archive: true,
     primary: `vits-piper-en_US-${voice}-medium`,
-    label, sizeMB,
+    label,
+    sizeMB,
   };
 }
 
 // Every URL below was HTTP-verified (200 + "GGUF" magic bytes) on 2026-07-27,
 // and the LFM2.5 230M row on 2026-08-05. Sizes are the real content-length, not
 // estimates.
-const CATALOG = {
+export const CATALOG: Catalog = {
   // ---- Qwen3.5 (chat + vision; one repo ships both the model and its projector) ----
   'qwen3.5-0.8b': llm('unsloth/Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_K_M.gguf', 'Qwen3.5 0.8B', '0.8B', 508),
   'qwen3.5-0.8b-vl': vlm('unsloth/Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_K_M.gguf', 'mmproj-F16.gguf', 'Qwen3.5 0.8B Vision', '0.8B', 738),
@@ -148,7 +223,12 @@ const CATALOG = {
   // ---- Speaker diarization (NVIDIA Sortformer, ONNX) ----
   sortformer: {
     type: 'diarization',
-    files: [{ url: `${HF}/cgus/diar_streaming_sortformer_4spk-v2.1-onnx/resolve/main/diar_streaming_sortformer_4spk-v2.1.onnx`, as: 'model.onnx' }],
+    files: [
+      {
+        url: `${HF}/cgus/diar_streaming_sortformer_4spk-v2.1-onnx/resolve/main/diar_streaming_sortformer_4spk-v2.1.onnx`,
+        as: 'model.onnx',
+      },
+    ],
     primary: 'model.onnx',
     label: 'Sortformer 4-speaker',
     params: '4 spk',
@@ -162,7 +242,12 @@ const CATALOG = {
   // opset/IO names before, and commons reads the graph's output names.
   'segformer-b0-ade-512': {
     type: 'segmentation',
-    files: [{ url: `${HF}/Xenova/segformer-b0-finetuned-ade-512-512/resolve/d3e5499fa8701ff0453ca940a8dfeae39b2f1504/onnx/model.onnx`, as: 'model.onnx' }],
+    files: [
+      {
+        url: `${HF}/Xenova/segformer-b0-finetuned-ade-512-512/resolve/d3e5499fa8701ff0453ca940a8dfeae39b2f1504/onnx/model.onnx`,
+        as: 'model.onnx',
+      },
+    ],
     primary: 'model.onnx',
     label: 'SegFormer B0 · ADE20K',
     params: 'B0',
@@ -170,4 +255,48 @@ const CATALOG = {
   },
 };
 
-module.exports = { CATALOG, LICENSES };
+/** Human label for a modality, as the model picker and chips show it. */
+export const MODALITY_LABEL: Readonly<Record<ModelType, string>> = Object.freeze({
+  llm: 'Language model',
+  vlm: 'Vision model',
+  embedder: 'Embedding model',
+  stt: 'Speech-to-text',
+  tts: 'Text-to-speech',
+  diarization: 'Diarization model',
+  segmentation: 'Segmentation model',
+});
+
+/** Section headings on the Models screen, in display order. */
+export const GROUP_ORDER: readonly (readonly [ModelType, string])[] = [
+  ['llm', 'Language models'],
+  ['vlm', 'Vision-language'],
+  ['stt', 'Speech-to-text'],
+  ['tts', 'Text-to-speech'],
+  ['embedder', 'Embeddings'],
+  ['diarization', 'Diarization'],
+  ['segmentation', 'Segmentation'],
+];
+
+/**
+ * Default model per modality.
+ *
+ * `llm` is 2B rather than 0.8B deliberately: at 0.8B the model absorbs the
+ * user's facts but re-attributes them to itself ("I am 21 years old"). Measured
+ * 1/3 vs 3/3 on a multi-fact recall probe.
+ */
+export const DEFAULT_MODELS: Readonly<Record<ModelType, string>> = Object.freeze({
+  llm: 'qwen3.5-2b',
+  vlm: 'qwen3.5-0.8b-vl',
+  embedder: 'minilm',
+  stt: 'whisper-tiny',
+  tts: 'piper-lessac',
+  diarization: 'sortformer',
+  segmentation: 'segformer-b0-ade-512',
+});
+
+/** Catalog ids of a given modality, in catalog order. */
+export function catalogIdsOfType(type: ModelType): string[] {
+  return Object.entries(CATALOG)
+    .filter(([, entry]) => entry.type === type)
+    .map(([id]) => id);
+}

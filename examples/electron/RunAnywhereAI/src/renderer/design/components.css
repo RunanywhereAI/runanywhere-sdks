@@ -1,0 +1,613 @@
+/* =============================================================================
+ * Components.
+ *
+ * Every value here is a token from tokens.css. A component that needs a value
+ * the tokens do not have means the token file is missing something the macOS app
+ * has — add it there, with its Swift source, rather than inlining a number.
+ * ============================================================================= */
+
+/* ---- Buttons ------------------------------------------------------------- */
+
+/* RAProminentButtonStyle (Surface.swift) — brand fill, ink label, press feedback. */
+.ra-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ra-space-sm);
+  min-height: var(--ra-hit-target);
+  padding: var(--ra-space-sm) var(--ra-space-lg);
+  border-radius: var(--ra-radius-sm);
+  background: var(--ra-brand);
+  color: var(--ra-on-brand);
+  font-size: var(--ra-size-card-title);
+  font-weight: 600;
+  transition:
+    transform var(--ra-spring-snappy) var(--ra-ease-spring),
+    opacity var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-btn-primary:hover:not(:disabled) {
+  background: var(--ra-brand-hover);
+}
+
+.ra-btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.ra-btn-primary:disabled {
+  opacity: 0.4;
+}
+
+.ra-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ra-space-sm);
+  min-height: var(--ra-hit-target);
+  padding: var(--ra-space-sm) var(--ra-space-md);
+  border-radius: var(--ra-radius-sm);
+  background: var(--ra-surface);
+  color: var(--ra-foreground);
+  border: var(--ra-hairline) solid var(--ra-border);
+  font-size: var(--ra-size-card-title);
+  font-weight: 500;
+  transition:
+    background var(--ra-duration-micro) var(--ra-ease-out),
+    transform var(--ra-spring-snappy) var(--ra-ease-spring);
+}
+
+.ra-btn-secondary:hover:not(:disabled) {
+  background: var(--ra-muted);
+}
+
+.ra-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.ra-btn-secondary:disabled {
+  opacity: 0.4;
+}
+
+.ra-btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ra-space-xs);
+  min-height: var(--ra-hit-min);
+  padding: var(--ra-space-xs) var(--ra-space-sm);
+  border-radius: var(--ra-radius-xs);
+  color: var(--ra-muted-foreground);
+  font-size: var(--ra-size-secondary);
+  transition: background var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-btn-quiet:hover:not(:disabled) {
+  background: var(--ra-muted);
+  color: var(--ra-foreground);
+}
+
+/* Icon-only control, sized to the macOS hit target. */
+.ra-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ra-hit-target);
+  height: var(--ra-hit-target);
+  border-radius: var(--ra-radius-xs);
+  color: var(--ra-muted-foreground);
+  transition:
+    background var(--ra-duration-micro) var(--ra-ease-out),
+    color var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-icon-button:hover:not(:disabled) {
+  background: var(--ra-muted);
+  color: var(--ra-foreground);
+}
+
+.ra-icon-button:disabled {
+  opacity: 0.35;
+}
+
+/* ---- Cards (Surface.swift cardSurface()) --------------------------------- */
+
+.ra-card {
+  background: var(--ra-surface);
+  border: var(--ra-hairline) solid var(--ra-border-subtle);
+  border-radius: var(--ra-radius-lg);
+  box-shadow: var(--ra-elevation-card);
+  padding: var(--ra-card-padding);
+}
+
+.ra-card-floating {
+  background: var(--ra-surface-floating);
+  border: var(--ra-hairline) solid var(--ra-border);
+  border-radius: var(--ra-radius-lg);
+  box-shadow: var(--ra-elevation-floating);
+}
+
+/* ---- Sidebar ------------------------------------------------------------- */
+
+.ra-sidebar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 var(--ra-space-sm) var(--ra-space-sm);
+}
+
+.ra-search-icon {
+  position: absolute;
+  left: var(--ra-space-sm);
+  color: var(--ra-muted-foreground);
+  pointer-events: none;
+}
+
+.ra-search-input {
+  width: 100%;
+  min-height: var(--ra-hit-target);
+  padding: var(--ra-space-xs) var(--ra-space-sm) var(--ra-space-xs) 28px;
+  border-radius: var(--ra-radius-xs);
+  border: var(--ra-hairline) solid var(--ra-border-subtle);
+  background: var(--ra-surface-sunken);
+  font-size: var(--ra-size-secondary);
+}
+
+.ra-search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.ra-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--ra-space-sm);
+  flex: 0 0 auto;
+}
+
+.ra-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ra-space-sm);
+  min-height: 30px;
+  padding: 0 var(--ra-space-sm);
+  border-radius: var(--ra-radius-xs);
+  font-size: var(--ra-size-body);
+  font-weight: 500;
+  color: var(--ra-foreground);
+  text-align: left;
+  transition: background var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-nav-row:hover {
+  background: color-mix(in srgb, var(--ra-muted) 60%, transparent);
+}
+
+/* The selected destination.
+ *
+ * A NEUTRAL fill, not the brand fill: `.listStyle(.sidebar)` on macOS renders
+ * selection as a subtle rounded rect and tints only the glyph, and that is what
+ * the reference capture of the shipping app shows. Filling the row with #FF6900
+ * makes the sidebar shout and puts ink-on-orange body copy on screen, which §5
+ * of the guideline reserves for large brand moments. */
+.ra-nav-row[aria-current='page'] {
+  background: var(--ra-muted);
+  font-weight: 600;
+}
+
+/* The glyph carries the accent — the one place the brand appears in the row. */
+.ra-nav-row[aria-current='page'] .ra-icon {
+  color: var(--ra-brand-ink);
+}
+
+.ra-sidebar-chats {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--ra-space-md) var(--ra-space-sm) var(--ra-space-sm);
+}
+
+.ra-sidebar-section {
+  padding: 0 var(--ra-space-sm) var(--ra-space-xs);
+}
+
+.ra-sidebar-group {
+  padding: var(--ra-space-sm) var(--ra-space-sm) var(--ra-space-hair);
+}
+
+.ra-sidebar-empty {
+  padding: var(--ra-space-xs) var(--ra-space-sm);
+}
+
+.ra-conv-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--ra-radius-xs);
+  transition: background var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-conv-row:hover {
+  background: var(--ra-muted);
+}
+
+.ra-conv-row[aria-current='true'] {
+  background: var(--ra-muted);
+}
+
+.ra-conv-open {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--ra-space-xs) var(--ra-space-sm);
+  text-align: left;
+}
+
+.ra-conv-title {
+  font-size: var(--ra-size-secondary);
+  font-weight: 500;
+  color: var(--ra-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The delete affordance appears on hover, as it does on macOS. */
+.ra-conv-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ra-hit-min);
+  height: var(--ra-hit-min);
+  margin-right: var(--ra-space-xs);
+  border-radius: var(--ra-radius-xs);
+  color: var(--ra-muted-foreground);
+  opacity: 0;
+  transition: opacity var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-conv-row:hover .ra-conv-delete,
+.ra-conv-delete:focus-visible {
+  opacity: 1;
+}
+
+.ra-conv-delete:hover {
+  color: var(--ra-danger-text);
+}
+
+.ra-sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--ra-space-xs);
+  padding: var(--ra-space-sm) var(--ra-space-md);
+  border-top: var(--ra-hairline) solid var(--ra-border-subtle);
+  color: var(--ra-muted-foreground);
+  flex: 0 0 auto;
+}
+
+/* ---- Chips / badges ------------------------------------------------------ */
+
+.ra-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ra-space-xs);
+  padding: var(--ra-space-xs) var(--ra-space-sm);
+  border-radius: var(--ra-radius-pill);
+  border: var(--ra-hairline) solid var(--ra-border);
+  background: var(--ra-surface);
+  font-size: var(--ra-size-chip);
+  font-weight: 600;
+  transition:
+    background var(--ra-duration-micro) var(--ra-ease-out),
+    border-color var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-chip:hover {
+  background: var(--ra-muted);
+}
+
+.ra-chip[data-active='true'] {
+  border-color: var(--ra-brand);
+  color: var(--ra-brand-ink);
+}
+
+.ra-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--ra-space-xs);
+  border-radius: var(--ra-radius-xs);
+  background: var(--ra-muted);
+  color: var(--ra-muted-foreground);
+  font-size: var(--ra-size-caption);
+  font-weight: 600;
+}
+
+.ra-badge[data-tone='warning'] {
+  background: color-mix(in srgb, var(--ra-warning) 16%, transparent);
+  color: var(--ra-warning-text);
+}
+
+.ra-badge[data-tone='success'] {
+  background: color-mix(in srgb, var(--ra-success) 16%, transparent);
+  color: var(--ra-success-text);
+}
+
+.ra-badge[data-tone='danger'] {
+  background: color-mix(in srgb, var(--ra-danger) 16%, transparent);
+  color: var(--ra-danger-text);
+}
+
+/* ---- The model chip in the toolbar -------------------------------------- */
+
+.ra-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ra-space-sm);
+  padding: var(--ra-space-xs) var(--ra-space-md);
+  border-radius: var(--ra-radius-sm);
+  border: var(--ra-hairline) solid var(--ra-border);
+  background: var(--ra-surface);
+  transition:
+    background var(--ra-duration-micro) var(--ra-ease-out),
+    border-color var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-model-chip:hover {
+  background: var(--ra-muted);
+  border-color: var(--ra-border);
+}
+
+.ra-model-chip-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.ra-model-chip-name {
+  font-size: var(--ra-size-chip);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ra-model-chip-meta {
+  font-size: var(--ra-size-caption);
+  color: var(--ra-muted-foreground);
+  white-space: nowrap;
+}
+
+/* ---- Empty-state mark (EmptyStateMark.swift) -----------------------------
+ * Three layers: bloom, aperture, glyph. Deliberately STILL — a pulsing mark
+ * reads as a spinner that never resolves. */
+
+.ra-mark {
+  position: relative;
+  width: var(--ra-mark-d);
+  height: var(--ra-mark-d);
+  flex: 0 0 auto;
+}
+
+.ra-mark-bloom {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ra-mark-tint) 22%, transparent);
+  /* SwiftUI's .blur(radius:) reads as roughly 2x a CSS blur (whose argument is
+     the standard deviation), so the literal D*0.18 becomes D*0.09 here. */
+  filter: blur(calc(var(--ra-mark-d) * 0.09));
+}
+
+.ra-mark-aperture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ra-mark-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ra-mark-tint);
+}
+
+/* ---- Empty state -------------------------------------------------------- */
+
+.ra-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ra-space-md);
+  text-align: center;
+  padding: var(--ra-space-xxl) var(--ra-space-xl);
+  animation: ra-pop var(--ra-duration-emphasis) var(--ra-ease-out);
+}
+
+.ra-empty-title {
+  font-size: var(--ra-size-large-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ra-empty-subtitle {
+  font-size: var(--ra-size-body);
+  color: var(--ra-muted-foreground);
+  max-width: var(--ra-measure-prose);
+}
+
+@keyframes ra-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ra-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ra-breathe {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ra-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ra-shimmer {
+  from {
+    background-position: -160% 0;
+  }
+
+  to {
+    background-position: 260% 0;
+  }
+}
+
+/* ---- Toast -------------------------------------------------------------- */
+
+.ra-toast-host {
+  position: fixed;
+  bottom: var(--ra-space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ra-space-sm);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.ra-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--ra-space-sm);
+  padding: var(--ra-space-sm) var(--ra-space-lg);
+  border-radius: var(--ra-radius-pill);
+  background: var(--ra-surface-floating);
+  border: var(--ra-hairline) solid var(--ra-border);
+  box-shadow: var(--ra-elevation-floating);
+  font-size: var(--ra-size-secondary);
+  animation: ra-fade-up var(--ra-duration-standard) var(--ra-ease-out);
+  pointer-events: auto;
+}
+
+.ra-toast[data-tone='danger'] {
+  color: var(--ra-danger-text);
+}
+
+/* ---- Progress ----------------------------------------------------------- */
+
+.ra-progress-track {
+  height: 4px;
+  border-radius: var(--ra-radius-pill);
+  background: var(--ra-muted);
+  overflow: hidden;
+}
+
+.ra-progress-fill {
+  height: 100%;
+  border-radius: var(--ra-radius-pill);
+  background: var(--ra-gradient-brand);
+  transition: width var(--ra-duration-standard) var(--ra-ease-out);
+}
+
+/* An indeterminate transfer shimmers rather than pretending to know a fraction. */
+.ra-progress-fill[data-indeterminate='true'] {
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--ra-brand), transparent);
+  background-size: 200% 100%;
+  animation: ra-shimmer var(--ra-ambient-shimmer) linear infinite;
+}
+
+/* ---- Spinner ------------------------------------------------------------ */
+
+.ra-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ra-border);
+  border-top-color: var(--ra-brand);
+  animation: ra-spin var(--ra-ambient-spin) linear infinite;
+}
+
+/* ---- Forms -------------------------------------------------------------- */
+
+.ra-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ra-space-xs);
+}
+
+.ra-input,
+.ra-textarea,
+.ra-select {
+  min-height: var(--ra-hit-target);
+  padding: var(--ra-space-xs) var(--ra-space-sm);
+  border-radius: var(--ra-radius-xs);
+  border: var(--ra-hairline) solid var(--ra-border);
+  background: var(--ra-surface);
+  font-size: var(--ra-size-body);
+  transition: border-color var(--ra-duration-micro) var(--ra-ease-out);
+}
+
+.ra-input:focus,
+.ra-textarea:focus,
+.ra-select:focus {
+  border-color: var(--ra-brand);
+}
+
+.ra-textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: var(--ra-leading-prose);
+}
+
+.ra-slider {
+  accent-color: var(--ra-brand);
+}
+
+/* ---- Layout helpers ---------------------------------------------------- */
+
+.ra-view-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--ra-screen-margin);
+}
+
+.ra-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ra-space-lg);
+}
+
+.ra-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ra-space-sm);
+}
