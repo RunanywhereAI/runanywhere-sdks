@@ -307,6 +307,7 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-electron/native/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-electron/packages/llamacpp/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-electron/packages/onnx/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-electron/packages/qhexrt/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-electron/packages/sherpa/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
