@@ -605,18 +605,26 @@ Anything not in the catalog can be pulled straight from Hugging Face or a direct
 
 ## Example apps
 
-Full consumer-assistant apps, one per platform, all built on the SDK:
+Full consumer-assistant apps, one per platform, all built on the SDK. The iOS, Android, Web, and Electron apps live in their own repositories; the Flutter and React Native ones are still in this tree.
 
 | Platform | Source | Get it |
 |----------|--------|--------|
-| iOS | [examples/ios/RunAnywhereAI](examples/ios/RunAnywhereAI/) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
-| Android | [examples/android/RunAnywhereAI](examples/android/RunAnywhereAI/) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
-| Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
+| iOS | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
+| Android | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
+| Web | [RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web) | Build from source |
+| Electron | [RunanywhereAI/runanywhere-electron](https://github.com/RunanywhereAI/runanywhere-electron) | Build from source (Windows) |
 | React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
 | Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
-| Electron | [examples/electron/RunAnywhereAI](examples/electron/RunAnywhereAI/) | Build from source (Windows) |
 
 The Android, Flutter, and React Native apps include an NPU section that detects the device's Hexagon arch and runs LLM, vision, speech, and text-to-speech on the NPU.
+
+**Minimal examples**, the in-repo harnesses SDK contributors use to check a change end to end. Each builds the SDK from local source, so an edit shows up without a publish step:
+
+| SDK | Harness | Run it |
+|-----|---------|--------|
+| Swift | [sdk/runanywhere-swift/example](sdk/runanywhere-swift/example/) | `./run example ios run` |
+| Kotlin | [sdk/runanywhere-kotlin/example](sdk/runanywhere-kotlin/example/) | `./run example android install` |
+| Web | [sdk/runanywhere-web/example](sdk/runanywhere-web/example/) | `./run example web dev` |
 
 **Starters**, minimal projects to copy from:
 [Swift](https://github.com/RunanywhereAI/swift-starter-example) ·
@@ -656,7 +664,8 @@ runanywhere-sdks/
 ├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language
-├── examples/                       # Full example apps
+├── examples/                       # Flutter, React Native, and Python example apps
+│                                   # (iOS/Android/Web/Electron live in their own repos)
 ├── Playground/                     # Real-world reference apps
 └── docs/                           # Documentation
 ```
@@ -699,9 +708,9 @@ cd runanywhere-sdks
 # Required for local Swift development.
 ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
-# Run the iOS sample app
-cd examples/ios/RunAnywhereAI
-open RunAnywhereAI.xcodeproj
+# Stream one completion through the minimal Swift harness
+cd sdk/runanywhere-swift/example
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift run
 ```
 
 ---

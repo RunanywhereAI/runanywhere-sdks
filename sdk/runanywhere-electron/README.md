@@ -167,10 +167,12 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 
 ## Example application
 
-TypeScript app under `examples/electron/RunAnywhereAI/`:
+The TypeScript demo app lives in its own repository:
+[RunanywhereAI/runanywhere-electron](https://github.com/RunanywhereAI/runanywhere-electron).
 
 ```bash
-cd examples/electron/RunAnywhereAI
+git clone https://github.com/RunanywhereAI/runanywhere-electron
+cd runanywhere-electron
 npm install
 npm start          # CPU
 npm run start:gpu  # CUDA (when the GPU prebuild is present)

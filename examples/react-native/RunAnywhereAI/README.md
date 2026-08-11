@@ -188,8 +188,8 @@ yarn typecheck
 | Resource | Link |
 |----------|------|
 | **React Native SDK** | [sdk/runanywhere-react-native/README.md](../../../sdk/runanywhere-react-native/README.md) |
-| **iOS example** | [examples/ios/RunAnywhereAI](../../ios/RunAnywhereAI/README.md) |
-| **Android example** | [examples/android/RunAnywhereAI](../../android/RunAnywhereAI/README.md) |
+| **iOS example** | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) |
+| **Android example** | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) |
 | **Flutter example** | [examples/flutter/RunAnywhereAI](../../flutter/RunAnywhereAI/README.md) |
 | **App Store / Play Store** | [iOS](https://apps.apple.com/us/app/runanywhere/id6756506307) · [Android](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
 | **Discord** | [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd) |

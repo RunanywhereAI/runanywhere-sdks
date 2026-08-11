@@ -55,9 +55,9 @@ For registration, downloads, streaming, and model catalogs, see the [Kotlin SDK 
 Any GGUF that llama.cpp can load — Gemma, Llama, Qwen, Phi, SmolLM. The backend is
 format-generic; the catalogs are conveniences, not a whitelist.
 
-For known-good entries with download URLs, see the example app catalog in
-[`ModelCatalog.kt`](../../../../examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/data/ModelCatalog.kt),
-which includes text and vision GGUF models (Gemma 4 E2B/E4B among them).
+For known-good entries with download URLs, see `ModelCatalog.kt` in the example
+app ([RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android)), which includes text and
+vision GGUF models (Gemma 4 E2B/E4B among them).
 
 On Snapdragon, the [QHexRT backend](../runanywhere-core-qhexrt/README.md) additionally
 runs NPU-accelerated bundles, including Gemma 3n/4 and EmbeddingGemma.

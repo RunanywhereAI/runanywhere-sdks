@@ -58,6 +58,20 @@ dev and the preview server. The build copies the canonical Emscripten
 `.js`/`.wasm` pairs into `dist/assets/` under their original filenames, which
 pthread workers request by name; a hashed copy alone is not enough.
 
+## Readiness contract for the browser gates
+
+`src/readiness.ts` publishes two globals the SDK's Playwright specs
+(`sdk/runanywhere-web/tests/browser/`) probe instead of a DOM layout:
+
+| Global | What it carries |
+| --- | --- |
+| `window.__RUNANYWHERE_AI_READY__` | boot progress (`state`, `backend`, `step`, `reason`, `shellReady`) |
+| `window.__RUNANYWHERE_SDK__` | the imported SDK singleton, for public-surface probes |
+
+The root element mirrors the backend state as `data-runanywhere-ai-backend`.
+`npm run test:browser:smoke` (from `sdk/runanywhere-web/`) boots this app by
+default; `RA_E2E_APP_DIR` points the same specs at a different app.
+
 ## Validation
 
 Build and typecheck are smoke checks. Real validation is a browser launch with

@@ -15,8 +15,8 @@ this file.
 
 **Everything in this package is written in TypeScript — strictly typed, no exceptions.**
 There is no JavaScript in authored source: not the build scripts, not the tests, not the native
-smoke tests. The conventions match `examples/web/RunAnywhereAI` so an engineer moves between the
-Web SDK, this SDK, and the example apps without changing habits.
+smoke tests. The conventions match the Web SDK so an engineer moves between the
+Web SDK, this SDK, and the consumer apps without changing habits.
 
 ### Non-negotiable rules
 

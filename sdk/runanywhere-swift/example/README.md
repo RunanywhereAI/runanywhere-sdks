@@ -81,4 +81,4 @@ non-Keychain fallback for unbundled macOS hosts, of the kind
 `sdk/runanywhere-commons/src/desktop/desktop_secure_store.cpp` already provides
 for the C++ `rcli` host). Until that lands, this example verifies **compile and
 link** against local SDK source; end-to-end generation needs an app bundle
-(`examples/ios/RunAnywhereAI`) or the C++ CLI.
+([RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios)) or the C++ CLI.

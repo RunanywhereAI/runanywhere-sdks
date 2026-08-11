@@ -13,10 +13,10 @@
 #   - npm
 #   - Built WASM binaries (run sdk/runanywhere-web/scripts/build-web.sh first)
 #
-# The web SDK uses a manual/agent test suite documented in:
-#   examples/web/RunAnywhereAI/tests/web-sdk-test-suite.md
-#
-# This script provides automated smoke checks and wraps the manual suite.
+# Drives the in-repo minimal harness (sdk/runanywhere-web/example). The full
+# demo app and its manual/agent test suite now live in
+# github.com/RunanywhereAI/runanywhere-web; point WEB_APP_DIR at a checkout of
+# it to smoke that app instead.
 # =============================================================================
 
 set -e
@@ -56,8 +56,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 REPO_ROOT="$(cd "${RAC_ROOT}/../.." && pwd)"
 WEB_SDK_DIR="${REPO_ROOT}/sdk/runanywhere-web"
-WEB_APP_DIR="${REPO_ROOT}/examples/web/RunAnywhereAI"
-TEST_SUITE="${WEB_APP_DIR}/tests/web-sdk-test-suite.md"
+WEB_APP_DIR="${WEB_APP_DIR:-${WEB_SDK_DIR}/example}"
 
 # =============================================================================
 # Parse arguments
@@ -172,25 +171,18 @@ fi
 
 if [ "${SHOW_FULL}" = true ]; then
     print_header "Full Web SDK Test Suite"
-    echo "The comprehensive 21-category test suite is documented at:"
-    echo "  ${TEST_SUITE}"
+    echo "The scripted browser suite lives in the Web SDK itself:"
+    echo "  cd ${WEB_SDK_DIR} && npm run test:browser"
     echo ""
-    echo "To run the full suite:"
+    echo "To drive the app by hand instead:"
     echo "  1. Start the dev server:"
     echo "     cd ${WEB_APP_DIR} && npm run dev"
     echo ""
     echo "  2. Open http://localhost:3000 in a browser"
     echo ""
-    echo "  3. Follow the test steps in web-sdk-test-suite.md"
-    echo "     Categories include:"
-    echo "     - App initialization and SDK setup"
-    echo "     - Model registry and download"
-    echo "     - STT, TTS, VAD, LLM, VLM features"
-    echo "     - Voice agent pipeline"
-    echo "     - Settings persistence"
-    echo "     - Error handling and edge cases"
-    echo ""
-    echo "  4. Or use the Playwright MCP server for browser automation"
+    echo "The comprehensive multi-modality suite exercises the full demo app,"
+    echo "which now lives in github.com/RunanywhereAI/runanywhere-web. Clone it"
+    echo "and re-run with WEB_APP_DIR pointing at that checkout."
     exit 0
 fi
 

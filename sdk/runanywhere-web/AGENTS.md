@@ -122,11 +122,12 @@ npm run build:wasm:clean
 ./scripts/package-sdk.sh
 ```
 
-Example app:
+Minimal example (the in-repo harness — the full demo app lives in
+[RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web)):
 
 ```bash
-cd ../../examples/web/RunAnywhereAI
-npm run lint
+cd example
+npm install
 npm run typecheck
 npm run build
 npm run dev
@@ -283,8 +284,7 @@ npm run build
 npm run test:browser
 npm run test:browser:release
 
-cd ../../examples/web/RunAnywhereAI
-npm run lint
+cd example
 npm run typecheck
 npm run build
 ```

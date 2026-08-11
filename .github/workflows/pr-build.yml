@@ -533,12 +533,12 @@ jobs:
       - name: Kotlin SDK unit tests + debug assembly
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --max-workers=2
-      - name: Stage debug SDK AARs for the Android example
-        working-directory: examples/android/RunAnywhereAI
-        run: ./scripts/stage-sdk-aars.sh debug
-      - name: Android example unit tests + debug assembly
-        working-directory: examples/android/RunAnywhereAI
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2
+      # The consumer app moved to github.com/RunanywhereAI/runanywhere-android
+      # and builds against published AARs there; the in-repo Gradle consumer is
+      # sdk/runanywhere-kotlin/example, which composite-builds the SDK itself.
+      - name: Minimal Kotlin example debug assembly
+        working-directory: sdk/runanywhere-kotlin/example
+        run: ./gradlew :app:assembleDebug --no-daemon --max-workers=2
       - name: ktlintCheck + detekt (lint lane)
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew ktlintCheck detekt --no-daemon
@@ -651,9 +651,10 @@ jobs:
         run: npm test
 
   # Lightweight browser readiness/stream gate. Stages release-prebuilt WASM
-  # (gitignored) from the latest RACommons-web GitHub Release asset, then uses
-  # the example Vite alias path — no real-model downloads. Full real-model
-  # matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
+  # (gitignored) from the latest RACommons-web GitHub Release asset into
+  # packages/*/wasm, which is exactly where the minimal example's Vite config
+  # reads it from in local-source mode — no real-model downloads. Full
+  # real-model matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
   web-browser-smoke:
     runs-on: ubuntu-22.04
     needs: [web-typecheck]
@@ -670,8 +671,8 @@ jobs:
       - name: Install proto-ts dependencies
         working-directory: sdk/shared/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
-      - name: Install example app dependencies
-        working-directory: examples/web/RunAnywhereAI
+      - name: Install minimal example dependencies
+        working-directory: sdk/runanywhere-web/example
         run: npm ci --no-audit --no-fund
       - name: Stage release-prebuilt WASM
         working-directory: sdk/runanywhere-web

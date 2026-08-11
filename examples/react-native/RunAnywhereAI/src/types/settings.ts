@@ -1,7 +1,7 @@
 /**
  * Settings Types
  *
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/
+ * Reference: RunanywhereAI/runanywhere-ios: Features/Settings/
  */
 
 import { RoutingPolicy } from '@runanywhere/proto-ts/model_types';

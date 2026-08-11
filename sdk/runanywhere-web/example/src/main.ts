@@ -12,6 +12,7 @@ import {
   RunAnywhere,
 } from '@runanywhere/web';
 import { LlamaCPP } from '@runanywhere/web-llamacpp';
+import { publishReadiness, publishSDK } from './readiness';
 
 const MODEL_ID = 'smollm2-360m-q8_0';
 
@@ -36,8 +37,25 @@ function describe(error: unknown): string {
 
 /** Boot order: SDK core WASM → backend WASM → background services. */
 async function boot(): Promise<void> {
+  publishReadiness({
+    state: 'initializing-sdk',
+    step: 'initializing-sdk',
+    reason: 'Loading the commons WASM.',
+  });
   await RunAnywhere.initialize({ environment: 'development' });
+  publishSDK(RunAnywhere);
+
+  publishReadiness({
+    step: 'registering-llamacpp',
+    reason: 'Loading the llama.cpp backend WASM.',
+  });
   await LlamaCPP.register({ acceleration: 'auto' });
+  publishReadiness({
+    backend: 'registered',
+    step: 'registering-catalog',
+    reason: 'Backend registered; registering the app-owned catalog.',
+  });
+
   // Deprecated no-op forwarder retained for the documented two-phase boot;
   // `initialize()` already folds both phases.
   await RunAnywhere.completeServicesInitialization();
@@ -97,8 +115,23 @@ boot().then(
   () => {
     generateEl.disabled = false;
     setStatus(`Ready — SDK ${RunAnywhere.version}, backend llama.cpp (${RunAnywhere.runtime.active ?? 'cpu'}).`);
+    publishReadiness({
+      ready: true,
+      state: 'interactive',
+      step: 'interactive',
+      shellReady: true,
+      reason: 'Prompt accepted; the model downloads and loads on first generate.',
+    });
   },
   (error: unknown) => {
-    setStatus(`Startup failed: ${describe(error)}`);
+    const message = describe(error);
+    setStatus(`Startup failed: ${message}`);
+    publishReadiness({
+      state: 'error',
+      step: 'error',
+      backend: 'unavailable',
+      reason: 'SDK boot failed.',
+      error: message,
+    });
   },
 );

@@ -10,7 +10,6 @@ on:
   push:
     paths:
       - 'sdk/runanywhere-electron/**'
-      - 'examples/electron/**'
       - 'sdk/runanywhere-commons/**'
       - 'engines/**'
       - 'cmake/**'
@@ -19,7 +18,6 @@ on:
   pull_request:
     paths:
       - 'sdk/runanywhere-electron/**'
-      - 'examples/electron/**'
       - 'sdk/runanywhere-commons/**'
       - 'engines/**'
       - 'cmake/**'
@@ -87,17 +85,6 @@ jobs:
             (cd "$pkg" && npm install && npm run build)
           done
           npm run typecheck
-          npm test
-
-      - name: Example app install / typecheck / lint / unit tests
-        if: matrix.run_typescript
-        working-directory: examples/electron/RunAnywhereAI
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci
-          npm run typecheck
-          npm run lint
           npm test
 
       # --- Thin native Option A ---

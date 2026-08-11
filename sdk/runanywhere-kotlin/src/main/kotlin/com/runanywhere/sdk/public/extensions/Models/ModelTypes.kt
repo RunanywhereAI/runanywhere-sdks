@@ -15,7 +15,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.net.URI
 // `ModelSelectionContext` lived here as a UI filter helper but had
 // zero consumers inside the SDK. It was moved to the Android example app at
-// `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
+// `ModelSelectionContext.kt` in github.com/RunanywhereAI/runanywhere-android.
 
 val ModelCategory.requiresContextLength: Boolean
     get() =

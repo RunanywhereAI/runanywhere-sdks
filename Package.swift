@@ -20,7 +20,7 @@ import Foundation
 //      into sdk/runanywhere-swift/Binaries/.
 //   2. Export `RUNANYWHERE_USE_LOCAL_NATIVES=1` so the package resolves to
 //      those on-disk XCFrameworks instead of the remote release URLs.
-//   3. Open the example app (examples/ios/RunAnywhereAI) in Xcode — it
+//   3. Open the example app (github.com/RunanywhereAI/runanywhere-ios) in Xcode — it
 //      depends on this package via a relative path.
 //
 // =============================================================================

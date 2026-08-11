@@ -7,8 +7,8 @@ import type { Catalog, ModelType } from '../../dist/catalog';
 // catalog.ts is a REGISTRY, not a built-in catalog: the SDK owns the entry
 // shape and lookup surface, the app owns which models it offers. These tests
 // exercise the registry mechanism against a small synthetic fixture rather
-// than any real-world model id — the actual catalog data lives in
-// examples/electron/RunAnywhereAI/model-catalog.
+// than any real-world model id — the actual catalog data lives in the app
+// (github.com/RunanywhereAI/runanywhere-electron, src/main/model-catalog).
 
 const VALID_TYPES: ModelType[] = ['llm', 'vlm', 'embedder', 'stt', 'tts'];
 

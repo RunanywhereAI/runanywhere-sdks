@@ -89,16 +89,35 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | `runtimes/` | 3 runtime adapters: cpu (always), onnxrt, coreml |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
-### Example Applications
+### Consumer Applications
+The four full consumer apps were extracted into standalone repositories (history preserved). They are **not** in this tree; open PRs against them there.
+
+| App | Repository | Build System |
+|-----|-----------|-------------|
+| iOS | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) | SwiftUI + SPM |
+| Android | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) | Gradle/Compose |
+| Web | [RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web) | Vanilla TS + Vite |
+| Electron | [RunanywhereAI/runanywhere-electron](https://github.com/RunanywhereAI/runanywhere-electron) | TS + electron-builder |
+
+Two example apps remain in-tree:
+
 | App | Path | Build System |
 |-----|------|-------------|
-| Android | `examples/android/RunAnywhereAI/` | Gradle/Compose |
-| iOS | `examples/ios/RunAnywhereAI/` | SwiftUI + SPM |
 | Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
 | React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
-| Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
 
 All example apps share one visual identity — brand orange `#FF6900` (the logo primary, **not** the legacy `#FF5500`), documented in `examples/DESIGN_GUIDELINE.md`. Each app hand-maintains a small theme file that mirrors that doc; see the "Design System" section in each app's `AGENTS.md`.
+
+### Minimal Examples (in-repo harnesses)
+These are how you verify an SDK change locally — and what monorepo CI builds. Each consumes the SDK **from local source**, so an edit is visible without staging or publishing anything.
+
+| SDK | Path | How it consumes the SDK |
+|-----|------|-------------------------|
+| Swift | `sdk/runanywhere-swift/example/` | SwiftPM package depending on the repo-root manifest (`RUNANYWHERE_USE_LOCAL_NATIVES=1`) |
+| Kotlin | `sdk/runanywhere-kotlin/example/` | Gradle composite build (`includeBuild` + `dependencySubstitution`) — no AAR staging |
+| Web | `sdk/runanywhere-web/example/` | Vite aliases + `tsconfig` paths into `packages/*/src`; `RAC_USE_INSTALLED_SDK=1` switches to installed tarballs |
+
+Each is deliberately small: one prompt in, one streamed completion out. They are contributor harnesses, not showcases — feature-complete UI belongs in the consumer repos above.
 
 ### Playground
 `Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
@@ -347,47 +366,53 @@ Generated files are committed. CI `idl-drift-check.yml` fails if they're out of 
 
 ## Example App Commands
 
-### iOS Example
+### Swift Minimal Example
 
 ```bash
-cd examples/ios/RunAnywhereAI/
+cd sdk/runanywhere-swift/example/
 
-# Build and run on simulator (recommended)
-./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift run
+```
 
-# Build and run on device
-./scripts/build_and_run_ios_sample.sh device
+Requires the XCFrameworks in `sdk/runanywhere-swift/Binaries/` (`RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`) — build them with `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`. `./run example ios {build|run|clean}` wraps this.
 
-# macOS target
-./scripts/build_and_run_ios_sample.sh mac
+SDK logs (in a separate terminal):
 
-# Local verification
-./scripts/verify.sh     # Checks XCFrameworks exist, resolves packages, xcodebuild
-./scripts/smoke.sh      # Greps source for SDK API calls (no compilation)
-
-# SDK logs (in separate terminal)
+```bash
 log stream --predicate 'subsystem CONTAINS "com.runanywhere"' --info --debug
 ```
 
-Requires 4 XCFrameworks in `sdk/runanywhere-swift/Binaries/`: `RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`.
-
-### Android Example
+### Kotlin Minimal Example
 
 ```bash
-cd examples/android/RunAnywhereAI/
+cd sdk/runanywhere-kotlin/example/
 
 ./gradlew :app:assembleDebug   # Build
 ./gradlew :app:installDebug    # Install on device/emulator
-./scripts/verify.sh            # Full build gate
 ```
 
-Consumes the SDK + engine modules as raw local AARs — `app/build.gradle.kts` declares `implementation(files("../libs/runanywhere-{sdk,llamacpp,onnx,qhexrt}.aar"))`, not Maven Local coordinates. Local AARs carry no POM, so the app declares the SDK's transitive runtime deps itself. Discrete steps:
-- `./run sdk commons build-android` — build the commons `.so` for all Android ABIs.
-- `./run example android stage` — build the SDK release AARs and copy them into `examples/android/RunAnywhereAI/libs/` (via `scripts/stage-sdk-aars.sh release`).
-- `./run example android build` — stage, then `:app:assembleDebug`.
-- `./run example android install` — stage, then `:app:installDebug` and launch.
+`settings.gradle.kts` pulls `sdk/runanywhere-kotlin` in as a **composite build** with `dependencySubstitution`, so Gradle recompiles the SDK from source on every app build and its transitive runtime deps (coroutines, OkHttp, Wire) come along automatically. There is no AAR staging step.
 
-Re-run `build-android` + `stage` after any change to C++ commons or the Kotlin SDK.
+- `./run sdk commons build-android` — build the commons `.so` for all Android ABIs (needed once, and after any C++ change; `runanywhere.useLocalNatives=true` expects them under `src/main/jniLibs/`).
+- `./run example android build` — `:app:assembleDebug`.
+- `./run example android install` — `:app:installDebug` and launch.
+
+### Web Minimal Example
+
+```bash
+cd sdk/runanywhere-web/example/
+
+npm install
+npm run typecheck
+npm run dev          # Vite dev server at port 3000 (COOP/COEP set by vite.config.ts)
+npm run build        # Production bundle in dist/
+npm run preview      # Serve dist/ on port 3000
+```
+
+Requires the four canonical WASM pairs (`npm run build:wasm:all` from `sdk/runanywhere-web/`); the build fails naming the missing files rather than emitting a broken bundle. `SharedArrayBuffer` needs cross-origin isolation (COOP + COEP).
+
+The example publishes `window.__RUNANYWHERE_SDK__` and `window.__RUNANYWHERE_AI_READY__` — the readiness contract `sdk/runanywhere-web/tests/browser/` probes. `RA_E2E_APP_DIR` points Playwright at a different app (e.g. a checkout of `RunanywhereAI/runanywhere-web` for the full release journey).
 
 ### Flutter Example
 
@@ -415,18 +440,6 @@ yarn typecheck      # Primary verification gate
 ```
 
 **Hermes caveat**: Does not support `for await...of` with NitroModules async iterables. Use manual `iterator.next()` loops.
-
-### Web Example
-
-```bash
-cd examples/web/RunAnywhereAI/
-
-npm install
-npm run dev          # Vite dev server at port 3000
-npm run build        # Production build
-```
-
-Requires WASM pre-built. `SharedArrayBuffer` needs cross-origin isolation headers (COOP + COEP).
 
 ---
 
@@ -601,7 +614,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 |-----------|-------|------|------|-------|
 | Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | Prefer workspace `npm run typecheck` (builds core `dist/` before backends). Isolated `npm run typecheck -w packages/{llamacpp,onnx}` needs a fresh `npm run build -w packages/core` first — backends resolve `@runanywhere/web/backend` via gitignored `packages/core/dist` types |
-| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:3000` | N/A | Full Vite app, works in demo mode without WASM |
+| Web minimal example | `npm run dev` (from `sdk/runanywhere-web/example/`) | Manual browser testing at `localhost:3000` | N/A | Streams one completion; needs the WASM pairs built |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |
 | Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |
@@ -614,7 +627,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 - **JDK 17**: Required by Gradle JVM toolchain. Both JDK 17 and JDK 21 are installed.
 - **`useLocalNatives` flag**: Set to `true` in `gradle.properties`. Pass `-Prunanywhere.useLocalNatives=false` to Gradle to avoid needing Android NDK (downloads pre-built JNI libs from GitHub releases instead of building locally).
 - **C++ compiler**: Default clang on this VM lacks `libc++` headers. Use `gcc`/`g++` via `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
-- **`local.properties`**: Auto-created at root, `sdk/runanywhere-kotlin/`, and `examples/android/RunAnywhereAI/` with `sdk.dir=/opt/android-sdk`.
+- **`local.properties`**: Auto-created at root, `sdk/runanywhere-kotlin/`, and `sdk/runanywhere-kotlin/example/` with `sdk.dir=/opt/android-sdk`.
 - **pre-commit hooks**: Installed via `pre-commit install`. Requires `git config --unset-all core.hooksPath` first if `core.hooksPath` is set.
 
 ### Linux Voice Assistant Quick Start

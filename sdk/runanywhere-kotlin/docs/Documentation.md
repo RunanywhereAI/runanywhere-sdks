@@ -1607,4 +1607,4 @@ if (allModelsLoaded) {
 ## See Also
 
 - [README.md](../README.md) - Getting started guide
-- [Sample App](../../../examples/android/RunAnywhereAI/) - Working example
+- [Sample App](https://github.com/RunanywhereAI/runanywhere-android) - Working example

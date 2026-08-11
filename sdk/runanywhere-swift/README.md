@@ -144,7 +144,7 @@ Models are discovered through the RunAnywhere catalog, downloaded on-device, and
 - Trust model: **trusted LAN only** (no TLS/pairing in this release). Runtime admission follows commons `platformPolicy()`; compile-time `#if os` guards only gate Apple APIs that do not exist on the other Apple platforms
 - React Native, Flutter, Web, and Electron are **not** Connect participants in this release
 
-See the iOS/macOS example under [`examples/ios/RunAnywhereAI/`](../../examples/ios/RunAnywhereAI/) (`ConnectHostManagementView`, model-selection Connect section).
+See the iOS/macOS example app in [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) (`ConnectHostManagementView`, model-selection Connect section).
 
 ---
 
@@ -153,7 +153,8 @@ See the iOS/macOS example under [`examples/ios/RunAnywhereAI/`](../../examples/i
 | Resource | Link |
 |----------|------|
 | **Docs** | [docs.runanywhere.ai/swift/introduction](https://docs.runanywhere.ai/swift/introduction) |
-| **Example app** | [`examples/ios/RunAnywhereAI/`](../../examples/ios/RunAnywhereAI/) |
+| **Minimal example** | [`example/`](example/) — SwiftPM harness, builds the SDK from local source |
+| **Full example app** | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) |
 | **Contributing / local build** | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 
 ---

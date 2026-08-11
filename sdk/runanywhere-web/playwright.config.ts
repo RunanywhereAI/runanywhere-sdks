@@ -50,6 +50,13 @@ const browserChannel = process.env.RA_BROWSER_CHANNEL
 const localReleaseURL = 'http://localhost:43173';
 const baseURL = configuredRemoteURL
   ?? (runFullE2E ? localReleaseURL : 'http://localhost:3000');
+// The app under test. Defaults to the in-repo minimal harness
+// (sdk/runanywhere-web/example), which the SDK owns and which publishes the
+// `__RUNANYWHERE_AI_READY__` / `__RUNANYWHERE_SDK__` readiness contract the
+// specs probe. The full demo app now lives in its own repository
+// (github.com/RunanywhereAI/runanywhere-web); point `RA_E2E_APP_DIR` at a
+// checkout of it to run the app-driven release journey.
+const appDir = process.env.RA_E2E_APP_DIR ?? resolve(__dirname, 'example');
 const launchArgs = [
   ...(enableWebGPU ? webgpuArgs : []),
   ...(runFullE2E ? fakeMediaArgs : []),
@@ -100,8 +107,8 @@ export default defineConfig({
     // The full release gate builds and previews this clone on a dedicated
     // port, never reusing a potentially stale server from another checkout.
     command: runFullE2E
-      ? 'cd ../../examples/web/RunAnywhereAI && npm run build && npm run preview -- --host localhost --port 43173 --strictPort'
-      : 'cd ../../examples/web/RunAnywhereAI && npm run dev',
+      ? `cd ${JSON.stringify(appDir)} && npm run build && npm run preview -- --host localhost --port 43173 --strictPort`
+      : `cd ${JSON.stringify(appDir)} && npm run dev`,
     url: baseURL,
     reuseExistingServer: runFullE2E ? false : !process.env.CI,
     gracefulShutdown: runFullE2E ? { signal: 'SIGTERM', timeout: 5_000 } : undefined,

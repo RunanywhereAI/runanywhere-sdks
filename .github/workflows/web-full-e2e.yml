@@ -2,6 +2,12 @@ name: Web full real-model E2E
 
 # Opt-in / scheduled gate for the serial real-model browser matrix.
 # PR CI stays on lightweight smoke (web-browser-smoke in pr-build.yml).
+#
+# The release journey (`tests/browser/release-app.e2e.spec.ts`) drives the full
+# demo app, which now lives in its own repository. This job checks that app out
+# and points Playwright at it with `RA_E2E_APP_DIR`; without that variable the
+# harness falls back to the in-repo minimal example
+# (`sdk/runanywhere-web/example`), which has no multi-tab UI to drive.
 
 on:
   workflow_dispatch: {}
@@ -33,8 +39,14 @@ jobs:
       - name: Install proto-ts dependencies
         working-directory: sdk/shared/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
-      - name: Install example app dependencies
-        working-directory: examples/web/RunAnywhereAI
+      - name: Check out the demo app
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/runanywhere-web
+          path: consumer-web
+          persist-credentials: false
+      - name: Install demo app dependencies
+        working-directory: consumer-web
         run: npm ci --no-audit --no-fund
       - name: Install Playwright Chrome
         working-directory: sdk/runanywhere-web
@@ -44,6 +56,7 @@ jobs:
         env:
           RA_RUN_FULL_E2E: '1'
           RA_E2E_TRACE: '1'
+          RA_E2E_APP_DIR: ${{ github.workspace }}/consumer-web
         run: npm run test:browser:release
       - name: Upload Playwright artifacts
         if: always()

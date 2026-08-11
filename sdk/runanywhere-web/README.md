@@ -137,15 +137,17 @@ export default defineConfig({
 
 Your deployment must serve every canonical `.js`/`.wasm` pair as real static files — never as an SPA HTML fallback. Threaded Emscripten workers require the canonical `.js` glue files at runtime.
 
-## Example application
+## Example applications
+
+The in-repo minimal harness — one prompt, one streamed answer — is the fastest way to check an SDK change in a browser:
 
 ```bash
-cd ../../examples/web/RunAnywhereAI
+cd example
 npm ci
 npm run dev
 ```
 
-The example demonstrates LLM (CPU and WebGPU), VLM, STT, TTS, VAD, Voice Agent, RAG, and model management with the required COOP/COEP headers.
+The full demo app (LLM on CPU and WebGPU, VLM, STT, TTS, VAD, Voice Agent, RAG, model management) lives in its own repository: [RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web). Both serve the COOP/COEP headers cross-origin isolation requires.
 
 ## FAQ
 

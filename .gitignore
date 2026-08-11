@@ -144,6 +144,8 @@ gradle.properties
 # But keep project-level gradle properties if needed
 !gradle.properties.example
 !examples/flutter/RunAnywhereAI/android/gradle.properties
+# The in-repo minimal Kotlin harness is a CI gate; a clean clone must build it.
+!sdk/runanywhere-kotlin/example/gradle.properties
 
 # Also ignore .idea folders in subdirectories
 sdk/runanywhere-kotlin/.idea/
@@ -175,7 +177,6 @@ SHARED_TASK_NOTES.md
 *.temp
 
 # Android
-/examples/android/RunAnywhereAI/play-assets/
 *.apk
 *.aar
 *.ap_
@@ -261,7 +262,6 @@ sdk/runanywhere-web/packages/*/wasm/*.wasm
 sdk/runanywhere-web/packages/*/wasm/*.wasm.map
 sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
-examples/web/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
 EXTERNAL/
@@ -409,8 +409,6 @@ sdk/runanywhere-flutter/android/*.aar
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 tools/
-!examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/
-!examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/WebSearchTool.kt
 
 # Python virtual environments
 .venv*/
@@ -453,7 +451,6 @@ docs/graph_primitives.md
 docs/migrations/
 docs/plugins/
 docs/sdks/web-sdk.md
-examples/web/RunAnywhereAI/README.md
 idl/README.md
 sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md
 sdk/runanywhere-commons/examples/solutions/README.md

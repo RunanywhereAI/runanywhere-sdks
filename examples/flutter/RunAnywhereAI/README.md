@@ -178,8 +178,8 @@ flutter test
 | Resource | Link |
 |----------|------|
 | **Flutter SDK** | [sdk/runanywhere-flutter/README.md](../../../sdk/runanywhere-flutter/README.md) |
-| **iOS example** | [examples/ios/RunAnywhereAI](../../ios/RunAnywhereAI/README.md) |
-| **Android example** | [examples/android/RunAnywhereAI](../../android/RunAnywhereAI/README.md) |
+| **iOS example** | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) |
+| **Android example** | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) |
 | **React Native example** | [examples/react-native/RunAnywhereAI](../../react-native/RunAnywhereAI/README.md) |
 | **App Store / Play Store** | [iOS](https://apps.apple.com/us/app/runanywhere/id6756506307) · [Android](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
 | **Discord** | [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd) |

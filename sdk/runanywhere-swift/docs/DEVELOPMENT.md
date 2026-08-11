@@ -89,14 +89,20 @@ Concurrency conventions worth knowing before you write bridge code: never use `N
 
 Three `.grpc.swift` files under `Sources/RunAnywhere/Generated/` are excluded from compilation. They require iOS 18 / macOS 15, above the SDK's deployment floor; an in-process C callback path replaces them.
 
-## Testing with the iOS example app
+## Testing with the minimal example
 
 ```bash
-cd examples/ios/RunAnywhereAI
-./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
+cd example
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift run
 ```
 
-Swift SDK source changes are picked up on rebuild. After a C++ change in `runanywhere-commons`, re-run `build-core-xcframework.sh` before trusting an app build.
+`example/` is a SwiftPM executable that depends on the repo-root manifest, so
+Swift SDK source changes are picked up on rebuild. After a C++ change in
+`runanywhere-commons`, re-run `build-core-xcframework.sh` before trusting a
+build.
+
+The full iOS consumer app lives in
+[RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios).
 
 Stream SDK logs in a separate terminal:
 

@@ -1,7 +1,7 @@
 /**
  * Voice Types - STT, TTS, and Voice Assistant
  *
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/
+ * Reference: RunanywhereAI/runanywhere-ios: Features/Voice/
  */
 
 export enum STTMode {

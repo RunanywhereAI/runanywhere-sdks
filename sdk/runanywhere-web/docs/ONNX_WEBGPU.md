@@ -25,8 +25,8 @@ source emsdk/emsdk_env.sh
 npm run vendor:wasm:speech          # CPU ORT + WebGPU ORT + Sherpa
 npm run build:wasm:all              # includes --onnx-webgpu
 
-# demo
-cd ../../examples/web/RunAnywhereAI && npm run release:build
+# demo (github.com/RunanywhereAI/runanywhere-web, cloned alongside this repo)
+cd ../runanywhere-web && npm run release:build
 ```
 
 Gate: both speech WASM pairs non-empty; demo `release.sh` requires the WebGPU pair in `dist`; browser COI shows `Speech`/`Embeddings: WebGPU` and `ONNX.lastFallbackReason == null` (or `__RUNANYWHERE_ONNX_DIAG__`). Forced `'webgpu'` must throw if the twin/probe is broken.

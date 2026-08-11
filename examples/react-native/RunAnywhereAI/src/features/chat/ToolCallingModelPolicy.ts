@@ -2,7 +2,7 @@
  * Tool-calling routing and execution policy for the chat screen.
  *
  * Mirrors the Android example's ToolCallingModelPolicy /
- * ToolCallingExecutionPolicy (examples/android/.../chat/ToolCallingModelPolicy.kt)
+ * ToolCallingExecutionPolicy (RunanywhereAI/runanywhere-android: .../chat/ToolCallingModelPolicy.kt)
  * so every platform gates and budgets tool calling identically. Sampling knobs
  * (temperature, top-p, max tokens) travel through generateWithTools' llmOptions
  * channel on React Native rather than the tool-options message.

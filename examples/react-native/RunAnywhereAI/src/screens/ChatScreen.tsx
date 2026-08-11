@@ -18,7 +18,7 @@
  * - Text generation via RunAnywhere.llm.generateStream(prompt, options?)
  *   and RunAnywhere.llm.generate(prompt, options?)
  *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
+ * Reference: iOS RunanywhereAI/runanywhere-ios: Features/Chat/Views/ChatInterfaceView.swift
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';

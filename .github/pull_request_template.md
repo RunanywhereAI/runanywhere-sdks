@@ -52,11 +52,13 @@ Please add the appropriate label(s):
 - [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
 
 **Sample Apps:**
-- [ ] `iOS Sample` - Changes to iOS example app (`examples/ios`)
-- [ ] `Android Sample` - Changes to Android example app (`examples/android`)
 - [ ] `Flutter Sample` - Changes to Flutter example app (`examples/flutter`)
 - [ ] `React Native Sample` - Changes to React Native example app (`examples/react-native`)
-- [ ] `Web Sample` - Changes to Web example app (`examples/web`)
+- [ ] `Minimal Examples` - Changes to an in-repo SDK harness (`sdk/runanywhere-{swift,kotlin,web}/example`)
+
+The iOS, Android, Web, and Electron consumer apps live in their own
+repositories (`RunanywhereAI/runanywhere-{ios,android,web,electron}`) — open
+those PRs there.
 
 ## Checklist
 - [ ] Code follows project style guidelines

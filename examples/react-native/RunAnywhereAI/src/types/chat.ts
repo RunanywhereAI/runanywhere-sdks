@@ -1,7 +1,7 @@
 /**
  * Chat Types - Matching iOS Message models
  *
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Models/
+ * Reference: RunanywhereAI/runanywhere-ios: Features/Chat/Models/
  */
 
 import type { PerformanceMetrics } from '@runanywhere/proto-ts/llm_options';

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
@@ -10,41 +8,26 @@ import 'package:runanywhere_ai/features/models/model_types.dart'
 void main() {
   tearDown(QHexRTModelCatalog.resetForTesting);
 
-  test('Flutter QHexRT catalog exactly matches the 60 Android rows', () {
-    final kotlinRows = _parseKotlinCatalog();
+  // The Android counterpart of this catalog now lives in
+  // github.com/RunanywhereAI/runanywhere-android, so the row-by-row parity
+  // assertion this test used to make against `ModelCatalog.kt` is no longer
+  // expressible here. What remains are the invariants this catalog owns.
+  test('QHexRT catalog rows are well-formed and uniquely identified', () {
     const flutterRows = QHexRTModelCatalog.models;
 
     expect(flutterRows, hasLength(60));
     expect(
-      flutterRows.map((model) => model.id).toList(),
-      kotlinRows.map((model) => model.id).toList(),
+      flutterRows.map((model) => model.id).toSet(),
+      hasLength(flutterRows.length),
     );
-
-    for (final flutterModel in flutterRows) {
-      final kotlinModel = kotlinRows.singleWhere(
-        (model) => model.id == flutterModel.id,
-      );
-      expect(flutterModel.name, kotlinModel.name, reason: flutterModel.id);
-      expect(flutterModel.url, kotlinModel.url, reason: flutterModel.id);
+    for (final model in flutterRows) {
+      expect(model.name, isNotEmpty, reason: model.id);
+      expect(model.url, startsWith('https://'), reason: model.id);
+      expect(model.memoryBytes, greaterThan(0), reason: model.id);
       expect(
-        flutterModel.category,
-        kotlinModel.category,
-        reason: flutterModel.id,
-      );
-      expect(
-        flutterModel.memoryBytes,
-        kotlinModel.memoryBytes,
-        reason: flutterModel.id,
-      );
-      expect(
-        flutterModel.contextLength,
-        kotlinModel.contextLength,
-        reason: flutterModel.id,
-      );
-      expect(
-        flutterModel.supportsThinking,
-        kotlinModel.supportsThinking,
-        reason: flutterModel.id,
+        model.contextLength,
+        anyOf(isNull, greaterThan(0)),
+        reason: model.id,
       );
     }
   });
@@ -222,79 +205,4 @@ void main() {
 
     expect(cpuModelWithSharedId.requiresHfAuth, isFalse);
   });
-}
-
-List<_KotlinCatalogModel> _parseKotlinCatalog() {
-  final candidates = [
-    File(
-      '../../android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/data/ModelCatalog.kt',
-    ),
-    File(
-      'examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/data/ModelCatalog.kt',
-    ),
-  ];
-  final sourceFile = candidates.firstWhere(
-    (candidate) => candidate.existsSync(),
-    orElse: () => throw StateError('Android ModelCatalog.kt not found'),
-  );
-  final source = sourceFile.readAsStringSync();
-  final start = source.indexOf('val npuCatalog:');
-  final end = source.indexOf('// The Play build', start);
-  final catalogSource = source.substring(start, end);
-  final rowPattern = RegExp(
-    r'SingleFileModel\("([^"]+)", "([^"]+)", "([^"]+)", QHEXRT, ([A-Z_]+), ([0-9_]+)L([^)]*)\)',
-  );
-
-  return rowPattern
-      .allMatches(catalogSource)
-      .map((match) {
-        final optionalArguments = match.group(6)!;
-        final contextMatch = RegExp(
-          r'contextLength = ([0-9_]+)',
-        ).firstMatch(optionalArguments);
-        return _KotlinCatalogModel(
-          id: match.group(1)!,
-          name: match.group(2)!,
-          url: match.group(3)!,
-          category: _kotlinCategory(match.group(4)!),
-          memoryBytes: int.parse(match.group(5)!.replaceAll('_', '')),
-          contextLength: contextMatch == null
-              ? null
-              : int.parse(contextMatch.group(1)!.replaceAll('_', '')),
-          supportsThinking: optionalArguments.contains(
-            'supportsThinking = true',
-          ),
-        );
-      })
-      .toList(growable: false);
-}
-
-ModelCategory _kotlinCategory(String category) => switch (category) {
-  'LANGUAGE' => ModelCategory.MODEL_CATEGORY_LANGUAGE,
-  'MULTIMODAL' => ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-  'IMAGE_GENERATION' => ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
-  'EMBEDDING' => ModelCategory.MODEL_CATEGORY_EMBEDDING,
-  'STT' => ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-  'TTS' => ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-  _ => throw StateError('Unknown Kotlin category: $category'),
-};
-
-class _KotlinCatalogModel {
-  const _KotlinCatalogModel({
-    required this.id,
-    required this.name,
-    required this.url,
-    required this.category,
-    required this.memoryBytes,
-    required this.contextLength,
-    required this.supportsThinking,
-  });
-
-  final String id;
-  final String name;
-  final String url;
-  final ModelCategory category;
-  final int memoryBytes;
-  final int? contextLength;
-  final bool supportsThinking;
 }

@@ -23,10 +23,7 @@ export const AUDIO_FIXTURE = resolve(
   REPO_ROOT,
   'Playground/openclaw-hybrid-assistant/tests/audio/edge-cases/weather-command.wav',
 );
-export const IMAGE_FIXTURE = resolve(
-  REPO_ROOT,
-  'examples/android/RunAnywhereAI/app/src/androidTest/assets/test.jpg',
-);
+export const IMAGE_FIXTURE = resolve(__dirname, '../fixtures/release-image.jpg');
 export const RAG_FIXTURE = resolve(__dirname, '../fixtures/release-rag.txt');
 
 export const RELEASE_MODELS = {

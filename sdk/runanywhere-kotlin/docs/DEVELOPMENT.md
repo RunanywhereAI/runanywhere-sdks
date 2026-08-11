@@ -82,32 +82,36 @@ Published Maven coordinates use group `io.github.sanchitmonga22`. See [KOTLIN_MA
 
 ---
 
-## Testing with the Android Sample App
+## Testing with the minimal example app
 
-The recommended way to validate SDK changes is the sample app at `examples/android/RunAnywhereAI/`:
+The recommended way to validate SDK changes is the harness at `example/`:
 
 1. Complete setup (above)
-2. Stage the SDK AARs into the sample app:
+2. Build and install it:
 
    ```bash
-   cd ../../examples/android/RunAnywhereAI
-   ./scripts/stage-sdk-aars.sh debug
+   cd example
+   ./gradlew :app:installDebug
    ```
 
-3. Open Android Studio → **Open** → `examples/android/RunAnywhereAI`
-4. Wait for Gradle sync
-5. Connect an ARM64 device or emulator
-6. Run the app
+3. Or open Android Studio → **Open** → `sdk/runanywhere-kotlin/example`
+4. Connect an ARM64 device or emulator and run
 
-The sample app does not consume this module as a Gradle project. It depends on staged release AARs copied into `examples/android/RunAnywhereAI/libs/`, so SDK changes need a restage before the app sees them:
+`example/settings.gradle.kts` pulls this module in as a **composite build**, so
+there is no AAR staging step — Gradle recompiles the SDK from source (and picks
+up its transitive runtime deps) on every app build:
 
 ```
-Sample App → libs/runanywhere-{sdk,llamacpp,onnx,qhexrt}.aar
+example :app → com.runanywhere:runanywhere-kotlin  (substituted)
                         ↑
-          examples/android/RunAnywhereAI/scripts/stage-sdk-aars.sh debug
+            sdk/runanywhere-kotlin (includeBuild)
                         ↑
              src/main/jniLibs/  ←  ./gradlew setupLocalDevelopment
 ```
+
+The full consumer app — chat, voice, RAG, model management — now lives in
+[RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android)
+and consumes published AARs.
 
 ---
 

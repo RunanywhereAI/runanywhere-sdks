@@ -20,12 +20,12 @@ com.runanywhere:runanywhere-core-llamacpp -> project ':runanywhere-kotlin:module
 ```
 
 Those coordinates are placeholders that exist only to be substituted; nothing is
-ever resolved from a repository. Unlike the `files("../libs/*.aar")` approach in
-the (departing) `examples/android/RunAnywhereAI`, this also brings the SDK's
+ever resolved from a repository. Unlike the `files("../libs/*.aar")` approach the
+full consumer app used before it moved to
+[RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android), this also brings the SDK's
 transitive runtime deps (coroutines, OkHttp, Wire) automatically, so the app
-declares none of them. `examples/android/RunAnywhereAI/scripts/stage-sdk-aars.sh`
-is deliberately **not** reused: it hardcodes that app's own `libs/` directory as
-its output and leaves the repo with that app.
+declares none of them — and there is no AAR staging step to re-run after an SDK
+edit.
 
 ## Prerequisites
 
@@ -88,5 +88,4 @@ even though nothing here is `@Serializable`. AGP 9 supplies Kotlin itself
 (applying `kotlin.android` is a hard error now) and its bundled compiler is
 2.2.0, which cannot read the SDK's 2.4.0 metadata. Putting a 2.4.0 Kotlin
 compiler plugin on the buildscript classpath pins the built-in compiler to
-2.4.0 — the same trick `sdk/runanywhere-kotlin` and
-`examples/android/RunAnywhereAI` already use.
+2.4.0 — the same trick `sdk/runanywhere-kotlin` itself uses.

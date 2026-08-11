@@ -10,7 +10,7 @@
  * - Tab-based navigation with 5 tabs (Chat, Vision, Voice, More, Settings)
  * - Tool calling settings are in Settings tab (matching iOS)
  *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
+ * Reference: iOS RunanywhereAI/runanywhere-ios: App/RunAnywhereAIApp.swift
  */
 
 import React, { useCallback, useEffect, useState } from 'react';

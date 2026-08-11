@@ -7,8 +7,8 @@
 // These constants are the single source of truth for:
 //   * the SDK version string emitted in telemetry events / release
 //     XCFramework URLs in Package.swift,
-//   * the swift-tools-version pinned in all three Package.swift files (root,
-//     sdk/runanywhere-swift, examples/ios/RunAnywhereAI),
+//   * the swift-tools-version pinned in the Package.swift files (root,
+//     sdk/runanywhere-swift, sdk/runanywhere-swift/example),
 //   * the version floors used in the `.upToNextMinor(from:)` constraints for
 //     each SPM dependency,
 //   * native dependency versions exposed by Swift runtime modules.

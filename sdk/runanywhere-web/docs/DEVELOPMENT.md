@@ -94,12 +94,15 @@ The full release journey covers LLM CPU and WebGPU, VLM, STT batch and streaming
 ## Example application (validation)
 
 ```bash
-cd ../../examples/web/RunAnywhereAI
+cd example
 npm ci
-npm run lint
 npm run typecheck
 npm run build
 npm run dev
 ```
 
-The example is the browser validation application for all supported modalities.
+`sdk/runanywhere-web/example` is the in-repo harness: it covers LLM streaming
+only, and it is what the browser gates boot by default. Validating every
+modality needs the full demo app, which lives in
+[RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web);
+point `RA_E2E_APP_DIR` at a checkout of it to run the release journey.

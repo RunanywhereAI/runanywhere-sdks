@@ -42,7 +42,7 @@
     "test:types": "tsd",
     "test:unit": "vitest run",
     "test": "vitest run",
-    "test:e2e": "npm run build && (cd ../../../../examples/web/RunAnywhereAI && npm run build)",
+    "test:e2e": "npm run build && (cd ../../example && npm run build)",
     "clean": "rm -rf dist",
     "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons.js wasm/racommons.wasm",
     "prepack": "npm run build && npm run verify:package"

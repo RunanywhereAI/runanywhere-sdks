@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sync canonical commons solution YAMLs into a generated Dart library.
 #
-# Mirrors examples/ios/RunAnywhereAI/scripts/sync-solutions-yamls.sh and
-# examples/react-native/RunAnywhereAI/scripts/sync-solutions-yamls.js:
+# Mirrors examples/react-native/RunAnywhereAI/scripts/sync-solutions-yamls.js
+# (and its counterpart in github.com/RunanywhereAI/runanywhere-ios):
 # reads sdk/runanywhere-commons/examples/solutions/{voice_agent,rag}.yaml and
 # emits lib/generated/solutions_yaml.dart so the Solutions screen never
 # embeds drift-prone inline copies.

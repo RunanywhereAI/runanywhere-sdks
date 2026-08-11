@@ -669,4 +669,4 @@ fun testRealInference() = runTest {
 
 - [RunAnywhere Swift SDK](../../runanywhere-swift/) - iOS implementation
 - [runanywhere-commons](../../runanywhere-commons/) - C++ core library
-- [Sample App](../../../examples/android/RunAnywhereAI/) - Reference implementation
+- [Sample App](https://github.com/RunanywhereAI/runanywhere-android) - Reference implementation

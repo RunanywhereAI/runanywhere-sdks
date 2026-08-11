@@ -108,7 +108,7 @@ setup_android() {
         warn "Android NDK ${NDK_VERSION} not found — install it before running ./run sdk commons build-android"
     fi
     ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin" "${sdk}" "${ndk}"
-    ensure_local_props "${REPO_ROOT}/examples/android/RunAnywhereAI" "${sdk}" "${ndk}"
+    ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin/example" "${sdk}" "${ndk}"
 }
 
 setup_flutter() {
@@ -141,11 +141,11 @@ setup_ios() {
     if [ -d "${REPO_ROOT}/sdk/runanywhere-swift" ]; then
         (cd "${REPO_ROOT}/sdk/runanywhere-swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
     fi
-    for ex in "${REPO_ROOT}"/examples/ios/*/; do
-        if [ -f "${ex}/Podfile" ] && have pod; then
-            (cd "${ex}" && pod install) && ok "$(basename "${ex}") pod install"
-        fi
-    done
+    if [ -f "${REPO_ROOT}/sdk/runanywhere-swift/example/Package.swift" ]; then
+        (cd "${REPO_ROOT}/sdk/runanywhere-swift/example" \
+            && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) \
+            && ok "minimal example swift package resolve"
+    fi
 }
 
 setup_web() {
@@ -155,12 +155,12 @@ setup_web() {
         cd "${REPO_ROOT}/sdk/runanywhere-web"
         if have yarn; then yarn install && ok "sdk yarn install"; else npm install && ok "sdk npm install"; fi
     fi
-    for ex in "${REPO_ROOT}"/examples/web/*/; do
-        if [ -f "${ex}/package.json" ]; then
-            cd "${ex}"
-            if have yarn; then yarn install && ok "$(basename "${ex}") yarn install"; else npm install && ok "$(basename "${ex}") npm install"; fi
-        fi
-    done
+    # The minimal harness is a standalone npm project (not a workspace member),
+    # so it installs on its own.
+    if [ -f "${REPO_ROOT}/sdk/runanywhere-web/example/package.json" ]; then
+        cd "${REPO_ROOT}/sdk/runanywhere-web/example"
+        npm install && ok "minimal example npm install"
+    fi
 }
 
 setup_all() {

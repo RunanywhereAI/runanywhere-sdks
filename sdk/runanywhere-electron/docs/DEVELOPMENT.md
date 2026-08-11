@@ -203,13 +203,14 @@ OFF still produce a working addon when backends are linked via
 Place the built `runanywhere_native.node` in `prebuilds/win32-x64-cuda/` beside its DLLs: `cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll` (from the CUDA `bin/`) plus `onnxruntime.dll`, `onnxruntime_providers_shared.dll`, `sherpa-onnx-c-api.dll`.
 
 Then run `npm run bundle:native` or copy manually. The demo's
-`examples/electron/RunAnywhereAI/RunAnywhere AI (GPU).cmd` (or `npm run start:gpu`)
-launches against that prebuild when `RA_GPU=1` / `--gpu` is set.
+`RunAnywhere AI (GPU).cmd` (or `npm run start:gpu`) launches against that
+prebuild when `RA_GPU=1` / `--gpu` is set.
 
 ## Example demo
 
-The example app is TypeScript (`src/main`, `src/preload`, `src/renderer`). From
-`examples/electron/RunAnywhereAI`:
+The example app is TypeScript (`src/main`, `src/preload`, `src/renderer`) and
+lives in [RunanywhereAI/runanywhere-electron](https://github.com/RunanywhereAI/runanywhere-electron).
+From a checkout of it:
 
 ```bash
 npm install
@@ -223,15 +224,15 @@ npm run test:e2e       # Playwright shell tests
 Windows shortcuts / launchers (clear `ELECTRON_RUN_AS_NODE`):
 
 ```cmd
-"examples\electron\RunAnywhereAI\RunAnywhere AI.cmd"
-"examples\electron\RunAnywhereAI\RunAnywhere AI (GPU).cmd"
+"RunAnywhere AI.cmd"
+"RunAnywhere AI (GPU).cmd"
 ```
 
 Or point Electron at a staged native addon:
 
 ```cmd
 set RUNANYWHERE_NATIVE_PATH=sdk\runanywhere-electron\prebuilds\win32-x64\runanywhere_native.node
-npx electron examples/electron/RunAnywhereAI
+npx electron path\to\runanywhere-electron
 ```
 
 When bundling into an Electron app, unpack native artifacts from the asar:

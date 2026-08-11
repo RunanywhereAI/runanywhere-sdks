@@ -132,7 +132,7 @@ Models are managed through the SDK catalog and lifecycle APIs: `RunAnywhere.down
 - Trust model: **trusted LAN only** — no TLS or pairing PIN. Do not use across untrusted networks
 - React Native and Flutter SDKs do **not** ship Connect clients; use this Kotlin API (or the Swift client on iOS/iPadOS)
 
-See [`examples/android/RunAnywhereAI/`](../../examples/android/RunAnywhereAI/) for the model-selection Connect UI and status banner.
+See [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) for the model-selection Connect UI and status banner.
 
 ---
 
@@ -142,7 +142,8 @@ See [`examples/android/RunAnywhereAI/`](../../examples/android/RunAnywhereAI/) f
 |----------|------|
 | **Docs** | [docs.runanywhere.ai/kotlin/introduction](https://docs.runanywhere.ai/kotlin/introduction) |
 | **API reference** | [docs/Documentation.md](docs/Documentation.md) |
-| **Example app** | [`examples/android/RunAnywhereAI/`](../../examples/android/RunAnywhereAI/) |
+| **Minimal example** | [`example/`](example/) — Gradle composite build against local SDK source |
+| **Full example app** | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) |
 | **Contributing / local build** | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | **Architecture** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 

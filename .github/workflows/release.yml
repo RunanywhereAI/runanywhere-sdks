@@ -817,8 +817,11 @@ jobs:
         # The script packs @runanywhere/proto-ts alongside the SDK packages (it
         # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
         run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
-      - name: Install example app dependencies
-        working-directory: examples/web/RunAnywhereAI
+      # The browser gates drive the in-repo minimal harness
+      # (sdk/runanywhere-web/example). The full demo app lives in
+      # github.com/RunanywhereAI/runanywhere-web and is validated there.
+      - name: Install minimal example dependencies
+        working-directory: sdk/runanywhere-web/example
         run: npm ci --no-audit --no-fund
       - name: Install Playwright Chromium
         working-directory: sdk/runanywhere-web
@@ -1370,7 +1373,7 @@ jobs:
         run: |
           set -euo pipefail
           # Policy: STRICT (see comment block above validate_consumer_swift).
-          STARTER="$GITHUB_WORKSPACE/examples/web/RunAnywhereAI"
+          STARTER="$GITHUB_WORKSPACE/sdk/runanywhere-web/example"
           STAGING="$GITHUB_WORKSPACE/sdk-web-staging"
           LOCAL_SDK="$STARTER/local-sdk"
           if [ ! -f "$STARTER/package.json" ]; then
@@ -1464,6 +1467,9 @@ jobs:
             console.log(`verified ${owner} bundled proto-ts@${protoManifest.version}`);
           }
           NODE
+          # `typecheck:installed` drops the local-source path mapping, and
+          # RAC_USE_INSTALLED_SDK=1 switches Vite module + WASM resolution to
+          # the installed tarballs — so both gates see only released bytes.
           npm run typecheck:installed
           RAC_USE_INSTALLED_SDK=1 npm run build
 
