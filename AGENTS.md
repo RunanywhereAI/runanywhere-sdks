@@ -568,13 +568,26 @@ Configured hooks: gitleaks (secrets), trailing-whitespace, end-of-file-fixer, ch
 
 ---
 
-## Active Issues (`thoughts/shared/issues/`)
+## Active Issues
 
-On `feat/v2-architecture` branch, 4 tracked regressions relative to `main`:
-- **001/002/005** (HIGH): Swift, Kotlin, and Web SDKs collapsed backends into monolithic artifacts, losing per-backend selective linking.
-- **003** (MEDIUM): React Native backend packages are TypeScript-only, missing native plumbing.
+> The old `thoughts/shared/issues/` directory (regressions 001/002/003/005 on
+> `feat/v2-architecture`) **does not exist** in this tree. Those bullets claimed
+> Swift/Kotlin/Web had collapsed backends into monoliths; those SDKs already ship
+> split backend packages. Do not revive that section from memory.
 
-Live state document: `thoughts/shared/plans/sdk_current_state.md`
+### Electron (`smonga/electron_upgrade`) — in progress
+
+Work is active on branch `smonga/electron_upgrade`. **Do not claim packaging or
+per-backend Electron packages are done.** Entry points:
+
+- [`thoughts/shared/plans/electron_HANDOFF.md`](thoughts/shared/plans/electron_HANDOFF.md) — master state
+- [`thoughts/shared/plans/electron_takeover.md`](thoughts/shared/plans/electron_takeover.md) — remaining executable plan
+
+Current shape (honest): TypeScript SDK + example shell are far along; feature
+views, visual gate, electron-builder packaging, and the backend packaging split
+(#9 / `RAC_HAVE_BACKEND_*` fat addon → runtime plugins) remain open. Parallel
+Tracks A/B/C plus Phase 0 commits may be in flight — check the HANDOFF status
+pointer before assuming anything landed.
 
 ---
 
@@ -587,7 +600,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 | Component | Build | Test | Lint | Notes |
 |-----------|-------|------|------|-------|
 | Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
-| Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
+| Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | Prefer workspace `npm run typecheck` (builds core `dist/` before backends). Isolated `npm run typecheck -w packages/{llamacpp,onnx}` needs a fresh `npm run build -w packages/core` first — backends resolve `@runanywhere/web/backend` via gitignored `packages/core/dist` types |
 | Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:3000` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |

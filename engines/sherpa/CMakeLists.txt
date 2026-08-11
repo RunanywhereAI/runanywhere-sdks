@@ -480,16 +480,25 @@ if(RAC_STATIC_PLUGINS)
 else()
     add_library(runanywhere_sherpa SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_sherpa.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_sherpa.cpp
     )
     set_target_properties(runanywhere_sherpa PROPERTIES
         OUTPUT_NAME           runanywhere_sherpa
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
+    target_compile_definitions(runanywhere_sherpa PRIVATE RAC_BUILDING_PLUGIN=1)
     target_link_libraries(runanywhere_sherpa PUBLIC
         rac_backend_sherpa
         rac_commons
     )
+    if(APPLE)
+        set_property(TARGET runanywhere_sherpa APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties(runanywhere_sherpa PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET runanywhere_sherpa APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties(runanywhere_sherpa PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
     rac_apply_android_page_alignment(runanywhere_sherpa)
     install(TARGETS runanywhere_sherpa LIBRARY DESTINATION lib)
 endif()

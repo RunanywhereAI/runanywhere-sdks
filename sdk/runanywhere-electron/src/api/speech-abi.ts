@@ -33,11 +33,16 @@ import {
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';
+import { audioFormatToProto, optionDefaults } from './options';
 import type { SttOptions, TtsOptions, VadOptions } from './options';
-import { newRequestId } from './types';
+import { AudioFormat as PublicAudioFormat, newRequestId } from './types';
 
-/** The sample rate every audio path in this SDK normalizes to. */
-export const SPEECH_SAMPLE_RATE = 16000;
+/**
+ * The sample rate every audio path in this SDK normalizes to.
+ * `idl/sdk_defaults.proto`'s `AudioCaptureDefaults.mic_sample_rate_hz`, read
+ * rather than restated.
+ */
+export const SPEECH_SAMPLE_RATE = optionDefaults.micSampleRateHz;
 
 function orThrow<T extends { error?: { message?: string } | undefined }>(result: T): T {
   if (result.error) throw SDKException.fromProto(result.error as never);
@@ -54,12 +59,19 @@ function orThrow<T extends { error?: { message?: string } | undefined }>(result:
  * `diarize` and `speakersExpected` reach commons for the first time here; the
  * component ABI had no field for either, so `SttOptions.diarization` used to be
  * declared and dropped.
+ *
+ * The unset policy across this file: a field the proto declares OPTIONAL is left
+ * absent so commons applies its own `rac_default`; a field the proto declares as
+ * a plain scalar cannot be left absent (proto3 would send the zero value, i.e.
+ * punctuation OFF), so the IDL default is read from the generated
+ * `*Defaults()` helper and sent explicitly. Nothing here states a literal.
  */
 export function toSttRequest(
   pcm16: Uint8Array,
   options: SttOptions,
   requestId = newRequestId('stt')
 ): STTTranscriptionRequest {
+  const defaults = optionDefaults.stt();
   return STTTranscriptionRequest.fromPartial({
     requestId,
     audio: {
@@ -71,12 +83,12 @@ export function toSttRequest(
       durationMs: Math.round((pcm16.byteLength / 2 / SPEECH_SAMPLE_RATE) * 1000),
     },
     options: {
+      ...defaults,
       language: options.language,
-      enablePunctuation: options.punctuation ?? true,
-      diarize: options.diarization ?? false,
+      enablePunctuation: options.punctuation ?? defaults.enablePunctuation,
+      diarize: options.diarization ?? defaults.diarize,
       speakersExpected: options.maxSpeakers,
-      enableWordTimestamps: options.wordTimestamps ?? true,
-      silenceDurationMs: 0,
+      enableWordTimestamps: options.wordTimestamps ?? defaults.enableWordTimestamps,
     },
     metadata: {},
   });
@@ -115,23 +127,34 @@ export class SttAbi {
 // tts
 // ---------------------------------------------------------------------------
 
+/**
+ * One synthesis request. Every unnamed knob falls back to the IDL default
+ * (`tTSOptionsDefaults()`), so `speed`, `pitch`, `volume`, `languageCode`, and
+ * the "0 = the voice's native rate" sample rate all come from
+ * `idl/tts_options.proto` rather than being retyped here.
+ *
+ * `audioFormat` is the exception: the public surface always hands the caller
+ * back float32 samples (`toFloatSamples` below), so PCM is a hard requirement of
+ * this path rather than a preference. `TtsOptions.format` describes what the
+ * caller wants to DO with the audio, which is `tts.speak`'s business.
+ */
 export function toTtsRequest(
   text: string,
   options: TtsOptions,
   requestId = newRequestId('tts')
 ): TTSSynthesisRequest {
+  const defaults = optionDefaults.tts();
   return TTSSynthesisRequest.fromPartial({
     requestId,
     text,
     options: {
-      voice: options.voice ?? '',
-      languageCode: options.language ?? '',
-      speed: options.speed ?? 1,
-      pitch: options.pitch ?? 1,
-      volume: 1,
-      audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-      // 0 means the voice's native rate; naming any other forces a resample.
-      sampleRate: options.sampleRate ?? 0,
+      ...defaults,
+      voice: options.voice ?? defaults.voice,
+      languageCode: options.language ?? defaults.languageCode,
+      speed: options.speed ?? defaults.speed,
+      pitch: options.pitch ?? defaults.pitch,
+      audioFormat: audioFormatToProto(PublicAudioFormat.PCM),
+      sampleRate: options.sampleRate ?? defaults.sampleRate,
     },
   });
 }
@@ -196,12 +219,20 @@ export class TtsAbi {
  * public options type and were dropped on the way to the component ABI, which
  * had only a threshold. Commons owns the debounce, the hangover, and the
  * pre-roll, so they travel on every frame now.
+ *
+ * Each is a plain (non-optional) scalar on `VADOptions`, so proto3 cannot leave
+ * one absent — sending `0` for an unnamed dial would mean "no debounce, no
+ * hangover, no pre-roll" rather than "use the IDL default". The generated
+ * `vADOptionsDefaults()` supplies them instead, which is the same 250/500/300 ms
+ * turn-taking policy every other SDK sends and the same values
+ * {@link SegmentTracker} debounces with client-side.
  */
 export function toVadRequest(
   samples: Float32Array,
   options: VadOptions,
   frameOffsetMs = 0
 ): VADProcessRequest {
+  const defaults = optionDefaults.vad();
   return VADProcessRequest.fromPartial({
     audio: {
       audioData: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
@@ -211,10 +242,13 @@ export function toVadRequest(
       frameOffsetMs,
     },
     options: {
+      ...defaults,
+      // Optional on the wire: unset keeps the loaded detector's own calibrated
+      // value, which is a better answer than the IDL's 0.5 (see toVadConfiguration).
       activationThreshold: options.activationThreshold,
-      minSpeechDurationMs: options.minSpeechMs ?? 0,
-      minSilenceDurationMs: options.minSilenceMs ?? 0,
-      prefixPaddingMs: options.prefixPaddingMs ?? 0,
+      minSpeechDurationMs: options.minSpeechMs ?? defaults.minSpeechDurationMs,
+      minSilenceDurationMs: options.minSilenceMs ?? defaults.minSilenceDurationMs,
+      prefixPaddingMs: options.prefixPaddingMs ?? defaults.prefixPaddingMs,
       sampleRate: SPEECH_SAMPLE_RATE,
     },
   });

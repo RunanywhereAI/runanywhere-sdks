@@ -3,13 +3,21 @@
 // host, and exposes a safe `window.runanywhere` API via contextBridge (no direct
 // port access leaks into the page). Runs with sandbox:false (it requires SDK
 // modules). What it publishes is the v3 facade built over `RpcBackend`, plus the
-// renderer-side DSP helpers and the app's staged catalog; SDK lifecycle events
-// reach the page through `runanywhere.models`/`llm` streams rather than a second
-// event bus.
+// renderer-side DSP helpers and the app's staged catalog.
+//
+// Every event a stream carries is structured-clone safe by construction (see
+// `bridgeStream` in iter.ts and `toProtoError` in api/types.ts): the union arms
+// are plain objects, the terminal `failed` arms carry the generated `SDKError`
+// message rather than an `SDKException` whose prototype the clone would strip,
+// and `DownloadProgressSnapshot`'s derived `fraction`/`percent` are computed at
+// emit time rather than declared as accessors. That is what lets a page read
+// `e.error.code` and `e.snapshot.percent` the same way main-process code does.
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { downsample, pcm16Bytes, rms } from '../audio';
 import { createRunAnywhere } from '../api/facade';
+import { rpcMethodFor } from '../api/backend';
+import type { SDKComponent } from '../api/model-abi';
 import { Environment } from '../api/types';
 import { RpcBackend } from '../api/rpc-backend';
 import { catalogEntries } from '../catalog';
@@ -93,7 +101,15 @@ ipcRenderer.on('runanywhere-port', (event) => {
     new Promise<void>((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve: () => resolve(), reject });
-      port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
+      // Posted raw rather than through `v3.initialize()` because the facade is
+      // already `ready` and would return immediately — but it must still be the
+      // NAMESPACED name: `dispatch`'s allowlist carries no bare addon-shaped
+      // method, so a bare 'initialize' here is rejected before it reaches the host.
+      port!.postMessage({
+        id,
+        method: rpcMethodFor('initialize'),
+        args: [{ secureDir, baseDir }],
+      });
     })
       // The fresh host has no tokens, so re-run the HTTP setup on it. The v3
       // facade is already `ready`, which is why this is a retry rather than a
@@ -158,6 +174,11 @@ contextBridge.exposeInMainWorld('runanywhere', {
   rag: v3.rag,
   models: v3.models,
   lora: v3.lora,
+  storage: v3.storage,
+  // A Diagnostics pane is a renderer surface, so the level knob and the record
+  // stream have to reach the page. `logging.records()` is a `bridgeStream` and
+  // every `LogEntry` is a plain generated message, so both cross intact.
+  logging: v3.logging,
   // Electron platform extras.
   secure: v3.secure,
   auth: v3.auth,
@@ -171,10 +192,51 @@ contextBridge.exposeInMainWorld('runanywhere', {
 
   capabilities: () => v3.capabilities(),
   reset: () => v3.reset(),
-  // A function rather than the facade's `version` getter: contextBridge clones
-  // what it publishes, and a getter would be read once at expose time — before
-  // initialize() has anything to report.
+
+  // ---- core members, every one a FUNCTION ----
+  // `isReady`, `deviceId`, `environment`, and `events` are GETTERS on the
+  // facade, and `contextBridge.exposeInMainWorld` clones what it publishes — so
+  // a getter would be read exactly ONCE, at expose time, which is before
+  // `initialize()` has anything to report. A page reading a cloned
+  // `runanywhere.isReady` property would see `false` forever and a cloned
+  // `deviceId` would stay `''`. That is why `version` has always been a function
+  // here, and why every member below is one: each call re-reads the facade.
+  // Functions themselves cross the bridge as proxies, so this works.
   version: () => send('version', []),
+  isReady: () => v3.isReady,
+  deviceId: () => v3.deviceId,
+  environment: () => v3.environment,
+  /**
+   * The token a settings pane collects for gated HuggingFace repos. It travels
+   * to the utility host, which puts it in the platform secure store (DPAPI on
+   * Win32, an owner-only 0600 file elsewhere) and hands it to commons; the page
+   * never gets it back, and nothing here writes it to `localStorage`.
+   */
+  setHfToken: (token: string | null) => v3.setHfToken(token),
+  /**
+   * Per-component lifecycle state straight from commons. Both the snapshot and
+   * its nested `SDKError` are plain proto messages, so the clone survives.
+   */
+  componentLifecycleSnapshot: (component: SDKComponent) =>
+    v3.componentLifecycleSnapshot(component),
+  /**
+   * A fresh SdkEvent stream per call, from the SAME facade instance the page's
+   * own `models.load()` / `initialize()` calls run on — so `ready`,
+   * `modelLoaded`, `modelUnloaded`, `memoryPressure`, and `authFailed` all land
+   * here. Every arm is a plain object, so the clone survives intact.
+   *
+   * Structured clone drops symbol keys, so `for await` does not work in a page;
+   * drive it by hand. `return()` is the unsubscribe — it removes this subscriber
+   * from the hub and ends a `next()` the reader is already parked on, so the two
+   * can live in different places (a loop on mount, a cancel on unmount):
+   *
+   *     const events = window.runanywhere.events();
+   *     (async () => {
+   *       for (;;) { const { value, done } = await events.next(); if (done) break; render(value); }
+   *     })();
+   *     onUnmount(() => events.return());
+   */
+  events: () => v3.events,
   initialize: (secureDir?: string, baseDir?: string, controlPlane?: ControlPlaneOptions) =>
     v3
       .initialize({

@@ -115,9 +115,13 @@ _rac_connect_transport_send
 # LLM Component — non-proto component create/load/generate/etc. APIs are
 # now internal (used by JNI bridge during migration). SDK-facing surface is
 # the proto-byte ABI (rac_llm_*_proto / rac_llm_set_stream_proto_callback)
-# below. Thinking helpers (rac_llm_extract_thinking et al.) moved to
-# internal — SDKs read thinking splits from LLMGenerationResult bytes.
-# (See docs/CPP_PROTO_OWNERSHIP.md.)
+# below. Thinking helpers stay RAC_API + exported: Electron thin commons,
+# desktop hosts, and in-process SDK bridges still call them directly while
+# generation results also carry thinking splits. (See docs/CPP_PROTO_OWNERSHIP.md.)
+_rac_llm_extract_thinking
+_rac_llm_extract_thinking_with_tags
+_rac_llm_strip_thinking
+_rac_llm_split_thinking_tokens
 
 # LoRA Registry — non-proto APIs are internal helpers. SDK-facing LoRA
 # surface is the rac_lora_*_proto family below.

@@ -10,13 +10,10 @@
 // every staged entry into the commons model registry (`catalogModelInfo` below),
 // and from then on `models.list`/`get`/`load` read commons, not this map.
 // Registration is buffered here because an app registers before the native addon
-// exists — `preload.js` and `host.js` in `examples/electron/RunAnywhereAI/` both
-// register at module load.
+// exists — the app preload and the SDK utility `host` both register at module load.
 //
 // Callers can also pass a HuggingFace repo id, a direct URL, or a local path, so
 // an app that registers nothing still resolves those.
-
-import * as path from 'path';
 
 import {
   ArchiveType,
@@ -144,21 +141,33 @@ function formatOf(entry: CatalogEntry): ModelFormat {
 /**
  * A staged entry as the `runanywhere.v1.ModelInfo` the commons registry stores.
  *
- * `localPath` is the primary FILE for a plain single-file entry and the model's
- * DIRECTORY for anything else. That is not cosmetic: commons' artifact resolver
- * trusts a declared single-file path verbatim and only scans (applying
- * `infer_file_role`) when the entry is an archive, multi-file, or a
- * directory-based framework — the scan is what recovers a VLM's mmproj and the
- * inner directory of an extracted sherpa archive.
+ * The entry declares WHAT the bundle is — its files, their roles, and its
+ * archive shape — and says nothing about WHERE it lands. Storage layout is
+ * commons' (`rac_model_paths_get_model_folder`, i.e.
+ * `{baseDir}/RunAnywhere/Models/{framework}/{id}/`), and the download
+ * orchestrator, the artifact resolver, and the cold-launch reconcile all read
+ * that one authority. A staged `localPath` here would be a second, competing
+ * answer: commons' own downloads would land in its folder while every load
+ * looked somewhere else, and — because `local_path` presence is what
+ * `overwrite_download_state_from_local_path` reads — a never-fetched row would
+ * register itself as already DOWNLOADED.
+ *
+ * So `local_path` is left unset. Commons fills it in from exactly three places,
+ * all of which agree: download completion (`self_heal_registry`), the
+ * cold-launch relink (`try_reconcile_model_local_path_locked`, which requires
+ * the declared descriptors to actually be complete on disk), and the load-time
+ * self-heal in `rac_model_lifecycle_load_proto`.
+ *
+ * The role assignments are what the resolver matches on when it scans a folder,
+ * which is how a VLM's mmproj and the inner directory of an extracted sherpa
+ * archive are recovered.
  */
-export function catalogModelInfo(id: string, entry: CatalogEntry, root: string): ModelInfo {
-  const dir = path.join(root, id);
+export function catalogModelInfo(id: string, entry: CatalogEntry): ModelInfo {
   const files = entry.files.map((f) => ({
     url: f.url,
     filename: f.as,
     isOptional: false,
     relativePath: f.as,
-    localPath: path.join(dir, f.as),
     role:
       f.as === entry.primary
         ? ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
@@ -166,7 +175,6 @@ export function catalogModelInfo(id: string, entry: CatalogEntry, root: string):
           ? ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR
           : ModelFileRole.MODEL_FILE_ROLE_COMPANION,
   }));
-  const scanned = Boolean(entry.archive) || files.length > 1 || Boolean(entry.mmproj);
   return {
     id,
     name: entry.label ?? id,
@@ -174,7 +182,7 @@ export function catalogModelInfo(id: string, entry: CatalogEntry, root: string):
     format: formatOf(entry),
     framework: FRAMEWORK_OF_TYPE[entry.type],
     downloadUrl: entry.files[0]?.url ?? '',
-    localPath: scanned ? dir : path.join(dir, entry.primary),
+    localPath: '',
     downloadSizeBytes: entry.sizeMB ? entry.sizeMB * 1_000_000 : 0,
     contextLength: 0,
     supportsThinking: false,
@@ -185,13 +193,36 @@ export function catalogModelInfo(id: string, entry: CatalogEntry, root: string):
     registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED,
     ...(entry.archive
       ? {
+          // An archive's `expected_files` would describe the EXTRACTED tree, and
+          // a catalog row only knows the tarball's name plus the directory it
+          // unpacks to (`primary`) — not the files inside it. Declaring the
+          // tarball there would make the completeness check look for an archive
+          // that extraction deletes, so the shape is declared and the file list
+          // is left to commons' post-extraction folder scan.
           archive: {
             type: ArchiveType.ARCHIVE_TYPE_TAR_BZ2,
             structure: 0,
           },
         }
-      : {}),
-    ...(files.length > 1 ? { multiFile: { files } } : {}),
+      : files.length > 1
+        ? { multiFile: { files } }
+        : {
+            // One file, named rather than left implicit. Without a manifest the
+            // cold-launch reconcile falls back to "any recognizable model file
+            // in the folder will do", which relinks a row against whatever
+            // happens to be lying there. `required_patterns` is what commons
+            // carries into its own artifact struct for a single-file entry (the
+            // descriptor list is only read off `multi_file`), so the filename is
+            // declared there to be enforced.
+            singleFile: {
+              expectedFiles: {
+                files,
+                rootDirectory: '',
+                requiredPatterns: [entry.primary],
+                optionalPatterns: [],
+              },
+            },
+          }),
     ...(entry.license ? { metadata: { description: '', author: '', license: entry.license, tags: [], version: '' } } : {}),
   };
 }

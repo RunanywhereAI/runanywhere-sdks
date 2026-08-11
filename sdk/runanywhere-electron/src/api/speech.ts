@@ -12,6 +12,7 @@ import { createModelsNamespace } from './assets';
 import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { AsyncQueue, bridgeStream } from './iter';
+import { ModelAbi, categoryToProto } from './model-abi';
 import { DataAbi, toDiarizationRequest } from './data-abi';
 import {
   VoiceAgentAbi,
@@ -21,6 +22,7 @@ import {
   toPublicVoiceEvent,
 } from './voice-abi';
 import {
+  SPEECH_SAMPLE_RATE,
   SttAbi,
   STTStreamEventKind,
   TtsAbi,
@@ -33,12 +35,7 @@ import {
   toVadRequest,
 } from './speech-abi';
 import type { STTOutput } from './speech-abi';
-import {
-  TTS_DEFAULTS,
-  VAD_DEFAULTS,
-  audioFormatFromOrdinal,
-  toNativeVadConfig,
-} from './options';
+import { audioFormatFromProto, optionDefaults } from './options';
 import type {
   DiarizationOptions,
   LlmOptions,
@@ -47,7 +44,15 @@ import type {
   TurnHandlingOptions,
   VadOptions,
 } from './options';
-import { AgentState, AudioEncoding, AudioFormat, ModelCategory, TokenKind, newRequestId } from './types';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import {
+  AgentState,
+  AudioEncoding,
+  AudioFormat,
+  ModelCategory,
+  newRequestId,
+  toProtoError,
+} from './types';
 import type {
   Audio,
   AudioChunk,
@@ -55,6 +60,7 @@ import type {
   AudioFrame,
   AudioInput,
   DiarizationResult,
+  GenerationEvent,
   ModelRef,
   Segment,
   SpeechHandle,
@@ -77,7 +83,8 @@ export interface SpeechDeps {
   requireReady(): void;
 }
 
-const STT_SAMPLE_RATE = 16000;
+/** `AudioCaptureDefaults.mic_sample_rate_hz` — the one rate every path here uses. */
+const STT_SAMPLE_RATE = SPEECH_SAMPLE_RATE;
 // 30 ms at 16 kHz: small enough for responsive endpointing, large enough that the
 // energy VAD sees a stable RMS.
 const VAD_FRAME_SAMPLES = 480;
@@ -256,21 +263,45 @@ function buildTranscription(native: STTOutput, durationMs: number): Transcriptio
  * when `finish()` is called — the same buffer-then-run shape the deprecated
  * `transcribeStream` adapter already used. Partial/final events come from
  * that native pass; nothing here fabricates a successful `completed`.
+ *
+ * The grammar's terminal rule holds either way: exactly one
+ * `completed`/`failed`/`cancelled` closes the queue, and which one it is says
+ * whether the transcript is trustworthy. `close()` before `finish()` is a
+ * `cancelled` — the caller walked away with audio still unprocessed — while a
+ * failure inside the native pass is a `failed` carrying the proto error.
  */
 function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: SttOptions = {}): SttStream {
   const stt = new SttAbi(deps.backend);
   const requestId = newRequestId('stt');
-  const events = new AsyncQueue<TranscriptionEvent>();
+  const queue = new AsyncQueue<TranscriptionEvent>();
+  // The public handle carries the queue's bridge-safe view, not the queue: a
+  // class instance loses `[Symbol.asyncIterator]` (a prototype member) crossing
+  // `contextBridge`, and a renderer could not `for await` over it.
+  const events = queue.stream();
   const chunks: Float32Array[] = [];
   let announced = false;
   let finished = false;
   let closed = false;
+  let terminal = false;
   let sequence = 0;
 
   function announce(): void {
     if (announced) return;
     announced = true;
-    events.push({ type: 'started', requestId });
+    queue.push({ type: 'started', requestId });
+  }
+
+  function next(): number {
+    sequence += 1;
+    return sequence;
+  }
+
+  /** Close the queue on exactly one terminal event. Later calls are no-ops. */
+  function end(event: TranscriptionEvent): void {
+    if (terminal) return;
+    terminal = true;
+    queue.push(event);
+    queue.complete();
   }
 
   function frameToMono(frame: AudioFrame): Float32Array {
@@ -284,7 +315,7 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
       let total = 0;
       for (const c of chunks) total += c.length;
       if (!total) {
-        events.push({ type: 'completed', requestId });
+        end({ type: 'completed', requestId });
         return;
       }
       const merged = new Float32Array(total);
@@ -299,30 +330,48 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
       // non-streaming pass the component ABI needed is gone.
       let lastPartial = '';
       let sawFinal = false;
+      let speaking = false;
       for await (const event of stt.transcribeStream(toSttRequest(pcm, options, requestId))) {
         if (closed) return;
         if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL) {
           const text = event.partial?.text ?? '';
           if (!text || text === lastPartial) continue;
+          // The first text commons recognized is the moment it heard speech.
+          // There is no separate VAD arm on `STTStreamEvent` to read — its
+          // kinds are STARTED/PARTIAL/FINAL/ENDPOINT/ERROR — so the honest
+          // signal is the one the recognizer itself produced.
+          if (!speaking) {
+            speaking = true;
+            queue.push({ type: 'speechStarted', requestId, sequence: next() });
+          }
           lastPartial = text;
-          sequence += 1;
-          events.push({
+          queue.push({
             type: 'partial',
             requestId,
-            sequence,
+            sequence: next(),
             segmentId: '0',
             revision: sequence,
-            alternatives: [{ text }],
+            alternatives: [text],
           });
+        } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT) {
+          // Commons closes an utterance on trailing silence and marks the
+          // boundary with ENDPOINT; that boundary IS the end of speech.
+          if (speaking) {
+            speaking = false;
+            queue.push({ type: 'speechEnded', requestId, sequence: next() });
+          }
         } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
           if (!event.finalOutput) continue;
           sawFinal = true;
-          sequence += 1;
-          events.push({
+          if (speaking) {
+            speaking = false;
+            queue.push({ type: 'speechEnded', requestId, sequence: next() });
+          }
+          queue.push({
             type: 'transcriptFinal',
             requestId,
-            sequence,
-            segment: buildTranscription(event.finalOutput, durationMsOf(merged.length)),
+            sequence: next(),
+            transcription: buildTranscription(event.finalOutput, durationMsOf(merged.length)),
           });
         } else if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
           if (event.error) throw SDKException.fromProto(event.error);
@@ -333,22 +382,20 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
       // a transcript; one non-streaming pass supplies it rather than the stream
       // ending on a partial.
       if (!sawFinal) {
-        sequence += 1;
-        events.push({
+        if (speaking) queue.push({ type: 'speechEnded', requestId, sequence: next() });
+        queue.push({
           type: 'transcriptFinal',
           requestId,
-          sequence,
-          segment: buildTranscription(
+          sequence: next(),
+          transcription: buildTranscription(
             await stt.transcribe(toSttRequest(pcm, options, requestId)),
             durationMsOf(merged.length)
           ),
         });
       }
-      events.push({ type: 'completed', requestId });
+      end({ type: 'completed', requestId });
     } catch (e) {
-      events.push({ type: 'failed', requestId, error: asSDKException(e) });
-    } finally {
-      events.complete();
+      end({ type: 'failed', requestId, error: toProtoError(e) });
     }
   }
 
@@ -371,7 +418,10 @@ function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: Stt
     async close() {
       if (closed) return;
       closed = true;
-      events.complete();
+      // Closing without `finish()` abandons buffered audio that was never
+      // transcribed, which is a cancellation and not a completion. Closing after
+      // `finish()` leaves whichever terminal the native pass reported.
+      end({ type: 'cancelled', requestId });
     },
   };
 }
@@ -502,7 +552,13 @@ class Playback {
   play(samples: Float32Array, sampleRate: number): Promise<void> {
     const Ctor = audioContextCtor();
     const ctx = this.ctx ?? (this.ctx = new Ctor());
-    const buffer = ctx.createBuffer(1, Math.max(1, samples.length), sampleRate || 22050);
+    // `AudioCaptureDefaults.tts_sample_rate_hz` when the synthesis result named
+    // no rate of its own; createBuffer rejects 0.
+    const buffer = ctx.createBuffer(
+      1,
+      Math.max(1, samples.length),
+      sampleRate || optionDefaults.ttsSampleRateHz
+    );
     buffer.getChannelData(0).set(samples);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -586,7 +642,10 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
     return {
       data: samples,
       sampleRate: native.sampleRate,
-      format: audioFormatFromOrdinal(native.audioFormat),
+      // `TTSOutput.audioFormat` is the PROTO enum (PCM = 1), not the C ABI's
+      // ordinal (PCM = 0) — decoding it with the C table reported every format
+      // one member too high, so a plain PCM synthesis came back as 'WAV'.
+      format: audioFormatFromProto(native.audioFormat),
       durationMs: native.durationMs || durationMsOf(samples.length, native.sampleRate),
     };
   }
@@ -676,12 +735,15 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
   async function voices(): Promise<Voice[]> {
     // Commons enumerates what the loaded voice/model actually offers, so this
     // is no longer "the one voice id the handle happened to carry".
+    // `TTSOptions.language_code`'s own `rac_default` is the label for a voice
+    // that declares no language, rather than a literal repeated here.
+    const fallbackLanguage = optionDefaults.tts().languageCode;
     const listed = await tts.voices();
     if (listed.voices.length) {
       return listed.voices.map((v) => ({
         id: v.id,
         name: v.displayName || v.id,
-        language: v.languageCode || TTS_DEFAULTS.language,
+        language: v.languageCode || fallbackLanguage,
       }));
     }
     const state = await tts.state();
@@ -690,7 +752,7 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
       {
         id: state.currentVoice,
         name: state.currentVoice,
-        language: state.supportedLanguageCodes[0] ?? TTS_DEFAULTS.language,
+        language: state.supportedLanguageCodes[0] ?? fallbackLanguage,
       },
     ];
   }
@@ -747,6 +809,11 @@ export interface VadNamespace {
  * `rac_vad_config_t` (it exposes an energy threshold, sample rate, frame length,
  * and calibration only), so the debouncing lives here. It belongs in commons so
  * every SDK shares one implementation.
+ *
+ * The dials an unset option falls back to are `VADOptions`' own `rac_default`s —
+ * 250 ms debounce, 500 ms hangover, 300 ms pre-roll — which is the turn-taking
+ * policy every other SDK applies and the same numbers {@link toVadRequest} sends
+ * commons on every frame.
  */
 class SegmentTracker {
   private readonly minSpeechMs: number;
@@ -758,9 +825,10 @@ class SegmentTracker {
   private pendingSilenceMs = 0;
 
   constructor(options: VadOptions) {
-    this.minSpeechMs = options.minSpeechMs ?? VAD_DEFAULTS.minSpeechMs;
-    this.minSilenceMs = options.minSilenceMs ?? VAD_DEFAULTS.minSilenceMs;
-    this.prefixPaddingMs = options.prefixPaddingMs ?? VAD_DEFAULTS.prefixPaddingMs;
+    const defaults = optionDefaults.vad();
+    this.minSpeechMs = options.minSpeechMs ?? defaults.minSpeechDurationMs;
+    this.minSilenceMs = options.minSilenceMs ?? defaults.minSilenceDurationMs;
+    this.prefixPaddingMs = options.prefixPaddingMs ?? defaults.prefixPaddingMs;
   }
 
   /** Feed one frame; returns the transitions it caused. */
@@ -828,7 +896,11 @@ function* frames(samples: Float32Array, size: number): Generator<Float32Array> {
  */
 function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: VadOptions = {}): VadStream {
   const vad = new VadAbi(deps.backend);
-  const events = new AsyncQueue<VadEvent>();
+  const queue = new AsyncQueue<VadEvent>();
+  // See `createSttStream`: the handle publishes the queue's bridge-safe view so
+  // a renderer can iterate it, which is what the app's old polling loop existed
+  // to work around.
+  const events = queue.stream();
   const tracker = new SegmentTracker(options);
   const rate = format.sampleRate || STT_SAMPLE_RATE;
   let pending = new Float32Array(0);
@@ -853,11 +925,11 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
       const result = await vad.process(toVadRequest(frame, options, atMs));
       if (closed) return;
       for (const t of tracker.push(result.isSpeech, atMs, frameMs)) {
-        if ('ended' in t) events.push({ type: 'speechEnded', timestampMs: t.ended.endMs });
-        else if (t.started !== undefined) events.push({ type: 'speechStarted', timestampMs: t.started });
+        if ('ended' in t) queue.push({ type: 'speechEnded', timestampMs: t.ended.endMs });
+        else if (t.started !== undefined) queue.push({ type: 'speechStarted', timestampMs: t.started });
       }
       // The detector's own score, not a boolean widened to 0/1.
-      events.push({
+      queue.push({
         type: 'activity',
         isSpeech: result.isSpeech,
         probability: result.probability,
@@ -869,7 +941,7 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
 
   function chainNext(step: () => Promise<void>): void {
     chain = chain.then(step).catch((e) => {
-      if (!closed) events.push({ type: 'failed', error: asSDKException(e) });
+      if (!closed) queue.push({ type: 'failed', error: toProtoError(e) });
     });
   }
 
@@ -889,16 +961,16 @@ function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: Vad
       chainNext(async () => {
         if (closed) return;
         const open = tracker.finish();
-        if (open) events.push({ type: 'speechEnded', timestampMs: open.endMs });
-        events.push({ type: 'completed' });
-        events.complete();
+        if (open) queue.push({ type: 'speechEnded', timestampMs: open.endMs });
+        queue.push({ type: 'completed' });
+        queue.complete();
       });
     },
     async close() {
       if (closed) return;
       closed = true;
       await vad.stop();
-      events.complete();
+      queue.complete();
     },
   };
 }
@@ -1137,10 +1209,7 @@ export interface VoiceDeps extends SpeechDeps {
   generate?: (
     prompt: string,
     options?: LlmOptions
-  ) => AsyncIterableIterator<
-    | { type: 'token'; text: string; kind: typeof TokenKind.TEXT | typeof TokenKind.THOUGHT }
-    | { type: string }
-  >;
+  ) => AsyncIterableIterator<GenerationEvent>;
   llmCancel?: () => Promise<void>;
 }
 
@@ -1149,6 +1218,7 @@ const VOICE_CATEGORIES: ModelCategory[] = [
   ModelCategory.SPEECH_TO_TEXT,
   ModelCategory.LANGUAGE,
   ModelCategory.TEXT_TO_SPEECH,
+  ModelCategory.VOICE_ACTIVITY,
 ];
 
 /**
@@ -1171,6 +1241,36 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
   // registry row at it, admit it against the machine's memory, then run the
   // lifecycle load that is the only store the voice pipeline reads from.
   const models = createModelsNamespace(deps);
+  const modelAbi = new ModelAbi(deps.backend);
+
+  /**
+   * Guarantee a resident VAD before the pipeline is composed, the way Swift's
+   * `ensureResidentVAD` does.
+   *
+   * A session used to refuse to open unless the app had already loaded one,
+   * which is exactly the multi-step bootstrap an example app must not carry.
+   * The model id is `VoiceAgentDefaults.default_vad_model_id` from the IDL, not
+   * a literal, so all six SDKs ensure the same one.
+   */
+  async function ensureResidentVad(downloadIfNeeded: boolean): Promise<void> {
+    const current = await modelAbi.current({
+      category: categoryToProto(ModelCategory.VOICE_ACTIVITY),
+      includeModelMetadata: false,
+    });
+    if (current.found && current.modelId) return;
+
+    const modelId = voiceAgentDefaults.defaultVadModelId;
+    if (!modelId) {
+      throw SDKException.modelNotFound('the default voice-activity model');
+    }
+    if (!downloadIfNeeded && !(await models.get(modelId))?.downloaded) {
+      throw SDKException.invalidState(
+        `a voice session needs a resident voice-activity model and '${modelId}' is not ` +
+          'downloaded — load one first, or leave downloadIfNeeded unset so the session fetches it'
+      );
+    }
+    await models.load(modelId, { keepResident: VOICE_CATEGORIES });
+  }
 
   return {
     async createSession(config: VoiceSessionConfig): Promise<VoiceSession> {
@@ -1186,6 +1286,9 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           await models.load(id, { keepResident: VOICE_CATEGORIES });
         }
       }
+      // The VAD is the session's own prerequisite rather than the caller's:
+      // `VoiceSessionConfig` names no VAD model, only its tuning knobs.
+      await ensureResidentVad(config.downloadIfNeeded !== false);
 
       const session = await deps.backend.voiceOpen(new Uint8Array(0));
       const agent = new VoiceAgentAbi(deps.backend, session);

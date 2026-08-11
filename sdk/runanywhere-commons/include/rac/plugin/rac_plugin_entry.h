@@ -111,16 +111,15 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 /**
  * @brief Declare a plugin entry point in a public header.
  *
- * The entry symbol is annotated with `RAC_API` (= default ELF/Mach-O
- * visibility, dllexport on Windows). dlsym/static-lookup MUST be able to
- * find this symbol regardless of how the host engine library was linked —
- * notably, even when a SHARED carrier sets visibility=hidden globally and
- * the real definition lives in a sibling static archive (e.g. the
+ * The entry symbol is annotated with `RAC_PLUGIN_API` (= default ELF/Mach-O
+ * visibility; on Windows, dllexport when `RAC_BUILDING_PLUGIN` is set). Do
+ * **not** use `RAC_API` here: a shared-commons consumer inherits
+ * `RAC_USING_SHARED` → `RAC_API` is dllimport, which would break the plugin
+ * DLL's own entry export. dlsym/LoadLibrary/GetProcAddress MUST still find
+ * this symbol when a SHARED carrier sets visibility=hidden globally and the
+ * real definition lives in a sibling static archive (e.g. the
  * runanywhere_llamacpp_vlm shared carrier whose only effective contents come
- * from rac_backend_llamacpp). Without an explicit annotation at declaration
- * time, loadability depended on transitive default visibility of the host
- * plugin target — a brittle invariant that a future visibility tightening
- * would silently break.
+ * from rac_backend_llamacpp).
  *
  * Example:
  * @code
@@ -129,7 +128,8 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   RAC_PLUGIN_ENTRY_DECL(llamacpp);
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DECL(name) RAC_API const rac_engine_vtable_t* rac_plugin_entry_##name(void)
+#define RAC_PLUGIN_ENTRY_DECL(name) \
+    RAC_PLUGIN_API const rac_engine_vtable_t* rac_plugin_entry_##name(void)
 
 /**
  * @brief Define a plugin entry point in the .cpp file.

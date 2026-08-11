@@ -27,6 +27,7 @@ import {
 } from '@runanywhere/proto-ts/download_service';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
+import type { DownloadProgressSnapshot } from './types';
 
 /** A task commons will not move any further on its own. */
 export function isTerminalState(state: DownloadState): boolean {
@@ -37,13 +38,49 @@ export function isTerminalState(state: DownloadState): boolean {
   );
 }
 
-/** Bytes done over bytes expected, clamped to 0..100 and 0 when the total is unknown. */
-export function percentOf(progress: DownloadProgress): number {
-  if (progress.totalBytes > 0) {
-    const pct = (100 * progress.bytesDownloaded) / progress.totalBytes;
-    return Math.max(0, Math.min(100, Math.round(pct)));
-  }
-  return Math.max(0, Math.min(100, Math.round(100 * (progress.overallProgress || 0))));
+/**
+ * One `DownloadProgress` as the public snapshot, carrying every field commons
+ * measured.
+ *
+ * The normalizations are all "absent means unknown": commons writes 0 into
+ * `bytes_per_second` before it has a sample, leaves `eta_seconds` unset (or
+ * negative) when it cannot project one, and reports `overall_progress` of 0
+ * both for "nothing done yet" and "not tracked". Mapping those to absent is
+ * what lets a caller show nothing instead of "0 B/s · 0% · 0s left" while the
+ * connection is still opening.
+ */
+export function toProgressSnapshot(
+  progress: DownloadProgress,
+  operationId: string,
+  sequence: number
+): DownloadProgressSnapshot {
+  const overall = progress.overallProgress > 0 ? progress.overallProgress : undefined;
+  const byteRatio =
+    progress.totalBytes > 0
+      ? Math.min(Math.max(progress.bytesDownloaded / progress.totalBytes, 0), 1)
+      : undefined;
+  // Commons' own figure across the whole plan wins over the byte ratio, which
+  // is per-file: the end of file one of three is 100% of those bytes but a
+  // third of the download.
+  const fraction = overall ?? byteRatio;
+  return {
+    operationId,
+    sequence,
+    bytesDone: Number(progress.bytesDownloaded),
+    bytesTotal: Number(progress.totalBytes),
+    file: progress.currentFileName || undefined,
+    bytesPerSecond: progress.bytesPerSecond > 0 ? progress.bytesPerSecond : undefined,
+    etaSeconds:
+      progress.etaSeconds !== undefined && progress.etaSeconds >= 0
+        ? Number(progress.etaSeconds)
+        : undefined,
+    retryAttempt: progress.retryAttempt,
+    currentFileIndex: progress.currentFileIndex,
+    totalFiles: Math.max(progress.totalFiles, 1),
+    fraction,
+    percent: fraction === undefined ? undefined : fraction * 100,
+    isIndeterminate: fraction === undefined,
+  };
 }
 
 /** The commons download workflow: plan, start, cancel, poll, and purge. */

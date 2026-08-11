@@ -732,11 +732,14 @@ jobs:
           if-no-files-found: ignore
 
   electron-unit:
-    # The Electron SDK's unit suite is hermetic: pure TS/JS, no native addon and
-    # no model, so it runs on the cheap Linux runner alongside the other
-    # per-SDK frontend lanes. The addon compile and the integration suite need
+    # The Electron SDK's unit suite is hermetic: pure TypeScript, no native addon
+    # and no model, so it runs on the cheap Linux runner alongside the other
+    # per-SDK frontend lanes. The addon compile and the feature suite need
     # MSVC plus a built commons and stay in electron-sdk-ci.yml, which is
     # path-filtered; this job runs on every PR.
+    #
+    # The tests are TypeScript too: they compile to dist-test/ and `npm test`
+    # runs that output (its `pretest` builds both src/ and test/).
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
@@ -753,6 +756,11 @@ jobs:
       - name: Type-check + build
         working-directory: sdk/runanywhere-electron
         run: npm run build
+      # src/, test/, scripts/ and native/ — a test that lies about a type fails
+      # here rather than at run time.
+      - name: Type-check (all projects)
+        working-directory: sdk/runanywhere-electron
+        run: npm run typecheck
       - name: Unit tests
         working-directory: sdk/runanywhere-electron
         run: npm test

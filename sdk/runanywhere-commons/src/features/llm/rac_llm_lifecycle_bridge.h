@@ -5,6 +5,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 namespace rac::llm {
 
@@ -13,6 +14,13 @@ struct LifecycleLlmRef {
     void* impl = nullptr;
     const char* model_id = nullptr;
     const char* framework_name = nullptr;
+    /**
+     * Typed twin of [framework_name]. `framework_name` is the proto enum NAME
+     * string and exists for telemetry/events; behavioral gates (e.g. the
+     * "/no_think" directive) read this enum instead of substring-matching a
+     * name that a proto rename could silently change.
+     */
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
     bool supports_lora = false;
     // Backend capability: the engine honors rac_llm_options_t.grammar
     // (grammar-constrained decoding). Set by the lifecycle accessor per framework.

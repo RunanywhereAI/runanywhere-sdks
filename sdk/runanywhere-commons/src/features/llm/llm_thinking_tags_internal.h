@@ -1,12 +1,14 @@
 #ifndef RAC_FEATURES_LLM_THINKING_TAGS_INTERNAL_H
 #define RAC_FEATURES_LLM_THINKING_TAGS_INTERNAL_H
 
+#include <cstring>
 #include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "model_types.pb.h"
@@ -68,6 +70,53 @@ inline bool model_thinking_tags_from_registry(const char* model_id, std::string*
     *out_close_tag = pattern.close_tag();
     return true;
 #endif
+}
+
+/**
+ * The two facts [apply_no_think_directive] needs about a model, as declared by
+ * its registry row.
+ *
+ * Defaults are deliberately the NO-INJECTION combination: an unresolvable model
+ * must not be handed the Qwen "/no_think" control token on a guess. Missing the
+ * prompt directive on a reasoning model still honors `disable_thinking` — the
+ * flag reaches the backend and the reasoning block is stripped post-hoc — while
+ * injecting it into a model outside the Qwen family destroys the reply outright.
+ */
+struct ModelThinkingProfile {
+    bool supports_thinking = false;
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+};
+
+/**
+ * Resolves [ModelThinkingProfile] from the global model registry for call sites
+ * that hold only a model id / path (the struct-vtable `rac_llm_generate*` path),
+ * mirroring the id→path→basename lookup order the service factory uses.
+ */
+inline ModelThinkingProfile model_thinking_profile_from_registry(const char* model_id) {
+    ModelThinkingProfile profile;
+    if (model_id == nullptr || model_id[0] == '\0') {
+        return profile;
+    }
+
+    rac_model_info_t* info = nullptr;
+    rac_result_t rc = rac_get_model(model_id, &info);
+    if (rc != RAC_SUCCESS) {
+        rc = rac_get_model_by_path(model_id, &info);
+    }
+    if (rc != RAC_SUCCESS) {
+        const char* last_slash = std::strrchr(model_id, '/');
+        if (last_slash != nullptr && last_slash[1] != '\0') {
+            rc = rac_get_model(last_slash + 1, &info);
+        }
+    }
+    if (rc != RAC_SUCCESS || info == nullptr) {
+        return profile;
+    }
+
+    profile.supports_thinking = info->supports_thinking == RAC_TRUE;
+    profile.framework = info->framework;
+    rac_model_info_free(info);
+    return profile;
 }
 
 }  // namespace rac::llm

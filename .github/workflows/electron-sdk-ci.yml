@@ -1,6 +1,9 @@
-# CI for @runanywhere/electron. The unit suite is hermetic (pure TS/JS — no native
-# addon, no models), so it builds and runs anywhere. The native addon + the
-# integration suite need MSVC + the compiled commons/engines and run separately.
+# Single Electron CI workflow: TypeScript gates + thin native Option A path.
+# Fat-addon lanes are no longer run here — thin (`electron-windows` /
+# `electron-macos`) is the CI contract for the package split.
+#
+# Unit suite is hermetic (pure TypeScript — no models / no GPU). Native jobs
+# only prove link + export symbols + loadPlugin smoke.
 name: electron-sdk-ci
 
 on:
@@ -8,93 +11,103 @@ on:
     paths:
       - 'sdk/runanywhere-electron/**'
       - 'examples/electron/**'
+      - 'sdk/runanywhere-commons/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
       - '.github/workflows/electron-sdk-ci.yml'
   pull_request:
     paths:
       - 'sdk/runanywhere-electron/**'
       - 'examples/electron/**'
+      - 'sdk/runanywhere-commons/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
       - '.github/workflows/electron-sdk-ci.yml'
 
-# Least-privilege: this workflow only needs to read the repo contents.
 permissions:
   contents: read
+  actions: write
 
 jobs:
-  unit:
-    # Windows is where the addon ships, so keep a Windows lane over the TS build
-    # and the unit suite. The always-on Linux lane is `electron-unit` in
-    # pr-build.yml.
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: sdk/runanywhere-electron
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          # 22+ so `node --test` expands the "test/unit/**/*.test.js" glob
-          # (glob support landed in Node 21; Node 20 treats it as a literal path).
-          node-version: '22'
-      - name: Install dependencies
-        run: npm install
-      - name: Type-check + build
-        run: npm run build
-      - name: Unit tests
-        run: npm test
-
-  # The demo app has its own hermetic unit tests (the JSON store: atomic writes,
-  # corrupt-file recovery, conversation capping). They need no Electron runtime.
-  demo-app-unit:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: examples/electron/RunAnywhereAI
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Unit tests (no Electron, no models)
-        run: npm test
-
-  # The native addon is NOT built by the job above, so a change that breaks the
-  # C++ bindings (a bad signature, a missing symbol, a renamed rac_* call) used to
-  # ship undetected — the .node is built by hand and is gitignored. This job
-  # compiles it on every PR that touches the addon or commons. It does not run
-  # inference: linking is the signal we are missing today.
-  native-addon-build:
-    # The .node is gitignored and built by hand, so a change that breaks the C++
-    # bindings (a bad signature, a missing symbol, a renamed rac_* call) would
-    # otherwise ship undetected. This compiles it on every PR.
-    #
-    # windows-2022, NOT windows-latest: the windows-release preset uses the
-    # "Visual Studio 17 2022" generator, which newer runner images no longer
-    # provide. This mirrors the rcli-windows job in pr-build.yml.
-    runs-on: windows-2022
+  electron:
+    name: electron (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: windows
+            preset: electron-windows
+            prebuild_dir: prebuilds/win32-x64-thin
+            artifact: electron-native-win32-x64-thin
+            plugin_name: runanywhere_llamacpp.dll
+            commons_name: rac_commons.dll
+            run_typescript: true
+          # macos-26 ships Xcode 26.6 (setup-toolchain platform:macos pin).
+          # macos-14 fails toolchain setup with "Could not find Xcode version 26.6".
+          - os: macos-26
+            platform: macos
+            preset: electron-macos
+            prebuild_dir: prebuilds/darwin-arm64-thin
+            artifact: electron-native-darwin-arm64-thin
+            plugin_name: librunanywhere_llamacpp.dylib
+            commons_name: librac_commons.dylib
+            run_typescript: false
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
           persist-credentials: false
+
       - uses: ./.github/actions/setup-toolchain
         with:
-          platform: windows
+          platform: ${{ matrix.platform }}
+
       - uses: actions/setup-node@v4
         with:
+          # 22+ so `node --test` expands globs (Node 20 treats them as literals).
           node-version: '22'
-      # node-addon-api + node-api-headers live in native/, not the SDK root.
-      - name: Install the addon's node deps
-        shell: pwsh
+
+      # --- TypeScript gates (Windows only — Linux coverage is pr-build electron-unit) ---
+      - name: SDK install / typecheck / unit tests
+        if: matrix.run_typescript
+        working-directory: sdk/runanywhere-electron
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install
+          # Tests import ../../dist; typecheck of tsconfig.test.json needs dist/.
+          npm run build
+          # Example path aliases point at packages/*/dist/*.d.ts — build backends too.
+          for pkg in packages/llamacpp packages/onnx packages/sherpa; do
+            (cd "$pkg" && npm install && npm run build)
+          done
+          npm run typecheck
+          npm test
+
+      - name: Example app install / typecheck / lint / unit tests
+        if: matrix.run_typescript
+        working-directory: examples/electron/RunAnywhereAI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck
+          npm run lint
+          npm test
+
+      # --- Thin native Option A ---
+      - name: Install addon node deps
         working-directory: sdk/runanywhere-electron/native
+        shell: bash
         run: npm install
-      # node-gyp caches headers + node.lib under the RUNNER's Node version, which
-      # is not the version CMake defaults to — resolve it and pass it explicitly.
-      - name: Fetch the node headers + import lib the N-API link needs
+
+      - name: Fetch node-gyp headers (Windows N-API link)
+        if: runner.os == 'Windows'
         id: nodedev
         shell: pwsh
         run: |
@@ -103,20 +116,190 @@ jobs:
           $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
           if (!(Test-Path "$dir/x64/node.lib")) { throw "node.lib missing under $dir" }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-      - name: Configure
+
+      # RAC_DESKTOP_ADAPTER=ON needs libcurl. macOS has system curl; Windows MSVC
+      # gets a static vcpkg package (no libcurl.dll sidecar for the loadPlugin smoke).
+      - name: Install static libcurl (Windows MSVC)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake --preset windows-release `
-            -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON `
-            -DRAC_BACKEND_ONNX=ON -DRAC_RUNTIME_ONNXRT=ON -DRAC_BACKEND_SHERPA=OFF `
-            -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_ELECTRON_ADDON=ON `
-            "-DRAC_NODE_DEV_DIR=${{ steps.nodedev.outputs.dir }}"
-      - name: Build the addon
-        shell: pwsh
-        run: cmake --build build/windows-release --target runanywhere_native --config Release
-      - name: Assert the addon was produced
-        shell: pwsh
+          if (-not $env:VCPKG_INSTALLATION_ROOT) {
+            throw "VCPKG_INSTALLATION_ROOT is unset on this runner"
+          }
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl:x64-windows-static install failed" }
+
+      - name: Configure thin preset
+        shell: bash
         run: |
-          $node = "build/windows-release/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
-          if (!(Test-Path $node)) { throw "the native addon was not produced" }
-          Write-Host "addon built: $((Get-Item $node).Length) bytes"
+          set -euo pipefail
+          # Avoid `extra=(); "${extra[@]}"` — bash 3.2 + `set -u` treats an empty
+          # array as unbound (macOS runners).
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cmake --preset "${{ matrix.preset }}" \
+              -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_TARGET_TRIPLET=x64-windows-static \
+              -DRAC_BACKEND_SHERPA=OFF \
+              -DRAC_NODE_DEV_DIR="${{ steps.nodedev.outputs.dir }}"
+          else
+            cmake --preset "${{ matrix.preset }}" -DRAC_BACKEND_SHERPA=OFF
+          fi
+
+      - name: Build thin .node + commons + llamacpp
+        shell: bash
+        run: |
+          set -euo pipefail
+          jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cmake --build --preset "${{ matrix.preset }}" \
+              --target rac_commons runanywhere_llamacpp runanywhere_native
+          else
+            cmake --build --preset "${{ matrix.preset }}" -j "$jobs" \
+              --target rac_commons runanywhere_llamacpp runanywhere_native
+          fi
+
+      - name: Assert symbols + stage prebuild + loadPlugin smoke
+        shell: bash
+        working-directory: sdk/runanywhere-electron
+        env:
+          PRESET: ${{ matrix.preset }}
+          PREBUILD_DIR: ${{ matrix.prebuild_dir }}
+          PLUGIN_NAME: ${{ matrix.plugin_name }}
+          COMMONS_NAME: ${{ matrix.commons_name }}
+        run: |
+          set -euo pipefail
+          root="${GITHUB_WORKSPACE}/build/${PRESET}"
+          out="${PREBUILD_DIR}"
+          mkdir -p "$out"
+
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            node_path="$root/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
+            commons_path="$root/sdk/runanywhere-commons/Release/${COMMONS_NAME}"
+            llama_dir="$root/engines/llamacpp/Release"
+            plugin_path="$llama_dir/${PLUGIN_NAME}"
+
+            for p in "$node_path" "$commons_path" "$plugin_path"; do
+              test -f "$p" || { echo "missing thin artifact: $p"; exit 1; }
+              echo "ok $p ($(wc -c < "$p") bytes)"
+            done
+
+            # dumpbin export gate
+            vswhere="${PROGRAMFILES(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+            test -f "$vswhere" || { echo "vswhere.exe not found"; exit 1; }
+            vs="$("$vswhere" -latest -products '*' \
+              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+              -property installationPath)"
+            test -n "$vs" || { echo "VS 2022 install path not found"; exit 1; }
+            dumpbin="$(find "$vs/VC/Tools/MSVC" -name dumpbin.exe | grep 'Hostx64/x64/dumpbin.exe' | head -1)"
+            test -n "$dumpbin" || { echo "dumpbin.exe not found"; exit 1; }
+            echo "using $dumpbin"
+
+            assert_export() {
+              local dll="$1"; shift
+              echo "=== dumpbin /EXPORTS $dll ==="
+              local out
+              out="$("$dumpbin" /EXPORTS "$dll" 2>&1)"
+              echo "$out"
+              for sym in "$@"; do
+                echo "$out" | grep -E "\\b${sym}\\b" >/dev/null || {
+                  echo "missing export '$sym' in $dll"; exit 1
+                }
+                echo "  ok export: $sym"
+              done
+            }
+            assert_export "$commons_path" rac_init rac_registry_load_plugin rac_llm_extract_thinking
+            assert_export "$plugin_path" rac_plugin_entry_llamacpp
+
+            cp "$node_path" "$out/"
+            cp "$commons_path" "$out/"
+            cp "$plugin_path" "$out/"
+            # Backend sidecar + other Release DLLs beside the carrier.
+            if [[ -f "$llama_dir/rac_backend_llamacpp.dll" ]]; then
+              cp "$llama_dir/rac_backend_llamacpp.dll" "$out/"
+            fi
+            for dll in "$llama_dir"/*.dll; do
+              base="$(basename "$dll")"
+              [[ -f "$out/$base" ]] || cp "$dll" "$out/"
+            done
+          else
+            node_path="$root/sdk/runanywhere-electron/native/runanywhere_native.node"
+            commons_path="$root/sdk/runanywhere-commons/${COMMONS_NAME}"
+            llama_dir="$root/engines/llamacpp"
+            plugin_path="$llama_dir/${PLUGIN_NAME}"
+
+            for p in "$node_path" "$commons_path" "$plugin_path"; do
+              test -f "$p" || { echo "missing thin artifact: $p"; exit 1; }
+              echo "ok $p ($(wc -c < "$p") bytes)"
+            done
+
+            echo "=== nm -gU ${COMMONS_NAME} (filtered) ==="
+            nm -gU "$commons_path" | grep -E ' _rac_(init|registry_load_plugin|llm_extract_thinking)$' || {
+              echo "missing expected rac_* exports in ${COMMONS_NAME}"
+              nm -gU "$commons_path" | grep ' _rac_' | head -40
+              exit 1
+            }
+            echo "=== nm -gU ${PLUGIN_NAME} (entry) ==="
+            nm -gU "$plugin_path" | grep -E ' _rac_plugin_entry_llamacpp$' || {
+              echo "missing rac_plugin_entry_llamacpp in ${PLUGIN_NAME}"
+              exit 1
+            }
+            echo "ok export: rac_plugin_entry_llamacpp"
+
+            cp "$node_path" "$out/"
+            cp "$commons_path" "$out/"
+            cp "$plugin_path" "$out/"
+            if [[ -f "$llama_dir/librac_backend_llamacpp.dylib" ]]; then
+              cp "$llama_dir/librac_backend_llamacpp.dylib" "$out/"
+            fi
+          fi
+
+          ls -la "$out"
+          test -f "$out/runanywhere_native.node"
+          test -f "$out/${COMMONS_NAME}"
+          test -f "$out/${PLUGIN_NAME}"
+
+          # loadPlugin smoke (no models / no generate)
+          export RA_THIN_STAGE="$(pwd)/$out"
+          export RA_THIN_PLUGIN="$RA_THIN_STAGE/${PLUGIN_NAME}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH="$RA_THIN_STAGE;$PATH"
+          fi
+          node <<'EOF'
+          const fs = require("fs");
+          const os = require("os");
+          const path = require("path");
+          const stage = process.env.RA_THIN_STAGE;
+          const pluginPath = process.env.RA_THIN_PLUGIN;
+          const nodePath = path.join(stage, "runanywhere_native.node");
+          if (!fs.existsSync(nodePath)) throw new Error("missing " + nodePath);
+          if (!fs.existsSync(pluginPath)) throw new Error("missing " + pluginPath);
+          const addon = require(nodePath);
+          if (addon.thinAddon !== true) {
+            throw new Error("expected thinAddon === true, got " + addon.thinAddon);
+          }
+          console.log(
+            "thinAddon=true pluginApiVersion=" +
+              (typeof addon.pluginApiVersion === "function" ? addon.pluginApiVersion() : "n/a")
+          );
+          const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ra-thin-ci-"));
+          (async () => {
+            await addon.initialize(tmp, tmp);
+            await addon.loadPlugin(pluginPath);
+            const listed = addon.listPlugins();
+            console.log("listPlugins=" + JSON.stringify(listed));
+            if (!listed.map(String).some((n) => /llama/i.test(n))) {
+              throw new Error("llamacpp missing after loadPlugin: " + JSON.stringify(listed));
+            }
+            console.log("loadPlugin smoke OK");
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          EOF
+
+      - name: Upload thin native prebuild
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: sdk/runanywhere-electron/${{ matrix.prebuild_dir }}/
+          if-no-files-found: error

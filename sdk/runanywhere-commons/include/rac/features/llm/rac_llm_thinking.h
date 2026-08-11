@@ -31,6 +31,7 @@
 #include <stdint.h>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,9 +63,9 @@ extern "C" {
  *                         is NULL.
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_extract_thinking(const char* text, const char** out_response,
-                                      size_t* out_response_len, const char** out_thinking,
-                                      size_t* out_thinking_len);
+RAC_API rac_result_t rac_llm_extract_thinking(const char* text, const char** out_response,
+                                              size_t* out_response_len, const char** out_thinking,
+                                              size_t* out_thinking_len);
 
 /**
  * Extracts thinking content with a caller-provided tag pair plus the built-in
@@ -77,10 +78,12 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
  * This is still a commons-internal parser; SDKs should consume the generated
  * proto fields populated by commons.
  */
-rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
-                                                const char* close_tag, const char** out_response,
-                                                size_t* out_response_len, const char** out_thinking,
-                                                size_t* out_thinking_len);
+RAC_API rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
+                                                        const char* close_tag,
+                                                        const char** out_response,
+                                                        size_t* out_response_len,
+                                                        const char** out_thinking,
+                                                        size_t* out_thinking_len);
 
 /**
  * Removes ALL built-in thinking blocks (multiple per text + trailing unclosed
@@ -93,8 +96,8 @@ rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* op
  *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
-                                    size_t* out_stripped_len);
+RAC_API rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
+                                            size_t* out_stripped_len);
 
 /**
  * Splits @p total_completion_tokens between thinking and response by the
@@ -115,10 +118,11 @@ rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
  * @param out_response_tokens     Receives response-segment count.
  * @return RAC_SUCCESS or RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_split_thinking_tokens(int32_t total_completion_tokens,
-                                           const char* response_text, const char* thinking_text,
-                                           int32_t* out_thinking_tokens,
-                                           int32_t* out_response_tokens);
+RAC_API rac_result_t rac_llm_split_thinking_tokens(int32_t total_completion_tokens,
+                                                   const char* response_text,
+                                                   const char* thinking_text,
+                                                   int32_t* out_thinking_tokens,
+                                                   int32_t* out_response_tokens);
 
 #ifdef __cplusplus
 } /* extern "C" */

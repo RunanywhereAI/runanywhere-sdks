@@ -1,19 +1,39 @@
 // iter.ts — AsyncIterable plumbing for the streaming verbs.
 //
-// Every stream the SDK returns must be *bridge safe*: Electron's contextBridge
-// cannot clone a generator object, so an iterator has to be a plain object whose
-// `Symbol.asyncIterator` returns `this` and whose `next()` resolves a plain
-// `{ value, done }`. `bridgeStream` is the only constructor used for public
-// streams, which is why the main-process and renderer surfaces can share one
-// implementation.
+// Queue / own-property iterator machinery lives in
+// `@runanywhere/proto-ts/streams/push` (contextBridge-safe: `next` / `return` /
+// `throw` / `Symbol.asyncIterator` are own properties). This file is a thin
+// Electron binding that coerces stream failures through {@link asSDKException}
+// so renderer and main consumers always see the house error type.
+
+import {
+  AsyncQueue as SharedAsyncQueue,
+  bridgeStream as sharedBridgeStream,
+  collect as sharedCollect,
+  streamOf as sharedStreamOf,
+  type StreamSink,
+} from '@runanywhere/proto-ts/streams/push';
 
 import { asSDKException } from '../errors';
 
-/** Where a producer pushes stream items. */
-export interface StreamSink<T> {
-  push(value: T): void;
-  end(): void;
-  fail(error: unknown): void;
+export type { StreamSink };
+
+/** Wrap a shared sink so `fail` always surfaces an {@link SDKException}. */
+function withTypedFail<T>(sink: StreamSink<T>): StreamSink<T> {
+  return {
+    get closed() {
+      return sink.closed;
+    },
+    push(value) {
+      sink.push(value);
+    },
+    end() {
+      sink.end();
+    },
+    fail(error) {
+      sink.fail(asSDKException(error));
+    },
+  };
 }
 
 /**
@@ -25,105 +45,17 @@ export function bridgeStream<T>(
   producer: (sink: StreamSink<T>) => void | Promise<void>,
   onCancel?: () => void | Promise<void>
 ): AsyncIterableIterator<T> {
-  const queue: T[] = [];
-  let done = false;
-  let failure: unknown = null;
-  let started = false;
-  let cancelled = false;
-  let wake: (() => void) | null = null;
-
-  const signal = (): void => {
-    const w = wake;
-    wake = null;
-    if (w) w();
-  };
-
-  const sink: StreamSink<T> = {
-    push(value) {
-      if (cancelled) return;
-      queue.push(value);
-      signal();
-    },
-    end() {
-      done = true;
-      signal();
-    },
-    fail(error) {
-      failure = error;
-      done = true;
-      signal();
-    },
-  };
-
-  const start = (): void => {
-    if (started) return;
-    started = true;
-    try {
-      const maybe = producer(sink);
-      if (maybe && typeof (maybe as Promise<void>).then === 'function') {
-        (maybe as Promise<void>).then(
-          () => sink.end(),
-          (e) => sink.fail(e)
-        );
-      }
-    } catch (e) {
-      sink.fail(e);
-    }
-  };
-
-  const finish = async (): Promise<IteratorResult<T>> => {
-    if (!cancelled) {
-      cancelled = true;
-      queue.length = 0;
-      try {
-        await onCancel?.();
-      } catch {
-        // A cancel that itself fails must not mask the caller's own control flow.
-      }
-    }
-    return { value: undefined as unknown as T, done: true };
-  };
-
-  return {
-    [Symbol.asyncIterator]() {
-      return this;
-    },
-    async next(): Promise<IteratorResult<T>> {
-      start();
-      for (;;) {
-        if (queue.length) return { value: queue.shift() as T, done: false };
-        if (failure) {
-          const error = failure;
-          failure = null;
-          throw asSDKException(error);
-        }
-        if (done || cancelled) return { value: undefined as unknown as T, done: true };
-        await new Promise<void>((resolve) => {
-          wake = resolve;
-        });
-      }
-    },
-    return: finish,
-    async throw(error?: unknown): Promise<IteratorResult<T>> {
-      await finish();
-      throw asSDKException(error);
-    },
-  };
+  return sharedBridgeStream<T>((sink) => producer(withTypedFail(sink)), onCancel);
 }
 
 /** Wrap a ready array as a bridge-safe stream (used for synthetic events). */
-export function streamOf<T>(values: T[]): AsyncIterableIterator<T> {
-  return bridgeStream<T>((sink) => {
-    for (const v of values) sink.push(v);
-    sink.end();
-  });
+export function streamOf<T>(values: readonly T[]): AsyncIterableIterator<T> {
+  return sharedStreamOf(values);
 }
 
 /** Drain a stream, returning every item. */
 export async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
-  const out: T[] = [];
-  for await (const item of source) out.push(item);
-  return out;
+  return sharedCollect(source);
 }
 
 /**
@@ -134,56 +66,9 @@ export async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
  * `vad.openStream` sessions, which are pushed into from outside their own
  * async iteration.
  */
-export class AsyncQueue<T> implements AsyncIterable<T> {
-  private readonly buffer: T[] = [];
-  private wake: (() => void) | null = null;
-  private ended = false;
-  private failure: unknown = null;
-
-  /** Enqueue one item. A no-op once the queue has ended. */
-  push(value: T): void {
-    if (this.ended) return;
-    this.buffer.push(value);
-    this.signal();
-  }
-
+export class AsyncQueue<T> extends SharedAsyncQueue<T> {
   /** End the queue with a terminal error; the next `next()` throws it. */
-  fail(error: unknown): void {
-    if (this.ended) return;
-    this.failure = error;
-    this.ended = true;
-    this.signal();
-  }
-
-  /** End the queue normally once every buffered item has been read. */
-  complete(): void {
-    if (this.ended) return;
-    this.ended = true;
-    this.signal();
-  }
-
-  private signal(): void {
-    const wake = this.wake;
-    this.wake = null;
-    if (wake) wake();
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return {
-      next: async (): Promise<IteratorResult<T>> => {
-        for (;;) {
-          if (this.buffer.length) return { value: this.buffer.shift() as T, done: false };
-          if (this.failure) {
-            const error = this.failure;
-            this.failure = null;
-            throw asSDKException(error);
-          }
-          if (this.ended) return { value: undefined as unknown as T, done: true };
-          await new Promise<void>((resolve) => {
-            this.wake = resolve;
-          });
-        }
-      },
-    };
+  override fail(error: unknown): void {
+    super.fail(asSDKException(error));
   }
 }

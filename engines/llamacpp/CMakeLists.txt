@@ -366,18 +366,32 @@ if(RAC_STATIC_PLUGINS)
 else()
     # Shared-plugin path: SHARED library whose only export is the entry
     # symbol; the actual op functions live in rac_backend_llamacpp.
+    # Compile the entry TU into the carrier so `rac_plugin_entry_llamacpp`
+    # is a real export of THIS image — required for Windows GetProcAddress
+    # (Darwin's dlsym walks dependents, which hid the missing export) and
+    # for the CI `nm`/`dumpbin` gate.
     add_library(runanywhere_llamacpp SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_llamacpp.cpp
     )
     set_target_properties(runanywhere_llamacpp PROPERTIES
         OUTPUT_NAME           runanywhere_llamacpp
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
+    target_compile_definitions(runanywhere_llamacpp PRIVATE RAC_BUILDING_PLUGIN=1)
     target_link_libraries(runanywhere_llamacpp PUBLIC
         rac_backend_llamacpp
         rac_commons
     )
+    # Sidecar RPATH: resolve librac_commons next to this plugin when staged.
+    if(APPLE)
+        set_property(TARGET runanywhere_llamacpp APPEND PROPERTY BUILD_RPATH "@loader_path")
+        set_target_properties(runanywhere_llamacpp PROPERTIES INSTALL_RPATH "@loader_path")
+    elseif(UNIX)
+        set_property(TARGET runanywhere_llamacpp APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_target_properties(runanywhere_llamacpp PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
     rac_apply_android_page_alignment(runanywhere_llamacpp)
     install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
 endif()

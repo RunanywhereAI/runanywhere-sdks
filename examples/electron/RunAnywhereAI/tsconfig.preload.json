@@ -1,0 +1,12 @@
+{
+  // Electron preload. Runs with contextIsolation:true and sandbox:false, so it
+  // sees BOTH Node and a limited DOM (contextBridge, window). Emits CommonJS.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src/preload/**/*.ts", "src/shared/**/*.ts"]
+}

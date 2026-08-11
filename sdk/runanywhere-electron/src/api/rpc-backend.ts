@@ -23,6 +23,7 @@ import type {
   NativeAudioChunk,
   NativeDiarization,
   NativeImagePayload,
+  NativeLogRecord,
   NativeLoraEntry,
   NativeRanked,
   NativeSegmentation,
@@ -66,6 +67,12 @@ export class RpcBackend implements RaBackend {
   memoryInfo(): Promise<MemoryInfo> {
     return this.call('memoryInfo', []);
   }
+  listPlugins(): Promise<string[]> {
+    return this.call('listPlugins', []);
+  }
+  isThinAddon(): Promise<boolean> {
+    return this.call('isThinAddon', []);
+  }
 
   // ---- desktop control plane (telemetry + auth) ----
   hasControlPlane(): Promise<boolean> {
@@ -91,6 +98,11 @@ export class RpcBackend implements RaBackend {
   }
   telemetryFlush(): Promise<void> {
     return this.call('telemetryFlush', []);
+  }
+
+  // ---- hugging face auth ----
+  hfTokenSet(token: string | null): Promise<void> {
+    return this.call('hfTokenSet', [token]);
   }
 
   // ---- model store ----
@@ -155,6 +167,12 @@ export class RpcBackend implements RaBackend {
   storageDeleteProto(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.call('storageDeleteProto', [requestBytes]);
   }
+  clearCache(): Promise<void> {
+    return this.call('clearCache', []);
+  }
+  clearTemp(): Promise<void> {
+    return this.call('clearTemp', []);
+  }
   ensure(slot: LoadSlot, source: string, options?: BackendLoadOptions): Promise<LoadedModel> {
     return this.call('ensure', [slot, source, options]);
   }
@@ -187,8 +205,34 @@ export class RpcBackend implements RaBackend {
     return this.call('loraRemoveProto', [requestBytes]);
   }
 
+  loraListProto(stateBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraListProto', [stateBytes]);
+  }
+
   loraStateProto(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.call('loraStateProto', [requestBytes]);
+  }
+
+  loraCompatibilityProto(configBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraCompatibilityProto', [configBytes]);
+  }
+
+  // ---- lora catalog ----
+
+  loraRegisterProto(entryBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraRegisterProto', [entryBytes]);
+  }
+
+  loraCatalogListProto(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraCatalogListProto', [requestBytes]);
+  }
+
+  loraCatalogQueryProto(queryBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraCatalogQueryProto', [queryBytes]);
+  }
+
+  loraCatalogGetProto(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('loraCatalogGetProto', [requestBytes]);
   }
 
   loraApply(adapterPath: string, scale: number): Promise<void> {
@@ -419,8 +463,14 @@ export class RpcBackend implements RaBackend {
   modelRegistryDiscover(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.call('modelRegistryDiscover', [requestBytes]);
   }
+  modelRegistryImport(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('modelRegistryImport', [requestBytes]);
+  }
   modelCompatibility(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.call('modelCompatibility', [requestBytes]) as Promise<Uint8Array>;
+  }
+  modelComponentSnapshot(component: number): Promise<Uint8Array> {
+    return this.call('modelComponentSnapshot', [component]);
   }
 
   modelRegisterFromUrl(requestBytes: Uint8Array): Promise<Uint8Array> {
@@ -512,5 +562,25 @@ export class RpcBackend implements RaBackend {
   }
   secureDelete(key: string): Promise<void> {
     return this.call('secureDelete', [key]);
+  }
+
+  // ---- logging ----
+  loggingSetLevel(level: number): Promise<void> {
+    return this.call('loggingSetLevel', [level]);
+  }
+  loggingLevel(): Promise<number> {
+    return this.call('loggingLevel', []);
+  }
+  loggingSetLocalEnabled(enabled: boolean): Promise<void> {
+    return this.call('loggingSetLocalEnabled', [enabled]);
+  }
+  loggingFlush(): Promise<void> {
+    return this.call('loggingFlush', []);
+  }
+  loggingWatch(onRecord: (record: NativeLogRecord) => void): Promise<void> {
+    return this.call('loggingWatch', [], onRecord as (c: unknown) => void);
+  }
+  loggingUnwatch(): Promise<void> {
+    return this.call('loggingUnwatch', []);
   }
 }

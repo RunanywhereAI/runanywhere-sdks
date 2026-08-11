@@ -30,6 +30,11 @@ export {
   frameworkToProto,
   toPublicModelInfo,
 } from './api/model-abi';
+// Proto messages the public surface takes and returns directly, so a caller can
+// build a `models.import` request and read a `componentLifecycleSnapshot`
+// without depending on `@runanywhere/proto-ts` itself.
+export { ComponentLifecycleSnapshot, ModelImportRequest, SDKComponent } from './api/model-abi';
+export type { ModelImportResult } from './api/model-abi';
 export {
   audio,
   image,
@@ -50,6 +55,7 @@ export {
   TokenKind,
   ToolChoice,
   newRequestId,
+  toProtoError,
 } from './api/types';
 export type {
   AppliedAdapter,
@@ -61,7 +67,9 @@ export type {
   ChatMessage,
   ClassInfo,
   DiarizationResult,
+  DiscoveredModel,
   DownloadEvent,
+  DownloadProgressSnapshot,
   Embedding,
   GenerationEvent,
   GenerationMetrics,
@@ -73,6 +81,7 @@ export type {
   LoadedModel,
   LoraState,
   Match,
+  ModelCompatibility,
   ModelFilter,
   ModelInfo,
   ModelRef,
@@ -126,10 +135,53 @@ export type {
   VadOptions,
 } from './api/options';
 // The namespace interfaces are reached through `RunAnywhereApi`, not by name.
-export type { RefreshOptions } from './api/assets';
+export type { DiscoverOptions, RefreshOptions } from './api/assets';
+// The Node-side half of the HuggingFace bearer. An application calls
+// `RunAnywhere.setHfToken(...)`, which drives BOTH this and commons; these are
+// exported for a host that runs `resolveModel`/`downloadFile` directly, without
+// a facade to route through.
+export { huggingFaceBearer, setHuggingFaceToken } from './api/hf';
+// `storage` is the exception: its verbs speak the generated storage protos, so a
+// caller needs the message types by name to build a request or read a result.
+export type { StorageNamespace } from './api/storage';
+export {
+  StorageAvailabilityRequest,
+  StorageDeletePlanRequest,
+  StorageDeleteRequest,
+  StorageInfoRequest,
+} from '@runanywhere/proto-ts/storage_types';
+export type {
+  StorageAvailability,
+  StorageAvailabilityResult,
+  StorageDeleteCandidate,
+  StorageDeletePlan,
+  StorageDeleteResult,
+  StorageInfo,
+  StorageInfoResult,
+} from '@runanywhere/proto-ts/storage_types';
+// `lora` is the other one: its catalog verbs take and return the generated LoRA
+// messages, so a caller building an entry or reading a query result needs them.
+export type { LoraNamespace } from './api/assets';
+export {
+  LoraAdapterCatalogEntry,
+  LoraAdapterCatalogQuery,
+  LoraAdapterConfig,
+} from '@runanywhere/proto-ts/lora_options';
+export type {
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListResult,
+  LoraAdapterInfo,
+  LoraApplyResult,
+  LoraCompatibilityResult,
+} from '@runanywhere/proto-ts/lora_options';
+// `logging` speaks the generated logging protos for the same reason: a
+// destination reads a `LogEntry`, and a level is a `LogLevel`.
+export type { LogDestination, LoggingNamespace } from './api/logging';
+export { LogLevel } from '@runanywhere/proto-ts/logging';
+export type { LogEntry, LoggingConfiguration } from '@runanywhere/proto-ts/logging';
 export { ResidencyPolicy } from './api/residency';
 export type { ResidencyDecision, ResidencySlots, ResidentModel } from './api/residency';
-export type { AuthState, MemoryInfo } from './api/backend';
+export type { AuthState, MemoryInfo, NativeLogRecord } from './api/backend';
 export type { VoiceSession, VoiceSessionConfig } from './api/speech';
 export type { RagSession } from './api/data';
 
@@ -137,7 +189,23 @@ export type { RagSession } from './api/data';
 // Not a second API surface: these are the pieces a host application needs that
 // have no namespace of their own — typed errors, renderer-side audio DSP, and
 // the staged catalog it hands the SDK before initialize().
-export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException, raiseForRac } from './errors';
+// `ErrorCode` / `ErrorCategory` / `ErrorSeverity` are the generated proto enums,
+// so their members read `ERROR_CODE_MODEL_NOT_FOUND`. `ErrorCodes` /
+// `ErrorCategories` are short-name alias objects derived from them, for app code
+// that would rather write `ErrorCodes.MODEL_NOT_FOUND`.
+export {
+  SDKException,
+  ErrorCode,
+  ErrorCodes,
+  ErrorCategory,
+  ErrorCategories,
+  ErrorSeverity,
+  categoryForCode,
+  isSDKException,
+  asSDKException,
+  raiseForRac,
+} from './errors';
+export type { ErrorCategoryName, ErrorCodeName, SDKErrorFields } from './errors';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { speakableText } from './speech';

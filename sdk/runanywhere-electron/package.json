@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.1.0",
-  "description": "RunAnywhere Electron SDK \u2014 on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
+  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "commonjs",
@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./backend": {
+      "types": "./dist/backend.d.ts",
+      "default": "./dist/backend.js"
     },
     "./audio": {
       "types": "./dist/audio.d.ts",
@@ -49,17 +53,26 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "bundle:native": "node scripts/bundle-native.js",
-    "pretest": "tsc -p tsconfig.json",
-    "test": "node --test \"test/unit/**/*.test.js\"",
-    "test:integration": "node --test \"test/integration/**/*.test.js\"",
-    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\" \"test/feature/**/*.test.js\"",
-    "prepack": "npm run build && npm run bundle:native",
-    "test:feature": "node --test \"test/feature/**/*.test.js\""
+    "build:test": "tsc -p tsconfig.test.json",
+    "build:scripts": "tsc -p tsconfig.scripts.json",
+    "build:native-smoke": "tsc -p tsconfig.native.json",
+    "bundle:native": "npm run build:scripts && node dist-scripts/bundle-native.js",
+    "pretest": "npm run build && npm run build:test",
+    "test": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\"",
+    "pretest:feature": "npm run build && npm run build:test",
+    "test:feature": "node --enable-source-maps --test \"dist-test/feature/**/*.test.js\"",
+    "pretest:all": "npm run build && npm run build:test",
+    "test:all": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\" \"dist-test/feature/**/*.test.js\"",
+    "check:proto-ts": "node scripts/check-proto-ts.mjs",
+    "typecheck": "npm run check:proto-ts && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.native.json --noEmit",
+    "prepack": "npm run build && npm run bundle:native"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "file:../shared/proto-ts"
+  },
+  "peerDependencies": {
+    "@runanywhere/proto-ts": "^0.20.14"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

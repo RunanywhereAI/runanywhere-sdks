@@ -250,13 +250,60 @@
         },
         {
             "name": "windows-release",
-            "displayName": "Windows x64 \u2014 Release (experimental, not release-tested)",
+            "displayName": "Windows x64 \u2014 Release (fat/static commons; experimental)",
+            "description": "Default Windows desktop Release. RAC_BUILD_SHARED=OFF so engines fold into static archives / the fat Electron .node. For the Option A thin addon + rac_commons.dll + plugin DLLs path, use the electron-windows preset instead.",
             "inherits": "base-release",
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "electron-macos",
+            "displayName": "Electron \u2014 macOS thin addon (shared commons + dynamic plugins)",
+            "description": "Option A packaging: librac_commons.dylib + per-backend runanywhere_*.dylib + thin runanywhere_native.node. Thin mode is automatic when RAC_STATIC_PLUGINS=OFF; RAC_ELECTRON_THIN_ADDON is set explicitly for clarity. Fat Electron builds keep using macos-release + -DRAC_BUILD_ELECTRON_ADDON=ON.",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "ON",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_STATIC_PLUGINS": "OFF",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "ON",
+                "RAC_BACKEND_ONNX": "ON",
+                "RAC_RUNTIME_ONNXRT": "ON",
+                "RAC_BACKEND_SHERPA": "ON",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_ELECTRON_ADDON": "ON",
+                "RAC_ELECTRON_THIN_ADDON": "ON",
+                "GGML_METAL": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "electron-windows",
+            "displayName": "Electron \u2014 Windows x64 thin addon (shared commons + dynamic plugins)",
+            "description": "Option A packaging on MSVC: rac_commons.dll + runanywhere_*.dll + thin runanywhere_native.node. Requires a Windows host (or CI windows-2022 runner) — not cross-compilable from macOS. Pass -DRAC_NODE_DEV_DIR=<node-gyp cache> after `npx node-gyp install`. Sherpa needs the Windows Sherpa-ONNX prebuilt; CI may override -DRAC_BACKEND_SHERPA=OFF when that archive is absent. See sdk/runanywhere-electron/docs/DEVELOPMENT.md (DELAYLOAD notes).",
+            "inherits": "base-release",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "x64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_STATIC_PLUGINS": "OFF",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "ON",
+                "RAC_BACKEND_ONNX": "ON",
+                "RAC_RUNTIME_ONNXRT": "ON",
+                "RAC_BACKEND_SHERPA": "ON",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_NEURT": "OFF",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_ELECTRON_ADDON": "ON",
+                "RAC_ELECTRON_THIN_ADDON": "ON",
+                "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
@@ -308,6 +355,8 @@
         { "name": "wasm",             "configurePreset": "wasm" },
         { "name": "windows-debug",    "configurePreset": "windows-debug" },
         { "name": "windows-release",  "configurePreset": "windows-release" },
+        { "name": "electron-macos",   "configurePreset": "electron-macos" },
+        { "name": "electron-windows", "configurePreset": "electron-windows", "configuration": "Release" },
         { "name": "windows-arm64-release", "configurePreset": "windows-arm64-release", "configuration": "Release" },
         { "name": "windows-arm64-release-vs2026", "configurePreset": "windows-arm64-release-vs2026", "configuration": "Release" }
     ],

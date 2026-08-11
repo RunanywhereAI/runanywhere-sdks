@@ -1,0 +1,74 @@
+# Packaging for RunAnywhere AI (examples/electron/RunAnywhereAI).
+# Invoked by `npm run package` / `package:mac` / `package:win`.
+#
+# Native artifacts cannot load from inside app.asar. asarUnpack covers the fat
+# .node today and the future split (shared libs + per-backend plugins).
+
+appId: ai.runanywhere.desktop
+productName: RunAnywhere AI
+copyright: Copyright © RunAnywhere
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - package.json
+  - out/**/*
+  - assets/icon.png
+  - assets/icon.ico
+  - '!**/{test,tests,e2e,src,scripts,release}/**'
+  - '!**/*.{md,map,ts,tsx}'
+  - '!**/tsconfig*.json'
+  - '!**/vite.config.*'
+  - '!**/playwright.config.*'
+  - '!**/eslint.config.*'
+  - '!electron-builder.yml'
+
+asar: true
+
+# Unpack every loadable native artifact under the Electron SDK — and by
+# extension glob so a future thin-addon + N dylibs/plugins layout still works
+# without another packaging change.
+asarUnpack:
+  - '**/*.node'
+  - '**/*.dylib'
+  - '**/*.dll'
+  - '**/*.so'
+  - '**/*.so.*'
+  - '**/node_modules/@runanywhere/electron/prebuilds/**'
+  - '**/node_modules/@runanywhere/electron/**/plugins/**'
+
+mac:
+  category: public.app-category.productivity
+  icon: assets/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Local / CI packages are unsigned; release signing is a follow-up.
+  identity: null
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+
+# Packaging only — no publish channel wired yet.
+publish: null

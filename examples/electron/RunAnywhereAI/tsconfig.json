@@ -1,0 +1,11 @@
+{
+  // Solution file. Each process has its own project because their libs and
+  // globals genuinely differ (node vs DOM) and letting them share one config is
+  // how `electron` ends up imported in a renderer.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.main.json" },
+    { "path": "./tsconfig.preload.json" },
+    { "path": "./tsconfig.renderer.json" }
+  ]
+}

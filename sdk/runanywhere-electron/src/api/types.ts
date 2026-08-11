@@ -4,16 +4,43 @@
 // survives a structured clone across the contextBridge unchanged — the renderer
 // surface hands these exact objects to the page.
 
-import { SDKException } from '../errors';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { SDKError } from '@runanywhere/proto-ts/errors';
+import type {
+  DownloadEvent as CanonicalDownloadEvent,
+  GenerationEvent as CanonicalGenerationEvent,
+  ImageEvent as CanonicalImageEvent,
+  RagEvent as CanonicalRagEvent,
+  SdkEvent as CanonicalSdkEvent,
+  TranscriptionEvent as CanonicalTranscriptionEvent,
+  VadEvent as CanonicalVadEvent,
+  VoiceEvent as CanonicalVoiceEvent,
+} from '@runanywhere/proto-ts/events/public_events';
+import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
+
+import { SDKException, asSDKException } from '../errors';
+
+/**
+ * `AudioCaptureDefaults.mic_sample_rate_hz` — the rate the {@link audio}
+ * constructors assume, read from `idl/sdk_defaults.proto` rather than restated.
+ */
+const CAPTURE_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
 
-/** Deployment environment the SDK reports to the control plane. */
+/**
+ * Deployment environment the SDK reports to the control plane.
+ *
+ * Development and production only, because that is all `SDKEnvironment` has:
+ * `idl/model_types.proto` reserves wire value 2, which was `SDK_ENVIRONMENT_STAGING`,
+ * so `PRODUCTION` stays at 3 and nothing can be added back at 2. A `STAGING`
+ * member here would be a public-surface lie — every consumer collapsed it to
+ * DEVELOPMENT.
+ */
 export const Environment = {
   DEVELOPMENT: 'development',
-  STAGING: 'staging',
   PRODUCTION: 'production',
 } as const;
 export type Environment = (typeof Environment)[keyof typeof Environment];
@@ -167,12 +194,12 @@ export interface AudioInput {
 
 /** Constructors for {@link AudioInput}, one per source shape. */
 export const audio = {
-  /** Wrap little-endian PCM16 bytes. */
-  pcm16(bytes: Uint8Array, sampleRate = 16000, channels = 1): AudioInput {
+  /** Wrap little-endian PCM16 bytes. Defaults to the IDL capture rate. */
+  pcm16(bytes: Uint8Array, sampleRate = CAPTURE_SAMPLE_RATE, channels = 1): AudioInput {
     return { bytes, format: { encoding: AudioEncoding.PCM_S16_LE, sampleRate, channels } };
   },
-  /** Wrap float32 samples in [-1, 1]. */
-  float32(samples: Float32Array, sampleRate = 16000): AudioInput {
+  /** Wrap float32 samples in [-1, 1]. Defaults to the IDL capture rate. */
+  float32(samples: Float32Array, sampleRate = CAPTURE_SAMPLE_RATE): AudioInput {
     return { samples, format: { encoding: AudioEncoding.PCM_F32_LE, sampleRate, channels: 1 } };
   },
   /** Wrap the bytes of a RIFF/WAVE file. */
@@ -555,14 +582,18 @@ export interface SpeechHandle {
  * audio format once; every pushed frame carries PCM samples in that format.
  */
 export interface SttStream {
-  readonly events: AsyncIterable<TranscriptionEvent>;
+  readonly events: AsyncIterableIterator<TranscriptionEvent>;
   /** Push one frame of PCM audio in the stream's established format. */
   pushFrame(frame: AudioFrame): void;
   /** Request the backend surface partials for audio pushed so far. */
   flush(): void;
   /** Signal that no more audio is coming; the backend finalizes the transcript. */
   finish(): void;
-  /** Release the stream's resources. Idempotent. */
+  /**
+   * Release the stream's resources. Idempotent. Closing before {@link finish}
+   * ends `events` with `cancelled`, because the buffered audio was never
+   * transcribed.
+   */
   close(): Promise<void>;
 }
 
@@ -571,7 +602,7 @@ export interface SttStream {
  * audio format once; every pushed frame carries PCM samples in that format.
  */
 export interface VadStream {
-  readonly events: AsyncIterable<VadEvent>;
+  readonly events: AsyncIterableIterator<VadEvent>;
   /** Push one frame of PCM audio in the stream's established format. */
   pushFrame(frame: AudioFrame): void;
   /** No-op on Electron: there is no partial-result buffer to flush. */
@@ -651,76 +682,210 @@ export interface ModelRegistration {
   framework?: InferenceFramework;
 }
 
+/**
+ * Commons' verdict on whether this machine can take a model, from
+ * {@link ModelsNamespace.compatibility}.
+ *
+ * The two halves are separate questions and a UI usually wants both: `canRun`
+ * is "there is enough RAM to hold it once loaded", `canFit` is "there is enough
+ * disk to store it". A registry row that declares no requirement answers yes,
+ * because commons will not guess a number it was never given.
+ */
+export interface ModelCompatibility {
+  /** Both halves at once — the badge a Models list shows. */
+  compatible: boolean;
+  canRun: boolean;
+  canFit: boolean;
+  /** Zero when the registry row does not declare a requirement. */
+  requiredMemoryBytes: number;
+  /** Zero when the platform cannot report free RAM. */
+  availableMemoryBytes: number;
+  requiredStorageBytes: number;
+  availableStorageBytes: number;
+  /** Commons' explanation of a negative verdict; empty when everything fits. */
+  reasons: string[];
+}
+
+/** One model artifact a {@link ModelsNamespace.discover} sweep found on disk. */
+export interface DiscoveredModel {
+  id: string;
+  localPath: string;
+  /** True when the artifact was matched to a row already in the registry. */
+  matchedRegistry: boolean;
+  sizeBytes: number;
+  /** The row as it stands after the sweep, when the artifact matched one. */
+  model?: ModelInfo;
+  /** What commons could not make sense of about this artifact. */
+  warnings: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
+//
+// Public grammars derive from `@runanywhere/proto-ts/events/public_events`, with
+// Electron-local bindings for payload shapes and a few deliberate renames:
+//   - `TokenKind` / `AgentState` stay UPPERCASE (renderer contracts)
+//   - `transcriptFinal.transcription` (canonical field is `segment`)
+//   - RAG keeps the `token` arm (not canonical `textDelta`) with UPPERCASE kind
+//   - download `progress` keeps the snapshot shape (not flattened bytes)
+//   - `SdkEvent` keeps Electron-only `memoryPressure` / `authFailed`
+//
+// One grammar throughout: `started`, then deltas, then exactly one terminal
+// `completed` / `failed` / `cancelled`. A stream never fabricates a successful
+// `completed` — a producer that dies mid-flight ends in `failed`, and a
+// generation commons stopped early ends in `cancelled`. The one case with no
+// terminal event is a consumer that abandons the iterator itself (`return()` /
+// breaking a `for await`), because nothing can be delivered after the caller
+// has said it is done reading.
+//
+// Every `failed` arm carries the generated `SDKError`, not the thrown
+// `SDKException`. `contextBridge` structured-clones what it publishes and a
+// class prototype does not survive that, so an exception instance reaches a
+// renderer as a bare `Error` with `code`/`category` gone. The proto message is
+// a plain object, so a page can branch on `error.code` exactly as main-process
+// code branches on `e.code`.
 
-/** One step of a streamed generation: started, then deltas, then completed. */
-export type GenerationEvent =
-  | { type: 'started'; requestId: string }
-  | { type: 'token'; text: string; kind: TokenKind }
-  | { type: 'toolCall'; toolCall: ToolCall }
-  | { type: 'completed'; result: GenerationResult };
+/** One step of a streamed generation (`llm`/`vlm` `generateStream`). */
+export type GenerationEvent = CanonicalGenerationEvent<
+  GenerationResult,
+  Partial<GenerationResult>,
+  ToolCall,
+  TokenUsage,
+  string
+>;
 
 /**
  * One step of a streamed transcription (`stt.openStream`, and the deprecated
  * `stt.transcribeStream` adapter over it).
+ *
+ * Canonical names the final segment `segment`; Electron keeps the public field
+ * `transcription` (Phase 1 decision #6). The optional canonical `usage` arm is
+ * omitted until a producer exists — adding it would break exhaustive consumer
+ * switches.
  */
 export type TranscriptionEvent =
-  | { type: 'started'; requestId: string }
-  | { type: 'speechStarted'; requestId: string; sequence: number; timestampMs?: number }
+  | Exclude<
+      CanonicalTranscriptionEvent<Transcription, string>,
+      { type: 'transcriptFinal' } | { type: 'usage' }
+    >
   | {
-      type: 'partial';
+      type: 'transcriptFinal';
       requestId: string;
       sequence: number;
-      segmentId: string;
-      revision: number;
-      alternatives: Array<{ text: string; confidence?: number }>;
-    }
-  | { type: 'transcriptFinal'; requestId: string; sequence: number; segment: Transcription }
-  | { type: 'speechEnded'; requestId: string; sequence: number; timestampMs?: number }
-  | { type: 'completed'; requestId: string }
-  | { type: 'failed'; requestId: string; error: SDKException }
-  | { type: 'cancelled'; requestId: string };
+      transcription: Transcription;
+    };
 
-/** One step of a voice conversation. */
+/**
+ * One step of a voice conversation.
+ *
+ * Canonical `AgentState` is lowercase; Electron keeps UPPERCASE values on the
+ * `agentStateChanged` arm (Phase 1 decision #3). Optional canonical fields
+ * (`requestId`, `speechId`, …) are accepted as additive.
+ */
 export type VoiceEvent =
-  | { type: 'userTranscribed'; text: string; isFinal: boolean }
-  | { type: 'agentStateChanged'; state: AgentState }
-  | { type: 'agentResponse'; text: string }
-  | { type: 'speechStarted' }
-  | { type: 'speechEnded' }
-  | { type: 'error'; message: string; recoverable: boolean };
+  | Exclude<CanonicalVoiceEvent, { type: 'agentStateChanged' }>
+  | { type: 'agentStateChanged'; state: AgentState };
 
-/** One step of a streamed grounded answer. */
+/**
+ * One step of a streamed grounded answer.
+ *
+ * Canonical uses `textDelta` + lowercase `TokenKind` and a `failed` arm.
+ * Electron's public surface still emits `token` with UPPERCASE `TokenKind`
+ * (and no mid-stream `failed` — errors go through `sink.fail`).
+ */
 export type RagEvent =
-  | { type: 'retrieved'; matches: Match[] }
-  | { type: 'token'; text: string; kind: TokenKind }
-  | { type: 'completed'; result: RagResult };
+  | Exclude<CanonicalRagEvent<Match, RagResult>, { type: 'textDelta' } | { type: 'failed' }>
+  | { type: 'token'; text: string; kind: TokenKind };
 
 /** One step of a streamed image generation. */
-export type ImageEvent =
-  | { type: 'started' }
-  | { type: 'progress'; step: number; totalSteps: number; partialImage?: ImageData }
-  | { type: 'completed'; result: ImageResult };
+export type ImageEvent = CanonicalImageEvent<ImageResult, ImageData>;
 
-/** One step of a model download. */
-export type DownloadEvent =
-  | { type: 'progress'; bytesDone: number; bytesTotal: number; percent: number }
-  | { type: 'extracting' }
-  | { type: 'completed'; model: ModelInfo };
-
-/** A lifecycle, model, or error breadcrumb from the SDK itself. */
-export type SdkEvent =
-  | { type: 'ready' }
-  | { type: 'modelLoaded'; id: string; category: ModelCategory; actualBackend?: InferenceFramework }
-  | { type: 'modelUnloaded'; id: string }
+/**
+ * What a download looks like to a caller at one instant.
+ *
+ * A model is hundreds of megabytes to several gigabytes, so a bare percentage
+ * cannot tell a slow transfer from a stalled one. Commons already measures
+ * throughput and projects a finish time (`download_orchestrator.cpp` sets
+ * `bytes_per_second` and `eta_seconds` on every `DownloadProgress`), and it
+ * counts retries and the position in a multi-file plan; all of it crossed the
+ * ABI and was dropped at this boundary until now. It is surfaced rather than
+ * re-derived because five SDKs each computing a rate from two successive UI
+ * samples would disagree with each other and with the transfer that knows its
+ * own history.
+ *
+ * Optional fields are absent when genuinely unknown rather than `0`, so a
+ * caller can omit a row instead of rendering "0 B/s" while the connection is
+ * still opening. Field-for-field the same shape as Swift's
+ * `DownloadProgressSnapshot`.
+ *
+ * The three derived values are plain properties rather than getters because a
+ * `contextBridge` structured clone drops accessors declared on a prototype;
+ * computing them once at emit time is what makes them readable in a renderer.
+ */
+export interface DownloadProgressSnapshot {
+  operationId: string;
+  sequence: number;
+  bytesDone: number;
+  /** 0 when the server never sent a length. */
+  bytesTotal: number;
+  /** Name of the file currently transferring, when the plan names one. */
+  file?: string;
+  /** Measured throughput. Absent until known — never a zero standing in for it. */
+  bytesPerSecond?: number;
+  /** Projected seconds remaining. Absent when the total size or the rate is unknown. */
+  etaSeconds?: number;
   /**
-   * A load asked for more memory than the machine reports free. Carries what
-   * the residency policy released trying to make room, and commons' reasons
-   * when it still does not fit — the load is attempted either way, because a
-   * registry row's memory figure is an estimate, not a measurement.
+   * 0 on the first attempt. Above 0 means the transfer recovered from a
+   * failure, which a UI should show rather than hide.
    */
+  retryAttempt: number;
+  /** 0-based position in the planned file list. */
+  currentFileIndex: number;
+  /** Files in the plan. 1 for a single-file model. */
+  totalFiles: number;
+  /**
+   * Fraction of the whole download that is done, 0..1, or absent when the size
+   * is unknown.
+   *
+   * Prefers commons' `overall_progress` over the byte ratio because a
+   * multi-file model's byte counts are per-file: the end of file one of three
+   * is 100% of those bytes but a third of the download, and a bar that fills
+   * and resets twice reads as a stall or a restart.
+   */
+  fraction?: number;
+  /** {@link fraction} as 0–100, or absent when the size is unknown. */
+  percent?: number;
+  /** True when the size is unknown, so a caller should show an indeterminate bar. */
+  isIndeterminate: boolean;
+}
+
+/**
+ * One step of a model download, correlated by `operationId`/`sequence`.
+ *
+ * Canonical flattens progress bytes onto the arm; Electron keeps a single
+ * `snapshot` payload (Phase 1 decision #6).
+ */
+export type DownloadEvent =
+  | Exclude<
+      CanonicalDownloadEvent<{ model: ModelInfo }, { snapshot: DownloadProgressSnapshot }>,
+      { type: 'progress' }
+    >
+  | { type: 'progress'; snapshot: DownloadProgressSnapshot };
+
+/**
+ * A lifecycle, model, or error breadcrumb from the SDK itself.
+ *
+ * Canonical `modelLoaded.category` is the proto numeric enum; Electron keeps
+ * the string {@link ModelCategory}. `memoryPressure` / `authFailed` are
+ * Electron-local arms not yet on the shared grammar.
+ */
+export type SdkEvent =
+  | Exclude<
+      CanonicalSdkEvent<InferenceFramework>,
+      { type: 'modelLoaded' } | { type: 'error' }
+    >
+  | { type: 'modelLoaded'; id: string; category: ModelCategory; actualBackend?: InferenceFramework }
   | {
       type: 'memoryPressure';
       id: string;
@@ -729,21 +894,11 @@ export type SdkEvent =
       evicted: string[];
       reasons: string[];
     }
-  /**
-   * The control plane did not authenticate. Local inference is unaffected; this
-   * is the breadcrumb an app needs to show "working offline" instead of
-   * pretending everything is fine. `offline` is worth retrying, `rejected` is not.
-   */
   | { type: 'authFailed'; status: 'offline' | 'rejected'; message: string }
   | { type: 'error'; message: string; recoverable: boolean };
 
 /** Speech-detection deltas over a chunk stream (`vad.openStream`, and `vad.detectStream` over it). */
-export type VadEvent =
-  | { type: 'speechStarted'; timestampMs?: number }
-  | { type: 'speechEnded'; timestampMs?: number }
-  | { type: 'activity'; isSpeech: boolean; probability: number; timestampMs?: number }
-  | { type: 'failed'; error: SDKException }
-  | { type: 'completed' };
+export type VadEvent = CanonicalVadEvent;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -755,6 +910,37 @@ let requestCounter = 0;
 export function newRequestId(prefix = 'req'): string {
   requestCounter += 1;
   return `${prefix}_${Date.now().toString(36)}_${requestCounter.toString(36)}`;
+}
+
+/**
+ * A thrown value as the generated `SDKError` every `failed` event arm carries.
+ *
+ * The event unions travel over `contextBridge`, which structured-clones them; a
+ * class instance arrives in the page with its prototype gone, so an
+ * `SDKException` on an event would lose `code`, `category`, and
+ * `recoverySuggestion` on the way. The proto message is a plain object, so it
+ * survives intact and a renderer reads the same fields main-process code reads.
+ *
+ * Every field round-trips, so an error commons authored comes out of a `failed`
+ * event byte-identical to the one it sent: `SDKException` already carries
+ * `component`, `retryable`, `requestId`, `severity`, and `timestampMs` from
+ * `fromProto`, and mints defaults for a failure the SDK raised itself.
+ */
+export function toProtoError(error: unknown): SDKError {
+  const failure = asSDKException(error);
+  return SDKError.fromPartial({
+    code: failure.code,
+    category: failure.category,
+    message: failure.message,
+    cAbiCode: failure.cAbiCode,
+    nestedMessage: failure.nestedMessage,
+    param: failure.fieldPath,
+    component: failure.component,
+    retryable: failure.retryable,
+    requestId: failure.requestId,
+    severity: failure.severity,
+    timestampMs: failure.timestampMs,
+  });
 }
 
 /** Reject an input that carries none of its accepted payload shapes. */

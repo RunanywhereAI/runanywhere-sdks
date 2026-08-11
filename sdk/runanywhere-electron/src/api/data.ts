@@ -22,7 +22,7 @@ import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
 import { DataAbi, toEmbeddingsRequest, toRerankRequest } from './data-abi';
 import { RAC_CATEGORY, RAC_FRAMEWORK } from './native-backend';
-import { RAG_DEFAULTS, toNativeEmbedOptions } from './options';
+import { optionDefaults } from './options';
 import type { EmbedOptions, LlmOptions, RagConfig } from './options';
 import { ModelCategory, TokenKind, newRequestId } from './types';
 import type {
@@ -281,26 +281,35 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
         deps.hub.emit({ type: 'modelLoaded', id: llmId, category: ModelCategory.LANGUAGE });
       }
 
+      // `RAGConfiguration`'s own `rac_default`s (top_k 5, chunk 512/64) fill
+      // whatever the caller left unset — every one is a plain scalar, so proto3
+      // would otherwise send 0 and mean "retrieve nothing, chunk at zero bytes".
+      const ragDefaults = optionDefaults.rag();
       const configBytes = RAGConfiguration.encode(
         RAGConfiguration.fromPartial({
+          ...ragDefaults,
           embeddingModelId: embeddingId,
           llmModelId: llmId,
-          topK: config.topK ?? RAG_DEFAULTS.topK,
-          chunkSize: config.chunkSize ?? RAG_DEFAULTS.chunkSize,
-          chunkOverlap: config.chunkOverlap ?? RAG_DEFAULTS.chunkOverlap,
-          scoreThreshold: config.similarityThreshold,
+          topK: config.topK ?? ragDefaults.topK,
+          chunkSize: config.chunkSize ?? ragDefaults.chunkSize,
+          chunkOverlap: config.chunkOverlap ?? ragDefaults.chunkOverlap,
+          scoreThreshold: config.similarityThreshold ?? ragDefaults.scoreThreshold,
         })
       ).finish();
 
       const handle = await deps.backend.ragOpen(configBytes);
-      const defaultTopK = config.topK ?? RAG_DEFAULTS.topK;
+      const defaultTopK = config.topK ?? ragDefaults.topK;
       let closed = false;
 
       const assertOpen = (): void => {
         if (closed) throw SDKException.invalidState('RagSession is closed');
       };
 
-      const queryBytes = (question: string, options: LlmOptions, topK: number) =>
+      // `topK` stays optional all the way down: the generated defaults set it,
+      // but the proto field is optional, and an absent field is the signal for
+      // commons to apply its own `rac_default` rather than for the SDK to
+      // restate the IDL literal here.
+      const queryBytes = (question: string, options: LlmOptions, topK: number | undefined) =>
         RAGQueryOptions.encode(
           RAGQueryOptions.fromPartial({
             query: question,

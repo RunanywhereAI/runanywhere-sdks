@@ -11,7 +11,7 @@
 // this one is handle-bound; `NativeBackend` holds it and hands out an opaque
 // session id, the same shape RAG uses.
 
-import { SDKException } from '../errors';
+import { ErrorCode, SDKException } from '../errors';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
@@ -25,19 +25,24 @@ import {
 import {
   PipelineState,
   TokenKind as ProtoTokenKind,
+  TurnLifecycleEventKind,
   VoiceAgentComponentStates,
   VoiceEvent as ProtoVoiceEvent,
 } from '@runanywhere/proto-ts/voice_events';
 import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
-import { TURN_DEFAULTS, VAD_DEFAULTS } from './options';
+import { TURN_DEFAULTS, optionDefaults } from './options';
 import type { LlmOptions, TurnHandlingOptions, VadOptions } from './options';
 import { AgentState } from './types';
 import type { VoiceEvent } from './types';
 
-/** The rate the voice agent's in-core segmenter expects (`voice_agent_feed_abi.cpp:48`). */
-export const VOICE_SAMPLE_RATE = 16000;
+/**
+ * The rate the voice agent's in-core segmenter expects
+ * (`voice_agent_feed_abi.cpp:48`), which is also
+ * `AudioCaptureDefaults.mic_sample_rate_hz`.
+ */
+export const VOICE_SAMPLE_RATE = optionDefaults.micSampleRateHz;
 
 /**
  * Build the compose config commons initializes an agent from.
@@ -108,7 +113,9 @@ function toTurnDetection(
       turnHandling?.endpointing?.minDelayMs ??
       vad?.minSilenceMs ??
       TURN_DEFAULTS.endpointing.minDelayMs,
-    prefixPaddingMs: vad?.prefixPaddingMs ?? VAD_DEFAULTS.prefixPaddingMs,
+    // `VADOptions.prefix_padding_ms`'s own `rac_default` (300 ms), so a turn
+    // keeps the pre-roll its first phoneme lives in. Sending 0 clipped it.
+    prefixPaddingMs: vad?.prefixPaddingMs ?? optionDefaults.vad().prefixPaddingMs,
     interruptResponse: turnHandling?.interruption?.enabled,
   });
 }
@@ -151,17 +158,51 @@ export function toPublicVoiceEvent(event: ProtoVoiceEvent): VoiceEvent | null {
     return event.vad.isSpeech ? { type: 'speechStarted' } : { type: 'speechEnded' };
   }
   if (event.sessionError) {
+    // "I am listening and hearing nothing" is not a failure. Commons already
+    // distinguishes it on the wire; folding it into the generic `error` arm is
+    // what made a healthy session look broken and an unheard user look ignored.
+    if (event.sessionError.code === ErrorCode.ERROR_CODE_INSUFFICIENT_AUDIO_DATA) {
+      return { type: 'inputSilent', detail: event.sessionError.message };
+    }
     return {
       type: 'error',
       message: event.sessionError.message,
       recoverable: event.sessionError.recoverable,
     };
   }
+  if (event.turnLifecycle) {
+    return fromTurnLifecycle(event.turnLifecycle.kind);
+  }
   if (event.state) {
     const state = toAgentState(event.state.current);
     return state ? { type: 'agentStateChanged', state } : null;
   }
   return null;
+}
+
+/**
+ * The turn-lifecycle arm carries the only *in-flight* speech signals commons
+ * emits: the in-feed segmenter reports the moment its energy gate opens
+ * (`voice_agent_feed_abi.cpp` -> USER_SPEECH_STARTED) while the user is still
+ * talking. The `vad` arm above fires once, after the utterance has already
+ * closed, and only when a VAD model answered — with none resident it never
+ * arrives at all. Reading only that arm is what made `speechStarted` late or
+ * absent. Swift and Kotlin both map these.
+ */
+function fromTurnLifecycle(kind: TurnLifecycleEventKind): VoiceEvent | null {
+  switch (kind) {
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED:
+      return { type: 'speechStarted' };
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED:
+      return { type: 'speechEnded' };
+    case TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED:
+      return { type: 'agentStateChanged', state: AgentState.SPEAKING };
+    default:
+      // Every other kind (started, transcription-final, response-completed,
+      // completed, cancelled, failed) is either already reported through a
+      // richer arm or has no home in the public union.
+      return null;
+  }
 }
 
 /**
