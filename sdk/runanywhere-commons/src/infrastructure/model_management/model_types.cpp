@@ -21,16 +21,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
-namespace {
-
-bool ends_with(const std::string& value, const char* suffix) {
-    const size_t suffix_length = std::strlen(suffix);
-    return value.size() >= suffix_length &&
-           value.compare(value.size() - suffix_length, suffix_length, suffix) == 0;
-}
-
-}  // namespace
-
 // =============================================================================
 // ARCHIVE TYPE FUNCTIONS
 // =============================================================================
@@ -60,25 +50,24 @@ rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_type_t* 
     if (suffix_noise != std::string::npos) {
         path.erase(suffix_noise);
     }
-    std::ranges::transform(path, path.begin(),
-                           [](unsigned char character) {
-                               return static_cast<char>(std::tolower(character));
-                           });
+    std::ranges::transform(path, path.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
 
     // Check suffixes (mirrors Swift's ArchiveType.from(url:))
-    if (ends_with(path, ".tar.bz2") || ends_with(path, ".tbz2")) {
+    if (path.ends_with(".tar.bz2") || path.ends_with(".tbz2")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
         return RAC_TRUE;
     }
-    if (ends_with(path, ".tar.gz") || ends_with(path, ".tgz")) {
+    if (path.ends_with(".tar.gz") || path.ends_with(".tgz")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
         return RAC_TRUE;
     }
-    if (ends_with(path, ".tar.xz") || ends_with(path, ".txz")) {
+    if (path.ends_with(".tar.xz") || path.ends_with(".txz")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
         return RAC_TRUE;
     }
-    if (ends_with(path, ".zip")) {
+    if (path.ends_with(".zip")) {
         *out_type = RAC_ARCHIVE_TYPE_ZIP;
         return RAC_TRUE;
     }
