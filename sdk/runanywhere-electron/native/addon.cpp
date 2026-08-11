@@ -39,6 +39,7 @@
 #include "tool_bridge.h"
 #include "data_bridge.h"
 #include "download_bridge.h"
+#include "logging_bridge.h"
 #include "lora_bridge.h"
 #include "speech_bridge.h"
 #include "voice_bridge.h"
@@ -65,6 +66,7 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -292,6 +294,13 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 #else
         rac_electron_fill_posix_adapter(&g_adapter, secure.c_str());
 #endif
+        // The adapter's own `log` writes straight to stderr. Commons routes every
+        // record through this slot, so replacing it here is what gives the
+        // `logging` namespace something to subscribe to — and what puts the
+        // stderr write itself behind `logging.setLocalEnabled`. The adapter files
+        // stay untouched because the M0 harness links them without this bridge.
+        g_adapter.log = [](rac_log_level_t level, const char* category, const char* message,
+                           void*) { rac_electron::ForwardLog(level, category, message); };
 
         rac_config_t cfg;
         std::memset(&cfg, 0, sizeof(cfg));
@@ -380,6 +389,37 @@ Napi::Value MemoryInfo(const Napi::CallbackInfo& info) {
     out.Set("availableBytes", Napi::Number::New(env, static_cast<double>(mem.available_bytes)));
     out.Set("usedBytes", Napi::Number::New(env, static_cast<double>(mem.used_bytes)));
     return out;
+}
+
+// hfTokenSet(token) — the process-wide Hugging Face bearer. Commons attaches it
+// as `Authorization: Bearer` to https requests whose host is exactly
+// huggingface.co / hf.co (downloads, the HEAD size preflight, and the Hub tree
+// API), never to a CDN/LFS redirect target and never over a caller-supplied
+// Authorization header. Without it a gated or private repo 401s.
+//
+// null restores the environment fallback commons resolves for itself (HF_TOKEN,
+// then $HF_TOKEN_PATH, then $HF_HOME/token, then ~/.cache/huggingface/token);
+// an empty string is an explicit opt-out that suppresses that fallback too.
+// Synchronous: the C entry point is a mutex and a string copy.
+Napi::Value HfTokenSet(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || info[0].IsNull() || info[0].IsUndefined()) {
+        rac_http_hf_token_set(nullptr);
+        return env.Undefined();
+    }
+    if (!info[0].IsString()) {
+        throw Napi::TypeError::New(env, "hfTokenSet(token) expects a string or null");
+    }
+    const std::string token = info[0].As<Napi::String>().Utf8Value();
+    rac_http_hf_token_set(token.c_str());
+    return env.Undefined();
+}
+
+// hfTokenConfigured() — whether a non-empty token is active, resolved exactly
+// the way the request dispatcher resolves it. The token itself is deliberately
+// unreadable across this boundary, so this is the only thing a caller can ask.
+Napi::Value HfTokenConfigured(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), rac_http_hf_token_is_configured() == RAC_TRUE);
 }
 
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
@@ -2427,6 +2467,9 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             // anything else: commons must not hold a pointer into this addon once
             // the runtime starts tearing down.
             rac_electron::ShutdownDownloadBridge();
+            // Same reason: commons keeps calling the adapter's log slot right
+            // through rac_shutdown(), so the JS subscriber has to go first.
+            rac_electron::ShutdownLoggingBridge();
             // Destroy every still-loaded component and clear the handle maps so no id
             // outlives the runtime — a later unload/use can't touch freed native
             // state, and a re-init starts from a clean slate.
@@ -3672,6 +3715,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     rac_electron::RegisterDataBridge(env, exports);
     rac_electron::RegisterDownloadBridge(env, exports);
     rac_electron::RegisterLoraBridge(env, exports);
+    rac_electron::RegisterLoggingBridge(env, exports);
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("memoryInfo", Napi::Function::New(env, MemoryInfo));
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
@@ -3688,6 +3732,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 #else
     exports.Set("hasControlPlane", Napi::Boolean::New(env, false));
 #endif
+    exports.Set("hfTokenSet", Napi::Function::New(env, HfTokenSet));
+    exports.Set("hfTokenConfigured", Napi::Function::New(env, HfTokenConfigured));
     exports.Set("secureSet", Napi::Function::New(env, SecureSet));
     exports.Set("secureGet", Napi::Function::New(env, SecureGet));
     exports.Set("secureDelete", Napi::Function::New(env, SecureDelete));

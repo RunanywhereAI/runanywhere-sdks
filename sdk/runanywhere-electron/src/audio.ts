@@ -12,7 +12,16 @@
 // The STT model wants 16 kHz mono PCM16 bytes; the TTS model returns float32 at
 // its own sample rate. These helpers bridge to/from those formats.
 
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+
 import { SDKException } from './errors';
+
+/**
+ * `AudioCaptureDefaults.mic_sample_rate_hz` from `idl/sdk_defaults.proto` — the
+ * rate every speech path in this SDK normalizes to, and what a WAV whose header
+ * does not say is assumed to be.
+ */
+const CAPTURE_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 /** Clamp+scale float32 samples in [-1,1] to signed 16-bit PCM. */
 export function float32ToPcm16(input: Float32Array): Int16Array {
@@ -118,7 +127,7 @@ export function decodeWav(bytes: Uint8Array): { sampleRate: number; samples: Flo
     throw new Error('decodeWav: not a RIFF/WAVE file');
   }
   let channels = 1;
-  let sampleRate = 16000;
+  let sampleRate = CAPTURE_SAMPLE_RATE;
   let bits = 16;
   let dataOffset = -1;
   let dataLen = 0;
@@ -129,7 +138,7 @@ export function decodeWav(bytes: Uint8Array): { sampleRate: number; samples: Flo
     const body = p + 8;
     if (id === 'fmt ') {
       channels = view.getUint16(body + 2, true) || 1;
-      sampleRate = view.getUint32(body + 4, true) || 16000;
+      sampleRate = view.getUint32(body + 4, true) || CAPTURE_SAMPLE_RATE;
       bits = view.getUint16(body + 14, true) || 16;
     } else if (id === 'data') {
       dataOffset = body;
@@ -172,7 +181,7 @@ function getAudioContextCtor(): AudioCtor {
 }
 
 export interface MicRecorderOptions {
-  /** Target rate for the captured PCM16 (default 16000, what STT wants). */
+  /** Target rate for the captured PCM16; defaults to the IDL capture rate, which is what STT wants. */
   targetSampleRate?: number;
 }
 
@@ -189,7 +198,7 @@ export class MicRecorder {
   private readonly targetRate: number;
 
   constructor(opts: MicRecorderOptions = {}) {
-    this.targetRate = opts.targetSampleRate ?? 16000;
+    this.targetRate = opts.targetSampleRate ?? CAPTURE_SAMPLE_RATE;
   }
 
   /** Open the mic and begin buffering audio. */

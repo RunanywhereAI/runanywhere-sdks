@@ -14,16 +14,40 @@ From `sdk/runanywhere-electron`:
 
 ```bash
 npm install
-npm run build          # TypeScript -> dist/
-npm run bundle:native  # copy the built .node + DLLs into prebuilds/
+npm run build          # src/ -> dist/
+npm run typecheck      # every project: src/, test/, scripts/, native/
+npm run bundle:native  # copy the built .node (+ sidecars) into prebuilds/
 npm test               # unit tests (hermetic, no native addon needed)
 ```
 
-Integration tests need the addon and downloaded models:
+Everything in this package is TypeScript — the tests and the build scripts
+included — so each lives in its own tsc project with its own out-dir:
+
+| Project | Sources | Output |
+|---|---|---|
+| `tsconfig.json` | `src/` | `dist/` (the published package) |
+| `tsconfig.test.json` | `test/` | `dist-test/` |
+| `tsconfig.scripts.json` | `scripts/` | `dist-scripts/` |
+| `tsconfig.native.json` | `native/test_*.ts` | `dist-native/` |
+
+`npm test` runs `node --test` over `dist-test/unit`, and its `pretest` builds both
+`dist/` and `dist-test/` first. `tsconfig.test.json` sets `rootDir: "test"` so a
+compiled `dist-test/unit/x.test.js` still resolves `../../dist` — do not change it
+to `"."`.
+
+Feature tests need the addon, and most of them a downloaded model. Without either
+they skip rather than fail:
 
 ```powershell
 $env:RUNANYWHERE_NATIVE_PATH = '<path>/runanywhere_native.node'
-npm run test:integration
+npm run test:feature
+```
+
+The manual scripts are compiled the same way:
+
+```bash
+npm run build:scripts       # then: node dist-scripts/manual-resolve.js
+npm run build:native-smoke  # then: node dist-native/test_addon.js <.node> <model.gguf>
 ```
 
 See `native/CMakeLists.txt` and the commons build docs for compiling the native addon against `runanywhere-commons`.

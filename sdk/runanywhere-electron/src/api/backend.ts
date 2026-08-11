@@ -141,6 +141,19 @@ export interface NativeSegmentation {
   diagnosticRgba?: Uint8Array;
 }
 
+/**
+ * One log record as the addon reports it. `level` is a `rac_log_level_t`
+ * ordinal, which the IDL's `LogLevel` mirrors exactly ("0 is TRACE, not
+ * UNSPECIFIED, to keep numeric parity with the C enum"), so no translation
+ * table stands between this and the generated enum.
+ */
+export interface NativeLogRecord {
+  level: number;
+  category: string;
+  message: string;
+  timestampUnixMs: number;
+}
+
 /** An applied LoRA adapter as the addon reports it. */
 export interface NativeLoraEntry {
   id: string;
@@ -227,6 +240,15 @@ export interface RaBackend {
   /** Send whatever telemetry is queued instead of waiting for the periodic flush. */
   telemetryFlush(): Promise<void>;
 
+  // ---- hugging face auth ----
+  /**
+   * Set the bearer both transfer paths authenticate HuggingFace with: commons'
+   * dispatcher (downloads, HEAD preflight, the Hub tree API) and this process's
+   * Node-side repo resolver. `null` restores the environment fallback; an empty
+   * string is an explicit opt-out that suppresses it.
+   */
+  hfTokenSet(token: string | null): Promise<void>;
+
   // ---- model store ----
   resolveModel(source: string, onProgress?: (p: DownloadProgress) => void): Promise<ResolvedModel>;
   modelStatus(): Promise<Record<string, { downloaded: boolean; sizeBytes: number }>>;
@@ -255,6 +277,14 @@ export interface RaBackend {
   storageDeletePlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageDeleteProto(requestBytes: Uint8Array): Promise<Uint8Array>;
 
+  // ---- the SDK's own cache and temp directories (commons file manager) ----
+  //
+  // Not the analyzer: it plans and executes deletion of MODEL bytes. These two
+  // clear {baseDir}/RunAnywhere/Cache and .../Temp, whose paths commons resolves
+  // and whose delete-then-recreate semantics it owns.
+  clearCache(): Promise<void>;
+  clearTemp(): Promise<void>;
+
   /** Load `source` into `slot`, downloading first when it is not on disk. */
   ensure(slot: LoadSlot, source: string, options?: BackendLoadOptions): Promise<LoadedModel>;
   /** What occupies `slot`, or null. */
@@ -272,7 +302,18 @@ export interface RaBackend {
   // ---- lora over the lifecycle proto ABI ----
   loraApplyProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   loraRemoveProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraListProto(stateBytes: Uint8Array): Promise<Uint8Array>;
   loraStateProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraCompatibilityProto(configBytes: Uint8Array): Promise<Uint8Array>;
+
+  // ---- lora catalog over the process-wide LoRA registry ----
+  //
+  // Registry-bound rather than lifecycle-bound: an adapter can be catalogued
+  // before any base model is loaded, and stays catalogued after it is unloaded.
+  loraRegisterProto(entryBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogListProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogQueryProto(queryBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogGetProto(requestBytes: Uint8Array): Promise<Uint8Array>;
 
   loraApply(adapterPath: string, scale: number): Promise<void>;
   loraRemove(adapterPath?: string): Promise<void>;
@@ -396,8 +437,12 @@ export interface RaBackend {
   modelRegistryRemove(modelId: string): Promise<Uint8Array>;
   modelRegistryRefresh(requestBytes: Uint8Array): Promise<Uint8Array>;
   modelRegistryDiscover(requestBytes: Uint8Array): Promise<Uint8Array>;
+  /** ModelImportRequest bytes in, ModelImportResult bytes out. */
+  modelRegistryImport(requestBytes: Uint8Array): Promise<Uint8Array>;
   /** ModelCompatibilityRequest bytes in, ModelCompatibilityResult bytes out. */
   modelCompatibility(requestBytes: Uint8Array): Promise<Uint8Array>;
+  /** A numeric SDKComponent in, ComponentLifecycleSnapshot bytes out. */
+  modelComponentSnapshot(component: number): Promise<Uint8Array>;
   modelRegisterFromUrl(requestBytes: Uint8Array): Promise<Uint8Array>;
   modelRegisterMultiFile(requestBytes: Uint8Array): Promise<Uint8Array>;
 
@@ -445,6 +490,18 @@ export interface RaBackend {
   secureSet(key: string, value: string): Promise<void>;
   secureGet(key: string): Promise<string | null>;
   secureDelete(key: string): Promise<void>;
+
+  // ---- logging (commons' own logger, plus one record subscription) ----
+  //
+  // `loggingWatch` is shaped like `downloadWatch`: commons routes every record
+  // through a single process-wide callback, so the subscription opens once and
+  // its promise resolves when `loggingUnwatch` closes it.
+  loggingSetLevel(level: number): Promise<void>;
+  loggingLevel(): Promise<number>;
+  loggingSetLocalEnabled(enabled: boolean): Promise<void>;
+  loggingFlush(): Promise<void>;
+  loggingWatch(onRecord: (record: NativeLogRecord) => void): Promise<void>;
+  loggingUnwatch(): Promise<void>;
 }
 
 /**
@@ -465,6 +522,7 @@ export const BACKEND_STREAMING_METHODS: ReadonlySet<string> = new Set([
   'voiceProcessTurn',
   'ragQueryStream',
   'downloadWatch',
+  'loggingWatch',
 ]);
 
 /** Every backend operation name, used to build the RPC allowlist. */
@@ -480,6 +538,7 @@ export const BACKEND_METHODS: readonly string[] = [
   'authState',
   'clearAuth',
   'telemetryFlush',
+  'hfTokenSet',
   'resolveModel',
   'modelStatus',
   'pathExists',
@@ -497,6 +556,8 @@ export const BACKEND_METHODS: readonly string[] = [
   'storageAvailabilityProto',
   'storageDeletePlanProto',
   'storageDeleteProto',
+  'clearCache',
+  'clearTemp',
   'ensure',
   'loaded',
   'unload',
@@ -512,7 +573,9 @@ export const BACKEND_METHODS: readonly string[] = [
   'modelRegistryRemove',
   'modelRegistryRefresh',
   'modelRegistryDiscover',
+  'modelRegistryImport',
   'modelCompatibility',
+  'modelComponentSnapshot',
   'modelRegisterFromUrl',
   'modelRegisterMultiFile',
   'llmGenerate',
@@ -530,7 +593,13 @@ export const BACKEND_METHODS: readonly string[] = [
   'loraList',
   'loraApplyProto',
   'loraRemoveProto',
+  'loraListProto',
   'loraStateProto',
+  'loraCompatibilityProto',
+  'loraRegisterProto',
+  'loraCatalogListProto',
+  'loraCatalogQueryProto',
+  'loraCatalogGetProto',
   'vlmGenerateProto',
   'vlmStreamProto',
   'vlmCancelProto',
@@ -587,6 +656,12 @@ export const BACKEND_METHODS: readonly string[] = [
   'secureSet',
   'secureGet',
   'secureDelete',
+  'loggingSetLevel',
+  'loggingLevel',
+  'loggingSetLocalEnabled',
+  'loggingFlush',
+  'loggingWatch',
+  'loggingUnwatch',
 ];
 
 /** RPC method name for a backend operation (namespaced so it cannot collide). */

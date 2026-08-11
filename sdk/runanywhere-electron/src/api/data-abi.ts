@@ -25,6 +25,7 @@ import {
 } from '@runanywhere/proto-ts/segmentation';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
+import { SEGMENTATION_DEFAULTS, optionDefaults } from './options';
 import type { DiarizationOptions, EmbedOptions, SegmentationOptions } from './options';
 import { NormalizeMode, PoolingMode, newRequestId } from './types';
 
@@ -39,23 +40,23 @@ const POOLING_TO_PROTO: Record<PoolingMode, EmbeddingsPoolingStrategy> = {
  *
  * `normalize` is the field that used to be lost: the public option existed and
  * the component ABI had nowhere to put it, so L2 and NONE produced the same
- * vectors. Here it is explicit presence, so unset still means commons' default.
+ * vectors. It is OPTIONAL on the wire, so unset is left absent and commons
+ * applies its own `rac_default`; the plain scalars come from
+ * `embeddingsOptionsDefaults()` rather than being typed out here.
  */
 export function toEmbeddingsRequest(
   texts: string[],
   options: EmbedOptions,
   requestId = newRequestId('embed')
 ): EmbeddingsRequest {
+  const defaults = optionDefaults.embed();
   return EmbeddingsRequest.fromPartial({
     requestId,
     texts,
     options: {
+      ...defaults,
       normalize: options.normalize ? options.normalize === NormalizeMode.L2 : undefined,
-      pooling: options.pooling
-        ? POOLING_TO_PROTO[options.pooling]
-        : EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED,
-      nThreads: 0,
-      inputType: EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED,
+      pooling: options.pooling ? POOLING_TO_PROTO[options.pooling] : defaults.pooling,
     },
   });
 }
@@ -82,15 +83,18 @@ export function toDiarizationRequest(
   options: DiarizationOptions,
   sampleRate: number
 ): DiarizationRequest {
+  const defaults = optionDefaults.diarization();
   return DiarizationRequest.fromPartial({
     audioData: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
     options: {
+      ...defaults,
       sampleRate,
       channels: 1,
       encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
+      // Optional on the wire: unset lets commons pick the model's own bar.
       threshold: options.threshold,
-      minimumDurationMs: options.minimumDurationMs ?? 0,
-      mergeGapMs: options.mergeGapMs ?? 0,
+      minimumDurationMs: options.minimumDurationMs ?? defaults.minimumDurationMs,
+      mergeGapMs: options.mergeGapMs ?? defaults.mergeGapMs,
     },
   });
 }
@@ -109,7 +113,10 @@ export function toSegmentationRequest(
       pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGB8,
     },
     options: {
-      includeDiagnosticRgba: options.includeDiagnosticImage ?? false,
+      // `SegmentationOptions` carries no `rac_default` annotations, so the
+      // proto3 zero value IS the default; SEGMENTATION_DEFAULTS names it once.
+      includeDiagnosticRgba:
+        options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
       includeConfidence: false,
     },
   });

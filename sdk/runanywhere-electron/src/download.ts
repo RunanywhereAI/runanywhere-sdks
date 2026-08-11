@@ -23,6 +23,7 @@ import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 
+import { huggingFaceBearer } from './api/hf';
 import { catalogEntries, catalogEntry, isCatalogId, ModelType } from './catalog';
 import { ErrorCode, SDKException } from './errors';
 
@@ -139,7 +140,7 @@ export function assertEnoughSpace(bytesNeeded: number, dir: string): void {
   if (free < bytesNeeded + MARGIN) {
     const gb = (v: number): string => (v / 1e9).toFixed(1) + ' GB';
     throw SDKException.of(
-      ErrorCode.STORAGE_ERROR,
+      ErrorCode.ERROR_CODE_STORAGE_ERROR,
       `not enough disk space: need ${gb(bytesNeeded)} (plus headroom) but only ${gb(free)} is free on ${probe}`
     );
   }
@@ -181,7 +182,7 @@ export function downloadFile(
         if (got.toLowerCase() !== (opts.sha256 as string).toLowerCase()) {
           try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
           reject(SDKException.of(
-            ErrorCode.STORAGE_ERROR,
+            ErrorCode.ERROR_CODE_STORAGE_ERROR,
             `checksum mismatch for ${path.basename(dest)}: expected ${opts.sha256}, got ${got}`
           ));
           return;
@@ -199,6 +200,11 @@ export function downloadFile(
       }
       const lib = new URL(u).protocol === 'http:' ? http : https;
       const headers: Record<string, string> = { 'User-Agent': 'runanywhere-electron' };
+      // Re-evaluated on every hop: a gated repo's file URL redirects to an LFS
+      // CDN host, and the bearer must follow the huggingface.co leg only. Never
+      // the redirect target — see api/hf.ts.
+      const bearer = huggingFaceBearer(u);
+      if (bearer) headers.Authorization = bearer;
       if (startAt > 0) headers.Range = `bytes=${startAt}-`;
       const req = lib.get(u, { headers }, (res) => {
         const code = res.statusCode ?? 0;
@@ -401,7 +407,15 @@ function httpText(url: string): Promise<{ headers: http.IncomingHttpHeaders; bod
     const get = (u: string, redirects = 0): void => {
       if (redirects > 6) return reject(new Error('too many redirects: ' + u));
       const lib = new URL(u).protocol === 'http:' ? http : https;
-      const req = lib.get(u, { headers: { 'User-Agent': 'runanywhere-electron', Accept: 'application/json' } }, (res) => {
+      // The Hub tree API is itself gated for a private repo, so the listing that
+      // decides WHICH files to fetch needs the same bearer the fetch does.
+      const bearer = huggingFaceBearer(u);
+      const headers: Record<string, string> = {
+        'User-Agent': 'runanywhere-electron',
+        Accept: 'application/json',
+        ...(bearer ? { Authorization: bearer } : {}),
+      };
+      const req = lib.get(u, { headers }, (res) => {
         const code = res.statusCode ?? 0;
         if (code >= 300 && code < 400 && res.headers.location) {
           res.resume();

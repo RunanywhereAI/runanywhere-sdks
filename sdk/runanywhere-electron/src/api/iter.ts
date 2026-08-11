@@ -1,11 +1,18 @@
 // iter.ts — AsyncIterable plumbing for the streaming verbs.
 //
-// Every stream the SDK returns must be *bridge safe*: Electron's contextBridge
-// cannot clone a generator object, so an iterator has to be a plain object whose
-// `Symbol.asyncIterator` returns `this` and whose `next()` resolves a plain
-// `{ value, done }`. `bridgeStream` is the only constructor used for public
-// streams, which is why the main-process and renderer surfaces can share one
-// implementation.
+// Every stream the SDK returns must be *bridge safe*. `contextBridge` walks an
+// exposed value's OWN properties and rebuilds it in the page; a generator object
+// cannot survive that at all, and neither can a class instance — its `next` and
+// its `[Symbol.asyncIterator]` live on the prototype, which is not walked, so
+// what arrives in the renderer is an object with no methods and no iterability.
+// `for await (… of stream)` then fails on a value that worked perfectly in the
+// main process.
+//
+// {@link bridgeIterator} is the single answer: one plain object literal carrying
+// `next`, `return`, `throw`, and `Symbol.asyncIterator` as its own properties.
+// Everything public goes through it — {@link bridgeStream} for pull-style
+// producers, {@link AsyncQueue.stream} for push-style ones — which is why the
+// main-process and renderer surfaces can share one implementation.
 
 import { asSDKException } from '../errors';
 
@@ -14,6 +21,30 @@ export interface StreamSink<T> {
   push(value: T): void;
   end(): void;
   fail(error: unknown): void;
+}
+
+/**
+ * The one iterator shape that survives `contextBridge`.
+ *
+ * `Symbol.asyncIterator` is installed on the returned literal rather than
+ * inherited, and it closes over `iterator` instead of returning `this` — a
+ * bridged copy is a different object, and `this` inside it would be that copy
+ * rather than the one holding the queue.
+ */
+function bridgeIterator<T>(
+  next: () => Promise<IteratorResult<T>>,
+  finish: () => Promise<IteratorResult<T>>
+): AsyncIterableIterator<T> {
+  const iterator: AsyncIterableIterator<T> = {
+    [Symbol.asyncIterator]: () => iterator,
+    next,
+    return: finish,
+    async throw(error?: unknown): Promise<IteratorResult<T>> {
+      await finish();
+      throw asSDKException(error);
+    },
+  };
+  return iterator;
 }
 
 /**
@@ -75,6 +106,14 @@ export function bridgeStream<T>(
     if (!cancelled) {
       cancelled = true;
       queue.length = 0;
+      // Wake a `next()` that is parked waiting for an item, so it returns
+      // `{done:true}` instead of hanging forever. `return()` is not always
+      // called from inside the consumer's own loop: `for await` cannot reach a
+      // page (contextBridge drops `Symbol.asyncIterator`), so a renderer drives
+      // `next()` in one place and cancels from another — a Stop button, an
+      // unmount, an unsubscribe. Without this signal that cancel strands the
+      // reader on a promise nothing will ever resolve.
+      signal();
       try {
         await onCancel?.();
       } catch {
@@ -84,31 +123,21 @@ export function bridgeStream<T>(
     return { value: undefined as unknown as T, done: true };
   };
 
-  return {
-    [Symbol.asyncIterator]() {
-      return this;
-    },
-    async next(): Promise<IteratorResult<T>> {
-      start();
-      for (;;) {
-        if (queue.length) return { value: queue.shift() as T, done: false };
-        if (failure) {
-          const error = failure;
-          failure = null;
-          throw asSDKException(error);
-        }
-        if (done || cancelled) return { value: undefined as unknown as T, done: true };
-        await new Promise<void>((resolve) => {
-          wake = resolve;
-        });
+  return bridgeIterator<T>(async (): Promise<IteratorResult<T>> => {
+    start();
+    for (;;) {
+      if (queue.length) return { value: queue.shift() as T, done: false };
+      if (failure) {
+        const error = failure;
+        failure = null;
+        throw asSDKException(error);
       }
-    },
-    return: finish,
-    async throw(error?: unknown): Promise<IteratorResult<T>> {
-      await finish();
-      throw asSDKException(error);
-    },
-  };
+      if (done || cancelled) return { value: undefined as unknown as T, done: true };
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+      });
+    }
+  }, finish);
 }
 
 /** Wrap a ready array as a bridge-safe stream (used for synthetic events). */
@@ -140,6 +169,14 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
   private ended = false;
   private failure: unknown = null;
 
+  /**
+   * An own property, not a prototype method: a queue handed straight to
+   * `contextBridge` would otherwise arrive in the page without iterability.
+   * Public streams still cross as {@link stream}'s plain object — this only
+   * keeps the class itself honest when it is iterated directly.
+   */
+  readonly [Symbol.asyncIterator] = (): AsyncIterableIterator<T> => this.stream();
+
   /** Enqueue one item. A no-op once the queue has ended. */
   push(value: T): void {
     if (this.ended) return;
@@ -168,9 +205,15 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
     if (wake) wake();
   }
 
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return {
-      next: async (): Promise<IteratorResult<T>> => {
+  /**
+   * A bridge-safe view of this queue, and the shape `SttStream.events` /
+   * `VadStream.events` publish. Iterating it drains the same buffer, so two
+   * views compete for items rather than each seeing every one — a queue has one
+   * consumer by construction.
+   */
+  stream(): AsyncIterableIterator<T> {
+    return bridgeIterator<T>(
+      async (): Promise<IteratorResult<T>> => {
         for (;;) {
           if (this.buffer.length) return { value: this.buffer.shift() as T, done: false };
           if (this.failure) {
@@ -184,6 +227,10 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
           });
         }
       },
-    };
+      // Walking away from the loop stops delivery but does not end the queue:
+      // the producer is outside it and may still be pushing, and `complete()` /
+      // `fail()` are what say the session is over.
+      async (): Promise<IteratorResult<T>> => ({ value: undefined as unknown as T, done: true })
+    );
   }
 }

@@ -11,6 +11,71 @@ this file.
   mirror each other (handle maps, leases, secure store, streaming).
 - Swift remains the cross-SDK product-semantics reference when behavior is ambiguous.
 
+## TypeScript is the only authoring language
+
+**Everything in this package is written in TypeScript — strictly typed, no exceptions.**
+There is no JavaScript in authored source: not the build scripts, not the tests, not the native
+smoke tests. The conventions match `examples/web/RunAnywhereAI` so an engineer moves between the
+Web SDK, this SDK, and the example apps without changing habits.
+
+### Non-negotiable rules
+
+- **`strict: true`**, and never weakened per-file.
+- **No `any`.** `@typescript-eslint/no-explicit-any` is an error. When a value genuinely is not
+  known, use `unknown` and narrow it. The native N-API boundary is the one place raw shapes
+  arrive — narrow them once, at the boundary, into a declared interface (`NativeAddon` in
+  `src/bridge.ts` is the pattern), and never let an untyped value travel inward.
+- **No `@ts-ignore` / `@ts-expect-error`** to silence a real type error. If a dependency's types
+  are wrong, declare the correct shape locally and convert at that seam.
+- **No non-null `!` to paper over a maybe.** Narrow, or throw a typed `SDKException`.
+- **No raw JSON assumptions.** Anything crossing a process, socket, or file boundary is validated
+  or decoded into a declared type before use.
+- **`consistent-type-imports`** — `import type { … }` for type-only imports, so emitted CJS has no
+  phantom requires.
+- **`no-floating-promises` / `no-misused-promises`** — every promise is awaited, returned, or
+  explicitly `void`ed with a comment saying why.
+- **Unused vars are errors**, `^_` prefix to opt out.
+- **Proto types are the source of truth.** Import generated types from `@runanywhere/proto-ts`;
+  never hand-write an enum, union, or message shape that the IDL already defines. See "Typed
+  contracts" below.
+- **Discriminated unions over booleans-plus-optionals** for state. A stream event is
+  `{ type: 'token'; … } | { type: 'completed'; … }`, never `{ token?, done? }`.
+- **`readonly` on anything the caller must not mutate**; `as const` for literal tables.
+- **Exhaustive `switch`** over proto enums and union discriminants, with a `never` fallthrough so
+  adding a case is a compile error rather than a silent gap.
+
+### Emit targets
+
+Source language is uniform; **output format is not**, and that distinction matters here:
+
+| Consumer | Output | Why |
+|---|---|---|
+| `dist/` (the package) | CommonJS | `"type": "commonjs"`, `module: node16`. Electron main and preload load as CJS. |
+| Electron preload | CommonJS | Preload with `sandbox: false` is CJS-loaded. |
+| Utility host catalog | CommonJS `.js` **on disk** | `host.ts` does a raw `require(RUNANYWHERE_CATALOG_PATH)`. |
+| A renderer bundle | ESM | Bundler's job, not this package's. |
+
+Tests and scripts compile to their own out-dirs (`dist-test/`, `dist-scripts/`) via dedicated
+tsconfigs. `tsconfig.test.json` **must** set `rootDir: "test"` so `dist-test/unit/x.test.js`
+resolves `../../dist` correctly — `rootDir: "."` silently breaks every test import.
+
+### Verification gates
+
+```bash
+npm run build      # tsc -> dist/
+npm run typecheck  # tsc --noEmit over all four projects (src, test, scripts, native smoke)
+npm test           # node --test over dist-test/unit
+```
+
+All three must pass before handoff, and they are exactly what `electron-sdk-ci.yml` runs. A green
+`build` with a red `typecheck` means a test file is lying about a type.
+
+**There is no `npm run lint` in this package yet** — no eslint config, no eslint dependency, no CI
+step. The rules above are still the standard, but today they are enforced by `strict` + `noEmit`
+type-checking and by review, not by a linter. The `eslint-disable-next-line` comments in the source
+are forward-looking; do not read them as evidence of a gate. Wiring eslint up is a real task, not a
+line in this file.
+
 ## Best practices (Electron)
 
 Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:

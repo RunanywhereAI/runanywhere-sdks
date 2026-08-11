@@ -67,6 +67,12 @@ export interface NativeAddon {
   };
   /** Drop tokens from memory and the secure store. */
   clearAuth?(): Promise<void>;
+  // Process-wide HuggingFace bearer (rac_http_hf_token_set). Commons attaches it
+  // to https requests whose host is exactly huggingface.co / hf.co and never
+  // hands it back, so `hfTokenConfigured` is all a caller can read. `null`
+  // restores the HF_TOKEN / token-file fallback; '' is an explicit opt-out.
+  hfTokenSet(token: string | null): void;
+  hfTokenConfigured(): boolean;
   secureSet(key: string, value: string): Promise<void>;
   secureGet(key: string): Promise<string | null>;
   secureDelete(key: string): Promise<void>;
@@ -329,6 +335,11 @@ export interface NativeAddon {
   storageAvailabilityProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageDeletePlanProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   storageDeleteProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  // The SDK's own Cache/ and Temp/ directories, which the analyzer above does
+  // not own: commons resolves both paths from the base dir and clears them
+  // (rac_file_manager_clear_cache / _clear_temp).
+  fileManagerClearCache(): Promise<void>;
+  fileManagerClearTemp(): Promise<void>;
 
   // LoRA over the lifecycle ABI (native/lora_bridge.cpp). Handle-free: these
   // act on the language model rac_model_lifecycle_load_proto made resident.
@@ -336,6 +347,33 @@ export interface NativeAddon {
   loraRemoveProto(requestBytes: Uint8Array): Promise<Uint8Array>;
   loraListProto(stateBytes: Uint8Array): Promise<Uint8Array>;
   loraStateProto(stateBytes: Uint8Array): Promise<Uint8Array>;
+  loraCompatibilityProto(configBytes: Uint8Array): Promise<Uint8Array>;
+
+  // LoRA adapter catalog (native/lora_bridge.cpp). Registry-bound: every one of
+  // these acts on the process-wide registry `rac_get_lora_registry()` owns, so a
+  // catalog entry outlives any loaded model.
+  loraRegisterProto(entryBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogListProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogQueryProto(queryBytes: Uint8Array): Promise<Uint8Array>;
+  loraCatalogGetProto(requestBytes: Uint8Array): Promise<Uint8Array>;
+
+  // Logging (native/logging_bridge.cpp). `loggingSetLevel` is commons' own
+  // `rac_logger_set_min_level`, read by every RAC_LOG_* macro before it formats.
+  // `loggingSubscribe` replaces the platform adapter's stderr-only log slot with
+  // one that also forwards each record here; `level` is a rac_log_level_t.
+  loggingSetLevel(level: number): void;
+  loggingLevel(): number;
+  loggingSetLocalEnabled(enabled: boolean): void;
+  loggingFlush(): void;
+  loggingSubscribe(
+    onRecord: (record: {
+      level: number;
+      category: string;
+      message: string;
+      timestampUnixMs: number;
+    }) => void
+  ): void;
+  loggingUnsubscribe(): void;
 }
 
 /**

@@ -1,0 +1,16 @@
+{
+  // The native smoke tests (native/test_*.ts). They are run by hand against a
+  // built addon whose path is argv[2], so they never require ../dist at runtime —
+  // only `import type { NativeAddon }`, which emits nothing.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "native",
+    "outDir": "dist-native",
+    "declaration": false,
+    "sourceMap": true,
+    "noEmitOnError": true,
+    "lib": ["ES2021"],
+    "types": ["node"]
+  },
+  "include": ["native/**/*.ts"]
+}

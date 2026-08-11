@@ -72,6 +72,16 @@ function toPublicCall(call: ProtoToolCall, result: ProtoToolResult | undefined):
   };
 }
 
+/**
+ * One call commons parsed but has not executed, in the public shape. Used by
+ * the plain (non-tool-loop) LLM stream, where commons republishes a call it
+ * found in the generated text on `LLMStreamEvent.tool_call` and there is no
+ * result to pair with it.
+ */
+export function toPublicToolCall(call: ProtoToolCall): ToolCall {
+  return toPublicCall(call, undefined);
+}
+
 function parseObject(json: string): Record<string, unknown> {
   if (!json) return {};
   try {

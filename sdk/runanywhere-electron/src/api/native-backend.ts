@@ -18,6 +18,7 @@ import {
   resolveModel,
 } from '../download';
 import type { DownloadProgress, ModelKind, ResolvedModel } from '../download';
+import { setHuggingFaceToken } from './hf';
 import { StorageDeleteRequest, StorageInfoRequest } from '@runanywhere/proto-ts/storage_types';
 import { StorageAbi } from './storage-abi';
 import type {
@@ -38,6 +39,7 @@ import type {
   NativeAudioChunk,
   NativeDiarization,
   NativeImagePayload,
+  NativeLogRecord,
   NativeLoraEntry,
   NativeRanked,
   NativeSegmentation,
@@ -138,6 +140,7 @@ export class NativeBackend implements RaBackend {
   private voiceCounter = 0;
   private readonly storageAbi = new StorageAbi(this);
   private downloadWatchDone: (() => void) | null = null;
+  private loggingWatchDone: (() => void) | null = null;
 
   constructor(private readonly addon: NativeAddon) {}
 
@@ -232,6 +235,24 @@ export class NativeBackend implements RaBackend {
 
   async telemetryFlush(): Promise<void> {
     await this.addon.telemetryFlush?.();
+  }
+
+  // ---- hugging face auth ----
+
+  // Both halves in one call, because both run in THIS process and a token that
+  // reached only one of them is the bug this closes: commons authenticates the
+  // download orchestrator's transfers, and `download.ts` authenticates the repo
+  // resolver behind `ensure()`. An addon predating the binding is reported
+  // rather than silently leaving the orchestrator unauthenticated.
+  async hfTokenSet(token: string | null): Promise<void> {
+    if (typeof this.addon.hfTokenSet !== 'function') {
+      throw SDKException.of(
+        ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+        'setHfToken is unavailable — rebuild the native addon against commons with rac_http_hf_token_set'
+      );
+    }
+    this.addon.hfTokenSet(token);
+    setHuggingFaceToken(token);
   }
 
   // ---- model store ----
@@ -351,6 +372,14 @@ export class NativeBackend implements RaBackend {
     return this.addon.storageDeletePlanProto(requestBytes);
   }
 
+  clearCache(): Promise<void> {
+    return this.addon.fileManagerClearCache();
+  }
+
+  clearTemp(): Promise<void> {
+    return this.addon.fileManagerClearTemp();
+  }
+
   storageDeleteProto(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.addon.storageDeleteProto(requestBytes);
   }
@@ -419,8 +448,34 @@ export class NativeBackend implements RaBackend {
     return this.addon.loraRemoveProto(requestBytes);
   }
 
+  loraListProto(stateBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraListProto(stateBytes);
+  }
+
   loraStateProto(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.addon.loraStateProto(requestBytes);
+  }
+
+  loraCompatibilityProto(configBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraCompatibilityProto(configBytes);
+  }
+
+  // ---- lora catalog over the process-wide LoRA registry ----
+
+  loraRegisterProto(entryBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraRegisterProto(entryBytes);
+  }
+
+  loraCatalogListProto(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraCatalogListProto(requestBytes);
+  }
+
+  loraCatalogQueryProto(queryBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraCatalogQueryProto(queryBytes);
+  }
+
+  loraCatalogGetProto(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.loraCatalogGetProto(requestBytes);
   }
 
   async loraApply(adapterPath: string, scale: number): Promise<void> {
@@ -730,8 +785,16 @@ export class NativeBackend implements RaBackend {
     return this.addon.modelRegistryDiscover(requestBytes);
   }
 
+  modelRegistryImport(requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.addon.modelRegistryImport(requestBytes);
+  }
+
   modelCompatibility(requestBytes: Uint8Array): Promise<Uint8Array> {
     return this.addon.modelCompatibility(requestBytes);
+  }
+
+  modelComponentSnapshot(component: number): Promise<Uint8Array> {
+    return this.addon.modelComponentSnapshot(component);
   }
 
   modelRegisterFromUrl(requestBytes: Uint8Array): Promise<Uint8Array> {
@@ -805,7 +868,7 @@ export class NativeBackend implements RaBackend {
   ragSearch(session: string, requestBytes: Uint8Array): Promise<Uint8Array> {
     if (typeof this.addon.ragSearch !== 'function') {
       throw SDKException.of(
-        ErrorCode.FEATURE_NOT_AVAILABLE,
+        ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE,
         'rag.search is unavailable — rebuild the native addon against commons with rac_rag_search_proto'
       );
     }
@@ -854,6 +917,41 @@ export class NativeBackend implements RaBackend {
 
   async secureDelete(key: string): Promise<void> {
     await this.addon.secureDelete(key);
+  }
+
+  // ---- logging ----
+
+  async loggingSetLevel(level: number): Promise<void> {
+    this.addon.loggingSetLevel(level);
+  }
+
+  async loggingLevel(): Promise<number> {
+    return this.addon.loggingLevel();
+  }
+
+  async loggingSetLocalEnabled(enabled: boolean): Promise<void> {
+    this.addon.loggingSetLocalEnabled(enabled);
+  }
+
+  async loggingFlush(): Promise<void> {
+    this.addon.loggingFlush();
+  }
+
+  // Same shape as downloadWatch: one process-wide subscription whose promise
+  // stands in for a stream that has no natural end, settled by loggingUnwatch.
+  loggingWatch(onRecord: (record: NativeLogRecord) => void): Promise<void> {
+    this.loggingWatchDone?.();
+    this.addon.loggingSubscribe(onRecord);
+    return new Promise<void>((resolve) => {
+      this.loggingWatchDone = resolve;
+    });
+  }
+
+  async loggingUnwatch(): Promise<void> {
+    this.addon.loggingUnsubscribe();
+    const done = this.loggingWatchDone;
+    this.loggingWatchDone = null;
+    done?.();
   }
 
   // ---- internals ----
