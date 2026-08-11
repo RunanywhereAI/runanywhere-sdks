@@ -23,6 +23,7 @@ TARGETS:
   rn        yarn install for React Native SDK
   ios       swift package resolve + pod install (macOS only)
   web       yarn install for Web SDK + examples
+  electron  npm install for Electron SDK + llamacpp backend + example
 
 Build commands live under ./run sdk <name> <action> and ./run example <platform> <action>.
 
@@ -163,12 +164,28 @@ setup_web() {
     fi
 }
 
+setup_electron() {
+    heading "Electron"
+    if ! have npm; then err "npm not found"; return 1; fi
+    (cd "${REPO_ROOT}/bindings/electron" && npm install) && ok "sdk npm install"
+    # The backend package the minimal example registers.
+    (cd "${REPO_ROOT}/bindings/electron/packages/llamacpp" && npm install) \
+        && ok "llamacpp backend npm install"
+    # The minimal harness is a standalone npm project that symlinks both of the
+    # above as file: dependencies, so it installs last and on its own.
+    if [ -f "${REPO_ROOT}/bindings/electron/example/package.json" ]; then
+        (cd "${REPO_ROOT}/bindings/electron/example" && npm install) \
+            && ok "minimal example npm install"
+    fi
+}
+
 setup_all() {
     local rc=0
     setup_android  || rc=1
     setup_web      || rc=1
     setup_rn       || rc=1
     setup_flutter  || rc=1
+    setup_electron || rc=1
     [ "${OS}" = "macos" ] && { setup_ios || rc=1; }
     return ${rc}
 }
@@ -191,6 +208,7 @@ for t in "${TARGETS[@]}"; do
         rn)       setup_rn      || EXIT=1 ;;
         ios)      setup_ios     || EXIT=1 ;;
         web)      setup_web     || EXIT=1 ;;
+        electron) setup_electron || EXIT=1 ;;
         help|-h|--help) usage; exit 0 ;;
         *) err "unknown target: ${t}"; usage; exit 2 ;;
     esac

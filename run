@@ -11,6 +11,7 @@ KOTLIN_SDK_DIR="bindings/kotlin"
 ANDROID_EXAMPLE_DIR="bindings/kotlin/example"
 IOS_EXAMPLE_DIR="bindings/swift/example"
 WEB_EXAMPLE_DIR="bindings/web/example"
+ELECTRON_EXAMPLE_DIR="bindings/electron/example"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
     C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_CMD=$'\033[36m'
@@ -65,6 +66,7 @@ ${C_BOLD}MINIMAL EXAMPLES${C_RESET}
   ${C_CMD}example android clean${C_RESET}        Clean its build outputs
   ${C_CMD}example ios${C_RESET}     {build|run|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
+  ${C_CMD}example electron${C_RESET} {build|start|clean}
   ${C_CMD}example flutter${C_RESET} {build|clean}   ${C_DIM}(bindings/flutter/example)${C_RESET}
 
 ${C_BOLD}RCLI${C_RESET}
@@ -237,13 +239,27 @@ cmd_example_web() {
     esac
 }
 
+# The minimal Electron harness symlinks bindings/electron (and its llamacpp
+# backend package) as file: dependencies, so it runs against the SDK in the
+# working tree — rebuild the SDK and the next start picks it up.
+cmd_example_electron() {
+    local ex_dir="${EX:-${ELECTRON_EXAMPLE_DIR}}"
+    case "${1:-}" in
+        build)  (cd "${ex_dir}" && npm run build) ;;
+        start)  (cd "${ex_dir}" && npm start) ;;
+        clean)  rm -rf "${ex_dir}/dist" ;;
+        *)      bad_subcommand "example electron" "${1:-}" ;;
+    esac
+}
+
 cmd_example() {
     case "${1:-}" in
-        android) shift; cmd_example_android "$@" ;;
-        flutter) shift; cmd_example_flutter "$@" ;;
-        ios)     shift; cmd_example_ios     "$@" ;;
-        web)     shift; cmd_example_web     "$@" ;;
-        *)       bad_subcommand "example" "${1:-}" ;;
+        android)  shift; cmd_example_android  "$@" ;;
+        flutter)  shift; cmd_example_flutter  "$@" ;;
+        ios)      shift; cmd_example_ios      "$@" ;;
+        web)      shift; cmd_example_web      "$@" ;;
+        electron) shift; cmd_example_electron "$@" ;;
+        *)        bad_subcommand "example" "${1:-}" ;;
     esac
 }
 

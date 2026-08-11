@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>RunAnywhere Electron SDK — Minimal</title>
+  </head>
+  <body>
+    <main>
+      <h1>RunAnywhere Electron SDK — Minimal</h1>
+      <p id="status">Starting…</p>
+      <textarea id="prompt" rows="3" cols="60" placeholder="Ask something…">Name three colours.</textarea>
+      <p><button id="generate" type="button" disabled>Generate</button></p>
+      <pre id="output"></pre>
+    </main>
+    <script type="module" src="./dist/renderer.js"></script>
+  </body>
+</html>
