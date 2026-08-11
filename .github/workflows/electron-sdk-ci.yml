@@ -83,7 +83,11 @@ jobs:
           # Tests import ../../dist; typecheck of tsconfig.test.json needs dist/.
           npm run build
           # Example path aliases point at packages/*/dist/*.d.ts — build backends too.
-          for pkg in packages/llamacpp packages/onnx packages/sherpa; do
+          # Every backend package, not a hand-kept subset: a package missing here
+          # has no dist/, so the example app's typecheck resolves its path alias to
+          # nothing and the NEXT step fails with an error that names the app rather
+          # than the package that was never built.
+          for pkg in packages/*/; do
             (cd "$pkg" && npm install && npm run build)
           done
           npm run typecheck
