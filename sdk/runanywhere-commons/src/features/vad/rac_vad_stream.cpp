@@ -277,7 +277,7 @@ void rac_vad_stream_component_teardown(rac_handle_t handle) {
         return;
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
-    for (auto it = g_sessions().begin(); it != g_sessions().end(); ) {
+    for (auto it = g_sessions().begin(); it != g_sessions().end();) {
         if (it->second.handle == handle) {
             it = g_sessions().erase(it);
         } else {

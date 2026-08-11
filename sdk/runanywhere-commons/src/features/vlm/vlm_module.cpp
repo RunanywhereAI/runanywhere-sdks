@@ -1114,17 +1114,14 @@ rac_bool_t dispatch_vlm_terminal_once(GeneratedStreamCtx* ctx,
         return RAC_TRUE;
     }
     ctx->terminal_sent = true;
-    
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, error_code != 0 ? runanywhere::v1::ERROR_SEVERITY_ERROR : runanywhere::v1::ERROR_SEVERITY_INFO);
-    auto* generation = event.mutable_generation();
-    generation->set_kind(error_code != 0 ? runanywhere::v1::GENERATION_EVENT_KIND_FAILED : runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
-    generation->set_streaming_text(ctx->text);
-    generation->set_output_tokens(ctx->token_count);
-    if (ctx->ref && ctx->ref->model_id)
-        generation->set_model_id(ctx->ref->model_id);
-    publish_event(event);
-
+    // No terminal SDKEvent is published here on purpose. The VLM stream's
+    // terminal telemetry row is already owned by the
+    // CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED / VLM_FAILED capability
+    // events emitted by rac_vlm_stream_proto (and publish_failure). Publishing
+    // a GenerationEvent COMPLETED/FAILED here would emit a SECOND terminal row
+    // ("vlm.generation.completed" alongside "vlm.process.completed") — both are
+    // flagged as completions by telemetry_manager and both charge the same
+    // output_tokens, double-counting every streamed VLM turn.
     return dispatch_vlm_stream_event(ctx, kind, nullptr, true, result, error_message, error_code);
 }
 
