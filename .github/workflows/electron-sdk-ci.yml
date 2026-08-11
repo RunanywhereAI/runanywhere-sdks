@@ -184,16 +184,39 @@ jobs:
             done
 
             # dumpbin export gate
-            # Bash cannot expand ${PROGRAMFILES(x86)} (parens); use printenv.
-            vswhere="$(printenv 'PROGRAMFILES(x86)')/Microsoft Visual Studio/Installer/vswhere.exe"
-            test -f "$vswhere" || { echo "vswhere.exe not found"; exit 1; }
+            # Git Bash cannot expand ${PROGRAMFILES(x86)} (parens break
+            # parameter expansion), and bare printenv fails under set -e when
+            # the var is absent. Prefer the fixed Git-Bash path on GHA.
+            vswhere=""
+            for candidate in \
+              "/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" \
+              "/c/Program Files/Microsoft Visual Studio/Installer/vswhere.exe"
+            do
+              if [[ -x "$candidate" ]]; then
+                vswhere="$candidate"
+                break
+              fi
+            done
+            if [[ -z "$vswhere" ]]; then
+              pf86="$(printenv 'PROGRAMFILES(x86)' 2>/dev/null || printenv 'ProgramFiles(x86)' 2>/dev/null || true)"
+              if [[ -n "$pf86" && -x "$pf86/Microsoft Visual Studio/Installer/vswhere.exe" ]]; then
+                vswhere="$pf86/Microsoft Visual Studio/Installer/vswhere.exe"
+              fi
+            fi
+            test -n "$vswhere" && test -x "$vswhere" || {
+              echo "vswhere.exe not found (checked Git-Bash Program Files paths)"
+              exit 1
+            }
+            echo "using vswhere: $vswhere"
             vs="$("$vswhere" -latest -products '*' \
               -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
-              -property installationPath)"
+              -property installationPath | tr -d '\r')"
             test -n "$vs" || { echo "VS 2022 install path not found"; exit 1; }
-            dumpbin="$(find "$vs/VC/Tools/MSVC" -name dumpbin.exe | grep 'Hostx64/x64/dumpbin.exe' | head -1)"
-            test -n "$dumpbin" || { echo "dumpbin.exe not found"; exit 1; }
-            echo "using $dumpbin"
+            # vswhere returns a Windows path (C:\...); map to Git-Bash /c/...
+            vs_unix="$(cygpath -u "$vs" 2>/dev/null || echo "$vs" | sed -e 's#^\([A-Za-z]\):#/\L\1#' -e 's#\\#/#g')"
+            dumpbin="$(find "$vs_unix/VC/Tools/MSVC" -name dumpbin.exe 2>/dev/null | grep 'Hostx64/x64/dumpbin.exe' | head -1 || true)"
+            test -n "$dumpbin" || { echo "dumpbin.exe not found under $vs_unix/VC/Tools/MSVC"; exit 1; }
+            echo "using dumpbin: $dumpbin"
 
             assert_export() {
               local dll="$1"; shift

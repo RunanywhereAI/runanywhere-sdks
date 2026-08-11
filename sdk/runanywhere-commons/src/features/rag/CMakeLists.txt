@@ -24,11 +24,15 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE INTERNAL "")
 set(USEARCH_USE_FP16LIB OFF CACHE BOOL "" FORCE)
 set(USEARCH_USE_SIMSIMD OFF CACHE BOOL "" FORCE)
 
+# Header-only dense index path does not need stringzilla/simsimd submodules.
+# Skipping them avoids flaky CI DNS failures when GitHub cannot resolve the
+# nested ashvardanian/stringzilla clone during FetchContent.
 FetchContent_Declare(
     usearch
     GIT_REPOSITORY https://github.com/unum-cloud/usearch.git
     GIT_TAG        ${RAC_USEARCH_VERSION}
     GIT_SHALLOW    TRUE
+    GIT_SUBMODULES ""
 )
 set(USEARCH_BUILD_TEST_C OFF CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_CPP OFF CACHE BOOL "" FORCE)
