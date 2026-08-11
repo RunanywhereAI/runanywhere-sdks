@@ -8,10 +8,16 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 // tsconfig.*.build.json) because Electron loads them as CommonJS and they need
 // no bundling — externalizing every native dependency is the whole job there.
 //
-// `@runanywhere/proto-ts` is intentionally NOT aliased: it is a real dependency
-// that resolves through node_modules to its built ESM, matching what the
-// tsconfigs typecheck against. The renderer imports only generated enums and
-// message types from it — never SDK code, which is Node-flavoured.
+// `@runanywhere/proto-ts` IS aliased, to the built `dist/*.js`.
+//
+// The tsconfigs map `@runanywhere/proto-ts/*` -> `dist/*.d.ts` as a typecheck-time
+// shim (see tsconfig.base.json). Vite 8's rolldown resolver honours tsconfig
+// `paths` during the bundle too, so without this alias the renderer resolves a
+// *declaration* file, type-stripping leaves an empty module, and any runtime
+// value import fails as MISSING_EXPORT (`audioCaptureDefaults` was the first).
+// Aliasing to the emitted JS keeps the bundle on exactly the module the package
+// `exports` map points at, while typecheck keeps reading the same declarations.
+const protoTsDist = path.resolve(dir, '../../../sdk/shared/proto-ts/dist');
 
 export default defineConfig({
   root: path.resolve(dir, 'src/renderer'),
@@ -19,7 +25,11 @@ export default defineConfig({
   // packaged build, where there is no server and no absolute root.
   base: './',
   resolve: {
-    alias: [{ find: /^@shared\/(.*)$/, replacement: path.resolve(dir, 'src/shared/$1') }],
+    alias: [
+      { find: /^@shared\/(.*)$/, replacement: path.resolve(dir, 'src/shared/$1') },
+      { find: /^@runanywhere\/proto-ts$/, replacement: path.join(protoTsDist, 'index.js') },
+      { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: path.join(protoTsDist, '$1.js') },
+    ],
   },
   build: {
     outDir: path.resolve(dir, 'out/renderer'),
