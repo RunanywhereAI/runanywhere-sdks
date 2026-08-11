@@ -6,6 +6,16 @@
 
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKError } from '@runanywhere/proto-ts/errors';
+import type {
+  DownloadEvent as CanonicalDownloadEvent,
+  GenerationEvent as CanonicalGenerationEvent,
+  ImageEvent as CanonicalImageEvent,
+  RagEvent as CanonicalRagEvent,
+  SdkEvent as CanonicalSdkEvent,
+  TranscriptionEvent as CanonicalTranscriptionEvent,
+  VadEvent as CanonicalVadEvent,
+  VoiceEvent as CanonicalVoiceEvent,
+} from '@runanywhere/proto-ts/events/public_events';
 import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 
 import { SDKException, asSDKException } from '../errors';
@@ -713,6 +723,14 @@ export interface DiscoveredModel {
 // Events
 // ---------------------------------------------------------------------------
 //
+// Public grammars derive from `@runanywhere/proto-ts/events/public_events`, with
+// Electron-local bindings for payload shapes and a few deliberate renames:
+//   - `TokenKind` / `AgentState` stay UPPERCASE (renderer contracts)
+//   - `transcriptFinal.transcription` (canonical field is `segment`)
+//   - RAG keeps the `token` arm (not canonical `textDelta`) with UPPERCASE kind
+//   - download `progress` keeps the snapshot shape (not flattened bytes)
+//   - `SdkEvent` keeps Electron-only `memoryPressure` / `authFailed`
+//
 // One grammar throughout: `started`, then deltas, then exactly one terminal
 // `completed` / `failed` / `cancelled`. A stream never fabricates a successful
 // `completed` — a producer that dies mid-flight ends in `failed`, and a
@@ -729,136 +747,59 @@ export interface DiscoveredModel {
 // code branches on `e.code`.
 
 /** One step of a streamed generation (`llm`/`vlm` `generateStream`). */
-export type GenerationEvent =
-  | { type: 'started'; requestId: string }
-  /**
-   * A new output item opened. Declared for grammar parity with the other SDKs;
-   * commons has no producer for it on any platform yet (`LLMStreamEvent` has no
-   * item-lifecycle event kind), so nothing emits it here either.
-   */
-  | {
-      type: 'outputItemAdded';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      index: number;
-      item: string;
-    }
-  /** Answer text. */
-  | {
-      type: 'textDelta';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      index: number;
-      text: string;
-    }
-  /** The model's reasoning, when it emitted any and `reasoning` allowed it. */
-  | {
-      type: 'reasoningDelta';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      index: number;
-      text: string;
-    }
-  | {
-      type: 'toolCallAdded';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      index: number;
-      call: ToolCall;
-    }
-  /**
-   * Incremental tool arguments. Declared for grammar parity; commons parses a
-   * call only once its arguments are whole, so it reports
-   * {@link GenerationEvent} `toolArgumentsDone` and never a partial delta.
-   */
-  | {
-      type: 'toolArgumentsDelta';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      delta: string;
-    }
-  | {
-      type: 'toolArgumentsDone';
-      requestId: string;
-      sequence: number;
-      itemId: string;
-      arguments: string;
-    }
-  /** Token accounting, emitted once just before the terminal event. */
-  | { type: 'usage'; requestId: string; sequence: number; usage: TokenUsage }
-  | { type: 'completed'; requestId: string; result: GenerationResult }
-  | {
-      type: 'failed';
-      requestId: string;
-      /** What had been generated when it failed, when anything had. */
-      partial?: Partial<GenerationResult>;
-      error: SDKError;
-    }
-  | {
-      type: 'cancelled';
-      requestId: string;
-      /** What had been generated when it was stopped, when anything had. */
-      partial?: Partial<GenerationResult>;
-    };
+export type GenerationEvent = CanonicalGenerationEvent<
+  GenerationResult,
+  Partial<GenerationResult>,
+  ToolCall,
+  TokenUsage,
+  string
+>;
 
 /**
  * One step of a streamed transcription (`stt.openStream`, and the deprecated
  * `stt.transcribeStream` adapter over it).
+ *
+ * Canonical names the final segment `segment`; Electron keeps the public field
+ * `transcription` (Phase 1 decision #6). The optional canonical `usage` arm is
+ * omitted until a producer exists — adding it would break exhaustive consumer
+ * switches.
  */
 export type TranscriptionEvent =
-  | { type: 'started'; requestId: string }
-  | { type: 'speechStarted'; requestId: string; sequence: number; timestampMs?: number }
+  | Exclude<
+      CanonicalTranscriptionEvent<Transcription, string>,
+      { type: 'transcriptFinal' } | { type: 'usage' }
+    >
   | {
-      type: 'partial';
+      type: 'transcriptFinal';
       requestId: string;
       sequence: number;
-      segmentId: string;
-      revision: number;
-      alternatives: string[];
-    }
-  | { type: 'transcriptFinal'; requestId: string; sequence: number; transcription: Transcription }
-  | { type: 'speechEnded'; requestId: string; sequence: number; timestampMs?: number }
-  | { type: 'completed'; requestId: string }
-  | { type: 'failed'; requestId: string; error: SDKError }
-  | { type: 'cancelled'; requestId: string };
+      transcription: Transcription;
+    };
 
-/** One step of a voice conversation. */
+/**
+ * One step of a voice conversation.
+ *
+ * Canonical `AgentState` is lowercase; Electron keeps UPPERCASE values on the
+ * `agentStateChanged` arm (Phase 1 decision #3). Optional canonical fields
+ * (`requestId`, `speechId`, …) are accepted as additive.
+ */
 export type VoiceEvent =
-  | { type: 'userTranscribed'; text: string; isFinal: boolean }
-  | { type: 'agentStateChanged'; state: AgentState }
-  | { type: 'agentResponse'; text: string }
-  | { type: 'speechStarted' }
-  | { type: 'speechEnded' }
-  /**
-   * The pipeline is listening and hearing nothing usable. `detail` is commons'
-   * own measurement, e.g. "the microphone is delivering digital silence".
-   *
-   * Its own arm rather than an `error` because nothing has failed: the session
-   * is healthy and will hear the moment real signal arrives. Rendering it as an
-   * error is wrong, and rendering it as nothing at all is what left a panel
-   * asserting "I'm listening" at a user it could not hear. The distinction is on
-   * the wire already (`ERROR_CODE_INSUFFICIENT_AUDIO_DATA` on a recoverable
-   * `VoiceSessionError`); this arm is what stops the SDK throwing it away.
-   */
-  | { type: 'inputSilent'; detail: string }
-  | { type: 'error'; message: string; recoverable: boolean };
+  | Exclude<CanonicalVoiceEvent, { type: 'agentStateChanged' }>
+  | { type: 'agentStateChanged'; state: AgentState };
 
-/** One step of a streamed grounded answer. */
+/**
+ * One step of a streamed grounded answer.
+ *
+ * Canonical uses `textDelta` + lowercase `TokenKind` and a `failed` arm.
+ * Electron's public surface still emits `token` with UPPERCASE `TokenKind`
+ * (and no mid-stream `failed` — errors go through `sink.fail`).
+ */
 export type RagEvent =
-  | { type: 'retrieved'; matches: Match[] }
-  | { type: 'token'; text: string; kind: TokenKind }
-  | { type: 'completed'; result: RagResult };
+  | Exclude<CanonicalRagEvent<Match, RagResult>, { type: 'textDelta' } | { type: 'failed' }>
+  | { type: 'token'; text: string; kind: TokenKind };
 
 /** One step of a streamed image generation. */
-export type ImageEvent =
-  | { type: 'started' }
-  | { type: 'progress'; step: number; totalSteps: number; partialImage?: ImageData }
-  | { type: 'completed'; result: ImageResult };
+export type ImageEvent = CanonicalImageEvent<ImageResult, ImageData>;
 
 /**
  * What a download looks like to a caller at one instant.
@@ -919,28 +860,32 @@ export interface DownloadProgressSnapshot {
   isIndeterminate: boolean;
 }
 
-/** One step of a model download, correlated by `operationId`/`sequence`. */
+/**
+ * One step of a model download, correlated by `operationId`/`sequence`.
+ *
+ * Canonical flattens progress bytes onto the arm; Electron keeps a single
+ * `snapshot` payload (Phase 1 decision #6).
+ */
 export type DownloadEvent =
-  | { type: 'started'; operationId: string; sequence: number }
-  | { type: 'progress'; snapshot: DownloadProgressSnapshot }
-  /** Checksum / expected-files verification. */
-  | { type: 'verifying'; operationId: string; sequence: number }
-  | { type: 'extracting'; operationId: string; sequence: number; percent?: number }
-  | { type: 'completed'; operationId: string; sequence: number; model: ModelInfo }
-  | { type: 'failed'; operationId: string; sequence: number; error: SDKError }
-  | { type: 'cancelled'; operationId: string; sequence: number };
+  | Exclude<
+      CanonicalDownloadEvent<{ model: ModelInfo }, { snapshot: DownloadProgressSnapshot }>,
+      { type: 'progress' }
+    >
+  | { type: 'progress'; snapshot: DownloadProgressSnapshot };
 
-/** A lifecycle, model, or error breadcrumb from the SDK itself. */
+/**
+ * A lifecycle, model, or error breadcrumb from the SDK itself.
+ *
+ * Canonical `modelLoaded.category` is the proto numeric enum; Electron keeps
+ * the string {@link ModelCategory}. `memoryPressure` / `authFailed` are
+ * Electron-local arms not yet on the shared grammar.
+ */
 export type SdkEvent =
-  | { type: 'ready' }
+  | Exclude<
+      CanonicalSdkEvent<InferenceFramework>,
+      { type: 'modelLoaded' } | { type: 'error' }
+    >
   | { type: 'modelLoaded'; id: string; category: ModelCategory; actualBackend?: InferenceFramework }
-  | { type: 'modelUnloaded'; id: string }
-  /**
-   * A load asked for more memory than the machine reports free. Carries what
-   * the residency policy released trying to make room, and commons' reasons
-   * when it still does not fit — the load is attempted either way, because a
-   * registry row's memory figure is an estimate, not a measurement.
-   */
   | {
       type: 'memoryPressure';
       id: string;
@@ -949,21 +894,11 @@ export type SdkEvent =
       evicted: string[];
       reasons: string[];
     }
-  /**
-   * The control plane did not authenticate. Local inference is unaffected; this
-   * is the breadcrumb an app needs to show "working offline" instead of
-   * pretending everything is fine. `offline` is worth retrying, `rejected` is not.
-   */
   | { type: 'authFailed'; status: 'offline' | 'rejected'; message: string }
   | { type: 'error'; message: string; recoverable: boolean };
 
 /** Speech-detection deltas over a chunk stream (`vad.openStream`, and `vad.detectStream` over it). */
-export type VadEvent =
-  | { type: 'speechStarted'; timestampMs?: number }
-  | { type: 'speechEnded'; timestampMs?: number }
-  | { type: 'activity'; isSpeech: boolean; probability: number; timestampMs?: number }
-  | { type: 'failed'; error: SDKError }
-  | { type: 'completed' };
+export type VadEvent = CanonicalVadEvent;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
