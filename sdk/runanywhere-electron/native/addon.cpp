@@ -14,10 +14,12 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -30,6 +32,7 @@
 #endif
 
 #include "rac/core/rac_core.h"
+#include "rac/plugin/rac_plugin_loader.h"
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_neurt.h"
@@ -271,6 +274,89 @@ void throw_rac_error(Napi::Env env, rac_result_t code, const std::string& contex
     make_rac_error(env, code, msg).ThrowAsJavaScriptException();
 }
 
+// Idempotent wrapper: a second load of the same plugin (host pre-load + env
+// replay inside initialize, or a re-fork that already registered) is success.
+rac_result_t load_plugin_path(const char* path) {
+    if (path == nullptr || path[0] == '\0')
+        return RAC_ERROR_NULL_POINTER;
+    rac_result_t rc = rac_registry_load_plugin(path);
+    if (rc == RAC_ERROR_PLUGIN_DUPLICATE)
+        return RAC_SUCCESS;
+    return rc;
+}
+
+#ifdef RAC_ELECTRON_THIN_ADDON
+// Path list separator matches Node's `path.delimiter` (Unix `:` / Windows `;`).
+#ifdef _WIN32
+constexpr char kPluginPathDelimiter = ';';
+#else
+constexpr char kPluginPathDelimiter = ':';
+#endif
+
+// Load every absolute path in RUNANYWHERE_PLUGIN_PATHS. Main sets this before
+// forking the utility host; it is NEVER an RPC argument (renderer must not be
+// able to dlopen arbitrary native code). Compiled only for thin builds — fat
+// builds may still receive the env for forward-compat but skip loading here.
+rac_result_t load_plugins_from_env() {
+    const char* raw = std::getenv("RUNANYWHERE_PLUGIN_PATHS");
+    if (raw == nullptr || raw[0] == '\0')
+        return RAC_SUCCESS;
+    std::string list(raw);
+    std::string path;
+    std::istringstream stream(list);
+    while (std::getline(stream, path, kPluginPathDelimiter)) {
+        if (path.empty())
+            continue;
+        rac_result_t rc = load_plugin_path(path.c_str());
+        if (rc != RAC_SUCCESS)
+            return rc;
+    }
+    return RAC_SUCCESS;
+}
+#endif  // RAC_ELECTRON_THIN_ADDON
+
+// =============================================================================
+// loadPlugin(absolutePath) — host / main only. Not on the RPC allowlist.
+// =============================================================================
+Napi::Value LoadPlugin(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "loadPlugin(absolutePath) expects a string")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string path = info[0].As<Napi::String>().Utf8Value();
+    return RunNativeCall(env, "rac_registry_load_plugin", [path]() {
+        return load_plugin_path(path.c_str());
+    });
+}
+
+// listPlugins() -> string[] of currently registered engine names (runtime).
+Napi::Value ListPlugins(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    (void)info;
+    const char** names = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_registry_list_plugins(&names, &count);
+    if (rc != RAC_SUCCESS) {
+        throw_rac_error(env, rc, "rac_registry_list_plugins");
+        return env.Undefined();
+    }
+    Napi::Array out = Napi::Array::New(env, count);
+    for (size_t i = 0; i < count; ++i) {
+        out.Set(i, Napi::String::New(env, names[i] != nullptr ? names[i] : ""));
+    }
+    rac_registry_free_plugin_list(names, count);
+    return out;
+}
+
+// pluginApiVersion() — commons' RAC_PLUGIN_API_VERSION as a runtime number.
+Napi::Value PluginApiVersion(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    (void)info;
+    return Napi::Number::New(env, static_cast<double>(rac_plugin_api_version()));
+}
+
 // =============================================================================
 // initialize(secureDir[, baseDir])
 // =============================================================================
@@ -315,10 +401,12 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             return rc;
 
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
-        // The download orchestrator refuses to start without a registered HTTP
-        // transport, and downloading a model has nothing to do with having
-        // control-plane credentials — so the libcurl transport goes up here
-        // rather than only inside configureControlPlane().
+        // D4 — desktop HTTP path. Platform adapters leave http_download NULL on
+        // purpose (that slot is the Web/Emscripten async driver). Model downloads,
+        // HF fetches inside the orchestrator, and control-plane POSTs all need the
+        // process-wide libcurl transport vtable. Register it here at initialize()
+        // — not only inside configureControlPlane() — so downloads work before
+        // any API key / phase-2 handshake.
         rc = rac_desktop_http_transport_register();
         if (rc != RAC_SUCCESS) {
             rac_shutdown();
@@ -330,7 +418,12 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
         // rac_shutdown(), so register exactly once — re-registering after a
         // shutdown+re-init would fail (RAC already-registered), which is why
         // initialize() must be safe to call again after shutdown().
-        // Each call is gated by RAC_HAVE_BACKEND_<X> from native/CMakeLists.txt.
+        //
+        // FAT builds: each call is gated by RAC_HAVE_BACKEND_<X> from
+        // native/CMakeLists.txt (zero macros ⇒ empty block in thin mode).
+        // THIN builds: engines arrive via rac_registry_load_plugin — either an
+        // explicit loadPlugin() from the host, or RUNANYWHERE_PLUGIN_PATHS set
+        // by main before the utility fork (never an RPC argument).
         static bool backends_registered = false;
         if (!backends_registered) {
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -362,6 +455,17 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
             rac_backend_cloud_register();
+#endif
+#ifdef RAC_ELECTRON_THIN_ADDON
+            // Runtime plugins (thin addon only). Fat/static builds ignore the env
+            // — rac_registry_load_plugin returns FEATURE_NOT_AVAILABLE there, and
+            // backends are already linked via RAC_HAVE_BACKEND_*. Idempotent with
+            // a prior host loadPlugin() thanks to DUPLICATE→success.
+            rc = load_plugins_from_env();
+            if (rc != RAC_SUCCESS) {
+                rac_shutdown();
+                return rc;
+            }
 #endif
             backends_registered = true;
         }
@@ -3718,6 +3822,16 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     rac_electron::RegisterLoggingBridge(env, exports);
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("memoryInfo", Napi::Function::New(env, MemoryInfo));
+    // Plugin loader — host / main only. Do NOT add these to ALLOWED_RPC_METHODS
+    // or expose them through RaBackend; paths come from RUNANYWHERE_PLUGIN_PATHS.
+    exports.Set("loadPlugin", Napi::Function::New(env, LoadPlugin));
+    exports.Set("listPlugins", Napi::Function::New(env, ListPlugins));
+    exports.Set("pluginApiVersion", Napi::Function::New(env, PluginApiVersion));
+#ifdef RAC_ELECTRON_THIN_ADDON
+    exports.Set("thinAddon", Napi::Boolean::New(env, true));
+#else
+    exports.Set("thinAddon", Napi::Boolean::New(env, false));
+#endif
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
     // Desktop control plane (telemetry + auth). Present only when the desktop
     // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
