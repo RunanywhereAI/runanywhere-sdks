@@ -4,7 +4,7 @@
 # publishes the platform tarballs: @VERSION@, @SHA256_MACOS_ARM64@ and
 # @SHA256_LINUX_X86_64@ are substituted from the release's .sha256 sidecars,
 # then the result is committed to the RunanywhereAI/homebrew-tap repository as
-# Formula/rcli.rb (`brew install runanywhere-ai/tap/rcli`).
+# Formula/rcli.rb (`brew install runanywhereai/tap/rcli`).
 class Rcli < Formula
   desc "RunAnywhere on-device AI CLI — run, manage and serve local models"
   homepage "https://github.com/RunanywhereAI/runanywhere-sdks"

@@ -295,10 +295,22 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/Foundation/Version
     "export const SDK_VERSION = '[^']+'" \
     "export const SDK_VERSION = '${NEW_VERSION}'"
 
-# 4a. Electron SDK package
+# 4a. Electron SDK packages
+# The root manifest, the native addon, and the three thin backend packages all
+# publish as a fixed train, so every one of them has to move together. Before
+# 0.20.15 only the root was listed here and the other four stayed stranded on
+# 0.1.0, which is why none of them was ever part of a release.
 echo ""
 echo ">> Electron SDK:"
-bump_json_version "${REPO_ROOT}/sdk/runanywhere-electron/package.json"
+for pkg in \
+    "${REPO_ROOT}/sdk/runanywhere-electron/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-electron/native/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-electron/packages/llamacpp/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-electron/packages/onnx/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-electron/packages/sherpa/package.json"; do
+    bump_json_version "$pkg"
+    bump_npm_proto_ts_dep "$pkg"
+done
 bump_npm_lock_root_version "${REPO_ROOT}/sdk/runanywhere-electron/package-lock.json"
 
 # 5. React Native SDK packages

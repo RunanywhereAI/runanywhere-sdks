@@ -1,9 +1,11 @@
 {
   "name": "@runanywhere/electron-onnx",
-  "version": "0.1.0",
+  "version": "0.20.15",
   "description": "RunAnywhere Electron SDK — ONNX backend plugin (embeddings / segmentation)",
-  "private": true,
-  "license": "SEE LICENSE IN ../../../../LICENSE",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,7 +19,8 @@
   "files": [
     "dist",
     "prebuilds",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "os": ["darwin", "linux", "win32"],
   "cpu": ["x64", "arm64"],

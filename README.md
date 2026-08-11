@@ -111,7 +111,7 @@ print(ra.llm.generate("Explain on-device AI in one sentence.",
 Prefer a terminal? The same core ships as a CLI:
 
 ```bash
-brew install runanywhere-ai/tap/rcli
+brew install runanywhereai/tap/rcli
 rcli run qwen3 "Explain on-device AI in one sentence."
 ```
 
@@ -399,7 +399,7 @@ Also: `rcli run --image photo.jpg` (VLM), `rcli vad`, `rcli embed`, `rcli image`
 Install (macOS Apple Silicon, Linux x86_64/aarch64, Windows x86_64):
 
 ```bash
-brew install runanywhere-ai/tap/rcli
+brew install runanywhereai/tap/rcli
 # or
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/runanywhere-cli/scripts/install.sh | sh
 ```

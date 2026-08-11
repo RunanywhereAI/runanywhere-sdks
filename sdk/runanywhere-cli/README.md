@@ -17,7 +17,7 @@ $ rcli serve qwen3        # OpenAI-compatible API on :8080
 **Homebrew** (macOS Apple Silicon or Linux x86_64):
 
 ```bash
-brew install runanywhere-ai/tap/rcli
+brew install runanywhereai/tap/rcli
 ```
 
 **Install script** (macOS Apple Silicon or Linux x86_64):

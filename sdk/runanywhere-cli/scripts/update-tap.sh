@@ -66,4 +66,4 @@ git -C "${TAP_DIR}" add Formula/rcli.rb
 git -C "${TAP_DIR}" commit -m "rcli ${VERSION}"
 git -C "${TAP_DIR}" push
 
-echo "Tap updated: brew install runanywhere-ai/tap/rcli"
+echo "Tap updated: brew install runanywhereai/tap/rcli"

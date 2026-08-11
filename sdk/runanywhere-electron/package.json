@@ -1,9 +1,11 @@
 {
   "name": "@runanywhere/electron",
-  "version": "0.1.0",
+  "version": "0.20.15",
   "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
-  "private": true,
-  "license": "SEE LICENSE IN ../../LICENSE",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,7 +39,8 @@
   "files": [
     "dist",
     "prebuilds",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "os": [
     "darwin",
@@ -72,7 +75,7 @@
     "@runanywhere/proto-ts": "file:../shared/proto-ts"
   },
   "peerDependencies": {
-    "@runanywhere/proto-ts": "^0.20.14"
+    "@runanywhere/proto-ts": "^0.20.15"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

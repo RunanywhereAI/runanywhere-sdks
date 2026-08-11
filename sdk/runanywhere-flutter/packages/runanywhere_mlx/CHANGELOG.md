@@ -1,3 +1,7 @@
+## [0.20.15] - 2026-08-11
+
+- Suite version bump.
+
 ## [0.20.14] - 2026-08-09
 
 - Suite version bump.
