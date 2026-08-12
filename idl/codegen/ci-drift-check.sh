@@ -26,6 +26,14 @@ if ! git diff --exit-code --stat; then
     DRIFT=1
 fi
 
+# `git diff`/`git status` cannot see a filename that changed only in letter
+# case while the working tree is on a case-insensitive filesystem, which is
+# where this gate normally runs (macOS). Compare names case-exactly so the
+# result is the same here and on Linux.
+if ! "${SCRIPT_DIR}/check_generated_filenames.sh"; then
+    DRIFT=1
+fi
+
 # Also catch newly created files that codegen may produce (e.g., a new .proto
 # added without committing the generated output).
 UNTRACKED="$(git ls-files --others --exclude-standard -- .)"

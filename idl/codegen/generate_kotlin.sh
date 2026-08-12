@@ -38,7 +38,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # consumer code (VoiceAgentTypes.kt, EventBus.kt, SDKEvent.kt) depending
     # on files that regen would delete. No exclusions today.
     if [ -z "${RAC_PROTO_FILES:-}" ]; then
-        RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+        RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
     fi
 
     # sdk_defaults.proto is the central default pool: it carries rac_default

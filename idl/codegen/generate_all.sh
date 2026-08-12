@@ -9,6 +9,22 @@
 #                 locally; CI regenerates Dart bindings on the pinned toolchain).
 set -euo pipefail
 
+# Deterministic environment. Every generator below must emit the same bytes on
+# a developer laptop and on a CI runner, so the few ambient inputs that can
+# reorder or reformat output are pinned here rather than inherited:
+#   LC_ALL/LANG  — collation for every `sort` in this pipeline (glibc's
+#                  en_US.UTF-8 ignores punctuation at the primary level, so
+#                  `rac_options.proto` vs `rag.proto` can order differently
+#                  than under C).
+#   TZ           — any generator that formats a date would otherwise embed the
+#                  runner's local time.
+#   PYTHONHASHSEED — the convenience generators walk descriptor sets; a stray
+#                  set/frozenset iteration would otherwise be seed-dependent.
+export LC_ALL=C
+export LANG=C
+export TZ=UTC
+export PYTHONHASHSEED=0
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IDL_DIR="${REPO_ROOT}/idl"
@@ -34,7 +50,30 @@ if ! command -v protoc >/dev/null 2>&1; then
     exit 127
 fi
 
-echo "▶ protoc version: $(protoc --version)"
+# protoc bakes its own major.minor.patch into the C++ headers
+# ("#if PROTOBUF_VERSION != 7035001") and into every ts-proto file header
+# ("//   protoc               v7.35.1"). A different protoc therefore rewrites
+# 144 committed files without a single .proto having changed. Fail closed on
+# the exact pin in core/VERSIONS so that shows up as one actionable error here
+# rather than as an unexplained diff in the drift gate.
+VERSIONS_FILE="${REPO_ROOT}/core/VERSIONS"
+if [ -f "${VERSIONS_FILE}" ]; then
+    set -a
+    eval "$(grep -E '^[A-Z_][A-Z0-9_]*=' "${VERSIONS_FILE}")"
+    set +a
+fi
+
+PROTOC_ACTUAL="$(protoc --version | awk '{print $2}')"
+echo "▶ protoc version: ${PROTOC_ACTUAL} (pinned ${PROTOC_VERSION:-${PROTOC_VERSION_MAJOR:-any}})"
+if [ -n "${PROTOC_VERSION:-}" ] && [ "${PROTOC_ACTUAL}" != "${PROTOC_VERSION}" ]; then
+    echo "error: protoc ${PROTOC_ACTUAL} does not match the pinned ${PROTOC_VERSION}" >&2
+    echo "       (core/VERSIONS::PROTOC_VERSION). Generated C++ and TypeScript" >&2
+    echo "       embed the compiler version, so regenerating with a different" >&2
+    echo "       protoc rewrites 144 committed files and breaks the drift gate." >&2
+    echo "       Install the pinned release, or bump PROTOC_VERSION and" >&2
+    echo "       regenerate every binding in the same commit." >&2
+    exit 1
+fi
 
 # Canonical proto-file list shared with every per-language codegen
 # script via the RAC_PROTO_FILES env var (absolute paths, newline-separated,
@@ -44,7 +83,7 @@ echo "▶ protoc version: $(protoc --version)"
 # rather than duplicating the positive list. Per-language scripts fall back
 # to the same `ls "$IDL_DIR"/*.proto` discovery when invoked standalone, so
 # behavior is identical whether run via generate_all.sh or individually.
-RAC_PROTO_FILES="$(ls "${IDL_DIR}"/*.proto | sort)"
+RAC_PROTO_FILES="$(ls "${IDL_DIR}"/*.proto | LC_ALL=C sort)"
 export RAC_PROTO_FILES
 echo "▶ canonical proto file list:"
 echo "${RAC_PROTO_FILES}" | sed 's|^.*/|    - |'
@@ -78,6 +117,14 @@ else
     if command -v python3 >/dev/null 2>&1; then
         echo "▶ Dart convenience post-processor"
         python3 "${SCRIPT_DIR}/generate_dart_convenience.py"
+        # ra_result_codes.dart is codegen output (ErrorCode -> user-facing
+        # message table derived from idl/errors.proto), but nothing used to
+        # invoke its generator, so the file was committed once and then aged
+        # out of the drift gate: an errors.proto edit could not make it stale
+        # in CI because CI never regenerated it. Run it here so the one gate
+        # that guards generated code actually covers it.
+        echo "▶ Dart result-code messages"
+        python3 "${SCRIPT_DIR}/generate_dart_result_codes.py"
     else
         echo "warning: python3 not on PATH; skipping Dart convenience post-processor." >&2
     fi

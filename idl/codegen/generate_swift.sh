@@ -36,7 +36,7 @@ fi
 # generated RAFrameworksForCapabilityRequest/Response exist for symmetry with
 # Kotlin's positive-list semantic (prior commit 769ceccff).
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
-    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
 fi
 
 # Language-specific exclusions (basenames of .proto files to skip).

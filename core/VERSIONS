@@ -111,6 +111,17 @@ PROTOC_GEN_DART_VERSION=25.0.0
 # The C++ generator emits exact runtime patch guards, so keep this in lockstep
 # with PROTOBUF_VERSION below and regenerate IDL bindings when it changes.
 PROTOC_VERSION_MAJOR=35
+# Exact protoc release that produced the committed bindings. NOT a new pin to
+# chase — it records reality. protoc stamps its full major.minor.patch into the
+# output of two generators, so a patch-level difference rewrites 144 committed
+# files with no .proto change at all:
+#   core/src/generated/proto/*.pb.h  ->  "// Protobuf C++ Version: 7.35.1"
+#                                        "#if PROTOBUF_VERSION != 7035001"
+#   bindings/proto-ts/src/*.ts       ->  "//   protoc               v7.35.1"
+# idl/codegen/generate_all.sh fails closed when `protoc --version` disagrees,
+# so a Homebrew/apt upgrade surfaces as one clear error instead of a 144-file
+# phantom diff in the drift gate. Bumping this REQUIRES regenerating bindings.
+PROTOC_VERSION=35.1
 
 # CMake version installed in CI. Toolchain present on the build host.
 # (2026-05-19 build-toolchain bump): 3.27 -> 4.3.2 (latest stable per cmake.org).

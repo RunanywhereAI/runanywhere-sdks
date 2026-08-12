@@ -212,6 +212,14 @@ jobs:
           npm install --package-lock=false --workspaces=false
           npm run build
 
+      - name: Fail on case-only filename drift
+        # This job runs on macOS, whose filesystem is case-insensitive, so
+        # `git status` below reports a clean tree even when a generator renamed
+        # Foo.kt to foo.kt — and the same run on Linux shows a delete plus an
+        # untracked add. Compare names case-exactly first so this gate means
+        # the same thing on every filesystem.
+        run: ./idl/codegen/check_generated_filenames.sh
+
       - name: Fail on drift
         run: |
           set -euo pipefail

@@ -34,7 +34,7 @@ fi
 # filesystem discovery when invoked standalone. C++ is the authoritative
 # consumer and emits every proto in idl/ except the declaration-only pool.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
-    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
 fi
 
 # sdk_defaults.proto carries rac_default annotations and no wire messages.
