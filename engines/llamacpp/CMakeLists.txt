@@ -443,6 +443,30 @@ elseif(RAC_PLATFORM_WINDOWS)
     # No extra link libraries needed on Windows (threading is built-in)
 endif()
 
+# The carrier recompiles rac_plugin_entry_llamacpp.cpp, which advertises
+# METAL/CUDA/VULKAN from GGML_USE_* . Those flags live on llama/ggml as
+# INTERFACE (or PRIVATE on rac_backend_llamacpp for iOS). Copy only those
+# feature flags — never RAC_LLAMACPP_BUILDING, which must stay dllimport on
+# the carrier.
+if(TARGET runanywhere_llamacpp)
+    foreach(_src llama ggml ggml-metal ggml-cuda ggml-vulkan rac_backend_llamacpp)
+        if(NOT TARGET ${_src})
+            continue()
+        endif()
+        foreach(_prop COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
+            get_target_property(_vals ${_src} ${_prop})
+            if(NOT _vals)
+                continue()
+            endif()
+            foreach(_def ${_vals})
+                if(_def MATCHES "^GGML_USE_(METAL|CUDA|VULKAN)(=.*)?$")
+                    target_compile_definitions(runanywhere_llamacpp PRIVATE ${_def})
+                endif()
+            endforeach()
+        endforeach()
+    endforeach()
+endif()
+
 # =============================================================================
 # JNI TARGET (Android)
 # =============================================================================
