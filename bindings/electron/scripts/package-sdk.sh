@@ -35,6 +35,13 @@ echo ">> Electron SDK packaging (version=${PACKAGE_VERSION})"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
 
+# bindings/proto-ts/{src,dist} are IDL codegen output plus its tsc build, and
+# neither is tracked. Unlike the Web and RN packaging scripts, nothing else here
+# compiles proto-ts — this script goes straight to `npm pack ../proto-ts` — so
+# --with-ts-dist is required, or the vendored archive below carries an empty
+# dist/ and every Electron package resolves `@runanywhere/proto-ts` to nothing.
+"${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only ts --with-ts-dist
+
 # proto-ts is packed first so it can be vendored into the entry tarball, the
 # same way the Web SDK does it: installing @runanywhere/electron then never
 # asks npm for a proto-ts version that may not be published yet.

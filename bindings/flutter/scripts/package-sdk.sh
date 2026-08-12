@@ -60,6 +60,16 @@ done
 
 echo ">> Flutter SDK packaging (mode=${RAC_BUILD_MODE})"
 
+# IDL codegen is a hard prerequisite. Two untracked trees ship inside the pub
+# package:
+#   packages/runanywhere/lib/generated/                     (79 Dart files)
+#   packages/runanywhere/android/src/main/kotlin/.../generated/RADefaultsPool.kt
+# `flutter pub publish --dry-run` below validates metadata and file layout — it
+# does not know these files are supposed to exist, so without this step it
+# validates, and would publish, a package whose `import 'generated/...'` lines
+# all resolve to nothing.
+"${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only dart
+
 QHEXRT_ROOT="$FLUTTER_ROOT/packages/runanywhere_qhexrt"
 
 # A public packaging run must not inherit private binaries from a prior local

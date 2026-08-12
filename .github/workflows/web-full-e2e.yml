@@ -33,6 +33,16 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # bindings/proto-ts/src is IDL codegen output and is not tracked, so a
+      # fresh checkout has an empty package for `npm ci` to link and for the
+      # Web SDK to import. Generate before either install.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
+          # The Web SDK imports @runanywhere/proto-ts/<module>, which the
+          # package's exports map resolves to dist/; generating only writes
+          # src/. Same reason electron-sdk-ci and rn-typecheck set this.
+          ts-dist: 'true'
       - name: Install Web SDK workspace
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund

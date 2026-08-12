@@ -36,7 +36,7 @@ fi
 # generated RAFrameworksForCapabilityRequest/Response exist for symmetry with
 # Kotlin's positive-list semantic (prior commit 769ceccff).
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
-    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
 fi
 
 # Language-specific exclusions (basenames of .proto files to skip).
@@ -92,15 +92,17 @@ rm -f "${OUT_DIR}"/*.grpc.swift
 # rac_required / rac_min / rac_max). The post-processor reads idl/*.proto via
 # protoc --descriptor_set_out and writes hand-friendly accessor extensions onto
 # the RA* swift-protobuf types in the same module.
-if command -v python3 >/dev/null 2>&1; then
-    python3 "${SCRIPT_DIR}/generate_swift_convenience.py"
-    # Generate `ModalityProtoABI+Generated.swift` from the
-    # manifest at swift-modality-abi.yaml. Owns the dlsym table for the 7
-    # fully-equivalent modality-ABI methods.
-    python3 "${SCRIPT_DIR}/generate_swift_modality_abi.py"
-else
-    echo "warning: python3 not found — skipping RAConvenience.swift + ModalityProtoABI codegen." >&2
-    echo "         Install python3 (https://www.python.org) to enable annotations." >&2
+#
+# RA_PYTHON is exported by generate_all.sh (bootstrap_pyproto.sh); a standalone
+# invocation resolves it here. Not optional — both outputs are compiled into the
+# published SwiftPM sources, so skipping them ships a module that does not build.
+if [ -z "${RA_PYTHON:-}" ]; then
+    RA_PYTHON="$("${SCRIPT_DIR}/bootstrap_pyproto.sh")" || exit 127
 fi
+"${RA_PYTHON}" "${SCRIPT_DIR}/generate_swift_convenience.py"
+# Generate `ModalityProtoABI+Generated.swift` from the
+# manifest at swift-modality-abi.yaml. Owns the dlsym table for the 7
+# fully-equivalent modality-ABI methods.
+"${RA_PYTHON}" "${SCRIPT_DIR}/generate_swift_modality_abi.py"
 
 ls -1 "${OUT_DIR}"

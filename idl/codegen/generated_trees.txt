@@ -1,0 +1,72 @@
+# =============================================================================
+# generated_trees.txt — the codegen output that is NOT committed
+# =============================================================================
+# Read by idl/codegen/check_generated_trees.sh. Every packaging path that ships
+# one of these trees must run codegen first (see ensure_generated.sh); the check
+# script is the assertion that it actually happened.
+#
+# Format, tab-separated:
+#   <kind>  <lang>  <path relative to repo root>  <min files>  <note>
+#
+# kind:
+#   tree   a directory that must exist and hold at least <min files> files
+#   file   a single generated file that must exist (<min files> is ignored, use 1)
+#   built  like `tree`, but produced by a compiler downstream of codegen (tsc),
+#          so it is checked only when the caller passes --with-built — a fresh
+#          clone has run codegen but not yet `npm run build`
+#   keep   a NON-generated file that lives inside a gitignored tree and MUST stay
+#          tracked — the .gitignore negations exist for exactly these
+#
+# lang: which `generate_all.sh --only <lang>` subset produces it. Lets a
+#   packaging path verify just its own output — the Web SDK generates and checks
+#   `ts` without needing a Dart or Swift toolchain on the runner.
+#
+# <min files> is a floor, not an exact count: adding a .proto legitimately
+# raises the real count. The floor is what catches "codegen produced nothing",
+# which is the failure that silently ships an empty package.
+#
+# Nothing generated is excluded from this list any more. The C/C++ and Kotlin
+# trees are here too, even though neither ships as source: their absence breaks
+# a build rather than a published package, but it breaks it just as silently, so
+# they get the same assertion.
+# =============================================================================
+
+tree	swift	bindings/swift/Sources/RunAnywhere/Generated	40	Swift proto + gRPC + convenience + modality ABI + defaults pool
+tree	ts	bindings/proto-ts/src	60	ts-proto messages + convenience + streams + defaults pool
+built	ts	bindings/proto-ts/dist	130	tsc output — the only thing the npm package ships (files: ["dist"]); a real build is 138, the committed tree was 160 because 22 files were orphans tsc never deletes
+tree	dart	bindings/flutter/packages/runanywhere/lib/generated	75	Dart proto + convenience + result codes + defaults pool
+tree	python	bindings/python/runanywhere/_proto	15	Python RAG protobuf modules
+tree	cpp	core/src/generated/proto	70	protoc --cpp_out; compiled into rac_commons (38 .pb.cc listed in core/CMakeLists.txt)
+tree	kotlin	bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated	300	Square Wire messages + RAConvenience.kt + RADefaultsPool.kt; compiled into the AAR
+
+# A tree's file count cannot tell "the post-processor ran" from "protoc emitted
+# a few more messages". Every generator that appends to an existing tree is
+# therefore also asserted by NAME: a skipped convenience/ABI/defaults pass would
+# otherwise sail past the floor above on the strength of the protoc output alone.
+file	swift	bindings/swift/Sources/RunAnywhere/Generated/RAConvenience.swift	1	Swift convenience accessors (generate_swift_convenience.py)
+file	swift	bindings/swift/Sources/RunAnywhere/Generated/ModalityProtoABI+Generated.swift	1	Swift modality ABI table (generate_swift_modality_abi.py)
+file	swift	bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift	1	default pool constants
+file	kotlin	bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt	1	Kotlin convenience accessors (generate_kotlin_convenience.py)
+file	kotlin	bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	default pool constants
+file	ts	bindings/proto-ts/src/defaults/pool.ts	1	default pool constants
+file	ts	bindings/proto-ts/src/streams/llm_service_stream.ts	1	AsyncIterable stream wrapper (generate_streams.sh)
+file	ts	bindings/proto-ts/src/streams/voice_agent_service_stream.ts	1	AsyncIterable stream wrapper (generate_streams.sh)
+file	dart	bindings/flutter/packages/runanywhere/lib/generated/ra_result_codes.dart	1	ErrorCode -> message table (generate_dart_result_codes.py)
+file	dart	bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart	1	default pool constants
+file	cpp	core/include/rac/rac_defaults_generated.h	1	rac_default macros; a SHIPPED public header (generate_cpp_defaults.py)
+file	dart	bindings/flutter/packages/runanywhere/android/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	shipped inside the pub package
+file	ts	bindings/react-native/packages/core/android/src/main/java/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	shipped inside the npm package (files includes android/src)
+file	python	bindings/python/runanywhere/_generated_errors.py	1	ErrorCode / ErrorCategory enums
+file	python	bindings/python/runanywhere/_generated_defaults.py	1	default pool constants
+file	cpp	core/include/rac/rac_defaults_generated.h	1	SHIPPED public header — install(DIRECTORY include/) puts it in XCFramework Headers/ and the Linux/Windows dist; 5 shipped rac_*_types.h include it
+file	kotlin	bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	default pool constants for the Kotlin SDK
+file	kotlin	bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt	1	defaults()/validate()/wireString extensions over the Wire types
+
+keep	swift	bindings/swift/Sources/RunAnywhere/Generated/Versions.swift	1	written by scripts/release/sync-versions.sh, not by codegen
+keep	ts	bindings/proto-ts/src/index.ts	1	hand-written barrel
+keep	ts	bindings/proto-ts/src/lifecycle_service.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/convenience/_errors.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/convenience/errors_category.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/events/public_events.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/streams/_streamFactory.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/streams/push.ts	1	hand-written

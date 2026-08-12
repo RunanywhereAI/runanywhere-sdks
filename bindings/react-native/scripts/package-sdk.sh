@@ -459,6 +459,19 @@ fi
 echo ">> yarn install --immutable (cwd=$YARN_CWD)"
 (cd "$YARN_CWD" && corepack yarn install --immutable)
 
+# IDL codegen is a hard prerequisite for everything below. Two untracked trees
+# feed this package set:
+#   bindings/proto-ts/src               -> `yarn build:proto` compiles it into
+#                                          ../proto-ts/dist, which is what
+#                                          `npm pack` publishes and what every
+#                                          entry package vendors.
+#   packages/core/android/src/main/java/com/runanywhere/sdk/generated/
+#                                       -> RADefaultsPool.kt, shipped inside the
+#                                          npm tarball (files includes android/src)
+#                                          and compiled by the consumer's Gradle.
+# Without this, both come out empty and the failure lands in a consumer's build.
+"${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only ts
+
 # Build and pack the canonical generated protocol package once. Public entry
 # packages that consume generated protocol types vendor this exact archive, so
 # installing a GitHub Release tarball never depends on an unpublished registry

@@ -25,16 +25,28 @@ OUT_DIR="${REPO_ROOT}/core/src/generated/proto"
 
 mkdir -p "${OUT_DIR}"
 
-if ! command -v protoc >/dev/null 2>&1; then
-    echo "error: protoc not found. Run scripts/setup/setup-toolchain.sh." >&2
+# The pinned protoc, obtained rather than assumed — see bootstrap_protoc.sh.
+# generate_all.sh already put it on PATH; this repeats the resolution for a
+# standalone invocation (CMake's RAC_REGENERATE_PROTO path calls this script
+# directly) and costs nothing when PATH is already correct.
+if ! PROTOC_BIN="$("${SCRIPT_DIR}/bootstrap_protoc.sh")"; then
+    echo "error: could not obtain the pinned protoc (see above)." >&2
     exit 127
+fi
+# Only when it changes the answer — dirname(PROTOC_BIN) is often a
+# general-purpose bin dir (Homebrew's, when `brew install protobuf` supplied the
+# pin), and prepending that re-orders every other tool the caller set up. Same
+# guard as generate_all.sh; see the long note there.
+if [ "$(command -v protoc 2>/dev/null || true)" != "${PROTOC_BIN}" ]; then
+    PATH="$(dirname "${PROTOC_BIN}"):${PATH}"
+    export PATH
 fi
 
 # Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone. C++ is the authoritative
 # consumer and emits every proto in idl/ except the declaration-only pool.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
-    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
 fi
 
 # sdk_defaults.proto carries rac_default annotations and no wire messages.
@@ -59,10 +71,22 @@ while IFS= read -r proto_path; do
     CPP_PROTO_BASENAMES+=("${proto_base}")
 done <<< "${RAC_PROTO_FILES}"
 
-protoc \
-    --proto_path="${PROTO_DIR}" \
-    --cpp_out="${OUT_DIR}" \
-    "${CPP_PROTO_BASENAMES[@]}"
+# Run from idl/ with RELATIVE paths on both sides.
+#
+# protoc is a native binary; under Git Bash the shell hands it MSYS-style
+# arguments (`--proto_path=/c/Users/...`) and relies on MSYS's argument
+# conversion heuristic to rewrite them into `C:/Users/...`. That heuristic is
+# not something to bet the Windows build on. Relative paths need no conversion
+# at all, and the output is byte-identical: what protoc embeds in the generated
+# code is each file's name relative to --proto_path, which is the basename
+# either way.
+(
+    cd "${PROTO_DIR}"
+    protoc \
+        --proto_path=. \
+        --cpp_out=../core/src/generated/proto \
+        "${CPP_PROTO_BASENAMES[@]}"
+)
 
 echo "✓ C++ proto codegen → ${OUT_DIR}"
 ls -1 "${OUT_DIR}"

@@ -273,6 +273,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # runanywhere/_proto, _generated_errors.py and _generated_defaults.py are
+      # IDL codegen output and are not tracked. `python -m build` runs them via
+      # the in-tree PEP 517 backend, but only when protoc + grpcio-tools are on
+      # the host; generating here makes that unconditional (the backend then
+      # finds the files present and skips). Without it the wheel builds,
+      # repairs, installs — and fails at `import runanywhere`.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: python
       - name: Sherpa-ONNX prebuilts
         shell: cmd
         # 7-Zip (used by this script) is preinstalled on GitHub windows runners.
@@ -340,6 +349,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      # runanywhere/_proto, _generated_errors.py and _generated_defaults.py are
+      # IDL codegen output and are not tracked. `python -m build` runs them via
+      # the in-tree PEP 517 backend, but only when protoc + grpcio-tools are on
+      # the host; generating here makes that unconditional (the backend then
+      # finds the files present and skips). Without it the wheel builds,
+      # repairs, installs — and fails at `import runanywhere`.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: python
       - name: Build tools (patchelf is required by auditwheel)
         run: |
           sudo apt-get update -q
@@ -401,6 +419,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # runanywhere/_proto, _generated_errors.py and _generated_defaults.py are
+      # IDL codegen output and are not tracked. `python -m build` runs them via
+      # the in-tree PEP 517 backend, but only when protoc + grpcio-tools are on
+      # the host; generating here makes that unconditional (the backend then
+      # finds the files present and skips). Without it the wheel builds,
+      # repairs, installs — and fails at `import runanywhere`.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: python
       - name: Build tools
         run: |
           brew install ninja
@@ -488,7 +515,13 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
-      - run: brew install protobuf
+      # Sources/RunAnywhere/Generated is IDL codegen output and is not tracked,
+      # so `swift build` below has nothing to compile without this. (It also
+      # installs the pinned protoc the native build wants, replacing the plain
+      # `brew install protobuf` that used to sit here.)
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: swift
       - name: Download vendored ONNX Runtime (iOS xcframework)
         run: bash core/scripts/ios/download-onnx.sh
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
@@ -532,6 +565,12 @@ jobs:
 
   kotlin-android:
     runs-on: ubuntu-22.04
+    # The native build plus three Gradle invocations land around 45 min. Without
+    # a ceiling a wedged Gradle task rides the 6 h runner limit and reports as
+    # "cancelled" with no failing step to point at — which is exactly how a hung
+    # :testDebugUnitTest presented once here. This does not weaken any check; it
+    # turns an invisible stall into a fast, attributable failure.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -565,6 +604,11 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
+      # The Dart bindings under packages/runanywhere/lib/generated are IDL codegen output and are not tracked; generate
+      # before anything compiles them.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: dart
       - name: Analyze and test the complete Flutter workspace
         working-directory: bindings/flutter
         run: |
@@ -584,6 +628,18 @@ jobs:
       # Repo root and bindings/react-native pin `packageManager: yarn@3.6.1`
       # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
+      # The shared proto-ts sources and RADefaultsPool.kt are IDL codegen output and are not tracked; generate
+      # before anything compiles them.
+      #
+      # `cpp` as well as `ts`: the RN header compile below -I's core/include and
+      # -fsyntax-only's packages/*/cpp/*.hpp, which reach rac_llm_types.h and
+      # friends — and every one of those #includes rac/rac_defaults_generated.h,
+      # which is codegen output too. This job never configures CMake, so the
+      # configure-time hook in core/CMakeLists.txt does not cover it.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts,cpp
+          ts-dist: 'true'
       - name: Enable Corepack (yarn@3.6.1)
         run: |
           set -euo pipefail
@@ -651,6 +707,12 @@ jobs:
       # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
       # `--workspaces=false` keeps npm from inheriting the root workspace
       # context and resolves the long/protobufjs deps in-tree directly.
+      # The shared proto-ts sources are IDL codegen output and are not tracked; generate
+      # before anything compiles them.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
+          ts-dist: 'true'
       - name: Install workspace dependencies
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
@@ -685,6 +747,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # The shared proto-ts sources are IDL codegen output and are not tracked; generate
+      # before anything compiles them.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
+          ts-dist: 'true'
       - name: Install Web SDK workspace
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
@@ -769,6 +837,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # bindings/proto-ts/src is IDL codegen output and is not tracked; the
+      # Electron packages import @runanywhere/proto-ts, so tsc needs it first.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
+          ts-dist: 'true'
       # Not a member of the root Yarn workspace — it installs standalone from
       # its own package-lock.json.
       - name: Install dependencies

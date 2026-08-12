@@ -1,0 +1,187 @@
+name: Generate IDL bindings
+description: |
+  Installs the pinned codegen toolchain for a subset of languages and runs
+  idl/codegen/generate_all.sh --only <languages>.
+
+  WHY EVERY SDK JOB NEEDS THIS
+    The Swift, TypeScript, Dart, React Native and Python bindings are IDL
+    codegen output and are not tracked (see .gitignore and
+    idl/codegen/generated_trees.txt). A job that checks out the repo and runs
+    `tsc`, `flutter pub get`, `swift build` or `pytest` therefore starts with no
+    generated code at all. Add this step after checkout and before the build.
+
+  WHY IT IS SCOPED
+    Generating everything would make a Linux Web job install protoc-gen-swift,
+    wire-compiler and a Dart SDK for output it never compiles. Each generator
+    reads the same idl/*.proto and writes a disjoint tree, so `--only` is safe
+    and keeps each job's install to what it actually needs.
+
+  WHAT DOES *NOT* NEED THIS
+    Jobs that configure core/CMakeLists.txt (native_*, wasm, rcli, ios-device,
+    android-arm64, macos-*, linux-*, the Electron addon, the Python wheel) get
+    the C/C++ bindings generated for them at CMake configure time, and jobs that
+    run Gradle on bindings/kotlin get the Kotlin bindings from the
+    `generateIdlKotlinBindings` task wired into preBuild. Those two hooks exist
+    so ~29 native runner instances do not each need a codegen step here.
+
+    A job that reads core/include WITHOUT configuring CMake does still need
+    this with `cpp` — rn-typecheck (-fsyntax-only against core/include) and
+    native_rcli_macos (`swift build` over root Package.swift) are the two.
+
+  All versions come from core/VERSIONS. Nothing here is installed from a package
+  manager where the exact patch level matters: idl/codegen/bootstrap_protoc.sh
+  and bootstrap_wire.sh download and checksum-verify the pinned protoc and
+  wire-compiler themselves, so this action's install steps are a warm cache, not
+  a prerequisite. generate_all.sh fails closed on a protoc mismatch.
+
+inputs:
+  languages:
+    required: true
+    description: 'Comma-separated subset of: swift, kotlin, dart, ts, cpp, python'
+  ts-dist:
+    required: false
+    default: 'false'
+    description: >-
+      Also compile bindings/proto-ts to dist/. Generating ts only writes src/,
+      but consumers resolve @runanywhere/proto-ts/<module> through the package
+      exports map, which points at dist/. Any job that typechecks or runs code
+      against proto-ts needs this; a job that only regenerates does not.
+
+runs:
+  using: composite
+  steps:
+    - name: Validate language selector
+      shell: bash
+      env:
+        RA_IDL_LANGUAGES: ${{ inputs.languages }}
+      run: |
+        set -euo pipefail
+        for l in ${RA_IDL_LANGUAGES//,/ }; do
+          case "$l" in
+            swift|kotlin|dart|ts|cpp|python) ;;
+            *) echo "::error::generate-idl: unknown language '$l'"; exit 1 ;;
+          esac
+        done
+
+    - name: Install protoc (pinned)
+      shell: bash
+      env:
+        # One asset for both macOS runner architectures, so a cache entry keyed
+        # on the version is portable across the x86_64 and arm64 images.
+        RAC_PROTOC_ASSET_DARWIN: osx-universal_binary
+      run: |
+        set -euo pipefail
+        cd "${GITHUB_WORKSPACE}"
+        if [ "$(uname -s)" = "Darwin" ]; then
+          export RAC_PROTOC_ASSET="${RAC_PROTOC_ASSET_DARWIN}"
+        fi
+        # The single implementation lives in idl/codegen/bootstrap_protoc.sh so
+        # that CI, a CMake configure, a Gradle build and a laptop all resolve
+        # protoc the same way. Here it only pre-warms the cache and exposes the
+        # binary to later steps.
+        bindir="$(./idl/codegen/bootstrap_protoc.sh --print-dir)"
+        # $GITHUB_PATH entries are consumed by the runner, not by bash. On
+        # Windows the runner is not MSYS-aware, so a /c/Users/... path from Git
+        # Bash would be added verbatim and never resolve — translate it.
+        if command -v cygpath >/dev/null 2>&1; then
+          cygpath -w "$bindir" >> "$GITHUB_PATH"
+        else
+          echo "$bindir" >> "$GITHUB_PATH"
+        fi
+
+    - name: Install Python protobuf runtime
+      # Every convenience/default-pool generator parses descriptor sets with it,
+      # regardless of which language is selected. Installing into the runner's
+      # own interpreter is the fast path; bootstrap_pyproto.sh falls back to a
+      # cached venv, and is the thing generate_all.sh actually consults — so
+      # this step is a warm cache and the assertion is its exit code.
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "${GITHUB_WORKSPACE}"
+        PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' core/VERSIONS | cut -d= -f2)"
+        # Windows runners expose `python`, not `python3`; --break-system-packages
+        # is a no-op before pip 23 and required on Debian-managed interpreters.
+        for py in python3 python; do
+          if command -v "$py" >/dev/null 2>&1; then
+            "$py" -m pip install --upgrade --break-system-packages \
+              "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml \
+              || "$py" -m pip install --upgrade "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml \
+              || true
+            break
+          fi
+        done
+        echo "python for codegen: $(./idl/codegen/bootstrap_pyproto.sh)"
+
+    - name: Install swift-protobuf + grpc-swift
+      if: contains(inputs.languages, 'swift')
+      shell: bash
+      run: |
+        set -euo pipefail
+        brew install protobuf swift-protobuf grpc-swift
+        # The formula installs the v2 plugin under a suffixed name; the codegen
+        # script invokes `protoc --grpc-swift_out=`, which resolves the bare name.
+        if [ -x /opt/homebrew/bin/protoc-gen-grpc-swift-2 ]; then
+          ln -sf /opt/homebrew/bin/protoc-gen-grpc-swift-2 /opt/homebrew/bin/protoc-gen-grpc-swift
+        fi
+        command -v protoc-gen-swift >/dev/null 2>&1 || { echo "::error::protoc-gen-swift missing"; exit 1; }
+        command -v protoc-gen-grpc-swift >/dev/null 2>&1 || { echo "::error::protoc-gen-grpc-swift missing"; exit 1; }
+
+    - name: Install wire-compiler
+      if: contains(inputs.languages, 'kotlin')
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "${GITHUB_WORKSPACE}"
+        # NOT `brew install wire` — that formula is the Wire messaging app.
+        # bootstrap_wire.sh pulls the pinned fat JAR from Maven Central and
+        # checksum-verifies it; same single implementation as everywhere else.
+        bindir="$(./idl/codegen/bootstrap_wire.sh --print-dir)"
+        if command -v cygpath >/dev/null 2>&1; then
+          cygpath -w "$bindir" >> "$GITHUB_PATH"
+        else
+          echo "$bindir" >> "$GITHUB_PATH"
+        fi
+
+    - name: Install Dart + protoc_plugin
+      if: contains(inputs.languages, 'dart')
+      shell: bash
+      run: |
+        set -euo pipefail
+        PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        if ! command -v dart >/dev/null 2>&1; then
+          echo "::error::dart not on PATH — add dart-lang/setup-dart or setup-toolchain platform=flutter before this action"
+          exit 1
+        fi
+        dart pub global activate protoc_plugin "$PROTOC_GEN_DART_VERSION"
+        echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+    - name: Install ts-proto
+      if: contains(inputs.languages, 'ts')
+      shell: bash
+      run: |
+        set -euo pipefail
+        TS_PROTO_VERSION="$(grep -E '^TS_PROTO_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        npm install -g "ts-proto@${TS_PROTO_VERSION}" protobufjs
+
+    - name: Install grpcio-tools
+      if: contains(inputs.languages, 'python')
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m pip install --upgrade --break-system-packages 'grpcio-tools==1.71.*'
+        python3 -c 'import grpc_tools.protoc'
+
+    - name: Generate
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: ./idl/codegen/generate_all.sh --only "${{ inputs.languages }}"
+
+    - name: Compile proto-ts to dist
+      if: inputs.ts-dist == 'true' && contains(inputs.languages, 'ts')
+      shell: bash
+      working-directory: ${{ github.workspace }}/bindings/proto-ts
+      run: |
+        set -euo pipefail
+        npm install --package-lock=false --workspaces=false
+        npm run build

@@ -1,52 +1,98 @@
-name: IDL drift check
+name: IDL gate
 
-# Runs on every PR and every push to `main`. If any .proto under idl/ is edited
-# without regenerating the committed language bindings, or if anyone hand-edits
-# a generated file, this job fails with ::error::IDL-generated code is out of
-# sync with .proto sources. Fixing the PR is a one-liner locally:
+# GENERATE, THEN VERIFY — not "regenerate and diff".
 #
-#   ./idl/codegen/generate_all.sh && (cd bindings/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
+# NO language binding is committed (.gitignore, and
+# idl/codegen/generated_trees.txt lists exactly what that covers). The old shape
+# of this job — regenerate, then require `git status --porcelain -uall` to be
+# empty — cannot fail for an ignored file. So it was rewritten rather than
+# amended. What runs now:
+#
+#   1. schema lock   idl/SCHEMA_LOCK is tracked and refreshed by generate_all.sh
+#                    from the .proto digest. Editing a schema without running
+#                    codegen leaves the committed lock stale -> fail. This is
+#                    the drift signal that replaces the diff.
+#   2. presence      every declared generated tree exists and is non-empty, and
+#                    none of them is TRACKED (a `git add -f` or a lost
+#                    .gitignore rule would otherwise re-commit hundreds of
+#                    machine files with no symptom at all).
+#   3. case          no two generated names differ only in letter case, which is
+#                    one file on macOS and two on Linux.
+#   4. compile       the generated TypeScript is fed to tsc and the generated
+#                    Python is imported. Un-reviewable output has to be
+#                    machine-checked instead. The C/C++ and Kotlin trees are
+#                    compiled by the native and kotlin-android jobs in
+#                    pr-build.yml.
+#
+# Fixing a failure locally:
+#   ./idl/codegen/generate_all.sh
+#   git add idl/SCHEMA_LOCK          # the only tracked output of a codegen run
 
 on:
   pull_request:
     paths:
+      # Inputs to codegen.
       - 'idl/**'
-      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
-      - 'bindings/proto-ts/**'
-      - 'core/src/generated/proto/**'
-      - 'bindings/python/runanywhere/_proto/**'
-      - 'idl/codegen/generate_python.sh'
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
+      # The composite action is the generator entry point for ~9 jobs; a
+      # change to how it installs or invokes codegen must face this gate.
+      - '.github/actions/generate-idl/action.yml'
       - '.github/workflows/idl-drift-check.yml'
+      # No generated path is listed any more: every one of them is untracked, so
+      # no PR can touch it and a filter pointing there can never fire.
+      # Hand-written files that live inside an otherwise-generated tree.
+      - 'bindings/proto-ts/src/index.ts'
+      - 'bindings/proto-ts/src/lifecycle_service.ts'
+      - 'bindings/proto-ts/src/convenience/_errors.ts'
+      - 'bindings/proto-ts/src/convenience/errors_category.ts'
+      - 'bindings/proto-ts/src/events/public_events.ts'
+      - 'bindings/proto-ts/src/streams/**'
+      - 'bindings/proto-ts/package.json'
+      - 'bindings/proto-ts/tsconfig.json'
+      # The publish paths that must generate before packaging.
+      - 'bindings/swift/scripts/sync-dist-repo.sh'
+      - 'bindings/*/scripts/package-sdk.sh'
+      - 'bindings/python/pyproject.toml'
+      - 'bindings/python/_build/**'
+      - 'scripts/setup/setup.sh'
+      - '.gitignore'
   push:
     # Include long-lived integration branches so a
     # direct push that touches IDL-adjacent files without a PR still
-    # gets the drift gate.
+    # gets the gate.
     branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
-      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
-      - 'bindings/proto-ts/**'
-      - 'core/src/generated/proto/**'
-      - 'bindings/python/runanywhere/_proto/**'
-      - 'idl/codegen/generate_python.sh'
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
+      # The composite action is the generator entry point for ~9 jobs; a
+      # change to how it installs or invokes codegen must face this gate.
+      - '.github/actions/generate-idl/action.yml'
       - '.github/workflows/idl-drift-check.yml'
+      - 'bindings/proto-ts/src/index.ts'
+      - 'bindings/proto-ts/src/lifecycle_service.ts'
+      - 'bindings/proto-ts/src/convenience/_errors.ts'
+      - 'bindings/proto-ts/src/convenience/errors_category.ts'
+      - 'bindings/proto-ts/src/events/public_events.ts'
+      - 'bindings/proto-ts/src/streams/**'
+      - 'bindings/proto-ts/package.json'
+      - 'bindings/proto-ts/tsconfig.json'
+      - 'bindings/swift/scripts/sync-dist-repo.sh'
+      - 'bindings/*/scripts/package-sdk.sh'
+      - 'bindings/python/pyproject.toml'
+      - 'bindings/python/_build/**'
+      - 'scripts/setup/setup.sh'
+      - '.gitignore'
 
 permissions:
   contents: read
 
 jobs:
   check:
-    name: Verify generated code matches IDL
+    name: Generate every binding, then verify it
     # macos-15 ships Xcode 16 with Swift 6, which is the minimum
     # required by Homebrew's grpc-swift v2 formula. On macos-14 the formula
     # bails with "protoc-gen-grpc-swift: An unsatisfied requirement failed
@@ -59,14 +105,21 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Two commits, so the base copy of idl/SCHEMA_LOCK is reachable for
+          # the "did IDL_VERSION move with the schema?" check below.
+          fetch-depth: 2
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
 
-      - name: Install protoc + swift-protobuf (Homebrew)
+      - name: Install swift-protobuf (Homebrew)
+        # NOT protobuf: Homebrew cannot pin protoc's patch level, and
+        # idl/codegen/bootstrap_protoc.sh downloads + checksum-verifies the
+        # pinned release itself when generate_all.sh runs.
         run: |
           set -euo pipefail
-          brew install protobuf swift-protobuf
+          brew install swift-protobuf
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
@@ -97,36 +150,19 @@ jobs:
         run: |
           set -euo pipefail
           # IMPORTANT: Homebrew's `wire` formula is the Wire *messaging app*
-          # (wire.com), NOT Square's protobuf compiler. The previous
-          # `brew install wire` therefore never produced a `wire-compiler`
-          # binary, so generate_kotlin.sh silently fell back to warn-and-skip
-          # (the Gradle Wire plugin only regenerates at app build time, NOT in
-          # this drift job) — Kotlin bindings drifted through CI undetected.
-          #
-          # Install the real wire-compiler from Maven Central, pinned to
-          # WIRE_VERSION in core/VERSIONS (the same version
-          # that produced the committed Kotlin bindings), and expose it as
-          # `wire-compiler` on PATH. Hard-fail if it is missing, matching the
-          # protoc-gen-grpc-swift gate above.
-          WIRE_VERSION="$(grep -E '^WIRE_VERSION=' core/VERSIONS | cut -d= -f2)"
-          echo "wire-compiler version (pinned): ${WIRE_VERSION}"
-          JAR_URL="https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
-          mkdir -p "$HOME/.local/bin"
-          curl --fail --show-error --location \
-            --retry 5 --retry-all-errors --retry-delay 2 \
-            -o "$HOME/.local/bin/wire-compiler.jar" "$JAR_URL"
-          # The generated wrapper must expand HOME and argv when it runs,
-          # not while this workflow step writes it.
-          # shellcheck disable=SC2016
-          printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
-          chmod +x "$HOME/.local/bin/wire-compiler"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # (wire.com), NOT Square's protobuf compiler. The real one is a fat
+          # JAR on Maven Central, pinned to WIRE_VERSION in core/VERSIONS and
+          # checksum-verified by idl/codegen/bootstrap_wire.sh — the same script
+          # generate_kotlin.sh and the Gradle build use, so this step only warms
+          # the cache and exposes it on PATH.
+          bindir="$(./idl/codegen/bootstrap_wire.sh --print-dir)"
+          echo "$bindir" >> "$GITHUB_PATH"
           # Wire 5.5.1 has no --help/--version flag and intentionally exits 1
           # without generation arguments. Probe its exact diagnostic without
           # letting pipefail turn that expected exit into a false install error.
-          WIRE_PROBE="$(java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 || true)"
+          WIRE_PROBE="$("$bindir/wire-compiler" 2>&1 || true)"
           if ! grep -Fq 'Nothing to do! Specify --java_out=' <<<"$WIRE_PROBE"; then
-            echo "::error::wire-compiler not runnable after Maven download (${JAR_URL})"
+            echo "::error::wire-compiler not runnable after Maven download"
             exit 1
           fi
 
@@ -185,10 +221,14 @@ jobs:
       - name: Dump toolchain versions (debug)
         run: |
           set -euo pipefail
-          echo "protoc: $(protoc --version)"
+          # protoc is not expected on PATH: bootstrap_protoc.sh resolves the
+          # pinned build (downloading it when needed) and generate_all.sh puts
+          # it on PATH for the duration of the run. Ask the same script.
+          echo "protoc (pinned): $("$(./idl/codegen/bootstrap_protoc.sh)" --version)"
+          echo "python (protobuf runtime): $(./idl/codegen/bootstrap_pyproto.sh)"
           echo "protoc-gen-swift: $(protoc-gen-swift --version 2>/dev/null || echo 'not present')"
           echo "protoc-gen-grpc-swift: $(protoc-gen-grpc-swift --version 2>/dev/null || echo 'not present')"
-          echo "wire-compiler: $(wire-compiler --version 2>/dev/null || echo 'not present')"
+          echo "wire-compiler: $(command -v wire-compiler || echo 'not present')"
           echo "dart: $(dart --version 2>&1 || echo 'not present')"
           echo "node: $(node --version)"
 
@@ -199,33 +239,52 @@ jobs:
         # is independent of the drift check below. See idl/codegen/tests/README.md.
         run: python3 idl/codegen/tests/test_convenience_generators.py
 
-      - name: Regenerate all bindings
-        run: ./idl/codegen/generate_all.sh
-
-      - name: Build shared TypeScript proto package
+      - name: Capture the base copy of idl/SCHEMA_LOCK
+        # Used by the IDL_VERSION bump check further down. Kept outside the
+        # working tree so it cannot be mistaken for a generated artifact.
+        id: base_lock
         run: |
           set -euo pipefail
-          cd bindings/proto-ts
-          # `--workspaces=false` so npm doesn't walk up into the repo-root
-          # Yarn workspace (which uses `workspace:*` deps that npm can't
-          # parse — bails with EUNSUPPORTEDPROTOCOL).
-          npm install --package-lock=false --workspaces=false
-          npm run build
-
-      - name: Fail on drift
-        run: |
-          set -euo pipefail
-          status="$(git status --porcelain --untracked-files=all)"
-          if [ -n "$status" ]; then
-            echo "::error::IDL-generated code is out of sync with .proto sources."
-            git diff --stat
-            printf '%s\n' "$status"
-            echo ""
-            echo "To fix locally:"
-            echo "  ./scripts/setup/setup-toolchain.sh"
-            echo "  ./idl/codegen/generate_all.sh"
-            echo "  (cd bindings/proto-ts && npm install --package-lock=false && npm run build)"
-            echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
-            exit 1
+          base_ref=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.event.pull_request.base.sha }}"
+          else
+            base_ref="${{ github.event.before }}"
           fi
-          echo "✓ No drift detected."
+          out="${RUNNER_TEMP}/SCHEMA_LOCK.base"
+          # fetch-depth: 2 makes the PR base reachable (the merge commit's other
+          # parent), but says nothing about `github.event.before` after a
+          # multi-commit push — and an unreachable base silently SKIPS the
+          # version-bump check below, which is the one case where it matters.
+          # Fetch the object rather than deepening the whole clone: this repo's
+          # full history is far too large to pull on every gate run.
+          if [ -n "$base_ref" ] && ! git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+            echo "Base ${base_ref} not in the shallow clone — fetching it"
+            git fetch --no-tags --depth=1 origin "${base_ref}" 2>/dev/null || true
+          fi
+          if [ -n "$base_ref" ] && git cat-file -e "${base_ref}:idl/SCHEMA_LOCK" 2>/dev/null; then
+            git show "${base_ref}:idl/SCHEMA_LOCK" > "$out"
+            echo "path=$out" >> "$GITHUB_OUTPUT"
+            echo "Base lock captured from ${base_ref}"
+          else
+            # First commit that introduces the lock, a shallow fetch, or a
+            # force-push: nothing to compare against, so the bump check is
+            # skipped rather than guessed at.
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "No base idl/SCHEMA_LOCK reachable — bump check will be skipped"
+          fi
+
+      - name: Generate every binding, then verify it
+        # Runs the same script contributors run locally, so a green CI and a
+        # green laptop mean the same thing. --with-compile adds the tsc build of
+        # bindings/proto-ts and an import of the generated Python: the
+        # de-committed trees cannot be reviewed in a diff any more, so they get
+        # machine-checked instead.
+        run: ./idl/codegen/ci-drift-check.sh --with-compile
+
+      - name: Require an idl/VERSION bump when the schema changed
+        if: steps.base_lock.outputs.path != ''
+        run: |
+          set -euo pipefail
+          ./idl/codegen/schema_lock.sh --check \
+            --require-bump "${{ steps.base_lock.outputs.path }}"

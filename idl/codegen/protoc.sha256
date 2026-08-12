@@ -1,0 +1,37 @@
+# =============================================================================
+# protoc.sha256 — pinned release assets for core/VERSIONS::PROTOC_VERSION
+# =============================================================================
+# Read by idl/codegen/bootstrap_protoc.sh. Every line is
+#
+#     <sha256>  protoc-<version>-<asset>.zip
+#
+# and names a file published on
+# https://github.com/protocolbuffers/protobuf/releases/download/v<version>/.
+#
+# WHY THE FILE IS VERSION-SCOPED
+#   The asset names embed the version, so bumping core/VERSIONS::PROTOC_VERSION
+#   without updating this file leaves bootstrap_protoc.sh with no checksum for
+#   the asset it is about to download — and it refuses to install an unverified
+#   binary. That is the intended failure: the pin and its provenance move
+#   together or not at all.
+#
+# HOW TO REFRESH AFTER A BUMP
+#   v=<new version>
+#   for a in osx-aarch_64 osx-x86_64 osx-universal_binary \
+#            linux-x86_64 linux-aarch_64 win64 win32; do
+#     curl -fsSL -O "https://github.com/protocolbuffers/protobuf/releases/download/v$v/protoc-$v-$a.zip"
+#   done
+#   shasum -a 256 protoc-$v-*.zip     # (sha256sum on Linux)
+#
+# osx-universal_binary is listed as well as the two single-arch macOS assets:
+# CI installs the universal build (one cache entry for both runner
+# architectures) while a developer machine takes the smaller native slice.
+# =============================================================================
+
+01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf  protoc-35.1-linux-aarch_64.zip
+6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7  protoc-35.1-linux-x86_64.zip
+193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2  protoc-35.1-osx-aarch_64.zip
+9c27aebb44c537f5627cc13c9c1c6bc0e34ecfefc6e4d79b19764afb8302d95b  protoc-35.1-osx-universal_binary.zip
+537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7  protoc-35.1-osx-x86_64.zip
+e0c1b5be94c0de8ecd1f4d509bdfb344e6464e68ada27c039113dd474b318c51  protoc-35.1-win32.zip
+5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082  protoc-35.1-win64.zip

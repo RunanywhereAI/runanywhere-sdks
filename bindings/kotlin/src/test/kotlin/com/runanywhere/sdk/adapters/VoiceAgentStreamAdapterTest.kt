@@ -104,14 +104,22 @@ class VoiceAgentStreamAdapterTest {
             val adapter = VoiceAgentStreamAdapter(handle, bridge)
             val a = mutableListOf<String>()
             val b = mutableListOf<String>()
+            val seenA = AtomicInteger(0)
+            val seenB = AtomicInteger(0)
 
             val jobA =
                 launch(Dispatchers.Default) {
-                    adapter.stream().take(1).collect { a += it.session_id }
+                    adapter.stream().take(1).collect {
+                        a += it.session_id
+                        seenA.incrementAndGet()
+                    }
                 }
             val jobB =
                 launch(Dispatchers.Default) {
-                    adapter.stream().take(1).collect { b += it.session_id }
+                    adapter.stream().take(1).collect {
+                        b += it.session_id
+                        seenB.incrementAndGet()
+                    }
                 }
 
             val ready =
@@ -120,9 +128,25 @@ class VoiceAgentStreamAdapterTest {
                 }
             assertTrue("single C registration must service both collectors", ready)
 
-            bridge.capturedCallback
-                .get()!!
-                .invoke(VoiceEvent(session_id = "shared", user_said = UserSaidEvent(text = "hi")).encode())
+            // Drive the event until BOTH collectors have observed one, exactly
+            // as `last detach tears down the C registration` does below and for
+            // the same reason: registerCount hits 1 the instant the FIRST
+            // collector attaches, so firing a single event there races jobB's
+            // attach. Losing that race left jobB's take(1) waiting on an event
+            // that had already been broadcast, jobB.join() blocked forever, and
+            // :testDebugUnitTest hung with no output until the CI job's 6 h
+            // ceiling. take(1) completes and detaches a collector the moment it
+            // receives, so a re-invoke only ever reaches one that has not been
+            // served yet — each still ends with exactly one event, and the
+            // assertions below are unchanged.
+            val bothServed =
+                waitFor(timeoutMs = 3000) {
+                    bridge.capturedCallback
+                        .get()
+                        ?.invoke(VoiceEvent(session_id = "shared", user_said = UserSaidEvent(text = "hi")).encode())
+                    seenA.get() > 0 && seenB.get() > 0
+                }
+            assertTrue("both collectors must be served by the one registration", bothServed)
 
             jobA.join()
             jobB.join()

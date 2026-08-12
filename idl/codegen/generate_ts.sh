@@ -33,14 +33,96 @@ if ! command -v protoc >/dev/null 2>&1; then
     exit 127
 fi
 
-# Resolve the ts-proto plugin that `npm install -g ts-proto` provides. On some
-# systems (nvm, asdf) `npm root -g` points at a user-local path — both work.
-TS_PROTO_PLUGIN="$(npm root -g 2>/dev/null)/ts-proto/protoc-gen-ts_proto"
-if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
-    echo "error: ts-proto plugin not found at ${TS_PROTO_PLUGIN}" >&2
+# Resolve the ts-proto plugin. `npm install -g ts-proto` leaves it in two
+# places — an executable shim on PATH at <prefix>/bin/protoc-gen-ts_proto, and
+# the package itself under `npm root -g` — and those two can name different
+# prefixes on the same machine. A host with more than one Node (a CI tool-cache
+# Node from actions/setup-node plus a Homebrew one, nvm, asdf) resolves `npm`
+# to whichever is first on PATH *at that moment*, so the prefix that received
+# `npm install -g` is not necessarily the prefix `npm root -g` reports here.
+# Try every legitimate location instead of betting on one.
+#
+# So resolve the PACKAGE DIRECTORY, which is unambiguous, rather than a shim.
+ts_proto_pkg_dirs() {
+    npm_root="$(npm root -g 2>/dev/null || true)"
+    [ -n "${npm_root}" ] && printf '%s\n' "${npm_root}/ts-proto"
+    # npm root -g answers <prefix>/lib/node_modules on POSIX and
+    # <prefix>/node_modules on Windows; list both anyway for a broken npm.
+    npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+    if [ -n "${npm_prefix}" ]; then
+        printf '%s\n' "${npm_prefix}/lib/node_modules/ts-proto"
+        printf '%s\n' "${npm_prefix}/node_modules/ts-proto"
+    fi
+    # A repo-local install is a first-class answer too: `npm install` in
+    # bindings/proto-ts, or a hoisted root install, both put it here.
+    printf '%s\n' "${REPO_ROOT}/bindings/proto-ts/node_modules/ts-proto"
+    printf '%s\n' "${REPO_ROOT}/node_modules/ts-proto"
+}
+
+TS_PROTO_PKG=""
+while IFS= read -r candidate_dir; do
+    [ -n "${candidate_dir}" ] || continue
+    if [ -f "${candidate_dir}/protoc-gen-ts_proto" ]; then
+        TS_PROTO_PKG="${candidate_dir}"
+        break
+    fi
+done <<< "$(ts_proto_pkg_dirs)"
+
+if [ -z "${TS_PROTO_PKG}" ]; then
+    echo "error: the ts-proto package is not installed anywhere this script looks." >&2
+    echo "       Tried, in order:" >&2
+    ts_proto_pkg_dirs | sed 's/^/         /' >&2
     echo "       Install via: npm install -g ts-proto@${TS_PROTO_VERSION}" >&2
+    echo "       If you just ran that and still see this, the npm that installed it and" >&2
+    echo "       the npm on PATH here have different global prefixes." >&2
     exit 127
 fi
+
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*|Windows_NT)
+        # Windows cannot execute the package's `protoc-gen-ts_proto`: it is an
+        # extensionless `#!/usr/bin/env node` script, and protoc spawns plugins
+        # through CreateProcess, which fails with "%1 is not a valid Win32
+        # application". npm's own .cmd shim would do, but where npm puts it
+        # depends on the prefix layout and on which Node is first on PATH — the
+        # thing that already went wrong once here. Write our own instead: two
+        # lines, no discovery, correct by construction.
+        #
+        # Into a per-run temp dir, NOT into the package: a global npm prefix can
+        # be read-only (C:\Program Files\nodejs\...) or a restored CI cache, and
+        # a failed redirect there would abort codegen with a bare shell error.
+        # Mutating an installed dependency tree that other tools checksum is its
+        # own problem.
+        RAC_TS_SHIM_DIR="$(mktemp -d)"
+        trap 'rm -rf "${RAC_TS_SHIM_DIR}"' EXIT
+        TS_PROTO_PLUGIN="${RAC_TS_SHIM_DIR}/protoc-gen-ts_proto.cmd"
+        entry="${TS_PROTO_PKG}/protoc-gen-ts_proto"
+        shim_out="${TS_PROTO_PLUGIN}"
+        if command -v cygpath >/dev/null 2>&1; then
+            entry="$(cygpath -w "${entry}")"
+            # protoc is a native binary, so the --plugin path it receives must
+            # be native too.
+            TS_PROTO_PLUGIN="$(cygpath -w "${TS_PROTO_PLUGIN}")"
+        fi
+        printf '@echo off\r\nnode "%s" %%*\r\n' "${entry}" > "${shim_out}"
+        ;;
+    *)
+        TS_PROTO_PLUGIN="${TS_PROTO_PKG}/protoc-gen-ts_proto"
+        if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
+            # Present but not +x (a tarball unpacked without exec bits): fall
+            # back to whatever `npm install -g` put on PATH.
+            on_path="$(command -v protoc-gen-ts_proto 2>/dev/null || true)"
+            if [ -n "${on_path}" ] && [ -x "${on_path}" ]; then
+                TS_PROTO_PLUGIN="${on_path}"
+            else
+                echo "error: ${TS_PROTO_PLUGIN} exists but is not executable, and no" >&2
+                echo "       protoc-gen-ts_proto is on PATH." >&2
+                exit 127
+            fi
+        fi
+        ;;
+esac
+echo "  ts-proto plugin: ${TS_PROTO_PLUGIN}" >&2
 
 # Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
@@ -53,7 +135,7 @@ fi
 # have future-proof parity with Kotlin / C++; no active TS consumer today,
 # but generated router.ts exists for symmetry.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
-    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
+    RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | LC_ALL=C sort)"
 fi
 
 # sdk_defaults.proto is the central default pool: it carries rac_default
