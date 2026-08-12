@@ -81,6 +81,11 @@ jobs:
         if: matrix.run_typescript
         with:
           languages: ts
+          # The SDK imports @runanywhere/proto-ts/<module>, which the package's
+          # exports map resolves to dist/ — generating only writes src/, so
+          # without this every subpath import fails to resolve ("TS2307: Cannot
+          # find module '@runanywhere/proto-ts/model_types'").
+          ts-dist: 'true'
       - name: SDK install / typecheck / unit tests
         if: matrix.run_typescript
         working-directory: bindings/electron

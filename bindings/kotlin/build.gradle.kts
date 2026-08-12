@@ -1,8 +1,5 @@
 import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-// Imported rather than written as java.time.Duration: inside a build script
-// `java` is the JavaPluginExtension accessor, so the fully-qualified name does
-// not resolve (same trap the resolveIdlBash() comment below calls out for File).
 import java.time.Duration
 
 plugins {
@@ -348,6 +345,11 @@ tasks.withType<Test>().configureEach {
     // wait forever, which on CI means the job burns its whole time budget and
     // then reports "cancelled" with no failing task named. Two orders of
     // magnitude of headroom, and a deadlock is attributed to this task.
+    //
+    // `Duration` is imported at the top rather than written as
+    // java.time.Duration: inside a build script `java` is the
+    // JavaPluginExtension accessor, so the fully-qualified name does not
+    // resolve — the same trap resolveIdlBash() calls out for File.
     timeout.set(Duration.ofMinutes(20))
 }
 
