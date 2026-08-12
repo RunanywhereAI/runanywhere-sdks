@@ -699,7 +699,7 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     // in addition to the proto_activity_slot cleared above. Without this, the
     // wire-seq + stale user_data UAF triggers when the handle heap address is
     // reused by a fresh component (rac_vad_component_create).
-    rac_vad_unset_stream_proto_callback(handle);
+    rac_vad_stream_component_teardown(handle);
     // Spin-wait for any in-flight
     // dispatch_vad_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
