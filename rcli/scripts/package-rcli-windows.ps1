@@ -10,7 +10,11 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $CliRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$RepoRoot = (Resolve-Path (Join-Path $CliRoot "..\..")).Path
+# $CliRoot is the rcli/ directory, which sits directly under the repo root. It
+# used to be sdk/runanywhere-cli/, two levels down, which is why this walked up
+# twice. The sibling .sh scripts derive their root from rcli/scripts instead, so
+# they legitimately still use "../..".
+$RepoRoot = (Resolve-Path (Join-Path $CliRoot "..")).Path
 if (-not [IO.Path]::IsPathRooted($BuildDir)) {
     $BuildDir = Join-Path $RepoRoot $BuildDir
 }
