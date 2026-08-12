@@ -565,6 +565,12 @@ jobs:
 
   kotlin-android:
     runs-on: ubuntu-22.04
+    # The native build plus three Gradle invocations land around 45 min. Without
+    # a ceiling a wedged Gradle task rides the 6 h runner limit and reports as
+    # "cancelled" with no failing step to point at — which is exactly how a hung
+    # :testDebugUnitTest presented once here. This does not weaken any check; it
+    # turns an invisible stall into a fast, attributable failure.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -633,6 +639,7 @@ jobs:
       - uses: ./.github/actions/generate-idl
         with:
           languages: ts,cpp
+          ts-dist: 'true'
       - name: Enable Corepack (yarn@3.6.1)
         run: |
           set -euo pipefail
