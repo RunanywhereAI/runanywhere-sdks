@@ -92,8 +92,14 @@ validate_pr_release_bump() {
     # arithmetic but the tag: v${VERSION} already exists, so the version was
     # reviewed and published rather than slipped in here. Accept only that case,
     # and only for a real tag object -- anything else still fails.
+    # actions/checkout fetches no tags by default, so a local-only probe finds
+    # nothing on CI even when the tag exists. Fall back to asking the remote.
     if git -C "${REPO_ROOT}" rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
       echo "[OK] PR release contract: ${base_version} -> ${VERSION}, already tagged v${VERSION}"
+      return
+    fi
+    if git -C "${REPO_ROOT}" ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+      echo "[OK] PR release contract: ${base_version} -> ${VERSION}, already tagged v${VERSION} on origin"
       return
     fi
     echo "[FAIL] release:${bump} requires ${base_version} -> ${expected}; reviewed version is ${VERSION}" >&2
