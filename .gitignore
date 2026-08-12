@@ -525,6 +525,10 @@ engines/qhexrt/prebuilt/
 /bindings/python/runanywhere/_generated_errors.py
 /bindings/python/runanywhere/_generated_defaults.py
 
+# CMake's file(LOCK) guard that serializes two concurrent configures of the
+# same checkout through idl/codegen (core/CMakeLists.txt).
+/idl/codegen/.codegen.lock
+
 # --- C/C++ (protoc --cpp_out + the rac_default macro header) -----------------
 # Generated at CMake configure time when absent — see the
 # "Generate the C/C++ IDL output if it is not there yet" block in

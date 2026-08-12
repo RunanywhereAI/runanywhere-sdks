@@ -83,17 +83,27 @@ runs:
 
     - name: Install Python protobuf runtime
       # Every convenience/default-pool generator parses descriptor sets with it,
-      # regardless of which language is selected.
+      # regardless of which language is selected. Installing into the runner's
+      # own interpreter is the fast path; bootstrap_pyproto.sh falls back to a
+      # cached venv, and is the thing generate_all.sh actually consults — so
+      # this step is a warm cache and the assertion is its exit code.
       shell: bash
       run: |
         set -euo pipefail
-        PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
-        if ! command -v python3 >/dev/null 2>&1; then
-          echo "::error::python3 is required for IDL codegen"
-          exit 1
-        fi
-        python3 -m pip install --upgrade --break-system-packages \
-          "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml
+        cd "${GITHUB_WORKSPACE}"
+        PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' core/VERSIONS | cut -d= -f2)"
+        # Windows runners expose `python`, not `python3`; --break-system-packages
+        # is a no-op before pip 23 and required on Debian-managed interpreters.
+        for py in python3 python; do
+          if command -v "$py" >/dev/null 2>&1; then
+            "$py" -m pip install --upgrade --break-system-packages \
+              "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml \
+              || "$py" -m pip install --upgrade "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml \
+              || true
+            break
+          fi
+        done
+        echo "python for codegen: $(./idl/codegen/bootstrap_pyproto.sh)"
 
     - name: Install swift-protobuf + grpc-swift
       if: contains(inputs.languages, 'swift')

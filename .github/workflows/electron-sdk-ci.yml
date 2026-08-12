@@ -71,6 +71,16 @@ jobs:
           node-version: '22'
 
       # --- TypeScript gates (Windows only — Linux coverage is pr-build electron-unit) ---
+      # bindings/electron depends on @runanywhere/proto-ts through a `file:`
+      # specifier, and that package's src/ is untracked IDL codegen output — so
+      # without this the install links an empty package and the typecheck fails
+      # on missing module declarations. (The native steps below do not need it:
+      # they configure core/CMakeLists.txt, which generates the C/C++ bindings
+      # itself.)
+      - uses: ./.github/actions/generate-idl
+        if: matrix.run_typescript
+        with:
+          languages: ts
       - name: SDK install / typecheck / unit tests
         if: matrix.run_typescript
         working-directory: bindings/electron

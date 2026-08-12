@@ -1570,16 +1570,30 @@ if(_RAC_GENERATED_MISSING)
             "checkout. A source archive must ship the generated tree instead.")
     endif()
 
-    message(STATUS "IDL: generating C/C++ bindings (missing ${_RAC_GENERATED_MISSING})")
-    execute_process(
-        COMMAND "${RAC_IDL_BASH}" "${_RAC_GENERATE_ALL_SH}" --only cpp
-        WORKING_DIRECTORY "${_RAC_REPO_ROOT_FOR_IDL}"
-        RESULT_VARIABLE _RAC_IDL_RC
-    )
-    if(NOT _RAC_IDL_RC EQUAL 0)
-        message(FATAL_ERROR
-            "idl/codegen/generate_all.sh --only cpp failed (exit ${_RAC_IDL_RC}). "
-            "See the output above.")
+    # Two configures of the same checkout (ios-device + ios-simulator in two
+    # terminals, say) would otherwise both see the tree as missing and have
+    # protoc write the same files at the same time. Serialize, then re-check —
+    # whoever waited usually finds the work already done.
+    file(LOCK "${_RAC_REPO_ROOT_FOR_IDL}/idl/codegen/.codegen.lock"
+         GUARD PROCESS TIMEOUT 900 RESULT_VARIABLE _RAC_IDL_LOCK_RC)
+    if(NOT _RAC_IDL_LOCK_RC STREQUAL "0")
+        message(STATUS "IDL: could not take the codegen lock (${_RAC_IDL_LOCK_RC}); proceeding")
+    endif()
+
+    if(EXISTS "${_RAC_DEFAULTS_HEADER}" AND EXISTS "${_RAC_GENERATED_MISSING}")
+        message(STATUS "IDL: another configure generated the C/C++ bindings while we waited")
+    else()
+        message(STATUS "IDL: generating C/C++ bindings (missing ${_RAC_GENERATED_MISSING})")
+        execute_process(
+            COMMAND "${RAC_IDL_BASH}" "${_RAC_GENERATE_ALL_SH}" --only cpp
+            WORKING_DIRECTORY "${_RAC_REPO_ROOT_FOR_IDL}"
+            RESULT_VARIABLE _RAC_IDL_RC
+        )
+        if(NOT _RAC_IDL_RC EQUAL 0)
+            message(FATAL_ERROR
+                "idl/codegen/generate_all.sh --only cpp failed (exit ${_RAC_IDL_RC}). "
+                "See the output above.")
+        endif()
     endif()
 
     # generate_all.sh can succeed while writing nothing that this build needs;
