@@ -1,0 +1,52 @@
+# =============================================================================
+# generated_trees.txt — the codegen output that is NOT committed
+# =============================================================================
+# Read by idl/codegen/check_generated_trees.sh. Every packaging path that ships
+# one of these trees must run codegen first (see ensure_generated.sh); the check
+# script is the assertion that it actually happened.
+#
+# Format, tab-separated:
+#   <kind>  <lang>  <path relative to repo root>  <min files>  <note>
+#
+# kind:
+#   tree   a directory that must exist and hold at least <min files> files
+#   file   a single generated file that must exist (<min files> is ignored, use 1)
+#   built  like `tree`, but produced by a compiler downstream of codegen (tsc),
+#          so it is checked only when the caller passes --with-built — a fresh
+#          clone has run codegen but not yet `npm run build`
+#   keep   a NON-generated file that lives inside a gitignored tree and MUST stay
+#          tracked — the .gitignore negations exist for exactly these
+#
+# lang: which `generate_all.sh --only <lang>` subset produces it. Lets a
+#   packaging path verify just its own output — the Web SDK generates and checks
+#   `ts` without needing a Dart or Swift toolchain on the runner.
+#
+# <min files> is a floor, not an exact count: adding a .proto legitimately
+# raises the real count. The floor is what catches "codegen produced nothing",
+# which is the failure that silently ships an empty package.
+#
+# NOT LISTED HERE, ON PURPOSE — still committed, see AGENTS.md "Generated code":
+#   core/src/generated/proto/                     (76 files, ~336k lines)
+#   core/include/rac/rac_defaults_generated.h
+#   bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/  (373 files)
+# =============================================================================
+
+tree	swift	bindings/swift/Sources/RunAnywhere/Generated	40	Swift proto + gRPC + convenience + modality ABI + defaults pool
+tree	ts	bindings/proto-ts/src	60	ts-proto messages + convenience + streams + defaults pool
+built	ts	bindings/proto-ts/dist	130	tsc output — the only thing the npm package ships (files: ["dist"]); a real build is 138, the committed tree was 160 because 22 files were orphans tsc never deletes
+tree	dart	bindings/flutter/packages/runanywhere/lib/generated	75	Dart proto + convenience + result codes + defaults pool
+tree	python	bindings/python/runanywhere/_proto	15	Python RAG protobuf modules
+
+file	dart	bindings/flutter/packages/runanywhere/android/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	shipped inside the pub package
+file	ts	bindings/react-native/packages/core/android/src/main/java/com/runanywhere/sdk/generated/RADefaultsPool.kt	1	shipped inside the npm package (files includes android/src)
+file	python	bindings/python/runanywhere/_generated_errors.py	1	ErrorCode / ErrorCategory enums
+file	python	bindings/python/runanywhere/_generated_defaults.py	1	default pool constants
+
+keep	swift	bindings/swift/Sources/RunAnywhere/Generated/Versions.swift	1	written by scripts/release/sync-versions.sh, not by codegen
+keep	ts	bindings/proto-ts/src/index.ts	1	hand-written barrel
+keep	ts	bindings/proto-ts/src/lifecycle_service.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/convenience/_errors.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/convenience/errors_category.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/events/public_events.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/streams/_streamFactory.ts	1	hand-written
+keep	ts	bindings/proto-ts/src/streams/push.ts	1	hand-written

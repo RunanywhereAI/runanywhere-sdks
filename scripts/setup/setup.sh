@@ -18,6 +18,7 @@ Provision environment (local.properties, deps) for the SDKs. Does not build arti
 
 TARGETS:
   all       (default) every host-buildable target
+  codegen   generate the IDL bindings (runs first in 'all'; a fresh clone has none)
   android   write local.properties for Kotlin SDK + Android example
   flutter   flutter pub get for Flutter SDK + examples
   rn        yarn install for React Native SDK
@@ -64,6 +65,34 @@ ensure_doc_symlinks() {
     else
         warn "could not create CLAUDE.md symlinks (see above)"
     fi
+}
+
+# The language bindings under bindings/*/…/generated are IDL codegen output and
+# are not tracked (see .gitignore). A fresh clone therefore has *no* generated
+# code, and every step below — flutter pub get, tsc, swift package resolve —
+# fails in a way that does not name the real cause. Generate first.
+#
+# This is a hard failure, not a warning: "setup succeeded but nothing compiles"
+# is exactly the experience this whole arrangement has to avoid.
+setup_codegen() {
+    heading "IDL codegen (bindings/*/generated are not tracked)"
+    if ! have protoc; then
+        err "protoc not on PATH — run ./scripts/setup/setup-toolchain.sh first"
+        return 1
+    fi
+    if ! bash "${REPO_ROOT}/idl/codegen/generate_all.sh"; then
+        err "IDL codegen failed — see above. Fix the toolchain with:"
+        err "  ./scripts/setup/setup-toolchain.sh && ./scripts/setup/setup-toolchain.sh --check"
+        return 1
+    fi
+    # generate_all.sh soft-skips generators whose toolchain is absent (exit 0
+    # with a warning), so its exit code alone does not prove anything was
+    # written. Assert the trees are really there.
+    if ! bash "${REPO_ROOT}/idl/codegen/check_generated_trees.sh"; then
+        err "IDL codegen ran but did not produce every expected tree (see above)"
+        return 1
+    fi
+    ok "IDL bindings generated"
 }
 
 resolve_android_sdk() {
@@ -183,6 +212,8 @@ setup_electron() {
 
 setup_all() {
     local rc=0
+    # Must precede every language target: they all consume generated code.
+    setup_codegen  || rc=1
     setup_android  || rc=1
     setup_web      || rc=1
     setup_rn       || rc=1
@@ -205,6 +236,7 @@ EXIT=0
 for t in "${TARGETS[@]}"; do
     case "${t}" in
         all)      setup_all     || EXIT=1 ;;
+        codegen)  setup_codegen || EXIT=1 ;;
         android)  setup_android || EXIT=1 ;;
         flutter)  setup_flutter || EXIT=1 ;;
         rn)       setup_rn      || EXIT=1 ;;

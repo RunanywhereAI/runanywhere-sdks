@@ -14,8 +14,20 @@
 #   checksums — the XCFrameworks are never re-uploaded.
 #
 # WHAT THIS SCRIPT OWNS
-#   Sources/      regenerated from `git ls-files bindings/swift/Sources`, minus
+#   Sources/      regenerated from `git ls-files bindings/swift/Sources` PLUS
+#                 everything on disk under Sources/RunAnywhere/Generated, minus
 #                 the packaging-only targets that must not ship to consumers.
+#
+#                 That union is load-bearing. Sources/RunAnywhere/Generated is
+#                 IDL codegen output and is gitignored, so `git ls-files` alone
+#                 returns exactly one file from it (Versions.swift) — this
+#                 script would copy 41 fewer files, commit, and tag a
+#                 distribution repo that does not compile, with no error
+#                 anywhere. SwiftPM has no build hook and no packaging step: it
+#                 clones the tag and compiles what is there, so this script IS
+#                 the Swift packaging step. It therefore runs codegen itself
+#                 (step 0) and hard-fails if the generated tree is missing or
+#                 implausibly small.
 #   Package.swift `let sdkVersion` bumped to core/VERSION. The rest of that
 #                 manifest is hand-authored in the distribution repo (its own
 #                 products, its own MLX dependency mirroring) and is carried
@@ -31,7 +43,12 @@
 #   bindings/swift/scripts/sync-dist-repo.sh [options] DIST_REPO_PATH
 #
 # Options:
-#   --check         Report what would change; write nothing. Exit 1 on drift.
+#   --check         Report what would change; write nothing to DIST_REPO_PATH.
+#                   Still runs codegen in the monorepo — comparing against an
+#                   absent Generated/ would report 41 phantom deletions.
+#   --no-codegen    Skip the codegen step (the generated tree must already be
+#                   present; it is still verified). For a release job that ran
+#                   idl/codegen/generate_all.sh once for all five SDKs.
 #   --zips DIR      After syncing, run sync-checksums.sh against DIR so the
 #                   distribution manifest gets this release's checksums too.
 #   --commit        Commit the result in DIST_REPO_PATH.
@@ -59,15 +76,17 @@ ZIP_DIR=""
 DO_COMMIT=0
 DO_TAG=0
 DIST_REPO=""
+RUN_CODEGEN=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --check)  MODE="check"; shift ;;
+        --no-codegen) RUN_CODEGEN=0; shift ;;
         --zips)   ZIP_DIR="${2:-}"; shift 2 ;;
         --commit) DO_COMMIT=1; shift ;;
         --tag)    DO_TAG=1; DO_COMMIT=1; shift ;;
         -h|--help)
-            sed -n '2,50p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+            sed -n '2,70p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         -*)
             echo "ERROR: unknown option: $1" >&2
@@ -118,6 +137,14 @@ OLD_VERSION="$(awk -F'"' '/^let sdkVersion = "/ { print $2; exit }' "$DIST_MANIF
 # monorepo and are deliberately absent from the consumer-facing package.
 EXCLUDED_TARGETS_RE='^Sources/(MLXRuntimeDistribution|RunAnywhereMLXCLI)/'
 
+# The IDL codegen output that `git ls-files` cannot see, relative to
+# bindings/swift/. Mirrors the `tree` entry in idl/codegen/generated_trees.txt.
+GENERATED_SUBDIR='Sources/RunAnywhere/Generated'
+# Floor, not an exact count: adding a .proto legitimately raises it. This exists
+# to catch "codegen produced nothing", which is the failure that would otherwise
+# ship a distribution tag that does not compile.
+GENERATED_MIN_FILES=40
+
 echo ">> runanywhere-swift distribution sync"
 echo ">> monorepo:     ${REPO_ROOT}"
 echo ">> distribution: ${DIST_REPO}"
@@ -127,25 +154,74 @@ if [ "$MODE" = "check" ]; then
 fi
 echo ""
 
+# --- 0. IDL codegen ---------------------------------------------------------
+# Must precede the file enumeration below: Sources/RunAnywhere/Generated is
+# gitignored, so it may simply not exist in a fresh clone.
+if [ "$RUN_CODEGEN" -eq 1 ]; then
+    echo ">> generating IDL bindings first (Sources/RunAnywhere/Generated is not tracked)"
+    "${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only swift
+    echo ""
+else
+    echo ">> --no-codegen: verifying the generated tree is already present"
+    "${REPO_ROOT}/idl/codegen/check_generated_trees.sh" --only swift >/dev/null
+    echo ""
+fi
+
 # --- 1. Sources/ -----------------------------------------------------------
-# git ls-files is the source of truth: it tracks exactly what is committed and
-# silently skips build detritus, so a dirty bindings/swift cannot leak.
-# Built with a read loop rather than `mapfile`: macOS ships bash 3.2, which has
+# Two sources, unioned:
+#   a) `git ls-files` for the hand-written Swift — it tracks exactly what is
+#      committed and silently skips build detritus, so a dirty bindings/swift
+#      cannot leak.
+#   b) `find` over Sources/RunAnywhere/Generated — codegen output, gitignored,
+#      therefore invisible to (a). Without this the distribution repo ships a
+#      Swift package with no proto types and no error is raised anywhere.
+# Built with read loops rather than `mapfile`: macOS ships bash 3.2, which has
 # no mapfile, and this script must run on a stock macOS release runner.
+GENERATED_ABS="${REPO_ROOT}/bindings/swift/${GENERATED_SUBDIR}"
+if [ ! -d "${GENERATED_ABS}" ]; then
+    echo "ERROR: ${GENERATED_SUBDIR} does not exist under bindings/swift/." >&2
+    echo "       It is IDL codegen output and is not tracked by git. Run:" >&2
+    echo "         ./idl/codegen/generate_all.sh" >&2
+    exit 1
+fi
+
 SOURCE_FILES=()
 while IFS= read -r rel; do
     [ -z "$rel" ] && continue
     SOURCE_FILES+=("$rel")
 done < <(
-    git -C "${REPO_ROOT}" ls-files bindings/swift/Sources \
-        | sed 's|^bindings/swift/||' \
+    {
+        git -C "${REPO_ROOT}" ls-files bindings/swift/Sources \
+            | sed 's|^bindings/swift/||'
+        find "${GENERATED_ABS}" -type f ! -name '.*' \
+            | sed "s|^${REPO_ROOT}/bindings/swift/||"
+    } \
         | grep -vE "${EXCLUDED_TARGETS_RE}" \
-        | sort
+        | LC_ALL=C sort -u
 )
 if [ "${#SOURCE_FILES[@]}" -eq 0 ]; then
-    echo "ERROR: no tracked files under bindings/swift/Sources" >&2
+    echo "ERROR: no files under bindings/swift/Sources" >&2
     exit 1
 fi
+
+# Prove the generated payload is actually in the list. `git ls-files` returns
+# exactly one file from Generated/ (the hand-written Versions.swift), so a
+# regression that drops the find(1) branch would still yield a plausible-looking
+# ~250-file list and a distribution repo that fails to compile at the tag.
+generated_count=0
+for rel in "${SOURCE_FILES[@]}"; do
+    case "$rel" in
+        "${GENERATED_SUBDIR}"/*) generated_count=$((generated_count + 1)) ;;
+    esac
+done
+if [ "${generated_count}" -lt "${GENERATED_MIN_FILES}" ]; then
+    echo "ERROR: only ${generated_count} file(s) under ${GENERATED_SUBDIR}; expected >= ${GENERATED_MIN_FILES}." >&2
+    echo "       The Swift proto bindings are IDL codegen output and are gitignored." >&2
+    echo "       Shipping this would tag a runanywhere-swift that does not compile." >&2
+    echo "       Run ./idl/codegen/generate_all.sh and retry." >&2
+    exit 1
+fi
+echo "  codegen: ${generated_count} files under ${GENERATED_SUBDIR}"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

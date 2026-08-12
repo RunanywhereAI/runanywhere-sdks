@@ -20,6 +20,15 @@
 # Linux. This script compares `git ls-files` (always case-exact, it reads the
 # index) against what the OS actually reports, which catches it everywhere.
 #
+# SCOPE
+#   Only the trees that are still COMMITTED. The comparison is
+#   `git ls-files` vs the filesystem, so it is meaningful only where git is
+#   supposed to hold every name; for the gitignored trees it would report all
+#   ~360 files as "not committed" on every run. Those trees are regenerated from
+#   scratch by every consumer, so a generator-side case rename cannot strand a
+#   stale committed name there in the first place — the hazard this gate exists
+#   for is specific to committed output.
+#
 # Usage:
 #   ./idl/codegen/check_generated_filenames.sh     # run after generate_all.sh
 set -euo pipefail
@@ -28,21 +37,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Every tree idl/codegen/generate_all.sh writes into. Keep in step with the
-# output paths documented at the top of each generate_*.sh / generate_*.py.
-# (bindings/proto-ts/dist is deliberately absent: tsc produces it, not protoc.)
+# The still-committed generated trees. See AGENTS.md "Generated code" for why
+# these three stayed tracked while the SDK bindings did not.
 CODEGEN_PATHS=(
     core/src/generated/proto
     core/include/rac/rac_defaults_generated.h
     bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated
-    bindings/proto-ts/src
-    bindings/swift/Sources/RunAnywhere/Generated
-    bindings/flutter/packages/runanywhere/lib/generated
-    bindings/flutter/packages/runanywhere/android/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt
-    bindings/react-native/packages/core/android/src/main/java/com/runanywhere/sdk/generated/RADefaultsPool.kt
-    bindings/python/runanywhere/_proto
-    bindings/python/runanywhere/_generated_errors.py
-    bindings/python/runanywhere/_generated_defaults.py
 )
 
 TRACKED="$(git ls-files -- "${CODEGEN_PATHS[@]}" | LC_ALL=C sort)"

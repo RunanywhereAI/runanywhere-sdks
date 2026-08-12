@@ -7,6 +7,20 @@
 # Flags:
 #   --skip-dart   Skip Dart codegen (use when Dart 3.0+ is unavailable
 #                 locally; CI regenerates Dart bindings on the pinned toolchain).
+#   --only LIST   Comma-separated subset of swift,kotlin,dart,ts,cpp,python.
+#                 Default: all six.
+#
+#                 Exists because the bindings are no longer committed, so a CI
+#                 job that compiles one SDK has to generate that SDK's code
+#                 first — and a Linux Web job should not have to install
+#                 protoc-gen-swift and wire-compiler to do it. Every generator
+#                 reads the same idl/*.proto and writes to a disjoint tree, so
+#                 the subsets are independent.
+#
+#                 The two cross-cutting post-processors (the C defaults header
+#                 and the default-pool constants) run whenever their language is
+#                 selected; the default pool emits all seven targets in one pass
+#                 by design, so it writes the same bytes regardless of subset.
 set -euo pipefail
 
 # Deterministic environment. Every generator below must emit the same bytes on
@@ -30,15 +44,37 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IDL_DIR="${REPO_ROOT}/idl"
 
 SKIP_DART=0
-for arg in "$@"; do
-    case "$arg" in
-        --skip-dart) SKIP_DART=1 ;;
+ONLY=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --skip-dart) SKIP_DART=1; shift ;;
+        --only) ONLY="${2:-}"; shift 2 ;;
+        --only=*) ONLY="${1#--only=}"; shift ;;
         -h|--help)
-            sed -n '1,15p' "$0" | sed 's/^#//'
+            sed -n '1,30p' "$0" | sed 's/^#//'
             exit 0
             ;;
+        *) echo "generate_all.sh: unknown flag: $1" >&2; exit 2 ;;
     esac
 done
+
+ALL_LANGS="swift kotlin dart ts cpp python"
+if [ -z "${ONLY}" ]; then
+    SELECTED="${ALL_LANGS}"
+else
+    SELECTED="$(printf '%s' "${ONLY}" | tr ',' ' ')"
+    for l in ${SELECTED}; do
+        case " ${ALL_LANGS} " in
+            *" ${l} "*) ;;
+            *) echo "generate_all.sh: --only: unknown language '${l}' (want: ${ALL_LANGS// /, })" >&2; exit 2 ;;
+        esac
+    done
+fi
+want() { case " ${SELECTED} " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
+# Dart is opt-out as well as opt-in: --skip-dart predates --only and is still
+# how a machine without Dart 3 runs everything else.
+[ "${SKIP_DART}" -eq 1 ] && SELECTED="${SELECTED//dart/}"
 
 # Fail fast on missing toolchain rather than running 80% and breaking late.
 # Each language script does its own lookup; this is just the base gate.
@@ -87,10 +123,14 @@ RAC_PROTO_FILES="$(ls "${IDL_DIR}"/*.proto | LC_ALL=C sort)"
 export RAC_PROTO_FILES
 echo "▶ canonical proto file list:"
 echo "${RAC_PROTO_FILES}" | sed 's|^.*/|    - |'
+echo "▶ schema: $("${SCRIPT_DIR}/schema_lock.sh" --print)"
 
-echo "▶ Swift proto codegen"
-"${SCRIPT_DIR}/generate_swift.sh"
+if want swift; then
+    echo "▶ Swift proto codegen"
+    "${SCRIPT_DIR}/generate_swift.sh"
+fi
 
+if want kotlin; then
 echo "▶ Kotlin proto codegen"
 "${SCRIPT_DIR}/generate_kotlin.sh"
 
@@ -105,9 +145,10 @@ if command -v python3 >/dev/null 2>&1; then
 else
     echo "warning: python3 not found — skipping RAConvenience.kt codegen." >&2
 fi
+fi  # want kotlin
 
-if [ "${SKIP_DART}" -eq 1 ]; then
-    echo "▶ Dart proto codegen (skipped via --skip-dart)"
+if ! want dart; then
+    echo "▶ Dart proto codegen (skipped)"
 else
     echo "▶ Dart proto codegen"
     "${SCRIPT_DIR}/generate_dart.sh"
@@ -130,6 +171,7 @@ else
     fi
 fi
 
+if want ts; then
 echo "▶ TypeScript proto codegen (RN + Web)"
 "${SCRIPT_DIR}/generate_ts.sh"
 # TypeScript convenience helpers (defaults / validate /
@@ -141,7 +183,9 @@ if command -v python3 >/dev/null 2>&1; then
 else
     echo "warning: python3 not on PATH; skipping generate_ts_convenience.py" >&2
 fi
+fi  # want ts
 
+if want cpp; then
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"
 
@@ -156,6 +200,7 @@ if python3 -c 'import google.protobuf' >/dev/null 2>&1; then
 else
     echo "warning: python protobuf runtime not installed; skipping generate_cpp_defaults.py" >&2
 fi
+fi  # want cpp
 
 # Swift / Kotlin / Dart / TypeScript constants for the central default pool.
 # sdk_defaults.proto is excluded from the four message generators above, so its
@@ -177,12 +222,15 @@ fi
 # @runanywhere/proto-ts; the previous generate_rn_streams.sh /
 # generate_web_streams.sh pair was byte-identical and overwrote each
 # other's output, masking unilateral edits.
-echo "▶ Shared TS AsyncIterable streams"
-"${SCRIPT_DIR}/generate_streams.sh"
+if want ts; then
+    echo "▶ Shared TS AsyncIterable streams"
+    "${SCRIPT_DIR}/generate_streams.sh"
+fi
 
 # Python protobuf for the RAG surface (optional — needs grpcio-tools). Soft-skip
 # when the package is missing so a non-Python developer environment still
 # completes the upstream codegen; CI installs grpcio-tools and fails on drift.
+if want python; then
 echo "▶ Python proto codegen (RAG)"
 if python3 -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
     "${SCRIPT_DIR}/generate_python.sh"
@@ -201,5 +249,22 @@ if python3 -c 'import google.protobuf' >/dev/null 2>&1; then
 else
     echo "warning: python protobuf runtime not installed; skipping generate_python_errors.py" >&2
 fi
+fi  # want python
 
-echo "✓ All proto codegen complete."
+# idl/SCHEMA_LOCK is refreshed LAST, and it is the only tracked artifact of a
+# codegen run now that the language bindings are gitignored. That ordering is
+# what gives it meaning: the lock moves only after every generator above has
+# succeeded, so a committed lock that matches the .proto digest is proof that a
+# full run happened against exactly these schemas. CI checks it with
+# `schema_lock.sh --check` in place of the old "git status must be empty" gate.
+# Only a FULL run may move the lock. A scoped run (--only ts, --skip-dart) is a
+# partial regeneration; stamping the lock from one would assert "every binding
+# matches these schemas" on the strength of having regenerated one of them.
+if [ "${SELECTED// /}" = "${ALL_LANGS// /}" ]; then
+    echo "▶ Schema lock"
+    "${SCRIPT_DIR}/schema_lock.sh" --update
+else
+    echo "▶ Schema lock: not updated (partial run: ${SELECTED})"
+fi
+
+echo "✓ Proto codegen complete (${SELECTED})."

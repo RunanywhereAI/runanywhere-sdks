@@ -1,52 +1,97 @@
-name: IDL drift check
+name: IDL gate
 
-# Runs on every PR and every push to `main`. If any .proto under idl/ is edited
-# without regenerating the committed language bindings, or if anyone hand-edits
-# a generated file, this job fails with ::error::IDL-generated code is out of
-# sync with .proto sources. Fixing the PR is a one-liner locally:
+# GENERATE, THEN VERIFY — not "regenerate and diff".
 #
-#   ./idl/codegen/generate_all.sh && (cd bindings/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
+# Most of the language bindings are no longer committed (.gitignore, and
+# idl/codegen/generated_trees.txt lists exactly which). The old shape of this
+# job — regenerate, then require `git status --porcelain -uall` to be empty —
+# cannot fail for those: regenerating an ignored file never moves git status.
+# So it was rewritten rather than amended. What runs now:
+#
+#   1. schema lock   idl/SCHEMA_LOCK is tracked and refreshed by generate_all.sh
+#                    from the .proto digest. Editing a schema without running
+#                    codegen leaves the committed lock stale -> fail. This is
+#                    the drift signal that replaces the diff.
+#   2. presence      every declared generated tree exists and is non-empty
+#                    (generate_all.sh soft-skips generators whose toolchain is
+#                    missing, so its exit code proves nothing on its own).
+#   3. still-tracked C++ and Kotlin bindings ARE committed; for those the
+#                    classic diff gate still applies and is still run.
+#   4. compile       the generated TypeScript is fed to tsc and the generated
+#                    Python is imported. Un-reviewable output has to be
+#                    machine-checked instead.
+#
+# Fixing a failure locally:
+#   ./idl/codegen/generate_all.sh
+#   git add idl/SCHEMA_LOCK core/src/generated core/include bindings/kotlin
 
 on:
   pull_request:
     paths:
+      # Inputs to codegen.
       - 'idl/**'
-      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
-      - 'bindings/proto-ts/**'
-      - 'core/src/generated/proto/**'
-      - 'bindings/python/runanywhere/_proto/**'
-      - 'idl/codegen/generate_python.sh'
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
+      # The generated trees that are STILL COMMITTED — a hand-edit to one of
+      # these must still trigger the gate. The de-committed trees are gone from
+      # this list on purpose: they are untracked, so no PR can ever touch them
+      # and the filters were dead weight pointing at paths that cannot change.
+      - 'core/src/generated/proto/**'
+      - 'core/include/rac/rac_defaults_generated.h'
+      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
+      # Hand-written files that live inside an otherwise-generated tree.
+      - 'bindings/proto-ts/src/index.ts'
+      - 'bindings/proto-ts/src/lifecycle_service.ts'
+      - 'bindings/proto-ts/src/convenience/_errors.ts'
+      - 'bindings/proto-ts/src/convenience/errors_category.ts'
+      - 'bindings/proto-ts/src/events/public_events.ts'
+      - 'bindings/proto-ts/src/streams/**'
+      - 'bindings/proto-ts/package.json'
+      - 'bindings/proto-ts/tsconfig.json'
+      # The publish paths that must generate before packaging.
+      - 'bindings/swift/scripts/sync-dist-repo.sh'
+      - 'bindings/*/scripts/package-sdk.sh'
+      - 'bindings/python/pyproject.toml'
+      - 'bindings/python/_build/**'
+      - 'scripts/setup/setup.sh'
+      - '.gitignore'
   push:
     # Include long-lived integration branches so a
     # direct push that touches IDL-adjacent files without a PR still
-    # gets the drift gate.
+    # gets the gate.
     branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
-      - 'bindings/swift/Sources/RunAnywhere/Generated/**'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
-      - 'bindings/flutter/packages/runanywhere/lib/generated/**'
-      - 'bindings/proto-ts/**'
-      - 'core/src/generated/proto/**'
-      - 'bindings/python/runanywhere/_proto/**'
-      - 'idl/codegen/generate_python.sh'
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
+      - 'core/src/generated/proto/**'
+      - 'core/include/rac/rac_defaults_generated.h'
+      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
+      - 'bindings/proto-ts/src/index.ts'
+      - 'bindings/proto-ts/src/lifecycle_service.ts'
+      - 'bindings/proto-ts/src/convenience/_errors.ts'
+      - 'bindings/proto-ts/src/convenience/errors_category.ts'
+      - 'bindings/proto-ts/src/events/public_events.ts'
+      - 'bindings/proto-ts/src/streams/**'
+      - 'bindings/proto-ts/package.json'
+      - 'bindings/proto-ts/tsconfig.json'
+      - 'bindings/swift/scripts/sync-dist-repo.sh'
+      - 'bindings/*/scripts/package-sdk.sh'
+      - 'bindings/python/pyproject.toml'
+      - 'bindings/python/_build/**'
+      - 'scripts/setup/setup.sh'
+      - '.gitignore'
 
 permissions:
   contents: read
 
 jobs:
   check:
-    name: Verify generated code matches IDL
+    name: Generate every binding, then verify it
     # macos-15 ships Xcode 16 with Swift 6, which is the minimum
     # required by Homebrew's grpc-swift v2 formula. On macos-14 the formula
     # bails with "protoc-gen-grpc-swift: An unsatisfied requirement failed
@@ -59,6 +104,10 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Two commits, so the base copy of idl/SCHEMA_LOCK is reachable for
+          # the "did IDL_VERSION move with the schema?" check below.
+          fetch-depth: 2
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
@@ -199,41 +248,42 @@ jobs:
         # is independent of the drift check below. See idl/codegen/tests/README.md.
         run: python3 idl/codegen/tests/test_convenience_generators.py
 
-      - name: Regenerate all bindings
-        run: ./idl/codegen/generate_all.sh
-
-      - name: Build shared TypeScript proto package
+      - name: Capture the base copy of idl/SCHEMA_LOCK
+        # Used by the IDL_VERSION bump check further down. Kept outside the
+        # working tree so it cannot be mistaken for a generated artifact.
+        id: base_lock
         run: |
           set -euo pipefail
-          cd bindings/proto-ts
-          # `--workspaces=false` so npm doesn't walk up into the repo-root
-          # Yarn workspace (which uses `workspace:*` deps that npm can't
-          # parse — bails with EUNSUPPORTEDPROTOCOL).
-          npm install --package-lock=false --workspaces=false
-          npm run build
-
-      - name: Fail on case-only filename drift
-        # This job runs on macOS, whose filesystem is case-insensitive, so
-        # `git status` below reports a clean tree even when a generator renamed
-        # Foo.kt to foo.kt — and the same run on Linux shows a delete plus an
-        # untracked add. Compare names case-exactly first so this gate means
-        # the same thing on every filesystem.
-        run: ./idl/codegen/check_generated_filenames.sh
-
-      - name: Fail on drift
-        run: |
-          set -euo pipefail
-          status="$(git status --porcelain --untracked-files=all)"
-          if [ -n "$status" ]; then
-            echo "::error::IDL-generated code is out of sync with .proto sources."
-            git diff --stat
-            printf '%s\n' "$status"
-            echo ""
-            echo "To fix locally:"
-            echo "  ./scripts/setup/setup-toolchain.sh"
-            echo "  ./idl/codegen/generate_all.sh"
-            echo "  (cd bindings/proto-ts && npm install --package-lock=false && npm run build)"
-            echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
-            exit 1
+          base_ref=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.event.pull_request.base.sha }}"
+          else
+            base_ref="${{ github.event.before }}"
           fi
-          echo "✓ No drift detected."
+          out="${RUNNER_TEMP}/SCHEMA_LOCK.base"
+          if [ -n "$base_ref" ] && git cat-file -e "${base_ref}:idl/SCHEMA_LOCK" 2>/dev/null; then
+            git show "${base_ref}:idl/SCHEMA_LOCK" > "$out"
+            echo "path=$out" >> "$GITHUB_OUTPUT"
+            echo "Base lock captured from ${base_ref}"
+          else
+            # First commit that introduces the lock, a shallow fetch, or a
+            # force-push: nothing to compare against, so the bump check is
+            # skipped rather than guessed at.
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "No base idl/SCHEMA_LOCK reachable — bump check will be skipped"
+          fi
+
+      - name: Generate every binding, then verify it
+        # Runs the same script contributors run locally, so a green CI and a
+        # green laptop mean the same thing. --with-compile adds the tsc build of
+        # bindings/proto-ts and an import of the generated Python: the
+        # de-committed trees cannot be reviewed in a diff any more, so they get
+        # machine-checked instead.
+        run: ./idl/codegen/ci-drift-check.sh --with-compile
+
+      - name: Require an idl/VERSION bump when the schema changed
+        if: steps.base_lock.outputs.path != ''
+        run: |
+          set -euo pipefail
+          ./idl/codegen/schema_lock.sh --check \
+            --require-bump "${{ steps.base_lock.outputs.path }}"

@@ -1,6 +1,12 @@
 [build-system]
 requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
-build-backend = "scikit_build_core.build"
+# In-tree PEP 517 shim around scikit_build_core.build. It runs the three Python
+# IDL generators before producing an sdist/wheel, because runanywhere/_proto/,
+# _generated_errors.py and _generated_defaults.py are codegen output and are not
+# tracked by git. Without it a wheel builds, packages and installs cleanly and
+# then raises ImportError on `import runanywhere`. See _build/ra_build_backend.py.
+build-backend = "ra_build_backend"
+backend-path = ["_build"]
 
 [project]
 name = "runanywhere"
@@ -100,6 +106,25 @@ include = [
     "README.md",
     "LICENSE",
     "PACKAGING.md",
+    # The IDL-generated modules are gitignored, and scikit-build-core's default
+    # file list honours .gitignore. The bare "runanywhere" entry above force-
+    # includes the whole directory and so already covers them today (verified on
+    # scikit-build-core 1.0.3: an sdist built with and without these lines carries
+    # the same 18 _proto modules) — these are named explicitly so that a later
+    # narrowing of that entry, or a change in directory-include semantics, cannot
+    # quietly drop them. That would be an expensive mistake: cibuildwheel builds
+    # every wheel FROM the sdist and idl/ is not in it, so an sdist missing these
+    # yields wheels that install cleanly and fail at `import runanywhere`.
+    # File-precise, not directory-wide: a force-include of `runanywhere/_proto`
+    # or `_build` also sweeps in whatever __pycache__ a local build left there,
+    # and sdist.include wins over sdist.exclude in scikit-build-core, so a
+    # matching exclude cannot take it back out.
+    "runanywhere/_proto/*.py",
+    "runanywhere/_generated_errors.py",
+    "runanywhere/_generated_defaults.py",
+    # _build/ carries the PEP 517 shim declared in [build-system]; an sdist
+    # without it cannot be built at all.
+    "_build/ra_build_backend.py",
 ]
 
 [tool.cibuildwheel]

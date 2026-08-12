@@ -1,0 +1,165 @@
+name: Generate IDL bindings
+description: |
+  Installs the pinned codegen toolchain for a subset of languages and runs
+  idl/codegen/generate_all.sh --only <languages>.
+
+  WHY EVERY SDK JOB NEEDS THIS
+    The Swift, TypeScript, Dart, React Native and Python bindings are IDL
+    codegen output and are not tracked (see .gitignore and
+    idl/codegen/generated_trees.txt). A job that checks out the repo and runs
+    `tsc`, `flutter pub get`, `swift build` or `pytest` therefore starts with no
+    generated code at all. Add this step after checkout and before the build.
+
+  WHY IT IS SCOPED
+    Generating everything would make a Linux Web job install protoc-gen-swift,
+    wire-compiler and a Dart SDK for output it never compiles. Each generator
+    reads the same idl/*.proto and writes a disjoint tree, so `--only` is safe
+    and keeps each job's install to what it actually needs.
+
+  WHAT DOES *NOT* NEED THIS
+    Anything that only builds C++ (native_*, wasm, rcli, ios-device,
+    android-arm64, macos-*, linux-*) or Kotlin (kotlin-android, sdk_kotlin) —
+    core/src/generated/proto, core/include/rac/rac_defaults_generated.h and the
+    Kotlin bindings are still COMMITTED, precisely so those ~20 native jobs need
+    no protoc. See AGENTS.md "Generated code".
+
+  All versions come from core/VERSIONS. protoc is pinned exactly
+  (PROTOC_VERSION) because it stamps its own version into generated C++ and
+  TypeScript; generate_all.sh fails closed on a mismatch.
+
+inputs:
+  languages:
+    required: true
+    description: 'Comma-separated subset of: swift, kotlin, dart, ts, cpp, python'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate language selector
+      shell: bash
+      env:
+        RA_IDL_LANGUAGES: ${{ inputs.languages }}
+      run: |
+        set -euo pipefail
+        for l in ${RA_IDL_LANGUAGES//,/ }; do
+          case "$l" in
+            swift|kotlin|dart|ts|cpp|python) ;;
+            *) echo "::error::generate-idl: unknown language '$l'"; exit 1 ;;
+          esac
+        done
+
+    - name: Install protoc (pinned)
+      shell: bash
+      run: |
+        set -euo pipefail
+        PROTOC_VERSION="$(grep -E '^PROTOC_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        have_pinned() {
+          command -v protoc >/dev/null 2>&1 && \
+            [ "$(protoc --version | awk '{print $2}')" = "${PROTOC_VERSION}" ]
+        }
+        if have_pinned; then
+          echo "protoc ${PROTOC_VERSION} already present"
+          exit 0
+        fi
+        # protobuf release archives carry the exact patch level; Homebrew/apt do
+        # not, and generate_all.sh fails closed on anything but ${PROTOC_VERSION}.
+        case "$(uname -s)-$(uname -m)" in
+          Linux-x86_64)   asset="linux-x86_64" ;;
+          Linux-aarch64)  asset="linux-aarch_64" ;;
+          Darwin-*)       asset="osx-universal_binary" ;;
+          MINGW*|MSYS*|CYGWIN*) asset="win64" ;;
+          *) echo "::error::generate-idl: no protoc asset for $(uname -s)-$(uname -m)"; exit 1 ;;
+        esac
+        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset}.zip"
+        echo "Downloading ${url}"
+        curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+          -o "${RUNNER_TEMP}/protoc.zip" "$url"
+        dest="${HOME}/.local/protoc"
+        unzip -q -o "${RUNNER_TEMP}/protoc.zip" -d "$dest"
+        chmod +x "$dest/bin/protoc"* 2>/dev/null || true
+        # $GITHUB_PATH entries are consumed by the runner, not by bash. On
+        # Windows the runner is not MSYS-aware, so a /c/Users/... path from Git
+        # Bash would be added verbatim and never resolve — translate it.
+        if command -v cygpath >/dev/null 2>&1; then
+          cygpath -w "$dest/bin" >> "$GITHUB_PATH"
+        else
+          echo "$dest/bin" >> "$GITHUB_PATH"
+        fi
+
+    - name: Install Python protobuf runtime
+      # Every convenience/default-pool generator parses descriptor sets with it,
+      # regardless of which language is selected.
+      shell: bash
+      run: |
+        set -euo pipefail
+        PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "::error::python3 is required for IDL codegen"
+          exit 1
+        fi
+        python3 -m pip install --upgrade --break-system-packages \
+          "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml
+
+    - name: Install swift-protobuf + grpc-swift
+      if: contains(inputs.languages, 'swift')
+      shell: bash
+      run: |
+        set -euo pipefail
+        brew install protobuf swift-protobuf grpc-swift
+        # The formula installs the v2 plugin under a suffixed name; the codegen
+        # script invokes `protoc --grpc-swift_out=`, which resolves the bare name.
+        if [ -x /opt/homebrew/bin/protoc-gen-grpc-swift-2 ]; then
+          ln -sf /opt/homebrew/bin/protoc-gen-grpc-swift-2 /opt/homebrew/bin/protoc-gen-grpc-swift
+        fi
+        command -v protoc-gen-swift >/dev/null 2>&1 || { echo "::error::protoc-gen-swift missing"; exit 1; }
+        command -v protoc-gen-grpc-swift >/dev/null 2>&1 || { echo "::error::protoc-gen-grpc-swift missing"; exit 1; }
+
+    - name: Install wire-compiler
+      if: contains(inputs.languages, 'kotlin')
+      shell: bash
+      run: |
+        set -euo pipefail
+        # NOT `brew install wire` — that formula is the Wire messaging app.
+        WIRE_VERSION="$(grep -E '^WIRE_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        mkdir -p "$HOME/.local/bin"
+        curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+          -o "$HOME/.local/bin/wire-compiler.jar" \
+          "https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
+        # shellcheck disable=SC2016
+        printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
+        chmod +x "$HOME/.local/bin/wire-compiler"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+    - name: Install Dart + protoc_plugin
+      if: contains(inputs.languages, 'dart')
+      shell: bash
+      run: |
+        set -euo pipefail
+        PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        if ! command -v dart >/dev/null 2>&1; then
+          echo "::error::dart not on PATH — add dart-lang/setup-dart or setup-toolchain platform=flutter before this action"
+          exit 1
+        fi
+        dart pub global activate protoc_plugin "$PROTOC_GEN_DART_VERSION"
+        echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+    - name: Install ts-proto
+      if: contains(inputs.languages, 'ts')
+      shell: bash
+      run: |
+        set -euo pipefail
+        TS_PROTO_VERSION="$(grep -E '^TS_PROTO_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
+        npm install -g "ts-proto@${TS_PROTO_VERSION}" protobufjs
+
+    - name: Install grpcio-tools
+      if: contains(inputs.languages, 'python')
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m pip install --upgrade --break-system-packages 'grpcio-tools==1.71.*'
+        python3 -c 'import grpc_tools.protoc'
+
+    - name: Generate
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: ./idl/codegen/generate_all.sh --only "${{ inputs.languages }}"

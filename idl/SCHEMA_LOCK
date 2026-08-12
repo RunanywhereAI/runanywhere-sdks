@@ -1,0 +1,18 @@
+# =============================================================================
+# idl/SCHEMA_LOCK — machine-written. Do not hand-edit.
+# =============================================================================
+# Refreshed by idl/codegen/generate_all.sh (via idl/codegen/schema_lock.sh
+# --update). This file is the TRACKED proof that codegen was run against the
+# current .proto surface: the generated bindings themselves are gitignored, so
+# this lock — not `git status` — is what makes schema drift detectable.
+#
+# IDL_SCHEMA_SHA256 is sha256 over "<basename>\n<sha256-of-contents>\n" for
+# every idl/*.proto in LC_ALL=C basename order. Path-independent by
+# construction, so it is identical in every checkout.
+#
+# Verify:  idl/codegen/schema_lock.sh --check
+# =============================================================================
+IDL_VERSION=1.0.0
+IDL_PROTO_COUNT=39
+IDL_SCHEMA_SHA256=d2a467ae8a4d0929e88ff8c41c1304d544acffa4800a49959df696921e14bcab
+IDL_PROTOC_VERSION=35.1

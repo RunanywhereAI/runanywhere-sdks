@@ -79,7 +79,7 @@ ${C_BOLD}UTILITIES${C_RESET}
   ${C_CMD}clean${C_RESET}                        Clean every SDK + native + cache
   ${C_CMD}lint${C_RESET}                         Run linters across all SDKs
   ${C_CMD}format${C_RESET}                       Run formatters across all SDKs
-  ${C_CMD}codegen${C_RESET}                      Generate code from idl/
+  ${C_CMD}codegen${C_RESET}                      Generate every language binding from idl/ (not tracked)
   ${C_CMD}sync-versions${C_RESET}                Propagate version pins via scripts/release/sync-versions.sh
   ${C_CMD}help${C_RESET}                         Show this help
 
@@ -323,7 +323,9 @@ case "${1:-help}" in
     clean)              cmd_clean ;;
     lint)               cmd_lint ;;
     format)             cmd_format ;;
-    codegen)            bash idl/codegen/generate_kotlin.sh ;;
+    # Every language, not just Kotlin: the bindings are untracked, so a partial
+    # run leaves the other four SDKs without generated code.
+    codegen)            shift; bash idl/codegen/generate_all.sh "$@" ;;
     sync-versions)      bash scripts/release/sync-versions.sh ;;
     *)
         echo "error: unknown command: $1" >&2

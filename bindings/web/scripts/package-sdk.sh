@@ -60,6 +60,13 @@ if [ -n "$NATIVES_FROM" ]; then
     done
 fi
 
+# The shared proto-ts sources (bindings/proto-ts/src) are IDL codegen output and
+# are not tracked. `npm run build:ts` below compiles them into ../proto-ts/dist,
+# which is what `files: ["dist"]` publishes and what every Web package bundles —
+# so with no codegen first, this script packs an empty proto-ts and four
+# packages that fail to resolve `@runanywhere/proto-ts/*` in a consumer project.
+"${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only ts
+
 cd "$WEB_ROOT"
 
 echo ">> npm ci"
