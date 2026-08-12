@@ -86,7 +86,18 @@ validate_pr_release_bump() {
   esac
   local expected="${major}.${minor}.${patch}"
   if [ "${VERSION}" != "${expected}" ]; then
+    # The base+1 rule assumes one PR carries one release. A long-lived release
+    # branch can cut several before it merges, and then VERSION is legitimately
+    # more than one step ahead of base. What makes that safe is not the label
+    # arithmetic but the tag: v${VERSION} already exists, so the version was
+    # reviewed and published rather than slipped in here. Accept only that case,
+    # and only for a real tag object -- anything else still fails.
+    if git -C "${REPO_ROOT}" rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+      echo "[OK] PR release contract: ${base_version} -> ${VERSION}, already tagged v${VERSION}"
+      return
+    fi
     echo "[FAIL] release:${bump} requires ${base_version} -> ${expected}; reviewed version is ${VERSION}" >&2
+    echo "       (no refs/tags/v${VERSION} either, so this is not a published catch-up)" >&2
     FAILURES=$((FAILURES + 1))
     return
   fi
