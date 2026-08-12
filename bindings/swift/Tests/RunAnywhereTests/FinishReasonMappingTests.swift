@@ -6,8 +6,8 @@
 //  count heuristics; UNSPECIFIED stays .unknown; ERROR stays .error.
 //
 
-import XCTest
 @testable import RunAnywhere
+import XCTest
 
 final class FinishReasonMappingTests: XCTestCase {
     func testProtoMappingPreservesTerminalsWithoutInventingFromLocalState() {

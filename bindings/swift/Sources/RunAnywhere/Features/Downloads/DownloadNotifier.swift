@@ -6,9 +6,9 @@
 //  ongoing progress notification. One notification per model, updated in place.
 //
 
+import CRACommons
 import Foundation
 import UserNotifications
-import CRACommons
 
 actor DownloadNotifier {
     static let shared = DownloadNotifier()
