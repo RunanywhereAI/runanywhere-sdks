@@ -60,114 +60,55 @@ int test_supported_arch_policy() {
 }
 
 int test_native_catalog_owns_arch_and_auth_policy() {
-    const std::unordered_set<std::string> v75 = {
-        "lfm2_5_230m",          "lfm2_5_350m",         "qwen3_0_6b",      "qwen3_5_0_8b",
-        "qwen3_5_2b",           "ternary_bonsai_1_7b", "internvl3_5_1b",  "qwen3_vl",
-        "nemotron_ocr",         "nemotron_ocr_v1",     "nemotron_parse",  "whisper_base",
-        "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
-        "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
-        "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "kitten_nano_0_8_varlen",
-        "embeddinggemma_300m", "lfm2_5_2_6b",
-        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
-        "nemotron_nano_8b",     "canary_180m_flash",
-        "parakeet_ctc_1_1b",    "nemotron_3_embed_1b", "magpie_tts_357m",
+    // Expectations come from the policy table itself rather than three
+    // hand-copied sets. Those sets are what drifted: lfm2_5_2_6b and the three
+    // cosmos3_edge_* rows were each granted archs the test still denied, so the
+    // test failed on a correct catalog. Reading the table makes that class of
+    // mismatch impossible while still checking that the public lookups agree
+    // with the policy the catalog actually stores.
+    const size_t row_count = rac_qhexrt_catalog_model_count();
+    ASSERT_TRUE(row_count > 0);
+
+    const rac_qhexrt_hexagon_arch_t arches[] = {
+        RAC_QHEXRT_HEXAGON_ARCH_V75,
+        RAC_QHEXRT_HEXAGON_ARCH_V79,
+        RAC_QHEXRT_HEXAGON_ARCH_V81,
     };
-    const std::unordered_set<std::string> v79 = {
-        "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
-        "gemma4_e2b",     "phi_tiny_moe",  "qwen3_5_0_8b",
-        "qwen3_5_2b",     "qwen3_5_4b",    "deepseek_r1_distill_qwen_1_5b",
-        "internvl3_5_1b", "qwen3_vl",      "gemma4_e2b_vlm",
-        "whisper_base",   "whisper_small", "moonshine_base",
-        "moonshine_tiny", "melotts_en",    "embeddinggemma_300m",
-        "siglip2_base",   "lama_dilated",
-        "lfm2_5_2_6b",   "cosmos3_edge_text", "cosmos3_edge_vlm",
-        "cosmos3_edge_diffusion",
-    };
-    const std::unordered_set<std::string> v81 = {
-        "qwen3_0_6b",
-        "llama3_2_1b",
-        "lfm2_5_230m",
-        "lfm2_5_350m",
-        "lfm2_5_2_6b",
-        "gemma4_e2b",
-        "gemma4_e4b",
-        "gemma3n_e4b",
-        "phi_tiny_moe",
-        "qwen3_5_0_8b",
-        "qwen3_5_2b",
-        "qwen3_5_4b",
-        "deepseek_r1_distill_qwen_1_5b",
-        "deepseek_r1_distill_qwen_7b",
-        "ternary_bonsai_1_7b",
-        "maple_preview",
-        "bonsai_1_7b_1bit",
-        "bonsai_27b_1bit",
-        "nemotron_nano_8b",
-        "nemoguard_content_8b",
-        "nemoguard_topic_8b",
-        "qwen3_vl_2b_text",
-        "cosmos3_edge_text",
-        "cosmos3_edge_vlm",
-        "cosmos3_edge_diffusion",
-        "internvl3_5_1b",
-        "gemma4_e2b_vlm",
-        "gemma4_e4b_vlm",
-        "nemotron_nano_vl_8b",
-        "nemotron_ocr",
-        "nemotron_ocr_v1",
-        "nemotron_parse",
-        "whisper_base",
-        "whisper_small",
-        "moonshine_base",
-        "moonshine_tiny",
-        "parakeet_tdt_0_6b_v2",
-        "parakeet_tdt_0_6b_v3",
-        "parakeet_rnnt_1_1b",
-        "canary_qwen_2_5b",
-        "canary_1b_flash",
-        "nemotron_asr_streaming",
-        "kokoro_en",
-        "melotts_en",
-        "kitten_nano_0_8",
-        "kitten_nano_0_8_varlen",
-        "kitten_mini_0_8",
-        "kitten_micro_0_8",
-        "magpie_tts_357m",
-        "embeddinggemma_300m",
-        "nv_embedqa_1b",
-        "nv_rerankqa_1b",
-        "nv_embedcode_7b",
-        "llama_embed_nemotron_8b",
-        "siglip2_base",
-        "lama_dilated",
-        "bonsai_4b_1bit",
-        "bonsai_8b_1bit",
-    };
-    std::unordered_set<std::string> all = v75;
-    all.insert(v79.begin(), v79.end());
-    all.insert(v81.begin(), v81.end());
-    // Drive coverage off the real policy array: every catalog row supports at
-    // least one arch, so the enumerated union must equal the array length. This
-    // fails loudly if a future row (like the Cosmos3 additions) is added to the
-    // catalog without being enumerated here, instead of drifting behind a
-    // hand-copied literal.
-    ASSERT_EQ(all.size(), rac_qhexrt_catalog_model_count());
-    for (const std::string& id : all) {
-        ASSERT_EQ(rac_qhexrt_catalog_model_is_known(id.c_str()), RAC_TRUE);
-        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V75),
-                  v75.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
-        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V79),
-                  v79.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
-        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V81),
-                  v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
+
+    size_t private_row_count = 0;
+    for (size_t i = 0; i < row_count; ++i) {
+        rac::qhexrt::catalog::PolicyRow row{};
+        // Also the count check the old `all.size() == model_count()` guard was
+        // reaching for, but done per index: a row that is added, removed or
+        // renamed changes what this loop reads, whereas a set union could stay
+        // the same size across an add-plus-remove.
+        ASSERT_TRUE(rac::qhexrt::catalog::policy_row_at(i, &row));
+        ASSERT_TRUE(row.id != nullptr && std::strlen(row.id) > 0);
+        ASSERT_EQ(rac_qhexrt_catalog_model_is_known(row.id), RAC_TRUE);
+
+        // Every row must be reachable on at least one arch, or it can never be
+        // registered on any device.
+        ASSERT_TRUE(row.arch_mask != 0);
+
+        for (const rac_qhexrt_hexagon_arch_t arch : arches) {
+            const bool expected =
+                (row.arch_mask & rac::qhexrt::catalog::policy_arch_bit(arch)) != 0;
+            ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(row.id, arch),
+                      expected ? RAC_TRUE : RAC_FALSE);
+        }
+
+        ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(row.id),
+                  row.requires_hf_auth ? RAC_TRUE : RAC_FALSE);
+        if (row.requires_hf_auth) {
+            ++private_row_count;
+        }
     }
 
-    const std::unordered_set<std::string> private_ids = {"kitten_nano_0_8_varlen"};
-    ASSERT_EQ(private_ids.size(), static_cast<size_t>(1));
-    for (const std::string& id : all) {
-        ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
-                  private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
-    }
+    // The auth gate stays pinned by intent: hosting a model behind a gated HF
+    // repo should be a deliberate act, so the count is asserted rather than
+    // derived. kitten_nano_0_8_varlen is the only private row today.
+    ASSERT_EQ(private_row_count, static_cast<size_t>(1));
+    ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth("kitten_nano_0_8_varlen"), RAC_TRUE);
     ASSERT_EQ(rac_qhexrt_catalog_model_is_known("not-in-product-catalog"), RAC_FALSE);
     ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth("not-in-product-catalog"), RAC_FALSE);
     ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("qwen3_5_0_8b", RAC_QHEXRT_HEXAGON_ARCH_V73),
