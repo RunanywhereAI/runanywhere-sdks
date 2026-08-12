@@ -139,6 +139,18 @@ std::string entry_symbol_from_path(const char* path) {
         s.erase(0, std::strlen("runanywhere_"));
     return std::string("rac_plugin_entry_") + s;
 }
+
+/**
+ * The backend name to blame when a load fails before we ever see a vtable.
+ * `dlopen`/`dlsym` failures have no `metadata.name`, but the file name carries
+ * it — `librunanywhere_sherpa.dylib` → `sherpa` — which is exactly the label a
+ * host wants in "sherpa is unavailable".
+ */
+std::string plugin_name_from_path(const char* path) {
+    const std::string sym = entry_symbol_from_path(path);
+    constexpr const char* kPrefix = "rac_plugin_entry_";
+    return sym.size() > std::strlen(kPrefix) ? sym.substr(std::strlen(kPrefix)) : std::string();
+}
 #endif
 
 }  // namespace
@@ -168,10 +180,16 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
+    /* Failures below are recorded against the name parsed from the file so the
+     * host can name the degraded backend. The registry records its own
+     * failures (ABI / capability / manifest) under the vtable's real name. */
+    const std::string blame = plugin_name_from_path(path);
+
     DlGuard guard{rac_dl_open(path)};
     if (guard.h == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlopen failed (%s)", path,
                       rac_dl_error());
+        rac_registry_record_plugin_unavailable(blame.c_str(), path, RAC_ERROR_PLUGIN_LOAD_FAILED);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
@@ -180,6 +198,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     if (entry_sym == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlsym('%s') failed (%s)", path,
                       sym.c_str(), rac_dl_error());
+        rac_registry_record_plugin_unavailable(blame.c_str(), path, RAC_ERROR_PLUGIN_LOAD_FAILED);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
@@ -189,6 +208,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         RAC_LOG_ERROR(LOG_CAT,
                       "rac_registry_load_plugin('%s'): entry '%s' returned NULL or unnamed vtable",
                       path, sym.c_str());
+        rac_registry_record_plugin_unavailable(blame.c_str(), path, RAC_ERROR_PLUGIN_LOAD_FAILED);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
@@ -200,6 +220,11 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
                       path, vt->metadata.name, static_cast<int>(rc));
         (void)rac_engine_manifest_detach_vtable(vt);
+        /* The registry recorded the reason under the vtable's own name; add
+         * the path, which only the loader knows and which is what makes a
+         * "wrong/stale library staged" diagnosis possible. */
+        if (rc != RAC_ERROR_PLUGIN_DUPLICATE)
+            rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
         return rc;
     }
 
@@ -230,6 +255,39 @@ rac_result_t rac_registry_load_plugin(const char* path) {
 }
 
 #endif /* RAC_PLUGIN_MODE_STATIC */
+
+rac_result_t rac_registry_load_plugins(const char* const* paths, size_t count, size_t* out_loaded) {
+    if (out_loaded != nullptr)
+        *out_loaded = 0;
+    if (count == 0)
+        return RAC_SUCCESS;
+    if (paths == nullptr)
+        return RAC_ERROR_NULL_POINTER;
+
+    size_t loaded = 0;
+    for (size_t i = 0; i < count; ++i) {
+        const char* path = paths[i];
+        if (path == nullptr || path[0] == '\0')
+            continue;
+        rac_result_t rc = rac_registry_load_plugin(path);
+        /* DUPLICATE means the plugin is already in the registry — the host
+         * pre-loaded it, or initialize() is replaying the same env list. The
+         * caller asked for it to be available and it is. */
+        if (rc == RAC_SUCCESS || rc == RAC_ERROR_PLUGIN_DUPLICATE) {
+            ++loaded;
+            continue;
+        }
+        /* Deliberately NOT a return. One backend that will not load is a
+         * degraded SDK, not a dead one; the remaining paths still get their
+         * chance and the failure is already in the ledger. */
+        RAC_LOG_WARNING(LOG_CAT,
+                        "rac_registry_load_plugins: '%s' failed (%d) — continuing with the rest",
+                        path, static_cast<int>(rc));
+    }
+    if (out_loaded != nullptr)
+        *out_loaded = loaded;
+    return RAC_SUCCESS;
+}
 
 rac_result_t rac_registry_unload_plugin(const char* name) {
     if (name == nullptr)

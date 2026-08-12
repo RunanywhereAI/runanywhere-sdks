@@ -21,6 +21,7 @@ import type { ImagesNamespace, LoraNamespace, ModelsNamespace, SegmentationNames
 import type { AuthState, RaBackend } from './backend';
 import {
   backendsForRegistry,
+  unavailableCapabilities,
   type EngineRegistrySnapshot,
 } from '../backend/engines';
 import {
@@ -294,7 +295,13 @@ function capabilitiesSnapshot(registry: EngineRegistrySnapshot): SDKCapabilities
       multiSession: has('rag'),
       persistent: has('rag'),
     },
-    unavailable: UNAVAILABLE_CAPABILITIES,
+    // Static gaps (features this SDK has not built yet) plus the runtime ones
+    // (backends that were refused registration on this machine). Both are the
+    // same question to an app deciding whether to show a button.
+    unavailable: [
+      ...UNAVAILABLE_CAPABILITIES,
+      ...unavailableCapabilities(registry.unavailablePlugins),
+    ],
   };
 }
 
@@ -337,11 +344,12 @@ function modalitiesForBackends(backends: readonly InferenceFramework[]): string[
 }
 
 async function readEngineRegistry(backend: RaBackend): Promise<EngineRegistrySnapshot> {
-  const [thinAddon, pluginNames] = await Promise.all([
+  const [thinAddon, pluginNames, unavailablePlugins] = await Promise.all([
     backend.isThinAddon(),
     backend.listPlugins(),
+    backend.listUnavailablePlugins(),
   ]);
-  return { thinAddon, pluginNames };
+  return { thinAddon, pluginNames, unavailablePlugins };
 }
 
 // A bearer token is a credential, so it lives in the platform secure store and

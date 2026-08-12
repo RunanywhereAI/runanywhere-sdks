@@ -140,6 +140,10 @@ rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
 #include "rac/plugin/rac_plugin_entry.h"
 #endif
 
+// rac_registry_record_plugin_unavailable — the ledger a refused backend lands
+// in, so one engine declining does not have to fail initialize() to be noticed.
+#include "rac/plugin/rac_plugin_loader.h"
+
 namespace {
 
 // The adapter struct is caller-owned and must outlive rac_shutdown().
@@ -385,38 +389,45 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
         // registry's priority (qhexrt=150 > mlx=110 > llamacpp=100 > sherpa=90 >
         // onnx/cloud=50), so a loaded model auto-routes to the best available engine and
         // adding a backend needs NO facade changes — just link it + one guarded call here.
+        // Every backend is treated identically: attempt it, and if it declines,
+        // record WHICH one and why in commons' unavailability ledger, then move
+        // on. llamacpp used to be "required when linked" — a non-success there
+        // called rac_shutdown() and raised, so one mis-built engine took down
+        // ONNX, Sherpa, RAG and every non-inference API with it. The rest went
+        // the other way and discarded their result entirely, leaving a missing
+        // backend with no code and no reason anyone could report.
+        const auto try_register = [](const char* name, rac_result_t result) {
+            if (result != RAC_SUCCESS)
+                rac_registry_record_plugin_unavailable(name, nullptr, result);
+        };
+        (void)try_register;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
-        // LLM/VLM engine — treated as required when linked: a failure here is fatal.
-        rc = rac_backend_llamacpp_register();
-        if (rc != RAC_SUCCESS) {
-            rac_shutdown();
-            raise_rac_error(rc, "rac_backend_llamacpp_register");
-        }
+        try_register("llamacpp", rac_backend_llamacpp_register());  // LLM / VLM
 #endif
 #ifdef RAC_HAVE_BACKEND_ONNX
-        rac_backend_onnx_register();  // embeddings (optional; failure just = unavailable)
+        try_register("onnx", rac_backend_onnx_register());  // embeddings
 #endif
 #ifdef RAC_HAVE_BACKEND_SHERPA
-        rac_backend_sherpa_register();  // STT / TTS (optional)
+        try_register("sherpa", rac_backend_sherpa_register());  // STT / TTS
 #endif
 #ifdef RAC_HAVE_BACKEND_QHEXRT
-        rac_backend_qhexrt_register();  // Hexagon NPU (Snapdragon; incl. Windows-on-Snapdragon)
+        // Hexagon NPU (Snapdragon; incl. Windows-on-Snapdragon)
+        try_register("qhexrt", rac_backend_qhexrt_register());
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
-        rac_backend_mlx_register();  // Apple MLX (Apple Silicon)
+        try_register("mlx", rac_backend_mlx_register());  // Apple MLX (Apple Silicon)
 #endif
 #ifdef RAC_HAVE_BACKEND_NEURT
         // No bespoke rac_backend_*_register() fn for this engine — register the
         // plugin entry directly, like rcli's bootstrap does.
-        rac_plugin_register(rac_plugin_entry_neurt());  // Apple Neural Engine + CoreML diffusion
+        try_register("neurt", rac_plugin_register(rac_plugin_entry_neurt()));
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
-        rac_backend_cloud_register();  // cloud STT provider fallback
+        try_register("cloud", rac_backend_cloud_register());  // cloud STT fallback
 #endif
 #ifdef RAC_HAVE_BACKEND_RAG
-        // RAG pipeline (also registers the ONNX embeddings provider it depends
-        // on if present). Optional: a failure here just leaves RAG unavailable.
-        rac_backend_rag_register();
+        // RAG pipeline (also registers the ONNX embeddings provider it depends on).
+        try_register("rag", rac_backend_rag_register());
 #endif
         backends_registered = true;
     }

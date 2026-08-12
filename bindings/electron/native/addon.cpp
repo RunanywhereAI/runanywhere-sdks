@@ -301,21 +301,37 @@ constexpr char kPluginPathDelimiter = ':';
 // forking the utility host; it is NEVER an RPC argument (renderer must not be
 // able to dlopen arbitrary native code). Compiled only for thin builds — fat
 // builds may still receive the env for forward-compat but skip loading here.
-rac_result_t load_plugins_from_env() {
+//
+// Delegates the loop to commons' rac_registry_load_plugins so per-plugin
+// isolation is a property of the loader every SDK shares, not of this file.
+// It previously returned on the first failure, which made initialize() call
+// rac_shutdown() and fail — one unloadable backend took the whole SDK with it.
+void load_plugins_from_env() {
     const char* raw = std::getenv("RUNANYWHERE_PLUGIN_PATHS");
     if (raw == nullptr || raw[0] == '\0')
-        return RAC_SUCCESS;
+        return;
     std::string list(raw);
     std::string path;
     std::istringstream stream(list);
+    std::vector<std::string> paths;
     while (std::getline(stream, path, kPluginPathDelimiter)) {
-        if (path.empty())
-            continue;
-        rac_result_t rc = load_plugin_path(path.c_str());
-        if (rc != RAC_SUCCESS)
-            return rc;
+        if (!path.empty())
+            paths.push_back(path);
     }
-    return RAC_SUCCESS;
+    if (paths.empty())
+        return;
+    std::vector<const char*> c_paths;
+    c_paths.reserve(paths.size());
+    for (const auto& p : paths)
+        c_paths.push_back(p.c_str());
+    size_t loaded = 0;
+    (void)rac_registry_load_plugins(c_paths.data(), c_paths.size(), &loaded);
+    if (loaded < c_paths.size()) {
+        // Not an error return: the backends that DID load must keep serving.
+        // listUnavailablePlugins() carries which ones failed and why.
+        RAC_LOG_WARNING("ElectronAddon", "%zu of %zu plugins loaded; the rest are unavailable",
+                        loaded, c_paths.size());
+    }
 }
 #endif  // RAC_ELECTRON_THIN_ADDON
 
@@ -350,6 +366,32 @@ Napi::Value ListPlugins(const Napi::CallbackInfo& info) {
         out.Set(i, Napi::String::New(env, names[i] != nullptr ? names[i] : ""));
     }
     rac_registry_free_plugin_list(names, count);
+    return out;
+}
+
+// listUnavailablePlugins() -> [{ name, path, status }] for every backend that
+// asked to register and was refused. The complement of listPlugins(): together
+// they answer "what is serving" and "what is missing, and why" — which is what
+// lets one broken backend be a reported degradation instead of a dead SDK.
+Napi::Value ListUnavailablePlugins(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    (void)info;
+    rac_plugin_unavailable_t* items = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_registry_list_unavailable_plugins(&items, &count);
+    if (rc != RAC_SUCCESS) {
+        throw_rac_error(env, rc, "rac_registry_list_unavailable_plugins");
+        return env.Undefined();
+    }
+    Napi::Array out = Napi::Array::New(env, count);
+    for (size_t i = 0; i < count; ++i) {
+        Napi::Object entry = Napi::Object::New(env);
+        entry.Set("name", Napi::String::New(env, items[i].name != nullptr ? items[i].name : ""));
+        entry.Set("path", Napi::String::New(env, items[i].path != nullptr ? items[i].path : ""));
+        entry.Set("status", Napi::Number::New(env, static_cast<int>(items[i].status)));
+        out.Set(i, entry);
+    }
+    rac_registry_free_unavailable_plugins(items, count);
     return out;
 }
 
@@ -429,46 +471,52 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
         // by main before the utility fork (never an RPC argument).
         static bool backends_registered = false;
         if (!backends_registered) {
+            // Every linked backend gets the same treatment: try it, and if it
+            // declines, record WHICH one and why, then move on to the next.
+            //
+            // Two bugs are closed here at once. llamacpp used to rac_shutdown()
+            // and fail initialize() on any non-success — one backend taking
+            // down the entire SDK, including ONNX, Sherpa and every
+            // non-inference API. The others went the opposite way and discarded
+            // their result entirely, so a backend could go missing with no
+            // code, no reason, and nothing for the app to report.
+            const auto try_register = [](const char* name, rac_result_t result) {
+                if (result != RAC_SUCCESS)
+                    rac_registry_record_plugin_unavailable(name, nullptr, result);
+            };
+            (void)try_register;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
-            rc = rac_backend_llamacpp_register();
-            if (rc != RAC_SUCCESS) {
-                rac_shutdown();
-                return rc;
-            }
+            try_register("llamacpp", rac_backend_llamacpp_register());
 #endif
 #ifdef RAC_HAVE_BACKEND_ONNX
-            rac_backend_onnx_register();  // embeddings (optional)
+            try_register("onnx", rac_backend_onnx_register());  // embeddings (optional)
 #endif
 #ifdef RAC_HAVE_BACKEND_SHERPA
-            rac_backend_sherpa_register();  // STT / TTS (optional)
+            try_register("sherpa", rac_backend_sherpa_register());  // STT / TTS (optional)
 #endif
 #ifdef RAC_HAVE_BACKEND_QHEXRT
             // Hexagon NPU. Routable on Snapdragon Android and Windows on ARM64 when a
             // matching prebuilt is linked; the not-routable shell otherwise, which
             // registers and then declines every primitive.
-            rac_backend_qhexrt_register();
+            try_register("qhexrt", rac_backend_qhexrt_register());
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
-            rac_backend_mlx_register();
+            try_register("mlx", rac_backend_mlx_register());
 #endif
 #ifdef RAC_HAVE_BACKEND_NEURT
             // The neurt engine has no bespoke rac_backend_*_register() fn; register
             // its plugin entry directly, like rcli's bootstrap does.
-            rac_plugin_register(rac_plugin_entry_neurt());
+            try_register("neurt", rac_plugin_register(rac_plugin_entry_neurt()));
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
-            rac_backend_cloud_register();
+            try_register("cloud", rac_backend_cloud_register());
 #endif
 #ifdef RAC_ELECTRON_THIN_ADDON
             // Runtime plugins (thin addon only). Fat/static builds ignore the env
             // — rac_registry_load_plugin returns FEATURE_NOT_AVAILABLE there, and
             // backends are already linked via RAC_HAVE_BACKEND_*. Idempotent with
             // a prior host loadPlugin() thanks to DUPLICATE→success.
-            rc = load_plugins_from_env();
-            if (rc != RAC_SUCCESS) {
-                rac_shutdown();
-                return rc;
-            }
+            load_plugins_from_env();
 #endif
             backends_registered = true;
         }
@@ -4007,6 +4055,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // or expose them through RaBackend; paths come from RUNANYWHERE_PLUGIN_PATHS.
     exports.Set("loadPlugin", Napi::Function::New(env, LoadPlugin));
     exports.Set("listPlugins", Napi::Function::New(env, ListPlugins));
+    exports.Set("listUnavailablePlugins", Napi::Function::New(env, ListUnavailablePlugins));
     exports.Set("pluginApiVersion", Napi::Function::New(env, PluginApiVersion));
 #ifdef RAC_ELECTRON_THIN_ADDON
     exports.Set("thinAddon", Napi::Boolean::New(env, true));

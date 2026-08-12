@@ -24,6 +24,16 @@ export interface NativeGenerationMetrics {
   tokensPerSecond: number;
 }
 
+/** One backend commons refused to register, and the `rac_result_t` saying why. */
+export interface UnavailablePlugin {
+  /** Engine name ("sherpa"), or the library stem when the load failed before the vtable. */
+  readonly name: string;
+  /** Library path for a dynamic-load failure; empty for a statically linked backend. */
+  readonly path: string;
+  /** The raw negative `rac_result_t` — e.g. -811 RAC_ERROR_CAPABILITY_UNSUPPORTED. */
+  readonly status: number;
+}
+
 /** Raw surface exported by runanywhere_native.node. */
 export interface NativeAddon {
   readonly version: string;
@@ -42,6 +52,16 @@ export interface NativeAddon {
   loadPlugin(absolutePath: string): Promise<void>;
   /** Runtime registry snapshot — engine names currently registered. */
   listPlugins(): string[];
+  /**
+   * Backends that asked to register and were refused, from commons'
+   * `rac_registry_list_unavailable_plugins`. The complement of
+   * {@link listPlugins}: one tells you what is serving, this one tells you
+   * what is missing and why, so a broken backend is a reported degradation
+   * rather than a silently absent feature.
+   *
+   * Optional because an older prebuilt .node predates the export.
+   */
+  listUnavailablePlugins?(): UnavailablePlugin[];
   /** Commons `RAC_PLUGIN_API_VERSION` as a runtime number. */
   pluginApiVersion(): number;
   /** Free / total / used RAM from the platform adapter. Cheap enough to stay sync. */

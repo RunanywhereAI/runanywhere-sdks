@@ -6,16 +6,37 @@
 // SDKException (never a crash). B5 wires capabilities() fully; this module is
 // the shared probe both paths use.
 
+import type { UnavailablePlugin } from '../bridge';
 import { SDKException } from '../errors';
 import { InferenceFramework } from '../api/types';
+import type { UnavailableCapability } from '../api/types';
 import { BackendPluginId } from './plugin-registry';
 
-/** Snapshot used by capabilities / ensure probes. */
-export interface EngineRegistrySnapshot {
+/**
+ * What is serving right now — all a routing decision needs.
+ *
+ * Kept separate from {@link EngineRegistrySnapshot} so the load-path guards
+ * below depend only on this: whether a backend failed is irrelevant to "can I
+ * load a model", and a guard that demanded the failure list too would force
+ * every caller to fetch data it does not use.
+ */
+export interface RegisteredEngines {
   /** True when the .node was built with RAC_ELECTRON_THIN_ADDON. */
   readonly thinAddon: boolean;
   /** Engine names currently in commons' plugin registry (`listPlugins()`). */
   readonly pluginNames: readonly string[];
+}
+
+/** Snapshot used by capabilities probes: what serves, plus what failed. */
+export interface EngineRegistrySnapshot extends RegisteredEngines {
+  /**
+   * Backends that tried to register and were refused
+   * (`listUnavailablePlugins()`). Empty on a healthy build. Kept beside
+   * `pluginNames` because "what is serving" and "what is broken" are two
+   * halves of the same answer — without this half, a backend that failed to
+   * load is indistinguishable from one the app never asked for.
+   */
+  readonly unavailablePlugins: readonly UnavailablePlugin[];
 }
 
 /**
@@ -78,9 +99,49 @@ export const FAT_ADDON_FRAMEWORKS: readonly InferenceFramework[] = [
  * Backends this process can actually reach.
  * Thin + empty registry → `[]` (core-alone). Fat ignores the registry list.
  */
-export function backendsForRegistry(snapshot: EngineRegistrySnapshot): readonly InferenceFramework[] {
+export function backendsForRegistry(snapshot: RegisteredEngines): readonly InferenceFramework[] {
   if (!snapshot.thinAddon) return FAT_ADDON_FRAMEWORKS;
   return frameworksFromPluginNames(snapshot.pluginNames);
+}
+
+/**
+ * `rac_result_t` values a refused backend actually comes back with, in the
+ * words an app can show a user. Anything else falls back to the raw code —
+ * better an unfamiliar number than a confident wrong explanation.
+ */
+const UNAVAILABLE_REASONS: ReadonlyMap<number, string> = new Map([
+  // RAC_ERROR_CAPABILITY_UNSUPPORTED
+  [
+    -811,
+    'the plugin declined registration (capability_check) — this build of the backend ' +
+      'was compiled without its engine, or the hardware does not support it',
+  ],
+  // RAC_ERROR_PLUGIN_LOAD_FAILED
+  [
+    -820,
+    'the plugin library could not be loaded (missing file, wrong architecture, or unresolved symbols)',
+  ],
+  // RAC_ERROR_ABI_VERSION_MISMATCH
+  [-810, 'the plugin was built against a different plugin ABI than this SDK'],
+  // RAC_ERROR_BACKEND_UNAVAILABLE
+  [-604, 'the backend reported itself unavailable on this machine'],
+]);
+
+/**
+ * Render commons' unavailability ledger as capability entries.
+ *
+ * This is what turns "speech silently does nothing" into "sherpa is
+ * unavailable, and here is why" at the one place apps already look.
+ */
+export function unavailableCapabilities(
+  plugins: readonly UnavailablePlugin[]
+): UnavailableCapability[] {
+  return plugins.map((plugin) => ({
+    name: `backend:${plugin.name}`,
+    reason:
+      UNAVAILABLE_REASONS.get(plugin.status) ??
+      `the plugin failed to register (rac_result_t ${plugin.status})`,
+  }));
 }
 
 /** Typed failure when a thin core has no registered engines. */
@@ -93,7 +154,7 @@ export function noBackendEnginesException(): SDKException {
  * Fat addons always pass. Thin addons with an empty registry throw
  * {@link noBackendEnginesException}.
  */
-export function assertBackendEnginesRegistered(snapshot: EngineRegistrySnapshot): void {
+export function assertBackendEnginesRegistered(snapshot: RegisteredEngines): void {
   if (!snapshot.thinAddon) return;
   if (snapshot.pluginNames.length > 0) return;
   throw noBackendEnginesException();

@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import type { NativeAddon } from '../bridge';
+import type { NativeAddon, UnavailablePlugin } from '../bridge';
 import { assertBackendEnginesRegistered } from '../backend/engines';
 import { ErrorCode, SDKException } from '../errors';
 import {
@@ -177,6 +177,14 @@ export class NativeBackend implements RaBackend {
   async listPlugins(): Promise<string[]> {
     if (typeof this.addon.listPlugins !== 'function') return [];
     return this.addon.listPlugins();
+  }
+
+  async listUnavailablePlugins(): Promise<UnavailablePlugin[]> {
+    // Absent on a prebuilt .node older than this export; "no data" is not the
+    // same claim as "nothing failed", but an empty list is the only honest
+    // answer a build that cannot report it can give.
+    if (typeof this.addon.listUnavailablePlugins !== 'function') return [];
+    return [...this.addon.listUnavailablePlugins()];
   }
 
   async isThinAddon(): Promise<boolean> {

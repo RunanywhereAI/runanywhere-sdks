@@ -488,6 +488,24 @@ else()
         CXX_VISIBILITY_PRESET hidden
     )
     target_compile_definitions(runanywhere_sherpa PRIVATE RAC_BUILDING_PLUGIN=1)
+    # rac_plugin_entry_sherpa.cpp is compiled TWICE — once into
+    # rac_backend_sherpa (which gets ${SHERPA_COMPILE_DEFS} via
+    # rac_add_engine_plugin, applied PRIVATE — see cmake/plugins.cmake) and
+    # once into this carrier. The carrier is the copy that actually ships as
+    # librunanywhere_sherpa, because rac_registry_load_plugin resolves
+    # rac_plugin_entry_sherpa out of THIS image.
+    #
+    # Without these definitions the carrier's copy sees neither
+    # SHERPA_ONNX_AVAILABLE nor RAC_SHERPA_SPEECH_OPS_AVAILABLE, so
+    # RAC_SHERPA_ROUTABLE compiles to 0: the entry drops the ops tables, and
+    # sherpa_capability_check() returns RAC_ERROR_BACKEND_UNAVAILABLE
+    # unconditionally. The registry then correctly refuses the plugin and the
+    # SDK ships with no STT/TTS/VAD at all — even though rac_backend_sherpa
+    # right next to it is a fully linked, sherpa-onnx-backed 30 MB library.
+    # That is exactly how @runanywhere/electron-sherpa 0.20.17 shipped a 33 KB
+    # stub. The invariant to preserve: one TU compiled into two targets must
+    # see identical macro state in both.
+    target_compile_definitions(runanywhere_sherpa PRIVATE ${SHERPA_COMPILE_DEFS})
     target_link_libraries(runanywhere_sherpa PUBLIC
         rac_backend_sherpa
         rac_commons

@@ -754,6 +754,10 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/plugin/rac_plugin_registry.cpp
     # Dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
+    # Ledger of backends that were refused registration, written by BOTH the
+    # loader and the registry so one failing backend degrades only itself and
+    # every SDK can still say which one, and why.
+    src/plugin/plugin_availability.cpp
     # L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.

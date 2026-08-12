@@ -59,6 +59,19 @@ void* rac_plugin_registry_take_dl_handle(const char* name) RAC_PLUGIN_REGISTRY_N
  */
 size_t rac_plugin_registry_snapshot_names(const char*** out_names) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
+/**
+ * Drop `name` from the unavailability ledger (`plugin_availability.cpp`).
+ * Called by the registry the moment a plugin registers successfully, so a
+ * backend that failed once and then loaded is not still reported as missing.
+ *
+ * The recording half of this pair is public
+ * (`rac_registry_record_plugin_unavailable` in `rac/plugin/rac_plugin_loader.h`)
+ * because SDKs that call `rac_backend_<x>_register()` directly need it; only
+ * the clearing half is internal, since nothing outside commons can know that a
+ * registration just succeeded.
+ */
+void rac_plugin_availability_forget(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

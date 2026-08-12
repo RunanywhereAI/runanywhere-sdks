@@ -4,6 +4,7 @@
 // runs the real `NativeBackend`. Because the shapes on both sides are identical,
 // the namespaces built on top are the same code as in the main process.
 
+import type { UnavailablePlugin } from '../bridge';
 import type { DownloadProgress, ResolvedModel } from '../download';
 import type {
   NativeDiarizationOptions,
@@ -69,6 +70,9 @@ export class RpcBackend implements RaBackend {
   }
   listPlugins(): Promise<string[]> {
     return this.call('listPlugins', []);
+  }
+  listUnavailablePlugins(): Promise<UnavailablePlugin[]> {
+    return this.call('listUnavailablePlugins', []);
   }
   isThinAddon(): Promise<boolean> {
     return this.call('isThinAddon', []);

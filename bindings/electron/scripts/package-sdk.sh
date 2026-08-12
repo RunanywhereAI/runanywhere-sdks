@@ -177,6 +177,22 @@ if failures:
 print("\nAll Electron tarballs are publishable.")
 PY
 
+# Fail closed on natives, the same way the manifest audit above fails closed on
+# entry points. A manifest that advertises dist/index.js and a tarball that has
+# it proves the JS is there; it proves nothing about the .dylib/.so/.dll beside
+# it. @runanywhere/electron-sherpa 0.20.17 passed every check above and shipped
+# a plugin compiled with RAC_SHERPA_ROUTABLE=0: it referenced none of
+# g_sherpa_{stt,tts,vad}_ops, so its capability_check() declined registration
+# and the package delivered no speech at all. This gate reads the shipped
+# binaries and refuses a stub.
+echo ""
+echo ">> Auditing packed plugin natives"
+NATIVE_GATE_ARGS=()
+for archive in "${DIST_DIR}"/*.tgz; do
+    NATIVE_GATE_ARGS+=(--tarball "${archive}")
+done
+python3 "${REPO_ROOT}/scripts/validation/gates/check_plugin_natives.py" "${NATIVE_GATE_ARGS[@]}"
+
 echo ""
 echo ">> Artifacts in ${DIST_DIR}:"
 ls -1 "${DIST_DIR}"
