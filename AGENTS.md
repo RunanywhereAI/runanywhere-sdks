@@ -217,6 +217,9 @@ cmake --preset wasm && cmake --build build/wasm
 # Update Package.swift checksums after building release zips
 ./bindings/swift/scripts/sync-checksums.sh <zip_dir>
 
+# Cut the runanywhere-swift SPM distribution repo at the current version
+./bindings/swift/scripts/sync-dist-repo.sh --zips <zip_dir> --tag <checkout>
+
 # Full IDL codegen (requires protoc toolchain — see scripts/setup/setup-toolchain.sh)
 ./idl/codegen/generate_all.sh
 ```
@@ -449,7 +452,38 @@ Canonical version: `core/VERSION` (single-line file, e.g. `0.20.0`).
 ./scripts/release/sync-versions.sh 0.20.0
 ```
 
-Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merge → `auto-tag.yml` pushes `v0.20.0` tag → `release.yml` builds all artifacts and creates draft GitHub Release.
+Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merge → `auto-tag.yml` pushes `v0.20.0` tag → `release.yml` builds all artifacts and creates draft GitHub Release → **cut the Swift distribution repo** (below).
+
+### Cutting `runanywhere-swift` (required, every release)
+
+[`RunanywhereAI/runanywhere-swift`](https://github.com/RunanywhereAI/runanywhere-swift)
+is a generated, Swift-only SPM distribution of `bindings/swift` (Package.swift +
+Sources/ + LICENSE + README). It exists so Swift consumers clone ~3 MB instead of
+the ~340 MB monorepo. Its manifest declares the **same** remote binaryTargets
+against the **same** release assets on `runanywhere-sdks`, with the **same**
+checksums — the XCFrameworks are never re-uploaded.
+
+**Its tag must track every release.** Publish `v<version>` here without cutting it
+and `from: "<version>"` resolves to nothing for every Swift consumer.
+
+```bash
+git clone https://github.com/RunanywhereAI/runanywhere-swift.git /tmp/ra-swift
+
+# Regenerate Sources/ + bump sdkVersion/README, sync this release's checksums,
+# commit, and tag (bare semver — no 'v' prefix; SwiftPM `from:` needs that).
+./bindings/swift/scripts/sync-dist-repo.sh \
+    --zips release-artifacts/native-ios-macos --tag /tmp/ra-swift
+
+# Prove both manifests agree before pushing.
+RUNANYWHERE_SWIFT_DIST_REPO=/tmp/ra-swift \
+    bash scripts/validation/gates/check_swift_dist_repo_sync.sh
+
+git -C /tmp/ra-swift push origin main --follow-tags
+```
+
+This is enforced, not merely documented: once `v<version>` is tagged here,
+`gates/check_swift_dist_repo_sync.sh` fails every PR until `runanywhere-swift`
+carries the matching tag.
 
 ---
 

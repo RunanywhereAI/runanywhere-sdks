@@ -28,19 +28,30 @@
 #   the two can never drift. Unset, nothing changes and only the monorepo
 #   manifests are touched.
 #
+#   You normally do NOT drive that by hand — bindings/swift/scripts/sync-dist-repo.sh
+#   regenerates the distribution checkout (Sources/ from `git ls-files`, sdkVersion,
+#   README, LICENSE) and chains into this script:
+#
+#     git clone https://github.com/RunanywhereAI/runanywhere-swift.git /tmp/ra-swift
+#     bindings/swift/scripts/sync-dist-repo.sh \
+#         --zips <zip_dir> --tag /tmp/ra-swift
+#     git -C /tmp/ra-swift push origin main --follow-tags
+#
 #   Release order (after the native iOS/macOS zips exist):
 #     1. scripts/release/sync-versions.sh <version>   # bumps sdkVersion everywhere
-#     2. git clone https://github.com/RunanywhereAI/runanywhere-swift.git /tmp/ra-swift
-#     3. Refresh /tmp/ra-swift from this tree:
-#          rsync -a --delete bindings/swift/Sources/{RunAnywhere,LlamaCPPRuntime,\
-#            ONNXRuntime,NeuRTRuntime,MLXRuntime}/ ... into /tmp/ra-swift/Sources/
-#          and set `let sdkVersion` in /tmp/ra-swift/Package.swift to <version>.
-#     4. RUNANYWHERE_SWIFT_DIST_REPO=/tmp/ra-swift \
-#          bindings/swift/scripts/sync-checksums.sh <zip_dir>
-#     5. Commit + push BOTH repos, then tag runanywhere-sdks `v<version>` and
-#        runanywhere-swift `<version>` (no `v` prefix on the dist repo).
-#     6. Re-run with --check against the published zips to prove both manifests
-#        still match the immutable tags.
+#     2. bindings/swift/scripts/sync-checksums.sh <zip_dir>   # monorepo manifests
+#     3. Commit + push runanywhere-sdks, then tag `v<version>`.
+#     4. Cut the distribution repo with sync-dist-repo.sh as above; it tags
+#        `<version>` (no `v` prefix — SwiftPM `from:` resolves bare semver).
+#     5. Prove both sides agree before pushing the dist repo:
+#          RUNANYWHERE_SWIFT_DIST_REPO=/tmp/ra-swift \
+#            scripts/validation/gates/check_swift_dist_repo_sync.sh
+#     6. Re-run this script with --check against the published zips to prove both
+#        manifests still match the immutable tags.
+#
+#   Enforcement: once `v<version>` is tagged on runanywhere-sdks,
+#   scripts/validation/gates/check_swift_dist_repo_sync.sh fails every PR until
+#   runanywhere-swift carries the matching tag.
 #
 # Looks for files of the form:
 #   {name}-v{version}.zip

@@ -70,6 +70,18 @@ jobs:
             git fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
           fi
           bash scripts/validation/gates/check_release_version_coherence.sh
+      - name: Swift distribution repo (runanywhere-swift) is cut at this release
+        # RunanywhereAI/runanywhere-swift is the lightweight SPM distribution of
+        # bindings/swift. Its tags MUST keep pace with this repo's releases or
+        # `from: "<version>"` breaks for every Swift consumer.
+        #
+        # Deliberately NOT in release.yml: that workflow runs on the tag push
+        # itself, when the split repo legitimately has not been cut yet, so it
+        # would fail every release. Here it stays quiet while a release is in
+        # flight (VERSION not yet tagged -> skip) and then fails every PR once
+        # v<VERSION> is published until the split repo catches up. That is what
+        # makes forgetting it impossible rather than merely discouraged.
+        run: bash scripts/validation/gates/check_swift_dist_repo_sync.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only

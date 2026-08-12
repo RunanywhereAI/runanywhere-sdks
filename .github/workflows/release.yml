@@ -12,14 +12,31 @@ name: Release
 # distribution channel.
 #
 # Pre-flight (engineer runs locally before tagging):
-#   scripts/release/sync-versions.sh 1.2.3
-#   build seven Swift XCFramework archives plus the MLX resource archive
-#   keep Package.swift production-defaulted to remote binaries
-#   sync and commit the real remote-binary checksums
-#   run all release gates, then commit the tag-ready manifest
-#   git add -u && git commit -m "chore: release 1.2.3"
-#   git tag v1.2.3
-#   git push origin main v1.2.3
+#   1. scripts/release/sync-versions.sh 1.2.3
+#   2. build seven Swift XCFramework archives plus the MLX resource archive
+#   3. keep Package.swift production-defaulted to remote binaries
+#   4. sync and commit the real remote-binary checksums
+#   5. run all release gates, then commit the tag-ready manifest
+#   6. git add -u && git commit -m "chore: release 1.2.3"
+#   7. git tag v1.2.3
+#   8. git push origin main v1.2.3
+#
+# Post-flight (REQUIRED — the release is not finished without it):
+#   9. Cut the Swift SPM distribution repo, RunanywhereAI/runanywhere-swift, at
+#      the same version. It ships the same Sources/ and the same remote
+#      binaryTarget checksums against THIS release's assets, so consumers can
+#      depend on ~3 MB instead of cloning the monorepo:
+#
+#        git clone https://github.com/RunanywhereAI/runanywhere-swift.git /tmp/ra-swift
+#        bindings/swift/scripts/sync-dist-repo.sh \
+#            --zips release-artifacts/native-ios-macos --tag /tmp/ra-swift
+#        git -C /tmp/ra-swift push origin main --follow-tags
+#
+#      Skip it and `from: "1.2.3"` resolves to nothing for every Swift consumer.
+#      scripts/validation/gates/check_swift_dist_repo_sync.sh fails every PR
+#      once v1.2.3 exists here until that repo carries the 1.2.3 tag. That gate
+#      is deliberately NOT in this workflow: it runs on the tag push, before the
+#      split repo can legitimately be cut.
 # =============================================================================
 
 on:
