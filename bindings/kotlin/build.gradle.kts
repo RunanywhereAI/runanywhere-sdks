@@ -225,14 +225,19 @@ val generateIdlKotlinBindings by tasks.registering(Exec::class) {
     standardInput = "".byteInputStream()
 
     inputs.files(fileTree(repoRootDir.resolve("idl")) { include("*.proto") })
+    // The whole codegen directory, not a hand-listed subset. `generate_all.sh
+    // --only kotlin` also runs bootstrap_protoc.sh and bootstrap_pyproto.sh,
+    // and generate_kotlin.sh runs bootstrap_wire.sh, which reads wire.sha256 —
+    // none of which were declared, so bumping a pinned toolchain (the one thing
+    // guaranteed to change the emitted bytes; see bootstrap_wire.sh's header on
+    // Wire 5.x renaming LoRAState.kt to LoraState.kt) left this task UP-TO-DATE
+    // on stale output.
     inputs.files(
-        idlCodegenScript,
-        repoRootDir.resolve("idl/codegen/generate_kotlin.sh"),
-        repoRootDir.resolve("idl/codegen/generate_kotlin_convenience.py"),
-        repoRootDir.resolve("idl/codegen/generate_defaults_pool.py"),
-        repoRootDir.resolve("idl/codegen/_convenience_common.py"),
-        repoRootDir.resolve("core/VERSIONS"),
+        fileTree(repoRootDir.resolve("idl/codegen")) {
+            include("*.sh", "*.py", "*.sha256")
+        },
     )
+    inputs.files(repoRootDir.resolve("core/VERSIONS"))
     outputs.dir(kotlinGeneratedDir)
 
     doFirst {

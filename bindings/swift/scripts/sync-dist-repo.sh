@@ -101,7 +101,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$DIST_REPO" ]; then
-    echo "usage: $0 [--check] [--zips DIR] [--commit] [--tag] DIST_REPO_PATH" >&2
+    echo "usage: $0 [--check] [--no-codegen] [--zips DIR] [--commit] [--tag] DIST_REPO_PATH" >&2
     exit 1
 fi
 if [ "$MODE" = "check" ] && { [ "$DO_COMMIT" -eq 1 ] || [ -n "$ZIP_DIR" ]; }; then
@@ -185,20 +185,33 @@ if [ ! -d "${GENERATED_ABS}" ]; then
     exit 1
 fi
 
+# Each producer runs separately with its exit status checked. `set -e` and
+# pipefail do NOT reach inside a process substitution: a failing `git ls-files`
+# or a `find` over a missing Generated/ is invisible there — the loop just reads
+# fewer lines — and the count guards below would then pass on a plausible but
+# incomplete list, which is the exact failure this section exists to prevent.
+# No EXIT trap here: one is installed further down for $STAGE and a second
+# would replace it. The file is removed inline once it has been read.
+SOURCE_LIST="$(mktemp)"
+
+if ! git -C "${REPO_ROOT}" ls-files bindings/swift/Sources \
+        | sed 's|^bindings/swift/||' > "${SOURCE_LIST}"; then
+    echo "ERROR: git ls-files bindings/swift/Sources failed" >&2
+    exit 1
+fi
+if ! find "${GENERATED_ABS}" -type f ! -name '.*' \
+        | sed "s|^${REPO_ROOT}/bindings/swift/||" >> "${SOURCE_LIST}"; then
+    echo "ERROR: could not enumerate ${GENERATED_ABS}." >&2
+    echo "       Run ./idl/codegen/generate_all.sh --only swift first." >&2
+    exit 1
+fi
+
 SOURCE_FILES=()
 while IFS= read -r rel; do
     [ -z "$rel" ] && continue
     SOURCE_FILES+=("$rel")
-done < <(
-    {
-        git -C "${REPO_ROOT}" ls-files bindings/swift/Sources \
-            | sed 's|^bindings/swift/||'
-        find "${GENERATED_ABS}" -type f ! -name '.*' \
-            | sed "s|^${REPO_ROOT}/bindings/swift/||"
-    } \
-        | grep -vE "${EXCLUDED_TARGETS_RE}" \
-        | LC_ALL=C sort -u
-)
+done < <(grep -vE "${EXCLUDED_TARGETS_RE}" "${SOURCE_LIST}" | LC_ALL=C sort -u)
+rm -f "${SOURCE_LIST}"
 if [ "${#SOURCE_FILES[@]}" -eq 0 ]; then
     echo "ERROR: no files under bindings/swift/Sources" >&2
     exit 1

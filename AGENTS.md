@@ -382,7 +382,10 @@ ever stops being tracked — and fails the other way if a generated file becomes
 **The toolchain is downloaded, not assumed.** protoc stamps its own patch version into
 every C++ header (`#if PROTOBUF_VERSION != 7035001`) and every ts-proto banner, and Wire
 renames files between releases, so the output is a function of the tool versions and not
-only of the schemas. No package manager can pin a patch level — but protobuf and Maven
+only of the schemas. The package managers this repo would otherwise reach for do not offer
+that guarantee — `brew install protobuf` gives whatever is current, `apt-get install
+protobuf-compiler` gives whatever the distro froze, neither selects a per-platform archive
+by checksum, and Homebrew's `wire` is a different product entirely. protobuf and Maven
 Central both publish immutable per-platform archives, so the pins are *obtainable*:
 
 | script | resolves | pinned by | verified against |

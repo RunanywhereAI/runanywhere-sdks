@@ -36,6 +36,9 @@ on:
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
+      # The composite action is the generator entry point for ~9 jobs; a
+      # change to how it installs or invokes codegen must face this gate.
+      - '.github/actions/generate-idl/action.yml'
       - '.github/workflows/idl-drift-check.yml'
       # No generated path is listed any more: every one of them is untracked, so
       # no PR can touch it and a filter pointing there can never fire.
@@ -65,6 +68,9 @@ on:
       - 'core/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
+      # The composite action is the generator entry point for ~9 jobs; a
+      # change to how it installs or invokes codegen must face this gate.
+      - '.github/actions/generate-idl/action.yml'
       - '.github/workflows/idl-drift-check.yml'
       - 'bindings/proto-ts/src/index.ts'
       - 'bindings/proto-ts/src/lifecycle_service.ts'
@@ -246,6 +252,16 @@ jobs:
             base_ref="${{ github.event.before }}"
           fi
           out="${RUNNER_TEMP}/SCHEMA_LOCK.base"
+          # fetch-depth: 2 makes the PR base reachable (the merge commit's other
+          # parent), but says nothing about `github.event.before` after a
+          # multi-commit push — and an unreachable base silently SKIPS the
+          # version-bump check below, which is the one case where it matters.
+          # Fetch the object rather than deepening the whole clone: this repo's
+          # full history is far too large to pull on every gate run.
+          if [ -n "$base_ref" ] && ! git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+            echo "Base ${base_ref} not in the shallow clone — fetching it"
+            git fetch --no-tags --depth=1 origin "${base_ref}" 2>/dev/null || true
+          fi
           if [ -n "$base_ref" ] && git cat-file -e "${base_ref}:idl/SCHEMA_LOCK" 2>/dev/null; then
             git show "${base_ref}:idl/SCHEMA_LOCK" > "$out"
             echo "path=$out" >> "$GITHUB_OUTPUT"

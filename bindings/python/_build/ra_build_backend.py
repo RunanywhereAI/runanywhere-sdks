@@ -36,7 +36,11 @@ Only the three Python generators are invoked, not ``generate_all.sh`` — a
 ``pip install`` must not require the Swift, Kotlin, Dart and TypeScript
 toolchains.
 
-Set ``RA_FORCE_CODEGEN=1`` to regenerate even when the outputs already exist.
+In the monorepo the outputs are regenerated whenever any ``idl/*.proto`` or
+generator script is newer than them — "the files exist" is not evidence that
+they match the current schema, and these trees are gitignored, so a stale one
+would be sealed into the wheel with nothing to notice it. Set
+``RA_FORCE_CODEGEN=1`` to regenerate unconditionally.
 """
 
 from __future__ import annotations
@@ -129,16 +133,52 @@ def _generate() -> None:
     _run([sys.executable, str(_CODEGEN_DIR / "generate_defaults_pool.py")], "default pool", env)
 
 
+def _newest_input_mtime() -> float:
+    """Newest mtime across everything the three Python generators read."""
+    newest = 0.0
+    for pattern in ("idl/*.proto", "idl/codegen/*.py", "idl/codegen/*.sh"):
+        for path in _REPO_ROOT.glob(pattern):
+            try:
+                newest = max(newest, path.stat().st_mtime)
+            except OSError:
+                pass
+    return newest
+
+
+def _outputs_are_stale() -> bool:
+    """True when any generator input is newer than the oldest generated output.
+
+    "Outputs exist" was the old bar, and it is too low: these trees are
+    gitignored, so an edit to ``idl/*.proto`` leaves a perfectly plausible stale
+    tree on disk that then gets sealed into a wheel or an sdist. Regenerating
+    *unconditionally* is not the answer either — CI runs
+    ``.github/actions/generate-idl`` immediately before ``python -m build``, and
+    the PEP 517 isolated build environment does not carry grpcio-tools, so an
+    unconditional ``_generate()`` would raise SystemExit on output that is
+    already correct. Comparing timestamps distinguishes the two.
+    """
+    newest_input = _newest_input_mtime()
+    if newest_input == 0.0:
+        return False
+    for path in _REQUIRED:
+        try:
+            if path.stat().st_mtime < newest_input:
+                return True
+        except OSError:
+            return True
+    return False
+
+
 def _ensure_generated() -> None:
     force = os.environ.get("RA_FORCE_CODEGEN") == "1"
 
     if _CODEGEN_DIR.is_dir():
-        if force or not _outputs_present():
+        if force or not _outputs_present() or _outputs_are_stale():
             _generate()
         else:
             print(
-                "[runanywhere-build] generated modules already present; "
-                "set RA_FORCE_CODEGEN=1 to regenerate",
+                "[runanywhere-build] generated modules are present and newer "
+                "than every IDL input; set RA_FORCE_CODEGEN=1 to regenerate",
                 flush=True,
             )
 

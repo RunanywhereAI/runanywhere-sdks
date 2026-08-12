@@ -1577,7 +1577,16 @@ if(_RAC_GENERATED_MISSING)
     file(LOCK "${_RAC_REPO_ROOT_FOR_IDL}/idl/codegen/.codegen.lock"
          GUARD PROCESS TIMEOUT 900 RESULT_VARIABLE _RAC_IDL_LOCK_RC)
     if(NOT _RAC_IDL_LOCK_RC STREQUAL "0")
-        message(STATUS "IDL: could not take the codegen lock (${_RAC_IDL_LOCK_RC}); proceeding")
+        # Deliberately not FATAL_ERROR. This lock is an optimisation, not the
+        # correctness boundary: generate_all.sh takes its own mkdir-based mutex
+        # (see the "serialize concurrent runs" block there), so two configures
+        # that both get past this point still serialize inside the generator.
+        # Failing here instead would make an orphaned advisory lock — left by a
+        # killed build, or an NFS/container mount where file(LOCK) simply does
+        # not work — permanently unconfigurable, which is a far worse failure
+        # than the one it would be guarding against.
+        message(STATUS "IDL: could not take the codegen lock (${_RAC_IDL_LOCK_RC}); "
+                       "proceeding — generate_all.sh serializes internally")
     endif()
 
     if(EXISTS "${_RAC_DEFAULTS_HEADER}" AND EXISTS "${_RAC_GENERATED_MISSING}")
@@ -1598,7 +1607,16 @@ if(_RAC_GENERATED_MISSING)
 
     # generate_all.sh can succeed while writing nothing that this build needs;
     # re-assert rather than trust the exit code.
-    foreach(_rac_required IN LISTS _RAC_PROTO_GENERATED_SOURCES ITEMS "${_RAC_DEFAULTS_HEADER}")
+    # Each .pb.cc has a .pb.h that the rest of the tree #includes; a generator
+    # that emitted the sources and not the headers would pass this loop and fail
+    # much later at the first #include. Derive and assert both.
+    set(_rac_required_generated "${_RAC_DEFAULTS_HEADER}")
+    foreach(_rac_pb_cc IN LISTS _RAC_PROTO_GENERATED_SOURCES)
+        list(APPEND _rac_required_generated "${_rac_pb_cc}")
+        string(REGEX REPLACE "\\.pb\\.cc$" ".pb.h" _rac_pb_hdr "${_rac_pb_cc}")
+        list(APPEND _rac_required_generated "${_rac_pb_hdr}")
+    endforeach()
+    foreach(_rac_required IN LISTS _rac_required_generated)
         if(NOT EXISTS "${_rac_required}")
             message(FATAL_ERROR
                 "idl codegen reported success but ${_rac_required} is still "

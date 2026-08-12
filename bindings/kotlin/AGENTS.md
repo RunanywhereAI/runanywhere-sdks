@@ -188,7 +188,7 @@ Both follow the same pattern: thin Android-library sub-modules that register a C
 
 **Source layout:** Single-target Android library — `src/main/kotlin/` and `src/test/kotlin/` only. No KMP source-set hierarchy. Backend sub-modules (`modules/runanywhere-core-llamacpp/`, `modules/runanywhere-core-onnx/`) follow the same Android-library plugin layout.
 
-**Wire codegen:** The Wire Gradle plugin is defined in the catalog but NOT applied (Kotlin DSL clash). Generated proto files are committed to git. Regenerate via `idl/codegen/generate_kotlin.sh`. A CI workflow (`idl-drift-check.yml`) enforces freshness.
+**Wire codegen:** The Wire Gradle plugin is defined in the catalog but NOT applied (Kotlin DSL clash). Generated proto files under `src/main/kotlin/com/runanywhere/sdk/generated/` are **not** tracked — they are produced by the `generateIdlKotlinBindings` task wired into `preBuild` (and into ktlint/detekt, which read the source tree directly). Regenerate by hand with `idl/codegen/generate_all.sh --only kotlin`. `idl-drift-check.yml` verifies the schema lock and asserts the generated tree exists and is untracked.
 
 **Maven group resolution:** Determined at configuration time from env vars — `com.github.RunanywhereAI.runanywhere-sdks` (JitPack), `com.runanywhere` (official), or `io.github.sanchitmonga22` (default).
 
@@ -206,5 +206,5 @@ Most tests can run without JNI loaded (they test Kotlin-layer logic). Tests requ
 
 - **`pr-build.yml`** — Triggered on PRs to `main` and pushes to `main`/`feat/v2-architecture`. Builds C++ from source, then runs `./gradlew assembleDebug`.
 - **`release.yml`** — Triggered by `v*.*.*` tags. Matrix-builds native libs for 4 ABIs, stages into `src/main/jniLibs/`, runs `assembleRelease`, uploads artifacts with SHA256 checksums.
-- **`idl-drift-check.yml`** — Monitors `generated/` directory. Regenerates proto bindings and fails on any `git diff`.
+- **`idl-drift-check.yml`** — Regenerates every binding, then verifies: the committed `idl/SCHEMA_LOCK` still matches the `.proto` digest, every declared generated tree exists and is **untracked**, no two generated names collide case-insensitively, and the generated TypeScript/Python compile. It cannot "fail on a `git diff`" any more — nothing generated is tracked.
 - **`scripts/package-sdk.sh`** — CI packaging script. Accepts `--natives-from PATH` for pre-staged `.so` files and emits one deterministic local Maven repository ZIP containing the exact core/LlamaCPP/ONNX AAR, POM, Gradle module metadata, and sources publications.
