@@ -116,6 +116,14 @@ def _generate() -> None:
     # the interpreter running this backend so an isolated build environment
     # with grpcio-tools installed is the one that gets used.
     env.setdefault("PYTHON_BIN", sys.executable)
+    # These generators are invoked directly here rather than through
+    # generate_all.sh, so they do not inherit its deterministic environment.
+    # Each prints a "✓ <path>" progress line, and on Windows stdout defaults to
+    # the ANSI code page, where that raises UnicodeEncodeError and aborts the
+    # wheel build. UTF-8 mode also pins open()'s default encoding so the
+    # generated files match every other platform byte for byte.
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
     _run(["bash", str(_CODEGEN_DIR / "generate_python.sh")], "protobuf modules", env)
     _run([sys.executable, str(_CODEGEN_DIR / "generate_python_errors.py")], "error enums", env)
     _run([sys.executable, str(_CODEGEN_DIR / "generate_defaults_pool.py")], "default pool", env)

@@ -34,10 +34,21 @@ set -euo pipefail
 #                  runner's local time.
 #   PYTHONHASHSEED — the convenience generators walk descriptor sets; a stray
 #                  set/frozenset iteration would otherwise be seed-dependent.
+#   PYTHONIOENCODING/PYTHONUTF8 — every generator prints a "✓ <path>" progress
+#                  line. On POSIX that survives LC_ALL=C because CPython coerces
+#                  the C locale to UTF-8 (PEP 538), but Windows has no locale
+#                  env to coerce: stdout defaults to the ANSI code page and the
+#                  first ✓ raises UnicodeEncodeError ('charmap' codec can't
+#                  encode character '✓'), which is a hard exit(1) in the
+#                  middle of an otherwise successful codegen run. UTF-8 mode
+#                  also pins open()'s default encoding, so the generated files
+#                  are the same bytes on Windows as everywhere else.
 export LC_ALL=C
 export LANG=C
 export TZ=UTC
 export PYTHONHASHSEED=0
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
