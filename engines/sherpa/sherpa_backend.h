@@ -100,6 +100,67 @@ struct SherpaStreamUpdate {
 };
 
 // =============================================================================
+// STT LANGUAGE POLICY
+// =============================================================================
+// Pure, state-free decisions shared by transcribe() and create_stream(). They
+// live here (rather than as SherpaSTT members) so they can be unit-tested
+// without a loaded recognizer — see tests/test_sherpa_language_policy.cpp.
+
+/**
+ * Resolve the language a request should actually run with.
+ *
+ * Whisper is the only recognizer that can auto-detect. For Canary and every
+ * other type a `detect_language` request uses the language the recognizer was
+ * built with instead of failing the call: public STT leaves the language unset
+ * to mean "auto", so `stt.transcribe(pcm)` must keep working on Canary.
+ *
+ * `whisper_auto_token` is the token that means auto-detect on the target path:
+ * empty for an offline Whisper recognizer (Sherpa reads an empty language as
+ * auto) and "auto" for the online-stream `language` option.
+ */
+inline std::string sherpa_resolve_request_language(STTModelType model_type,
+                                                   const std::string& loaded_language,
+                                                   bool detect_language,
+                                                   const std::string& requested_language,
+                                                   const char* whisper_auto_token) {
+    const std::string whisper_auto =
+        whisper_auto_token ? std::string(whisper_auto_token) : std::string();
+    if (detect_language) {
+        if (model_type == STTModelType::WHISPER) {
+            return whisper_auto;
+        }
+        return loaded_language.empty() ? std::string("en") : loaded_language;
+    }
+    if (!requested_language.empty()) {
+        return requested_language;
+    }
+    if (!loaded_language.empty()) {
+        return loaded_language;
+    }
+    return model_type == STTModelType::WHISPER ? whisper_auto : std::string("en");
+}
+
+/**
+ * Whether an explicit per-request language override can be honored by a
+ * recognizer whose language is fixed at build time.
+ *
+ * Offline recognizers bake the language in when they are constructed:
+ * `SherpaOnnxCreateOfflineStream()` inherits it and there is no per-stream
+ * language option (contrast `SherpaOnnxOnlineStreamSetOption`). Accepting an
+ * override on such a path and then decoding with the loaded language means a
+ * caller who asked for French silently gets English, so the request must be
+ * refused instead.
+ *
+ * An UNSET language is not an override: it resolves to the loaded language
+ * (see sherpa_resolve_request_language) and MUST keep succeeding — that is what
+ * `stt.transcribe(pcm)` / `stt.transcribeStream()` send by default.
+ */
+inline bool sherpa_fixed_language_request_is_honored(const std::string& loaded_language,
+                                                     const std::string& requested_language) {
+    return requested_language.empty() || requested_language == loaded_language;
+}
+
+// =============================================================================
 // TTS TYPES
 // =============================================================================
 
@@ -243,14 +304,21 @@ class SherpaSTT {
     std::vector<std::string> get_supported_languages() const;
 
    private:
-    // Whisper is the only recognizer that can auto-detect. For Canary and
-    // every other type, a detect_language request uses the language the
-    // recognizer was built with instead of failing the call. `whisper_auto_token`
-    // is empty for offline Whisper auto-detect and "auto" for the online stream
-    // option. Mutex need not be held; reads model_type_ / language_ only.
+    // Thin logging wrapper over sherpa_resolve_request_language() bound to this
+    // recognizer's model_type_ / language_. Mutex need not be held; reads
+    // model_type_ / language_ only.
     std::string resolve_request_language(bool detect_language,
                                          const std::string& requested_language,
                                          const char* whisper_auto_token) const;
+
+    // Whether an explicit per-request language can actually be applied to a
+    // stream of this recognizer. True only for a prompt-aware online transducer
+    // on a build whose Sherpa headers declare SherpaOnnxOnlineStreamSetOption —
+    // every other recognizer (all offline ones, English-only transducers, older
+    // headers) decodes with the language baked in when it was built. When this
+    // is false an override that disagrees with `language_` is REFUSED rather
+    // than silently ignored. Reads recognizer_mode_ / uses_language_prompt_.
+    bool per_stream_language_configurable() const;
 
     // Builds the offline recognizer using cached model paths and the current
     // `language_`. Mutex MUST be held by the caller. Returns true on success.
@@ -277,6 +345,12 @@ class SherpaSTT {
         const SherpaOnnxOfflineStream* offline = nullptr;
         const SherpaOnnxOnlineStream* online = nullptr;
         int sample_rate = 16000;
+        // The language this stream will ACTUALLY decode with, never merely the
+        // one that was requested. Online streams can be re-pinned per stream via
+        // SherpaOnnxOnlineStreamSetOption, so this carries the resolved request;
+        // offline streams inherit the recognizer's build-time language, so this
+        // carries `language_`. create_stream() refuses any override it cannot
+        // honor, which is what keeps the two in agreement.
         std::string language;
         std::string last_text;
     };

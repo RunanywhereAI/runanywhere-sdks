@@ -603,6 +603,25 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(plugin_entry_sherpa_tests PROPERTIES
             LABELS "native;protobuf-isolation;sherpa")
     endif()
+    # Sherpa STT language policy: the unset-language fallback (Canary) and the
+    # refusal of an override a build-time-pinned recognizer cannot honor. Wired
+    # here rather than in engines/sherpa/CMakeLists.txt because enable_testing()
+    # runs after add_subdirectory(engines), so add_test() there is a no-op.
+    # Header-only policy — needs neither Sherpa-ONNX nor sherpa_backend.cpp.
+    if(RAC_BACKEND_SHERPA AND NOT TARGET test_sherpa_language_policy)
+        add_executable(test_sherpa_language_policy
+            engines/sherpa/tests/test_sherpa_language_policy.cpp)
+        target_include_directories(test_sherpa_language_policy PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/sherpa
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines
+        )
+        target_compile_definitions(test_sherpa_language_policy PRIVATE SHERPA_ONNX_AVAILABLE=0)
+        target_link_libraries(test_sherpa_language_policy PRIVATE nlohmann_json::nlohmann_json)
+        target_compile_features(test_sherpa_language_policy PRIVATE cxx_std_20)
+        add_test(NAME sherpa_language_policy_tests COMMAND test_sherpa_language_policy)
+        set_tests_properties(sherpa_language_policy_tests PROPERTIES
+            LABELS "native;sherpa;stt")
+    endif()
     # The speech backend and its availability flag are configured after
     # commons/tests. Wire the real Sherpa STT test here so optional NVIDIA
     # transducer/Canary fixtures can exercise the shipped backend instead of
