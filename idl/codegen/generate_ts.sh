@@ -41,17 +41,39 @@ fi
 # to whichever is first on PATH *at that moment*, so the prefix that received
 # `npm install -g` is not necessarily the prefix `npm root -g` reports here.
 # Try every legitimate location instead of betting on one.
+#
+# On Windows the .cmd shims come FIRST. protoc spawns the plugin with
+# CreateProcess, which cannot run the extensionless `#!/usr/bin/env node`
+# script that npm also drops next to them — Git Bash's `command -v` happily
+# returns that script, and handing it to protoc fails with a bare
+# "program not found". `command -v x.cmd` simply resolves to nothing on POSIX,
+# so one ordered list serves both.
 TS_PROTO_PLUGIN=""
 ts_proto_candidates() {
+    command -v protoc-gen-ts_proto.cmd 2>/dev/null || true
     command -v protoc-gen-ts_proto 2>/dev/null || true
+
+    # `npm prefix -g` is where the shims live: <prefix>/bin on POSIX and
+    # <prefix> itself (%APPDATA%\npm) on Windows.
+    npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+    if [ -n "${npm_prefix}" ]; then
+        printf '%s\n' "${npm_prefix}/protoc-gen-ts_proto.cmd"
+        printf '%s\n' "${npm_prefix}/bin/protoc-gen-ts_proto"
+        printf '%s\n' "${npm_prefix}/lib/node_modules/ts-proto/protoc-gen-ts_proto"
+    fi
+
+    # `npm root -g` is the package directory: <prefix>/lib/node_modules on
+    # POSIX, <prefix>/node_modules on Windows. Ask rather than reconstruct.
     npm_root="$(npm root -g 2>/dev/null || true)"
     [ -n "${npm_root}" ] && printf '%s\n' "${npm_root}/ts-proto/protoc-gen-ts_proto"
-    npm_prefix="$(npm prefix -g 2>/dev/null || true)"
-    [ -n "${npm_prefix}" ] && printf '%s\n' "${npm_prefix}/lib/node_modules/ts-proto/protoc-gen-ts_proto"
+
     # A repo-local install is a first-class answer too: `npm install` in
     # bindings/proto-ts, or a hoisted root install, both put it here.
-    printf '%s\n' "${REPO_ROOT}/bindings/proto-ts/node_modules/ts-proto/protoc-gen-ts_proto"
-    printf '%s\n' "${REPO_ROOT}/node_modules/ts-proto/protoc-gen-ts_proto"
+    for dir in "${REPO_ROOT}/bindings/proto-ts" "${REPO_ROOT}"; do
+        printf '%s\n' "${dir}/node_modules/.bin/protoc-gen-ts_proto.cmd"
+        printf '%s\n' "${dir}/node_modules/.bin/protoc-gen-ts_proto"
+        printf '%s\n' "${dir}/node_modules/ts-proto/protoc-gen-ts_proto"
+    done
 }
 while IFS= read -r candidate; do
     [ -n "${candidate}" ] || continue
