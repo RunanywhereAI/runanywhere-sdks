@@ -577,21 +577,24 @@ jobs:
           set -euo pipefail
           corepack enable
           corepack prepare yarn@3.6.1 --activate
-      # Root lockfile gate: the RN example app is a root-workspace member, so
-      # a stale root yarn.lock is still caught here even though the package
-      # commands below run inside the standalone RN workspace.
+      # Root lockfile gate: the RN packages and the example app are all
+      # root-workspace members, so a stale root yarn.lock is still caught here
+      # even though every package command below runs inside the standalone RN
+      # workspace.
       - name: Yarn install (repo root lockfile gate)
         run: yarn install --immutable
-      - name: Jest unit tests (React Native example)
-        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
       # bindings/react-native is ALSO a standalone Yarn project with its
-      # own pinned yarn.lock (fb060a368) and workspaces declaration.
-      # `yarn workspace <name> run <script>` re-detects the project from the
-      # package's cwd, and packages/core's nearest lockfile is the NESTED one —
-      # so a root-only install leaves that project stateless and every package
-      # command dies with "Couldn't find the node_modules state file". Install
-      # and run everything inside the standalone workspace (the documented SDK
-      # dev flow), with the root install kept above as the root-lockfile gate.
+      # own pinned yarn.lock and workspaces declaration. Yarn resolves the
+      # owning project by walking up to the NEAREST lockfile, so that nested
+      # project owns everything under bindings/react-native — packages/* AND
+      # example/. `yarn workspace <name> run <script>` re-detects the project
+      # from the package's cwd, so a root-only install leaves that project
+      # stateless and every package command dies ("Couldn't find the
+      # node_modules state file", or — if the nested project does not declare
+      # the package — "doesn't seem to be part of the project declared in").
+      # Install and run everything inside the standalone workspace (the
+      # documented SDK dev flow), with the root install kept above as the
+      # root-lockfile gate.
       - name: Yarn install (RN standalone workspace)
         working-directory: bindings/react-native
         run: yarn install --immutable
@@ -603,6 +606,8 @@ jobs:
       # has already provided the Nitro and React Native jsi headers.
       - name: Compile RN C++ headers against the generated Nitro specs
         run: bash scripts/validation/gates/check_rn_cpp_headers_compile.sh
+      # Both scripts fan out over every workspace member, so they now cover the
+      # example app as well as packages/*.
       - name: Typecheck React Native workspace
         working-directory: bindings/react-native
         run: yarn typecheck
@@ -612,6 +617,9 @@ jobs:
       - name: Jest unit tests (@runanywhere/core)
         working-directory: bindings/react-native
         run: yarn workspace @runanywhere/core run test --runInBand
+      - name: Jest unit tests (React Native example)
+        working-directory: bindings/react-native
+        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
 
   web-typecheck:
     runs-on: ubuntu-22.04

@@ -5,6 +5,7 @@
   "description": "RunAnywhere React Native SDK - Multi-Package Monorepo",
   "workspaces": [
     "packages/*",
+    "example",
     "../proto-ts"
   ],
   "scripts": {

@@ -1374,13 +1374,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@bufbuild/protobuf@npm:^2.12.0":
-  version: 2.12.0
-  resolution: "@bufbuild/protobuf@npm:2.12.0"
-  checksum: f905c34ffbf0a05ee3fd6281a13f5daa5b43c215682d4900b23629691c1ee7fe0d96fefbbad84055ba0547ef089fb2d488a68c4e8383abf5b7dc56a9207c44ea
-  languageName: node
-  linkType: hard
-
 "@bufbuild/protobuf@npm:^2.12.1":
   version: 2.12.1
   resolution: "@bufbuild/protobuf@npm:2.12.1"
@@ -9074,7 +9067,7 @@ __metadata:
   dependencies:
     "@babel/core": ^7.25.2
     "@babel/runtime": ^7.28.6
-    "@bufbuild/protobuf": ^2.12.0
+    "@bufbuild/protobuf": ^2.12.1
     "@gorhom/bottom-sheet": ^5.2.14
     "@react-native-async-storage/async-storage": ^2.2.0
     "@react-native-clipboard/clipboard": ^1.16.3

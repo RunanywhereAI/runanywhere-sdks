@@ -230,11 +230,33 @@ bindings/react-native/packages/core
 bindings/react-native/packages/llamacpp
 bindings/react-native/packages/mlx
 bindings/react-native/packages/onnx
+bindings/react-native/packages/qhexrt
 bindings/react-native/example
 bindings/proto-ts
 ```
 
-The inner `bindings/react-native/package.json` also declares workspaces (`packages/*` + `../proto-ts`) for standalone operation.
+The inner `bindings/react-native/package.json` declares the same set by local path
+(`packages/*` + `example` + `../proto-ts`) for standalone operation.
+
+**Both declarations are required, and they must stay in sync.** Yarn picks the owning
+project by walking up to the *nearest* `yarn.lock`, so `bindings/react-native/yarn.lock`
+makes the inner project the owner of everything beneath it — including `example/`. Any
+package under `bindings/react-native/` that the inner `workspaces` array omits is
+disowned, and `yarn workspace <name> run …` fails from anywhere in the repo with
+"doesn't seem to be part of the project declared in …". The root declaration is what
+keeps the root `yarn.lock` covering these packages, which is the repo-root lockfile gate
+in `rn-typecheck`.
+
+Because `example` is a member of the inner project, the workspace-wide `yarn typecheck`
+and `yarn lint` scripts fan out over the example app too, not just `packages/*`.
+
+The example sets `installConfig.hoistingLimits: "workspaces"`, so its dependencies stay
+in `example/node_modules` instead of hoisting. That makes the example a hoisting
+boundary that `@runanywhere/proto-ts` (an *external* workspace at `../proto-ts`) must be
+linkable into, so the example's `@bufbuild/protobuf` range must stay compatible with the
+one proto-ts and `packages/*` declare (`^2.12.1`). A looser range resolves to a second
+copy of the protobuf runtime and the install fails with YN0071 "Cannot link
+@runanywhere/proto-ts … conflicts with parent dependency".
 
 ## CI/CD
 
