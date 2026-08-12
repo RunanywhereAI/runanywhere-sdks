@@ -29,13 +29,24 @@ validate_pr_release_bump() {
     FAILURES=$((FAILURES + 1))
     return
   fi
-  if ! git -C "${REPO_ROOT}" cat-file -e "${base_sha}:core/VERSION" 2>/dev/null; then
+  # VERSION lived at sdk/runanywhere-commons/VERSION until the core/ rename, so a
+  # PR whose base predates that commit only has the old path. Probing just one
+  # spelling makes the gate report the base as "unavailable" when it is merely
+  # older, which is indistinguishable from a genuinely missing fetch.
+  base_version_path=""
+  for candidate in core/VERSION sdk/runanywhere-commons/VERSION; do
+    if git -C "${REPO_ROOT}" cat-file -e "${base_sha}:${candidate}" 2>/dev/null; then
+      base_version_path="${candidate}"
+      break
+    fi
+  done
+  if [ -z "${base_version_path}" ]; then
     echo "[FAIL] PR base ${base_sha} is unavailable; fetch it before running this gate" >&2
     FAILURES=$((FAILURES + 1))
     return
   fi
 
-  base_version="$(git -C "${REPO_ROOT}" show "${base_sha}:core/VERSION" | tr -d '[:space:]')"
+  base_version="$(git -C "${REPO_ROOT}" show "${base_sha}:${base_version_path}" | tr -d '[:space:]')"
   if ! [[ "${base_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
     echo "[FAIL] invalid PR-base release version: ${base_version}" >&2
     FAILURES=$((FAILURES + 1))
