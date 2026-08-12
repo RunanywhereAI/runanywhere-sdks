@@ -76,6 +76,46 @@ want() { case " ${SELECTED} " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 # how a machine without Dart 3 runs everything else.
 [ "${SKIP_DART}" -eq 1 ] && SELECTED="${SELECTED//dart/}"
 
+# --- serialize concurrent runs ----------------------------------------------
+# Three build systems now invoke this script on their own schedule — a CMake
+# configure (core/CMakeLists.txt), a Gradle preBuild, and a developer in a
+# terminal — and they can overlap. Two runs interleaving inside the same
+# generated tree, or inside the shared bootstrap caches under
+# ~/.cache/runanywhere, produce a tree that is neither run's output.
+#
+# mkdir is the only atomic create-if-absent primitive available on every host
+# this repo builds on; flock(1) exists on Linux but not on macOS or Git Bash.
+# The wait is BOUNDED and then proceeds with a warning: a codegen that is
+# merely racy is a much better failure than a build that blocks forever, which
+# is what an unbounded lock would introduce.
+LOCK_DIR="${SCRIPT_DIR}/.codegen.lock.d"
+LOCK_TIMEOUT="${RAC_CODEGEN_LOCK_TIMEOUT:-900}"
+LOCK_HELD=0
+release_lock() {
+    if [ "${LOCK_HELD}" -eq 1 ]; then
+        LOCK_HELD=0
+        rm -rf "${LOCK_DIR}" 2>/dev/null || true
+    fi
+}
+waited=0
+while :; do
+    if mkdir "${LOCK_DIR}" 2>/dev/null; then
+        LOCK_HELD=1
+        trap release_lock EXIT INT TERM
+        break
+    fi
+    if [ "${waited}" -ge "${LOCK_TIMEOUT}" ]; then
+        # Either a genuinely long run, or a lock orphaned by a killed build.
+        # Break it rather than fail: the next run must not inherit the jam.
+        echo "warning: codegen lock ${LOCK_DIR} held for >${LOCK_TIMEOUT}s; breaking it and proceeding" >&2
+        rm -rf "${LOCK_DIR}" 2>/dev/null || true
+        break
+    fi
+    [ "${waited}" -eq 0 ] && echo "▶ another codegen run holds ${LOCK_DIR}; waiting" >&2
+    sleep 2
+    waited=$((waited + 2))
+done
+
 # protoc is not "install it however you like": it bakes its own
 # major.minor.patch into the C++ headers ("#if PROTOBUF_VERSION != 7035001")
 # and into every ts-proto file header ("//   protoc  v7.35.1"), so the output
@@ -95,8 +135,24 @@ if ! PROTOC_BIN="$("${SCRIPT_DIR}/bootstrap_protoc.sh")"; then
     echo "       or run scripts/setup/setup-toolchain.sh." >&2
     exit 127
 fi
-PATH="$(dirname "${PROTOC_BIN}"):${PATH}"
-export PATH
+# Put it on PATH for the generators below — but ONLY when that changes the
+# answer. `dirname "${PROTOC_BIN}"` is frequently a general-purpose bin
+# directory: bootstrap_protoc.sh accepts a protoc already on PATH, and on a
+# macOS CI runner `brew install swift-protobuf` drags in protobuf, so that
+# directory is /opt/homebrew/bin. Prepending it unconditionally re-orders the
+# whole toolchain — Homebrew's node/npm then shadow the tool-cache Node that
+# actions/setup-node put first, `npm root -g` starts answering
+# /opt/homebrew/lib/node_modules, and generate_ts.sh cannot find the
+# protoc-gen-ts_proto that `npm install -g` placed under the *other* prefix.
+# If protoc already resolves to exactly this binary, PATH is already correct.
+CURRENT_PROTOC="$(command -v protoc 2>/dev/null || true)"
+if [ "${CURRENT_PROTOC}" != "${PROTOC_BIN}" ]; then
+    PATH="$(dirname "${PROTOC_BIN}"):${PATH}"
+    export PATH
+fi
+# Nested resolutions (generate_cpp.sh, the CMake hook re-entering) then agree
+# with this one by construction instead of re-deriving it.
+export RAC_PROTOC="${PROTOC_BIN}"
 
 # The Python half of the toolchain, obtained the same way and for the same
 # reason. Every driver below that turns rac_* annotations into code imports

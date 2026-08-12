@@ -526,8 +526,11 @@ engines/qhexrt/prebuilt/
 /bindings/python/runanywhere/_generated_defaults.py
 
 # CMake's file(LOCK) guard that serializes two concurrent configures of the
-# same checkout through idl/codegen (core/CMakeLists.txt).
+# same checkout through idl/codegen (core/CMakeLists.txt), and generate_all.sh's
+# own mkdir-based mutex, which additionally covers the Gradle preBuild hook and
+# a developer running the script by hand (flock(1) is Linux-only).
 /idl/codegen/.codegen.lock
+/idl/codegen/.codegen.lock.d/
 
 # --- C/C++ (protoc --cpp_out + the rac_default macro header) -----------------
 # Generated at CMake configure time when absent — see the

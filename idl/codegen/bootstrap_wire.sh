@@ -124,16 +124,26 @@ sha256_of() {
     fi
 }
 
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/rac-wire.XXXXXX")"
+# Staged inside the cache root, not $TMPDIR: publishing is a rename, and on Git
+# Bash for Windows $TMPDIR and $HOME are routinely different volumes, where
+# MSYS's rename() answers EACCES instead of EXDEV and coreutils `mv` therefore
+# never falls back to a copy. Same filesystem, always.
+mkdir -p "${CACHE_ROOT}"
+TMP="$(mktemp -d "${CACHE_ROOT}/.tmp-XXXXXX")"
 trap 'rm -rf "${TMP}"' EXIT
 
 log "downloading ${URL}"
+# Bounded: this runs inside Gradle builds and CMake configures where a stalled
+# connection would otherwise hang the build with no output at all. The fat JAR
+# is ~30 MB, so the ceiling is higher than protoc's.
 if command -v curl >/dev/null 2>&1; then
     curl --fail --silent --show-error --location \
-        --retry 5 --retry-all-errors --retry-delay 2 \
-        -o "${TMP}/${JAR_NAME}" "${URL}" || die "download failed: ${URL}"
+        --connect-timeout 20 --max-time 600 --speed-time 60 --speed-limit 1024 \
+        --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 900 \
+        -o "${TMP}/${JAR_NAME}" "${URL}" || die "download failed or timed out: ${URL}"
 elif command -v wget >/dev/null 2>&1; then
-    wget --quiet --tries=5 -O "${TMP}/${JAR_NAME}" "${URL}" || die "download failed: ${URL}"
+    wget --quiet --tries=5 --timeout=60 --waitretry=2 \
+        -O "${TMP}/${JAR_NAME}" "${URL}" || die "download failed or timed out: ${URL}"
 else
     die "neither curl nor wget is available to fetch ${URL}"
 fi

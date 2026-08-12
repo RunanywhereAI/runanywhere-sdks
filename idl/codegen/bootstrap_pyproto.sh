@@ -120,7 +120,11 @@ done
 log "creating ${VENV_DIR} with protobuf>=${PIN},<7 + pyyaml (base: ${BASE_PY})"
 mkdir -p "${CACHE_ROOT}"
 rm -rf "${VENV_DIR}.tmp"
-if ! "${BASE_PY}" -m venv "${VENV_DIR}.tmp" >&2; then
+# </dev/null on every child: this script runs inside CMake configures and a
+# Gradle Exec task, where a subprocess that decides to ask a question (pip
+# prompting for keyring credentials against an authenticated index is the
+# realistic one) would block forever on an stdin nobody is attached to.
+if ! "${BASE_PY}" -m venv "${VENV_DIR}.tmp" </dev/null >&2; then
     rm -rf "${VENV_DIR}.tmp"
     die "python3 -m venv failed. On Debian/Ubuntu install python3-venv, or
        pip install 'protobuf>=${PIN},<7' pyyaml into ${BASE_PY} yourself."
@@ -132,10 +136,17 @@ for candidate in "${VENV_DIR}.tmp/bin/python" "${VENV_DIR}.tmp/Scripts/python.ex
 done
 [ -n "${VENV_PY}" ] || { rm -rf "${VENV_DIR}.tmp"; die "venv created but no interpreter found inside it"; }
 
-if ! "${VENV_PY}" -m pip install --quiet --upgrade "protobuf>=${PIN},<7" pyyaml >&2; then
+# --timeout/--retries bound the socket: pip's default is a 15s socket timeout
+# with 5 retries, but a hung index that accepts the connection and dribbles
+# bytes can still stall indefinitely, and there is no terminal to Ctrl-C here.
+# PIP_DISABLE_PIP_VERSION_CHECK stops a second network round-trip on every run.
+if ! PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    "${VENV_PY}" -m pip install --quiet --upgrade \
+        --timeout 30 --retries 5 \
+        "protobuf>=${PIN},<7" pyyaml </dev/null >&2; then
     rm -rf "${VENV_DIR}.tmp"
-    die "pip install of protobuf/pyyaml failed (offline? proxy?). Install them
-       into ${BASE_PY} manually, or set RAC_PYTHON to an interpreter that has them."
+    die "pip install of protobuf/pyyaml failed or timed out (offline? proxy?). Install
+       them into ${BASE_PY} manually, or set RAC_PYTHON to an interpreter that has them."
 fi
 
 # Publish atomically so an interrupted pip cannot leave a venv that imports

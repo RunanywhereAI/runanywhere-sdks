@@ -226,19 +226,33 @@ unzip_to() {
     return 1
 }
 
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/rac-protoc.XXXXXX")"
+# Stage inside the cache root, NOT $TMPDIR. Publishing below is a directory
+# rename, and on Git Bash for Windows $TMPDIR and $HOME routinely sit on
+# different volumes (D:\a\_temp vs C:\Users\...). MSYS's rename() reports
+# EACCES — "Permission denied" — rather than EXDEV for a cross-volume directory
+# move, so GNU mv never reaches its copy fallback and the install fails with an
+# error that reads like a permissions problem and is not one. Everything under
+# CACHE_ROOT is one filesystem by construction.
+mkdir -p "${CACHE_ROOT}"
+TMP="$(mktemp -d "${CACHE_ROOT}/.tmp-XXXXXX")"
 cleanup() { rm -rf "${TMP}"; }
 trap cleanup EXIT
 
 log "downloading ${URL}"
+# Every fetch is bounded. Without --max-time / --timeout a stalled connection
+# (a proxy that accepts and never speaks, a hung CDN edge) blocks the whole
+# build forever instead of failing — and this runs inside CMake configures and
+# Gradle tasks where nobody is watching a terminal.
 if command -v curl >/dev/null 2>&1; then
     curl --fail --silent --show-error --location \
-        --retry 5 --retry-all-errors --retry-delay 2 \
+        --connect-timeout 20 --max-time 300 --speed-time 60 --speed-limit 1024 \
+        --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 600 \
         -o "${TMP}/${ZIP_NAME}" "${URL}" \
-        || die "download failed: ${URL}"
+        || die "download failed or timed out: ${URL}"
 elif command -v wget >/dev/null 2>&1; then
-    wget --quiet --tries=5 -O "${TMP}/${ZIP_NAME}" "${URL}" \
-        || die "download failed: ${URL}"
+    wget --quiet --tries=5 --timeout=60 --waitretry=2 \
+        -O "${TMP}/${ZIP_NAME}" "${URL}" \
+        || die "download failed or timed out: ${URL}"
 else
     die "neither curl nor wget is available to fetch ${URL}"
 fi
@@ -262,14 +276,10 @@ chmod +x "${TMP}/unpack/bin/protoc" "${TMP}/unpack/bin/protoc.exe" 2>/dev/null |
 # killed download can never leave a half-populated cache that the next run
 # happily treats as installed. A concurrent bootstrap that wins the race is
 # fine — the losing rename is discarded and both see the same verified bits.
-mkdir -p "${CACHE_ROOT}"
-STAGE="${CACHE_ROOT}/.stage-$$"
-rm -rf "${STAGE}"
-mv "${TMP}/unpack" "${STAGE}"
-if [ -d "${INSTALL_DIR}" ]; then
-    rm -rf "${STAGE}"
-else
-    mv "${STAGE}" "${INSTALL_DIR}" 2>/dev/null || rm -rf "${STAGE}"
+# ${TMP} is already inside ${CACHE_ROOT}, so this is a same-filesystem rename
+# on every host including Git Bash (see the staging note above).
+if [ ! -d "${INSTALL_DIR}" ]; then
+    mv "${TMP}/unpack" "${INSTALL_DIR}" 2>/dev/null || true
 fi
 
 for candidate in "${INSTALL_DIR}/bin/protoc" "${INSTALL_DIR}/bin/protoc.exe"; do
