@@ -89,6 +89,19 @@ void release_lifecycle_diarization(LifecycleDiarizationRef* ref);
 rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref);
 void release_lifecycle_segmentation(LifecycleSegmentationRef* ref);
 
+
+/**
+ * @brief Whether commons currently holds @p model_id loaded on any component.
+ *
+ * Answers from the lifecycle store, so it is true wherever commons performed
+ * the load regardless of what a host reports through
+ * rac_storage_callbacks_t::is_model_loaded. Callers that must not act while a
+ * model is open should treat `true` as authoritative; `false` only means
+ * commons did not load it, and a host that loads outside commons may still
+ * have it open.
+ */
+bool is_model_loaded(const char* model_id);
+
 }  // namespace rac::lifecycle
 
 #endif  // RAC_FEATURES_RAC_NONLLM_LIFECYCLE_BRIDGE_H
