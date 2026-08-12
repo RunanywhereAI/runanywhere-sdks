@@ -1,5 +1,9 @@
 import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+// Imported rather than written as java.time.Duration: inside a build script
+// `java` is the JavaPluginExtension accessor, so the fully-qualified name does
+// not resolve (same trap the resolveIdlBash() comment below calls out for File).
+import java.time.Duration
 
 plugins {
     alias(libs.plugins.android.library)
@@ -212,6 +216,14 @@ val generateIdlKotlinBindings by tasks.registering(Exec::class) {
     description = "Generate the Kotlin IDL bindings (idl/*.proto -> src/main/kotlin/.../generated)"
 
     workingDir = repoRootDir
+
+    // Nothing downstream of here may ever wait on a terminal. The generator
+    // shells out to curl, pip and a JVM; any one of them deciding to ask a
+    // question would block this task forever on a CI runner, and a Gradle Exec
+    // that inherits a live stdin gives it something to block on. An empty
+    // stream makes every such read return EOF immediately instead.
+    standardInput = "".byteInputStream()
+
     inputs.files(fileTree(repoRootDir.resolve("idl")) { include("*.proto") })
     inputs.files(
         idlCodegenScript,
@@ -324,6 +336,14 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStackTraces = true
     }
+
+    // The suite is JVM-only and finishes in seconds; several cases coordinate
+    // worker threads through CountDownLatch, so the realistic failure mode for
+    // a regression here is a deadlock, not an assertion. Gradle's default is to
+    // wait forever, which on CI means the job burns its whole time budget and
+    // then reports "cancelled" with no failing task named. Two orders of
+    // magnitude of headroom, and a deadlock is attributed to this task.
+    timeout.set(Duration.ofMinutes(20))
 }
 
 kotlin {
