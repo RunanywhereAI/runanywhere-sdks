@@ -68,6 +68,88 @@ RAC_API uint32_t rac_plugin_api_version(void);
 RAC_API rac_result_t rac_registry_load_plugin(const char* path);
 
 /**
+ * @brief Load a batch of plugin paths, isolating each one's failure.
+ *
+ * The all-or-nothing alternative — a caller looping over
+ * `rac_registry_load_plugin` and bailing on the first non-success — turns one
+ * broken backend into a dead SDK: `rac_init` is never reached and every
+ * feature, including the ones served by the backends that DID load, becomes
+ * unreachable. That is a packaging accident (a mis-built plugin) escalated
+ * into a total outage, and it is the reason this entry point exists.
+ *
+ * Every path is attempted. A path that fails is logged and recorded in the
+ * unavailability ledger (see `rac_registry_list_unavailable_plugins`); the
+ * loop continues to the next one. `RAC_ERROR_PLUGIN_DUPLICATE` counts as
+ * loaded — the plugin is in the registry, which is what the caller asked for.
+ *
+ * @param paths      Array of `count` library paths. NULL/empty entries are skipped.
+ * @param count      Number of entries in `paths`.
+ * @param out_loaded Optional; receives how many plugins are now registered as
+ *                   a result of this call.
+ *
+ * @return RAC_SUCCESS whenever the arguments are well-formed — INCLUDING the
+ *         case where every plugin failed. "Which backends are missing" is a
+ *         capability question the caller answers through the ledger, not an
+ *         initialization error. Returns RAC_ERROR_NULL_POINTER only when
+ *         `paths` is NULL with a non-zero `count`.
+ *
+ * Thread-safe.
+ */
+RAC_API rac_result_t rac_registry_load_plugins(const char* const* paths, size_t count,
+                                               size_t* out_loaded);
+
+/**
+ * @brief One backend that asked to join the registry and was refused.
+ *
+ * Produced by the loader (`dlopen`/`dlsym` failure) and by the registry
+ * (ABI mismatch, `capability_check` decline, manifest validation failure), so
+ * a single query answers "what can this build NOT do, and why" regardless of
+ * whether the plugin was dynamic or statically registered.
+ */
+typedef struct rac_plugin_unavailable {
+    /** Engine name when known, else the library stem parsed from the path. Never NULL. */
+    const char* name;
+    /** Library path for loader-originated failures; NULL for static registrations. */
+    const char* path;
+    /** Why it was refused — the same code the failing call returned. */
+    rac_result_t status;
+} rac_plugin_unavailable_t;
+
+/**
+ * @brief Record a backend as unavailable.
+ *
+ * For SDKs that call a backend's `rac_backend_<x>_register()` directly rather
+ * than going through the loader: pass the non-success result here so the
+ * failure reaches the same capability surface as a dynamic load failure
+ * instead of being dropped on the floor.
+ *
+ * A later successful registration of the same `name` clears the entry, so the
+ * ledger never reports a backend that is actually serving. Passing
+ * `RAC_SUCCESS` clears the entry too.
+ *
+ * Thread-safe. Never allocates on the caller's behalf; a NULL `name` is a
+ * no-op.
+ */
+RAC_API void rac_registry_record_plugin_unavailable(const char* name, const char* path,
+                                                    rac_result_t status);
+
+/**
+ * @brief Snapshot every backend currently recorded as unavailable.
+ *
+ * Allocates an array of `out_count` entries whose strings the entries own.
+ * Caller MUST free with `rac_registry_free_unavailable_plugins()`. Returns
+ * RAC_SUCCESS with `*out_count = 0` and `*out_items = NULL` when everything
+ * that tried to register succeeded.
+ */
+RAC_API rac_result_t rac_registry_list_unavailable_plugins(rac_plugin_unavailable_t** out_items,
+                                                           size_t* out_count);
+
+/**
+ * @brief Free the array returned by `rac_registry_list_unavailable_plugins`.
+ */
+RAC_API void rac_registry_free_unavailable_plugins(rac_plugin_unavailable_t* items, size_t count);
+
+/**
  * @brief Unregister a plugin by name. If the plugin was loaded via
  *        `rac_registry_load_plugin`, the underlying `dlopen` handle is
  *        `dlclose`'d. Statically registered plugins are accepted but the

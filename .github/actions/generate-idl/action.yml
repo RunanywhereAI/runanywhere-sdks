@@ -63,6 +63,34 @@ runs:
           esac
         done
 
+    # The cache key MUST carry the pin, and nothing defines PROTOC_VERSION as an
+    # env var — not this action, not any caller — so `env.PROTOC_VERSION` was
+    # empty and the key was the constant `protoc--<os>-<arch>`. bootstrap_protoc.sh
+    # stayed correct (it re-reads core/VERSIONS and fails closed on a mismatch),
+    # but every pin bump restored the stale entry and re-downloaded protoc on top
+    # of it, forever. Read the pin here and key on the output.
+    - name: Resolve pinned protoc version
+      id: protoc-pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Anchored so it cannot match PROTOC_VERSION_MAJOR, which is also in
+        # core/VERSIONS. Same expression bootstrap_protoc.sh uses.
+        version="$(grep -E '^PROTOC_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" \
+          | head -1 | cut -d= -f2 | tr -d '[:space:]')"
+        if [ -z "${version}" ]; then
+          echo "::error::core/VERSIONS does not define PROTOC_VERSION"
+          exit 1
+        fi
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        echo "pinned protoc: ${version}"
+
+    - name: Cache pinned protoc
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/runanywhere/protoc
+        key: protoc-${{ steps.protoc-pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
     - name: Install protoc (pinned)
       shell: bash
       env:

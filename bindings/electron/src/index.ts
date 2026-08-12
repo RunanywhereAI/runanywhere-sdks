@@ -228,7 +228,7 @@ export {
   setAudioNativeForTests,
 } from './audio';
 export type { MicRecorderOptions, AudioNative, AudioDspBackend } from './audio';
-export type { NativeAddon } from './bridge';
+export type { NativeAddon, UnavailablePlugin } from './bridge';
 export {
   registerCatalog,
   clearCatalog,

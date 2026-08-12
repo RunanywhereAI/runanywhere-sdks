@@ -164,6 +164,7 @@ message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 # =============================================================================
 
 include(FetchContent)
+include(RacFetchArchive)
 
 # Targets that bundle zlib/BZip2 need a stable archive output directory so
 # downstream FetchContent projects can consume concrete file paths instead of
@@ -323,14 +324,14 @@ endif()
 
 if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
-    FetchContent_Declare(
+    # sourceware.org is frequently unreachable from CI/dev networks; use a
+    # byte-identical GitHub-release mirror (SHA256 still validates it). Prefetch
+    # over HTTP/1.1 — FetchContent's HTTP/2 path REFUSED_STREAMs on CI.
+    rac_fetchcontent_archive(
         bzip2_src
-        # sourceware.org is frequently unreachable from CI/dev networks; use a
-        # byte-identical GitHub-release mirror (SHA256 below still validates it).
-        URL https://github.com/Siddhesh2377/runanywhere-build-mirrors/releases/download/bzip2-1.0.8/bzip2-1.0.8.tar.gz
+        https://github.com/Siddhesh2377/runanywhere-build-mirrors/releases/download/bzip2-1.0.8/bzip2-1.0.8.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
     )
-    FetchContent_MakeAvailable(bzip2_src)
 
     add_library(bz2_bundled STATIC
         ${bzip2_src_SOURCE_DIR}/blocksort.c
@@ -754,6 +755,10 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/plugin/rac_plugin_registry.cpp
     # Dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
+    # Ledger of backends that were refused registration, written by BOTH the
+    # loader and the registry so one failing backend degrades only itself and
+    # every SDK can still say which one, and why.
+    src/plugin/plugin_availability.cpp
     # L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.

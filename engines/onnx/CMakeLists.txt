@@ -214,6 +214,19 @@ else()
         CXX_VISIBILITY_PRESET hidden
     )
     target_compile_definitions(runanywhere_onnx PRIVATE RAC_BUILDING_PLUGIN=1)
+    # rac_plugin_entry_onnx.cpp is compiled TWICE — once into rac_backend_onnx
+    # (which gets ${ONNX_COMPILE_DEFS} via rac_add_engine_plugin, applied
+    # PRIVATE — see cmake/plugins.cmake) and once into this carrier. The
+    # carrier is the copy that ships as librunanywhere_onnx, because
+    # rac_registry_load_plugin resolves rac_plugin_entry_onnx out of THIS
+    # image.
+    #
+    # Without RAC_BACKEND_RAG the carrier's copy NULLs embedding_ops and
+    # drops RAC_PRIMITIVE_EMBED from the manifest, even when
+    # rac_backend_onnx right next to it was built with the embeddings
+    # provider. Same invariant as sherpa: one TU compiled into two targets
+    # must see identical macro state in both.
+    target_compile_definitions(runanywhere_onnx PRIVATE ${ONNX_COMPILE_DEFS})
     target_link_libraries(runanywhere_onnx PUBLIC
         rac_backend_onnx
         rac_commons

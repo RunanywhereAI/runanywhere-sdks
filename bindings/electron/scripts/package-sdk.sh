@@ -71,9 +71,28 @@ python3 "${REPO_ROOT}/scripts/release/rewrite_npm_package.py" \
 # native/ is intentionally absent: it is a private build-only CMake target with
 # no runtime dependents. Its output is bundled into the entry package's
 # prebuilds/ by the prepack hook.
+has_native_prebuilds() {
+    local dir="$1/prebuilds"
+    [[ -d "$dir" ]] || return 1
+    find "$dir" -type f \( -name '*.dylib' -o -name '*.so' -o -name '*.dll' \) \
+        -print -quit | grep -q .
+}
+
 for pkg in llamacpp onnx qhexrt sherpa; do
     pkg_dir="${ELECTRON_ROOT}/packages/${pkg}"
     [ -d "${pkg_dir}" ] || { echo "ERROR: missing package dir ${pkg_dir}" >&2; exit 1; }
+    # QHexRT is Windows ARM64 only. Packing it from a Mac with no prebuilds is
+    # how 0.20.17 shipped a 4 KB JS-only tarball that advertised a DLL. Skip
+    # rather than publish an empty NPU package. llamacpp/onnx/sherpa have no
+    # such excuse — missing natives is a hard fail.
+    if ! has_native_prebuilds "${pkg_dir}"; then
+        if [ "${pkg}" = qhexrt ]; then
+            echo ">> skipping qhexrt: no native prebuilds (refusing to publish an empty NPU package)"
+            continue
+        fi
+        echo "ERROR: packages/${pkg} has no native prebuilds under prebuilds/" >&2
+        exit 1
+    fi
     # Build, don't assume. These packages have no `prepack` hook, so `npm pack`
     # ships whatever dist/ happens to be on disk -- which for a package that has
     # never been built locally is nothing at all. @runanywhere/electron-qhexrt
@@ -176,6 +195,24 @@ if failures:
     sys.exit(1)
 print("\nAll Electron tarballs are publishable.")
 PY
+
+# Fail closed on natives, the same way the manifest audit above fails closed on
+# entry points. A manifest that advertises dist/index.js and a tarball that has
+# it proves the JS is there; it proves nothing about the .dylib/.so/.dll beside
+# it. @runanywhere/electron-sherpa 0.20.17 passed every check above and shipped
+# a plugin compiled with RAC_SHERPA_ROUTABLE=0: it referenced none of
+# g_sherpa_{stt,tts,vad}_ops, so its capability_check() declined registration
+# and the package delivered no speech at all. This gate reads the shipped
+# binaries and refuses a stub.
+echo ""
+echo ">> Auditing packed plugin natives"
+NATIVE_GATE_ARGS=()
+for archive in "${DIST_DIR}"/*.tgz; do
+    NATIVE_GATE_ARGS+=(--tarball "${archive}")
+done
+python3 "${REPO_ROOT}/scripts/validation/gates/check_plugin_natives.py" \
+    --expect-version "${PACKAGE_VERSION}" \
+    "${NATIVE_GATE_ARGS[@]}"
 
 echo ""
 echo ">> Artifacts in ${DIST_DIR}:"

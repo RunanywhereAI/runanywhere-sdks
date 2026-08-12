@@ -77,6 +77,7 @@ runs:
       with:
         distribution: temurin
         java-version: ${{ env.JAVA_VERSION }}
+        cache: gradle
 
     - name: Setup Android SDK + NDK (Android)
       if: inputs.platform == 'android'

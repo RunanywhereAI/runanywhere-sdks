@@ -58,7 +58,9 @@ def _contains_host_build_path(payload: bytes) -> bool:
         return True
 
 
-def _validate_archive_members(archive: Path, bundle: tarfile.TarFile) -> None:
+def _validate_archive_members(
+    archive: Path, bundle: tarfile.TarFile, expected_version: str | None = None
+) -> None:
     names: set[str] = set()
     for member in bundle.getmembers():
         if "\\" in member.name:
@@ -109,6 +111,15 @@ def _validate_archive_members(archive: Path, bundle: tarfile.TarFile) -> None:
             raise PackageValidationError(
                 f"{archive.name}: Web runtime exposes an absolute host build path"
             )
+        if (
+            expected_version
+            and lowered_name.endswith(".wasm")
+            and expected_version.encode("ascii") not in payload
+        ):
+            raise PackageValidationError(
+                f"{archive.name}: {PurePosixPath(normalized).name} does not embed "
+                f"RAC_VERSION_STRING {expected_version!r}"
+            )
 
 
 def _file_hashes(bundle: tarfile.TarFile, prefix: str) -> dict[str, str]:
@@ -128,9 +139,10 @@ def _file_hashes(bundle: tarfile.TarFile, prefix: str) -> dict[str, str]:
 
 def _archive_contents(
     archive: Path,
+    expected_version: str | None = None,
 ) -> tuple[str, dict[str, object], dict[str, str], dict[str, str]]:
     with tarfile.open(archive, "r:gz") as bundle:
-        _validate_archive_members(archive, bundle)
+        _validate_archive_members(archive, bundle, expected_version)
         try:
             manifest_file = bundle.extractfile("package/package.json")
         except KeyError as error:
@@ -266,7 +278,9 @@ def validate_public_packages(
     ] = {}
     versions: set[str] = set()
     for archive in sorted(dist_dir.glob("*.tgz")):
-        name, metadata, package_hashes, proto_hashes = _archive_contents(archive)
+        name, metadata, package_hashes, proto_hashes = _archive_contents(
+            archive, expected_version
+        )
         if name in packages:
             raise PackageValidationError(f"duplicate public package {name}")
         versions.add(_validate_manifest(archive, name, metadata, expected_version))
@@ -316,8 +330,8 @@ def main() -> int:
         print(f"ERROR: {error}")
         return 1
     print(
-        "Validated the exact Web package set, versions, and self-contained "
-        "proto-ts payloads."
+        "Validated the exact Web package set, versions, WASM RAC_VERSION_STRING, "
+        "and self-contained proto-ts payloads."
     )
     return 0
 

@@ -38,5 +38,6 @@ export {
   backendsForRegistry,
   frameworksFromPluginNames,
   noBackendEnginesException,
+  unavailableCapabilities,
 } from './backend/engines';
-export type { EngineRegistrySnapshot } from './backend/engines';
+export type { EngineRegistrySnapshot, RegisteredEngines } from './backend/engines';

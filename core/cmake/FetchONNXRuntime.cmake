@@ -25,6 +25,8 @@ endif()
 
 message(STATUS "ONNX Runtime versions: iOS=${RAC_ONNX_VERSION_IOS}, Android=${RAC_ONNX_VERSION_ANDROID}, macOS=${RAC_ONNX_VERSION_MACOS}, Linux=${RAC_ONNX_VERSION_LINUX}")
 
+include(RacFetchArchive)
+
 # Vendored ONNX and Sherpa artifacts live under core/third_party.
 # Anchor all local lookups on this module path so the single-root CMake build no
 # longer needs a repo-root third_party symlink.
@@ -289,13 +291,7 @@ elseif(APPLE)
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_MACOS_VERSION}/onnxruntime-osx-${ONNX_MACOS_ARCH}-${ONNX_MACOS_VERSION}.tgz")
         message(STATUS "ONNX Runtime macOS URL: ${ONNX_URL}")
 
-        FetchContent_Declare(
-            onnxruntime
-            URL ${ONNX_URL}
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        )
-
-        FetchContent_MakeAvailable(onnxruntime)
+        rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
 
         add_library(onnxruntime SHARED IMPORTED GLOBAL)
 
@@ -318,13 +314,7 @@ elseif(UNIX)
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_LINUX}/onnxruntime-linux-x64-${RAC_ONNX_VERSION_LINUX}.tgz")
     endif()
 
-    FetchContent_Declare(
-        onnxruntime
-        URL ${ONNX_URL}
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
-
-    FetchContent_MakeAvailable(onnxruntime)
+    rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
 
     add_library(onnxruntime SHARED IMPORTED GLOBAL)
 
@@ -350,13 +340,7 @@ elseif(WIN32)
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-x86-${RAC_ONNX_VERSION_WINDOWS}.zip")
     endif()
 
-    FetchContent_Declare(
-        onnxruntime
-        URL ${ONNX_URL}
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
-
-    FetchContent_MakeAvailable(onnxruntime)
+    rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
 
     add_library(onnxruntime SHARED IMPORTED GLOBAL)
 

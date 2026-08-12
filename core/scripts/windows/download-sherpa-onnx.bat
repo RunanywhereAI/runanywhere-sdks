@@ -65,16 +65,21 @@ if exist "%DEST_DIR%" (
 set "TEMP_DL=%TEMP%\sherpa_onnx_dl_%RANDOM%"
 mkdir "%TEMP_DL%" 2>nul
 
-:: Download
+:: Download. GitHub release assets 503 / REFUSED_STREAM on Windows HTTP/2
+:: (schannel). Force HTTP/1.1 and wrap curl's retries in an outer backoff.
 echo [DOWNLOAD] Downloading Sherpa-ONNX v%VERSION%...
-:: --fail turns an HTTP 404 into a non-zero exit instead of silently writing the
-:: error body (which then fails opaquely at the tar step). --connect-timeout /
-:: --max-time bound a stalled transfer (curl has no default timeout and would
-:: otherwise hang the CI job indefinitely); --retry-all-errors retries the
-:: timeout too.
-curl -L --fail --show-error --connect-timeout 30 --max-time 900 --retry 3 ^
+set "ATTEMPT=0"
+:download_retry
+set /a ATTEMPT+=1
+echo [DOWNLOAD] attempt %ATTEMPT%/8
+curl -L --fail --show-error --http1.1 --connect-timeout 30 --max-time 900 --retry 3 ^
     --retry-delay 5 --retry-all-errors -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
 if errorlevel 1 (
+    if %ATTEMPT% LSS 8 (
+        echo [DOWNLOAD] retrying after 8s...
+        timeout /t 8 /nobreak >nul
+        goto download_retry
+    )
     echo [ERROR] Download failed for %URL%
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1

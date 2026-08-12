@@ -10,6 +10,7 @@
 // Native handles are integers owned entirely by `NativeBackend`; nothing in this
 // interface exposes one, which is what keeps raw handles out of the renderer.
 
+import type { UnavailablePlugin } from '../bridge';
 import type { DownloadProgress, ResolvedModel } from '../download';
 import type {
   NativeDiarizationOptions,
@@ -226,6 +227,13 @@ export interface RaBackend {
    * Runtime truth for capabilities — not compile-time `RAC_HAVE_BACKEND_*`.
    */
   listPlugins(): Promise<string[]>;
+  /**
+   * Backends that were refused registration, and the `rac_result_t` explaining
+   * each. Surfaced through `capabilities().unavailable` so an app can tell a
+   * user "speech is unavailable in this build" instead of failing opaquely the
+   * first time they press record.
+   */
+  listUnavailablePlugins(): Promise<UnavailablePlugin[]>;
   /**
    * True when the .node was built thin (`RAC_ELECTRON_THIN_ADDON`) and engines
    * must arrive via RUNANYWHERE_PLUGIN_PATHS / loadPlugin.
@@ -589,6 +597,7 @@ export const BACKEND_METHODS: readonly string[] = [
   'initialize',
   'shutdown',
   'listPlugins',
+  'listUnavailablePlugins',
   'isThinAddon',
   'hasControlPlane',
   'devicePersistentId',

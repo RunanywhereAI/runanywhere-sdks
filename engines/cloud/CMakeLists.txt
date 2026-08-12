@@ -124,7 +124,10 @@ endif()
 # routing through rac_backend_cloud_register() — whose definition is also in
 # rac_commons on those hosts (the SOURCES folded in above). On dynamic hosts the
 # shim becomes a SHARED library whose only export is the entry symbol; the actual
-# op functions + register fns live in rac_backend_cloud.
+# op functions + register fns live in rac_backend_cloud. Compile the entry TU
+# into the carrier so `rac_plugin_entry_cloud` is a real export of THIS image —
+# required for Windows GetProcAddress (Darwin dlsym walks dependents and hid
+# the missing export).
 if(RAC_STATIC_PLUGINS)
     target_sources(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_cloud.cpp
@@ -137,12 +140,14 @@ if(RAC_STATIC_PLUGINS)
 else()
     add_library(runanywhere_cloud SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_cloud.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_plugin_entry_cloud.cpp
     )
     set_target_properties(runanywhere_cloud PROPERTIES
         OUTPUT_NAME           runanywhere_cloud
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
+    target_compile_definitions(runanywhere_cloud PRIVATE RAC_BUILDING_PLUGIN=1)
     target_include_directories(runanywhere_cloud PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${RAC_COMMONS_ROOT_DIR}/include

@@ -30,6 +30,7 @@
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_loader.h"
 #include "rac/plugin/rac_primitive.h"
 
 /* Portable string duplicator from src/core/rac_memory.cpp — replaces POSIX
@@ -342,6 +343,8 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
             RAC_LOG_ERROR(LOG_CAT, "rac_plugin_register: '%s' ABI mismatch (plugin=%u host=%u)",
                           vtable->metadata.name, vtable->metadata.abi_version,
                           RAC_PLUGIN_API_VERSION);
+            rac_registry_record_plugin_unavailable(vtable->metadata.name, nullptr,
+                                                   RAC_ERROR_ABI_VERSION_MISMATCH);
             return RAC_ERROR_ABI_VERSION_MISMATCH;
         }
 
@@ -357,6 +360,8 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
                               "rac_plugin_register: '%s' capability_check threw — refusing load",
                               vtable->metadata.name);
                 detach_pending_manifest(vtable);
+                rac_registry_record_plugin_unavailable(vtable->metadata.name, nullptr,
+                                                       RAC_ERROR_PLUGIN_LOAD_FAILED);
                 return RAC_ERROR_PLUGIN_LOAD_FAILED;
             }
             if (cap != RAC_SUCCESS) {
@@ -367,6 +372,12 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
                 // Return the registry-level code; capability_check's raw status
                 // is visible in the log above for debugging.
                 detach_pending_manifest(vtable);
+                // A declined capability_check is the single most common way a
+                // backend goes missing (a stub build, unsupported hardware).
+                // Record it so the host can report WHICH backend is degraded
+                // instead of only observing that a feature does not work.
+                rac_registry_record_plugin_unavailable(vtable->metadata.name, nullptr,
+                                                       RAC_ERROR_CAPABILITY_UNSUPPORTED);
                 return RAC_ERROR_CAPABILITY_UNSUPPORTED;
             }
         }
@@ -393,6 +404,8 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
                                   "rac_plugin_register: '%s' manifest validation failed (%d)",
                                   vtable->metadata.name, (int)manifest_rc);
                     s.manifests_by_vtable.erase(vtable);
+                    rac_registry_record_plugin_unavailable(vtable->metadata.name, nullptr,
+                                                           manifest_rc);
                     return manifest_rc;
                 }
             }
@@ -444,9 +457,15 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
             RAC_LOG_DEBUG(LOG_CAT, "rac_plugin_register: '%s' ok", name.c_str());
         }
 
-        // Lock released. Tear down the evicted entry (only if we replaced
-        // one). The evicted vtable is no longer reachable from the registry
-        // so on_unload races with nothing.
+        // Lock released. This name is serving now, so any earlier failure of
+        // the same backend (a stale plugin path retried with a good one, a
+        // capability_check that declined before the hardware was ready) must
+        // stop being reported as unavailable.
+        rac_plugin_availability_forget(vtable->metadata.name);
+
+        // Tear down the evicted entry (only if we replaced one). The evicted
+        // vtable is no longer reachable from the registry so on_unload races
+        // with nothing.
         if (evicted_vtable != nullptr && evicted_vtable->on_unload != nullptr) {
             try {
                 evicted_vtable->on_unload();

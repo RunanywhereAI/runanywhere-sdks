@@ -238,16 +238,27 @@ jobs:
 
             assert_export() {
               local dll="$1"; shift
-              echo "=== dumpbin /EXPORTS $dll ==="
-              local out
-              out="$("$dumpbin" /EXPORTS "$dll" 2>&1)"
-              echo "$out"
+              local dll_win tmp
+              dll_win="$(cygpath -w "$dll")"
+              echo "=== dumpbin /EXPORTS $dll_win ==="
+              tmp="$(mktemp)"
+              # Capturing dumpbin in a bash variable SIGPIPEs (exit 157) on
+              # this runner; write to a file and grep that.
+              # Git Bash converts a leading /EXPORTS into
+              # C:\Program Files\Git\EXPORTS. Disable that for this call.
+              MSYS_NO_PATHCONV=1 "$dumpbin" /EXPORTS "$dll_win" >"$tmp" 2>&1 || {
+                echo "dumpbin failed on $dll_win (exit $?)"; cat "$tmp"; rm -f "$tmp"; exit 1
+              }
               for sym in "$@"; do
-                echo "$out" | grep -E "\\b${sym}\\b" >/dev/null || {
-                  echo "missing export '$sym' in $dll"; exit 1
+                grep -E "\\b${sym}\\b" "$tmp" >/dev/null || {
+                  echo "missing export '$sym' in $dll_win"
+                  grep -E " rac_" "$tmp" | head -40 || true
+                  rm -f "$tmp"
+                  exit 1
                 }
                 echo "  ok export: $sym"
               done
+              rm -f "$tmp"
             }
             assert_export "$commons_path" rac_init rac_registry_load_plugin rac_llm_extract_thinking
             assert_export "$plugin_path" rac_plugin_entry_llamacpp
