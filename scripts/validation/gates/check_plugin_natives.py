@@ -96,8 +96,13 @@ BACKEND_TARBALL_RE = re.compile(
 
 
 class Finding:
-    def __init__(self, path: Path, backend: str, missing: list[str], method: str):
+    def __init__(self, path: Path, display: str, backend: str, missing: list[str], method: str):
         self.path = path
+        # Where the caller can find this plugin: the path they passed, or
+        # "<tarball>:<archive-relative path>" for a tarball member. The basename
+        # alone is ambiguous — one tarball ships the same file name once per
+        # platform-arch — so every message uses this instead.
+        self.display = display
         self.backend = backend
         self.missing = missing
         self.method = method
@@ -139,7 +144,7 @@ def symbol_text(path: Path) -> tuple[str, str]:
     return path.read_bytes().decode("latin-1"), "byte scan"
 
 
-def check_plugin(path: Path) -> Finding | None:
+def check_plugin(path: Path, display: str) -> Finding | None:
     match = PLUGIN_NAME_RE.match(path.name)
     if match is None:
         return None
@@ -150,19 +155,42 @@ def check_plugin(path: Path) -> Finding | None:
         return None
     text, method = symbol_text(path)
     missing = [sym for sym in required if sym not in text]
-    return Finding(path, backend, missing, method)
+    return Finding(path, display, backend, missing, method)
 
 
-def collect(paths: list[Path]) -> list[Path]:
-    found: list[Path] = []
+def collect(paths: list[Path]) -> list[tuple[Path, str]]:
+    found: list[tuple[Path, str]] = []
     for path in paths:
         if path.is_dir():
             for child in sorted(path.rglob("*")):
                 if child.is_file() and PLUGIN_NAME_RE.match(child.name):
-                    found.append(child)
+                    found.append((child, str(child)))
         elif path.is_file():
-            found.append(path)
+            found.append((path, str(path)))
     return found
+
+
+def member_dest(root: Path, member_name: str) -> Path | None:
+    """Where a tarball member extracts to, KEEPING its archive-relative path.
+
+    One tarball ships the same plugin file name once per platform-arch:
+
+        package/prebuilds/darwin-arm64/librunanywhere_sherpa.dylib
+        package/prebuilds/darwin-x64/librunanywhere_sherpa.dylib
+
+    Extracting both to the basename made the second overwrite the first while
+    BOTH queued targets pointed at the survivor. The first member's bytes were
+    then never read, so a stub in any target but the last one passed this gate
+    unexamined — the exact defect the gate exists to stop. Preserve the path so
+    every member is its own file.
+
+    Returns None when the member path escapes `root` (absolute, or `..`), which
+    is a malformed/hostile archive trying to make this gate write outside its
+    temporary directory.
+    """
+    resolved_root = root.resolve()
+    out = (root / member_name).resolve()
+    return out if resolved_root in out.parents else None
 
 
 def tarball_backend_id(name: str) -> str | None:
@@ -185,6 +213,7 @@ def main() -> int:
     findings: list[Finding] = []
     empty_backends: list[str] = []
     version_mismatches: list[str] = []
+    unsafe_members: list[str] = []
     checked = 0
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -205,19 +234,28 @@ def main() -> int:
                         continue
                     payload = src.read()
                     if PLUGIN_NAME_RE.match(leaf):
-                        out = dest / leaf
+                        out = member_dest(dest, member.name)
+                        if out is None:
+                            print(f"  FAIL  {archive.name}  member escapes the "
+                                  f"archive root: {member.name}")
+                            unsafe_members.append(
+                                f"{archive.name}: member {member.name!r} escapes "
+                                f"the archive root"
+                            )
+                            continue
                         out.parent.mkdir(parents=True, exist_ok=True)
                         out.write_bytes(payload)
-                        targets.append(out)
+                        targets.append((out, f"{archive.name}:{member.name}"))
                         plugin_count += 1
                     elif args.expect_version and COMMONS_NAME_RE.match(leaf):
                         if args.expect_version.encode("ascii") not in payload:
                             version_mismatches.append(
-                                f"{archive.name}: {leaf} does not embed "
+                                f"{archive.name}: {member.name} does not embed "
                                 f"{args.expect_version!r}"
                             )
                         else:
-                            print(f"  ok    version  {leaf}  embeds {args.expect_version}")
+                            print(f"  ok    version  {member.name}  "
+                                  f"embeds {args.expect_version}")
             required_id = tarball_backend_id(archive.name)
             if required_id is not None and plugin_count == 0:
                 print(f"  FAIL  {archive.name}  no runanywhere_{required_id} native in tarball")
@@ -225,12 +263,12 @@ def main() -> int:
                     f"{archive.name}: backend package '{required_id}' ships no plugin native"
                 )
 
-        for target in targets:
-            finding = check_plugin(target)
+        for target, display in targets:
+            finding = check_plugin(target, display)
             if finding is None:
                 continue
             checked += 1
-            label = f"{finding.backend:<9} {finding.path.name}"
+            label = f"{finding.backend:<9} {finding.display}"
             if finding.missing:
                 print(f"  FAIL  {label}  [{finding.method}]  missing: "
                       f"{', '.join(finding.missing)}")
@@ -239,7 +277,7 @@ def main() -> int:
                 print(f"  ok    {label}  [{finding.method}]  "
                       f"references all {len(REQUIRED_OPS[finding.backend])} ops tables")
 
-    failed = bool(findings or empty_backends or version_mismatches)
+    failed = bool(findings or empty_backends or version_mismatches or unsafe_members)
     if not failed and checked == 0:
         print("  no backend plugin natives found (nothing to verify)")
         return 0
@@ -247,12 +285,14 @@ def main() -> int:
     if failed:
         print("\nERROR: these plugins must not be published:")
         for finding in findings:
-            print(f"  - {finding.path}")
+            print(f"  - {finding.display}")
             print(f"      backend '{finding.backend}' does not reference "
                   f"{', '.join(finding.missing)}")
         for line in empty_backends:
             print(f"  - {line}")
         for line in version_mismatches:
+            print(f"  - {line}")
+        for line in unsafe_members:
             print(f"  - {line}")
         print(
             "\nA plugin missing its ops tables was compiled with its engine\n"
