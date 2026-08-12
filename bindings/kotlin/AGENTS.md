@@ -124,7 +124,7 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `src/main/kotli
 
 ### Type System
 
-**Wire protobuf types are the canonical data model.** Generated bindings live in `src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/` (~190 files). The SDK uses these directly or via typealiases:
+**Wire protobuf types are the canonical data model.** Generated bindings live in `src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/` (~370 files). That whole tree — plus `generated/RADefaultsPool.kt` and `generated/convenience/RAConvenience.kt` — is **not tracked**: a fresh clone has none of it until the `generateIdlKotlinBindings` Gradle task runs, which `preBuild` (and ktlint/detekt) depend on, so any `./gradlew assemble*` / `compile*Kotlin` / `test*` generates it first. Run `./idl/codegen/generate_all.sh --only kotlin` to refresh it by hand. The compiler pins (protoc, wire-compiler, the Python protobuf runtime) are downloaded and checksum-verified by `idl/codegen/bootstrap_*.sh`; nothing needs installing. The SDK uses these types directly or via typealiases:
 
 ```kotlin
 typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment

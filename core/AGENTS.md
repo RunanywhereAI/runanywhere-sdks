@@ -75,7 +75,8 @@ scripts/build-windows.bat
 | `RAC_BUILD_SERVER` | OFF | OpenAI-compatible HTTP server (`src/server/`, `tools/`) |
 | `RAC_ENABLE_SOLUTIONS` | ON desktop, OFF mobile/WASM | Full Protobuf + Abseil Solutions API; OFF → stub returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` |
 | `RAC_STATIC_PLUGINS` | Forced ON for iOS/WASM | Static plugin linking vs `dlopen` at runtime |
-| `RAC_REGENERATE_PROTO` | OFF | Re-run `idl/codegen/generate_cpp.sh` when `.proto` files change |
+| `RAC_ENSURE_GENERATED_PROTO` | ON | Generate `src/generated/proto/` + `include/rac/rac_defaults_generated.h` at **configure** time when they are absent. Neither is tracked; this is what makes `cmake --preset …` work in a fresh clone, and what guarantees the shipped `rac_defaults_generated.h` exists before `install(DIRECTORY include/)`. Set OFF to assert "already generated" instead |
+| `RAC_REGENERATE_PROTO` | OFF | Dev loop: re-run `idl/codegen/generate_cpp.sh` at **build** time when a `.proto` is newer than the output. Orthogonal to the option above, which only fires when the output is missing entirely |
 | `RAC_BACKEND_RAG` | ON (except Emscripten) | RAG pipeline OBJECT library folded into `rac_commons` |
 
 ## Project Overview
