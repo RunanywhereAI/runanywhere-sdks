@@ -33,8 +33,14 @@ if ! PROTOC_BIN="$("${SCRIPT_DIR}/bootstrap_protoc.sh")"; then
     echo "error: could not obtain the pinned protoc (see above)." >&2
     exit 127
 fi
-PATH="$(dirname "${PROTOC_BIN}"):${PATH}"
-export PATH
+# Only when it changes the answer — dirname(PROTOC_BIN) is often a
+# general-purpose bin dir (Homebrew's, when `brew install protobuf` supplied the
+# pin), and prepending that re-orders every other tool the caller set up. Same
+# guard as generate_all.sh; see the long note there.
+if [ "$(command -v protoc 2>/dev/null || true)" != "${PROTOC_BIN}" ]; then
+    PATH="$(dirname "${PROTOC_BIN}"):${PATH}"
+    export PATH
+fi
 
 # Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone. C++ is the authoritative
