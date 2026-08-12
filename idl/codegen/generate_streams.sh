@@ -38,9 +38,24 @@ fi
 # Request and response modules are separate so a service whose response type
 # lives in a different proto file (e.g. VoiceAgent's response is VoiceEvent
 # from voice_events.proto, not voice_agent_service.proto) renders correctly.
+# node is a native Windows binary under Git Bash, so it cannot open the MSYS
+# paths this script works in: `/d/a/repo/idl/...` is read relative to the
+# current drive and becomes `D:\d\a\repo\idl\...`. Hand it native paths, and
+# hand them over through the environment rather than by interpolating into the
+# script text — a Windows path is full of backslashes that a JS string literal
+# would eat as escapes.
+RAC_STREAM_TEMPLATE="${TEMPLATE}"
+RAC_STREAM_OUT_DIR="${OUT_DIR}"
+if command -v cygpath >/dev/null 2>&1; then
+    RAC_STREAM_TEMPLATE="$(cygpath -w "${TEMPLATE}")"
+    RAC_STREAM_OUT_DIR="$(cygpath -w "${OUT_DIR}")"
+fi
+export RAC_STREAM_TEMPLATE RAC_STREAM_OUT_DIR
+
 RENDER_NODE_SCRIPT="
 const fs = require('fs');
-const tpl = fs.readFileSync('${TEMPLATE}', 'utf8');
+const path = require('path');
+const tpl = fs.readFileSync(process.env.RAC_STREAM_TEMPLATE, 'utf8');
 function render(vars) {
     return Object.keys(vars).reduce(
         (acc, k) => acc.replaceAll('{{ ' + k + ' }}', vars[k])
@@ -64,7 +79,7 @@ function sourceProtoFromRequestModule(reqMod) {
     return 'idl/' + base + '.proto';
 }
 for (const [s, l, req, resp, rpc, reqMod, respMod] of tuples) {
-    const out = '${OUT_DIR}/' + l + '_service_stream.ts';
+    const out = path.join(process.env.RAC_STREAM_OUT_DIR, l + '_service_stream.ts');
     const vars = {
         service_name: s,
         service_lower: l,
