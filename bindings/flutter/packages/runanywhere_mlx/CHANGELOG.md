@@ -1,3 +1,11 @@
+## [0.20.18] - 2026-08-12
+
+- Rebuilt the Electron backend plugin natives. 0.20.17 shipped a non-routable
+  sherpa carrier that referenced none of its STT/TTS/VAD ops tables, so the
+  plugin registry declined it and the backend served nothing.
+- Backend registration failures are now isolated: one unavailable engine no
+  longer prevents the rest of the SDK from initializing.
+
 ## [0.20.17] - 2026-08-11
 
 - Electron QHexRT backend and its commons platform-capability changes.

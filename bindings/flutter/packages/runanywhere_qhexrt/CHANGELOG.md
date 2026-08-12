@@ -5,6 +5,14 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.18] - 2026-08-12
+
+- Rebuilt the Electron backend plugin natives. 0.20.17 shipped a non-routable
+  sherpa carrier that referenced none of its STT/TTS/VAD ops tables, so the
+  plugin registry declined it and the backend served nothing.
+- Backend registration failures are now isolated: one unavailable engine no
+  longer prevents the rest of the SDK from initializing.
+
 ## [0.20.17] - 2026-08-11
 
 - Electron QHexRT backend and its commons platform-capability changes.
