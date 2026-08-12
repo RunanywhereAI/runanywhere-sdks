@@ -705,6 +705,7 @@ jobs:
       - uses: ./.github/actions/generate-idl
         with:
           languages: ts
+          ts-dist: 'true'
       - name: Install workspace dependencies
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
@@ -744,6 +745,7 @@ jobs:
       - uses: ./.github/actions/generate-idl
         with:
           languages: ts
+          ts-dist: 'true'
       - name: Install Web SDK workspace
         working-directory: bindings/web
         run: npm ci --no-audit --no-fund
@@ -833,6 +835,7 @@ jobs:
       - uses: ./.github/actions/generate-idl
         with:
           languages: ts
+          ts-dist: 'true'
       # Not a member of the root Yarn workspace — it installs standalone from
       # its own package-lock.json.
       - name: Install dependencies

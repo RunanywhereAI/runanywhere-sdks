@@ -38,6 +38,14 @@ inputs:
   languages:
     required: true
     description: 'Comma-separated subset of: swift, kotlin, dart, ts, cpp, python'
+  ts-dist:
+    required: false
+    default: 'false'
+    description: >-
+      Also compile bindings/proto-ts to dist/. Generating ts only writes src/,
+      but consumers resolve @runanywhere/proto-ts/<module> through the package
+      exports map, which points at dist/. Any job that typechecks or runs code
+      against proto-ts needs this; a job that only regenerates does not.
 
 runs:
   using: composite
@@ -168,3 +176,12 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: ./idl/codegen/generate_all.sh --only "${{ inputs.languages }}"
+
+    - name: Compile proto-ts to dist
+      if: inputs.ts-dist == 'true' && contains(inputs.languages, 'ts')
+      shell: bash
+      working-directory: ${{ github.workspace }}/bindings/proto-ts
+      run: |
+        set -euo pipefail
+        npm install --package-lock=false --workspaces=false
+        npm run build
