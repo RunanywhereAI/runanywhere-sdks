@@ -188,7 +188,10 @@ val kotlinGeneratedDir = projectDir.resolve("src/main/kotlin/com/runanywhere/sdk
 // PATH of the shell that launched Gradle.
 fun resolveIdlBash(): String {
     val explicit = System.getenv("RAC_BASH")
-    if (!explicit.isNullOrBlank() && java.io.File(explicit).canExecute()) return explicit
+    // `File` here is java.io.File (a Gradle Kotlin DSL default import). Do NOT
+    // write java.io.File: in a build script `java` is the JavaPluginExtension
+    // accessor, so the fully-qualified name does not resolve.
+    if (!explicit.isNullOrBlank() && File(explicit).canExecute()) return explicit
     val candidates =
         listOf(
             "${System.getenv("PROGRAMFILES")}\\Git\\bin\\bash.exe",
@@ -197,7 +200,7 @@ fun resolveIdlBash(): String {
             "${System.getenv("LOCALAPPDATA")}\\Programs\\Git\\bin\\bash.exe",
         )
     for (candidate in candidates) {
-        val f = java.io.File(candidate)
+        val f = File(candidate)
         if (f.canExecute()) return f.absolutePath
     }
     // POSIX hosts (and Windows shells that do have it on PATH).
