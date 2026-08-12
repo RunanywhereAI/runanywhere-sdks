@@ -59,7 +59,15 @@ ONLY=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --skip-dart) SKIP_DART=1; shift ;;
-        --only) ONLY="${2:-}"; shift 2 ;;
+        # `shift 2` with one argument left is fatal under `set -e`, and the
+        # shell's "shift count out of range" is not a diagnostic anyone can act
+        # on. Every other bad input here exits 2 with a named reason.
+        --only)
+            [ $# -ge 2 ] && [ -n "${2:-}" ] || {
+                echo "generate_all.sh: --only requires a value (e.g. --only ts,cpp)" >&2
+                exit 2
+            }
+            ONLY="$2"; shift 2 ;;
         --only=*) ONLY="${1#--only=}"; shift ;;
         -h|--help)
             sed -n '1,30p' "$0" | sed 's/^#//'
@@ -322,7 +330,14 @@ fi  # want python
 # Only a FULL run may move the lock. A scoped run (--only ts, --skip-dart) is a
 # partial regeneration; stamping the lock from one would assert "every binding
 # matches these schemas" on the strength of having regenerated one of them.
-if [ "${SELECTED// /}" = "${ALL_LANGS// /}" ]; then
+# Set comparison, not string comparison: `--only cpp,swift,kotlin,dart,ts,python`
+# selects every language but concatenates in a different order than ALL_LANGS,
+# and the old equality test called that a partial run and left the lock stale.
+FULL_RUN=1
+for lang in ${ALL_LANGS}; do
+    want "${lang}" || { FULL_RUN=0; break; }
+done
+if [ "${FULL_RUN}" -eq 1 ]; then
     echo "▶ Schema lock"
     "${SCRIPT_DIR}/schema_lock.sh" --update
 else

@@ -103,8 +103,36 @@ find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "Grpc*Client.kt" -delete
 # Wire may emit trailing spaces in multiline EnumAdapter constructor
 # arguments. Normalize generated Kotlin so codegen output passes the
 # repository's whitespace gate deterministically on macOS and Linux.
-find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*.kt" -type f \
-    -exec perl -pi -e 's/[ \t]+$//' {} +
+#
+# Done in Python, not perl. Every other tool this pipeline needs is downloaded
+# and version-checked (bootstrap_{protoc,wire,pyproto}.sh); perl was the one
+# unchecked, unpinned host dependency, and `sed -i` is not portable between GNU
+# and BSD. RA_PYTHON is already resolved by generate_all.sh and bootstrapped
+# on demand when this script runs standalone.
+STRIP_PY="${RA_PYTHON:-}"
+if [ -z "${STRIP_PY}" ]; then
+    STRIP_PY="$("${SCRIPT_DIR}/bootstrap_pyproto.sh")" || {
+        echo "error: no Python available to normalize generated Kotlin whitespace" >&2
+        exit 127
+    }
+fi
+"${STRIP_PY}" - "${OUT_DIR}/ai/runanywhere/proto/v1" <<'PY'
+import pathlib
+import re
+import sys
+
+# Bytes, not text: text mode would translate "\n" to os.linesep on write and
+# silently turn every generated Kotlin file into CRLF on Windows. Strip spaces
+# and tabs that sit immediately before a line ending or at end of file.
+TRAILING = re.compile(rb"[ \t]+(?=\r?\n|\Z)")
+
+root = pathlib.Path(sys.argv[1])
+for path in sorted(root.rglob("*.kt")):
+    data = path.read_bytes()
+    cleaned = TRAILING.sub(b"", data)
+    if cleaned != data:
+        path.write_bytes(cleaned)
+PY
 
 echo "✓ Kotlin proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
 

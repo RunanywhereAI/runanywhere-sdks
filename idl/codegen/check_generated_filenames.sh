@@ -54,15 +54,17 @@ fi
 
 COLLISIONS="$(
     find "${TREES[@]}" -type f -print \
-        | awk -F/ '{
-              name = $NF
-              dir  = substr($0, 1, length($0) - length(name) - 1)
-              lower = tolower(name)
-              key = dir "/" lower
-              if (key in seen && seen[key] != name) {
-                  print dir "/  " seen[key] "  vs  " name
+        | awk '{
+              # Fold the WHOLE path, not just the basename. A case-insensitive
+              # filesystem collapses directory components too, so Foo/Type.kt
+              # and foo/Type.kt are one file on macOS and two on Linux —
+              # keying on "<verbatim dir>/<lowered name>" made those two
+              # distinct keys and missed the collision entirely.
+              key = tolower($0)
+              if (key in seen && seen[key] != $0) {
+                  print seen[key] "  vs  " $0
               }
-              seen[key] = name
+              seen[key] = $0
           }' \
         | LC_ALL=C sort -u
 )"

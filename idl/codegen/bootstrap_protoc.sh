@@ -250,7 +250,12 @@ if command -v curl >/dev/null 2>&1; then
         -o "${TMP}/${ZIP_NAME}" "${URL}" \
         || die "download failed or timed out: ${URL}"
 elif command -v wget >/dev/null 2>&1; then
-    wget --quiet --tries=5 --timeout=60 --waitretry=2 \
+    # wget's --timeout is DNS + connect + IDLE read only; it has no total
+    # deadline, so a peer that dribbles a byte before every idle timeout keeps
+    # this running forever. timeout(1) supplies the wall clock when present.
+    RAC_WGET_DEADLINE=()
+    command -v timeout >/dev/null 2>&1 && RAC_WGET_DEADLINE=(timeout 300)
+    "${RAC_WGET_DEADLINE[@]}" wget --quiet --tries=5 --timeout=60 --waitretry=2 \
         -O "${TMP}/${ZIP_NAME}" "${URL}" \
         || die "download failed or timed out: ${URL}"
 else
@@ -281,6 +286,14 @@ chmod +x "${TMP}/unpack/bin/protoc" "${TMP}/unpack/bin/protoc.exe" 2>/dev/null |
 if [ ! -d "${INSTALL_DIR}" ]; then
     mv "${TMP}/unpack" "${INSTALL_DIR}" 2>/dev/null || true
 fi
+# That test-then-rename is a check-then-act: a concurrent bootstrap can publish
+# between the two, and `mv dir existing-dir` NESTS rather than fails, landing our
+# staging copy at ${INSTALL_DIR}/unpack. The bits are identical (same checksum-
+# verified archive), so the winner's install is correct either way — but the
+# nested copy is stale cache that nothing would ever clean up, and `|| true`
+# would have hidden it. The archive contains bin/ and include/ only, so an
+# `unpack` here is unambiguously ours.
+rm -rf "${INSTALL_DIR}/unpack" 2>/dev/null || true
 
 for candidate in "${INSTALL_DIR}/bin/protoc" "${INSTALL_DIR}/bin/protoc.exe"; do
     if is_pinned "${candidate}"; then

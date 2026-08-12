@@ -179,6 +179,18 @@ case "${MODE}" in
             rc=1
         fi
 
+        # A caller that names a base lock and then hands over a path that is not
+        # there gets an error, not a silent pass. The old `&& [ -f ... ]` made
+        # the whole bump check vanish on a typo or a failed `git show`, which is
+        # precisely when it is most needed. Callers that have no base to compare
+        # against pass an empty string (the workflow guards on that).
+        if [ -n "${REQUIRE_BUMP_AGAINST}" ] && [ ! -f "${REQUIRE_BUMP_AGAINST}" ]; then
+            echo "::error::--require-bump ${REQUIRE_BUMP_AGAINST}: no such file." >&2
+            echo "  The base copy of idl/SCHEMA_LOCK could not be read, so the" >&2
+            echo "  'did idl/VERSION move with the schema?' check cannot run." >&2
+            rc=1
+        fi
+
         if [ -n "${REQUIRE_BUMP_AGAINST}" ] && [ -f "${REQUIRE_BUMP_AGAINST}" ]; then
             base_digest="$(read_key "${REQUIRE_BUMP_AGAINST}" IDL_SCHEMA_SHA256)"
             base_version="$(read_key "${REQUIRE_BUMP_AGAINST}" IDL_VERSION)"

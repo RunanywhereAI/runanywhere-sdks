@@ -53,7 +53,16 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --files-only) FILES_ONLY=1; shift ;;
         --with-built) WITH_BUILT=1; shift ;;
-        --only) ONLY_LANGS="$(printf '%s' "${2:-}" | tr ',' ' ')"; shift 2 ;;
+        # This script does not run under `set -e`, so a bare `shift 2` with one
+        # argument left leaves $# unchanged and the loop spins forever.
+        --only)
+            if [ $# -lt 2 ] || [ -z "${2}" ]; then
+                echo "check_generated_trees.sh: --only requires a language list" >&2
+                exit 2
+            fi
+            ONLY_LANGS="$(printf '%s' "${2}" | tr ',' ' ')"
+            shift 2
+            ;;
         --only=*) ONLY_LANGS="$(printf '%s' "${1#--only=}" | tr ',' ' ')"; shift ;;
         -h|--help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "check_generated_trees.sh: unknown flag: $1" >&2; exit 2 ;;

@@ -45,6 +45,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 WITH_TS_DIST=0
 VERIFY_ONLY=0
+SKIP_DART=0
 ONLY=""
 GEN_ARGS=()
 
@@ -52,18 +53,45 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --with-ts-dist) WITH_TS_DIST=1; shift ;;
         --verify-only)  VERIFY_ONLY=1; shift ;;
-        --skip-dart)    GEN_ARGS+=("--skip-dart"); shift ;;
-        --only)         ONLY="${2:-}"; shift 2 ;;
+        --skip-dart)    SKIP_DART=1; GEN_ARGS+=("--skip-dart"); shift ;;
+        --only)
+            [ $# -ge 2 ] && [ -n "${2:-}" ] || {
+                echo "ensure_generated.sh: --only requires a value (e.g. --only ts)" >&2
+                exit 2
+            }
+            ONLY="$2"; shift 2 ;;
         --only=*)       ONLY="${1#--only=}"; shift ;;
         -h|--help)      sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "ensure_generated.sh: unknown flag: $1" >&2; exit 2 ;;
     esac
 done
 
+# Validate the EFFECTIVE selection, not the requested one. --skip-dart removes
+# Dart from generation, so validating the unmodified set made
+# `ensure_generated.sh --skip-dart` on a fresh checkout generate no Dart tree
+# and then fail its own check. Same for `--only ...,dart --skip-dart`.
+CHECK_ONLY="${ONLY}"
+if [ "${SKIP_DART}" -eq 1 ]; then
+    if [ -z "${CHECK_ONLY}" ]; then
+        CHECK_ONLY="swift,kotlin,ts,cpp,python"
+    else
+        CHECK_ONLY="$(printf '%s' "${CHECK_ONLY}" | tr ',' '\n' \
+            | grep -vx 'dart' | paste -sd, -)"
+    fi
+fi
+
 CHECK_ARGS=()
 if [ -n "${ONLY}" ]; then
     GEN_ARGS+=("--only" "${ONLY}")
-    CHECK_ARGS+=("--only" "${ONLY}")
+fi
+SKIP_CHECK=0
+if [ -n "${CHECK_ONLY}" ]; then
+    CHECK_ARGS+=("--only" "${CHECK_ONLY}")
+elif [ -n "${ONLY}" ]; then
+    # `--only dart --skip-dart` asks for nothing at all. An empty --only means
+    # "every language" to check_generated_trees.sh, so passing it through would
+    # validate trees this run never intended to produce.
+    SKIP_CHECK=1
 fi
 
 if [ "${RAC_SKIP_CODEGEN:-0}" = "1" ]; then
@@ -91,4 +119,8 @@ if [ "${WITH_TS_DIST}" -eq 1 ]; then
     CHECK_ARGS+=(--with-built)
 fi
 
-"${SCRIPT_DIR}/check_generated_trees.sh" ${CHECK_ARGS[@]+"${CHECK_ARGS[@]}"}
+if [ "${SKIP_CHECK}" -eq 1 ]; then
+    echo ">> nothing selected to verify (every requested language was skipped)"
+else
+    "${SCRIPT_DIR}/check_generated_trees.sh" ${CHECK_ARGS[@]+"${CHECK_ARGS[@]}"}
+fi

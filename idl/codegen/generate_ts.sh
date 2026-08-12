@@ -85,14 +85,26 @@ case "$(uname -s)" in
         # through CreateProcess, which fails with "%1 is not a valid Win32
         # application". npm's own .cmd shim would do, but where npm puts it
         # depends on the prefix layout and on which Node is first on PATH — the
-        # thing that already went wrong once here. Write our own next to the
-        # package instead: two lines, no discovery, correct by construction.
-        TS_PROTO_PLUGIN="${TS_PROTO_PKG}/protoc-gen-ts_proto.rac.cmd"
+        # thing that already went wrong once here. Write our own instead: two
+        # lines, no discovery, correct by construction.
+        #
+        # Into a per-run temp dir, NOT into the package: a global npm prefix can
+        # be read-only (C:\Program Files\nodejs\...) or a restored CI cache, and
+        # a failed redirect there would abort codegen with a bare shell error.
+        # Mutating an installed dependency tree that other tools checksum is its
+        # own problem.
+        RAC_TS_SHIM_DIR="$(mktemp -d)"
+        trap 'rm -rf "${RAC_TS_SHIM_DIR}"' EXIT
+        TS_PROTO_PLUGIN="${RAC_TS_SHIM_DIR}/protoc-gen-ts_proto.cmd"
         entry="${TS_PROTO_PKG}/protoc-gen-ts_proto"
+        shim_out="${TS_PROTO_PLUGIN}"
         if command -v cygpath >/dev/null 2>&1; then
             entry="$(cygpath -w "${entry}")"
+            # protoc is a native binary, so the --plugin path it receives must
+            # be native too.
+            TS_PROTO_PLUGIN="$(cygpath -w "${TS_PROTO_PLUGIN}")"
         fi
-        printf '@echo off\r\nnode "%s" %%*\r\n' "${entry}" > "${TS_PROTO_PLUGIN}"
+        printf '@echo off\r\nnode "%s" %%*\r\n' "${entry}" > "${shim_out}"
         ;;
     *)
         TS_PROTO_PLUGIN="${TS_PROTO_PKG}/protoc-gen-ts_proto"

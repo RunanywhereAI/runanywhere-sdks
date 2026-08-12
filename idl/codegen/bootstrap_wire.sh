@@ -142,7 +142,11 @@ if command -v curl >/dev/null 2>&1; then
         --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 900 \
         -o "${TMP}/${JAR_NAME}" "${URL}" || die "download failed or timed out: ${URL}"
 elif command -v wget >/dev/null 2>&1; then
-    wget --quiet --tries=5 --timeout=60 --waitretry=2 \
+    # --timeout covers DNS/connect/idle-read but is not a total deadline; a peer
+    # that trickles data forever never trips it. timeout(1) is the wall clock.
+    RAC_WGET_DEADLINE=()
+    command -v timeout >/dev/null 2>&1 && RAC_WGET_DEADLINE=(timeout 600)
+    "${RAC_WGET_DEADLINE[@]}" wget --quiet --tries=5 --timeout=60 --waitretry=2 \
         -O "${TMP}/${JAR_NAME}" "${URL}" || die "download failed or timed out: ${URL}"
 else
     die "neither curl nor wget is available to fetch ${URL}"
@@ -157,12 +161,19 @@ fi
 log "sha256 ok (${EXPECTED})"
 
 mkdir -p "${INSTALL_DIR}/bin"
-mv "${TMP}/${JAR_NAME}" "${JAR}.tmp"
-mv "${JAR}.tmp" "${JAR}"
+# PID-scoped staging, then an atomic rename. A Gradle build and a CMake
+# configure can both drive this script at once: with a fixed ${JAR}.tmp, B
+# overwriting it after A renamed it into place makes A's second `mv` fail and
+# `set -e` kills A with a bare mv error. The bits are checksum-identical, so
+# only the spurious failure was ever at stake — but the shim had the sharper
+# version of the same shape, where a reader could exec a half-written file.
+mv "${TMP}/${JAR_NAME}" "${JAR}.tmp.$$"
+mv -f "${JAR}.tmp.$$" "${JAR}"
 # The wrapper resolves the JAR next to itself, so a moved cache still works.
 # shellcheck disable=SC2016
-printf '#!/usr/bin/env bash\nexec java -jar "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/wire-compiler.jar" "$@"\n' > "${SHIM}"
-chmod +x "${SHIM}"
+printf '#!/usr/bin/env bash\nexec java -jar "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/wire-compiler.jar" "$@"\n' > "${SHIM}.$$"
+chmod +x "${SHIM}.$$"
+mv -f "${SHIM}.$$" "${SHIM}"
 
 log "installed wire-compiler ${PIN} -> ${SHIM}"
 emit "${SHIM}"

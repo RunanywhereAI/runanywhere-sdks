@@ -117,7 +117,19 @@ if [ "${WITH_COMPILE}" -eq 1 ]; then
     fi
 
     step "importing the generated Python"
-    if ! (cd bindings/python && python3 -c '
+    # The same interpreter the generators ran under, not whatever `python3`
+    # resolves to here. generate_all.sh exports RA_PYTHON into its OWN children
+    # only, so this script never sees it; a system python3 without
+    # google.protobuf would fail the *_pb2 imports below and read as generated-
+    # code drift. bootstrap_pyproto.sh is idempotent and already warm at this
+    # point, having been resolved during the run above.
+    RA_PYTHON="$("${SCRIPT_DIR}/bootstrap_pyproto.sh")" || {
+        echo "::error::no Python with the protobuf runtime is available to import the generated modules." >&2
+        RA_PYTHON=""
+    }
+    if [ -z "${RA_PYTHON}" ]; then
+        DRIFT=1
+    elif ! (cd bindings/python && "${RA_PYTHON}" -c '
 import importlib, pathlib, sys, types
 sys.path.insert(0, ".")
 # Stand `runanywhere` up as a bare namespace package pointing at the real
