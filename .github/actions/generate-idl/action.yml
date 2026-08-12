@@ -63,6 +63,12 @@ runs:
           esac
         done
 
+    - name: Cache pinned protoc
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/runanywhere/protoc
+        key: protoc-${{ env.PROTOC_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
     - name: Install protoc (pinned)
       shell: bash
       env:

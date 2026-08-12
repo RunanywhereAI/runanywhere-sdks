@@ -25,46 +25,7 @@ endif()
 
 message(STATUS "ONNX Runtime versions: iOS=${RAC_ONNX_VERSION_IOS}, Android=${RAC_ONNX_VERSION_ANDROID}, macOS=${RAC_ONNX_VERSION_MACOS}, Linux=${RAC_ONNX_VERSION_LINUX}")
 
-# GitHub release downloads over HTTP/2 regularly get REFUSED_STREAM on Windows
-# runners (schannel + libcurl). FetchContent retries those 5 times and still
-# uses HTTP/2, so configure fails. Prefetch with curl --http1.1, then hand
-# FetchContent a local archive path.
-macro(rac_fetchcontent_archive name url)
-    string(REGEX MATCH "[^/]+$" _rac_fc_fname "${url}")
-    set(_rac_fc_dest "${CMAKE_BINARY_DIR}/_deps/${name}-archive/${_rac_fc_fname}")
-    get_filename_component(_rac_fc_dir "${_rac_fc_dest}" DIRECTORY)
-    file(MAKE_DIRECTORY "${_rac_fc_dir}")
-    set(_rac_fc_local FALSE)
-    if(EXISTS "${_rac_fc_dest}")
-        set(_rac_fc_local TRUE)
-    else()
-        find_program(_rac_fc_curl NAMES curl curl.exe)
-        if(_rac_fc_curl)
-            foreach(_rac_fc_attempt RANGE 1 8)
-                message(STATUS "Downloading ${name} (attempt ${_rac_fc_attempt}/8): ${url}")
-                execute_process(
-                    COMMAND "${_rac_fc_curl}" -fsSL --http1.1
-                            --retry 3 --retry-all-errors --retry-delay 2
-                            --connect-timeout 30 --max-time 600
-                            -o "${_rac_fc_dest}" "${url}"
-                    RESULT_VARIABLE _rac_fc_rc
-                )
-                if(_rac_fc_rc EQUAL 0 AND EXISTS "${_rac_fc_dest}")
-                    set(_rac_fc_local TRUE)
-                    break()
-                endif()
-                file(REMOVE "${_rac_fc_dest}")
-            endforeach()
-        endif()
-    endif()
-    if(_rac_fc_local)
-        FetchContent_Declare(${name} URL "${_rac_fc_dest}" DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    else()
-        message(STATUS "${name}: curl prefetch unavailable; FetchContent will download ${url}")
-        FetchContent_Declare(${name} URL ${url} DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    endif()
-    FetchContent_MakeAvailable(${name})
-endmacro()
+include(RacFetchArchive)
 
 # Vendored ONNX and Sherpa artifacts live under core/third_party.
 # Anchor all local lookups on this module path so the single-root CMake build no

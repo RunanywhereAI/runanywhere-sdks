@@ -238,24 +238,36 @@ TMP="$(mktemp -d "${CACHE_ROOT}/.tmp-XXXXXX")"
 cleanup() { rm -rf "${TMP}"; }
 trap cleanup EXIT
 
-log "downloading ${URL}"
 # Every fetch is bounded. Without --max-time / --timeout a stalled connection
 # (a proxy that accepts and never speaks, a hung CDN edge) blocks the whole
 # build forever instead of failing — and this runs inside CMake configures and
 # Gradle tasks where nobody is watching a terminal.
+#
+# GitHub release assets 503 / REFUSED_STREAM on Windows HTTP/2 (schannel).
+# Force HTTP/1.1 and wrap curl's own retries in an outer backoff loop.
+download_ok=0
 if command -v curl >/dev/null 2>&1; then
-    curl --fail --silent --show-error --location \
-        --connect-timeout 20 --max-time 300 --speed-time 60 --speed-limit 1024 \
-        --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 600 \
-        -o "${TMP}/${ZIP_NAME}" "${URL}" \
-        || die "download failed or timed out: ${URL}"
+    for attempt in 1 2 3 4 5 6 7 8; do
+        log "downloading ${URL} (attempt ${attempt}/8)"
+        if curl --fail --silent --show-error --location --http1.1 \
+            --connect-timeout 20 --max-time 300 --speed-time 60 --speed-limit 1024 \
+            --retry 3 --retry-all-errors --retry-delay 3 --retry-max-time 180 \
+            -o "${TMP}/${ZIP_NAME}" "${URL}"; then
+            download_ok=1
+            break
+        fi
+        rm -f "${TMP}/${ZIP_NAME}"
+        sleep $((attempt * 3))
+    done
+    [ "${download_ok}" = 1 ] || die "download failed or timed out: ${URL}"
 elif command -v wget >/dev/null 2>&1; then
     # wget's --timeout is DNS + connect + IDLE read only; it has no total
     # deadline, so a peer that dribbles a byte before every idle timeout keeps
     # this running forever. timeout(1) supplies the wall clock when present.
     RAC_WGET_DEADLINE=()
     command -v timeout >/dev/null 2>&1 && RAC_WGET_DEADLINE=(timeout 300)
-    "${RAC_WGET_DEADLINE[@]}" wget --quiet --tries=5 --timeout=60 --waitretry=2 \
+    log "downloading ${URL}"
+    "${RAC_WGET_DEADLINE[@]}" wget --quiet --tries=8 --timeout=60 --waitretry=3 \
         -O "${TMP}/${ZIP_NAME}" "${URL}" \
         || die "download failed or timed out: ${URL}"
 else
