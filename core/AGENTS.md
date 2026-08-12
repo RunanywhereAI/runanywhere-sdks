@@ -2,16 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core Principles
+## Core principles
 
-- Focus on **SIMPLICITY**, following Clean SOLID principles. Reusability, clean architecture, clear separation of concerns.
+- Focus on simplicity, following Clean SOLID principles. Reusability, clean architecture, clear separation of concerns.
 - Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.
 - DO NOT PLAN or WRITE any unit tests unless specified otherwise.
-- Always use **structured types**, never use strings directly for consistency and scalability.
-- When fixing issues focus on **SIMPLICITY** - do not add complicated logic unless necessary.
-- Don't over plan it, always think **MVP**.
+- Always use structured types, never raw strings for consistency and scalability.
+- When fixing issues focus on simplicity; do not add complicated logic unless necessary.
+- Don't over plan it; always think MVP.
 
-## C++ Specific Rules
+## C++ rules
 
 - C++20 standard required (`CMAKE_CXX_STANDARD 20`)
 - Google C++ Style Guide with project customizations (`.clang-format`: 4-space indent, 100-column limit)
@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run `./scripts/lint-cpp.sh --tidy` for clang-tidy (requires `compile_commands.json` in a build dir)
 - All public C API symbols prefixed with `rac_`; types suffixed `_t`; error codes `RAC_ERROR_*`; macros `RAC_*`
 
-## Build Commands
+## Build commands
 
 ```bash
 # Desktop/macOS build (core only, no backends)
@@ -63,7 +63,7 @@ scripts/build-windows.bat
 ./scripts/lint-cpp.sh --tidy     # Static analysis (needs compile_commands.json)
 ```
 
-## CMake Options
+## CMake options
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -73,52 +73,47 @@ scripts/build-windows.bat
 | `RAC_BUILD_PLATFORM` | ON (Apple only) | Apple Foundation Models, System TTS, CoreML Diffusion |
 | `RAC_BUILD_BACKENDS` | OFF | ML backend compilation |
 | `RAC_BUILD_SERVER` | OFF | OpenAI-compatible HTTP server (`src/server/`, `tools/`) |
-| `RAC_ENABLE_SOLUTIONS` | ON desktop, OFF mobile/WASM | Full Protobuf + Abseil Solutions API; OFF → stub returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` |
+| `RAC_ENABLE_SOLUTIONS` | Follows `RAC_ENABLE_PROTOBUF`; forced OFF under Emscripten | Full Protobuf + Abseil Solutions API; OFF makes the stub return `RAC_ERROR_FEATURE_NOT_AVAILABLE`. Mobile builds enable protobuf, so Solutions is ON there too. |
 | `RAC_STATIC_PLUGINS` | Forced ON for iOS/WASM | Static plugin linking vs `dlopen` at runtime |
 | `RAC_REGENERATE_PROTO` | OFF | Re-run `idl/codegen/generate_cpp.sh` when `.proto` files change |
 | `RAC_BACKEND_RAG` | ON (except Emscripten) | RAG pipeline OBJECT library folded into `rac_commons` |
 
-## Project Overview
+## Project overview
 
-`runanywhere-commons` is a unified C/C++ library (C++20 internals, pure C API surface) that sits between platform SDKs (Swift, Kotlin, Web/WASM) and ML inference backends. It is the single source of truth for business logic — platform SDKs are thin bridges.
+`runanywhere-commons` is a unified C/C++ library (C++20 internals, pure C API surface) that sits between platform SDKs (Swift, Kotlin, Web/WASM) and ML inference backends. It is the single source of truth for business logic; platform SDKs are thin bridges.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│               Swift / Kotlin / Web SDKs                         │
-│         (CRACommons module map / JNI / Emscripten ccall)        │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ C API (rac_*)
-┌──────────────────────────▼──────────────────────────────────────┐
-│  Component Layer  (rac_*_component_*)                            │
-│  Owns lifecycle, emits analytics, exposes clean public API       │
-│  LLM | STT | TTS | VAD | VLM | Diffusion | Embed | Segment     │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ rac_*_create() → rac_plugin_find() → vtable dispatch
-┌──────────────────────────▼──────────────────────────────────────┐
-│  Service Layer  (rac_*_service.cpp)                              │
-│  Looks up model in registry → resolves framework → optional      │
-│  engine pin → rac_plugin_find[_for_engine]() → vtable dispatch    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────────┐
-│  Plugin Registry  (src/plugin/)                                 │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 9u)    │
-│  Priority order: highest-priority plugin per primitive wins, no  │
-│  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
-│  dynamic (rac_registry_load_plugin / dlopen).                    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────────┐
-│                    Engine Plugins                                 │
-│  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+Segment) | neurt (ANE LLM + Diffusion, Apple)       │
-│  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
-└─────────────────────────────────────────────────────────────────┘
-```
+Five layers, top to bottom.
 
-### Two-Layer Feature Pattern
+Swift, Kotlin, and Web SDKs enter through the `rac_*` C API, reached by the CRACommons module
+map, JNI, or an Emscripten `ccall`.
+
+The component layer (`rac_*_component_*`) owns lifecycle, emits analytics, and exposes the
+public API for LLM, STT, TTS, VAD, VLM, diffusion, embed, and segment.
+
+Below it, `rac_*_create()` calls `rac_plugin_find()` and dispatches through a vtable to the
+service layer (`rac_*_service.cpp`), which looks the model up in the registry, resolves its
+framework, applies an optional engine pin, and calls
+`rac_plugin_find[_for_engine]()`.
+
+The plugin registry (`src/plugin/`) performs the ABI-versioned vtable handshake at
+`RAC_PLUGIN_API_VERSION = 9u`. The highest-priority plugin per primitive wins; there is no
+scoring. Registration is static through `RAC_STATIC_PLUGIN_REGISTER` or dynamic through
+`rac_registry_load_plugin` and `dlopen`.
+
+Engine plugins sit at the bottom.
+
+| Plugin | Primitives |
+|---|---|
+| llamacpp | LLM, VLM |
+| sherpa | STT, TTS, VAD |
+| onnx | Embed, Segment |
+| neurt (Apple) | ANE LLM, Diffusion |
+| qhexrt (Hexagon NPU) | LLM, VLM, STT, TTS |
+| platform (Apple) | Foundation Models, TTS, Diffusion |
+
+### Two-layer feature pattern
 
 Every AI capability follows the same two-layer design:
 
@@ -126,13 +121,13 @@ Every AI capability follows the same two-layer design:
 
 2. **Component layer** (merged into `src/features/*/*_module.cpp`): Owns model lifecycle via `rac_lifecycle_t`, emits analytics events (`RAC_EVENT_*`), handles cancel, streams tokens/audio, exposes the public `rac_*_component_*()` API that platform SDKs call.
 
-**Feature-family classification** — not every capability fits one mold:
+Feature-family classification, because not every capability fits one mold:
 
-- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
-- **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
-- **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
+- Single-backend capabilities (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
+- Composed pipelines (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
+- VAD is a dual-backend special case: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Unified Plugin ABI (v9)
+### Unified plugin ABI (v9)
 
 All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10 active primitive slots, one optional terminal token-count callback, and 6 reserved slots (the single source of truth for primitive slots is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
@@ -149,72 +144,72 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
 | `RAC_PRIMITIVE_RERANK` | `rerank_ops` | llamacpp (rank-pooling GGUF) |
 
-NULL primitive slot = "not supported." ABI version mismatch → immediate rejection at registration.
-Current handshake is **`RAC_PLUGIN_API_VERSION = 9u`**: ABI v9 widens
+A NULL primitive slot means not supported. An ABI version mismatch is rejected at registration.
+The current handshake is `RAC_PLUGIN_API_VERSION = 9u`: ABI v9 widens
 `rac_llm_stream_callback_fn` with `tokens_in_delta` and adds
 `get_stream_token_counts` on `rac_llm_service_ops_t`. A NULL callback makes commons estimate counts and set
 `TokenUsage.counts_estimated`.
-`RAC_PRIMITIVE_RERANK` (wire value **11**, `rerank_ops`, promoted from `reserved_slot_2` at the same binary offset) was **revived as a first-class cross-encoder reranking primitive in ABI v8**. The *original* rerank slot (wire value 6, retired in ABI v4) stays permanently retired — the revived primitive is a new wire value, not a reuse of 6.
+`RAC_PRIMITIVE_RERANK` (wire value 11, `rerank_ops`, promoted from `reserved_slot_2` at the same binary offset) was revived as a first-class cross-encoder reranking primitive in ABI v8. The original rerank slot (wire value 6, retired in ABI v4) stays permanently retired; the revived primitive is a new wire value, not a reuse of 6.
 
-### Platform Adapter Inversion-of-Control
+### Platform adapter inversion of control
 
 `rac_platform_adapter_t` (`include/rac/core/rac_platform_adapter.h`) is the single struct through which all platform services enter C++. The platform SDK populates it before calling `rac_init()`:
 
-- **Mandatory**: `file_exists`, `file_read`, `file_write`, `file_delete`, `secure_get/set/delete`, `log`, `now_ms`
-- **Optional (NULL-safe, each slot is null-checked at the call site with a documented fallback)**: `get_memory_info`, `http_download/cancel`, `extract_archive` (currently unused — commons extracts via built-in libarchive `rac_extract_archive_native` directly), `file_list_directory`, `is_non_empty_directory`, `get_vendor_id` (Apple-only)
+- Mandatory: `file_exists`, `file_read`, `file_write`, `file_delete`, `secure_get/set/delete`, `log`, `now_ms`
+- Optional, NULL-safe, each null-checked at the call site with a documented fallback: `get_memory_info`, `http_download/cancel`, `extract_archive` (currently unused, since commons extracts through built-in libarchive `rac_extract_archive_native` directly), `file_list_directory`, `is_non_empty_directory`, `get_vendor_id` (Apple-only)
 
-`rac_init()` validates the adapter's `abi_version` + `struct_size` (rejecting a mismatch with `RAC_ERROR_ABI_VERSION_MISMATCH`) **and** all 9 Mandatory slots above (returning `RAC_ERROR_ADAPTER_NOT_SET` if any is NULL) — see `rac_core.cpp:151-195`. Optional slots are not enforced; each is null-checked before use with a documented fallback (e.g. Kotlin's JNI ships without `get_memory_info`, which is why it is Optional). There is no `track_error` slot.
+`rac_init()` validates the adapter's `abi_version` + `struct_size` (rejecting a mismatch with `RAC_ERROR_ABI_VERSION_MISMATCH`) and all 9 mandatory slots above (returning `RAC_ERROR_ADAPTER_NOT_SET` if any is NULL); see `rac_core.cpp:151-195`. Optional slots are not enforced; each is null-checked before use with a documented fallback (e.g. Kotlin's JNI ships without `get_memory_info`, which is why it is Optional). There is no `track_error` slot.
 
 All file I/O, secure storage, HTTP, and logging pass through this struct. C++ code never calls platform APIs directly.
 
-### Swift Callback Pattern (Apple-only backends)
+### Swift callback pattern (Apple-only backends)
 
 Foundation Models, System TTS, and CoreML Diffusion all use the same pattern:
 1. Swift calls `rac_*_set_callbacks(&callback_struct)` to register function pointers
 2. Swift calls `rac_backend_*_register()` which registers the vtable with the plugin registry
 3. At runtime, vtable dispatch calls back into Swift through the stored function pointers
 
-### Dual Event System
+### Dual event system
 
-1. **Legacy struct-based** (`rac_event_publish/subscribe/track` in `src/infrastructure/events/event_publisher.cpp`): category-keyed pub/sub with lock-copy-dispatch (snapshot subscribers under mutex, dispatch outside to prevent deadlock). Still live — used by `LifecycleManager` and the engine plugins (sherpa, llamacpp) to emit analytics breadcrumbs via `rac_event_track`.
+1. Legacy struct-based (`rac_event_publish/subscribe/track` in `src/infrastructure/events/event_publisher.cpp`): category-keyed pub/sub with lock-copy-dispatch (snapshot subscribers under mutex, dispatch outside to prevent deadlock). Still live, used by `LifecycleManager` and the engine plugins (sherpa, llamacpp) to emit analytics breadcrumbs via `rac_event_track`.
 
-2. **Canonical proto** (`rac::events::emit_*` in `src/core/events.cpp`, published through `src/infrastructure/events/sdk_event_publish.cpp`): builds `runanywhere.v1.SDKEvent` payloads carrying a **destination bitmask** (`EVENT_DESTINATION_PUBLIC` | `TELEMETRY` | `LOG`; `ALL` = PUBLIC\|TELEMETRY). `route()` fans out to the public proto stream, the telemetry manager, and an opt-in log breadcrumb. The former fixed analytics/public callback registry (`rac_analytics_event_emit`, `rac_event_get_destination`) was removed.
+2. Canonical proto (`rac::events::emit_*` in `src/core/events.cpp`, published through `src/infrastructure/events/sdk_event_publish.cpp`): builds `runanywhere.v1.SDKEvent` payloads carrying a **destination bitmask** (`EVENT_DESTINATION_PUBLIC` | `TELEMETRY` | `LOG`; `ALL` = PUBLIC\|TELEMETRY). `route()` fans out to the public proto stream, the telemetry manager, and an opt-in log breadcrumb. The former fixed analytics/public callback registry (`rac_analytics_event_emit`, `rac_event_get_destination`) was removed.
 
-### Thread Safety Patterns
+### Thread-safety patterns
 
-- **Meyers singleton** for all global state (`SDKState`, `ModuleRegistryState`, `LoggerState`, plugin registry) — avoids static initialization order fiasco
-- **Lock-copy-dispatch** in event publisher — prevents deadlock if callbacks re-enter
-- **Atomic cancel** in LLM component — `cancel_requested` is `std::atomic<bool>`, read without mutex in the token callback to avoid deadlock with the generating thread
-- **Lifecycle refcount pinning** — `rac_lifecycle_acquire_service/release_service` prevents model unload during active inference; unload waits on `condition_variable` for refcount == 0
-- **VAD component backend selection** — `rac_vad_component_*` routes model-backed operations through the selected plugin and falls back to the component-owned energy VAD when no model is loaded
-- **Energy VAD hot path** — mean-square computed without sqrt (compares `mean_sq > threshold_sq`); 4-way loop unrolling; callbacks deferred outside lock
+- Meyers singleton for all global state (`SDKState`, `ModuleRegistryState`, `LoggerState`, plugin registry), which avoids static initialization order fiasco
+- Lock-copy-dispatch in the event publisher prevents deadlock if callbacks re-enter
+- Atomic cancel in the LLM component: `cancel_requested` is `std::atomic<bool>`, read without mutex in the token callback to avoid deadlock with the generating thread
+- Lifecycle refcount pinning: `rac_lifecycle_acquire_service/release_service` prevents model unload during active inference; unload waits on `condition_variable` for refcount == 0
+- VAD component backend selection: `rac_vad_component_*` routes model-backed operations through the selected plugin and falls back to the component-owned energy VAD when no model is loaded
+- Energy VAD hot path: mean-square computed without sqrt (compares `mean_sq > threshold_sq`); 4-way loop unrolling; callbacks deferred outside lock
 
-### Voice Agent Pipeline
+### Voice agent pipeline
 
 Orchestrates VAD → STT → LLM → TTS with 8 pipeline states (`rac_audio_pipeline_state_t`):
 `IDLE → LISTENING → PROCESSING_SPEECH → GENERATING_RESPONSE → PLAYING_TTS → COOLDOWN → IDLE`
 (plus `WAITING_WAKEWORD` and `ERROR`). Microphone blocked during processing/TTS. 800ms cooldown after TTS. State transitions validated by `rac_audio_pipeline_is_valid_transition()`.
 
-## Key Subsystems
+## Key subsystems
 
 ### Lifecycle Manager (`src/core/capabilities/lifecycle_manager.cpp`)
 
-The `rac_lifecycle_*` C API is a thin **per-handle facade over the canonical global `g_loaded` store** (`src/core/model_lifecycle.cpp`), not a separate state machine. A `LifecycleManager` owns no model state — only its config, per-handle metrics, and a pin token. `load()` calls the feature module's own `create_fn` (path-based — no registry lookup, no download) and stores the resulting `rac_<mod>_service_t` into `g_loaded`; the single store/pin is `g_loaded` + `LoadedModel::active_refs` + `g_lifecycle_cv`. Every facade op is **owner-scoped** (only touches the `g_loaded[component]` slot whose `owner_lifecycle` is this handle), so destroying a never-loaded component handle never evicts a user's registry-loaded model. State maps READY→LOADED, ERROR→FAILED. `get_state`/`get_service` take `g_lifecycle_mutex` briefly (never held across model creation). Auto-unload of a previous model drains in-flight refs via `g_lifecycle_cv` before destroying. Under `#if !defined(RAC_HAVE_PROTOBUF)` (no `g_loaded`), the original self-contained per-handle implementation is retained verbatim.
+The `rac_lifecycle_*` C API is a thin per-handle facade over the canonical global `g_loaded` store (`src/core/model_lifecycle.cpp`), not a separate state machine. A `LifecycleManager` owns no model state, only its config, per-handle metrics, and a pin token. `load()` calls the feature module's own `create_fn` (path-based, with no registry lookup and no download) and stores the resulting `rac_<mod>_service_t` into `g_loaded`; the single store/pin is `g_loaded` + `LoadedModel::active_refs` + `g_lifecycle_cv`. Every facade op is **owner-scoped** (only touches the `g_loaded[component]` slot whose `owner_lifecycle` is this handle), so destroying a never-loaded component handle never evicts a user's registry-loaded model. State maps READY→LOADED, ERROR→FAILED. `get_state`/`get_service` take `g_lifecycle_mutex` briefly (never held across model creation). Auto-unload of a previous model drains in-flight refs via `g_lifecycle_cv` before destroying. Under `#if !defined(RAC_HAVE_PROTOBUF)` (no `g_loaded`), the original self-contained per-handle implementation is retained verbatim.
 
-### Model Registry & Paths
+### Model registry and paths
 
-- `rac_model_registry_t` — CRUD for model metadata; `discover_downloaded()` scans filesystem; `refresh()` combines remote catalog + local rescan + orphan pruning
-- `rac_model_paths_t` — All paths follow `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
-- `rac_lora_registry_t` — LoRA adapter entries with compatible model ID matching
-- Model assignment (`rac_model_assignment_*` functions in `model_assignment.cpp`) — fetches device-assigned models from the backend API with a TTL cache. Function-based API; there is no `rac_model_assignment_t` handle type.
+- `rac_model_registry_t`: CRUD for model metadata; `discover_downloaded()` scans filesystem; `refresh()` combines remote catalog + local rescan + orphan pruning
+- `rac_model_paths_t`: all paths follow `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
+- `rac_lora_registry_t`: LoRA adapter entries with compatible model ID matching
+- Model assignment (`rac_model_assignment_*` functions in `model_assignment.cpp`) fetches device-assigned models from the backend API with a TTL cache. Function-based API; there is no `rac_model_assignment_t` handle type.
 
-### Download Manager (`include/rac/infrastructure/download/rac_download_orchestrator.h`)
+### Download manager (`include/rac/infrastructure/download/rac_download_orchestrator.h`)
 
 Orchestration (not HTTP transport). Stages: `DOWNLOADING` (0-80%) → `EXTRACTING` (80-95%) → `VALIDATING` (95-99%) → `COMPLETED` (100%). HTTP delegated to `rac_http_download` (platform adapter).
 
-### Error Categories (`include/rac/core/rac_structured_error.h`)
+### Error categories (`include/rac/core/rac_structured_error.h`)
 
-SDK-facing errors cross the boundary as `runanywhere.v1.SDKError` proto bytes via `rac_result_to_proto_error()` — the canonical, single error path. `rac_structured_error.h` now holds only the `rac_error_category_t` taxonomy (`RAC_CATEGORY_*`), mapped onto the proto `ErrorCategory` by `rac_proto_adapters`. The old structured-error subsystem (`rac_error_t`, stack-trace capture, thread-local last-error, `rac_error_log_and_track`, the bespoke JSON / `rac::Error` surface) was retired — it had no remaining callers once the proto path became canonical. Per-result message/expectedness lookups live in `rac_error.cpp` (`rac_error_message`, `rac_error_is_expected`).
+SDK-facing errors cross the boundary as `runanywhere.v1.SDKError` proto bytes through `rac_result_to_proto_error()`, the canonical single error path. `rac_structured_error.h` now holds only the `rac_error_category_t` taxonomy (`RAC_CATEGORY_*`), mapped onto the proto `ErrorCategory` by `rac_proto_adapters`. The old structured-error subsystem (`rac_error_t`, stack-trace capture, thread-local last-error, `rac_error_log_and_track`, the bespoke JSON / `rac::Error` surface) was retired because it had no remaining callers once the proto path became canonical. Per-result message/expectedness lookups live in `rac_error.cpp` (`rac_error_message`, `rac_error_is_expected`).
 
 ### Logging
 
@@ -233,36 +228,36 @@ Okapi BM25 inverted index (`bm25_index.cpp`). Per-session `RAGBackend` guarded b
 `mutex_`; the graph runs outside the lock. Multi-session; each handle independent.
 
 Design rules for RAG work (do not relitigate):
-- **Keep USearch** as the dense ANN store. Do not replace it with a brute-force
-  Hamming/binary-quantized scan — techniques may be borrowed from reference engines, the
+- Keep USearch as the dense ANN store. Do not replace it with a brute-force
+  Hamming/binary-quantized scan. Techniques may be borrowed from reference engines, the
   storage engine is not.
-- **RAG's default rerank is LLM-pointwise** (score fused candidates 1–5 with the existing
+- RAG's default rerank is LLM-pointwise (score fused candidates 1 to 5 with the existing
   LLM handle) and is the only reranking path wired into the RAG query flow today. The
   first-class `RAC_PRIMITIVE_RERANK` cross-encoder primitive (`rerank_ops`, revived in plugin
-  ABI v8) exists and is reachable standalone via `rac_rerank_*`, but it is **not yet invoked
-  from the RAG query path** — `RAGBackend`/`rag_pipeline_graph` do not score fused candidates
+  ABI v8) exists and is reachable standalone through `rac_rerank_*`, but it is not yet invoked
+  from the RAG query path: `RAGBackend`/`rag_pipeline_graph` do not score fused candidates
   through it. Until that wiring lands, `rac_rag_proto_abi` **rejects** a `reranker_model_id`
   at session-create with `RAC_ERROR_NOT_IMPLEMENTED` (rather than accepting it and silently
   no-op'ing); callers wanting reranking today use `rerank_results` (LLM-pointwise). With no
   `reranker_model_id` the default fusion path is unchanged.
-- **All RAG persistence goes through the platform adapter** file I/O
+- All RAG persistence goes through the platform adapter file I/O
   (`file_read`/`file_write`/`file_delete`/`file_exists`, `rac_platform_adapter.h`), never
   direct `std::ofstream`/`fopen`. This is what makes persistence work on Web (OPFS) as well
   as mobile.
-- **Content-addressed dedup: never re-embed the same input.** Documents are keyed by
+- Content-addressed dedup: never re-embed the same input. Documents are keyed by
   `sha256(raw_bytes)` (files) or `sha256(normalized_text)` (text); chunk embeddings are
   cached by `sha256(chunk_text) + embedding_model_fingerprint`. A matching hash + matching
-  fingerprint skips chunking/embedding. Embedding caches are **namespaced by embedding
-  fingerprint**, so switching models is safe and reversible.
-- **SHA-256 is the shared foundation util** `src/foundation/rac_sha256`. Do not add a
+  fingerprint skips chunking/embedding. Embedding caches are namespaced by embedding
+  fingerprint, so switching models is safe and reversible.
+- SHA-256 is the shared foundation util `src/foundation/rac_sha256`. Do not add a
   second SHA-256 implementation (the old file-local one in `rac_http_download.cpp` is being
   consolidated here).
-- **Persisted indexes are fingerprint-guarded** (embedding model + dim + format version).
-  On mismatch, discard and re-embed — never load stale vectors against a different embedder.
-- Proto changes to `idl/rag.proto` are **additive only** (new optional fields); regenerate
+- Persisted indexes are fingerprint-guarded (embedding model + dim + format version).
+  On mismatch, discard and re-embed; never load stale vectors against a different embedder.
+- Proto changes to `idl/rag.proto` are additive only (new optional fields); regenerate
   all SDK bindings, no version bump.
 
-## Error Code Ranges
+## Error code ranges
 
 | Range | Category |
 |-------|----------|
@@ -283,7 +278,7 @@ Design rules for RAG work (do not relitigate):
 
 Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.cpp`, add mapping in platform SDK error converters.
 
-## Backend Details
+## Backend details
 
 | Backend | Primitives | Models | Engine | Registration |
 |---------|-----------|--------|--------|-------------|
@@ -294,20 +289,20 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 
-## Version Management
+## Version management
 
 All versions centralized in `VERSIONS` file. Consumed three ways:
 - **Shell**: `source scripts/load-versions.sh` → exports `$LLAMACPP_VERSION`, `$ONNX_VERSION_IOS`, etc.
 - **CMake**: `include(LoadVersions)` → sets cache variables `RAC_<KEY>` and bare `<KEY>`
 - **Windows**: `for /f` parsing in `.bat` scripts
 
-## Symbol Visibility
+## Symbol visibility
 
 - **Apple**: `exports/RACommons.exports` lists 465 curated `_rac_*` symbols; applied via `-exported_symbols_list`
 - **Android**: Currently `-fvisibility=default` (all symbols exported) as workaround; TODO(v0.21) to annotate all public functions with `RAC_API`
 - **Shared builds**: Global `-fvisibility=hidden` + `RAC_API` attribute (`__attribute__((visibility("default")))` / `__declspec(dllexport)`) on public C functions
 
-## Build Outputs
+## Build outputs
 
 **Apple**: XCFrameworks under `../bindings/swift/Binaries/`; versioned reproducible archives under `dist/packages/`.
 
@@ -342,11 +337,11 @@ Key test categories: core infrastructure, plugin registry/routing, graph schedul
 
 ## CI/CD
 
-- **Build**: `.github/workflows/build-commons.yml` — macOS, iOS, Android parallel builds + lint
-- **Release**: `.github/workflows/release.yml` — triggered by `commons-v*` tags; publishes to `RunanywhereAI/runanywhere-binaries`
-- **Size Check**: `.github/workflows/size-check.yml` — xcframework must stay under 3 MB
+- Build: `.github/workflows/build-commons.yml` runs macOS, iOS, and Android builds in parallel plus lint
+- Release: `.github/workflows/release.yml` is triggered by `commons-v*` tags and publishes to `RunanywhereAI/runanywhere-binaries`
+- Size check: `.github/workflows/size-check.yml` holds the xcframework under 3 MB
 
-## Common Tasks
+## Common tasks
 
 ### Adding a new backend
 
