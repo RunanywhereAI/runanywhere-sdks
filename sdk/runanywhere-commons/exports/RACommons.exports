@@ -672,6 +672,28 @@ _rac_solution_feed
 _rac_solution_start
 _rac_solution_stop
 
+# Agent workflow runner — document CRUD, validation, and run lifecycle called
+# from Swift Public/Extensions/Workflows/RunAnywhere+Workflows.swift. Separate
+# from the Solutions block above: different runtime, no shared state.
+_rac_agent_bundle_export_proto
+_rac_agent_bundle_import_proto
+_rac_agent_pack_delete
+_rac_agent_pack_list_proto
+_rac_agent_pack_load_proto
+_rac_agent_pack_save_proto
+_rac_agent_run_cancel
+_rac_agent_run_create_proto
+_rac_agent_run_destroy
+_rac_agent_run_record_load_proto
+_rac_agent_run_record_proto
+_rac_agent_run_start
+_rac_agent_set_host_callbacks
+_rac_agent_workflow_delete
+_rac_agent_workflow_list_proto
+_rac_agent_workflow_load_proto
+_rac_agent_workflow_save_proto
+_rac_agent_workflow_validate_proto
+
 # Telemetry manager — flush + HTTP callback bridge for analytics.
 _rac_telemetry_manager_create
 _rac_telemetry_manager_destroy

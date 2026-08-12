@@ -44,6 +44,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
+
+    init() {
+        #if os(macOS) && DEBUG
+        // A local Mac build is signed ad-hoc, and an ad-hoc signature changes on
+        // every rebuild. The Keychain sees each build as a different program, so
+        // it re-prompts for access to items the previous build stored, once per
+        // secret per launch. Point the SDK at its file-backed secure store
+        // instead. The 0 overwrite flag leaves an externally-set value alone, so
+        // a signed build or an explicit override still uses the Keychain.
+        setenv("RUNANYWHERE_SWIFT_SECURE_STORE", "file", 0)
+        #endif
+    }
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var flowSession = FlowSessionManager.shared
@@ -168,6 +180,7 @@ struct RunAnywhereAIApp: App {
 
             await ModelCatalogBootstrap.registerAll(mlxRegistered: mlxRegistered)
             await refreshSDKCatalogs()
+            await ToolSettingsViewModel.shared.restoreRegisteredTools()
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("SDK initialized in \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
@@ -175,6 +188,9 @@ struct RunAnywhereAIApp: App {
             await MainActor.run {
                 isSDKInitialized = true
                 isInitializingSDK = false
+                // Owned here, not by the workflow editor: a schedule must keep
+                // firing after its canvas is closed.
+                WorkflowScheduler.shared.start()
             }
         } catch {
             logger.error("SDK initialization failed: \(error, privacy: .public)")

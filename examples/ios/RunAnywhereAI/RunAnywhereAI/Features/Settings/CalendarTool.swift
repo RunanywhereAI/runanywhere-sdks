@@ -2,11 +2,11 @@
 //  CalendarTool.swift
 //  RunAnywhereAI
 //
-//  Calendar tool — lets the on-device assistant answer simple questions
+//  Calendar tools — lets the on-device assistant answer simple questions
 //  about the user's own schedule ("what's on my calendar today", "am I
-//  free this week"). Read-only, single tool, on purpose: this mirrors the
-//  scope of get_current_time / get_weather rather than trying to be a full
-//  calendar client.
+//  free this week"), create events, and list the available calendars.
+//  All three tools share CalendarManager and the single EventKit full-access
+//  grant, so they are gated behind one Settings toggle.
 //
 
 import EventKit
@@ -24,9 +24,9 @@ actor CalendarManager {
 
     private let store = EKEventStore()
 
-    /// Requests full read/write access to Calendars. This tool only reads,
-    /// but EventKit does not offer a read-only grant — write access is
-    /// simply unused.
+    /// Requests full read/write access to Calendars. The same grant covers
+    /// get_calendar_events (read), create_calendar_event (write), and
+    /// list_calendars — EventKit does not offer a read-only grant.
     func requestAuthorization() async throws {
         _ = try await store.requestFullAccessToEvents()
     }
@@ -118,7 +118,8 @@ actor CalendarManager {
             if event.isAllDay {
                 timeText = "all day"
             } else {
-                timeText = "\(timeFormatter.string(from: event.startDate)) - \(timeFormatter.string(from: event.endDate))"
+                let startText = timeFormatter.string(from: event.startDate)
+                timeText = "\(startText) - \(timeFormatter.string(from: event.endDate))"
             }
             let locationText = event.location.map { " at \($0)" } ?? ""
             return "\(event.title ?? "Untitled") (\(timeText)\(locationText))"
@@ -128,6 +129,111 @@ actor CalendarManager {
             "event_count": RAToolValue(Double(events.count)),
             "events": RAToolValue(summaries.joined(separator: "; ")),
             "date": RAToolValue(range.label)
+        ]
+    }
+
+    struct CalendarEventRequest: Sendable {
+        let title: String
+        let startSpec: String
+        let endSpec: String?
+        let durationMinutes: Int?
+        let notes: String?
+        let location: String?
+        let calendarName: String?
+    }
+
+    private func eventCalendar(named name: String?) -> (calendar: EKCalendar?, error: String?) {
+        guard let name, !name.isEmpty else {
+            return (store.defaultCalendarForNewEvents, nil)
+        }
+        let writable = store.calendars(for: .event).filter(\.allowsContentModifications)
+        guard let match = writable.first(where: {
+            $0.title.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }) else {
+            let available = writable.map(\.title).joined(separator: ", ")
+            return (nil, "No writable calendar named \"\(name)\". Writable calendars: \(available)")
+        }
+        return (match, nil)
+    }
+
+    private func resolveEventEnd(
+        start: ToolDateParser.ParsedDate,
+        endSpec: String?,
+        durationMinutes: Int?
+    ) -> (end: Date, error: String?) {
+        if let endSpec, !endSpec.isEmpty {
+            guard let parsedEnd = ToolDateParser.parse(endSpec), parsedEnd.date > start.date else {
+                return (start.date, "end \"\(endSpec)\" must be a valid date-time after start")
+            }
+            return (parsedEnd.date, nil)
+        }
+        let minutes = max(durationMinutes ?? 60, 1)
+        return (start.date.addingTimeInterval(TimeInterval(minutes) * 60), nil)
+    }
+
+    func createEvent(_ request: CalendarEventRequest) throws -> [String: RAToolValue] {
+        guard let start = ToolDateParser.parse(request.startSpec) else {
+            return [
+                "error": RAToolValue(
+                    "Could not parse start \"\(request.startSpec)\" — use \"YYYY-MM-DD HH:mm\" or \"YYYY-MM-DD\""
+                )
+            ]
+        }
+        let (calendar, calendarError) = eventCalendar(named: request.calendarName)
+        if let calendarError {
+            return ["error": RAToolValue(calendarError)]
+        }
+        guard let calendar else {
+            return ["error": RAToolValue("No default calendar is configured on this device")]
+        }
+
+        let event = EKEvent(eventStore: store)
+        event.title = request.title
+        event.calendar = calendar
+        if start.hasTime {
+            let (end, endError) = resolveEventEnd(
+                start: start,
+                endSpec: request.endSpec,
+                durationMinutes: request.durationMinutes
+            )
+            if let endError {
+                return ["error": RAToolValue(endError)]
+            }
+            event.startDate = start.date
+            event.endDate = end
+        } else {
+            event.isAllDay = true
+            event.startDate = start.date
+            event.endDate = start.date
+        }
+        if let notes = request.notes, !notes.isEmpty {
+            event.notes = notes
+        }
+        if let location = request.location, !location.isEmpty {
+            event.location = location
+        }
+
+        try store.save(event, span: .thisEvent, commit: true)
+
+        return [
+            "created": RAToolValue(true),
+            "event_id": RAToolValue(event.eventIdentifier ?? ""),
+            "title": RAToolValue(request.title),
+            "start": RAToolValue(ToolDateParser.display(event.startDate, hasTime: start.hasTime)),
+            "end": RAToolValue(ToolDateParser.display(event.endDate, hasTime: start.hasTime)),
+            "calendar": RAToolValue(calendar.title)
+        ]
+    }
+
+    func fetchCalendars() -> [String: RAToolValue] {
+        let calendars = store.calendars(for: .event)
+        let summaries = calendars.map { calendar in
+            calendar.allowsContentModifications ? calendar.title : "\(calendar.title) (read-only)"
+        }
+        return [
+            "calendar_count": RAToolValue(calendars.count),
+            "calendars": RAToolValue(summaries.joined(separator: "; ")),
+            "default_calendar": RAToolValue(store.defaultCalendarForNewEvents?.title ?? "none")
         ]
     }
 }
@@ -175,7 +281,10 @@ enum CalendarTool {
                 ToolParameter(
                     name: "end_date",
                     type: .string,
-                    description: "End of the custom date range (inclusive), as \"YYYY-MM-DD\". Only used together with start_date.",
+                    description: """
+                        End of the custom date range (inclusive), as "YYYY-MM-DD". Only \
+                        used together with start_date.
+                        """,
                     required: false
                 )
             ],
@@ -197,6 +306,138 @@ enum CalendarTool {
             } catch {
                 return ["error": RAToolValue(error.localizedDescription)]
             }
+        }
+    }
+}
+
+// MARK: - create_calendar_event Tool
+
+enum CalendarCreateTool {
+    static var definition: RAToolDefinition {
+        let todayString = CalendarManager.todayString
+        return RAToolDefinition(
+            name: "create_calendar_event",
+            description: """
+                Creates a new event in the user's own Calendar. Use only when the user \
+                explicitly asks to schedule, book, or add something to their calendar \
+                ("schedule a meeting tomorrow at 3pm", "put lunch with Sam on my \
+                calendar") — never create an event as a side effect. Today's date is \
+                \(todayString) — compute concrete dates for "tomorrow" or "next Tuesday" \
+                from that, never from memory. Before picking a slot around existing \
+                events, check availability with get_calendar_events; this tool does not \
+                check for conflicts. On success the result contains event_id, the final \
+                start/end, and the calendar used; if the result has "error", the event was \
+                NOT created — report the error instead of claiming success.
+                """,
+            parameters: [
+                ToolParameter(
+                    name: "title",
+                    type: .string,
+                    description: "Event title as it should appear in the calendar, e.g. \"Lunch with Sam\"."
+                ),
+                ToolParameter(
+                    name: "start",
+                    type: .string,
+                    description: """
+                        Event start as "YYYY-MM-DD HH:mm" in the user's local time (e.g. \
+                        "2026-08-12 15:00" for 3pm). Pass a bare "YYYY-MM-DD" to create an \
+                        all-day event instead.
+                        """
+                ),
+                ToolParameter(
+                    name: "end",
+                    type: .string,
+                    description: """
+                        Event end as "YYYY-MM-DD HH:mm", after start. Omit to use \
+                        duration_minutes instead. Ignored for all-day events.
+                        """,
+                    required: false
+                ),
+                ToolParameter(
+                    name: "duration_minutes",
+                    type: .number,
+                    description: """
+                        Event length in minutes when "end" is not given. Defaults to 60. \
+                        Ignored for all-day events.
+                        """,
+                    required: false
+                ),
+                ToolParameter(
+                    name: "notes",
+                    type: .string,
+                    description: "Optional notes/description to attach to the event.",
+                    required: false
+                ),
+                ToolParameter(
+                    name: "location",
+                    type: .string,
+                    description: "Optional location, e.g. \"Cafe Roma\" or a street address.",
+                    required: false
+                ),
+                ToolParameter(
+                    name: "calendar_name",
+                    type: .string,
+                    description: """
+                        Name of the calendar to add the event to, matching a name from \
+                        list_calendars. Omit to use the user's default calendar — only set \
+                        this when the user names a specific calendar.
+                        """,
+                    required: false
+                )
+            ],
+            category: "Calendar"
+        )
+    }
+
+    static var executor: ToolExecutor {
+        { args in
+            guard let title = args["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !title.isEmpty else {
+                return ["error": RAToolValue("Missing required \"title\" argument")]
+            }
+            guard let startSpec = args["start"]?.string, !startSpec.isEmpty else {
+                return ["error": RAToolValue("Missing required \"start\" argument")]
+            }
+            let request = CalendarManager.CalendarEventRequest(
+                title: title,
+                startSpec: startSpec,
+                endSpec: args["end"]?.string,
+                durationMinutes: args["duration_minutes"]?.int,
+                notes: args["notes"]?.string,
+                location: args["location"]?.string,
+                calendarName: args["calendar_name"]?.string
+            )
+            do {
+                return try await CalendarManager.shared.createEvent(request)
+            } catch {
+                return ["error": RAToolValue(error.localizedDescription)]
+            }
+        }
+    }
+}
+
+// MARK: - list_calendars Tool
+
+enum CalendarListTool {
+    static var definition: RAToolDefinition {
+        RAToolDefinition(
+            name: "list_calendars",
+            description: """
+                Lists the calendars available on this device (e.g. "Home", "Work", \
+                subscribed calendars), marking read-only ones, plus the default calendar \
+                new events go to. Use before create_calendar_event when the user names a \
+                specific calendar, or when they ask what calendars they have. Only name \
+                calendars that literally appear in this result. Events cannot be created \
+                on calendars marked read-only.
+                """,
+            parameters: [],
+            category: "Calendar"
+        )
+    }
+
+    static var executor: ToolExecutor {
+        { _ in
+            await CalendarManager.shared.fetchCalendars()
         }
     }
 }

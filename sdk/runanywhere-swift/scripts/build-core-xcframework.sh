@@ -420,15 +420,15 @@ collect_protobuf_static_deps() {
         return
     fi
 
+    local discovered=()
+    local has_full_protobuf=0
+    local has_utf8_validity=0
+
     while IFS= read -r dep; do
-        RAC_PROTO_STATIC_DEPS+=("${dep}")
+        discovered+=("${dep}")
         case "$(basename "${dep}")" in
-            libabsl*.a)
-                absl_count=$((absl_count + 1))
-                ;;
-            libprotobuf*.a)
-                protobuf_archives+=("${dep}")
-                ;;
+            libprotobuf.a) has_full_protobuf=1 ;;
+            libutf8_validity.a) has_utf8_validity=1 ;;
         esac
     # Skip stale Debug output. Everything above builds `--config Release`, but the
     # iOS build roots use the multi-config Xcode generator, which keeps
@@ -455,6 +455,37 @@ collect_protobuf_static_deps() {
         -name "libabsl*.a" -o \
         -name "libutf8*.a" \
     \) ! -path "*/Debug/*" ! -path "*/Debug-*/*" | sort)
+
+    # Two overlapping-archive pairs reach the same failure as the Debug/Release
+    # note above, by a different route: merging both halves lands one object in
+    # the slice twice, which libtool accepts and the consuming app then rejects
+    # with "duplicate symbol" errors naming two members of the same archive.
+    #
+    #   libprotobuf.a      strict superset of libprotobuf-lite.a (79 members
+    #                      vs 27, none unique to lite)
+    #   libutf8_validity.a same utf8_range.c.o, same three symbols, as
+    #                      libutf8_range.a
+    #
+    # Only single-config build roots (macOS, Android, Electron) emit both halves.
+    # The iOS presets emit libprotobuf.a and libutf8_validity.a alone, which is
+    # why the iOS slices were never affected.
+    for dep in "${discovered[@]}"; do
+        if [ "${has_full_protobuf}" = "1" ] && [ "$(basename "${dep}")" = "libprotobuf-lite.a" ]; then
+            continue
+        fi
+        if [ "${has_utf8_validity}" = "1" ] && [ "$(basename "${dep}")" = "libutf8_range.a" ]; then
+            continue
+        fi
+        RAC_PROTO_STATIC_DEPS+=("${dep}")
+        case "$(basename "${dep}")" in
+            libabsl*.a)
+                absl_count=$((absl_count + 1))
+                ;;
+            libprotobuf*.a)
+                protobuf_archives+=("${dep}")
+                ;;
+        esac
+    done
 
     if [ "${DRY_RUN}" != "1" ] && [ "${#RAC_PROTO_STATIC_DEPS[@]}" -eq 0 ]; then
         echo "error: no vendored protobuf/abseil static archives found under ${build_root}/_deps" >&2

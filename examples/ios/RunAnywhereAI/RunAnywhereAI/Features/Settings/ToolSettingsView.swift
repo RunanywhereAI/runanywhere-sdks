@@ -68,6 +68,8 @@ class ToolSettingsViewModel: ObservableObject {
                     await enableCalendarTool()
                 } else {
                     await RunAnywhere.unregisterTool(CalendarTool.definition.name)
+                    await RunAnywhere.unregisterTool(CalendarCreateTool.definition.name)
+                    await RunAnywhere.unregisterTool(CalendarListTool.definition.name)
                     await refreshRegisteredTools()
                 }
             }
@@ -75,9 +77,44 @@ class ToolSettingsViewModel: ObservableObject {
     }
     @Published var calendarAuthorizationError: String?
 
+    // Reminders is opt-in separately from Calendar: EventKit treats Reminders
+    // as its own full-access authorization with its own usage string.
+    @Published var remindersToolEnabled: Bool = false {
+        didSet {
+            guard remindersToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(remindersToolEnabled, forKey: "remindersToolEnabled")
+            Task {
+                if remindersToolEnabled {
+                    await enableRemindersTools()
+                } else {
+                    await RunAnywhere.unregisterTool(ReminderListTool.definition.name)
+                    await RunAnywhere.unregisterTool(ReminderCreateTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var remindersAuthorizationError: String?
+
+    @Published var notificationToolEnabled: Bool = false {
+        didSet {
+            guard notificationToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(notificationToolEnabled, forKey: "notificationToolEnabled")
+            Task {
+                if notificationToolEnabled {
+                    await enableNotificationTool()
+                } else {
+                    await RunAnywhere.unregisterTool(NotificationTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var notificationAuthorizationError: String?
+
     // App-local tools with real implementations.
     private var builtInTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
-        [
+        var tools: [(definition: RAToolDefinition, executor: ToolExecutor)] = [
             // Weather Tool - Uses Open-Meteo API (free, no API key required)
             (
                 definition: RAToolDefinition(
@@ -182,7 +219,6 @@ class ToolSettingsViewModel: ObservableObject {
                             "error": RAToolValue("Missing expression argument")
                         ]
                     }
-                    print("Calculator received args: \(args), using expression: '\(expression)'")
                     // Clean the expression - remove any non-math characters
                     let cleanedExpression = expression
                         .replacingOccurrences(of: "=", with: "")
@@ -250,6 +286,17 @@ class ToolSettingsViewModel: ObservableObject {
                 }
             )
         ]
+        tools.append(contentsOf: [
+            (definition: DateTimeTool.definition, executor: DateTimeTool.executor),
+            (definition: WorldClockTool.definition, executor: WorldClockTool.executor),
+            (definition: ClipboardReadTool.definition, executor: ClipboardReadTool.executor),
+            (definition: ClipboardWriteTool.definition, executor: ClipboardWriteTool.executor),
+            (definition: OpenURLTool.definition, executor: OpenURLTool.executor)
+        ])
+        #if os(macOS)
+        tools.append((definition: RunningAppsTool.definition, executor: RunningAppsTool.executor))
+        #endif
+        return tools
     }
 
     init() {
@@ -258,8 +305,39 @@ class ToolSettingsViewModel: ObservableObject {
         healthToolEnabled = UserDefaults.standard.bool(forKey: "healthToolEnabled")
         #endif
         calendarToolEnabled = UserDefaults.standard.bool(forKey: "calendarToolEnabled")
+        remindersToolEnabled = UserDefaults.standard.bool(forKey: "remindersToolEnabled")
+        notificationToolEnabled = UserDefaults.standard.bool(forKey: "notificationToolEnabled")
         Task {
             await refreshRegisteredTools()
+        }
+    }
+
+    /// Register the tools the user has already opted into, at launch.
+    ///
+    /// Assigning a stored property inside `init` does not fire `didSet`, so the
+    /// toggles above only ever registered when the user flipped them by hand.
+    /// A cold launch left the registry empty however many tools were enabled
+    /// last session, which a chat could survive (the user visits Settings
+    /// eventually) but a scheduled workflow cannot: it runs with nobody there
+    /// to open Settings first.
+    func restoreRegisteredTools() async {
+        guard toolCallingEnabled else { return }
+
+        await registerBuiltInTools()
+
+        #if os(iOS)
+        if healthToolEnabled {
+            await enableHealthTool()
+        }
+        #endif
+        if calendarToolEnabled {
+            await enableCalendarTool()
+        }
+        if remindersToolEnabled {
+            await enableRemindersTools()
+        }
+        if notificationToolEnabled {
+            await enableNotificationTool()
         }
     }
 
@@ -282,6 +360,12 @@ class ToolSettingsViewModel: ObservableObject {
         #endif
         if calendarToolEnabled {
             await enableCalendarTool()
+        }
+        if remindersToolEnabled {
+            await enableRemindersTools()
+        }
+        if notificationToolEnabled {
+            await enableNotificationTool()
         }
         await refreshRegisteredTools()
     }
@@ -316,11 +400,40 @@ class ToolSettingsViewModel: ObservableObject {
             try await CalendarManager.shared.requestAuthorization()
             calendarAuthorizationError = nil
             await RunAnywhere.registerTool(CalendarTool.definition, executor: CalendarTool.executor)
-            logger.info("Registered tool \(CalendarTool.definition.name)")
+            await RunAnywhere.registerTool(CalendarCreateTool.definition, executor: CalendarCreateTool.executor)
+            await RunAnywhere.registerTool(CalendarListTool.definition, executor: CalendarListTool.executor)
+            logger.info("Registered calendar tools")
             await refreshRegisteredTools()
         } catch {
             calendarAuthorizationError = error.localizedDescription
             calendarToolEnabled = false
+        }
+    }
+
+    func enableRemindersTools() async {
+        do {
+            try await RemindersManager.shared.requestAuthorization()
+            remindersAuthorizationError = nil
+            await RunAnywhere.registerTool(ReminderListTool.definition, executor: ReminderListTool.executor)
+            await RunAnywhere.registerTool(ReminderCreateTool.definition, executor: ReminderCreateTool.executor)
+            logger.info("Registered reminders tools")
+            await refreshRegisteredTools()
+        } catch {
+            remindersAuthorizationError = error.localizedDescription
+            remindersToolEnabled = false
+        }
+    }
+
+    func enableNotificationTool() async {
+        do {
+            try await NotificationToolManager.shared.requestAuthorization()
+            notificationAuthorizationError = nil
+            await RunAnywhere.registerTool(NotificationTool.definition, executor: NotificationTool.executor)
+            logger.info("Registered tool \(NotificationTool.definition.name)")
+            await refreshRegisteredTools()
+        } catch {
+            notificationAuthorizationError = error.localizedDescription
+            notificationToolEnabled = false
         }
     }
 }
@@ -350,6 +463,24 @@ struct ToolSettingsSection: View {
                     Label("Calendar", systemImage: "calendar")
                 }
                 if let error = viewModel.calendarAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+
+                Toggle(isOn: $viewModel.remindersToolEnabled) {
+                    Label("Reminders", systemImage: "checklist")
+                }
+                if let error = viewModel.remindersAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+
+                Toggle(isOn: $viewModel.notificationToolEnabled) {
+                    Label("Notifications", systemImage: "bell.badge")
+                }
+                if let error = viewModel.notificationAuthorizationError {
                     Text(error)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.primaryRed)
@@ -392,9 +523,12 @@ struct ToolSettingsSection: View {
         } footer: {
             Text(
                 "Allow the LLM to use registered tools to perform actions like "
-                + "web lookup, weather, time, calculations, your Apple Health data, or your "
-                + "Calendar. iOS does not reveal which Health categories were granted, so if "
-                + "answers seem empty, check Settings > Privacy & Security > Health."
+                + "web lookup, weather, time, calculations, clipboard, opening web pages, "
+                + "your Apple Health data, Calendar, Reminders, or notifications. "
+                + "Calendar, Reminders, and Notifications each ask for their own system "
+                + "permission when first enabled. iOS does not reveal which Health "
+                + "categories were granted, so if answers seem empty, check "
+                + "Settings > Privacy & Security > Health."
             )
             .font(AppTypography.caption)
         }
@@ -568,133 +702,6 @@ enum WeatherService {
         case 95: return "Thunderstorm"
         case 96, 99: return "Thunderstorm with hail"
         default: return "Unknown"
-        }
-    }
-}
-
-// MARK: - Safe Math Evaluator
-//
-// Deterministic recursive-descent parser for simple arithmetic expressions.
-// Replaces NSExpression(format:) which can raise uncaught Objective-C
-// exceptions (e.g. for "1 2", "(1+2", "1++2") that Swift's do-catch cannot
-// intercept. Supports the grammar:
-//   expr    := term (("+" | "-") term)*
-//   term    := factor (("*" | "/") factor)*
-//   factor  := ("+" | "-") factor | primary
-//   primary := number | "(" expr ")"
-enum SafeMathEvaluator {
-    static func evaluate(_ expression: String) -> Double? {
-        var parser = Parser(input: expression)
-        guard let value = parser.parseExpression() else { return nil }
-        guard parser.isAtEnd else { return nil }
-        guard value.isFinite else { return nil }
-        return value
-    }
-
-    private struct Parser {
-        let scalars: [Character]
-        var index: Int = 0
-
-        init(input: String) {
-            self.scalars = Array(input)
-        }
-
-        var isAtEnd: Bool {
-            mutating get {
-                skipWhitespace()
-                return index >= scalars.count
-            }
-        }
-
-        mutating func skipWhitespace() {
-            while index < scalars.count, scalars[index].isWhitespace {
-                index += 1
-            }
-        }
-
-        mutating func peek() -> Character? {
-            skipWhitespace()
-            return index < scalars.count ? scalars[index] : nil
-        }
-
-        mutating func advance() -> Character? {
-            skipWhitespace()
-            guard index < scalars.count else { return nil }
-            let char = scalars[index]
-            index += 1
-            return char
-        }
-
-        mutating func match(_ char: Character) -> Bool {
-            if peek() == char {
-                _ = advance()
-                return true
-            }
-            return false
-        }
-
-        mutating func parseExpression() -> Double? {
-            guard var value = parseTerm() else { return nil }
-            while let op = peek(), op == "+" || op == "-" {
-                _ = advance()
-                guard let rhs = parseTerm() else { return nil }
-                value = op == "+" ? value + rhs : value - rhs
-            }
-            return value
-        }
-
-        mutating func parseTerm() -> Double? {
-            guard var value = parseFactor() else { return nil }
-            while let op = peek(), op == "*" || op == "/" {
-                _ = advance()
-                guard let rhs = parseFactor() else { return nil }
-                if op == "/" {
-                    guard rhs != 0 else { return nil }
-                    value /= rhs
-                } else {
-                    value *= rhs
-                }
-            }
-            return value
-        }
-
-        mutating func parseFactor() -> Double? {
-            if match("+") { return parseFactor() }
-            if match("-") {
-                guard let value = parseFactor() else { return nil }
-                return -value
-            }
-            return parsePrimary()
-        }
-
-        mutating func parsePrimary() -> Double? {
-            guard let next = peek() else { return nil }
-            if next == "(" {
-                _ = advance()
-                guard let value = parseExpression() else { return nil }
-                guard match(")") else { return nil }
-                return value
-            }
-            return parseNumber()
-        }
-
-        mutating func parseNumber() -> Double? {
-            skipWhitespace()
-            let start = index
-            var seenDot = false
-            while index < scalars.count {
-                let char = scalars[index]
-                if char.isNumber {
-                    index += 1
-                } else if char == "." && !seenDot {
-                    seenDot = true
-                    index += 1
-                } else {
-                    break
-                }
-            }
-            guard index > start else { return nil }
-            return Double(String(scalars[start..<index]))
         }
     }
 }

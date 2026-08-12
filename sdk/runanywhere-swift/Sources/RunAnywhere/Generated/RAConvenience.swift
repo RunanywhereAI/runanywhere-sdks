@@ -16,28 +16,6 @@
 
 import Foundation
 
-extension RAToolCallingOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAToolCallingOptions {
-        var r = RAToolCallingOptions()
-        r.maxToolCalls = 5
-        return r
-    }
-}
-
-extension RAToolCallingOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        let effectiveMaxToolCalls = hasMaxToolCalls ? maxToolCalls : 5
-        if effectiveMaxToolCalls < 1 {
-            throw SDKException.validationFailed(
-                fieldPath: "ToolCallingOptions.max_tool_calls",
-                message: "max_tool_calls must be >= 1 (got \(effectiveMaxToolCalls))"
-            )
-        }
-    }
-}
-
 extension RAErrorCategory {
     /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
     public var wireString: String {
@@ -275,6 +253,28 @@ extension RAStructuredOutputOptions {
         var r = RAStructuredOutputOptions()
         r.includeSchemaInPrompt = true
         return r
+    }
+}
+
+extension RAToolCallingOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAToolCallingOptions {
+        var r = RAToolCallingOptions()
+        r.maxToolCalls = 5
+        return r
+    }
+}
+
+extension RAToolCallingOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        let effectiveMaxToolCalls = hasMaxToolCalls ? maxToolCalls : 5
+        if effectiveMaxToolCalls < 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "ToolCallingOptions.max_tool_calls",
+                message: "max_tool_calls must be >= 1 (got \(effectiveMaxToolCalls))"
+            )
+        }
     }
 }
 

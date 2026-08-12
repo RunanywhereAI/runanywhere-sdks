@@ -792,6 +792,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "RunAnywhere AI requests permission to update Apple Health data. The on-device assistant only reads your health data to answer questions about it, and does not write any.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "RunAnywhere AI reads and creates Reminders so the on-device assistant can list your to-dos and add reminders you ask for.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -847,6 +848,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "RunAnywhere AI requests permission to update Apple Health data. The on-device assistant only reads your health data to answer questions about it, and does not write any.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "RunAnywhere AI reads and creates Reminders so the on-device assistant can list your to-dos and add reminders you ask for.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

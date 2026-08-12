@@ -1409,6 +1409,7 @@ set(RAC_PROTOBUF_NAMESPACE_ISOLATED OFF CACHE INTERNAL
 set(RAC_SOLUTIONS_RUNTIME_ENABLED OFF CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
 set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
 set(_RAC_PROTO_GENERATED_SOURCES
+    ${_RAC_PROTO_GEN_DIR}/agent_workflow.pb.cc
     ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc
     ${_RAC_PROTO_GEN_DIR}/sdk_events.pb.cc
     ${_RAC_PROTO_GEN_DIR}/download_service.pb.cc
@@ -1683,6 +1684,21 @@ if(RAC_ENABLE_PROTOBUF)
     if(RAC_ABSL_LIBS)
         target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
     endif()
+
+    # Agent workflow runner. Needs the generated protos and full protobuf for
+    # json_util, so it rides RAC_ENABLE_PROTOBUF rather than RAC_ENABLE_SOLUTIONS:
+    # the two runtimes are independent and neither calls the other.
+    target_sources(rac_commons PRIVATE
+        src/agent/workflow_store.cpp
+        src/agent/pack_store.cpp
+        src/agent/bundle.cpp
+        src/agent/workflow_validator.cpp
+        src/agent/expression.cpp
+        src/agent/host_callbacks.cpp
+        src/agent/node_executors.cpp
+        src/agent/workflow_runner.cpp
+        src/agent/rac_agent_workflow.cpp
+    )
 
     target_compile_definitions(rac_commons PRIVATE RAC_HAVE_PROTOBUF=1)
     set(RAC_PROTOBUF_RUNTIME_ENABLED ON CACHE INTERNAL "rac_commons protobuf runtime enabled" FORCE)

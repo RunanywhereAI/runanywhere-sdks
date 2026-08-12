@@ -63,6 +63,11 @@ public final class KeychainManager: @unchecked Sendable {
     ///   - key: Unique key for the data
     /// - Throws: SDKException if storage fails
     public func store(_ data: Data, for key: String) throws {
+        if fileStore.isEnabled {
+            try fileStore.write(data, for: key)
+            return
+        }
+
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
 
@@ -98,6 +103,13 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Returns: Stored data
     /// - Throws: SDKException if retrieval fails (but not for missing items - use retrieveDataIfExists for that)
     public func retrieveData(for key: String) throws -> Data {
+        if fileStore.isEnabled {
+            guard let data = fileStore.read(for: key) else {
+                throw SDKException(code: .keychainError, message: "Item not found in keychain", category: .auth)
+            }
+            return data
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -122,6 +134,10 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Returns: Stored data if found, nil if not found
     /// - Throws: SDKException only for actual keychain errors (not for missing items)
     public func retrieveDataIfExists(for key: String) throws -> Data? {
+        if fileStore.isEnabled {
+            return fileStore.read(for: key)
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -164,6 +180,11 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Parameter key: Key for the item to delete
     /// - Throws: SDKException if deletion fails
     public func delete(for key: String) throws {
+        if fileStore.isEnabled {
+            fileStore.delete(for: key)
+            return
+        }
+
         let query = baseQuery(for: key)
         let status = SecItemDelete(query as CFDictionary)
 
@@ -176,6 +197,10 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Parameter key: Key to check
     /// - Returns: True if item exists
     public func exists(for key: String) -> Bool {
+        if fileStore.isEnabled {
+            return fileStore.read(for: key) != nil
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = false
 
@@ -184,6 +209,8 @@ public final class KeychainManager: @unchecked Sendable {
     }
 
     // MARK: - Private Methods
+
+    private var fileStore: KeychainFileStore { KeychainFileStore(serviceName: serviceName) }
 
     private func baseQuery(for key: String) -> [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         var query: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type

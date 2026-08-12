@@ -51,6 +51,16 @@ private struct ConsumerMacShell: View {
         .onChange(of: columnVisibility) { _, visibility in
             storedVisibility = visibility == .detailOnly ? "detailOnly" : "all"
         }
+        // The canvas wants the whole window. A 260pt sidebar next to a graph
+        // editor is the first thing that makes it feel cramped, so entering
+        // Workflows collapses it and leaving restores it.
+        .onChange(of: selection) { oldValue, newValue in
+            if newValue == .workflows {
+                columnVisibility = .detailOnly
+            } else if oldValue == .workflows {
+                columnVisibility = .all
+            }
+        }
         .onChange(of: selection) { _, newValue in
             switch newValue {
             case .conversation(let id):
@@ -64,7 +74,7 @@ private struct ConsumerMacShell: View {
                 if let id = viewModel.currentConversation?.id {
                     selection = .conversation(id)
                 }
-            case .models, .advanced, .none:
+            case .models, .workflows, .advanced, .none:
                 break
             }
         }
@@ -90,6 +100,8 @@ private struct ConsumerMacShell: View {
         switch selection {
         case .models:
             NavigationStack { SimplifiedModelsView() }
+        case .workflows:
+            NavigationStack { WorkflowCanvasView() }
         case .advanced:
             NavigationStack { ConsumerAdvancedHubView() }
         case .chat, .conversation, .none:

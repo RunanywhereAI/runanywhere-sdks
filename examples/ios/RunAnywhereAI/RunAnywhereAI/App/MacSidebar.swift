@@ -28,6 +28,7 @@ import SwiftUI
 enum MacSidebarScope: Hashable {
     case chat
     case models
+    case workflows
     case advanced
 }
 
@@ -38,12 +39,14 @@ enum MacSidebarSelection: Hashable {
     case chat
     case conversation(String)
     case models
+    case workflows
     case advanced
 
     var scope: MacSidebarScope {
         switch self {
         case .chat, .conversation: return .chat
         case .models: return .models
+        case .workflows: return .workflows
         case .advanced: return .advanced
         }
     }
@@ -125,6 +128,8 @@ struct MacSidebar: View {
                     .tag(MacSidebarSelection.chat)
                 Label("Models", systemImage: "square.stack.3d.up")
                     .tag(MacSidebarSelection.models)
+                Label("Workflows", systemImage: "point.3.connected.trianglepath.dotted")
+                    .tag(MacSidebarSelection.workflows)
                 Label("Advanced", systemImage: "slider.horizontal.3")
                     .tag(MacSidebarSelection.advanced)
             }

@@ -411,6 +411,7 @@ sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 tools/
 !examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/
 !examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/WebSearchTool.kt
+!examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Tools/
 
 # Python virtual environments
 .venv*/

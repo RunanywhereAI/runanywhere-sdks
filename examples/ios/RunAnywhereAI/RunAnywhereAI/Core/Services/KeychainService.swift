@@ -14,7 +14,46 @@ class KeychainService {
 
     private init() {}
 
+    /// A local Mac build is signed ad-hoc, and that signature changes on every
+    /// rebuild, so the Keychain treats each build as a different program and
+    /// prompts for the login password once per stored item per launch. Debug Mac
+    /// builds read and write a file in Application Support instead. Release and
+    /// every iOS build keep using the Keychain.
+    private var usesFileStore: Bool {
+        #if os(macOS) && DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private func fileURL(for key: String) throws -> URL {
+        let base = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appendingPathComponent("RunAnywhereAI", isDirectory: true)
+        .appendingPathComponent("DebugSecrets", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        // Key names come from the app, not from user input, but percent-encoding
+        // keeps a future key with a slash from escaping the directory.
+        let name = key.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? key
+        return base.appendingPathComponent(name)
+    }
+
     func save(key: String, data: Data) throws {
+        if usesFileStore {
+            do {
+                try data.write(to: try fileURL(for: key), options: [.atomic])
+                return
+            } catch {
+                throw KeychainError.saveFailed
+            }
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -32,6 +71,11 @@ class KeychainService {
     }
 
     func read(key: String) -> Data? {
+        if usesFileStore {
+            guard let url = try? fileURL(for: key) else { return nil }
+            return try? Data(contentsOf: url)
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -53,6 +97,14 @@ class KeychainService {
     }
 
     func delete(key: String) throws {
+        if usesFileStore {
+            guard let url = try? fileURL(for: key) else { return }
+            if FileManager.default.fileExists(atPath: url.path) {
+                try? FileManager.default.removeItem(at: url)
+            }
+            return
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key
