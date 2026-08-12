@@ -81,8 +81,24 @@ os_hint() {
 OS="$(os_hint)"
 
 install_protoc() {
+    # The exact patch level matters — protoc stamps it into every generated
+    # C++ header and ts-proto banner — and no package manager can pin one. So
+    # the pinned compiler comes from idl/codegen/bootstrap_protoc.sh (official
+    # prebuilt release archive, checksum-verified, cached), not from brew/apt.
+    # This is a pre-warm: generate_all.sh calls the same script anyway.
+    local bootstrap="${REPO_ROOT}/idl/codegen/bootstrap_protoc.sh"
+    if [ -x "${bootstrap}" ]; then
+        local resolved
+        if resolved="$("${bootstrap}")"; then
+            echo "• protoc (pinned): ${resolved} — $("${resolved}" --version)"
+            return 0
+        fi
+        echo "warning: bootstrap_protoc.sh could not resolve the pinned protoc." >&2
+    fi
+    # Fallback: any protoc is better than none for ad-hoc use, but codegen will
+    # still insist on the pin.
     if have protoc; then
-        echo "• protoc already present: $(protoc --version)"
+        echo "• protoc on PATH: $(protoc --version) (codegen uses the pinned build)"
         return 0
     fi
     if [ "${OS}" = "mac" ]; then
@@ -110,18 +126,22 @@ install_swift_protobuf() {
 }
 
 install_wire() {
-    if have wire-compiler; then
-        echo "• wire-compiler already present."
-        return 0
+    # NEVER `brew install wire` — that formula is the Wire messaging app, not
+    # Square's protobuf compiler, and installing it used to make
+    # `have wire-compiler` false while looking like a success. The real compiler
+    # is a pinned fat JAR from Maven Central, resolved and checksum-verified by
+    # idl/codegen/bootstrap_wire.sh (the same script the Kotlin Gradle build and
+    # generate_kotlin.sh use). This is a pre-warm.
+    local bootstrap="${REPO_ROOT}/idl/codegen/bootstrap_wire.sh"
+    if [ -x "${bootstrap}" ]; then
+        local resolved
+        if resolved="$("${bootstrap}")"; then
+            echo "• wire-compiler (pinned): ${resolved}"
+            return 0
+        fi
     fi
-    if [ "${OS}" = "mac" ]; then
-        brew install wire || true   # older Homebrew may not have the bottle
-    fi
-    if ! have wire-compiler; then
-        echo "warning: wire-compiler not installed via brew on this host." >&2
-        echo "         The Kotlin Gradle build uses the Wire Gradle plugin;" >&2
-        echo "         CLI is only needed for standalone codegen runs." >&2
-    fi
+    echo "warning: could not resolve the pinned wire-compiler." >&2
+    echo "         Kotlin codegen will fail until it is reachable." >&2
 }
 
 install_dart_plugin() {
@@ -195,19 +215,15 @@ check_versions() {
         esac
     }
 
-    if have protoc; then
-        local protoc_ver
-        protoc_ver="$(protoc --version | grep -oE '[0-9]+\.[0-9]+' | head -1)"
-        local protoc_major
-        protoc_major="$(echo "${protoc_ver}" | cut -d. -f1)"
-        echo "protoc:            ${protoc_ver} (expected major ${PROTOC_EXPECTED_MAJOR})"
-        if [ "${protoc_major:-0}" != "${PROTOC_EXPECTED_MAJOR}" ]; then
-            echo "  ✗ version mismatch — got major ${protoc_major}, want ${PROTOC_EXPECTED_MAJOR}" >&2
-            rc=1
-        fi
+    # Report on the protoc codegen will ACTUALLY use, which is the pinned build
+    # bootstrap_protoc.sh resolves — not whatever `protoc` happens to be first
+    # on PATH. --check must not download, so a cold cache reports "not
+    # installed" rather than failing.
+    local pinned_protoc
+    if pinned_protoc="$("${REPO_ROOT}/idl/codegen/bootstrap_protoc.sh" --check 2>/dev/null)"; then
+        echo "protoc:            $("${pinned_protoc}" --version) [pinned ${PROTOC_VERSION:-${PROTOC_EXPECTED_MAJOR}.x}] — ${pinned_protoc}"
     else
-        echo "protoc:            MISSING" >&2
-        rc=1
+        echo "protoc:            not installed — bootstrap_protoc.sh will fetch the pin on first codegen"
     fi
 
     if have protoc-gen-swift; then
@@ -231,8 +247,10 @@ check_versions() {
             echo "  ✗ version mismatch — got ${wire_ver}, want ${WIRE_EXPECTED}" >&2
             rc=1
         fi
+    elif "${REPO_ROOT}/idl/codegen/bootstrap_wire.sh" --check >/dev/null 2>&1; then
+        echo "wire-compiler:     cached (pinned ${WIRE_EXPECTED})"
     else
-        echo "wire-compiler:     not on PATH (Gradle Wire plugin handles this)"
+        echo "wire-compiler:     not installed — bootstrap_wire.sh will fetch it on first codegen"
     fi
 
     if have protoc-gen-dart; then

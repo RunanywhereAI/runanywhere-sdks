@@ -1,0 +1,23 @@
+# =============================================================================
+# wire.sha256 — pinned Square Wire compiler for core/VERSIONS::WIRE_VERSION
+# =============================================================================
+# Read by idl/codegen/bootstrap_wire.sh. One line:
+#
+#     <sha256>  wire-compiler-<version>-jar-with-dependencies.jar
+#
+# published at
+# https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/<version>/.
+#
+# Version-scoped on purpose: bumping WIRE_VERSION without refreshing this file
+# leaves the bootstrap with no checksum for the JAR it is about to download, and
+# it refuses to install an unverified compiler. Wire's output filenames change
+# between releases (5.x renamed LoRAState.kt to LoraState.kt), so the version
+# and its provenance must move together.
+#
+# To refresh after a bump:
+#   v=<new version>
+#   curl -fsSL -O "https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/$v/wire-compiler-$v-jar-with-dependencies.jar"
+#   shasum -a 256 wire-compiler-$v-jar-with-dependencies.jar
+# =============================================================================
+
+69633e6fdc9a9bce51992804caebcd3be2218957092548162e73f114d9a407f1  wire-compiler-5.5.1-jar-with-dependencies.jar

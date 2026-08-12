@@ -17,18 +17,16 @@
 #      from the .proto digest. Edit a schema without running codegen and the
 #      committed lock no longer matches: that is now the drift signal.
 #
-#   2. STILL-COMMITTED TREES — core/src/generated/proto/, the shipped
-#      rac_defaults_generated.h header and the Kotlin bindings ARE tracked (see
-#      AGENTS.md "Generated code" for why). For those, "regenerate and diff"
-#      still works and still catches hand-edits, so it is kept.
+#   2. PRESENCE — check_generated_trees.sh asserts every tree was actually
+#      written, and that none of them came back TRACKED. Nothing generated is
+#      committed any more, so "regenerate and diff" is gone entirely; the
+#      inverse assertion (no generated file is in the index) took its place.
 #
-#   3. PRESENCE — check_generated_trees.sh asserts every untracked tree was
-#      actually written. generate_all.sh soft-skips a generator whose toolchain
-#      is missing (exit 0 + warning), so its exit code is not proof of anything.
-#
-#   4. COMPILE — the generated TypeScript is fed to tsc and the generated Python
+#   3. COMPILE — the generated TypeScript is fed to tsc and the generated Python
 #      is imported. Those are the two languages where a bad generator produces
-#      output that looks fine and fails only downstream.
+#      output that looks fine and fails only downstream. The C/C++ and Kotlin
+#      trees are compiled by the native and kotlin-android jobs in pr-build.yml,
+#      which now generate before they build.
 #
 # Run locally:
 #   ./idl/codegen/ci-drift-check.sh                  parts 1-3 + 5
@@ -90,41 +88,20 @@ if ! "${SCRIPT_DIR}/check_generated_trees.sh"; then
     DRIFT=1
 fi
 
-# --- 4. The trees that are still tracked -----------------------------------
-# C++ (core/src/generated/proto + rac_defaults_generated.h) and Kotlin. For
-# these the classic diff gate is still the right instrument.
-step "still-committed generated code matches the schemas"
-TRACKED_GENERATED=(
-    core/src/generated/proto
-    core/include/rac/rac_defaults_generated.h
-    bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated
-)
-if ! git diff --exit-code --stat -- "${TRACKED_GENERATED[@]}"; then
-    echo "::error::committed C++/Kotlin bindings differ from fresh codegen output." >&2
-    DRIFT=1
-fi
-UNTRACKED="$(git ls-files --others --exclude-standard -- "${TRACKED_GENERATED[@]}")"
-if [ -n "${UNTRACKED}" ]; then
-    echo "" >&2
-    echo "::error::codegen produced files under a still-committed tree that are not committed:" >&2
-    echo "${UNTRACKED}" | sed 's/^/  ?? /' >&2
-    DRIFT=1
-fi
-
-# `git diff`/`git status` cannot see a filename that changed only in letter case
-# while the working tree is on a case-insensitive filesystem, which is where
-# this gate normally runs (macOS). Compare names case-exactly so the result is
-# the same here and on Linux.
-step "case-exact filenames"
+# --- 4. Case-collisions in the generated names ------------------------------
+# Two generated files whose names differ only in case are one file on macOS and
+# two on Linux, so the tree that compiles here is not the tree that compiles
+# there. De-committing removed the index side of this hazard but not this half.
+step "case-distinct filenames"
 if ! "${SCRIPT_DIR}/check_generated_filenames.sh"; then
     DRIFT=1
 fi
 
 # --- 4b. Compile the generated code -----------------------------------------
-# The de-committed trees can no longer be reviewed in a diff, so "it was
-# generated" has to be backed by "and it builds". TypeScript and Python are the
-# two where a bad generator emits output that looks plausible and only fails
-# downstream — tsc catches the first, `import` catches the second.
+# The trees can no longer be reviewed in a diff, so "it was generated" has to be
+# backed by "and it builds". TypeScript and Python are the two where a bad
+# generator emits output that looks plausible and only fails downstream — tsc
+# catches the first, `import` catches the second.
 if [ "${WITH_COMPILE}" -eq 1 ]; then
     step "compiling the generated TypeScript (tsc -> bindings/proto-ts/dist)"
     if (cd bindings/proto-ts \
@@ -179,9 +156,8 @@ if [ "${DRIFT}" -ne 0 ]; then
     echo "::error::IDL gate failed." >&2
     echo "" >&2
     echo "To fix locally:" >&2
-    echo "  ./scripts/setup/setup-toolchain.sh" >&2
     echo "  ./idl/codegen/generate_all.sh" >&2
-    echo "  git add -A idl/SCHEMA_LOCK core/src/generated core/include bindings/kotlin" >&2
+    echo "  git add idl/SCHEMA_LOCK        # the only tracked output of a codegen run" >&2
     exit 1
 fi
 

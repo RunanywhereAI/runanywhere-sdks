@@ -16,6 +16,18 @@ jdk:
 # Install Android SDK and NDK (required for AAR builds)
 before_install:
   - chmod +x bindings/kotlin/gradlew
+  # The Kotlin bindings under bindings/kotlin/src/main/kotlin/.../generated are
+  # IDL codegen output and are NOT in the repository. The Gradle build
+  # regenerates them from `preBuild` (task `generateIdlKotlinBindings`), which
+  # needs: bash + java (already present), the pinned wire-compiler and protoc
+  # (idl/codegen/bootstrap_*.sh download and checksum-verify those itself), and
+  # a Python with the protobuf runtime for RAConvenience.kt / RADefaultsPool.kt.
+  #
+  # bootstrap_pyproto.sh can build its own venv, but python3-venv is not
+  # guaranteed on this image and a failure there would surface as an
+  # unresolved-reference wall in Kotlin. Install the runtime directly, which
+  # makes the bootstrap a no-op, and only warn if the image will not allow it.
+  - python3 -m pip install --user --upgrade 'protobuf>=6.33,<7' pyyaml || echo "WARNING: pip install failed; idl/codegen/bootstrap_pyproto.sh will try a venv"
   - export ANDROID_HOME=$HOME/android-sdk
   - mkdir -p $ANDROID_HOME/cmdline-tools
   - wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip

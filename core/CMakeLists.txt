@@ -1473,6 +1473,128 @@ set(_RAC_PROTO_GENERATED_SOURCES
     # proto-byte variant serialized by rac_cua_parse_action_proto.
     ${_RAC_PROTO_GEN_DIR}/cua.pb.cc
 )
+
+# =============================================================================
+# Generate the C/C++ IDL output if it is not there yet
+# =============================================================================
+# `src/generated/proto/*.pb.{cc,h}` and `include/rac/rac_defaults_generated.h`
+# are protoc output and are NOT tracked (see .gitignore + generated_trees.txt).
+# A fresh clone therefore has neither, and both are hard build inputs:
+#   - the .pb.cc list above is compiled into rac_commons whenever
+#     RAC_ENABLE_PROTOBUF is ON, and
+#   - rac_defaults_generated.h is #included by five SHIPPED public headers
+#     (rac_{llm,stt,tts,vad,vlm}_types.h) and re-published by
+#     `install(DIRECTORY include/)` into the XCFramework Headers/ and the
+#     Linux/Windows dist. It must exist before anything compiles OR installs,
+#     in every configuration — including EMSCRIPTEN, where RAC_ENABLE_PROTOBUF
+#     defaults OFF and the .pb.cc are not compiled at all.
+#
+# WHY THIS RUNS AT CONFIGURE TIME AND NOT AS A BUILD RULE
+#   Roughly 29 CI runner instances across macOS/iOS/Linux/Windows/Android x3/
+#   WASM/rcli/python configure this project. Making each of them add a codegen
+#   step is 29 places to forget. One configure-time prerequisite here covers
+#   every one of them, plus every developer typing `cmake --preset macos-debug`
+#   in a fresh clone, plus every downstream CMakeLists (rcli, the Electron
+#   addon, the Python extension, the WASM module) that reaches core through
+#   add_subdirectory. Configure time specifically, because `install(DIRECTORY
+#   include/)` and the target's source list both need the files to already
+#   exist as far as the generators of build systems are concerned.
+#
+#   The toolchain is not a prerequisite either: generate_all.sh resolves the
+#   pinned protoc and Python protobuf runtime itself (idl/codegen/bootstrap_*),
+#   downloading and checksum-verifying them into a per-user cache when the host
+#   does not already have the exact pins. Network at configure time is not a new
+#   requirement — RAC_VENDOR_PROTOBUF already FetchContent's protobuf + abseil
+#   from GitHub in the same phase.
+#
+# Set RAC_ENSURE_GENERATED_PROTO=OFF to assert "the files are already here"
+# (a packaging job that generated once up front and configures five times).
+# =============================================================================
+option(RAC_ENSURE_GENERATED_PROTO
+       "Run idl/codegen at configure time when the generated C/C++ output is missing" ON)
+
+set(_RAC_DEFAULTS_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/rac/rac_defaults_generated.h)
+get_filename_component(_RAC_REPO_ROOT_FOR_IDL "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+set(_RAC_GENERATE_ALL_SH "${_RAC_REPO_ROOT_FOR_IDL}/idl/codegen/generate_all.sh")
+
+set(_RAC_GENERATED_MISSING "")
+if(NOT EXISTS "${_RAC_DEFAULTS_HEADER}")
+    set(_RAC_GENERATED_MISSING "${_RAC_DEFAULTS_HEADER}")
+else()
+    foreach(_rac_pb IN LISTS _RAC_PROTO_GENERATED_SOURCES)
+        if(NOT EXISTS "${_rac_pb}")
+            set(_RAC_GENERATED_MISSING "${_rac_pb}")
+            break()
+        endif()
+        # protoc writes the .cc and its .h together, but a half-finished or
+        # hand-deleted tree can have one without the other.
+        string(REGEX REPLACE "\\.pb\\.cc$" ".pb.h" _rac_pb_h "${_rac_pb}")
+        if(NOT EXISTS "${_rac_pb_h}")
+            set(_RAC_GENERATED_MISSING "${_rac_pb_h}")
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(_RAC_GENERATED_MISSING)
+    if(NOT RAC_ENSURE_GENERATED_PROTO)
+        message(FATAL_ERROR
+            "Generated IDL output is missing (${_RAC_GENERATED_MISSING}) and "
+            "RAC_ENSURE_GENERATED_PROTO=OFF.\n"
+            "Run:  ./idl/codegen/generate_all.sh --only cpp")
+    endif()
+
+    # bash: on Windows it comes with Git for Windows, which anyone who cloned
+    # this repo already has, but its bin/ is not always on PATH for a Visual
+    # Studio or Ninja shell — so look where it actually lives as well.
+    find_program(RAC_IDL_BASH
+        NAMES bash bash.exe
+        HINTS
+            "$ENV{PROGRAMFILES}/Git/bin"
+            "$ENV{PROGRAMFILES\(X86\)}/Git/bin"
+            "C:/Program Files/Git/bin"
+            "$ENV{LOCALAPPDATA}/Programs/Git/bin"
+        DOC "bash used to run idl/codegen/generate_all.sh")
+    if(NOT RAC_IDL_BASH)
+        message(FATAL_ERROR
+            "Generated IDL output is missing (${_RAC_GENERATED_MISSING}) and no "
+            "bash was found to run idl/codegen/generate_all.sh.\n"
+            "On Windows install Git for Windows (Git Bash), then reconfigure. "
+            "Or generate elsewhere and configure with "
+            "-DRAC_ENSURE_GENERATED_PROTO=OFF.")
+    endif()
+    if(NOT EXISTS "${_RAC_GENERATE_ALL_SH}")
+        message(FATAL_ERROR
+            "Generated IDL output is missing (${_RAC_GENERATED_MISSING}) and "
+            "${_RAC_GENERATE_ALL_SH} does not exist — this looks like a partial "
+            "checkout. A source archive must ship the generated tree instead.")
+    endif()
+
+    message(STATUS "IDL: generating C/C++ bindings (missing ${_RAC_GENERATED_MISSING})")
+    execute_process(
+        COMMAND "${RAC_IDL_BASH}" "${_RAC_GENERATE_ALL_SH}" --only cpp
+        WORKING_DIRECTORY "${_RAC_REPO_ROOT_FOR_IDL}"
+        RESULT_VARIABLE _RAC_IDL_RC
+    )
+    if(NOT _RAC_IDL_RC EQUAL 0)
+        message(FATAL_ERROR
+            "idl/codegen/generate_all.sh --only cpp failed (exit ${_RAC_IDL_RC}). "
+            "See the output above.")
+    endif()
+
+    # generate_all.sh can succeed while writing nothing that this build needs;
+    # re-assert rather than trust the exit code.
+    foreach(_rac_required IN LISTS _RAC_PROTO_GENERATED_SOURCES ITEMS "${_RAC_DEFAULTS_HEADER}")
+        if(NOT EXISTS "${_rac_required}")
+            message(FATAL_ERROR
+                "idl codegen reported success but ${_rac_required} is still "
+                "missing. Run ./idl/codegen/generate_all.sh --only cpp by hand "
+                "and read its output.")
+        endif()
+    endforeach()
+    message(STATUS "IDL: C/C++ bindings generated")
+endif()
+
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND RAC_PROTOBUF_COMPILE_OPTIONS -Wno-nullability-extension)

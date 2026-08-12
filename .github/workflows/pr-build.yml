@@ -624,9 +624,15 @@ jobs:
       # activate the pinned version through Corepack before any `yarn` call.
       # The shared proto-ts sources and RADefaultsPool.kt are IDL codegen output and are not tracked; generate
       # before anything compiles them.
+      #
+      # `cpp` as well as `ts`: the RN header compile below -I's core/include and
+      # -fsyntax-only's packages/*/cpp/*.hpp, which reach rac_llm_types.h and
+      # friends — and every one of those #includes rac/rac_defaults_generated.h,
+      # which is codegen output too. This job never configures CMake, so the
+      # configure-time hook in core/CMakeLists.txt does not cover it.
       - uses: ./.github/actions/generate-idl
         with:
-          languages: ts
+          languages: ts,cpp
       - name: Enable Corepack (yarn@3.6.1)
         run: |
           set -euo pipefail

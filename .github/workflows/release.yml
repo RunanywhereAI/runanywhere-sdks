@@ -293,7 +293,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # protobuf here is the RUNTIME: Package.swift adds
+      # -I$(brew --prefix)/opt/protobuf/include for RCLIHost. Its protoc is
+      # whatever Homebrew ships and is not the pin; bootstrap_protoc.sh in the
+      # step below resolves the pinned one regardless of what is on PATH.
       - run: brew install ninja protobuf
+      # `swift build` over the root Package.swift compiles rcli's C++ against
+      # core/include + core/src/generated/proto without ever configuring CMake,
+      # so the configure-time codegen hook does not cover this job. Both are
+      # protoc output and neither is tracked — generate them here.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: cpp
       - uses: actions/download-artifact@v8
         with:
           name: native-ios-macos

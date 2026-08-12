@@ -5,18 +5,19 @@
 #
 # Paths match the output directories from idl/codegen/generate_*.sh.
 #
-# Most of these trees are no longer tracked at all (see .gitignore and
-# idl/codegen/generated_trees.txt), which makes their entries here inert — kept
-# so a stray `git add -f` still lands collapsed. The two that DO still matter are
-# the C++ and Kotlin trees below, which stay committed on purpose.
+# NONE of these trees is tracked any longer (see .gitignore and
+# idl/codegen/generated_trees.txt), which makes every entry here inert. They are
+# kept deliberately: a stray `git add -f` — the one way generated code can come
+# back — then lands collapsed and marked instead of as a reviewable-looking
+# 336k-line diff. The generic `**/*.pb.*` rules at the bottom also cover
+# generated files in consumer projects that are not ours to gitignore.
 
-# Swift (untracked)
+# Swift
 bindings/swift/Sources/RunAnywhere/Generated/**  linguist-generated=true -diff
 
-# Kotlin (tracked). The path was `src/commonMain/kotlin/...` until the SDK left
-# KMP for a single-target Android library, so this attribute matched nothing and
-# the largest committed generated tree — 373 files — was expanded in full in
-# every PR diff that touched it.
+# Kotlin. The path was `src/commonMain/kotlin/...` until the SDK left KMP for a
+# single-target Android library, so this attribute matched nothing while the
+# tree was still committed.
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**  linguist-generated=true -diff
 bindings/kotlin/build/generated/**  linguist-generated=true -diff
 
@@ -29,8 +30,9 @@ bindings/web/packages/core/src/generated/**  linguist-generated=true -diff
 bindings/proto-ts/src/**  linguist-generated=true -diff
 bindings/proto-ts/dist/**  linguist-generated=true -diff
 
-# C++
+# C/C++
 core/src/generated/proto/**  linguist-generated=true -diff
+core/include/rac/rac_defaults_generated.h  linguist-generated=true -diff
 
 # Mirror Nitrogen's existing output tree for consistency.
 bindings/react-native/packages/*/nitrogen/generated/**  linguist-generated=true -diff

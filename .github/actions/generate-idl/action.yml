@@ -17,15 +17,22 @@ description: |
     and keeps each job's install to what it actually needs.
 
   WHAT DOES *NOT* NEED THIS
-    Anything that only builds C++ (native_*, wasm, rcli, ios-device,
-    android-arm64, macos-*, linux-*) or Kotlin (kotlin-android, sdk_kotlin) —
-    core/src/generated/proto, core/include/rac/rac_defaults_generated.h and the
-    Kotlin bindings are still COMMITTED, precisely so those ~20 native jobs need
-    no protoc. See AGENTS.md "Generated code".
+    Jobs that configure core/CMakeLists.txt (native_*, wasm, rcli, ios-device,
+    android-arm64, macos-*, linux-*, the Electron addon, the Python wheel) get
+    the C/C++ bindings generated for them at CMake configure time, and jobs that
+    run Gradle on bindings/kotlin get the Kotlin bindings from the
+    `generateIdlKotlinBindings` task wired into preBuild. Those two hooks exist
+    so ~29 native runner instances do not each need a codegen step here.
 
-  All versions come from core/VERSIONS. protoc is pinned exactly
-  (PROTOC_VERSION) because it stamps its own version into generated C++ and
-  TypeScript; generate_all.sh fails closed on a mismatch.
+    A job that reads core/include WITHOUT configuring CMake does still need
+    this with `cpp` — rn-typecheck (-fsyntax-only against core/include) and
+    native_rcli_macos (`swift build` over root Package.swift) are the two.
+
+  All versions come from core/VERSIONS. Nothing here is installed from a package
+  manager where the exact patch level matters: idl/codegen/bootstrap_protoc.sh
+  and bootstrap_wire.sh download and checksum-verify the pinned protoc and
+  wire-compiler themselves, so this action's install steps are a warm cache, not
+  a prerequisite. generate_all.sh fails closed on a protoc mismatch.
 
 inputs:
   languages:
@@ -50,40 +57,28 @@ runs:
 
     - name: Install protoc (pinned)
       shell: bash
+      env:
+        # One asset for both macOS runner architectures, so a cache entry keyed
+        # on the version is portable across the x86_64 and arm64 images.
+        RAC_PROTOC_ASSET_DARWIN: osx-universal_binary
       run: |
         set -euo pipefail
-        PROTOC_VERSION="$(grep -E '^PROTOC_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
-        have_pinned() {
-          command -v protoc >/dev/null 2>&1 && \
-            [ "$(protoc --version | awk '{print $2}')" = "${PROTOC_VERSION}" ]
-        }
-        if have_pinned; then
-          echo "protoc ${PROTOC_VERSION} already present"
-          exit 0
+        cd "${GITHUB_WORKSPACE}"
+        if [ "$(uname -s)" = "Darwin" ]; then
+          export RAC_PROTOC_ASSET="${RAC_PROTOC_ASSET_DARWIN}"
         fi
-        # protobuf release archives carry the exact patch level; Homebrew/apt do
-        # not, and generate_all.sh fails closed on anything but ${PROTOC_VERSION}.
-        case "$(uname -s)-$(uname -m)" in
-          Linux-x86_64)   asset="linux-x86_64" ;;
-          Linux-aarch64)  asset="linux-aarch_64" ;;
-          Darwin-*)       asset="osx-universal_binary" ;;
-          MINGW*|MSYS*|CYGWIN*) asset="win64" ;;
-          *) echo "::error::generate-idl: no protoc asset for $(uname -s)-$(uname -m)"; exit 1 ;;
-        esac
-        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset}.zip"
-        echo "Downloading ${url}"
-        curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
-          -o "${RUNNER_TEMP}/protoc.zip" "$url"
-        dest="${HOME}/.local/protoc"
-        unzip -q -o "${RUNNER_TEMP}/protoc.zip" -d "$dest"
-        chmod +x "$dest/bin/protoc"* 2>/dev/null || true
+        # The single implementation lives in idl/codegen/bootstrap_protoc.sh so
+        # that CI, a CMake configure, a Gradle build and a laptop all resolve
+        # protoc the same way. Here it only pre-warms the cache and exposes the
+        # binary to later steps.
+        bindir="$(./idl/codegen/bootstrap_protoc.sh --print-dir)"
         # $GITHUB_PATH entries are consumed by the runner, not by bash. On
         # Windows the runner is not MSYS-aware, so a /c/Users/... path from Git
         # Bash would be added verbatim and never resolve — translate it.
         if command -v cygpath >/dev/null 2>&1; then
-          cygpath -w "$dest/bin" >> "$GITHUB_PATH"
+          cygpath -w "$bindir" >> "$GITHUB_PATH"
         else
-          echo "$dest/bin" >> "$GITHUB_PATH"
+          echo "$bindir" >> "$GITHUB_PATH"
         fi
 
     - name: Install Python protobuf runtime
@@ -119,16 +114,16 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        cd "${GITHUB_WORKSPACE}"
         # NOT `brew install wire` — that formula is the Wire messaging app.
-        WIRE_VERSION="$(grep -E '^WIRE_VERSION=' "${GITHUB_WORKSPACE}/core/VERSIONS" | cut -d= -f2)"
-        mkdir -p "$HOME/.local/bin"
-        curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
-          -o "$HOME/.local/bin/wire-compiler.jar" \
-          "https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
-        # shellcheck disable=SC2016
-        printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
-        chmod +x "$HOME/.local/bin/wire-compiler"
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        # bootstrap_wire.sh pulls the pinned fat JAR from Maven Central and
+        # checksum-verifies it; same single implementation as everywhere else.
+        bindir="$(./idl/codegen/bootstrap_wire.sh --print-dir)"
+        if command -v cygpath >/dev/null 2>&1; then
+          cygpath -w "$bindir" >> "$GITHUB_PATH"
+        else
+          echo "$bindir" >> "$GITHUB_PATH"
+        fi
 
     - name: Install Dart + protoc_plugin
       if: contains(inputs.languages, 'dart')

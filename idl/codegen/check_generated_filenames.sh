@@ -1,66 +1,83 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# check_generated_filenames.sh — assert that the filenames codegen just wrote
-# are the filenames git has committed, compared case-exactly.
+# check_generated_filenames.sh — assert no two generated files differ only in
+# letter case.
 #
-# Why this exists as a separate gate from `git status`:
+# WHAT THIS USED TO BE, AND WHY IT CHANGED
+#   It compared `git ls-files` against the filesystem, case-exactly, for the
+#   three generated trees that were still committed. The hazard was a stale
+#   committed name: wire-compiler 5.x emits `LoraState.kt` while `LoRAState.kt`
+#   stayed in the index, and on macOS/Windows (case-insensitive) `git status`
+#   reports that tree clean while on Linux the same run reports six deletions
+#   plus six untracked files. The IDL gate runs on macOS, so it could not see it.
 #
-# On a case-insensitive filesystem (macOS APFS by default, Windows NTFS) git
-# resolves an index entry through the OS, so `LoRAState.kt` in the index and
-# `LoraState.kt` on disk are the same file as far as `git status` is concerned
-# — it reports a clean tree. On Linux they are two different files, and the
-# same codegen run reports one deletion plus one untracked file. The IDL drift
-# job runs on macOS, so a generator-side rename that differs only in letter
-# case is invisible to it and detonates for everyone on Linux instead.
+#   No generated file is committed any more, so there is no index side left to
+#   compare against and that check can only be vacuous.
 #
-# That is not hypothetical: wire-compiler emits `Lora*.kt` for the six
-# lora_options.proto messages, while `LoRA*.kt` stayed committed from an older
-# Wire naming. Byte-identical contents, different names, green on macOS, red on
-# Linux. This script compares `git ls-files` (always case-exact, it reads the
-# index) against what the OS actually reports, which catches it everywhere.
-#
-# SCOPE
-#   Only the trees that are still COMMITTED. The comparison is
-#   `git ls-files` vs the filesystem, so it is meaningful only where git is
-#   supposed to hold every name; for the gitignored trees it would report all
-#   ~360 files as "not committed" on every run. Those trees are regenerated from
-#   scratch by every consumer, so a generator-side case rename cannot strand a
-#   stale committed name there in the first place — the hazard this gate exists
-#   for is specific to committed output.
+# WHAT IT CHECKS NOW
+#   The other half of the same hazard, which de-committing does NOT remove: two
+#   generated files whose names differ only in case, in the same directory. On a
+#   case-insensitive filesystem the second write silently clobbers the first, so
+#   the tree that compiles on the developer's Mac has one file where Linux CI
+#   has two — and the missing one is a type somebody imports. Comparing each
+#   directory's names against their lowercase forms catches that without needing
+#   git, on every filesystem.
 #
 # Usage:
 #   ./idl/codegen/check_generated_filenames.sh     # run after generate_all.sh
 set -euo pipefail
 
+export LC_ALL=C
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+MANIFEST="${SCRIPT_DIR}/generated_trees.txt"
 cd "${REPO_ROOT}"
 
-# The still-committed generated trees. See AGENTS.md "Generated code" for why
-# these three stayed tracked while the SDK bindings did not.
-CODEGEN_PATHS=(
-    core/src/generated/proto
-    core/include/rac/rac_defaults_generated.h
-    bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated
-)
+[ -f "${MANIFEST}" ] || { echo "check_generated_filenames.sh: missing ${MANIFEST}" >&2; exit 2; }
 
-TRACKED="$(git ls-files -- "${CODEGEN_PATHS[@]}" | LC_ALL=C sort)"
-ON_DISK="$(find "${CODEGEN_PATHS[@]}" -type f | LC_ALL=C sort)"
+# Every declared output directory. `built` (proto-ts/dist) is included when it
+# happens to exist — tsc derives its names from src/, so a collision there is a
+# collision here too.
+TREES=()
+while IFS=$'\t' read -r kind lang path minfiles note; do
+    case "${kind}" in tree|built) ;; *) continue ;; esac
+    [ -n "${path:-}" ] || continue
+    [ -d "${path}" ] && TREES+=("${path}")
+done < "${MANIFEST}"
 
-if [ "${TRACKED}" = "${ON_DISK}" ]; then
-    echo "✓ generated filenames match the committed names (case-exact)."
+if [ "${#TREES[@]}" -eq 0 ]; then
+    echo "check_generated_filenames.sh: no generated tree exists yet — run generate_all.sh first" >&2
+    exit 1
+fi
+
+COLLISIONS="$(
+    find "${TREES[@]}" -type f -print \
+        | awk -F/ '{
+              name = $NF
+              dir  = substr($0, 1, length($0) - length(name) - 1)
+              lower = tolower(name)
+              key = dir "/" lower
+              if (key in seen && seen[key] != name) {
+                  print dir "/  " seen[key] "  vs  " name
+              }
+              seen[key] = name
+          }' \
+        | LC_ALL=C sort -u
+)"
+
+if [ -z "${COLLISIONS}" ]; then
+    echo "✓ generated filenames are unique case-insensitively (${#TREES[@]} trees)."
     exit 0
 fi
 
-echo "::error::Generated filenames do not match the committed names." >&2
+echo "::error::Generated filenames collide when compared case-insensitively." >&2
 echo "" >&2
-echo "  '<' = committed but not produced by codegen" >&2
-echo "  '>' = produced by codegen but not committed under that exact name" >&2
+printf '%s\n' "${COLLISIONS}" | sed 's/^/  /' >&2
 echo "" >&2
-diff <(printf '%s\n' "${TRACKED}") <(printf '%s\n' "${ON_DISK}") >&2 || true
-echo "" >&2
-echo "If the pairs differ only in letter case, git on macOS/Windows cannot see" >&2
-echo "it but Linux CI can. Rename the committed files to what the generator" >&2
-echo "emits: git mv -f <OldName> <NewName>" >&2
+echo "On macOS/Windows one of each pair silently overwrites the other, so the" >&2
+echo "tree that compiles locally is missing a file that Linux CI will have." >&2
+echo "Fix the generator (or the .proto names) so the outputs differ by more" >&2
+echo "than letter case." >&2
 exit 1

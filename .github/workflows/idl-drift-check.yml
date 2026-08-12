@@ -2,28 +2,31 @@ name: IDL gate
 
 # GENERATE, THEN VERIFY — not "regenerate and diff".
 #
-# Most of the language bindings are no longer committed (.gitignore, and
-# idl/codegen/generated_trees.txt lists exactly which). The old shape of this
-# job — regenerate, then require `git status --porcelain -uall` to be empty —
-# cannot fail for those: regenerating an ignored file never moves git status.
-# So it was rewritten rather than amended. What runs now:
+# NO language binding is committed (.gitignore, and
+# idl/codegen/generated_trees.txt lists exactly what that covers). The old shape
+# of this job — regenerate, then require `git status --porcelain -uall` to be
+# empty — cannot fail for an ignored file. So it was rewritten rather than
+# amended. What runs now:
 #
 #   1. schema lock   idl/SCHEMA_LOCK is tracked and refreshed by generate_all.sh
 #                    from the .proto digest. Editing a schema without running
 #                    codegen leaves the committed lock stale -> fail. This is
 #                    the drift signal that replaces the diff.
-#   2. presence      every declared generated tree exists and is non-empty
-#                    (generate_all.sh soft-skips generators whose toolchain is
-#                    missing, so its exit code proves nothing on its own).
-#   3. still-tracked C++ and Kotlin bindings ARE committed; for those the
-#                    classic diff gate still applies and is still run.
+#   2. presence      every declared generated tree exists and is non-empty, and
+#                    none of them is TRACKED (a `git add -f` or a lost
+#                    .gitignore rule would otherwise re-commit hundreds of
+#                    machine files with no symptom at all).
+#   3. case          no two generated names differ only in letter case, which is
+#                    one file on macOS and two on Linux.
 #   4. compile       the generated TypeScript is fed to tsc and the generated
 #                    Python is imported. Un-reviewable output has to be
-#                    machine-checked instead.
+#                    machine-checked instead. The C/C++ and Kotlin trees are
+#                    compiled by the native and kotlin-android jobs in
+#                    pr-build.yml.
 #
 # Fixing a failure locally:
 #   ./idl/codegen/generate_all.sh
-#   git add idl/SCHEMA_LOCK core/src/generated core/include bindings/kotlin
+#   git add idl/SCHEMA_LOCK          # the only tracked output of a codegen run
 
 on:
   pull_request:
@@ -34,13 +37,8 @@ on:
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
-      # The generated trees that are STILL COMMITTED — a hand-edit to one of
-      # these must still trigger the gate. The de-committed trees are gone from
-      # this list on purpose: they are untracked, so no PR can ever touch them
-      # and the filters were dead weight pointing at paths that cannot change.
-      - 'core/src/generated/proto/**'
-      - 'core/include/rac/rac_defaults_generated.h'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
+      # No generated path is listed any more: every one of them is untracked, so
+      # no PR can touch it and a filter pointing there can never fire.
       # Hand-written files that live inside an otherwise-generated tree.
       - 'bindings/proto-ts/src/index.ts'
       - 'bindings/proto-ts/src/lifecycle_service.ts'
@@ -68,9 +66,6 @@ on:
       - 'scripts/setup/setup-toolchain.sh'
       - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
-      - 'core/src/generated/proto/**'
-      - 'core/include/rac/rac_defaults_generated.h'
-      - 'bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'bindings/proto-ts/src/index.ts'
       - 'bindings/proto-ts/src/lifecycle_service.ts'
       - 'bindings/proto-ts/src/convenience/_errors.ts'
@@ -112,10 +107,13 @@ jobs:
         with:
           platform: node
 
-      - name: Install protoc + swift-protobuf (Homebrew)
+      - name: Install swift-protobuf (Homebrew)
+        # NOT protobuf: Homebrew cannot pin protoc's patch level, and
+        # idl/codegen/bootstrap_protoc.sh downloads + checksum-verifies the
+        # pinned release itself when generate_all.sh runs.
         run: |
           set -euo pipefail
-          brew install protobuf swift-protobuf
+          brew install swift-protobuf
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
@@ -146,36 +144,19 @@ jobs:
         run: |
           set -euo pipefail
           # IMPORTANT: Homebrew's `wire` formula is the Wire *messaging app*
-          # (wire.com), NOT Square's protobuf compiler. The previous
-          # `brew install wire` therefore never produced a `wire-compiler`
-          # binary, so generate_kotlin.sh silently fell back to warn-and-skip
-          # (the Gradle Wire plugin only regenerates at app build time, NOT in
-          # this drift job) — Kotlin bindings drifted through CI undetected.
-          #
-          # Install the real wire-compiler from Maven Central, pinned to
-          # WIRE_VERSION in core/VERSIONS (the same version
-          # that produced the committed Kotlin bindings), and expose it as
-          # `wire-compiler` on PATH. Hard-fail if it is missing, matching the
-          # protoc-gen-grpc-swift gate above.
-          WIRE_VERSION="$(grep -E '^WIRE_VERSION=' core/VERSIONS | cut -d= -f2)"
-          echo "wire-compiler version (pinned): ${WIRE_VERSION}"
-          JAR_URL="https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
-          mkdir -p "$HOME/.local/bin"
-          curl --fail --show-error --location \
-            --retry 5 --retry-all-errors --retry-delay 2 \
-            -o "$HOME/.local/bin/wire-compiler.jar" "$JAR_URL"
-          # The generated wrapper must expand HOME and argv when it runs,
-          # not while this workflow step writes it.
-          # shellcheck disable=SC2016
-          printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
-          chmod +x "$HOME/.local/bin/wire-compiler"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # (wire.com), NOT Square's protobuf compiler. The real one is a fat
+          # JAR on Maven Central, pinned to WIRE_VERSION in core/VERSIONS and
+          # checksum-verified by idl/codegen/bootstrap_wire.sh — the same script
+          # generate_kotlin.sh and the Gradle build use, so this step only warms
+          # the cache and exposes it on PATH.
+          bindir="$(./idl/codegen/bootstrap_wire.sh --print-dir)"
+          echo "$bindir" >> "$GITHUB_PATH"
           # Wire 5.5.1 has no --help/--version flag and intentionally exits 1
           # without generation arguments. Probe its exact diagnostic without
           # letting pipefail turn that expected exit into a false install error.
-          WIRE_PROBE="$(java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 || true)"
+          WIRE_PROBE="$("$bindir/wire-compiler" 2>&1 || true)"
           if ! grep -Fq 'Nothing to do! Specify --java_out=' <<<"$WIRE_PROBE"; then
-            echo "::error::wire-compiler not runnable after Maven download (${JAR_URL})"
+            echo "::error::wire-compiler not runnable after Maven download"
             exit 1
           fi
 
@@ -234,10 +215,14 @@ jobs:
       - name: Dump toolchain versions (debug)
         run: |
           set -euo pipefail
-          echo "protoc: $(protoc --version)"
+          # protoc is not expected on PATH: bootstrap_protoc.sh resolves the
+          # pinned build (downloading it when needed) and generate_all.sh puts
+          # it on PATH for the duration of the run. Ask the same script.
+          echo "protoc (pinned): $("$(./idl/codegen/bootstrap_protoc.sh)" --version)"
+          echo "python (protobuf runtime): $(./idl/codegen/bootstrap_pyproto.sh)"
           echo "protoc-gen-swift: $(protoc-gen-swift --version 2>/dev/null || echo 'not present')"
           echo "protoc-gen-grpc-swift: $(protoc-gen-grpc-swift --version 2>/dev/null || echo 'not present')"
-          echo "wire-compiler: $(wire-compiler --version 2>/dev/null || echo 'not present')"
+          echo "wire-compiler: $(command -v wire-compiler || echo 'not present')"
           echo "dart: $(dart --version 2>&1 || echo 'not present')"
           echo "node: $(node --version)"
 

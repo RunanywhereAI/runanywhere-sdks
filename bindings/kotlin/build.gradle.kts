@@ -160,6 +160,96 @@ val generateRunAnywhereLicenseResource by tasks.registering(Copy::class) {
     rename { "LICENSE.runanywhere-sdk.txt" }
 }
 
+// =============================================================================
+// IDL codegen — src/main/kotlin/com/runanywhere/sdk/generated is not tracked
+// =============================================================================
+// Every type under that package is Square Wire output plus two Python-generated
+// files (RAConvenience.kt, RADefaultsPool.kt). None of it is committed, so a
+// fresh clone compiles nothing without this task. It is wired into `preBuild`,
+// which every AGP compile/test/assemble path already depends on, so
+// `./gradlew compileDebugKotlin`, `assembleRelease`, `testDebugUnitTest` and a
+// JitPack build all generate first without any of them knowing about it.
+//
+// The generator obtains its own toolchain: idl/codegen/bootstrap_{wire,protoc,
+// pyproto}.sh download and checksum-verify the pinned wire-compiler JAR, the
+// pinned protoc and a protobuf-capable Python into a per-user cache. So the
+// only host prerequisites are bash, java (already required to run Gradle) and
+// python3.
+//
+// Note it declares only the Kotlin tree as its output while
+// generate_defaults_pool.py also refreshes the Swift/Dart/TS/Python copies of
+// the same constants in one pass — those live outside this Gradle project and
+// are owned by their own packaging paths.
+val repoRootDir = projectDir.resolve("../..").canonicalFile
+val idlCodegenScript = repoRootDir.resolve("idl/codegen/generate_all.sh")
+val kotlinGeneratedDir = projectDir.resolve("src/main/kotlin/com/runanywhere/sdk/generated")
+
+// Git for Windows always provides bash, but its bin/ is not necessarily on the
+// PATH of the shell that launched Gradle.
+fun resolveIdlBash(): String {
+    val explicit = System.getenv("RAC_BASH")
+    if (!explicit.isNullOrBlank() && java.io.File(explicit).canExecute()) return explicit
+    val candidates =
+        listOf(
+            "${System.getenv("PROGRAMFILES")}\\Git\\bin\\bash.exe",
+            "${System.getenv("ProgramFiles(x86)")}\\Git\\bin\\bash.exe",
+            "C:\\Program Files\\Git\\bin\\bash.exe",
+            "${System.getenv("LOCALAPPDATA")}\\Programs\\Git\\bin\\bash.exe",
+        )
+    for (candidate in candidates) {
+        val f = java.io.File(candidate)
+        if (f.canExecute()) return f.absolutePath
+    }
+    // POSIX hosts (and Windows shells that do have it on PATH).
+    return "bash"
+}
+
+val generateIdlKotlinBindings by tasks.registering(Exec::class) {
+    group = "runanywhere"
+    description = "Generate the Kotlin IDL bindings (idl/*.proto -> src/main/kotlin/.../generated)"
+
+    workingDir = repoRootDir
+    inputs.files(fileTree(repoRootDir.resolve("idl")) { include("*.proto") })
+    inputs.files(
+        idlCodegenScript,
+        repoRootDir.resolve("idl/codegen/generate_kotlin.sh"),
+        repoRootDir.resolve("idl/codegen/generate_kotlin_convenience.py"),
+        repoRootDir.resolve("idl/codegen/generate_defaults_pool.py"),
+        repoRootDir.resolve("idl/codegen/_convenience_common.py"),
+        repoRootDir.resolve("core/VERSIONS"),
+    )
+    outputs.dir(kotlinGeneratedDir)
+
+    doFirst {
+        if (!idlCodegenScript.exists()) {
+            throw GradleException("Missing IDL codegen script: ${idlCodegenScript.absolutePath}")
+        }
+        commandLine(resolveIdlBash(), idlCodegenScript.absolutePath, "--only", "kotlin")
+    }
+
+    doLast {
+        val wireDir = kotlinGeneratedDir.resolve("ai/runanywhere/proto/v1")
+        val emitted = fileTree(wireDir) { include("*.kt") }.files.size
+        // A soft-skipped generator exits 0 and writes nothing; the compile
+        // error it causes points at 300 unresolved references instead of here.
+        if (emitted < 300) {
+            throw GradleException(
+                "IDL codegen produced only $emitted Kotlin files in $wireDir (expected 300+). " +
+                    "Run ./idl/codegen/generate_all.sh --only kotlin and read its output.",
+            )
+        }
+        if (!kotlinGeneratedDir.resolve("RADefaultsPool.kt").isFile ||
+            !kotlinGeneratedDir.resolve("convenience/RAConvenience.kt").isFile
+        ) {
+            throw GradleException(
+                "IDL codegen did not write RADefaultsPool.kt / convenience/RAConvenience.kt — " +
+                    "the Python protobuf runtime is probably unavailable. Run " +
+                    "./idl/codegen/generate_all.sh --only kotlin by hand.",
+            )
+        }
+    }
+}
+
 android {
     namespace = "com.runanywhere.sdk.kotlin"
     compileSdk = 37
@@ -213,6 +303,13 @@ android {
 
 tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn(generateRunAnywhereLicenseResource)
+    dependsOn(generateIdlKotlinBindings)
+}
+
+// ktlint/detekt read src/main/kotlin directly rather than through a compile
+// task, so they can start before preBuild and see an empty generated/ tree.
+tasks.matching { it.name.startsWith("ktlint") || it.name.startsWith("detekt") }.configureEach {
+    dependsOn(generateIdlKotlinBindings)
 }
 
 // Gradle's default console prints only "AssertionError at Foo.kt:12" for a

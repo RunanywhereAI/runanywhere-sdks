@@ -75,11 +75,11 @@ ensure_doc_symlinks() {
 # This is a hard failure, not a warning: "setup succeeded but nothing compiles"
 # is exactly the experience this whole arrangement has to avoid.
 setup_codegen() {
-    heading "IDL codegen (bindings/*/generated are not tracked)"
-    if ! have protoc; then
-        err "protoc not on PATH — run ./scripts/setup/setup-toolchain.sh first"
-        return 1
-    fi
+    heading "IDL codegen (nothing generated is tracked)"
+    # No `have protoc` gate: generate_all.sh resolves the pinned protoc,
+    # wire-compiler and Python protobuf runtime itself
+    # (idl/codegen/bootstrap_*.sh), so requiring a system protoc here would
+    # reject a machine on which codegen works fine.
     if ! bash "${REPO_ROOT}/idl/codegen/generate_all.sh"; then
         err "IDL codegen failed — see above. Fix the toolchain with:"
         err "  ./scripts/setup/setup-toolchain.sh && ./scripts/setup/setup-toolchain.sh --check"
