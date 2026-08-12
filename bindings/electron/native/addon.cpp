@@ -480,9 +480,20 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             // non-inference API. The others went the opposite way and discarded
             // their result entirely, so a backend could go missing with no
             // code, no reason, and nothing for the app to report.
+            //
+            // "Already registered" is NOT a failure: RAC_ERROR_PLUGIN_DUPLICATE
+            // and RAC_ERROR_MODULE_ALREADY_REGISTERED both mean the backend is
+            // in the registry and serving — a static-init ctor, a prior
+            // loadPlugin(), or an env replay simply got there first. Commons'
+            // own batch loader counts DUPLICATE as loaded
+            // (rac_registry_load_plugins), so recording either here would put a
+            // working backend on the unavailability ledger and make
+            // capabilities() report it as missing.
             const auto try_register = [](const char* name, rac_result_t result) {
-                if (result != RAC_SUCCESS)
-                    rac_registry_record_plugin_unavailable(name, nullptr, result);
+                if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
+                    result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
+                    return;
+                rac_registry_record_plugin_unavailable(name, nullptr, result);
             };
             (void)try_register;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP

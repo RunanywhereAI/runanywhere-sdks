@@ -96,12 +96,46 @@ export const FAT_ADDON_FRAMEWORKS: readonly InferenceFramework[] = [
 ];
 
 /**
- * Backends this process can actually reach.
- * Thin + empty registry → `[]` (core-alone). Fat ignores the registry list.
+ * {@link RegisteredEngines} plus the ledger, when the caller has it.
+ *
+ * The ledger is optional rather than required so the load-path guards keep
+ * their narrower dependency: {@link EngineRegistrySnapshot} satisfies this
+ * type, and a caller that only knows what is registered still gets an answer.
  */
-export function backendsForRegistry(snapshot: RegisteredEngines): readonly InferenceFramework[] {
-  if (!snapshot.thinAddon) return FAT_ADDON_FRAMEWORKS;
-  return frameworksFromPluginNames(snapshot.pluginNames);
+type BackendQuery = RegisteredEngines & {
+  readonly unavailablePlugins?: readonly UnavailablePlugin[];
+};
+
+/**
+ * Backends this process can actually reach.
+ *
+ * Thin + empty registry → `[]` (core-alone). Fat starts from the compile-time
+ * set, because a statically linked engine is a fact about the binary that is
+ * true even before `initialize()` has populated the registry.
+ *
+ * Then the ledger subtracts. A statically linked backend can still be REFUSED
+ * at registration (a stub build whose `capability_check` declines, an
+ * unsupported machine) — and `UnavailablePlugin.path` is empty for exactly
+ * that case, so there is no path to filter on, only the name. Without this
+ * subtraction a refused engine is reported as both available (its modalities)
+ * and unavailable (the ledger entry) in the same capability snapshot, which is
+ * worse than either answer alone: an app that trusts `modalities` calls a
+ * feature that cannot work.
+ */
+export function backendsForRegistry(snapshot: BackendQuery): readonly InferenceFramework[] {
+  const base = snapshot.thinAddon
+    ? frameworksFromPluginNames(snapshot.pluginNames)
+    : FAT_ADDON_FRAMEWORKS;
+  const refused = snapshot.unavailablePlugins;
+  if (refused === undefined || refused.length === 0) return base;
+  const refusedFrameworks = new Set(frameworksFromPluginNames(refused.map((p) => p.name)));
+  if (refusedFrameworks.size === 0) return base;
+  // The registry is the stronger witness. Commons drops a ledger entry the
+  // moment the same name registers successfully
+  // (`rac_plugin_availability_forget`), so a framework in BOTH lists is
+  // serving — a stale entry must never retract a backend that answers.
+  const serving = new Set(frameworksFromPluginNames(snapshot.pluginNames));
+  return base.filter((framework) => !refusedFrameworks.has(framework) || serving.has(framework));
 }
 
 /**

@@ -396,9 +396,18 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
         // ONNX, Sherpa, RAG and every non-inference API with it. The rest went
         // the other way and discarded their result entirely, leaving a missing
         // backend with no code and no reason anyone could report.
+        //
+        // "Already registered" is NOT a failure: RAC_ERROR_PLUGIN_DUPLICATE and
+        // RAC_ERROR_MODULE_ALREADY_REGISTERED both mean the backend is in the
+        // registry and serving — a static-init ctor or a prior registration
+        // simply got there first. Commons' own batch loader counts DUPLICATE as
+        // loaded (rac_registry_load_plugins), so recording either here would put
+        // a working backend on the unavailability ledger.
         const auto try_register = [](const char* name, rac_result_t result) {
-            if (result != RAC_SUCCESS)
-                rac_registry_record_plugin_unavailable(name, nullptr, result);
+            if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
+                result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
+                return;
+            rac_registry_record_plugin_unavailable(name, nullptr, result);
         };
         (void)try_register;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP

@@ -28,9 +28,16 @@ if (catalogPath) {
 /**
  * Apply the main-process registration queue before any RPC (and before
  * initialize via the same env inside the addon). Fat builds skip — backends
- * are compile-linked. Thin builds load each existing path. Missing files are
- * skipped so a partial stage does not brick the host. Never accept plugin
- * paths over RPC (security — no v3.registerBackendPlugin).
+ * are compile-linked. Thin builds hand EVERY queued path to `loadPlugin`.
+ * Never accept plugin paths over RPC (security — no v3.registerBackendPlugin).
+ *
+ * A missing artifact is deliberately NOT pre-filtered here. Skipping it would
+ * be the quietest possible failure: commons never sees the path, so it cannot
+ * derive the backend name from the file stem
+ * (`librunanywhere_sherpa.dylib` → `sherpa`) nor record
+ * RAC_ERROR_PLUGIN_LOAD_FAILED against it — and `capabilities().unavailable`
+ * then omits the very backend the app is missing. Letting the load fail costs
+ * one caught rejection and buys a named ledger entry.
  *
  * NEVER REJECTS, and never stops early. Both properties are load-bearing:
  * `pluginsReady` gates every RPC below, so a rejection here used to make
@@ -46,16 +53,18 @@ async function applyPluginRegistrationQueue(): Promise<void> {
   const raw = process.env.RUNANYWHERE_PLUGIN_PATHS;
   if (!raw) return;
   for (const pluginPath of raw.split(path.delimiter).filter(Boolean)) {
-    if (!fs.existsSync(pluginPath)) continue;
     try {
       await addon.loadPlugin(pluginPath);
     } catch (err) {
       // Commons already recorded the reason against the backend's name; this
-      // is the human-readable breadcrumb in the host log.
+      // is the human-readable breadcrumb in the host log. `rac_result_t -820`
+      // covers every dlopen failure, so say which kind it was — a path that is
+      // simply not there is a staging bug, not a broken binary.
       const reason = err instanceof Error ? err.message : String(err);
+      const detail = fs.existsSync(pluginPath) ? reason : `${reason}; file does not exist`;
       console.warn(
         `[runanywhere] backend plugin failed to register, continuing without it: ` +
-          `${pluginPath} (${reason})`
+          `${pluginPath} (${detail})`
       );
     }
   }

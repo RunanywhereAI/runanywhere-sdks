@@ -64,6 +64,82 @@ test('backendsForRegistry lists only registered thin plugins', () => {
   );
 });
 
+test('backendsForRegistry drops a fat backend the ledger refused', () => {
+  // A statically linked engine can still decline registration (stub build,
+  // unsupported hardware). Its ledger entry carries an EMPTY path — there is
+  // nothing to filter on but the name — and without this subtraction the same
+  // snapshot would call sherpa available and unavailable at once.
+  assert.deepEqual(
+    [
+      ...backendsForRegistry({
+        thinAddon: false,
+        pluginNames: ['llamacpp', 'onnx'],
+        unavailablePlugins: [{ name: 'sherpa', path: '', status: -811 }],
+      }),
+    ],
+    [InferenceFramework.LLAMA_CPP, InferenceFramework.ONNX]
+  );
+});
+
+test('backendsForRegistry ignores a ledger entry for a backend that is serving', () => {
+  // Commons forgets an entry the moment the same name registers, so an overlap
+  // means the registry won. A stale entry must never retract a live backend.
+  assert.deepEqual(
+    [
+      ...backendsForRegistry({
+        thinAddon: false,
+        pluginNames: ['llamacpp', 'onnx', 'sherpa'],
+        unavailablePlugins: [{ name: 'sherpa', path: '', status: -401 }],
+      }),
+    ],
+    [...FAT_ADDON_FRAMEWORKS]
+  );
+});
+
+test('backendsForRegistry drops a thin plugin that failed to load', () => {
+  assert.deepEqual(
+    [
+      ...backendsForRegistry({
+        thinAddon: true,
+        pluginNames: ['llamacpp'],
+        unavailablePlugins: [
+          { name: 'sherpa', path: '/nope/librunanywhere_sherpa.dylib', status: -820 },
+        ],
+      }),
+    ],
+    [InferenceFramework.LLAMA_CPP]
+  );
+});
+
+test('backendsForRegistry is unchanged by an empty or unrecognised ledger', () => {
+  assert.deepEqual(
+    [...backendsForRegistry({ thinAddon: false, pluginNames: [], unavailablePlugins: [] })],
+    [...FAT_ADDON_FRAMEWORKS]
+  );
+  // cloud/mlx/neurt map to no InferenceFramework, so they subtract nothing.
+  assert.deepEqual(
+    [
+      ...backendsForRegistry({
+        thinAddon: false,
+        pluginNames: [],
+        unavailablePlugins: [{ name: 'cloud', path: '', status: -604 }],
+      }),
+    ],
+    [...FAT_ADDON_FRAMEWORKS]
+  );
+});
+
+test('assertBackendEnginesRegistered ignores the ledger entirely', () => {
+  // The load-path guard answers "can I load a model", which only the registry
+  // knows. A refused backend must not turn a working fat build into a throw.
+  assert.doesNotThrow(() =>
+    assertBackendEnginesRegistered({ thinAddon: false, pluginNames: [] })
+  );
+  assert.doesNotThrow(() =>
+    assertBackendEnginesRegistered({ thinAddon: true, pluginNames: ['llamacpp'] })
+  );
+});
+
 test('assertBackendEnginesRegistered is a no-op for fat and non-empty thin', () => {
   assert.doesNotThrow(() =>
     assertBackendEnginesRegistered({ thinAddon: false, pluginNames: [] })
