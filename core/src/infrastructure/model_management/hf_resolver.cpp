@@ -713,6 +713,19 @@ static std::unordered_set<std::string> manifest_referenced_paths(
             refs.insert(s);
             continue;
         }
+        // fixture_dir / family names a subdirectory (e.g. "vlm"). Keep every
+        // file under it — those host weights are not listed as individual
+        // artifact paths, and dropping the >=1 MiB ones ships an unloadable
+        // VLM (ArtifactMissing on pe/pos).
+        const std::string dir_prefix = (!s.empty() && s.back() == '/') ? s : s + "/";
+        bool any_under = false;
+        for (const auto& p : bundle_paths) {
+            if (p.starts_with(dir_prefix)) {
+                refs.insert(p);
+                any_under = true;
+            }
+        }
+        if (any_under) continue;
         const std::string base = basename_of(s);
         // Otherwise fall back to basename matching only when that basename is unambiguous.
         const auto it = unique_basename_to_path.find(base);
