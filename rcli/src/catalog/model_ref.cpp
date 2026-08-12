@@ -98,14 +98,16 @@ std::string id_for_local_path(const std::string &path) {
 
   // The basename alone collides — every `.../model.mlpackage` sanitizes to the
   // same string — so pin the id to the whole path with an FNV-1a digest.
-  uint64_t hash = 1469598103934665603ULL;
+  uint64_t hash = 14695981039346656037ULL;  // FNV-1a 64-bit offset basis
   for (const unsigned char c : full) {
     hash ^= c;
     hash *= 1099511628211ULL;
   }
   static constexpr char kHex[] = "0123456789abcdef";
   std::string digest;
-  for (int shift = 28; shift >= 0; shift -= 4) {
+  // 16 nibbles: emit the whole 64-bit hash. Stopping at shift 28 kept only the
+  // low 32 bits, so paths differing above that bit shared an id.
+  for (int shift = 60; shift >= 0; shift -= 4) {
     digest.push_back(kHex[(hash >> shift) & 0xF]);
   }
   return "local-" + base + "-" + digest;

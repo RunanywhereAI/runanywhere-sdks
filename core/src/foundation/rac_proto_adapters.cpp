@@ -810,15 +810,30 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
         return false;
     std::memset(out, 0, sizeof(*out));
     out->id = copy_string(in.id());
+    if (!in.id().empty() && !out->id) {
+        return false;
+    }
     out->name = copy_string(in.name());
+    if (!in.name().empty() && !out->name) {
+        return false;
+    }
     // Preserve an explicit catalog 0.0; only absent default_scale falls back.
     out->default_scale = in.has_default_scale() ? in.default_scale() : 1.0f;
     if (in.compatible_models_size() > 0) {
         out->compatible_model_count = static_cast<size_t>(in.compatible_models_size());
         out->compatible_model_ids =
-            static_cast<char**>(rac_alloc(sizeof(char*) * out->compatible_model_count));
+            static_cast<char**>(std::calloc(out->compatible_model_count, sizeof(char*)));
+        if (!out->compatible_model_ids) {
+            // Keep the count consistent with the null pointer so the entry never
+            // advertises elements that were never allocated.
+            out->compatible_model_count = 0;
+            return false;
+        }
         for (int i = 0; i < in.compatible_models_size(); ++i) {
             out->compatible_model_ids[i] = rac_strdup(in.compatible_models(i).c_str());
+            if (!out->compatible_model_ids[i]) {
+                return false;
+            }
         }
     }
     return true;

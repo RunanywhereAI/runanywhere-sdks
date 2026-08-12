@@ -272,6 +272,20 @@ rac_result_t rac_vad_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
+void rac_vad_stream_component_teardown(rac_handle_t handle) {
+    if (handle == nullptr)
+        return;
+    std::lock_guard<std::mutex> lock(g_mu());
+    g_slots().erase(handle);
+    for (auto it = g_sessions().begin(); it != g_sessions().end();) {
+        if (it->second.handle == handle) {
+            it = g_sessions().erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 // Public quiesce helper. Mirrors
 // rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
 // in-flight dispatch_vad_stream_event invocation has returned. Callers

@@ -142,6 +142,24 @@ RAC_API rac_result_t rac_vad_stream_stop_proto(uint64_t session_id);
  */
 RAC_API rac_result_t rac_vad_stream_cancel_proto(uint64_t session_id);
 
+/**
+ * @brief Clear the stream callback slot AND erase every streaming session
+ *        still bound to @p handle.
+ *
+ * Commons-internal: called only from rac_vad_component_destroy() in
+ * vad_module.cpp. Deliberately NOT decorated with RAC_API — it is not part of
+ * the exported SDK ABI (see sdk/runanywhere-commons/exports/RACommons.exports
+ * and scripts/validation/commons/check_rac_api_exports.sh), and SDK bridges
+ * must keep using rac_vad_unset_stream_proto_callback() +
+ * rac_vad_proto_quiesce() for their own teardown.
+ *
+ * Superset of rac_vad_unset_stream_proto_callback(handle): sessions that were
+ * never stopped/cancelled would otherwise outlive the component in the session
+ * registry, holding a dangling handle that a recycled component address makes
+ * indistinguishable from a live session.
+ */
+void rac_vad_stream_component_teardown(rac_handle_t handle);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

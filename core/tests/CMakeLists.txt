@@ -893,6 +893,23 @@ rac_link_archive_deps(test_model_string_accessors)
 target_compile_features(test_model_string_accessors PRIVATE cxx_std_17)
 add_test(NAME model_string_accessors_tests COMMAND test_model_string_accessors)
 
+# --- Artifact-descriptor deep-copy round-trip tests --------------------------
+# Guards the one shared artifact copy (rac::infra::model_types::artifact_info_copy)
+# used by both rac_model_info_copy() and the registry's deep_copy_model():
+# multi-file metadata survives a copy and a registry save/get, the copy owns its
+# own memory, and file_descriptors/file_descriptor_count never disagree (a
+# non-zero count over a NULL array is a null deref in
+# model_folder_is_complete_struct). Pure C ABI test, no protobuf required.
+add_executable(test_model_artifact_copy test_model_artifact_copy.cpp)
+target_include_directories(test_model_artifact_copy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_artifact_copy PRIVATE rac_commons)
+rac_link_archive_deps(test_model_artifact_copy)
+target_compile_features(test_model_artifact_copy PRIVATE cxx_std_17)
+add_test(NAME model_artifact_copy_tests COMMAND test_model_artifact_copy)
+
 # --- Proto enum ↔ C enum mapper parity tests --------------------------
 # Exercises rac_inference_framework_from/to_proto, rac_model_category_*,
 # rac_model_format_*, rac_model_source_* and rac_archive_type_*. Pure C ABI,

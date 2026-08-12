@@ -314,6 +314,7 @@ function requireProvider(feature = 'RAG'): RAGProvider {
 class NativeRAGSessionProvider implements RAGProvider {
   readonly providerKind = 'wasm-session' as const;
   private session: number | null = null;
+  private sessionInit: Promise<number> | null = null;
   private config: RAGConfiguration;
 
   constructor(
@@ -465,11 +466,22 @@ class NativeRAGSessionProvider implements RAGProvider {
     };
   }
 
-  private async ensureSession(): Promise<number> {
-    if (this.session != null) return this.session;
-    validateNativeRAGConfiguration(this.config, 'RAG.session');
-    await this.ragCreatePipeline(this.config);
-    return this.session!;
+  private ensureSession(): Promise<number> {
+    if (this.session != null) return Promise.resolve(this.session);
+    // Concurrent callers share one creation. `ragCreatePipeline` is not
+    // idempotent: it destroys any existing session and creates a fresh one, so
+    // a second caller arriving while the first awaits would still see a null
+    // session, create a second native session, and orphan whichever handle
+    // lost the assignment race. Cleared once settled so a failed creation can
+    // be retried.
+    this.sessionInit ??= (async () => {
+      validateNativeRAGConfiguration(this.config, 'RAG.session');
+      await this.ragCreatePipeline(this.config);
+      return this.session!;
+    })().finally(() => {
+      this.sessionInit = null;
+    });
+    return this.sessionInit;
   }
 
   private async statistics(): Promise<RAGStatistics> {

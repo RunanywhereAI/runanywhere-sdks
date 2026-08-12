@@ -268,7 +268,10 @@ RAC_API rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t 
  * @param model_id Model identifier
  * @param framework Inference framework
  * @param out_metrics Output: Model metrics
- * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT on a null argument,
+ *         RAC_ERROR_NOT_FOUND if the model is not in the registry, or
+ *         RAC_ERROR_OUT_OF_MEMORY if a string copy into out_metrics fails
+ *         (out_metrics is left zeroed in that case)
  */
 RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,

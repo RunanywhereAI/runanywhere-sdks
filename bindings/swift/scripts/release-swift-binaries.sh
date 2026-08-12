@@ -67,7 +67,7 @@ export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_SHERPA RAC_BACKEND_NEURT RAC_BACKEND
 
 if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_SHERPA}" != "ON" ] || \
    [ "${RAC_BACKEND_NEURT}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
-    echo "error: a Swift release requires every Apple binary/resource payload (ONNX, Sherpa, CoreML, and MLX must be ON)" >&2
+    echo "error: a Swift release requires every Apple binary/resource payload; RAC_BACKEND_ONNX, RAC_BACKEND_SHERPA, RAC_BACKEND_NEURT and RAC_BACKEND_MLX must all be ON" >&2
     exit 1
 fi
 
