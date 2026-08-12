@@ -244,7 +244,9 @@ jobs:
               tmp="$(mktemp)"
               # Capturing dumpbin in a bash variable SIGPIPEs (exit 157) on
               # this runner; write to a file and grep that.
-              "$dumpbin" /EXPORTS "$dll_win" >"$tmp" 2>&1 || {
+              # Git Bash converts a leading /EXPORTS into
+              # C:\Program Files\Git\EXPORTS. Disable that for this call.
+              MSYS_NO_PATHCONV=1 "$dumpbin" /EXPORTS "$dll_win" >"$tmp" 2>&1 || {
                 echo "dumpbin failed on $dll_win (exit $?)"; cat "$tmp"; rm -f "$tmp"; exit 1
               }
               for sym in "$@"; do
