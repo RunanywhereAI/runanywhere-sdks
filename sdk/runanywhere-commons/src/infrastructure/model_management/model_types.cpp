@@ -10,6 +10,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include "model_types_internal.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -20,6 +22,10 @@
 
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+
+namespace {
+constexpr const char* LOG_CAT = "ModelTypes";
+}  // namespace
 
 // =============================================================================
 // ARCHIVE TYPE FUNCTIONS
@@ -1220,6 +1226,148 @@ void rac_model_info_array_free(rac_model_info_t** models, size_t count) {
     free(static_cast<void*>(models));
 }
 
+// =============================================================================
+// ARTIFACT INFO DEEP COPY
+//
+// One copy authority for the three heap blocks owned by
+// rac_model_artifact_info_t. Both duplicators of rac_model_info_t call this:
+// rac_model_info_copy() below and deep_copy_model() in
+// model_registry_convert.cpp. See model_types_internal.h for the contract.
+// =============================================================================
+
+namespace {
+
+// Duplicates a nullable C string. Returns false only when a non-null source
+// could not be duplicated, so callers can distinguish "absent" from "OOM".
+bool dup_optional_string(const char* src, const char** out) {
+    if (!src) {
+        *out = nullptr;
+        return true;
+    }
+    *out = rac_strdup(src);
+    return *out != nullptr;
+}
+
+// Duplicates a pattern array. All-or-nothing: on failure nothing is written to
+// *out_patterns / *out_count and the partial array is released, so the caller
+// never sees a counted array with NULL entries.
+bool dup_pattern_array(const char* const* src, size_t count, const char*** out_patterns,
+                       size_t* out_count) {
+    if (!src || count == 0) {
+        return true;  // nothing to copy; caller's fields stay NULL/0
+    }
+    auto** patterns = static_cast<const char**>(calloc(count, sizeof(char*)));
+    if (!patterns) {
+        return false;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        if (!dup_optional_string(src[i], &patterns[i])) {
+            for (size_t j = 0; j < i; ++j) {
+                free((void*)patterns[j]);
+            }
+            free(static_cast<void*>(patterns));
+            return false;
+        }
+    }
+    *out_patterns = patterns;
+    *out_count = count;
+    return true;
+}
+
+// Deep copy of the expected-files manifest. Returns nullptr on null input or on
+// any allocation failure (the partial copy is released first).
+rac_expected_model_files_t* copy_expected_files(const rac_expected_model_files_t* src) {
+    if (!src) {
+        return nullptr;
+    }
+    rac_expected_model_files_t* copy = rac_expected_model_files_alloc();
+    if (!copy) {
+        return nullptr;
+    }
+    if (!dup_pattern_array(src->required_patterns, src->required_pattern_count,
+                           &copy->required_patterns, &copy->required_pattern_count) ||
+        !dup_pattern_array(src->optional_patterns, src->optional_pattern_count,
+                           &copy->optional_patterns, &copy->optional_pattern_count) ||
+        !dup_optional_string(src->description, &copy->description)) {
+        rac_expected_model_files_free(copy);
+        return nullptr;
+    }
+    return copy;
+}
+
+// Deep copy of the multi-file descriptor array. Returns nullptr on empty input
+// or on any allocation failure (the partial array is released first).
+rac_model_file_descriptor_t* copy_file_descriptors(const rac_model_file_descriptor_t* src,
+                                                   size_t count) {
+    if (!src || count == 0) {
+        return nullptr;
+    }
+    rac_model_file_descriptor_t* copy = rac_model_file_descriptors_alloc(count);
+    if (!copy) {
+        return nullptr;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        if (!dup_optional_string(src[i].relative_path, &copy[i].relative_path) ||
+            !dup_optional_string(src[i].destination_path, &copy[i].destination_path) ||
+            !dup_optional_string(src[i].url, &copy[i].url) ||
+            !dup_optional_string(src[i].checksum_sha256, &copy[i].checksum_sha256)) {
+            // rac_model_file_descriptors_alloc() zeroes the array, so freeing
+            // all `count` entries is safe even though only `i` are populated.
+            rac_model_file_descriptors_free(copy, count);
+            return nullptr;
+        }
+        copy[i].is_required = src[i].is_required;
+        copy[i].role = src[i].role;
+        copy[i].size_bytes = src[i].size_bytes;
+    }
+    return copy;
+}
+
+}  // namespace
+
+namespace rac::infra::model_types {
+
+rac_result_t artifact_info_copy(const rac_model_artifact_info_t* src,
+                                rac_model_artifact_info_t* dst) {
+    if (!src || !dst) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    // Scalars first, then every owned pointer explicitly -- never a struct
+    // assignment, which would alias src's heap blocks into dst.
+    dst->kind = src->kind;
+    dst->archive_type = src->archive_type;
+    dst->archive_structure = src->archive_structure;
+    dst->expected_files = nullptr;
+    dst->file_descriptors = nullptr;
+    dst->file_descriptor_count = 0;
+    dst->strategy_id = nullptr;
+
+    bool ok = true;
+
+    dst->expected_files = copy_expected_files(src->expected_files);
+    if (src->expected_files && !dst->expected_files) {
+        ok = false;
+    }
+
+    dst->file_descriptors =
+        copy_file_descriptors(src->file_descriptors, src->file_descriptor_count);
+    // The invariant consumers rely on: a non-zero count always implies a
+    // non-NULL array. Derive the count from the pointer, never from the source.
+    dst->file_descriptor_count = dst->file_descriptors ? src->file_descriptor_count : 0;
+    if (src->file_descriptors && src->file_descriptor_count > 0 && !dst->file_descriptors) {
+        ok = false;
+    }
+
+    if (!dup_optional_string(src->strategy_id, &dst->strategy_id)) {
+        ok = false;
+    }
+
+    return ok ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+}
+
+}  // namespace rac::infra::model_types
+
 rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
     if (!model)
         return nullptr;
@@ -1249,11 +1397,22 @@ rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
     copy->local_path = rac_strdup(model->local_path);
     copy->description = rac_strdup(model->description);
 
-    // Copy artifact info (shallow for now - TODO: deep copy if needed)
-    copy->artifact_info = model->artifact_info;
-    copy->artifact_info.expected_files = nullptr;
-    copy->artifact_info.file_descriptors = nullptr;
-    copy->artifact_info.strategy_id = rac_strdup(model->artifact_info.strategy_id);
+    // Deep-copy the artifact block through the one shared helper (see
+    // model_types_internal.h). A shallow struct assignment aliases the source's
+    // expected-files manifest and descriptor array into the copy -- a double
+    // free -- and nulling only the pointers while keeping
+    // file_descriptor_count leaves consumers iterating a NULL array.
+    //
+    // Best-effort on OOM by design: rac_model_info_copy() has always returned a
+    // (possibly lossy) copy rather than NULL once allocation started, and
+    // rac_model_assignment_* pushes the result straight into its cache without
+    // a NULL check. Turning artifact OOM into a NULL return would move the
+    // crash there instead of fixing it.
+    if (rac::infra::model_types::artifact_info_copy(&model->artifact_info, &copy->artifact_info) ==
+        RAC_ERROR_OUT_OF_MEMORY) {
+        RAC_LOG_WARNING(LOG_CAT, "Out of memory copying artifact info for model '%s'",
+                        model->id ? model->id : "?");
+    }
 
     // Copy tags
     if (model->tags && model->tag_count > 0) {

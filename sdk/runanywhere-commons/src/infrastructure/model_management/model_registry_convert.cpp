@@ -9,6 +9,7 @@
  */
 
 #include "model_registry_internal.h"
+#include "model_types_internal.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -23,67 +24,6 @@
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 
 namespace rac::infra::model_registry::detail {
-
-namespace {
-
-// Deep copy of the expected-files manifest. Returns nullptr on null input or
-// allocation failure (callers treat a missing manifest as "no declared
-// expectations", which is the pre-existing behavior for null).
-rac_expected_model_files_t* deep_copy_expected_files(const rac_expected_model_files_t* src) {
-    if (!src) {
-        return nullptr;
-    }
-    rac_expected_model_files_t* copy = rac_expected_model_files_alloc();
-    if (!copy) {
-        return nullptr;
-    }
-    if (src->required_patterns && src->required_pattern_count > 0) {
-        copy->required_patterns =
-            static_cast<const char**>(calloc(src->required_pattern_count, sizeof(char*)));
-        if (copy->required_patterns) {
-            copy->required_pattern_count = src->required_pattern_count;
-            for (size_t i = 0; i < src->required_pattern_count; ++i) {
-                copy->required_patterns[i] = rac_strdup(src->required_patterns[i]);
-            }
-        }
-    }
-    if (src->optional_patterns && src->optional_pattern_count > 0) {
-        copy->optional_patterns =
-            static_cast<const char**>(calloc(src->optional_pattern_count, sizeof(char*)));
-        if (copy->optional_patterns) {
-            copy->optional_pattern_count = src->optional_pattern_count;
-            for (size_t i = 0; i < src->optional_pattern_count; ++i) {
-                copy->optional_patterns[i] = rac_strdup(src->optional_patterns[i]);
-            }
-        }
-    }
-    copy->description = rac_strdup(src->description);
-    return copy;
-}
-
-// Deep copy of the multi-file descriptor array.
-rac_model_file_descriptor_t* deep_copy_file_descriptors(const rac_model_file_descriptor_t* src,
-                                                        size_t count) {
-    if (!src || count == 0) {
-        return nullptr;
-    }
-    rac_model_file_descriptor_t* copy = rac_model_file_descriptors_alloc(count);
-    if (!copy) {
-        return nullptr;
-    }
-    for (size_t i = 0; i < count; ++i) {
-        copy[i].relative_path = rac_strdup(src[i].relative_path);
-        copy[i].destination_path = rac_strdup(src[i].destination_path);
-        copy[i].url = rac_strdup(src[i].url);
-        copy[i].is_required = src[i].is_required;
-        copy[i].role = src[i].role;
-        copy[i].size_bytes = src[i].size_bytes;
-        copy[i].checksum_sha256 = rac_strdup(src[i].checksum_sha256);
-    }
-    return copy;
-}
-
-}  // namespace
 
 rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     if (!src)
@@ -103,17 +43,10 @@ rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     // Copy artifact info struct. Expected-files and descriptor arrays MUST be
     // deep-copied: every registry save/get round-trips through this function,
     // and dropping them silently downgrades artifact completeness validation
-    // to filename heuristics everywhere downstream.
-    copy->artifact_info.kind = src->artifact_info.kind;
-    copy->artifact_info.archive_type = src->artifact_info.archive_type;
-    copy->artifact_info.archive_structure = src->artifact_info.archive_structure;
-    copy->artifact_info.expected_files =
-        deep_copy_expected_files(src->artifact_info.expected_files);
-    copy->artifact_info.file_descriptors = deep_copy_file_descriptors(
-        src->artifact_info.file_descriptors, src->artifact_info.file_descriptor_count);
-    copy->artifact_info.file_descriptor_count =
-        copy->artifact_info.file_descriptors ? src->artifact_info.file_descriptor_count : 0;
-    copy->artifact_info.strategy_id = rac_strdup(src->artifact_info.strategy_id);
+    // to filename heuristics everywhere downstream. Shared with
+    // rac_model_info_copy() so both duplicators keep identical ownership and
+    // pointer/count invariants (see model_types_internal.h).
+    rac::infra::model_types::artifact_info_copy(&src->artifact_info, &copy->artifact_info);
     copy->download_size = src->download_size;
     copy->memory_required = src->memory_required;
     copy->context_length = src->context_length;
