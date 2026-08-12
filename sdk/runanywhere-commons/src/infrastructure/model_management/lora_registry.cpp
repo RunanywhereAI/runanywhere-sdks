@@ -542,8 +542,8 @@ extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
     }
     if (!rac::foundation::rac_lora_entry_from_proto(proto, entry)) {
         rac_lora_entry_free(entry);
-        return rac_proto_buffer_set_error(out_entry, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert LoraAdapterCatalogEntry");
+        return rac_proto_buffer_set_error(out_entry, RAC_ERROR_OUT_OF_MEMORY,
+                                          "failed to allocate LoRA entry fields");
     }
 
     rc = rac_lora_registry_register(registry, entry);
