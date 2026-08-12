@@ -7,8 +7,8 @@
 //  a payload field.
 //
 
-import Foundation
 import CRACommons
+import Foundation
 
 // MARK: - TokenKind
 
