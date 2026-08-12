@@ -22,7 +22,7 @@ include(LoadVersions)
 # nativeGetVersion() doesn't drift from the actual linked llama.cpp build.
 add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 
-# Repo + tag both come from sdk/runanywhere-commons/VERSIONS (via LoadVersions)
+# Repo + tag both come from core/VERSIONS (via LoadVersions)
 # so a fork swap (e.g. the PrismML Bonsai fork) is a VERSIONS-only change.
 # Fall back to upstream when the key is absent (older VERSIONS files).
 if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
@@ -308,10 +308,10 @@ list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 #                                 rac_registry_load_plugin().
 #
 # Resolve the runanywhere-commons root before the macro call so the
-# include path list below references it. Was sdk/runanywhere-commons/
+# include path list below references it. Was core/
 # src/backends/<name>/ → ../../.. = commons; now engines/<name>/ →
-# ../../sdk/runanywhere-commons.
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+# ../../core.
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 

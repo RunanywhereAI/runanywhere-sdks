@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="examples/logo.svg" alt="RunAnywhere Logo" width="130"/>
+  <img src="docs/logo.svg" alt="RunAnywhere Logo" width="130"/>
 </p>
 
 <h1 align="center">RunAnywhere</h1>
@@ -111,7 +111,7 @@ print(ra.llm.generate("Explain on-device AI in one sentence.",
 Prefer a terminal? The same core ships as a CLI:
 
 ```bash
-brew install runanywhere-ai/tap/rcli
+brew install runanywhereai/tap/rcli
 rcli run qwen3 "Explain on-device AI in one sentence."
 ```
 
@@ -152,7 +152,7 @@ Install via Swift Package Manager:
 https://github.com/RunanywhereAI/runanywhere-sdks
 ```
 
-[Documentation](https://docs.runanywhere.ai/swift/introduction) · [Source](sdk/runanywhere-swift/)
+[Documentation](https://docs.runanywhere.ai/swift/introduction) · [Source](bindings/swift/)
 
 </details>
 
@@ -200,7 +200,7 @@ dependencies {
 }
 ```
 
-[Documentation](https://docs.runanywhere.ai/kotlin/introduction) · [Source](sdk/runanywhere-kotlin/)
+[Documentation](https://docs.runanywhere.ai/kotlin/introduction) · [Source](bindings/kotlin/)
 
 </details>
 
@@ -237,7 +237,7 @@ dependencies:
   # runanywhere_qhexrt: ^0.20.11  # Snapdragon Hexagon NPU
 ```
 
-[Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](sdk/runanywhere-flutter/)
+[Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)
 
 </details>
 
@@ -270,7 +270,7 @@ npm install @runanywhere/core@0.20.11 @runanywhere/llamacpp@0.20.11
 # optional backends: @runanywhere/onnx @runanywhere/mlx @runanywhere/qhexrt
 ```
 
-[Documentation](https://docs.runanywhere.ai/react-native/introduction) · [Source](sdk/runanywhere-react-native/)
+[Documentation](https://docs.runanywhere.ai/react-native/introduction) · [Source](bindings/react-native/)
 
 </details>
 
@@ -305,7 +305,7 @@ npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
 # @runanywhere/web-onnx for STT/TTS/VAD/embeddings in the browser
 ```
 
-[Source](sdk/runanywhere-web/) · [Web starter app](https://github.com/RunanywhereAI/web-starter-app)
+[Source](bindings/web/) · [Web starter app](https://github.com/RunanywhereAI/web-starter-app)
 
 </details>
 
@@ -334,7 +334,7 @@ RunAnywhere.shutdown();
 
 A native N-API addon over the C core. Inference runs in an isolated Electron utility process and streams to the renderer over a MessagePort. LLM, VLM, STT, TTS, embeddings, RAG, structured output, tool calling, and a voice pipeline, with a prebuilt `win32-x64` addon. CUDA is available as an opt-in source build.
 
-Install: build from source (Windows x64 preview), see the [SDK README](sdk/runanywhere-electron/) for steps.
+Install: build from source (Windows x64 preview), see the [SDK README](bindings/electron/) for steps.
 
 </details>
 
@@ -373,7 +373,7 @@ Install via pip:
 pip install runanywhere==0.20.11
 ```
 
-[Source](sdk/runanywhere-python/)
+[Source](bindings/python/)
 
 </details>
 
@@ -399,12 +399,12 @@ Also: `rcli run --image photo.jpg` (VLM), `rcli vad`, `rcli embed`, `rcli image`
 Install (macOS Apple Silicon, Linux x86_64/aarch64, Windows x86_64):
 
 ```bash
-brew install runanywhere-ai/tap/rcli
+brew install runanywhereai/tap/rcli
 # or
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/runanywhere-cli/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/rcli/scripts/install.sh | sh
 ```
 
-[CLI README](sdk/runanywhere-cli/)
+[CLI README](rcli/)
 
 </details>
 
@@ -418,10 +418,10 @@ curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main
 | **Kotlin** | Android API 24+ | Stable | Gradle (`io.github.sanchitmonga22:runanywhere-sdk`) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) |
 | **Flutter** | iOS, Android | Beta | pub.dev (`runanywhere`) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 | **React Native** | iOS, Android | Beta | npm (`@runanywhere/core`) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
-| **Web** | Chromium, Safari, Firefox | Beta | npm (`@runanywhere/web`) | [SDK README](sdk/runanywhere-web/) |
-| **Electron** | Windows x64 desktop | Preview | [Build from source](sdk/runanywhere-electron/) | [SDK README](sdk/runanywhere-electron/) |
-| **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](sdk/runanywhere-python/) |
-| **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [CLI README](sdk/runanywhere-cli/) |
+| **Web** | Chromium, Safari, Firefox | Beta | npm (`@runanywhere/web`) | [SDK README](bindings/web/) |
+| **Electron** | Windows x64 desktop | Preview | [Build from source](bindings/electron/) | [SDK README](bindings/electron/) |
+| **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
+| **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [CLI README](rcli/) |
 
 All SDKs ship on one version line, currently **0.20.11**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
@@ -605,18 +605,26 @@ Anything not in the catalog can be pulled straight from Hugging Face or a direct
 
 ## Example apps
 
-Full consumer-assistant apps, one per platform, all built on the SDK:
+Full consumer-assistant apps, one per platform, all built on the SDK. The iOS, Android, Web, and Electron apps live in their own repositories; the Flutter and React Native ones are still in this tree.
 
 | Platform | Source | Get it |
 |----------|--------|--------|
-| iOS | [examples/ios/RunAnywhereAI](examples/ios/RunAnywhereAI/) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
-| Android | [examples/android/RunAnywhereAI](examples/android/RunAnywhereAI/) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
-| Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
-| React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
-| Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
-| Electron | [examples/electron/RunAnywhereAI](examples/electron/RunAnywhereAI/) | Build from source (Windows) |
+| iOS | [RunanywhereAI/runanywhere-ios](https://github.com/RunanywhereAI/runanywhere-ios) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
+| Android | [RunanywhereAI/runanywhere-android](https://github.com/RunanywhereAI/runanywhere-android) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
+| Web | [RunanywhereAI/runanywhere-web](https://github.com/RunanywhereAI/runanywhere-web) | Build from source |
+| Electron | [RunanywhereAI/runanywhere-electron](https://github.com/RunanywhereAI/runanywhere-electron) | Build from source (Windows) |
+| React Native | [bindings/react-native/example](bindings/react-native/example/) | Build from source |
+| Flutter | [bindings/flutter/example](bindings/flutter/example/) | Build from source |
 
 The Android, Flutter, and React Native apps include an NPU section that detects the device's Hexagon arch and runs LLM, vision, speech, and text-to-speech on the NPU.
+
+**Minimal examples**, the in-repo harnesses SDK contributors use to check a change end to end. Each builds the SDK from local source, so an edit shows up without a publish step:
+
+| SDK | Harness | Run it |
+|-----|---------|--------|
+| Swift | [bindings/swift/example](bindings/swift/example/) | `./run example ios run` |
+| Kotlin | [bindings/kotlin/example](bindings/kotlin/example/) | `./run example android install` |
+| Web | [bindings/web/example](bindings/web/example/) | `./run example web dev` |
 
 **Starters**, minimal projects to copy from:
 [Swift](https://github.com/RunanywhereAI/swift-starter-example) ·
@@ -625,14 +633,9 @@ The Android, Flutter, and React Native apps include an NPU section that detects 
 [React Native](https://github.com/RunanywhereAI/react-native-starter-app) ·
 [Web](https://github.com/RunanywhereAI/web-starter-app)
 
-**Playground**, real projects built on the stack:
+Real projects built on the stack:
 
 - [RCLI](https://github.com/RunanywhereAI/RCLI): on-device voice assistant for macOS with local RAG and 40+ system actions, powered by MetalRT
-- [Android Use Agent](Playground/android-use-agent/): an autonomous Android agent driven by an on-device LLM ([benchmarks](Playground/android-use-agent/ASSESSMENT.md))
-- [On-Device Browser Agent](Playground/on-device-browser-agent/): a Chrome extension that automates browser tasks with WebLLM and WebGPU
-- [YapRun](Playground/YapRun/): on-device dictation for iOS and macOS
-- [Linux Voice Assistant](Playground/linux-voice-assistant/): a full voice pipeline in one C++ binary for Raspberry Pi 5, x86_64, and ARM64
-- [OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/): on-device VAD, STT, and TTS with cloud LLM reasoning
 
 ---
 
@@ -642,22 +645,24 @@ Business logic lives in the C++ core, so one fix lands on all eight SDKs at once
 
 ```
 runanywhere-sdks/
-├── sdk/
-│   ├── runanywhere-swift/          # iOS/macOS SDK (XCFramework)
-│   ├── runanywhere-kotlin/         # Android SDK (JNI)
-│   ├── runanywhere-flutter/        # Flutter SDK (Dart FFI)
-│   ├── runanywhere-react-native/   # React Native SDK (Nitro/JSI)
-│   ├── runanywhere-web/            # Web SDK (WebAssembly / WebGPU)
-│   ├── runanywhere-electron/       # Electron SDK (N-API addon)
-│   ├── runanywhere-python/         # Python SDK (pybind11)
-│   ├── runanywhere-cli/            # rcli, the terminal SDK
-│   └── runanywhere-commons/        # Shared C/C++ core behind a C ABI
+├── core/                           # Shared C/C++ core behind a C ABI — all business logic
 │
+├── bindings/                       # Thin language bindings over core/
+│   ├── swift/                      # iOS/macOS SDK (XCFramework) + example/
+│   ├── kotlin/                     # Android SDK (JNI) + example/
+│   ├── flutter/                    # Flutter SDK (Dart FFI) + example/
+│   ├── react-native/               # React Native SDK (Nitro/JSI) + example/
+│   ├── web/                        # Web SDK (WebAssembly / WebGPU) + example/
+│   ├── electron/                   # Electron SDK (N-API addon) + example/
+│   ├── python/                     # Python SDK (pybind11) + example/
+│   ├── proto-ts/                   # @runanywhere/proto-ts, the IDL's TypeScript binding
+│   └── shared-apple/               # Apple transport shared by the RN + Flutter bindings
+│                                   # (iOS/Android/Web/Electron consumer apps live in their own repos)
+│
+├── rcli/                           # rcli, the terminal app built on core/
 ├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language
-├── examples/                       # Full example apps
-├── Playground/                     # Real-world reference apps
 └── docs/                           # Documentation
 ```
 
@@ -695,13 +700,13 @@ cd runanywhere-sdks
 ./run doctor
 ./run setup
 
-# Build the native XCFrameworks into sdk/runanywhere-swift/Binaries/.
+# Build the native XCFrameworks into bindings/swift/Binaries/.
 # Required for local Swift development.
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./bindings/swift/scripts/build-core-xcframework.sh
 
-# Run the iOS sample app
-cd examples/ios/RunAnywhereAI
-open RunAnywhereAI.xcodeproj
+# Stream one completion through the minimal Swift harness
+cd bindings/swift/example
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift run
 ```
 
 ---

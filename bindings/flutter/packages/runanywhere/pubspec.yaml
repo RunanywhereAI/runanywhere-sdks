@@ -1,0 +1,86 @@
+name: runanywhere
+description: Privacy-first, on-device AI SDK for Flutter. Run LLMs, STT, TTS, and VAD directly on device with no data leaving the device.
+version: 0.20.17
+homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
+topics:
+  - ai
+  - machine-learning
+  - on-device
+  - llm
+  - speech-recognition
+
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # FFI (Foreign Function Interface)
+  ffi: ^2.2.0
+  # Networking: HTTP transport routed through the commons C ABI
+  # (rac_http_client_*, rac_http_download_execute).
+  # Protobuf runtime — consumed by the IDL-generated bindings in
+  # `lib/generated/`.
+  # Pinned to match the pinned protoc_plugin version in
+  # scripts/setup/setup-toolchain.sh / idl/codegen/generate_dart.sh.
+  # Bumped 2026-05-19 (idl-codegen bump): ^3.1.0 -> ^6.0.0.
+  # protoc_plugin 25.0.0 (PROTOC_GEN_DART_VERSION) emits `.pb.dart` bindings
+  # against the protobuf 6.x runtime API — `protoc_plugin` 25.0.0 declares
+  # `protobuf: ^6.0.0` as its peer dep. The 4.x/5.x lines were skipped; 6.0.0
+  # supersedes them. `lib/generated/` is regenerated in lockstep.
+  protobuf: ^6.0.0
+  # `fixnum` is a transitive peer of `protobuf` — the generated bindings
+  # import it directly for `int64` field handling, so it must be declared.
+  fixnum: ^1.1.1
+  # Storage
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.5
+  # Audio capture (STT) + playback (TTS) — owned by the SDK per the repo
+  # layering rule (platform audio capture/playback belongs in the SDK, not
+  # example apps). Mirrors Swift Features/STT/AudioCaptureManager and
+  # Features/TTS/AudioPlaybackManager.
+  audioplayers: ^6.0.0
+  record: ^7.1.1
+  # Device info — previous cap `<11.3.2` removed 2026-05-19 (dep bump).
+  # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
+  # 13.x is now the latest stable and the cap is no longer warranted.
+  device_info_plus: ^13.1.0
+  battery_plus: ^7.0.0
+  flutter_timezone: ^5.1.0
+  package_info_plus: ^10.1.0
+  # Utilities
+  uuid: ^4.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  # No explicit `test:` pin — flutter_test supplies a compatible test_api for
+  # the active Flutter SDK (e.g. 0.7.7 on 3.38+). Direct `test` pins conflicted
+  # with that and broke `melos bootstrap`.
+  flutter_lints: ^6.0.0
+  # Pinned (not caret) so local + CI codegen produces byte-identical output.
+  # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup/setup-toolchain.sh and
+  # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
+  # this pin (the packages/runanywhere pubspec is the workspace source of
+  # truth for shared deps — see the centralization comment block in
+  # bindings/flutter/pubspec.yaml).
+  # Bumped 2026-05-19 (idl-codegen bump): 22.0.0 -> 25.0.0.
+  protoc_plugin: 25.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Native plugin configuration
+  # RACommons binaries are bundled in ios/ and android/ directories
+  plugin:
+    platforms:
+      android:
+        package: ai.runanywhere.sdk
+        pluginClass: RunAnywherePlugin
+      ios:
+        pluginClass: RunAnywherePlugin

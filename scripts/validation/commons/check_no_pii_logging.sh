@@ -8,7 +8,7 @@
 #
 # Prevents reintroduction of the Android logcat leak where signed URLs
 # were emitted at INFO level — originally in
-# `sdk/runanywhere-commons/src/infrastructure/http/rac_http_download.cpp`,
+# `core/src/infrastructure/http/rac_http_download.cpp`,
 # but the same hazard exists across any code path that touches signed URLs
 # or per-user filesystem paths (features/diffusion, features/rag,
 # infrastructure/model_management, infrastructure/network, etc.).
@@ -16,8 +16,8 @@
 # Heuristic:
 #
 #   1. Scan files under
-#      sdk/runanywhere-commons/src/features/
-#      sdk/runanywhere-commons/src/infrastructure/
+#      core/src/features/
+#      core/src/infrastructure/
 #      — anywhere signed URLs or per-user paths can show up.
 #   2. Inside those files, treat as a violation any __android_log_print(...)
 #      or RAC_LOG_INFO(...) call whose JOINED argument list contains a %s
@@ -33,7 +33,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-COMMONS_SRC="${REPO_ROOT}/sdk/runanywhere-commons/src"
+COMMONS_SRC="${REPO_ROOT}/core/src"
 
 if [[ ! -d "${COMMONS_SRC}" ]]; then
   printf "ERROR: expected commons source root not found: %s\n" "${COMMONS_SRC}" >&2

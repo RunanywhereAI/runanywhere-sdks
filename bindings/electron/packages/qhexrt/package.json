@@ -1,0 +1,55 @@
+{
+  "name": "@runanywhere/electron-qhexrt",
+  "version": "0.20.17",
+  "description": "RunAnywhere Electron SDK \u2014 QHexRT backend plugin (Qualcomm Hexagon NPU; Snapdragon X / X2 Elite on Windows ARM64)",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "prebuilds",
+    "README.md",
+    "LICENSE"
+  ],
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\""
+  },
+  "peerDependencies": {
+    "@runanywhere/electron": "^0.20.15"
+  },
+  "devDependencies": {
+    "@runanywhere/electron": "file:../..",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "bindings/electron/packages/qhexrt"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

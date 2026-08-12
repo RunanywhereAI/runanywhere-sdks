@@ -1,0 +1,95 @@
+name: runanywhere_ai
+description: RunAnywhere AI Flutter example app demonstrating on-device AI capabilities
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # RunAnywhere SDK - Core
+  runanywhere:
+    path: ../../../bindings/flutter/packages/runanywhere
+
+  # RunAnywhere SDK - LlamaCpp Backend (LLM)
+  runanywhere_llamacpp:
+    path: ../../../bindings/flutter/packages/runanywhere_llamacpp
+
+  # RunAnywhere SDK - Apple MLX Backend (iOS only)
+  runanywhere_mlx:
+    path: ../../../bindings/flutter/packages/runanywhere_mlx
+
+  # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
+  runanywhere_onnx:
+    path: ../../../bindings/flutter/packages/runanywhere_onnx
+
+  # RunAnywhere SDK - QHexRT NPU Backend (Android/Snapdragon Hexagon only)
+  runanywhere_qhexrt:
+    path: ../../../bindings/flutter/packages/runanywhere_qhexrt
+  # Int64 proto scalars (LoRA catalog sizeBytes) — already transitive via
+  # protobuf; declared directly because the app constructs proto messages.
+  fixnum: ^1.1.1
+  flutter_markdown_plus: ^1.0.7
+  permission_handler: ^12.0.3
+  shared_preferences: ^2.5.5
+  # Secure storage (iOS Keychain, Android Keystore)
+  flutter_secure_storage: ^10.3.1
+  # File system access
+  path_provider: ^2.1.5
+  # Device information — bumped 2026-05-19 (P10 dep-bump): aligned with
+  # core SDK package which now requires ^13.1.0 (P6 dep-bump). The previous
+  # `<11.3.2` upper cap was removed in P6 (no longer warranted).
+  device_info_plus: ^13.1.0
+  # App package info — bumped 2026-05-19 (P10 dep-bump): 4.2.0 → 10.1.0
+  # (latest stable; resolved via dependency_overrides win32 ^6.x below).
+  package_info_plus: ^10.1.0
+  # URL launcher
+  url_launcher: ^6.2.0
+  # HTTP client for API calls
+  http: ^1.2.0
+  # Image picker for gallery photos
+  image_picker: ^1.0.0
+  # File picker for PDF/JSON document selection (RAG) — bumped 2026-05-19
+  # (P10 dep-bump): 8.0.0 → 12.0.0-beta.3.
+  # Gap documented: 11.0.2 (latest stable) hard-codes win32 ^5.9.0 API
+  # surface; on Android builds it errors at COMObject / TEXT / convertToIID
+  # call sites because the unconditional `export 'src/platform/windows/...'`
+  # forces the Windows path to compile on every target. 12.0.0-beta.3 is the
+  # only version compatible with win32 ^6.x (required transitively by
+  # device_info_plus 13.x and package_info_plus 10.x, both pinned by P6).
+  # Move to ^12.0.0 stable once it ships.
+  file_picker: ^12.0.0-beta.3
+  # PDF text extraction (RAG)
+  syncfusion_flutter_pdf: ^27.1.48
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  # Bumped 2026-05-19 (P10 dep-bump): 5.0.0 → 6.0.0 to match SDK packages.
+  flutter_lints: ^6.0.0
+
+# Force all packages to use local path dependencies during development
+dependency_overrides:
+  runanywhere:
+    path: ../../../bindings/flutter/packages/runanywhere
+  runanywhere_mlx:
+    path: ../../../bindings/flutter/packages/runanywhere_mlx
+  runanywhere_onnx:
+    path: ../../../bindings/flutter/packages/runanywhere_onnx
+  runanywhere_qhexrt:
+    path: ../../../bindings/flutter/packages/runanywhere_qhexrt
+  # win32 ^6.x override (P10 dep-bump 2026-05-19): `device_info_plus 13.x`
+  # and `package_info_plus 10.x` both require win32 ^6.x. Win32 is a
+  # mobile-no-op (this app targets iOS/Android only), so 6.x is safe.
+  win32: ^6.2.0
+  # flutter_secure_storage 10.3.1 pulls in flutter_secure_storage_windows
+  # 4.1.0 which hard-codes win32 ^5.5.4 — incompatible with the win32 6.x
+  # override above. 4.2.2 declares win32 ^6.0.1 and compiles on the
+  # Android target. P10 dep-bump 2026-05-19.
+  flutter_secure_storage_windows: ^4.2.2
+
+flutter:
+  uses-material-design: true

@@ -9,7 +9,7 @@ if(EMSCRIPTEN)
         set(_rac_onnxrt_wasm_dir "${RAC_ONNX_WASM_RUNTIME_DIR}")
     else()
         set(_rac_onnxrt_wasm_dir
-            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+            "${CMAKE_SOURCE_DIR}/core/third_party/onnxruntime-wasm")
     endif()
     if(NOT EXISTS "${_rac_onnxrt_wasm_dir}/lib/libonnxruntime.a")
         set(_rac_runtime_onnxrt_default OFF)
@@ -35,11 +35,11 @@ set_target_properties(rac_runtime_onnxrt PROPERTIES
 
 target_include_directories(rac_runtime_onnxrt PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/core/include
 )
 
 target_include_directories(rac_runtime_onnxrt PRIVATE
-    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    ${CMAKE_SOURCE_DIR}/core/src
 )
 
 target_link_libraries(rac_runtime_onnxrt PUBLIC

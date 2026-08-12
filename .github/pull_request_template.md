@@ -29,9 +29,6 @@ Brief description of the changes made.
 - [ ] Tested on iOS
 - [ ] Tested on Android
 
-**Playground:**
-- [ ] Tested on target platform
-- [ ] Verified no regressions in existing Playground projects
 **Web SDK / Web Sample:**
 - [ ] Tested in Chrome (Desktop)
 - [ ] Tested in Firefox
@@ -44,19 +41,21 @@ Brief description of the changes made.
 Please add the appropriate label(s):
 
 **SDKs:**
-- [ ] `Swift SDK` - Changes to Swift SDK (`sdk/runanywhere-swift`)
-- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/runanywhere-kotlin`)
-- [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/runanywhere-flutter`)
-- [ ] `React Native SDK` - Changes to React Native SDK (`sdk/runanywhere-react-native`)
-- [ ] `Web SDK` - Changes to Web SDK (`sdk/runanywhere-web`)
-- [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
+- [ ] `Swift SDK` - Changes to Swift SDK (`bindings/swift`)
+- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`bindings/kotlin`)
+- [ ] `Flutter SDK` - Changes to Flutter SDK (`bindings/flutter`)
+- [ ] `React Native SDK` - Changes to React Native SDK (`bindings/react-native`)
+- [ ] `Web SDK` - Changes to Web SDK (`bindings/web`)
+- [ ] `Commons` - Changes to shared native code (`core`)
 
 **Sample Apps:**
-- [ ] `iOS Sample` - Changes to iOS example app (`examples/ios`)
-- [ ] `Android Sample` - Changes to Android example app (`examples/android`)
-- [ ] `Flutter Sample` - Changes to Flutter example app (`examples/flutter`)
-- [ ] `React Native Sample` - Changes to React Native example app (`examples/react-native`)
-- [ ] `Web Sample` - Changes to Web example app (`examples/web`)
+- [ ] `Flutter Sample` - Changes to Flutter example app (`bindings/flutter/example`)
+- [ ] `React Native Sample` - Changes to React Native example app (`bindings/react-native/example`)
+- [ ] `Minimal Examples` - Changes to an in-repo SDK harness (`bindings/{swift,kotlin,web}/example`)
+
+The iOS, Android, Web, and Electron consumer apps live in their own
+repositories (`RunanywhereAI/runanywhere-{ios,android,web,electron}`) — open
+those PRs there.
 
 ## Checklist
 - [ ] Code follows project style guidelines

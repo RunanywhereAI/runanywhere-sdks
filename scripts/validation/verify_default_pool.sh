@@ -48,20 +48,20 @@ QUIET = os.environ.get("QUIET") == "1"
 PROTO = Path("idl/sdk_defaults.proto")
 TARGETS = {
     "proto":  PROTO,
-    "c":      Path("sdk/runanywhere-commons/include/rac/rac_defaults_generated.h"),
-    "swift":  Path("sdk/runanywhere-swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift"),
-    "kotlin": Path("sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt"),
-    "dart":   Path("sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart"),
-    "ts":     Path("sdk/shared/proto-ts/src/defaults/pool.ts"),
-    "python": Path("sdk/runanywhere-python/runanywhere/_generated_defaults.py"),
+    "c":      Path("core/include/rac/rac_defaults_generated.h"),
+    "swift":  Path("bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift"),
+    "kotlin": Path("bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt"),
+    "dart":   Path("bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart"),
+    "ts":     Path("bindings/proto-ts/src/defaults/pool.ts"),
+    "python": Path("bindings/python/runanywhere/_generated_defaults.py"),
     # The Flutter and RN Android plugins get their own copy because neither
     # depends on the Kotlin SDK; they must match it byte-for-byte in value.
     "kotlin/flutter-android": Path(
-        "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/"
+        "bindings/flutter/packages/runanywhere/android/src/main/kotlin/"
         "com/runanywhere/sdk/generated/RADefaultsPool.kt"
     ),
     "kotlin/rn-android": Path(
-        "sdk/runanywhere-react-native/packages/core/android/src/main/java/"
+        "bindings/react-native/packages/core/android/src/main/java/"
         "com/runanywhere/sdk/generated/RADefaultsPool.kt"
     ),
 }

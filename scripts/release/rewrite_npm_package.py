@@ -44,18 +44,30 @@ class ArchiveEntry:
     payload: bytes | None
 
 
+# A monorepo-local dependency spec that must not survive into a published
+# tarball. `workspace:` is what the yarn/npm workspaces use; `file:` is what the
+# Electron SDK uses for its sibling proto-ts dependency (it sets
+# `.npmrc install-links=true` so the dep is copied rather than symlinked).
+# Either form resolves to a path that does not exist on a consumer machine.
+_LOCAL_SPEC_PREFIXES = ("workspace:", "file:")
+
+
+def _is_local_spec(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(_LOCAL_SPEC_PREFIXES)
+
+
 def _rewrite_workspace_specs(value: object, exact_version: str) -> int:
     rewritten = 0
     if isinstance(value, dict):
         for key, nested in value.items():
-            if isinstance(nested, str) and nested.startswith("workspace:"):
+            if _is_local_spec(nested):
                 value[key] = exact_version
                 rewritten += 1
             else:
                 rewritten += _rewrite_workspace_specs(nested, exact_version)
     elif isinstance(value, list):
         for index, nested in enumerate(value):
-            if isinstance(nested, str) and nested.startswith("workspace:"):
+            if _is_local_spec(nested):
                 value[index] = exact_version
                 rewritten += 1
             else:

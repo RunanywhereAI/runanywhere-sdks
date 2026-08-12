@@ -20,7 +20,7 @@
 #                       extension <Msg>Validate on <Msg> { void validate() }
 #
 # Output (single file):
-#   sdk/runanywhere-flutter/packages/runanywhere/lib/generated/convenience/ra_convenience.dart
+#   bindings/flutter/packages/runanywhere/lib/generated/convenience/ra_convenience.dart
 #
 # Invoked by generate_dart.sh / generate_all.sh AFTER protoc-gen-dart has
 # produced the .pb.dart files so the message / enum type names referenced
@@ -665,7 +665,7 @@ def main() -> int:
     proto_dir  = repo_root / "idl"
     out_dir    = (
         repo_root
-        / "sdk" / "runanywhere-flutter" / "packages" / "runanywhere"
+        / "bindings" / "flutter" / "packages" / "runanywhere"
         / "lib" / GENERATED_SUBDIR / CONVENIENCE_SUBDIR
     )
     out_path   = out_dir / OUTPUT_FILE_NAME

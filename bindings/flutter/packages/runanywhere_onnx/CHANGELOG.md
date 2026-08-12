@@ -1,0 +1,94 @@
+# Changelog
+
+All notable changes to the RunAnywhere ONNX Backend will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.20.17] - 2026-08-11
+
+- Electron QHexRT backend and its commons platform-capability changes.
+- Swift package is now consumable by version (`from:`) rather than only by git revision.
+
+## [0.20.15] - 2026-08-11
+
+- Suite version bump.
+
+## [0.20.14] - 2026-08-09
+
+- Suite version bump.
+
+## [0.20.13] - 2026-08-08
+
+- Suite version bump.
+
+## [0.20.12] - 2026-07-28
+
+- Suite version bump; Kotlin/QHexRT Maven release.
+
+## [0.20.11] - 2026-07-16
+
+- Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.
+
+## [0.20.10] - 2026-07-13
+
+- CoreML diffusion enablement + macOS backend slice fixes (see SDK release notes).
+
+## [0.20.9] - 2026-07-13
+
+### Changed
+- Version-aligned 0.20.9 release across all RunAnywhere SDKs; dev-analytics config baked into the native core at build time.
+
+## [0.20.0] - 2026-07-12
+
+### Changed
+- Aligned the backend package and native artifact contract with RunAnywhere 0.20.0.
+
+## [0.19.15] - 2026-07-11
+
+### Changed
+- Aligned public package metadata and native artifact staging with RunAnywhere 0.19.15.
+
+## [0.19.13] - 2026-05-13
+
+### Changed
+- Kept the Flutter plugin as a thin backend registration adapter by removing unused template MethodChannel methods.
+- Aligned the iOS deployment target and platform claims with the Swift iOS 17.0 baseline.
+- Removed the backend plugin `uses-material-design` flag.
+
+### Notes
+- ONNX backend FFI typedefs still live in this package because moving them to the shared native type layer requires touching the core `runanywhere` package, which is outside this lane's write scope.
+
+## [0.16.0] - 2026-02-14
+
+### Changed
+- Updated runanywhere dependency to ^0.16.0
+- Rebuilt native ONNX backend binaries with latest Sherpa-ONNX (v1.12.20 for Android, v1.12.18 for iOS)
+- Includes parameter piping fix (#340) and network layer improvements from core SDK
+
+## [0.15.9] - 2025-01-11
+
+### Changed
+- Updated runanywhere dependency to ^0.15.9 for iOS symbol visibility fix
+- See runanywhere 0.15.9 changelog for details on the iOS fix
+
+## [0.15.8] - 2025-01-10
+
+### Added
+- Initial public release on pub.dev
+- ONNX Runtime integration for on-device inference
+- Speech-to-Text (STT) implementation using Whisper models
+- Text-to-Speech (TTS) implementation
+- Voice Activity Detection (VAD) implementation using Silero
+- Native bindings for iOS and Android
+
+### Features
+- Real-time speech transcription
+- Neural voice synthesis
+- Speech detection for voice interfaces
+- Model download and extraction support
+- Streaming transcription support
+
+### Platforms
+- iOS 17.0+ support
+- Android API 24+ support

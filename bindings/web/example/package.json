@@ -1,0 +1,22 @@
+{
+  "name": "@runanywhere/example-web-minimal",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Bare-minimum browser harness for the RunAnywhere Web SDK: one prompt, one streamed answer.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host localhost --port 3000 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host localhost --port 3000 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "typecheck:installed": "tsc --noEmit -p tsconfig.installed-sdk.json"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.4"
+  }
+}

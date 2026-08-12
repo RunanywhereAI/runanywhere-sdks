@@ -7,7 +7,7 @@
 #   pip install "grpcio-tools==1.71.*"   # bundles a protoc that emits protobuf 5.x gencode
 #
 # Output:
-#   sdk/runanywhere-python/runanywhere/_proto/*_pb2.py
+#   bindings/python/runanywhere/_proto/*_pb2.py
 #
 # Only the RAG surface is bound in Python today (the rest of the SDK uses the flat C ABI), so we
 # generate rag.proto plus its transitive imports (llm_options.proto pulls in model_types,
@@ -20,7 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IDL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-OUT_DIR="$(cd "${IDL_DIR}/.." && pwd)/sdk/runanywhere-python/runanywhere/_proto"
+OUT_DIR="$(cd "${IDL_DIR}/.." && pwd)/bindings/python/runanywhere/_proto"
 
 mkdir -p "${OUT_DIR}"
 # Prefer python3 (CI installs grpcio-tools into the python3 environment). Fall

@@ -56,7 +56,7 @@ enum CuaActionType {
 // you downscaled the screenshot before sending it, pass the downscaled
 // dimensions. On a DPR-2/3/4 display, passing logical points while sending a
 // physical-pixel screenshot offsets every click by that factor, silently (see
-// examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+// RunanywhereAI/runanywhere-ios ComputerUseAgentViewModel.swift for the correct
 // computation). parse_action has already rescaled out of the profile's own
 // space (1000x1000 for `fara`), so no further scaling is ever correct.
 //

@@ -25,7 +25,7 @@
 #     rac_max_float     (50007, double) -> participates in validate()
 #
 # Output:
-#   sdk/runanywhere-swift/Sources/RunAnywhere/Generated/RAConvenience.swift
+#   bindings/swift/Sources/RunAnywhere/Generated/RAConvenience.swift
 #
 # Descriptor parsing, wire-format readers, naming utilities, and the
 # default-literal translator are factored into `_convenience_common.py`
@@ -351,7 +351,7 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root  = script_dir.parent.parent
     proto_dir  = repo_root / "idl"
-    out_dir    = repo_root / "sdk" / "runanywhere-swift" / "Sources" / "RunAnywhere" / "Generated"
+    out_dir    = repo_root / "bindings" / "swift" / "Sources" / "RunAnywhere" / "Generated"
     out_path   = out_dir / "RAConvenience.swift"
 
     out_dir.mkdir(parents=True, exist_ok=True)

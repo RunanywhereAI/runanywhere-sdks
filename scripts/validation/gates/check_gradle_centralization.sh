@@ -57,11 +57,8 @@ CONFIGS_REGEX='(implementation|api|testImplementation|androidTestImplementation|
 HARDCODED_REGEX="^[[:space:]]*${CONFIGS_REGEX}[[:space:]]*\\([[:space:]]*\"[A-Za-z0-9._-]+:[A-Za-z0-9._-]+:[0-9][A-Za-z0-9._+-]*\"[[:space:]]*[),]"
 
 # Paths to exclude — vendored projects and generated outputs. Applied as an
-# ERE filter over the tracked-file list. Playground/ is a collection of
-# standalone demo projects that are not part of any unified build system (see
-# AGENTS.md); it is intentionally excluded from the centralization gate so its
-# experimental version pins can drift independently.
-EXCLUDE_PATHS_REGEX='(^|/)(build|\.gradle|node_modules|third_party)/|(^|/)build[-_][^/]*/|^Playground/'
+# ERE filter over the tracked-file list.
+EXCLUDE_PATHS_REGEX='(^|/)(build|\.gradle|node_modules|third_party)/|(^|/)build[-_][^/]*/'
 
 # Tracked *.gradle.kts files only — matches the stated scope and needs no
 # external tooling beyond git + grep.

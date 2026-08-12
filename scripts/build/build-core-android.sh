@@ -19,35 +19,35 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Anchor cwd to the repo root so CMake presets resolve correctly regardless
 # of where the script is invoked from (e.g., Gradle's buildLocalJniLibs task
-# runs with `workingDir = sdk/runanywhere-kotlin/`, which would otherwise
+# runs with `workingDir = bindings/kotlin/`, which would otherwise
 # break `cmake --preset android-arm64` because CMakePresets.json lives at
 # the repo root, not in the Kotlin module dir).
 cd "${REPO_ROOT}"
 
 # Kotlin + React Native destinations (existing).
-KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs"
-KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
-KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
-KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
-KOTLIN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels"
-RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
-RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
-RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
-RN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/jniLibs"
-RN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
+KOTLIN_JNI_DEST="${REPO_ROOT}/bindings/kotlin/src/main/jniLibs"
+KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
+KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
+KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
+KOTLIN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels"
+RN_CORE_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/core/android/src/main/jniLibs"
+RN_LLAMA_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/llamacpp/android/src/main/jniLibs"
+RN_ONNX_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/onnx/android/src/main/jniLibs"
+RN_QHEXRT_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/qhexrt/android/src/main/jniLibs"
+RN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/bindings/react-native/packages/qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
 RN_QHEXRT_INCLUDE_DEST="${RN_QHEXRT_JNI_DEST}/include"
 
 # Flutter destinations.
-FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
-FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
-FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
-FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
-FLUTTER_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
+FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhere/android/src/main/jniLibs"
+FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
+FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
+FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
+FLUTTER_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhere_qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 
-COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
+COMMONS_INCLUDE_SRC="${REPO_ROOT}/core/include"
 QHEXRT_INCLUDE_SRC="${REPO_ROOT}/engines/qhexrt/include"
-SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-android/jniLibs"
+SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/core/third_party/sherpa-onnx-android/jniLibs"
 
 if [ -z "${ANDROID_NDK_HOME:-}" ]; then
     echo "error: ANDROID_NDK_HOME is not set. Install the NDK and export it." >&2
@@ -497,7 +497,7 @@ for ABI in "${ABIS[@]}"; do
     #
     # Depth bumped from 4 → 6 so we also catch the commons JNI bridge, which
     # lives one level deeper than the engine plugins:
-    #   build/<preset>/sdk/runanywhere-commons/src/jni/librunanywhere_jni.so
+    #   build/<preset>/core/src/jni/librunanywhere_jni.so
     # -------------------------------------------------------------------------
     LIB_COMMONS="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_commons.so"             -print -quit || true)"
     LIB_COMMONS_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_jni.so"     -print -quit || true)"

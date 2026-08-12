@@ -17,7 +17,7 @@ message(STATUS "Configuring mlx engine...")
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
 get_filename_component(RAC_COMMONS_ROOT_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 set(MLX_SOURCES
     rac_mlx_engine.cpp

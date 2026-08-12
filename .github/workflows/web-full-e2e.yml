@@ -2,6 +2,12 @@ name: Web full real-model E2E
 
 # Opt-in / scheduled gate for the serial real-model browser matrix.
 # PR CI stays on lightweight smoke (web-browser-smoke in pr-build.yml).
+#
+# The release journey (`tests/browser/release-app.e2e.spec.ts`) drives the full
+# demo app, which now lives in its own repository. This job checks that app out
+# and points Playwright at it with `RA_E2E_APP_DIR`; without that variable the
+# harness falls back to the in-repo minimal example
+# (`bindings/web/example`), which has no multi-tab UI to drive.
 
 on:
   workflow_dispatch: {}
@@ -28,22 +34,29 @@ jobs:
         with:
           platform: node
       - name: Install Web SDK workspace
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm ci --no-audit --no-fund
       - name: Install proto-ts dependencies
-        working-directory: sdk/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
-      - name: Install example app dependencies
-        working-directory: examples/web/RunAnywhereAI
+      - name: Check out the demo app
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/runanywhere-web
+          path: consumer-web
+          persist-credentials: false
+      - name: Install demo app dependencies
+        working-directory: consumer-web
         run: npm ci --no-audit --no-fund
       - name: Install Playwright Chrome
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npx playwright install --with-deps chrome
       - name: Full release browser journey
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         env:
           RA_RUN_FULL_E2E: '1'
           RA_E2E_TRACE: '1'
+          RA_E2E_APP_DIR: ${{ github.workspace }}/consumer-web
         run: npm run test:browser:release
       - name: Upload Playwright artifacts
         if: always()
@@ -51,6 +64,6 @@ jobs:
         with:
           name: web-full-e2e-artifacts
           path: |
-            sdk/runanywhere-web/playwright-report
-            sdk/runanywhere-web/test-results
+            bindings/web/playwright-report
+            bindings/web/test-results
           if-no-files-found: ignore

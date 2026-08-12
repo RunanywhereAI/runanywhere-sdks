@@ -5,7 +5,7 @@ Every shell script in the repo lives in one of these places, organized by scope:
 ## Repo-root `scripts/` (cross-cutting, grouped by function)
 
 These serve multiple SDKs or the whole repo, so they're grouped by **function**
-(per-SDK scripts live under `sdk/<name>/scripts/`, below).
+(per-SDK scripts live under `bindings/<name>/scripts/`, below).
 
 ### `build/` — native core builds (cross-cutting → stage into multiple SDKs)
 | Script | Purpose |
@@ -13,8 +13,8 @@ These serve multiple SDKs or the whole repo, so they're grouped by **function**
 | `build/build-core-android.sh` | Native build for Android consumers (per-ABI `.so`, staged into kotlin/rn/flutter `jniLibs/`). Stays at root — it serves three SDKs. |
 
 > The Apple xcframework builder and the Web/WASM builder were moved into their
-> owning SDKs (`sdk/runanywhere-swift/scripts/build-core-xcframework.sh`,
-> `sdk/runanywhere-web/scripts/build-core-wasm.sh`) — see the per-SDK section below.
+> owning SDKs (`bindings/swift/scripts/build-core-xcframework.sh`,
+> `bindings/web/scripts/build-core-wasm.sh`) — see the per-SDK section below.
 > `sync-swift-headers.sh` was deleted (unused; the vendored Swift headers are hand-maintained).
 
 ### `release/` — version / packaging
@@ -24,7 +24,7 @@ These serve multiple SDKs or the whole repo, so they're grouped by **function**
 | `release/validate-artifact.sh <file>...` | Type-aware artifact sanity check (XCFramework / `.so` / `.aar` / `.wasm` / `.tgz`). Called by every `package-sdk.sh`. |
 
 > `sync-checksums.sh` and `release-swift-binaries.sh` moved into
-> `sdk/runanywhere-swift/scripts/` (Swift-release-specific) — see below.
+> `bindings/swift/scripts/` (Swift-release-specific) — see below.
 
 ### `setup/` — dev environment
 | Script | Purpose |
@@ -41,7 +41,7 @@ Organized into `gates/` (CI rule-gates wired into `pr-build.yml`), `commons/`
 e2e skills). Output lands under `build/validation/`, not ad hoc root folders.
 See `scripts/validation/README.md` for the full per-script table.
 
-## Per-SDK `sdk/runanywhere-<lang>/scripts/`
+## Per-SDK `bindings/<lang>/scripts/`
 
 Each client SDK has a `scripts/` folder next to its source. With the single-root CMake layout, the per-SDK build *orchestrators* were removed — native artifacts are produced by the `build-core-*.sh` scripts (Android at `scripts/build/`; Apple and Web each live in their own SDK's `scripts/` folder), and the SDK itself is compiled directly by its native toolchain (Xcode/SwiftPM, Gradle, Vite, Melos, Yarn).
 
@@ -54,37 +54,37 @@ The one canonical per-SDK script is the release packager:
 Per-SDK scripts currently in tree:
 
 ```
-sdk/runanywhere-swift/scripts/
+bindings/swift/scripts/
     package-sdk.sh                     # unified release packaging contract
     build-core-xcframework.sh          # builds the Apple xcframeworks (cmake presets) → Binaries/ (+ stages RN/Flutter iOS)
     release-swift-binaries.sh          # local iOS/macOS release packager (zip + checksums)
     sync-checksums.sh                  # patches the root Package.swift checksum: lines
 
-sdk/runanywhere-kotlin/scripts/
+bindings/kotlin/scripts/
     package-sdk.sh                     # unified contract; Gradle drives the rest
 
-sdk/runanywhere-web/scripts/
+bindings/web/scripts/
     package-sdk.sh                     # unified contract; npm drives the rest
     build-core-wasm.sh                 # builds the WebAssembly artifacts (Emscripten) → packages/llamacpp/wasm
 
-sdk/runanywhere-flutter/scripts/
+bindings/flutter/scripts/
     package-sdk.sh                     # unified contract; melos + flutter pub drive the rest
 
-sdk/runanywhere-react-native/scripts/
+bindings/react-native/scripts/
     package-sdk.sh                     # unified contract; yarn workspaces drive the rest
 ```
 
-For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` (Apple), or `sdk/runanywhere-web/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
+For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `bindings/swift/scripts/build-core-xcframework.sh` (Apple), or `bindings/web/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
 
-## `sdk/runanywhere-commons/scripts/` (C++ native build helpers)
+## `core/scripts/` (C++ native build helpers)
 
 Day-to-day native builds use the platform core builders. The release entry
-points in `sdk/runanywhere-commons/scripts/` call those builders and add the
+points in `core/scripts/` call those builders and add the
 strict, deterministic archive staging consumed by `release.yml`; the remaining
 files are platform-specific helpers.
 
 ```
-sdk/runanywhere-commons/scripts/
+core/scripts/
     build-ios.sh                     # canonical Apple release build + versioned XCFramework archives
     build-android.sh                 # canonical per-ABI Android release build + public archive
     build-linux.sh                   # canonical Linux release build + versioned tarball
@@ -103,11 +103,11 @@ sdk/runanywhere-commons/scripts/
 
 Use the core builders for local iteration and these three release entry points
 when producing publishable archives. Native artifacts land under
-`sdk/runanywhere-swift/Binaries/` (Apple) or each SDK's `jniLibs/` tree
+`bindings/swift/Binaries/` (Apple) or each SDK's `jniLibs/` tree
 (Android); release archives and checksums land under
-`sdk/runanywhere-commons/dist/`.
+`core/dist/`.
 
-## Test scripts — `sdk/runanywhere-commons/tests/scripts/`
+## Test scripts — `core/tests/scripts/`
 
 ```
 run-tests.sh            # per-platform entry
@@ -116,9 +116,9 @@ run-tests-all.sh
 download-test-models.sh
 ```
 
-## WASM build — `sdk/runanywhere-web/wasm/scripts/`
+## WASM build — `bindings/web/wasm/scripts/`
 
-Emscripten-specific helpers invoked by the repo-root `sdk/runanywhere-web/scripts/build-core-wasm.sh`:
+Emscripten-specific helpers invoked by the repo-root `bindings/web/scripts/build-core-wasm.sh`:
 
 ```
 build.sh                # WASM compile orchestrator
@@ -138,12 +138,12 @@ relatively.
 
 **Rule of thumb when adding a new script:**
 - **Cross-cutting utility for multiple SDKs or the whole repo?** → `scripts/<build|release|setup|validation>/` at repo root.
-- **Scoped to one SDK's build/release/test flow?** → `sdk/runanywhere-<lang>/scripts/`.
-- **Native build helper that depends on commons' CMake?** → `sdk/runanywhere-commons/scripts/`.
-- **Test runner?** → `sdk/runanywhere-commons/tests/scripts/`.
+- **Scoped to one SDK's build/release/test flow?** → `bindings/<lang>/scripts/`.
+- **Native build helper that depends on commons' CMake?** → `core/scripts/`.
+- **Test runner?** → `core/tests/scripts/`.
 
 ## CI workflows that call these scripts
 
-- `.github/workflows/pr-build.yml` — calls the repo-root `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` and `scripts/build/build-core-android.sh` for native matrix jobs; calls each SDK's build/gradle/npm tooling for SDK jobs. (Linux/Windows/WASM are exercised via CMake presets directly.)
-- `.github/workflows/release.yml` — invokes the canonical `sdk/runanywhere-commons/scripts/build-{ios,android,linux}.sh` release packagers, the WASM build via `npm run build:wasm` (→ `wasm/scripts/build.sh`), and `package-sdk.sh` per SDK plus `sync-checksums.sh` after iOS builds land.
-- `.github/actions/setup-toolchain/action.yml` — loads `sdk/runanywhere-commons/VERSIONS` into `$GITHUB_ENV` so every script sees the same pinned tool versions.
+- `.github/workflows/pr-build.yml` — calls the repo-root `bindings/swift/scripts/build-core-xcframework.sh` and `scripts/build/build-core-android.sh` for native matrix jobs; calls each SDK's build/gradle/npm tooling for SDK jobs. (Linux/Windows/WASM are exercised via CMake presets directly.)
+- `.github/workflows/release.yml` — invokes the canonical `core/scripts/build-{ios,android,linux}.sh` release packagers, the WASM build via `npm run build:wasm` (→ `wasm/scripts/build.sh`), and `package-sdk.sh` per SDK plus `sync-checksums.sh` after iOS builds land.
+- `.github/actions/setup-toolchain/action.yml` — loads `core/VERSIONS` into `$GITHUB_ENV` so every script sees the same pinned tool versions.

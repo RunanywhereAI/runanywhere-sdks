@@ -3,8 +3,8 @@
 # check_rac_api_exports.sh
 #
 # Drift gate: parse every RAC_API-decorated declaration under
-# sdk/runanywhere-commons/include/rac/**/*.h, parse the curated exports list at
-# sdk/runanywhere-commons/exports/RACommons.exports, and report any public
+# core/include/rac/**/*.h, parse the curated exports list at
+# core/exports/RACommons.exports, and report any public
 # RAC_API symbol missing from the exports list.
 #
 # Default behavior: prints a non-zero-exit report listing the drift but is
@@ -38,8 +38,8 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-COMMONS_INCLUDE="${REPO_ROOT}/sdk/runanywhere-commons/include"
-EXPORTS_DIR="${REPO_ROOT}/sdk/runanywhere-commons/exports"
+COMMONS_INCLUDE="${REPO_ROOT}/core/include"
+EXPORTS_DIR="${REPO_ROOT}/core/exports"
 EXPORTS_FILE="${EXPORTS_DIR}/RACommons.exports"
 
 if [[ ! -d "${COMMONS_INCLUDE}" ]]; then

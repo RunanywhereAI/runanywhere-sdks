@@ -32,8 +32,8 @@ permissions:
 jobs:
   # =============================================================================
   # Centralization gates — defend the invariant that toolchain + library
-  # pins live in a single source of truth (sdk/runanywhere-commons/VERSIONS,
-  # dependencies/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
+  # pins live in a single source of truth (core/VERSIONS,
+  # dependencies/versions.json, bindings/flutter/pubspec.yaml, and
   # gradle/libs.versions.toml). Fast-fail before kicking off the SDK matrix.
   # See docs/dependencies/CENTRALIZATION.md.
   # =============================================================================
@@ -70,6 +70,18 @@ jobs:
             git fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
           fi
           bash scripts/validation/gates/check_release_version_coherence.sh
+      - name: Swift distribution repo (runanywhere-swift) is cut at this release
+        # RunanywhereAI/runanywhere-swift is the lightweight SPM distribution of
+        # bindings/swift. Its tags MUST keep pace with this repo's releases or
+        # `from: "<version>"` breaks for every Swift consumer.
+        #
+        # Deliberately NOT in release.yml: that workflow runs on the tag push
+        # itself, when the split repo legitimately has not been cut yet, so it
+        # would fail every release. Here it stays quiet while a release is in
+        # flight (VERSION not yet tagged -> skip) and then fails every PR once
+        # v<VERSION> is published until the split repo catches up. That is what
+        # makes forgetting it impossible rather than merely discouraged.
+        run: bash scripts/validation/gates/check_swift_dist_repo_sync.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only
@@ -84,7 +96,7 @@ jobs:
           set -euo pipefail
           python3 scripts/build/test_validate_qhexrt_prebuilt.py
           python3 scripts/build/test_build_core_android_guards.py
-          python3 sdk/runanywhere-commons/scripts/android/test_download_sherpa_onnx.py
+          python3 core/scripts/android/test_download_sherpa_onnx.py
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
@@ -160,7 +172,7 @@ jobs:
       - name: Smoke (modelless)
         run: |
           set -euo pipefail
-          RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
+          RCLI=build/rcli-macos-release/rcli/rcli
           "$RCLI" version
           BACKENDS="$("$RCLI" backends --json)"
           echo "$BACKENDS"
@@ -171,7 +183,7 @@ jobs:
           "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
           "$RCLI" info --json
       - name: Package smoke
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+        run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
 
   rcli-linux:
     # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
@@ -180,7 +192,7 @@ jobs:
       - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
       - name: Sherpa-ONNX prebuilts
-        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+        run: ./core/scripts/linux/download-sherpa-onnx.sh
       - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
       - run: cmake --build --preset rcli-linux-release
       - name: Unit tests
@@ -188,7 +200,7 @@ jobs:
       - name: Smoke (modelless)
         run: |
           set -euo pipefail
-          RCLI=build/rcli-linux-release/sdk/runanywhere-cli/rcli
+          RCLI=build/rcli-linux-release/rcli/rcli
           "$RCLI" version
           BACKENDS="$("$RCLI" backends --json)"
           echo "$BACKENDS"
@@ -196,7 +208,7 @@ jobs:
           "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
           "$RCLI" info --json
       - name: Package smoke
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
 
   rcli-windows:
     # Windows is compiled and exercised on the native runner. MLX remains
@@ -217,7 +229,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
       - name: Sherpa-ONNX prebuilts
         shell: cmd
-        run: sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Configure
         shell: pwsh
         run: cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
@@ -232,7 +244,7 @@ jobs:
             Select-Object -First 1
           if (-not $Onnx) { throw "onnxruntime.dll not found" }
           $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib" |
+          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
             Out-File $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Unit tests
         shell: pwsh
@@ -242,7 +254,7 @@ jobs:
       - name: Package and smoke
         shell: pwsh
         run: >-
-          ./sdk/runanywhere-cli/scripts/package-rcli-windows.ps1
+          ./rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
 
   python-windows:
@@ -264,10 +276,10 @@ jobs:
       - name: Sherpa-ONNX prebuilts
         shell: cmd
         # 7-Zip (used by this script) is preinstalled on GitHub windows runners.
-        run: sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Build wheel
         shell: pwsh
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         env:
           # The PRE_LINK that builds the bundled zlib/bz2 statics is multi-config
           # VS-generator specific; pin the generator so the wheel build is deterministic.
@@ -278,23 +290,23 @@ jobs:
           python -m build --wheel -o dist
       - name: Repair wheel (vendor sidecar DLLs)
         shell: pwsh
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           # The version-matched onnxruntime.dll + sherpa-onnx-c-api.dll both live in the
           # sherpa prebuilt lib dir; putting it on PATH lets delvewheel find them.
-          $env:PATH = "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib;$env:PATH"
+          $env:PATH = "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib;$env:PATH"
           $wheel = Get-ChildItem dist/*.whl | Select-Object -First 1
           delvewheel repair -w wheelhouse $wheel.FullName
       - name: Validate release boundary (no host paths, no binaries in sdist)
         shell: pwsh
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           python -m build --sdist -o wheelhouse
-          $ver = (Get-Content ..\runanywhere-commons\VERSION -Raw).Trim()
+          $ver = (Get-Content ..\..\core\VERSION -Raw).Trim()
           python scripts/validate_public_packages.py --dist wheelhouse --expected-version $ver
       - name: Install + hermetic tests
         shell: pwsh
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           $wheel = Get-ChildItem wheelhouse/*.whl | Select-Object -First 1
           # [server,test] pulls fastapi/uvicorn/multipart + httpx so tests/test_server.py runs
@@ -335,30 +347,30 @@ jobs:
           python -m pip install --upgrade pip build auditwheel pytest
       - name: Sherpa-ONNX prebuilts
         run: |
-          ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+          ./core/scripts/linux/download-sherpa-onnx.sh
           # The prebuilt ships libonnxruntime.so, but _core/sherpa record a versioned
           # DT_NEEDED (libonnxruntime.so.1); give auditwheel a matching filename to vendor.
-          lib="sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib"
+          lib="core/third_party/sherpa-onnx-linux/lib"
           ln -sf libonnxruntime.so "$lib/libonnxruntime.so.1"
       - name: Build wheel
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: python -m build --wheel -o dist
       - name: Repair wheel (vendor sidecar .so)
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           # The sherpa prebuilt lib dir holds the version-matched libonnxruntime.so +
           # libsherpa-onnx-c-api.so; on LD_LIBRARY_PATH auditwheel finds + vendors them.
-          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:$LD_LIBRARY_PATH"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/core/third_party/sherpa-onnx-linux/lib:$LD_LIBRARY_PATH"
           wheel="$(ls dist/*.whl | head -1)"
           auditwheel repair -w wheelhouse "$wheel"
       - name: Validate release boundary (no host paths, no binaries in sdist)
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           python -m build --sdist -o wheelhouse
-          ver="$(tr -d '[:space:]' < ../runanywhere-commons/VERSION)"
+          ver="$(tr -d '[:space:]' < ../../core/VERSION)"
           python scripts/validate_public_packages.py --dist wheelhouse --expected-version "$ver"
       - name: Install + hermetic tests
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           wheel="$(ls wheelhouse/*.whl | head -1)"
           # [server,test] pulls fastapi/uvicorn/multipart + httpx so tests/test_server.py runs
@@ -394,25 +406,25 @@ jobs:
           brew install ninja
           python -m pip install --upgrade pip build delocate pytest
       - name: Sherpa-ONNX prebuilts
-        run: ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
+        run: ./core/scripts/macos/download-sherpa-onnx.sh
       - name: Build wheel
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: python -m build --wheel -o dist
       - name: Repair wheel (vendor sidecar dylibs)
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           # sherpa/onnxruntime are static (.a) on macOS and linked into _core, so the wheel is
           # self-contained and delocate has nothing to vendor — it just re-tags/validates archs.
           wheel="$(ls dist/*.whl | head -1)"
           delocate-wheel --require-archs arm64 -w wheelhouse -v "$wheel"
       - name: Validate release boundary (no host paths, no binaries in sdist)
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           python -m build --sdist -o wheelhouse
-          ver="$(tr -d '[:space:]' < ../runanywhere-commons/VERSION)"
+          ver="$(tr -d '[:space:]' < ../../core/VERSION)"
           python scripts/validate_public_packages.py --dist wheelhouse --expected-version "$ver"
       - name: Install + hermetic tests
-        working-directory: sdk/runanywhere-python
+        working-directory: bindings/python
         run: |
           wheel="$(ls wheelhouse/*.whl | head -1)"
           python -m pip install "${wheel}[server,test]"
@@ -444,9 +456,9 @@ jobs:
           platform: ios
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+        run: bash core/scripts/ios/download-onnx.sh
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+        run: bash core/scripts/ios/download-sherpa-onnx.sh
       - run: cmake --preset ios-device
       - run: cmake --build --preset ios-device --config Release
 
@@ -459,7 +471,7 @@ jobs:
           platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
-        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
+        run: bash core/scripts/android/download-sherpa-onnx.sh
       - run: cmake --preset android-arm64
       - run: cmake --build --preset android-arm64
 
@@ -478,11 +490,11 @@ jobs:
           platform: ios
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+        run: bash core/scripts/ios/download-onnx.sh
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+        run: bash core/scripts/ios/download-sherpa-onnx.sh
       - name: Build pinned Sherpa/ONNX static inventory (macOS arm64)
-        run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
       - name: Build XCFramework
         env:
           # The NeuRT (Apple ANE) engine is implemented in the sibling `neurun` repo, which is
@@ -491,7 +503,7 @@ jobs:
           # package COMPILES and LINKS, not that ANE inference works. The script otherwise refuses
           # to package a stub, so opt in explicitly — this artifact is never shipped.
           RAC_ALLOW_NEURT_STUB: "1"
-        run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+        run: ./bindings/swift/scripts/build-core-xcframework.sh
       - name: Build all Swift products and run tests
         env:
           RUNANYWHERE_USE_LOCAL_NATIVES: "1"
@@ -500,7 +512,7 @@ jobs:
           swift build --build-tests --jobs 2
           swift test --skip-build --jobs 2
       - name: SwiftLint (SDK, strict)
-        working-directory: sdk/runanywhere-swift
+        working-directory: bindings/swift
         run: |
           set -euo pipefail
           command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
@@ -509,7 +521,7 @@ jobs:
       # repository has a checked-in, reproducible scan configuration.
       - name: Periphery unused-code scan (advisory)
         continue-on-error: true
-        working-directory: sdk/runanywhere-swift
+        working-directory: bindings/swift
         run: |
           set -euo pipefail
           if command -v periphery >/dev/null 2>&1; then
@@ -527,34 +539,34 @@ jobs:
           platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
-        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
+        run: bash core/scripts/android/download-sherpa-onnx.sh
       - name: Build Android JNI libs
         run: ./scripts/build/build-core-android.sh
       - name: Kotlin SDK unit tests + debug assembly
-        working-directory: sdk/runanywhere-kotlin
+        working-directory: bindings/kotlin
         run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --max-workers=2
-      - name: Stage debug SDK AARs for the Android example
-        working-directory: examples/android/RunAnywhereAI
-        run: ./scripts/stage-sdk-aars.sh debug
-      - name: Android example unit tests + debug assembly
-        working-directory: examples/android/RunAnywhereAI
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2
+      # The consumer app moved to github.com/RunanywhereAI/runanywhere-android
+      # and builds against published AARs there; the in-repo Gradle consumer is
+      # bindings/kotlin/example, which composite-builds the SDK itself.
+      - name: Minimal Kotlin example debug assembly
+        working-directory: bindings/kotlin/example
+        run: ./gradlew :app:assembleDebug --no-daemon --max-workers=2
       - name: ktlintCheck + detekt (lint lane)
-        working-directory: sdk/runanywhere-kotlin
+        working-directory: bindings/kotlin
         run: ./gradlew ktlintCheck detekt --no-daemon
 
   flutter-pubget:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
-      # FLUTTER_VERSION is sourced from sdk/runanywhere-commons/VERSIONS (single
+      # FLUTTER_VERSION is sourced from core/VERSIONS (single
       # source of truth) by the setup-toolchain action. Bump the value in
       # VERSIONS to roll the Flutter pin across pr-build, release, and FVM.
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
       - name: Analyze and test the complete Flutter workspace
-        working-directory: sdk/runanywhere-flutter
+        working-directory: bindings/flutter
         run: |
           set -euo pipefail
           flutter pub get
@@ -569,7 +581,7 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
-      # Repo root and sdk/runanywhere-react-native pin `packageManager: yarn@3.6.1`
+      # Repo root and bindings/react-native pin `packageManager: yarn@3.6.1`
       # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
       - name: Enable Corepack (yarn@3.6.1)
@@ -577,23 +589,26 @@ jobs:
           set -euo pipefail
           corepack enable
           corepack prepare yarn@3.6.1 --activate
-      # Root lockfile gate: the RN example app is a root-workspace member, so
-      # a stale root yarn.lock is still caught here even though the package
-      # commands below run inside the standalone RN workspace.
+      # Root lockfile gate: the RN packages and the example app are all
+      # root-workspace members, so a stale root yarn.lock is still caught here
+      # even though every package command below runs inside the standalone RN
+      # workspace.
       - name: Yarn install (repo root lockfile gate)
         run: yarn install --immutable
-      - name: Jest unit tests (React Native example)
-        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
-      # sdk/runanywhere-react-native is ALSO a standalone Yarn project with its
-      # own pinned yarn.lock (fb060a368) and workspaces declaration.
-      # `yarn workspace <name> run <script>` re-detects the project from the
-      # package's cwd, and packages/core's nearest lockfile is the NESTED one —
-      # so a root-only install leaves that project stateless and every package
-      # command dies with "Couldn't find the node_modules state file". Install
-      # and run everything inside the standalone workspace (the documented SDK
-      # dev flow), with the root install kept above as the root-lockfile gate.
+      # bindings/react-native is ALSO a standalone Yarn project with its
+      # own pinned yarn.lock and workspaces declaration. Yarn resolves the
+      # owning project by walking up to the NEAREST lockfile, so that nested
+      # project owns everything under bindings/react-native — packages/* AND
+      # example/. `yarn workspace <name> run <script>` re-detects the project
+      # from the package's cwd, so a root-only install leaves that project
+      # stateless and every package command dies ("Couldn't find the
+      # node_modules state file", or — if the nested project does not declare
+      # the package — "doesn't seem to be part of the project declared in").
+      # Install and run everything inside the standalone workspace (the
+      # documented SDK dev flow), with the root install kept above as the
+      # root-lockfile gate.
       - name: Yarn install (RN standalone workspace)
-        working-directory: sdk/runanywhere-react-native
+        working-directory: bindings/react-native
         run: yarn install --immutable
       # `yarn typecheck` only covers TypeScript. The RN bridge C++ is compiled
       # solely by an app build (CocoaPods / Gradle), which PR CI does not run —
@@ -603,15 +618,20 @@ jobs:
       # has already provided the Nitro and React Native jsi headers.
       - name: Compile RN C++ headers against the generated Nitro specs
         run: bash scripts/validation/gates/check_rn_cpp_headers_compile.sh
+      # Both scripts fan out over every workspace member, so they now cover the
+      # example app as well as packages/*.
       - name: Typecheck React Native workspace
-        working-directory: sdk/runanywhere-react-native
+        working-directory: bindings/react-native
         run: yarn typecheck
       - name: ESLint (React Native workspace)
-        working-directory: sdk/runanywhere-react-native
+        working-directory: bindings/react-native
         run: yarn lint
       - name: Jest unit tests (@runanywhere/core)
-        working-directory: sdk/runanywhere-react-native
+        working-directory: bindings/react-native
         run: yarn workspace @runanywhere/core run test --runInBand
+      - name: Jest unit tests (React Native example)
+        working-directory: bindings/react-native
+        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
 
   web-typecheck:
     runs-on: ubuntu-22.04
@@ -621,39 +641,40 @@ jobs:
         with:
           platform: node
       # Install + typecheck from the workspace root so the in-tree
-      # @runanywhere/proto-ts package (sdk/shared/proto-ts) is resolved as a
+      # @runanywhere/proto-ts package (bindings/proto-ts) is resolved as a
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
       # llamacpp, mlx, and onnx — exactly the surface this PR touches.
       # proto-ts is a workspace member of BOTH the repo-root Yarn workspace AND
-      # the sdk/runanywhere-web npm workspace. When we cd into proto-ts and run
+      # the bindings/web npm workspace. When we cd into proto-ts and run
       # `npm install`, npm walks up, finds the root Yarn package.json with
       # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
       # `--workspaces=false` keeps npm from inheriting the root workspace
       # context and resolves the long/protobufjs deps in-tree directly.
       - name: Install workspace dependencies
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm ci --no-audit --no-fund
       # npm may clean the external workspace's own node_modules while laying
       # out the Web workspace. Install proto-ts last so TypeScript resolution
       # from its real path always sees its direct @bufbuild/protobuf dependency.
       - name: Install proto-ts dependencies (standalone install)
-        working-directory: sdk/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
       - name: Typecheck Web workspace (proto-ts + packages)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run typecheck
       - name: ESLint (Web workspace)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run lint
       - name: Web unit tests
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm test
 
   # Lightweight browser readiness/stream gate. Stages release-prebuilt WASM
-  # (gitignored) from the latest RACommons-web GitHub Release asset, then uses
-  # the example Vite alias path — no real-model downloads. Full real-model
-  # matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
+  # (gitignored) from the latest RACommons-web GitHub Release asset into
+  # packages/*/wasm, which is exactly where the minimal example's Vite config
+  # reads it from in local-source mode — no real-model downloads. Full
+  # real-model matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
   web-browser-smoke:
     runs-on: ubuntu-22.04
     needs: [web-typecheck]
@@ -665,16 +686,16 @@ jobs:
         with:
           platform: node
       - name: Install Web SDK workspace
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm ci --no-audit --no-fund
       - name: Install proto-ts dependencies
-        working-directory: sdk/shared/proto-ts
+        working-directory: bindings/proto-ts
         run: npm ci --no-audit --no-fund --workspaces=false
-      - name: Install example app dependencies
-        working-directory: examples/web/RunAnywhereAI
+      - name: Install minimal example dependencies
+        working-directory: bindings/web/example
         run: npm ci --no-audit --no-fund
       - name: Stage release-prebuilt WASM
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         env:
           # checkout uses persist-credentials: false; gh still needs a token.
           GH_TOKEN: ${{ github.token }}
@@ -716,10 +737,10 @@ jobs:
           done
           echo "Staged release-prebuilt WASM from ${TAG}"
       - name: Install Playwright Chromium
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npx playwright install --with-deps chromium
       - name: Browser smoke (readiness + hybrid STT surface)
-        working-directory: sdk/runanywhere-web
+        working-directory: bindings/web
         run: npm run test:browser:smoke
       - name: Upload Playwright artifacts on failure
         if: failure()
@@ -727,8 +748,8 @@ jobs:
         with:
           name: web-browser-smoke-artifacts
           path: |
-            sdk/runanywhere-web/playwright-report
-            sdk/runanywhere-web/test-results
+            bindings/web/playwright-report
+            bindings/web/test-results
           if-no-files-found: ignore
 
   electron-unit:
@@ -751,18 +772,18 @@ jobs:
       # Not a member of the root Yarn workspace — it installs standalone from
       # its own package-lock.json.
       - name: Install dependencies
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         run: npm ci --no-audit --no-fund
       - name: Type-check + build
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         run: npm run build
       # src/, test/, scripts/ and native/ — a test that lies about a type fails
       # here rather than at run time.
       - name: Type-check (all projects)
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         run: npm run typecheck
       - name: Unit tests
-        working-directory: sdk/runanywhere-electron
+        working-directory: bindings/electron
         run: npm test
 
   # Dedicated validation lane — runs the source-of-truth validation scripts
@@ -776,17 +797,17 @@ jobs:
       - name: RAC_API export drift check (strict)
         run: bash scripts/validation/commons/check_rac_api_exports.sh --strict
       - name: Kotlin release-boundary validator tests
-        run: python3 sdk/runanywhere-kotlin/scripts/test_validate_public_artifacts.py
+        run: python3 bindings/kotlin/scripts/test_validate_public_artifacts.py
       - name: React Native release-boundary validator tests
-        run: python3 sdk/runanywhere-react-native/scripts/test_validate_public_packages.py
+        run: python3 bindings/react-native/scripts/test_validate_public_packages.py
       - name: Web release-boundary validator tests
-        run: python3 sdk/runanywhere-web/scripts/test_validate_public_packages.py
+        run: python3 bindings/web/scripts/test_validate_public_packages.py
       - name: Python release-boundary validator tests
-        run: python3 sdk/runanywhere-python/scripts/test_validate_public_packages.py
+        run: python3 bindings/python/scripts/test_validate_public_packages.py
       - name: HF-auth public API packaging parity
         run: |
           set -euo pipefail
           declaration='RAC_API rac_bool_t rac_http_hf_token_is_configured(void);'
-          grep -Fq "$declaration" sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
-          grep -Fxq '_rac_http_hf_token_is_configured' sdk/runanywhere-commons/exports/RACommons.exports
-          grep -Fq "$declaration" sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include/rac_http_client.h
+          grep -Fq "$declaration" core/include/rac/infrastructure/http/rac_http_client.h
+          grep -Fxq '_rac_http_hf_token_is_configured' core/exports/RACommons.exports
+          grep -Fq "$declaration" bindings/swift/Sources/RunAnywhere/CRACommons/include/rac_http_client.h

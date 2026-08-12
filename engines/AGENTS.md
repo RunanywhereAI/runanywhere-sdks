@@ -4,7 +4,7 @@ This file is the authoritative architecture + contributor guide for the
 `engines/` tree. The engine taxonomy lives **here and only here** — do not
 re-document it inside engine headers or scatter it across the per-engine
 CMakeLists. Cross-references: the repo-root `AGENTS.md` (monorepo overview),
-`sdk/runanywhere-commons/AGENTS.md` (the C++ core that owns the plugin registry +
+`core/AGENTS.md` (the C++ core that owns the plugin registry +
 router), and the sibling `runtimes/` tree (the L1 device-runtime adapters this
 doc repeatedly contrasts engines against).
 
@@ -20,7 +20,7 @@ doc repeatedly contrasts engines against).
 An **engine is an op-table adapter for modalities.** Concretely, an engine:
 
 1. Fills exactly **one** `rac_engine_vtable_t`
-   (`sdk/runanywhere-commons/include/rac/plugin/rac_engine_vtable.h`) — a struct
+   (`core/include/rac/plugin/rac_engine_vtable.h`) — a struct
    of per-modality op-table slots:
    `llm_ops` / `stt_ops` / `tts_ops` / `vad_ops` / `embedding_ops` / `vlm_ops` /
    `diffusion_ops` / `diarization_ops` / `segmentation_ops` / `rerank_ops` (10 live
@@ -38,7 +38,7 @@ An **engine is an op-table adapter for modalities.** Concretely, an engine:
 Dispatch happens through the plugin registry: callers in commons go through
 `rac_plugin_find(primitive)` (or `rac_plugin_find_for_engine(primitive,
 engine_name)` to pin a specific engine), declared in
-`sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h`. Selection is
+`core/include/rac/plugin/rac_plugin_entry.h`. Selection is
 plain priority order — the highest-`priority` registered engine that serves the
 requested primitive wins (no scoring). The caller then invokes
 `vtable->{primitive}_ops->create(...)` and the rest of the op-table.
@@ -287,7 +287,7 @@ modality, no runtime). Concretely:
 
 Do **not** invent a new modality just to ship an engine — fill an existing slot.
 Adding a brand-new *primitive* is a commons ABI change (see
-`sdk/runanywhere-commons/AGENTS.md` → "Adding a new capability interface"), not an
+`core/AGENTS.md` → "Adding a new capability interface"), not an
 engine change.
 
 ---

@@ -11,7 +11,7 @@
 # `SDKEnvironment.kt`, etc.
 #
 # Output:
-#   sdk/runanywhere-kotlin/src/main/kotlin/
+#   bindings/kotlin/src/main/kotlin/
 #     com/runanywhere/sdk/generated/convenience/RAConvenience.kt
 #
 # Single-file output mirrors the Swift `RAConvenience.swift` shape so the
@@ -342,7 +342,7 @@ def main() -> int:
     proto_dir  = repo_root / "idl"
     out_dir = (
         repo_root
-        / "sdk" / "runanywhere-kotlin" / "src" / "main" / "kotlin"
+        / "bindings" / "kotlin" / "src" / "main" / "kotlin"
         / "com" / "runanywhere" / "sdk" / "generated" / "convenience"
     )
     out_path = out_dir / "RAConvenience.kt"

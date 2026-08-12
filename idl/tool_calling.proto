@@ -122,7 +122,7 @@ message ToolCall {
     // JSON-encoded arguments. Empty object "{}" if no args.
     //
     // The C++ tokenizer / tool-prompt formatter
-    // (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+    // (core/src/features/llm/tool_calling.cpp) reads
     // `arguments_json` directly when building LLM prompts. It is the
     // canonical wire shape for the prompt-formatting path.
     string arguments_json            = 3;
@@ -148,7 +148,7 @@ message ToolResult {
     // JSON-encoded tool execution result.
     //
     // The C++ tool-prompt formatter
-    // (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+    // (`core/src/features/llm/tool_calling.cpp:1870-1885`)
     // reads `result_json` directly when building follow-up LLM prompts after
     // tool execution. It is the canonical wire shape.
     string result_json               = 3;

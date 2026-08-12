@@ -3,7 +3,7 @@
 #
 # Wraps `find_package(Protobuf)` and probes absl so proto-consuming
 # C++ targets — chiefly rac_commons, which compiles the committed *.pb.cc under
-# sdk/runanywhere-commons/src/generated/proto/ — get consistent runtime + absl
+# core/src/generated/proto/ — get consistent runtime + absl
 # link deps without each running its own skip-if-missing block.
 #
 # Outputs:
@@ -22,7 +22,7 @@ include_guard(GLOBAL)
 
 # Protobuf must exactly match the checked-in generated C++ sources.
 #
-# Checked-in generated headers under sdk/runanywhere-commons/src/generated/proto
+# Checked-in generated headers under core/src/generated/proto
 # include an exact `PROTOBUF_VERSION` preprocessor guard. Newer patch releases
 # can satisfy a loose `find_package(Protobuf 5.0)` probe but still fail during
 # compilation. Keep this early, optional probe exact so it cannot pre-register

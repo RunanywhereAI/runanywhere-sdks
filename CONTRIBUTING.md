@@ -38,10 +38,12 @@ all interactions.
 
 ## 🛠️ Development Setup
 
-This is a monorepo: a single C++ core (`sdk/runanywhere-commons`) behind the
+This is a monorepo: a single C++ core (`core`) behind the
 `rac_*` C ABI, with five thin platform SDKs — **Swift, Kotlin, Flutter, React
-Native, and Web** — plus an example app per platform. See [`AGENTS.md`](AGENTS.md)
-for the full architecture and per-SDK build details.
+Native, and Web** — plus a minimal example harness per SDK. (The full iOS,
+Android, Web, and Electron consumer apps live in their own repositories:
+`RunanywhereAI/runanywhere-{ios,android,web,electron}`.) See
+[`AGENTS.md`](AGENTS.md) for the full architecture and per-SDK build details.
 
 Everything is driven through the **`./run`** task runner at the repo root
 (`run.bat` is the Windows wrapper). Start here:
@@ -88,9 +90,9 @@ full list. Common commands:
 ./run sdk rn build
 ./run sdk web build
 
-# Example apps
+# Minimal examples (contributor harnesses, SDK built from local source)
 ./run example android install       # Build + install + launch on a device
-./run example ios build             # (macOS only)
+./run example ios run               # (macOS only)
 ./run example web dev
 
 # Repo-wide helpers
@@ -171,7 +173,9 @@ pre-commit hooks:
 General guidance: meaningful names, self-documenting code, early returns over
 deep nesting, and small single-responsibility functions. Do not add unit tests
 unless the change specifically calls for them — this repo validates behavior
-end-to-end through the example apps rather than through broad unit-test suites.
+end-to-end through the example apps (the in-repo minimal harnesses, and the
+consumer apps in their own repositories) rather than through broad unit-test
+suites.
 
 ## 🐛 Reporting Issues
 

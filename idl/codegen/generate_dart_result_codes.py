@@ -23,7 +23,7 @@
 # switch over them, and the message strings are humanized here, at codegen time.
 #
 # Output:
-#   sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_result_codes.dart
+#   bindings/flutter/packages/runanywhere/lib/generated/ra_result_codes.dart
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from _convenience_common import (
 )
 
 OUT_RELPATH = Path(
-    "sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_result_codes.dart"
+    "bindings/flutter/packages/runanywhere/lib/generated/ra_result_codes.dart"
 )
 ENUM_NAME = "ErrorCode"
 

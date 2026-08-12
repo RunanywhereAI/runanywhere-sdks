@@ -14,7 +14,7 @@
 # the transcription moves here.
 #
 # Output:
-#   sdk/runanywhere-python/runanywhere/_generated_errors.py
+#   bindings/python/runanywhere/_generated_errors.py
 #
 # Naming: the proto strips the enum-name prefix, so ERROR_CODE_MODEL_NOT_FOUND
 # becomes MODEL_NOT_FOUND and ERROR_CATEGORY_NETWORK becomes NETWORK. That
@@ -34,7 +34,7 @@ from _convenience_common import (
     load_file_descriptor_set,
 )
 
-OUT_RELPATH = Path("sdk/runanywhere-python/runanywhere/_generated_errors.py")
+OUT_RELPATH = Path("bindings/python/runanywhere/_generated_errors.py")
 
 # Only what errors.py re-exports. ErrorSeverity exists in the IDL but nothing in
 # the Python SDK consumes it, and the package's AGENTS.md is explicit about not

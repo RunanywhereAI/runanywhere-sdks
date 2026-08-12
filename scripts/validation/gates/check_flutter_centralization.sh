@@ -6,7 +6,7 @@
 # Tier 4 / PR #494 T4.4 — Flutter dependency centralization linter.
 #
 # Reads the `dependencies:` / `dev_dependencies:` blocks of
-# sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml (the workspace
+# bindings/flutter/packages/runanywhere/pubspec.yaml (the workspace
 # source of truth for shared third-party deps — see pass2-syn-121) and
 # warns when any other pubspec.yaml in the repo hardcodes a `^x.y.z` (or
 # `x.y.z`) version that differs from the source-of-truth value for the
@@ -27,8 +27,8 @@
 #   FLUTTER_CENTRALIZATION_STRICT=1 ... check_flutter_centralization.sh  # fail on warn
 #
 # Scope:
-#   - Walks sdk/runanywhere-flutter/**/pubspec.yaml and
-#     examples/flutter/**/pubspec.yaml
+#   - Walks bindings/flutter/**/pubspec.yaml (the SDK packages and the
+#     in-repo example app at bindings/flutter/example/)
 #   - Skips the workspace root pubspec itself (that IS the source of truth)
 #   - Ignores SDK-bundled deps (`sdk: flutter`) and path/git deps
 
@@ -36,11 +36,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-WORKSPACE_ROOT_PUBSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/pubspec.yaml"
+WORKSPACE_ROOT_PUBSPEC="${REPO_ROOT}/bindings/flutter/pubspec.yaml"
 # Source-of-truth package (per pass2-syn-121: melos.dependencies block was
 # removed because Pub does not read it; the `packages/runanywhere` pubspec
 # is now the authoritative pin set for shared third-party deps).
-SOURCE_OF_TRUTH_PUBSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml"
+SOURCE_OF_TRUTH_PUBSPEC="${REPO_ROOT}/bindings/flutter/packages/runanywhere/pubspec.yaml"
 
 if [[ ! -f "${WORKSPACE_ROOT_PUBSPEC}" ]]; then
   echo "error: workspace root pubspec not found at ${WORKSPACE_ROOT_PUBSPEC}" >&2
@@ -154,12 +154,11 @@ PUBSPEC_TARGETS=()
 while IFS= read -r -d '' f; do
   PUBSPEC_TARGETS+=("$f")
 done < <(find \
-  "${REPO_ROOT}/sdk/runanywhere-flutter" \
-  "${REPO_ROOT}/examples/flutter" \
+  "${REPO_ROOT}/bindings/flutter" \
   -type f -name pubspec.yaml -print0 2>/dev/null)
 
 if [[ "${#PUBSPEC_TARGETS[@]}" -eq 0 ]]; then
-  echo "warning: no pubspec.yaml files found under sdk/runanywhere-flutter/ or examples/flutter/" >&2
+  echo "warning: no pubspec.yaml files found under bindings/flutter/" >&2
 fi
 
 # Extract `^x.y.z` / `x.y.z` pins from a package pubspec, restricted to
@@ -231,7 +230,7 @@ done
 version_value() {
   local key="$1"
   awk -F= -v key="${key}" '$1 == key { print $2; exit }' \
-    "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+    "${REPO_ROOT}/core/VERSIONS"
 }
 
 expect_literal() {
@@ -252,19 +251,19 @@ flutter_compile_sdk="$(version_value FLUTTER_ANDROID_COMPILE_SDK)"
 flutter_target_sdk="$(version_value FLUTTER_ANDROID_TARGET_SDK)"
 flutter_ndk="$(version_value FLUTTER_NDK_VERSION)"
 
-expect_literal "examples/flutter/RunAnywhereAI/android/gradle/wrapper/gradle-wrapper.properties" \
+expect_literal "bindings/flutter/example/android/gradle/wrapper/gradle-wrapper.properties" \
   "gradle-${flutter_gradle}-all.zip"
-expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+expect_literal "bindings/flutter/example/android/settings.gradle" \
   "id \"com.android.application\" version \"${flutter_agp}\" apply false"
-expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+expect_literal "bindings/flutter/example/android/settings.gradle" \
   "id \"org.jetbrains.kotlin.android\" version \"${flutter_kotlin}\" apply false"
 
 flutter_owned_gradle_files=(
-  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"
+  "bindings/flutter/example/android/app/build.gradle"
+  "bindings/flutter/packages/runanywhere/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_llamacpp/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_onnx/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_qhexrt/android/build.gradle"
 )
 for gradle_file in "${flutter_owned_gradle_files[@]}"; do
   if grep -Eq '(^|[[:space:]"'"'"'])((kotlin-android)|(org\.jetbrains\.kotlin\.android))([[:space:]"'"'"']|$)|kotlinOptions' \
@@ -277,11 +276,11 @@ for gradle_file in "${flutter_owned_gradle_files[@]}"; do
 done
 
 flutter_android_builds=(
-  "sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle"
-  "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"
-  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
+  "bindings/flutter/packages/runanywhere/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_llamacpp/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_onnx/android/build.gradle"
+  "bindings/flutter/packages/runanywhere_qhexrt/android/build.gradle"
+  "bindings/flutter/example/android/app/build.gradle"
 )
 for build_file in "${flutter_android_builds[@]}"; do
   expect_literal "${build_file}" "compileSdk = ${flutter_compile_sdk}"

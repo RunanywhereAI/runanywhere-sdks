@@ -1,16 +1,16 @@
 # AGENTS.md — `runtimes/`
 
-This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) when working with the **runtime plugins** under `runtimes/`. It is the **single authoritative place** the runtime architecture is documented. For the surrounding system see the root [`AGENTS.md`](../AGENTS.md), the C++ core [`sdk/runanywhere-commons/AGENTS.md`](../sdk/runanywhere-commons/AGENTS.md), and the sibling engine guide [`engines/AGENTS.md`](../engines/AGENTS.md).
+This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) when working with the **runtime plugins** under `runtimes/`. It is the **single authoritative place** the runtime architecture is documented. For the surrounding system see the root [`AGENTS.md`](../AGENTS.md), the C++ core [`core/AGENTS.md`](../core/AGENTS.md), and the sibling engine guide [`engines/AGENTS.md`](../engines/AGENTS.md).
 
 ---
 
 ## What a runtime is
 
-A **runtime is a compute substrate / device** — the hardware (or vendor library treated as a device) that math actually runs on: **CPU**, **Apple Metal** (GPU), **Apple Core ML** (ANE/GPU/CPU chosen by Core ML), **ONNX Runtime as a library**, and future targets (CUDA, Vulkan, QNN, NNAPI, WebGPU). A runtime is **named by the device/framework** (`"cpu"`, `"metal"`, `"coreml"`, `"onnxrt"`), keyed by `rac_runtime_id_t` (`sdk/runanywhere-commons/include/rac/plugin/rac_primitive.h:83`).
+A **runtime is a compute substrate / device** — the hardware (or vendor library treated as a device) that math actually runs on: **CPU**, **Apple Metal** (GPU), **Apple Core ML** (ANE/GPU/CPU chosen by Core ML), **ONNX Runtime as a library**, and future targets (CUDA, Vulkan, QNN, NNAPI, WebGPU). A runtime is **named by the device/framework** (`"cpu"`, `"metal"`, `"coreml"`, `"onnxrt"`), keyed by `rac_runtime_id_t` (`core/include/rac/plugin/rac_primitive.h:83`).
 
-**A runtime is NOT an engine.** Engines (llamacpp, sherpa, onnx, neurt, qhexrt, cloud) serve **modalities** — they publish primitive ops (`llm_ops`, `stt_ops`, …) and are *clients* of one or more runtimes. Runtimes provide **compute**; they describe a device and, in exactly one case, host a session. The two registries are separate: engines register a `rac_engine_vtable_t` via `rac_plugin_register`; runtimes register a `rac_runtime_vtable_t` via `rac_runtime_register` (`sdk/runanywhere-commons/include/rac/plugin/rac_runtime_registry.h`).
+**A runtime is NOT an engine.** Engines (llamacpp, sherpa, onnx, neurt, qhexrt, cloud) serve **modalities** — they publish primitive ops (`llm_ops`, `stt_ops`, …) and are *clients* of one or more runtimes. Runtimes provide **compute**; they describe a device and, in exactly one case, host a session. The two registries are separate: engines register a `rac_engine_vtable_t` via `rac_plugin_register`; runtimes register a `rac_runtime_vtable_t` via `rac_runtime_register` (`core/include/rac/plugin/rac_runtime_registry.h`).
 
-Promoting runtimes to first-class plugins lets multiple engines share one ORT `Ort::Env`, reuse one Core ML `MLModel` loader, and (eventually) allocate device buffers through one allocator per device instead of one per engine — see the header rationale in `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtable.h:1-27`.
+Promoting runtimes to first-class plugins lets multiple engines share one ORT `Ort::Env`, reuse one Core ML `MLModel` loader, and (eventually) allocate device buffers through one allocator per device instead of one per engine — see the header rationale in `core/include/rac/plugin/rac_runtime_vtable.h:1-27`.
 
 ---
 
@@ -54,7 +54,7 @@ Callers can thus distinguish **"this runtime is registered (device present)"** f
 
 ## The runtime contract (`rac_runtime_vtable_t`)
 
-The ABI boundary is `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtable.h`. A runtime populates a `rac_runtime_vtable_t` whose storage lives in `.rodata` (the registry does **not** copy it — the plugin keeps the pointer alive until unregister).
+The ABI boundary is `core/include/rac/plugin/rac_runtime_vtable.h`. A runtime populates a `rac_runtime_vtable_t` whose storage lives in `.rodata` (the registry does **not** copy it — the plugin keeps the pointer alive until unregister).
 
 ### Vtable layout (`rac_runtime_vtable.h:425-478`)
 
@@ -82,7 +82,7 @@ The ABI boundary is `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtab
 
 Most runtimes self-register with `RAC_STATIC_RUNTIME_REGISTER(<name>)` (`rac_runtime_registry.h:147-157`) — a file-scope constructor that calls `rac_runtime_register(rac_runtime_entry_<name>())` before `main`, plus a `rac_runtime_static_marker_<name>` symbol so a `-force_load` / `--whole-archive` reference can keep the TU alive against dead-symbol stripping. `onnxrt` and `coreml` use this path.
 
-**The CPU runtime is the special case.** It does **not** use `RAC_STATIC_RUNTIME_REGISTER`. Instead `rac_commons`' registry TU explicitly bootstraps it (`sdk/runanywhere-commons/src/plugin/rac_runtime_registry.cpp:135-189`, calling `rac_runtime_entry_cpu()` directly). Rationale (`cpu/rac_runtime_cpu.cpp:634-645`, `cpu/CMakeLists.txt:1-11`): this guarantees the registry is non-empty out-of-the-box on **every** build configuration — iOS static xcframework, Android `.so`, plain unit test — with no per-host `-force_load` dance. A failed CPU `init()` is logged and skipped so it can never abort SDK bootstrap. The `RAC_STATIC_RUNTIME_REGISTER` path is still exercised separately by `tests/test_runtime_loader.cpp`.
+**The CPU runtime is the special case.** It does **not** use `RAC_STATIC_RUNTIME_REGISTER`. Instead `rac_commons`' registry TU explicitly bootstraps it (`core/src/plugin/rac_runtime_registry.cpp:135-189`, calling `rac_runtime_entry_cpu()` directly). Rationale (`cpu/rac_runtime_cpu.cpp:634-645`, `cpu/CMakeLists.txt:1-11`): this guarantees the registry is non-empty out-of-the-box on **every** build configuration — iOS static xcframework, Android `.so`, plain unit test — with no per-host `-force_load` dance. A failed CPU `init()` is logged and skipped so it can never abort SDK bootstrap. The `RAC_STATIC_RUNTIME_REGISTER` path is still exercised separately by `tests/test_runtime_loader.cpp`.
 
 ---
 
@@ -112,7 +112,7 @@ The vtable/registrar machinery is uniform across all three runtimes, but **how m
 
 ## The CPU provider pattern
 
-The CPU runtime is the seam through which an engine delegates **session execution** to a shared, engine-agnostic runtime. Contract: `sdk/runanywhere-commons/include/rac/plugin/rac_cpu_runtime_provider.h`.
+The CPU runtime is the seam through which an engine delegates **session execution** to a shared, engine-agnostic runtime. Contract: `core/include/rac/plugin/rac_cpu_runtime_provider.h`.
 
 ```
 engine plugin                         runtimes/cpu (in rac_commons)

@@ -4,8 +4,14 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${REPO_ROOT}"
 
-KOTLIN_SDK_DIR="sdk/runanywhere-kotlin"
-ANDROID_EXAMPLE_DIR="examples/android/RunAnywhereAI"
+KOTLIN_SDK_DIR="bindings/kotlin"
+# The consumer apps live in their own repositories now
+# (RunanywhereAI/runanywhere-{ios,android,web,electron}). What is left here
+# are the minimal per-SDK harnesses, which build the SDK from local source.
+ANDROID_EXAMPLE_DIR="bindings/kotlin/example"
+IOS_EXAMPLE_DIR="bindings/swift/example"
+WEB_EXAMPLE_DIR="bindings/web/example"
+ELECTRON_EXAMPLE_DIR="bindings/electron/example"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
     C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_CMD=$'\033[36m'
@@ -52,15 +58,16 @@ ${C_BOLD}SDK${C_RESET}
   ${C_CMD}sdk ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}sdk web${C_RESET}     {build|clean}
 
-${C_BOLD}EXAMPLE APPS${C_RESET}
-  ${C_CMD}example android stage${C_RESET}        Build SDK release AARs + copy into examples/android/.../libs/
-  ${C_CMD}example android build${C_RESET}        Stage AARs + assembleDebug the example app
-  ${C_CMD}example android install${C_RESET}      Stage + build + install + launch on device
-  ${C_CMD}example android lint${C_RESET}         ktlint + detekt for the example app
-  ${C_CMD}example android clean${C_RESET}        Clean Android example build outputs
-  ${C_CMD}example flutter${C_RESET} {build|clean}
-  ${C_CMD}example ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
+${C_BOLD}MINIMAL EXAMPLES${C_RESET}
+  ${C_DIM}Contributor harnesses that build the SDK from local source. The full
+  consumer apps live in RunanywhereAI/runanywhere-{ios,android,web,electron}.${C_RESET}
+  ${C_CMD}example android build${C_RESET}        assembleDebug bindings/kotlin/example
+  ${C_CMD}example android install${C_RESET}      Build + install + launch on a connected device
+  ${C_CMD}example android clean${C_RESET}        Clean its build outputs
+  ${C_CMD}example ios${C_RESET}     {build|run|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
+  ${C_CMD}example electron${C_RESET} {build|start|clean}
+  ${C_CMD}example flutter${C_RESET} {build|clean}   ${C_DIM}(bindings/flutter/example)${C_RESET}
 
 ${C_BOLD}RCLI${C_RESET}
   ${C_CMD}rcli build${C_RESET} ${C_DIM}[--env-staging]${C_RESET}    Build the desktop CLI (host preset). --env-staging bakes the
@@ -83,7 +90,7 @@ ${C_BOLD}EXAMPLES${C_RESET}
   ${C_DIM}\$${C_RESET} ./run example android install
 
 ${C_BOLD}LEARN MORE${C_RESET}
-  See AGENTS.md for architecture; sdk/<name>/AGENTS.md for per-SDK detail.
+  See AGENTS.md for architecture; bindings/<name>/AGENTS.md for per-SDK detail.
 
 EOF
 }
@@ -103,7 +110,7 @@ require_macos() {
 # Reads STAGING_BASE_URL out of the git-ignored development_config.cpp so
 # --env-staging never needs the URL on the command line (or in this script).
 staging_url_from_local_config() {
-    local cfg="sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp"
+    local cfg="core/src/infrastructure/network/development_config.cpp"
     [ -f "${cfg}" ] || die "--env-staging needs the git-ignored development_config.cpp (copy the .template next to it and fill STAGING_BASE_URL)"
     local url
     url="$(sed -n 's/.*STAGING_BASE_URL = "\([^"]*\)".*/\1/p' "${cfg}" | head -1)"
@@ -122,8 +129,8 @@ cmd_sdk_commons() {
     fi
     case "${sub}" in
         build-android) bash scripts/build/build-core-android.sh ;;
-        build-ios)     require_macos; bash sdk/runanywhere-swift/scripts/build-core-xcframework.sh ;;
-        build-wasm)    bash sdk/runanywhere-web/scripts/build-core-wasm.sh ;;
+        build-ios)     require_macos; bash bindings/swift/scripts/build-core-xcframework.sh ;;
+        build-wasm)    bash bindings/web/scripts/build-core-wasm.sh ;;
         build-linux)   cmake --preset=linux-release && cmake --build --preset=linux-release ;;
         clean)         rm -rf build/android-* build/ios-* build/wasm-* build/linux-* ;;
         *)             bad_subcommand "sdk commons" "${1:-}" ;;
@@ -145,17 +152,17 @@ cmd_sdk_kotlin() {
 
 cmd_sdk_flutter() {
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib) ;;
-        lint)   (cd sdk/runanywhere-flutter/packages/runanywhere && flutter analyze) ;;
-        clean)  (cd sdk/runanywhere-flutter/packages/runanywhere && flutter clean) ;;
+        build)  (cd bindings/flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib) ;;
+        lint)   (cd bindings/flutter/packages/runanywhere && flutter analyze) ;;
+        clean)  (cd bindings/flutter/packages/runanywhere && flutter clean) ;;
         *)      bad_subcommand "sdk flutter" "${1:-}" ;;
     esac
 }
 
 cmd_sdk_rn() {
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-react-native && ./scripts/build-react-native.sh --setup) ;;
-        clean)  (cd sdk/runanywhere-react-native && yarn clean 2>/dev/null || npm run clean 2>/dev/null || true) ;;
+        build)  (cd bindings/react-native && ./scripts/build-react-native.sh --setup) ;;
+        clean)  (cd bindings/react-native && yarn clean 2>/dev/null || npm run clean 2>/dev/null || true) ;;
         *)      bad_subcommand "sdk rn" "${1:-}" ;;
     esac
 }
@@ -163,16 +170,16 @@ cmd_sdk_rn() {
 cmd_sdk_ios() {
     require_macos
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-swift && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build) ;;
-        clean)  (cd sdk/runanywhere-swift && swift package clean) ;;
+        build)  (cd bindings/swift && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build) ;;
+        clean)  (cd bindings/swift && swift package clean) ;;
         *)      bad_subcommand "sdk ios" "${1:-}" ;;
     esac
 }
 
 cmd_sdk_web() {
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-web && (yarn build 2>/dev/null || npm run build)) ;;
-        clean)  (cd sdk/runanywhere-web && (yarn clean 2>/dev/null || npm run clean 2>/dev/null || true)) ;;
+        build)  (cd bindings/web && (yarn build 2>/dev/null || npm run build)) ;;
+        clean)  (cd bindings/web && (yarn clean 2>/dev/null || npm run clean 2>/dev/null || true)) ;;
         *)      bad_subcommand "sdk web" "${1:-}" ;;
     esac
 }
@@ -189,22 +196,20 @@ cmd_sdk() {
     esac
 }
 
+# The minimal Kotlin harness composite-builds bindings/kotlin, so there
+# is no AAR staging step: Gradle rebuilds the SDK from source on every run.
 cmd_example_android() {
-    local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
     case "${1:-}" in
-        stage)    bash "${stage}" release ;;
-        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:assembleDebug) ;;
-        install)  bash "${stage}" release \
-                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:installDebug) \
-                    && adb shell am start -n com.runanywhere.runanywhereai/com.runanywhere.runanywhereai.MainActivity ;;
-        lint)     (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:ktlintCheck :app:detekt) ;;
+        build)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:assembleDebug) ;;
+        install)  (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:installDebug) \
+                    && adb shell am start -n com.runanywhere.minimal/com.runanywhere.minimal.MainActivity ;;
         clean)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew clean) ;;
         *)        bad_subcommand "example android" "${1:-}" ;;
     esac
 }
 
 cmd_example_flutter() {
-    local ex_dir="${EX:-examples/flutter/RunAnywhereAI}"
+    local ex_dir="${EX:-bindings/flutter/example}"
     case "${1:-}" in
         build)  (cd "${ex_dir}" && flutter build apk) ;;
         clean)  (cd "${ex_dir}" && flutter clean) ;;
@@ -212,18 +217,20 @@ cmd_example_flutter() {
     esac
 }
 
+# SwiftPM executable against the repo-root manifest; the root package fails
+# closed to remote binaries, so local natives must be opted into explicitly.
 cmd_example_ios() {
     require_macos
-    local scheme="${SCHEME:-RunAnywhereAI}"
     case "${1:-}" in
-        build)  (cd examples/ios/RunAnywhereAI && xcodebuild -scheme "${scheme}" build) ;;
-        clean)  (cd examples/ios/RunAnywhereAI && xcodebuild clean) ;;
+        build)  (cd "${IOS_EXAMPLE_DIR}" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build) ;;
+        run)    (cd "${IOS_EXAMPLE_DIR}" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift run) ;;
+        clean)  (cd "${IOS_EXAMPLE_DIR}" && swift package clean) ;;
         *)      bad_subcommand "example ios" "${1:-}" ;;
     esac
 }
 
 cmd_example_web() {
-    local ex_dir="${EX:-examples/web/RunAnywhereAI}"
+    local ex_dir="${EX:-${WEB_EXAMPLE_DIR}}"
     case "${1:-}" in
         dev)    (cd "${ex_dir}" && (yarn dev 2>/dev/null || npm run dev)) ;;
         build)  (cd "${ex_dir}" && (yarn build 2>/dev/null || npm run build)) ;;
@@ -232,13 +239,27 @@ cmd_example_web() {
     esac
 }
 
+# The minimal Electron harness symlinks bindings/electron (and its llamacpp
+# backend package) as file: dependencies, so it runs against the SDK in the
+# working tree — rebuild the SDK and the next start picks it up.
+cmd_example_electron() {
+    local ex_dir="${EX:-${ELECTRON_EXAMPLE_DIR}}"
+    case "${1:-}" in
+        build)  (cd "${ex_dir}" && npm run build) ;;
+        start)  (cd "${ex_dir}" && npm start) ;;
+        clean)  rm -rf "${ex_dir}/dist" ;;
+        *)      bad_subcommand "example electron" "${1:-}" ;;
+    esac
+}
+
 cmd_example() {
     case "${1:-}" in
-        android) shift; cmd_example_android "$@" ;;
-        flutter) shift; cmd_example_flutter "$@" ;;
-        ios)     shift; cmd_example_ios     "$@" ;;
-        web)     shift; cmd_example_web     "$@" ;;
-        *)       bad_subcommand "example" "${1:-}" ;;
+        android)  shift; cmd_example_android  "$@" ;;
+        flutter)  shift; cmd_example_flutter  "$@" ;;
+        ios)      shift; cmd_example_ios      "$@" ;;
+        web)      shift; cmd_example_web      "$@" ;;
+        electron) shift; cmd_example_electron "$@" ;;
+        *)        bad_subcommand "example" "${1:-}" ;;
     esac
 }
 
@@ -260,7 +281,7 @@ cmd_rcli() {
                         # Staging build: bake credentials (incl. STAGING_BASE_URL) from the
                         # git-ignored development_config.cpp so `RUNANYWHERE_ENVIRONMENT=staging`
                         # needs no explicit URL. Nothing secret lives in this script.
-                        [ -f sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp ] \
+                        [ -f core/src/infrastructure/network/development_config.cpp ] \
                             || die "--env-staging needs the git-ignored development_config.cpp (copy the .template next to it and fill STAGING_BASE_URL)"
                         extra+=(-DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON)
                         ;;
@@ -283,13 +304,13 @@ cmd_clean() {
 
 cmd_lint() {
     cmd_sdk_kotlin lint || true
-    have dart && (cd sdk/runanywhere-flutter/packages/runanywhere && flutter analyze) || true
+    have dart && (cd bindings/flutter/packages/runanywhere && flutter analyze) || true
 }
 
 cmd_format() {
     cmd_sdk_kotlin format || true
-    have swiftformat && swiftformat sdk/runanywhere-swift || true
-    have dart && dart format sdk/runanywhere-flutter || true
+    have swiftformat && swiftformat bindings/swift || true
+    have dart && dart format bindings/flutter || true
 }
 
 case "${1:-help}" in

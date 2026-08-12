@@ -23,6 +23,7 @@ TARGETS:
   rn        yarn install for React Native SDK
   ios       swift package resolve + pod install (macOS only)
   web       yarn install for Web SDK + examples
+  electron  npm install for Electron SDK + llamacpp backend + example
 
 Build commands live under ./run sdk <name> <action> and ./run example <platform> <action>.
 
@@ -39,9 +40,9 @@ case "${OS}" in
     *)       OS=other ;;
 esac
 
-NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
-# Keep this in step with NDK_VERSION in sdk/runanywhere-commons/VERSIONS
-# (currently r27d), which racNdkVersion above is read from.
+NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/bindings/kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
+# Keep this in step with NDK_VERSION in core/VERSIONS (currently r27d),
+# which racNdkVersion above is read from.
 NDK_VERSION="${NDK_VERSION:-27.3.13750724}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -109,17 +110,17 @@ setup_android() {
     else
         warn "Android NDK ${NDK_VERSION} not found — install it before running ./run sdk commons build-android"
     fi
-    ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin" "${sdk}" "${ndk}"
-    ensure_local_props "${REPO_ROOT}/examples/android/RunAnywhereAI" "${sdk}" "${ndk}"
+    ensure_local_props "${REPO_ROOT}/bindings/kotlin" "${sdk}" "${ndk}"
+    ensure_local_props "${REPO_ROOT}/bindings/kotlin/example" "${sdk}" "${ndk}"
 }
 
 setup_flutter() {
     heading "Flutter"
     if ! have flutter; then err "flutter not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere" && flutter pub get </dev/null) && ok "sdk pub get"
+    if [ -d "${REPO_ROOT}/bindings/flutter/packages/runanywhere" ]; then
+        (cd "${REPO_ROOT}/bindings/flutter/packages/runanywhere" && flutter pub get </dev/null) && ok "sdk pub get"
     fi
-    for ex in "${REPO_ROOT}"/examples/flutter/*/; do
+    for ex in "${REPO_ROOT}"/bindings/flutter/example/; do
         [ -d "${ex}" ] && [ -f "${ex}/pubspec.yaml" ] && (cd "${ex}" && flutter pub get </dev/null) && ok "$(basename "${ex}") pub get"
     done
 }
@@ -127,8 +128,8 @@ setup_flutter() {
 setup_rn() {
     heading "React Native"
     if ! have yarn && ! have npm; then err "yarn/npm not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-react-native" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-react-native"
+    if [ -d "${REPO_ROOT}/bindings/react-native" ]; then
+        cd "${REPO_ROOT}/bindings/react-native"
         if have yarn; then yarn install && ok "yarn install"; else npm install && ok "npm install"; fi
     fi
 }
@@ -140,29 +141,44 @@ setup_ios() {
         return 0
     fi
     if ! have swift; then err "swift not found (install Xcode)"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-swift" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
+    if [ -d "${REPO_ROOT}/bindings/swift" ]; then
+        (cd "${REPO_ROOT}/bindings/swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
     fi
-    for ex in "${REPO_ROOT}"/examples/ios/*/; do
-        if [ -f "${ex}/Podfile" ] && have pod; then
-            (cd "${ex}" && pod install) && ok "$(basename "${ex}") pod install"
-        fi
-    done
+    if [ -f "${REPO_ROOT}/bindings/swift/example/Package.swift" ]; then
+        (cd "${REPO_ROOT}/bindings/swift/example" \
+            && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) \
+            && ok "minimal example swift package resolve"
+    fi
 }
 
 setup_web() {
     heading "Web"
     if ! have yarn && ! have npm; then err "yarn/npm not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-web" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-web"
+    if [ -d "${REPO_ROOT}/bindings/web" ]; then
+        cd "${REPO_ROOT}/bindings/web"
         if have yarn; then yarn install && ok "sdk yarn install"; else npm install && ok "sdk npm install"; fi
     fi
-    for ex in "${REPO_ROOT}"/examples/web/*/; do
-        if [ -f "${ex}/package.json" ]; then
-            cd "${ex}"
-            if have yarn; then yarn install && ok "$(basename "${ex}") yarn install"; else npm install && ok "$(basename "${ex}") npm install"; fi
-        fi
-    done
+    # The minimal harness is a standalone npm project (not a workspace member),
+    # so it installs on its own.
+    if [ -f "${REPO_ROOT}/bindings/web/example/package.json" ]; then
+        cd "${REPO_ROOT}/bindings/web/example"
+        npm install && ok "minimal example npm install"
+    fi
+}
+
+setup_electron() {
+    heading "Electron"
+    if ! have npm; then err "npm not found"; return 1; fi
+    (cd "${REPO_ROOT}/bindings/electron" && npm install) && ok "sdk npm install"
+    # The backend package the minimal example registers.
+    (cd "${REPO_ROOT}/bindings/electron/packages/llamacpp" && npm install) \
+        && ok "llamacpp backend npm install"
+    # The minimal harness is a standalone npm project that symlinks both of the
+    # above as file: dependencies, so it installs last and on its own.
+    if [ -f "${REPO_ROOT}/bindings/electron/example/package.json" ]; then
+        (cd "${REPO_ROOT}/bindings/electron/example" && npm install) \
+            && ok "minimal example npm install"
+    fi
 }
 
 setup_all() {
@@ -171,6 +187,7 @@ setup_all() {
     setup_web      || rc=1
     setup_rn       || rc=1
     setup_flutter  || rc=1
+    setup_electron || rc=1
     [ "${OS}" = "macos" ] && { setup_ios || rc=1; }
     return ${rc}
 }
@@ -193,6 +210,7 @@ for t in "${TARGETS[@]}"; do
         rn)       setup_rn      || EXIT=1 ;;
         ios)      setup_ios     || EXIT=1 ;;
         web)      setup_web     || EXIT=1 ;;
+        electron) setup_electron || EXIT=1 ;;
         help|-h|--help) usage; exit 0 ;;
         *) err "unknown target: ${t}"; usage; exit 2 ;;
     esac

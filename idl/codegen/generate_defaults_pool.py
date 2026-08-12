@@ -24,10 +24,10 @@
 # the message generators; this emits plain constants instead.
 #
 # Outputs:
-#   sdk/runanywhere-swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift
-#   sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt
-#   sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart
-#   sdk/shared/proto-ts/src/defaults/pool.ts
+#   bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift
+#   bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt
+#   bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart
+#   bindings/proto-ts/src/defaults/pool.ts
 #
 # The C header comes from generate_cpp_defaults.py, which covers every
 # rac_default in idl/ rather than just the pool.
@@ -71,13 +71,13 @@ class Target:
 
 
 SWIFT = Target(
-    rel_path="sdk/runanywhere-swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift",
+    rel_path="bindings/swift/Sources/RunAnywhere/Generated/RADefaultsPool.swift",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 KOTLIN_PROFILE = LangProfile(int64_wrapper=None, int64_suffix="L", float_suffix="f")
 
 KOTLIN = Target(
-    rel_path="sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt",
+    rel_path="bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt",
     profile=KOTLIN_PROFILE,
 )
 
@@ -92,32 +92,32 @@ KOTLIN = Target(
 KOTLIN_ANDROID_FORKS = (
     Target(
         rel_path=(
-            "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/"
+            "bindings/flutter/packages/runanywhere/android/src/main/kotlin/"
             "com/runanywhere/sdk/generated/RADefaultsPool.kt"
         ),
         profile=KOTLIN_PROFILE,
     ),
     Target(
         rel_path=(
-            "sdk/runanywhere-react-native/packages/core/android/src/main/java/"
+            "bindings/react-native/packages/core/android/src/main/java/"
             "com/runanywhere/sdk/generated/RADefaultsPool.kt"
         ),
         profile=KOTLIN_PROFILE,
     ),
 )
 DART = Target(
-    rel_path="sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart",
+    rel_path="bindings/flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 TS = Target(
-    rel_path="sdk/shared/proto-ts/src/defaults/pool.ts",
+    rel_path="bindings/proto-ts/src/defaults/pool.ts",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 # Python consumes the flat C ABI for everything but RAG and has no convenience
 # post-processor, but it still has pooled values of its own (the STT capture rate
 # in the HTTP server, for one), so it gets the constants like everyone else.
 PYTHON = Target(
-    rel_path="sdk/runanywhere-python/runanywhere/_generated_defaults.py",
+    rel_path="bindings/python/runanywhere/_generated_defaults.py",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
 

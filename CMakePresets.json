@@ -285,7 +285,7 @@
         {
             "name": "electron-windows",
             "displayName": "Electron \u2014 Windows x64 thin addon (shared commons + dynamic plugins)",
-            "description": "Option A packaging on MSVC: rac_commons.dll + runanywhere_*.dll + thin runanywhere_native.node. Requires a Windows host (or CI windows-2022 runner) — not cross-compilable from macOS. Pass -DRAC_NODE_DEV_DIR=<node-gyp cache> after `npx node-gyp install`. Sherpa needs the Windows Sherpa-ONNX prebuilt; CI may override -DRAC_BACKEND_SHERPA=OFF when that archive is absent. See sdk/runanywhere-electron/docs/DEVELOPMENT.md (DELAYLOAD notes).",
+            "description": "Option A packaging on MSVC: rac_commons.dll + runanywhere_*.dll + thin runanywhere_native.node. Requires a Windows host (or CI windows-2022 runner) — not cross-compilable from macOS. Pass -DRAC_NODE_DEV_DIR=<node-gyp cache> after `npx node-gyp install`. Sherpa needs the Windows Sherpa-ONNX prebuilt; CI may override -DRAC_BACKEND_SHERPA=OFF when that archive is absent. See bindings/electron/docs/DEVELOPMENT.md (DELAYLOAD notes).",
             "inherits": "base-release",
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
