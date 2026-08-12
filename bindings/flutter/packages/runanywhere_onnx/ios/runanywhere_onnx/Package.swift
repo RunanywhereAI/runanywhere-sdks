@@ -36,7 +36,7 @@ let sherpaTarget = runAnywhereBinaryTarget(
 // makes on-device image generation (diffusion.generateImage) routable.
 let coremlTarget = runAnywhereBinaryTarget(
     name: "RABackendNeuRT",
-    checksum: "93cb97b0a3e64dca8996214ebb85945202fa413e05907c260908fa6ab2b41e24"
+    checksum: "b85d91f0a6b24ffaa21affa5bc7cb9e5300451dfd2ae876af77c00972374e74d"
 )
 
 let package = Package(

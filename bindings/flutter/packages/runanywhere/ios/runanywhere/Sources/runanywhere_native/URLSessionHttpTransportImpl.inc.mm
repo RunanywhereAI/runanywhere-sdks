@@ -72,6 +72,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/rac_defaults_generated.h"
 
 // =============================================================================
 // Logging — route through os_log so messages surface via
@@ -310,8 +311,10 @@ static NSURLSession* sharedSession() {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSURLSessionConfiguration* config = [NSURLSessionConfiguration defaultSessionConfiguration];
-        config.timeoutIntervalForRequest = 60;
-        config.timeoutIntervalForResource = 600;
+        config.timeoutIntervalForRequest =
+            (NSTimeInterval)RAC_DEFAULT_NETWORK_REQUEST_TIMEOUT_MS / 1000.0;
+        config.timeoutIntervalForResource =
+            (NSTimeInterval)RAC_DEFAULT_NETWORK_RESOURCE_TIMEOUT_MS / 1000.0;
         config.URLCache = nil;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
         config.HTTPAdditionalHeaders = nil;
@@ -532,11 +535,12 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
             [NSURLSessionConfiguration defaultSessionConfiguration];
         config.timeoutIntervalForRequest = snap.timeoutMs > 0
             ? (NSTimeInterval)snap.timeoutMs / 1000.0
-            : 60;
+            : (NSTimeInterval)RAC_DEFAULT_NETWORK_REQUEST_TIMEOUT_MS / 1000.0;
         // Resource timeout covers the whole transfer; a 10 GB GGUF over a
         // slow cellular link can legitimately run for hours. Matches the
         // Swift reference (24h ceiling rather than 600s).
-        config.timeoutIntervalForResource = 24 * 60 * 60;
+        config.timeoutIntervalForResource =
+            (NSTimeInterval)RAC_DEFAULT_NETWORK_STREAMING_TIMEOUT_MS / 1000.0;
         config.URLCache = nil;
         config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
         // Streaming downloads benefit from NSURLSession queuing a retry when

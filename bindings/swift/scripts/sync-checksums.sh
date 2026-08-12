@@ -15,6 +15,33 @@
 #   bindings/swift/scripts/sync-checksums.sh core/dist
 #   bindings/swift/scripts/sync-checksums.sh release-artifacts/native-ios-macos
 #
+# CROSS-REPO: the standalone Swift distribution repo
+#   https://github.com/RunanywhereAI/runanywhere-swift is a generated,
+#   Swift-only mirror of bindings/swift (Package.swift + Sources/ + LICENSE +
+#   README.md) that exists so SPM consumers do not clone this whole monorepo.
+#   Its Package.swift carries the SAME six remote binaryTarget checksums as the
+#   root manifest, pointing at the SAME release assets on runanywhere-sdks — the
+#   XCFrameworks are never re-uploaded.
+#
+#   Export RUNANYWHERE_SWIFT_DIST_REPO=/path/to/runanywhere-swift to make this
+#   script update (or, with --check, verify) that manifest in the same pass, so
+#   the two can never drift. Unset, nothing changes and only the monorepo
+#   manifests are touched.
+#
+#   Release order (after the native iOS/macOS zips exist):
+#     1. scripts/release/sync-versions.sh <version>   # bumps sdkVersion everywhere
+#     2. git clone https://github.com/RunanywhereAI/runanywhere-swift.git /tmp/ra-swift
+#     3. Refresh /tmp/ra-swift from this tree:
+#          rsync -a --delete bindings/swift/Sources/{RunAnywhere,LlamaCPPRuntime,\
+#            ONNXRuntime,NeuRTRuntime,MLXRuntime}/ ... into /tmp/ra-swift/Sources/
+#          and set `let sdkVersion` in /tmp/ra-swift/Package.swift to <version>.
+#     4. RUNANYWHERE_SWIFT_DIST_REPO=/tmp/ra-swift \
+#          bindings/swift/scripts/sync-checksums.sh <zip_dir>
+#     5. Commit + push BOTH repos, then tag runanywhere-sdks `v<version>` and
+#        runanywhere-swift `<version>` (no `v` prefix on the dist repo).
+#     6. Re-run with --check against the published zips to prove both manifests
+#        still match the immutable tags.
+#
 # Looks for files of the form:
 #   {name}-v{version}.zip
 # where {name} is one of:
@@ -45,6 +72,21 @@ FLUTTER_CORE_PACKAGE="${REPO_ROOT}/bindings/flutter/packages/runanywhere/ios/run
 FLUTTER_LLAMA_PACKAGE="${REPO_ROOT}/bindings/flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift"
 FLUTTER_ONNX_PACKAGE="${REPO_ROOT}/bindings/flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift"
 FLUTTER_MLX_PODSPEC="${REPO_ROOT}/bindings/flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec"
+
+# Optional cross-repo target: a checkout of the standalone
+# RunanywhereAI/runanywhere-swift distribution repo. Its Package.swift declares
+# the same six remote binaryTargets against the same runanywhere-sdks release
+# assets, so its checksums must move in lockstep with the root manifest. Unset
+# → skipped entirely and this script behaves exactly as before.
+DIST_SWIFT_PACKAGE=""
+if [ -n "${RUNANYWHERE_SWIFT_DIST_REPO:-}" ]; then
+    DIST_SWIFT_PACKAGE="${RUNANYWHERE_SWIFT_DIST_REPO%/}/Package.swift"
+    if [ ! -f "$DIST_SWIFT_PACKAGE" ]; then
+        echo "ERROR: RUNANYWHERE_SWIFT_DIST_REPO is set but no Package.swift at" >&2
+        echo "       $DIST_SWIFT_PACKAGE" >&2
+        exit 1
+    fi
+fi
 
 if [ ! -f "$PACKAGE_SWIFT" ]; then
     echo "ERROR: Package.swift not found at $PACKAGE_SWIFT" >&2
@@ -94,6 +136,16 @@ if [ "$flutter_mlx_version" != "$SDK_VERSION" ]; then
     echo "ERROR: Flutter MLX podspec version mismatch: $FLUTTER_MLX_PODSPEC" >&2
     echo "       expected $SDK_VERSION, found ${flutter_mlx_version:-<missing>}" >&2
     exit 1
+fi
+
+if [ -n "$DIST_SWIFT_PACKAGE" ]; then
+    dist_version="$(sed -nE 's/^let sdkVersion = "([^"]+)"$/\1/p' "$DIST_SWIFT_PACKAGE")"
+    if [ "$dist_version" != "$SDK_VERSION" ]; then
+        echo "ERROR: runanywhere-swift manifest version mismatch: $DIST_SWIFT_PACKAGE" >&2
+        echo "       expected $SDK_VERSION, found ${dist_version:-<missing>}" >&2
+        echo "       Bump 'let sdkVersion' in the distribution repo before syncing." >&2
+        exit 1
+    fi
 fi
 
 # swiftpm binary target name → local-filename-prefix pairs. Names match the
@@ -207,6 +259,15 @@ while IFS='|' read -r binary_name zip_prefix; do
         "$binary_name" "$sum" "$PACKAGE_SWIFT" remote-binary-target; then
         failed=$((failed + 1))
     fi
+    # The standalone distribution repo uses byte-identical binaryTarget names
+    # and the same remote `url:` + `checksum:` shape, so the root pattern
+    # applies unchanged.
+    if [ -n "$DIST_SWIFT_PACKAGE" ]; then
+        if ! process_checksum_line \
+            "$binary_name" "$sum" "$DIST_SWIFT_PACKAGE" remote-binary-target; then
+            failed=$((failed + 1))
+        fi
+    fi
     case "$binary_name" in
         RACommonsBinary)
             if ! process_checksum_line \
@@ -229,6 +290,14 @@ while IFS='|' read -r binary_name zip_prefix; do
         RABackendSherpaBinary)
             if ! process_checksum_line \
                 RABackendSherpa "$sum" "$FLUTTER_ONNX_PACKAGE" flutter-helper; then
+                failed=$((failed + 1))
+            fi
+            ;;
+        RABackendNeuRTBinary)
+            # runanywhere_onnx vendors RABackendNeuRT alongside ONNX/Sherpa, so
+            # its Flutter manifest pins this checksum too.
+            if ! process_checksum_line \
+                RABackendNeuRT "$sum" "$FLUTTER_ONNX_PACKAGE" flutter-helper; then
                 failed=$((failed + 1))
             fi
             ;;
@@ -304,6 +373,9 @@ if [ "$MODE" = "check" ]; then
         exit 1
     fi
     echo ">> Root/Flutter manifests and the Flutter MLX podspec match every release archive."
+    if [ -n "$DIST_SWIFT_PACKAGE" ]; then
+        echo ">> runanywhere-swift distribution manifest matches too: $DIST_SWIFT_PACKAGE"
+    fi
 else
     if [ "$missing" -ne 0 ] || [ "$failed" -ne 0 ]; then
         echo "ERROR: could not update every Swift binary target checksum" >&2
@@ -312,4 +384,10 @@ else
     echo ""
     echo ">> Verify with:"
     echo "    git diff -- Package.swift bindings/flutter/packages/*/ios/*/Package.swift $FLUTTER_MLX_PODSPEC"
+    if [ -n "$DIST_SWIFT_PACKAGE" ]; then
+        echo "    git -C ${RUNANYWHERE_SWIFT_DIST_REPO%/} diff -- Package.swift"
+        echo ""
+        echo ">> Remember: commit + push the runanywhere-swift repo and tag it"
+        echo "   ${SDK_VERSION} (no 'v' prefix) so 'from: \"${SDK_VERSION}\"' resolves."
+    fi
 fi
