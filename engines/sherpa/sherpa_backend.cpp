@@ -793,6 +793,35 @@ STTModelType SherpaSTT::get_model_type() const {
     return model_type_;
 }
 
+std::string SherpaSTT::resolve_request_language(bool detect_language,
+                                                const std::string& requested_language,
+                                                const char* whisper_auto_token) const {
+    const std::string whisper_auto =
+        whisper_auto_token ? std::string(whisper_auto_token) : std::string();
+    if (detect_language) {
+        if (model_type_ == STTModelType::WHISPER) {
+            return whisper_auto;
+        }
+        // Unset language on the public STT proto means auto-detect. Whisper
+        // honors that; Canary (en/es/de/fr) and every other recognizer do not.
+        // Falling back to the loaded language is what `stt.transcribe(pcm)`
+        // without a language pin must do — returning LanguageNotSupported
+        // made Canary look broken after a successful load.
+        const std::string loaded = language_.empty() ? std::string("en") : language_;
+        RAC_LOG_DEBUG("Sherpa.STT",
+                      "Language auto-detect is Whisper-only; using loaded language \"%s\"",
+                      loaded.c_str());
+        return loaded;
+    }
+    if (!requested_language.empty()) {
+        return requested_language;
+    }
+    if (!language_.empty()) {
+        return language_;
+    }
+    return model_type_ == STTModelType::WHISPER ? whisper_auto : std::string("en");
+}
+
 STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_status) {
     STTResult result;
     // Default to success; each failure path below overwrites this before
@@ -830,15 +859,8 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             return result;
         }
 
-        std::string stream_language = language_;
-        if (request.detect_language) {
-            stream_language = "auto";
-        } else if (!request.language.empty()) {
-            stream_language = request.language;
-        }
-        if (stream_language.empty()) {
-            stream_language = "auto";
-        }
+        std::string stream_language = resolve_request_language(
+            request.detect_language, request.language, "auto");
 #if defined(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION) && \
     SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION
         SherpaOnnxOnlineStreamSetOption(stream, "language", stream_language.c_str());
@@ -882,17 +904,10 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
     // Whisper accepts an empty language for auto-detect. Canary requires an
     // explicit source/target language; its exact RunAnywhere bundle supports
     // en/es/de/fr. Other recognizers are fixed-language at this layer.
-    std::string desired_language = language_;
-    if (request.detect_language) {
-        if (model_type_ != STTModelType::WHISPER) {
-            RAC_LOG_WARNING("Sherpa.STT", "Language auto-detection is only supported for Whisper");
-            set_status(SherpaSttStatus::LanguageNotSupported);
-            return result;
-        }
-        desired_language.clear();
-    } else if (!request.language.empty()) {
-        desired_language = request.language;
-    }
+    // detect_language on a non-Whisper model falls back to the loaded language
+    // rather than failing — public STT leaves language unset to mean "auto".
+    std::string desired_language =
+        resolve_request_language(request.detect_language, request.language, "");
 
     if (desired_language != language_) {
         const bool language_configurable =
@@ -1077,6 +1092,10 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         RAC_LOG_DEBUG("Sherpa.STT", "No transcription result (empty audio or silence)");
     }
 
+    if (result.detected_language.empty() && !desired_language.empty()) {
+        result.detected_language = desired_language;
+    }
+
     SherpaOnnxDestroyOfflineStream(stream);
 
     return result;
@@ -1134,11 +1153,10 @@ std::string SherpaSTT::create_stream(const nlohmann::json& config) {
         state.sample_rate = 16000;
     }
     const bool detect_language = has_config && config.value("detect_language", false);
+    const std::string requested_language =
+        has_config ? config.value("language", language_) : language_;
     state.language =
-        detect_language ? "auto" : (has_config ? config.value("language", language_) : language_);
-    if (state.language.empty()) {
-        state.language = "auto";
-    }
+        resolve_request_language(detect_language, requested_language, "auto");
 
     if (recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer) {
         state.online = SherpaOnnxCreateOnlineStream(sherpa_online_recognizer_);
@@ -1427,6 +1445,9 @@ void SherpaSTT::destroy_stream(const std::string& stream_id) {
 }
 
 std::vector<std::string> SherpaSTT::get_supported_languages() const {
+    if (model_type_ == STTModelType::CANARY) {
+        return {"en", "es", "de", "fr"};
+    }
     if (recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer) {
         if (!uses_language_prompt_) {
             return {"en"};

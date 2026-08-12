@@ -83,7 +83,7 @@ struct DeviceInfo {
 enum class SherpaSttStatus {
     Ok,                     // transcription succeeded (text may still be empty for silence)
     ModelNotLoaded,         // recognizer missing / model_loaded_ false
-    LanguageNotSupported,   // per-call language rejected (non-Whisper) or rebuild for it failed
+    LanguageNotSupported,   // explicit per-call language rejected, or rebuild for it failed
     RecognizerBuildFailed,  // could not (re)build any recognizer; model now unloaded
     StreamCreationFailed,   // SherpaOnnxCreateOfflineStream returned null
     BackendUnavailable,     // built without SHERPA_ONNX_AVAILABLE
@@ -243,6 +243,15 @@ class SherpaSTT {
     std::vector<std::string> get_supported_languages() const;
 
    private:
+    // Whisper is the only recognizer that can auto-detect. For Canary and
+    // every other type, a detect_language request uses the language the
+    // recognizer was built with instead of failing the call. `whisper_auto_token`
+    // is empty for offline Whisper auto-detect and "auto" for the online stream
+    // option. Mutex need not be held; reads model_type_ / language_ only.
+    std::string resolve_request_language(bool detect_language,
+                                         const std::string& requested_language,
+                                         const char* whisper_auto_token) const;
+
     // Builds the offline recognizer using cached model paths and the current
     // `language_`. Mutex MUST be held by the caller. Returns true on success.
     // Existing recognizer (if any) is destroyed first. Used by load_model() to
