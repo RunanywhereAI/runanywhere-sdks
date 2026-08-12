@@ -42,56 +42,75 @@ fi
 # `npm install -g` is not necessarily the prefix `npm root -g` reports here.
 # Try every legitimate location instead of betting on one.
 #
-# On Windows the .cmd shims come FIRST. protoc spawns the plugin with
-# CreateProcess, which cannot run the extensionless `#!/usr/bin/env node`
-# script that npm also drops next to them — Git Bash's `command -v` happily
-# returns that script, and handing it to protoc fails with a bare
-# "program not found". `command -v x.cmd` simply resolves to nothing on POSIX,
-# so one ordered list serves both.
-TS_PROTO_PLUGIN=""
-ts_proto_candidates() {
-    command -v protoc-gen-ts_proto.cmd 2>/dev/null || true
-    command -v protoc-gen-ts_proto 2>/dev/null || true
-
-    # `npm prefix -g` is where the shims live: <prefix>/bin on POSIX and
-    # <prefix> itself (%APPDATA%\npm) on Windows.
+# So resolve the PACKAGE DIRECTORY, which is unambiguous, rather than a shim.
+ts_proto_pkg_dirs() {
+    npm_root="$(npm root -g 2>/dev/null || true)"
+    [ -n "${npm_root}" ] && printf '%s\n' "${npm_root}/ts-proto"
+    # npm root -g answers <prefix>/lib/node_modules on POSIX and
+    # <prefix>/node_modules on Windows; list both anyway for a broken npm.
     npm_prefix="$(npm prefix -g 2>/dev/null || true)"
     if [ -n "${npm_prefix}" ]; then
-        printf '%s\n' "${npm_prefix}/protoc-gen-ts_proto.cmd"
-        printf '%s\n' "${npm_prefix}/bin/protoc-gen-ts_proto"
-        printf '%s\n' "${npm_prefix}/lib/node_modules/ts-proto/protoc-gen-ts_proto"
+        printf '%s\n' "${npm_prefix}/lib/node_modules/ts-proto"
+        printf '%s\n' "${npm_prefix}/node_modules/ts-proto"
     fi
-
-    # `npm root -g` is the package directory: <prefix>/lib/node_modules on
-    # POSIX, <prefix>/node_modules on Windows. Ask rather than reconstruct.
-    npm_root="$(npm root -g 2>/dev/null || true)"
-    [ -n "${npm_root}" ] && printf '%s\n' "${npm_root}/ts-proto/protoc-gen-ts_proto"
-
     # A repo-local install is a first-class answer too: `npm install` in
     # bindings/proto-ts, or a hoisted root install, both put it here.
-    for dir in "${REPO_ROOT}/bindings/proto-ts" "${REPO_ROOT}"; do
-        printf '%s\n' "${dir}/node_modules/.bin/protoc-gen-ts_proto.cmd"
-        printf '%s\n' "${dir}/node_modules/.bin/protoc-gen-ts_proto"
-        printf '%s\n' "${dir}/node_modules/ts-proto/protoc-gen-ts_proto"
-    done
+    printf '%s\n' "${REPO_ROOT}/bindings/proto-ts/node_modules/ts-proto"
+    printf '%s\n' "${REPO_ROOT}/node_modules/ts-proto"
 }
-while IFS= read -r candidate; do
-    [ -n "${candidate}" ] || continue
-    if [ -x "${candidate}" ]; then
-        TS_PROTO_PLUGIN="${candidate}"
+
+TS_PROTO_PKG=""
+while IFS= read -r candidate_dir; do
+    [ -n "${candidate_dir}" ] || continue
+    if [ -f "${candidate_dir}/protoc-gen-ts_proto" ]; then
+        TS_PROTO_PKG="${candidate_dir}"
         break
     fi
-done <<< "$(ts_proto_candidates)"
+done <<< "$(ts_proto_pkg_dirs)"
 
-if [ -z "${TS_PROTO_PLUGIN}" ]; then
-    echo "error: the ts-proto plugin (protoc-gen-ts_proto) is not installed anywhere this" >&2
-    echo "       script looks. Tried, in order:" >&2
-    ts_proto_candidates | sed 's/^/         /' >&2
+if [ -z "${TS_PROTO_PKG}" ]; then
+    echo "error: the ts-proto package is not installed anywhere this script looks." >&2
+    echo "       Tried, in order:" >&2
+    ts_proto_pkg_dirs | sed 's/^/         /' >&2
     echo "       Install via: npm install -g ts-proto@${TS_PROTO_VERSION}" >&2
     echo "       If you just ran that and still see this, the npm that installed it and" >&2
     echo "       the npm on PATH here have different global prefixes." >&2
     exit 127
 fi
+
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*|Windows_NT)
+        # Windows cannot execute the package's `protoc-gen-ts_proto`: it is an
+        # extensionless `#!/usr/bin/env node` script, and protoc spawns plugins
+        # through CreateProcess, which fails with "%1 is not a valid Win32
+        # application". npm's own .cmd shim would do, but where npm puts it
+        # depends on the prefix layout and on which Node is first on PATH — the
+        # thing that already went wrong once here. Write our own next to the
+        # package instead: two lines, no discovery, correct by construction.
+        TS_PROTO_PLUGIN="${TS_PROTO_PKG}/protoc-gen-ts_proto.rac.cmd"
+        entry="${TS_PROTO_PKG}/protoc-gen-ts_proto"
+        if command -v cygpath >/dev/null 2>&1; then
+            entry="$(cygpath -w "${entry}")"
+        fi
+        printf '@echo off\r\nnode "%s" %%*\r\n' "${entry}" > "${TS_PROTO_PLUGIN}"
+        ;;
+    *)
+        TS_PROTO_PLUGIN="${TS_PROTO_PKG}/protoc-gen-ts_proto"
+        if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
+            # Present but not +x (a tarball unpacked without exec bits): fall
+            # back to whatever `npm install -g` put on PATH.
+            on_path="$(command -v protoc-gen-ts_proto 2>/dev/null || true)"
+            if [ -n "${on_path}" ] && [ -x "${on_path}" ]; then
+                TS_PROTO_PLUGIN="${on_path}"
+            else
+                echo "error: ${TS_PROTO_PLUGIN} exists but is not executable, and no" >&2
+                echo "       protoc-gen-ts_proto is on PATH." >&2
+                exit 127
+            fi
+        fi
+        ;;
+esac
+echo "  ts-proto plugin: ${TS_PROTO_PLUGIN}" >&2
 
 # Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
