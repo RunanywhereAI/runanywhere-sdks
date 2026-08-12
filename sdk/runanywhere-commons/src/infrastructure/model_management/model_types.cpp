@@ -45,24 +45,29 @@ rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_type_t* 
         return RAC_FALSE;
     }
 
-    // Convert to lowercase for comparison
     std::string path(url_path);
-    std::ranges::transform(path, path.begin(), ::tolower);
+    const size_t suffix_noise = path.find_first_of("?#");
+    if (suffix_noise != std::string::npos) {
+        path.erase(suffix_noise);
+    }
+    std::ranges::transform(path, path.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
 
     // Check suffixes (mirrors Swift's ArchiveType.from(url:))
-    if (path.rfind(".tar.bz2") != std::string::npos || path.rfind(".tbz2") != std::string::npos) {
+    if (path.ends_with(".tar.bz2") || path.ends_with(".tbz2")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
         return RAC_TRUE;
     }
-    if (path.rfind(".tar.gz") != std::string::npos || path.rfind(".tgz") != std::string::npos) {
+    if (path.ends_with(".tar.gz") || path.ends_with(".tgz")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
         return RAC_TRUE;
     }
-    if (path.rfind(".tar.xz") != std::string::npos || path.rfind(".txz") != std::string::npos) {
+    if (path.ends_with(".tar.xz") || path.ends_with(".txz")) {
         *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
         return RAC_TRUE;
     }
-    if (path.rfind(".zip") != std::string::npos) {
+    if (path.ends_with(".zip")) {
         *out_type = RAC_ARCHIVE_TYPE_ZIP;
         return RAC_TRUE;
     }
