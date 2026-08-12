@@ -118,10 +118,19 @@ if [ "${WITH_COMPILE}" -eq 1 ]; then
 
     step "importing the generated Python"
     if ! (cd bindings/python && python3 -c '
-import importlib, pathlib, sys
+import importlib, pathlib, sys, types
 sys.path.insert(0, ".")
-# Import the generated modules directly: the runanywhere package pulls in the
-# native _core, which this job does not build.
+# Stand `runanywhere` up as a bare namespace package pointing at the real
+# directory, so importing its generated submodules does NOT execute
+# runanywhere/__init__.py. That module imports .inputs -> numpy and, further
+# down, the native _core — neither of which this job builds or installs, and
+# neither of which says anything about whether the generated code is valid.
+# The generated *_pb2 modules import each other absolutely
+# ("from runanywhere._proto import errors_pb2"), so the name has to resolve;
+# it just must not run the package body.
+_shim = types.ModuleType("runanywhere")
+_shim.__path__ = [str(pathlib.Path("runanywhere").resolve())]
+sys.modules["runanywhere"] = _shim
 import runanywhere._generated_errors as e
 import runanywhere._generated_defaults as d
 assert e.ErrorCode, "ErrorCode enum is empty"
