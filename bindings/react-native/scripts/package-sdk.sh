@@ -376,6 +376,30 @@ rm -rf "$CORE_RAC_HEADERS"
 mkdir -p "$(dirname "$CORE_RAC_HEADERS")"
 cp -R "$PUBLIC_RAC_HEADERS" "$CORE_RAC_HEADERS"
 
+# FAIL CLOSED: the copy above is an unguarded `cp -R`, so it happily ships an
+# INCOMPLETE header set. Some public headers are gitignored codegen output --
+# rac/rac_defaults_generated.h is written by generate_cpp_defaults.py and is
+# #included by all five rac_{llm,stt,tts,vad,vlm}_types.h. If codegen did not
+# run for cpp, those five ship while their dependency does not, and the package
+# installs fine and then fails at NDK compile time in the consumer's app with
+#   rac_llm_types.h:27:10: fatal error: 'rac/rac_defaults_generated.h' file not found
+# That is exactly how @runanywhere/core 0.20.18 shipped unbuildable for RN
+# Android. npm is append-only, so it could not be withdrawn.
+# Resolve every intra-tree `#include "rac/..."` against the copied tree.
+_missing_headers=""
+while IFS= read -r _inc; do
+    [ -f "$CORE_RAC_HEADERS/../$_inc" ] || _missing_headers="$_missing_headers $_inc"
+done <<EOF
+$(grep -rhoE '#[[:space:]]*include[[:space:]]+"rac/[^"]+"' "$CORE_RAC_HEADERS" 2>/dev/null \
+    | sed -E 's/.*"(rac\/[^"]+)".*/\1/' | sort -u)
+EOF
+if [ -n "$_missing_headers" ]; then
+    echo "ERROR: the staged public header tree is incomplete; these are #included but absent:" >&2
+    for _h in $_missing_headers; do echo "         $_h" >&2; done
+    echo "       Most likely C++ codegen did not run. Try: idl/codegen/ensure_generated.sh --only cpp" >&2
+    exit 1
+fi
+
 # Defense in depth: a public package tree must never contain a private backend
 # or QNN runtime, even if an input directory combines public and private builds.
 if find \

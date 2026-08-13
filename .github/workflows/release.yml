@@ -920,7 +920,18 @@ jobs:
       # PATH. RN packaging runs ensure_generated.sh --only ts; without ts-proto it exits 127.
       - uses: ./.github/actions/generate-idl
         with:
-          languages: ts
+          # ts for the proto-ts bindings the packaging script regenerates, AND
+          # cpp because package-sdk.sh copies core/include/rac wholesale into
+          # packages/core/android/src/main/jniLibs/include. One of those public
+          # headers, rac/rac_defaults_generated.h, is gitignored codegen output
+          # (.gitignore:543). Generating only ts left it absent while the five
+          # rac_{llm,stt,tts,vad,vlm}_types.h headers beside it still #include
+          # it, so @runanywhere/core@0.20.18 cannot compile for RN Android:
+          #   rac_llm_types.h:27:10: fatal error:
+          #   'rac/rac_defaults_generated.h' file not found
+          # The copy is an unguarded `cp -R`, so a missing generated header does
+          # not fail the build, it just ships an unusable package.
+          languages: ts,cpp
       # The RN tree pins `packageManager: yarn@3.6.1` (Yarn Berry). Activate it
       # via Corepack at the workflow level so package-sdk.sh (and any later
       # `yarn` invocation against the RN workspace) doesn't silently fall back
