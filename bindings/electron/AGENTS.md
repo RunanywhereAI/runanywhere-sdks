@@ -94,13 +94,29 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
 
 - Document what is true today. Do not claim encryption or remote Phase-2 auth unless
   packaging and runtime are wired end-to-end.
-- **Windows QHexRT/NPU is wired** on Windows ARM64 (Snapdragon X / X2 Elite, Hexagon
-  v81): `@runanywhere/electron-qhexrt` ships `runanywhere_qhexrt.dll` plus the flat
-  QAIRT set in its own `prebuilds/win32-arm64/`, and a v81 bundle loads and generates
-  through the thin addon. What is NOT wired on that host: llama.cpp, ONNX and Sherpa
-  do not build for win-arm64 (ggml rejects MSVC for ARM; `FetchONNXRuntime.cmake` has
-  no win-arm64 URL — see the `windows-arm64-release` preset comments), so the NPU is
-  the only engine there and there is no CPU fallback to hide behind.
+- **Windows QHexRT/NPU is NOT shipped yet.** Windows ARM64 (Snapdragon X / X2 Elite,
+  Hexagon v81) is the only platform where it could ever work, and no build of it
+  exists. Concretely, as of 0.20.18: no CMake preset sets `RAC_BACKEND_QHEXRT=ON`,
+  so `engines/qhexrt/CMakeLists.txt` self-gates OFF and the target is never built;
+  every staged payload under `engines/qhexrt/prebuilt/` carries only Android
+  `lib/arm64-v8a/libqhexrt_{core,host}.a`, so the `qhexrt_core.lib` /
+  `qhexrt_host.lib` that `CMakeLists.txt` requires on win-arm64 do not exist
+  anywhere, and `stage_prebuilt_for_sdk.sh` is structurally Android-only. On a
+  win-arm64 runner this hard-fails at configure time with the "Partial QHexRT
+  prebuilt" `FATAL_ERROR` rather than producing a DLL.
+  The published `@runanywhere/electron-qhexrt` is therefore JS-only: `register()`
+  records a path with no prebuild behind it, and the plugin never loads. 0.20.16 and
+  0.20.17 are deprecated on npm to say so. **Do not describe this package as
+  NPU-accelerated on any platform until a real win-arm64 DLL passes
+  `check_plugin_natives.py`.** A shell build is not evidence of one: building the
+  macOS shell yields a 1.3 MB dylib that exports `rac_plugin_entry_qhexrt` and 14
+  other symbols, yet `nm -a` shows only `g_qhexrt_unavailable_vtable` (the all-NULL
+  table) and the marker string is `qhexrt:engine-unavailable`. Gate on
+  `g_qhexrt_llm_ops`, never on file size or exported-symbol count.
+  What is separately true on that host: llama.cpp, ONNX and Sherpa do not build for
+  win-arm64 (ggml rejects MSVC for ARM; `FetchONNXRuntime.cmake` has no win-arm64
+  URL, see the `windows-arm64-release` preset comments), so once the NPU does land
+  it is the only engine there and there is no CPU fallback to hide behind.
 - Win32 secure store is DPAPI; do not label it "plaintext M0" in headers/docs.
 - Phase-2 `completeServicesInitialization` is a local lifecycle seam unless real auth
   lands.
