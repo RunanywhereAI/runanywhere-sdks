@@ -14,6 +14,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
@@ -223,10 +224,13 @@ object CppBridgeModelRegistry {
      * → registry save) and returns the persisted [ProtoModelInfo].
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
-        val bytes =
+        val bytes = try {
             RunAnywhereBridge.racRegisterModelFromUrlProto(
                 ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-            ) ?: return null
+            )
+        } catch (error: NativeProtoException) {
+            throw SDKException.fromRACResult(error.resultCode) ?: error
+        } ?: return null
 
         return decodeProtoModel(bytes)
     }

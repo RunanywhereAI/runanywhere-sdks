@@ -7,6 +7,8 @@
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.ModelSource
+
 /**
  * A model artifact to register: a single URL, an archive, or a file set.
  *
@@ -21,12 +23,14 @@ public class ModelRegistration private constructor(
     internal val category: ModelCategory,
     internal val memoryBytes: Long?,
     internal val downloadBytes: Long?,
+    internal val contextLength: Int?,
+    internal val source: ModelSource,
+    internal val description: String?,
     internal val supportsThinking: Boolean,
     internal val supportsLora: Boolean,
     internal val archiveType: ArchiveType?,
     internal val archiveStructure: ArchiveStructure?,
     internal val files: List<ModelFileDescriptor>,
-    internal val contextLength: Int?,
     internal val cuaProfile: String?,
 ) {
     internal enum class Kind {
@@ -45,6 +49,9 @@ public class ModelRegistration private constructor(
             id: String? = null,
             memoryBytes: Long? = null,
             downloadBytes: Long? = null,
+            contextLength: Int? = null,
+            source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+            description: String? = null,
             supportsThinking: Boolean = false,
             supportsLora: Boolean = false,
             cuaProfile: String? = null,
@@ -58,12 +65,14 @@ public class ModelRegistration private constructor(
                 category = category,
                 memoryBytes = memoryBytes,
                 downloadBytes = downloadBytes,
+                contextLength = contextLength,
+                source = source,
+                description = description,
                 supportsThinking = supportsThinking,
                 supportsLora = supportsLora,
                 archiveType = null,
                 archiveStructure = null,
                 files = emptyList(),
-                contextLength = null,
                 cuaProfile = cuaProfile,
             )
 
@@ -90,12 +99,14 @@ public class ModelRegistration private constructor(
                 category = category,
                 memoryBytes = memoryBytes,
                 downloadBytes = null,
+                contextLength = null,
+                source = ModelSource.MODEL_SOURCE_REMOTE,
+                description = null,
                 supportsThinking = supportsThinking,
                 supportsLora = supportsLora,
                 archiveType = archiveType,
                 archiveStructure = structure,
                 files = emptyList(),
-                contextLength = null,
                 cuaProfile = cuaProfile,
             )
 
@@ -121,12 +132,14 @@ public class ModelRegistration private constructor(
                 category = category,
                 memoryBytes = memoryBytes,
                 downloadBytes = downloadBytes,
+                contextLength = contextLength,
+                source = ModelSource.MODEL_SOURCE_REMOTE,
+                description = null,
                 supportsThinking = supportsThinking,
                 supportsLora = false,
                 archiveType = null,
                 archiveStructure = null,
                 files = files,
-                contextLength = contextLength,
                 cuaProfile = cuaProfile,
             )
     }
