@@ -159,6 +159,15 @@ export { formatFramework } from './Public/Helpers/formatFramework';
 // Explicit tool-calling run loop — mirrors Swift/Kotlin generateWithTools for
 // hosts that need full control over the tool-loop budget (max calls, thinking,
 // parallel execution) beyond what llm.generate's inline tools expose.
+// `RunAnywhere.solutions.run(args)` takes SolutionRunArgs and resolves to a
+// SolutionHandle, so a consumer cannot annotate either side of that call
+// without these. Type-only: SolutionHandle is constructed by the SDK from a
+// native handle, never by callers.
+export type {
+  SolutionHandle,
+  SolutionRunArgs,
+} from './Public/Extensions/Solutions/RunAnywhere+Solutions';
+
 export { generateWithTools } from './Public/Extensions/LLM/RunAnywhere+ToolCalling';
 export type {
   GenerateWithToolsOptions,
