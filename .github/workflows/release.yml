@@ -742,7 +742,15 @@ jobs:
         run: npm run build:wasm -- --core --llamacpp --onnx
       - name: Build WASM (WebGPU llama.cpp)
         working-directory: bindings/web
-        run: npm run build:wasm -- --webgpu
+        # --rag is REQUIRED here. core/CMakeLists.txt force-sets
+        # RAC_BACKEND_RAG=OFF on Emscripten when neither RAC_BACKEND_ONNX nor
+        # RAC_WASM_RAG_STANDALONE is set. The CPU twin above is built in the
+        # same invocation as --onnx so it keeps RAG; this WebGPU invocation
+        # stands alone, so without --rag it silently drops the 8
+        # rac_rag_*_proto exports and the WebGPU bundle differs from its CPU
+        # sibling by exactly those symbols. (--onnx-webgpu below sets RAG=ON
+        # itself, which is why only this line was affected.)
+        run: npm run build:wasm -- --webgpu --rag
       - name: Build WASM (WebGPU ONNX + Sherpa)
         working-directory: bindings/web
         run: npm run build:wasm -- --onnx-webgpu

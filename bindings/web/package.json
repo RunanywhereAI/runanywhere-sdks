@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build:wasm": "cd wasm && ./scripts/build.sh",
-    "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu && npm run build:wasm -- --onnx-webgpu",
+    "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu --rag && npm run build:wasm -- --onnx-webgpu",
     "build:wasm:onnx-webgpu": "cd wasm && ./scripts/build.sh --onnx-webgpu",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
     "build:wasm:clean": "npm run clean:wasm && npm run build:wasm:all",
