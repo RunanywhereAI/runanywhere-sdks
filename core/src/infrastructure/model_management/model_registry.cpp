@@ -360,9 +360,17 @@ rac_result_t save_model_info_impl(rac_model_registry_handle_t handle, const rac_
         }
 
         if (should_preserve_path) {
-            if (copy->local_path)
-                free(copy->local_path);
-            copy->local_path = rac_strdup(existing_local_path);
+            // Allocate before destroying. The free-then-strdup shape loses the
+            // path this branch exists to preserve when the allocation fails,
+            // and the loss then propagates into the cached proto snapshot while
+            // the call still returns RAC_SUCCESS.
+            char* preserved_path = rac_strdup(existing_local_path);
+            if (!preserved_path) {
+                free_model_info(copy);
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            free(copy->local_path);
+            copy->local_path = preserved_path;
         }
 
         free_model_info(it->second);

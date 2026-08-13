@@ -372,6 +372,15 @@ CANONICAL_PRIVACY_MANIFEST="$REPO_ROOT/bindings/swift/Sources/RunAnywhere/Privac
 CORE_RAC_HEADERS="$RN_ROOT/packages/core/android/src/main/jniLibs/include/rac"
 [ -d "$PUBLIC_RAC_HEADERS" ] || { echo "ERROR: public RAC headers not found: $PUBLIC_RAC_HEADERS" >&2; exit 1; }
 [ -f "$CANONICAL_PRIVACY_MANIFEST" ] || { echo "ERROR: canonical Apple privacy manifest not found: $CANONICAL_PRIVACY_MANIFEST" >&2; exit 1; }
+# Generate before staging, not after: rac/rac_defaults_generated.h is codegen
+# output that lives INSIDE the tree copied below, so the copy has to happen
+# after it exists. Without this the guard further down can only report the
+# breakage, and every invocation outside .github/workflows/release.yml (a local
+# packaging run, a fresh clone, a new workflow that forgets the step) hard-fails
+# instead of self-healing. Every packaging script in this repo calls
+# ensure_generated.sh before packing; this is that call for the header tree.
+"${REPO_ROOT}/idl/codegen/ensure_generated.sh" --only cpp
+
 rm -rf "$CORE_RAC_HEADERS"
 mkdir -p "$(dirname "$CORE_RAC_HEADERS")"
 cp -R "$PUBLIC_RAC_HEADERS" "$CORE_RAC_HEADERS"
@@ -386,16 +395,20 @@ cp -R "$PUBLIC_RAC_HEADERS" "$CORE_RAC_HEADERS"
 # That is exactly how @runanywhere/core 0.20.18 shipped unbuildable for RN
 # Android. npm is append-only, so it could not be withdrawn.
 # Resolve every intra-tree `#include "rac/..."` against the copied tree.
-_missing_headers=""
+_missing_headers=()
 while IFS= read -r _inc; do
-    [ -f "$CORE_RAC_HEADERS/../$_inc" ] || _missing_headers="$_missing_headers $_inc"
+    # A no-match grep still feeds one empty line through the here-doc. Without
+    # this, `[ -f "$CORE_RAC_HEADERS/../" ]` fails on a directory and packaging
+    # aborts printing an ERROR with an empty header list.
+    [ -n "$_inc" ] || continue
+    [ -f "$CORE_RAC_HEADERS/../$_inc" ] || _missing_headers+=("$_inc")
 done <<EOF
 $(grep -rhoE '#[[:space:]]*include[[:space:]]+"rac/[^"]+"' "$CORE_RAC_HEADERS" 2>/dev/null \
     | sed -E 's/.*"(rac\/[^"]+)".*/\1/' | sort -u)
 EOF
-if [ -n "$_missing_headers" ]; then
+if ((${#_missing_headers[@]})); then
     echo "ERROR: the staged public header tree is incomplete; these are #included but absent:" >&2
-    for _h in $_missing_headers; do echo "         $_h" >&2; done
+    printf '         %s\n' "${_missing_headers[@]}" >&2
     echo "       Most likely C++ codegen did not run. Try: idl/codegen/ensure_generated.sh --only cpp" >&2
     exit 1
 fi

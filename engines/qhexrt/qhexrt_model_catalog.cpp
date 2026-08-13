@@ -45,8 +45,11 @@ struct ModelPolicy {
     // HF token is configured, which is what drives the per-SDK "bring your own HF
     // token" preflight UX. Most RunAnywhere-hosted QHexRT repos are PUBLIC and set this
     // false; private bundles are gated here. The exact set is pinned by
-    // test_qhexrt_model_catalog's private_ids, so hosting a model behind a gated HF repo
-    // means flipping this row AND that set — nothing else changes.
+    // test_qhexrt_model_catalog, which counts the gated rows it derives from this
+    // table and asserts `private_row_count == 1` plus a named
+    // `requires_hf_auth("kitten_nano_0_8_varlen") == RAC_TRUE`. Hosting a model
+    // behind a gated HF repo means flipping this row AND updating that count and
+    // named assertion. Nothing else changes.
     bool requires_hf_auth;
 };
 

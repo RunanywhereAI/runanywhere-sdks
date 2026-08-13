@@ -1258,7 +1258,16 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
                 rac_model_info_free(model);
                 continue;
             }
-            if (!handle->callbacks.unload_model && !request.dry_run()) {
+            // Commons unloads what commons loaded. The host callback is
+            // unanswerable on the SDKs that matter here (nil on Swift, NULL on
+            // Electron, a no-op returning RAC_SUCCESS on Android), so routing
+            // through it either refused a delete that should have worked or
+            // pretended to close a model that stayed open. Asking the lifecycle
+            // store, which performed the load, is the only answer that is true
+            // on every host. The callback stays as the fallback for a model the
+            // host loaded outside commons.
+            const bool commons_owns_load = rac::lifecycle::is_model_loaded(model->id);
+            if (!commons_owns_load && !handle->callbacks.unload_model && !request.dry_run()) {
                 result_proto.add_failed_model_ids(id);
                 add_warning_once(&result_proto, &warnings,
                                  "Model is loaded but no unload callback is set: " + id);
@@ -1267,13 +1276,19 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
                 rac_model_info_free(model);
                 continue;
             }
-            if (!handle->callbacks.unload_model && request.dry_run()) {
+            if (!commons_owns_load && !handle->callbacks.unload_model && request.dry_run()) {
                 add_warning_once(&result_proto, &warnings,
                                  "Dry run would require a platform unload before delete: " + id);
             }
             if (!request.dry_run()) {
+                // No lifecycle mutex is held here: unload_model() drives backend
+                // teardown that reacquires it to drain active refs, and it
+                // publishes component events whose subscribers may re-enter
+                // lifecycle APIs.
                 rac_result_t unload_result =
-                    handle->callbacks.unload_model(model->id, handle->callbacks.user_data);
+                    commons_owns_load
+                        ? rac::lifecycle::unload_model(model->id)
+                        : handle->callbacks.unload_model(model->id, handle->callbacks.user_data);
                 if (RAC_FAILED(unload_result)) {
                     result_proto.add_failed_model_ids(id);
                     add_warning_once(&result_proto, &warnings,
