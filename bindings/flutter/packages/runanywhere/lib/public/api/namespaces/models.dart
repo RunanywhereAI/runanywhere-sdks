@@ -130,6 +130,10 @@ class ModelsApi {
           modality: model.category,
           archiveType: model.archiveType,
           memoryRequirement: model.memoryRequirementBytes,
+          downloadSize: model.downloadSizeBytes,
+          contextLength: model.contextLength,
+          source: model.source,
+          description: model.description,
           supportsThinking: model.supportsThinking,
           supportsLora: model.supportsLora,
           cuaProfile: model.cuaProfile,
@@ -145,6 +149,7 @@ class ModelsApi {
           contextLength: model.contextLength,
           supportsThinking: model.supportsThinking,
           source: model.source,
+          description: model.description,
           cuaProfile: model.cuaProfile,
         );
     }

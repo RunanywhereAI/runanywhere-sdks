@@ -8,7 +8,7 @@
  * backend module. The native library (librac_backend_qhexrt_jni.so) exposes:
  * - rac_backend_qhexrt_register() / rac_backend_qhexrt_unregister()
  * - rac_qhexrt_probe_proto() (pre-flight Hexagon arch detection)
- * - QHexRT-owned architecture matching and device-aware model registration
+ * - QHexRT-owned architecture support checks
  */
 
 package com.runanywhere.sdk.npu.qhexrt
@@ -89,25 +89,6 @@ internal object QHexRTBridge {
     /** True when [arch] is in QHexRT's native device-validated support set. */
     @JvmStatic
     external fun nativeArchIsSupported(arch: Int): Boolean
-
-    /** Match the native product catalog policy for [modelId] against [arch]. */
-    @JvmStatic
-    external fun nativeCatalogModelSupportsArch(
-        modelId: String,
-        arch: Int,
-    ): Boolean
-
-    /** Whether the native product catalog marks [modelId] as HF-authenticated. */
-    @JvmStatic
-    external fun nativeCatalogModelRequiresHfAuth(modelId: String): Boolean
-
-    /**
-     * Register one serialized `RegisterModelFromUrlRequest` only when the
-     * native product catalog allows it on the current device. A null result is
-     * the normal ineligible/private-without-token outcome.
-     */
-    @JvmStatic
-    external fun nativeCatalogRegisterModelProto(requestBytes: ByteArray): ByteArray?
 
     /** QHexRT module version string (RAC_QHEXRT_VERSION baked into the JNI lib). */
     @JvmStatic
