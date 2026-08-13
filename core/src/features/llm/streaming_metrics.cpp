@@ -235,11 +235,20 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
     }
 
     // Populate result
+    *out_result = RAC_STREAMING_RESULT_DEFAULT;
     out_result->text = rac_strdup(handle->full_text.c_str());
-    out_result->thinking_content = nullptr;
+    if (!out_result->text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    out_result->model_id = rac_strdup(handle->model_id.c_str());
+    if (!out_result->model_id) {
+        rac_streaming_result_free(out_result);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
     out_result->input_tokens = input_tokens;
     out_result->output_tokens = output_tokens;
-    out_result->model_id = rac_strdup(handle->model_id.c_str());
     out_result->latency_ms = latency_ms;
     out_result->tokens_per_second = tokens_per_second;
     out_result->ttft_ms = ttft_ms;
