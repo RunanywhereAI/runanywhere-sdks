@@ -687,13 +687,16 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
 
     rac_model_info_t* model = it->second;
 
-    // Free old local path
-    if (model->local_path) {
-        free(model->local_path);
+    char* replacement_path = nullptr;
+    if (local_path) {
+        replacement_path = rac_strdup(local_path);
+        if (!replacement_path) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
-    // Set new local path
-    model->local_path = rac_strdup(local_path);
+    free(model->local_path);
+    model->local_path = replacement_path;
     // Proto ModelInfo.updated_at_unix_ms — milliseconds, not seconds.
     model->updated_at = rac_get_current_time_ms();
 
