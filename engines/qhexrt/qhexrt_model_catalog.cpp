@@ -312,6 +312,21 @@ rac_result_t pin_hf_ref_to_arch(const std::string& input, rac_qhexrt_hexagon_arc
 
 namespace rac::qhexrt::catalog {
 
+bool policy_row_at(size_t index, PolicyRow* out_row) {
+    if (out_row == nullptr || index >= std::size(kModelPolicies)) {
+        return false;
+    }
+    const ModelPolicy& policy = kModelPolicies[index];
+    // `id` is a string_view over a literal in kModelPolicies, so it is
+    // NUL-terminated and outlives the caller.
+    out_row->id = policy.id.data();
+    out_row->arch_mask = policy.arch_mask;
+    out_row->requires_hf_auth = policy.requires_hf_auth;
+    return true;
+}
+
+uint8_t policy_arch_bit(rac_qhexrt_hexagon_arch_t arch) { return arch_mask(arch); }
+
 rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t request_size,
                                      rac_qhexrt_hexagon_arch_t detected_arch,
                                      rac_bool_t engine_available, rac_bool_t* out_registered,
