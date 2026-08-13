@@ -39,7 +39,9 @@ class ModelRegistration {
     this.files = const <ModelFileDescriptor>[],
     this.artifactType,
     this.memoryRequirementBytes,
+    this.downloadSizeBytes,
     this.contextLength,
+    this.description,
     this.supportsThinking = false,
     this.supportsLora = false,
     this.source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -55,6 +57,10 @@ class ModelRegistration {
     ModelCategory category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     ModelArtifactType? artifactType,
     int? memoryRequirementBytes,
+    int? downloadSizeBytes,
+    int? contextLength,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
     String? cuaProfile,
@@ -67,6 +73,10 @@ class ModelRegistration {
     url: url,
     artifactType: artifactType,
     memoryRequirementBytes: memoryRequirementBytes,
+    downloadSizeBytes: downloadSizeBytes,
+    contextLength: contextLength,
+    source: source,
+    description: description,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
     cuaProfile: cuaProfile,
@@ -169,6 +179,11 @@ class ModelRegistration {
   /// Resident memory the model needs.
   final int? memoryRequirementBytes;
 
+  /// Exact remote artifact bytes, when known.
+  ///
+  /// This is intentionally independent from [memoryRequirementBytes].
+  final int? downloadSizeBytes;
+
   /// Context window the model supports.
   final int? contextLength;
 
@@ -180,6 +195,9 @@ class ModelRegistration {
 
   /// Where the model comes from.
   final ModelSource source;
+
+  /// Human-readable model description.
+  final String? description;
 
   /// Computer-Use-Agent profile id (e.g. `'fara'`) for a CUA-capable model.
   /// Lands on `ModelInfo.cuaProfile` so callers can discover which
