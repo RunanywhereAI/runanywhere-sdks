@@ -286,7 +286,6 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
 
     const auto t_start = std::chrono::steady_clock::now();
     emscripten_fetch_t* fetch = emscripten_fetch(&attr, req->url);
-    const auto t_end = std::chrono::steady_clock::now();
 
     if (!fetch) {
         RAC_LOG_ERROR(kTag, "emscripten_fetch returned NULL for url=%s", req->url);
@@ -303,6 +302,7 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
         }
     }
 
+    const auto t_end = std::chrono::steady_clock::now();
     out->status = static_cast<int32_t>(fetch->status);
     out->elapsed_ms = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count());
