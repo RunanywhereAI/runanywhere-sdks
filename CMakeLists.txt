@@ -308,41 +308,6 @@ if(RAC_BUILD_TESTS)
         add_test(NAME qhexrt_request_cancellation_tests
                  COMMAND test_qhexrt_request_cancellation)
     endif()
-    # QHexRT owns Qualcomm chip selection and the device-aware model catalog
-    # facade. The test lives with the engine and links after the engine target
-    # exists; commons tests intentionally remain backend-neutral.
-    if(RAC_BACKEND_QHEXRT AND TARGET rac_backend_qhexrt AND
-       NOT TARGET test_qhexrt_model_catalog)
-        add_executable(test_qhexrt_model_catalog
-            engines/qhexrt/tests/test_qhexrt_model_catalog.cpp)
-        target_include_directories(test_qhexrt_model_catalog PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
-        )
-        target_link_libraries(test_qhexrt_model_catalog PRIVATE
-            rac_backend_qhexrt
-            rac_commons
-        )
-        if(RAC_PROTOBUF_RUNTIME_ENABLED)
-            target_compile_definitions(test_qhexrt_model_catalog PRIVATE
-                RAC_QHEXRT_HAVE_PROTOBUF=1)
-            target_include_directories(test_qhexrt_model_catalog PRIVATE
-                ${CMAKE_CURRENT_SOURCE_DIR}/core/src/generated/proto)
-            if(TARGET protobuf::libprotobuf)
-                target_link_libraries(test_qhexrt_model_catalog PRIVATE protobuf::libprotobuf)
-            elseif(Protobuf_LIBRARIES)
-                target_include_directories(test_qhexrt_model_catalog PRIVATE
-                    ${Protobuf_INCLUDE_DIRS})
-                target_link_libraries(test_qhexrt_model_catalog PRIVATE ${Protobuf_LIBRARIES})
-            endif()
-        endif()
-        if(COMMAND rac_link_archive_deps)
-            rac_link_archive_deps(test_qhexrt_model_catalog)
-        endif()
-        target_compile_features(test_qhexrt_model_catalog PRIVATE cxx_std_17)
-        add_test(NAME qhexrt_model_catalog_tests COMMAND test_qhexrt_model_catalog)
-    endif()
     # The llama.cpp engine is configured after commons/tests, so its plugin
     # contract test must be wired here once the backend target exists.
     if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND

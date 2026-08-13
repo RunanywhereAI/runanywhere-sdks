@@ -2,7 +2,6 @@ import {
   InferenceFramework,
   ModelCategory,
   ModelInfo,
-  ModelSource,
 } from '@runanywhere/proto-ts/model_types';
 import {
   filterVisibleNativeNpuCatalog,
@@ -10,7 +9,7 @@ import {
   NPU_BUNDLES,
   publishNpuCatalogAcceptance,
   subscribeNpuCatalog,
-  toNpuRegistrationRequest,
+  toNpuModelRegistration,
   visibleNativeNpuCatalogModelOrNull,
 } from '../../src/services/NpuModelCatalog';
 
@@ -70,25 +69,19 @@ describe('React Native QHexRT catalog', () => {
     ]);
   });
 
-  it('maps app metadata into the canonical device-registration request', () => {
-    const bundle = NPU_BUNDLES.find(
-      (candidate) => candidate.id === 'qwen3_5_0_8b'
-    );
+  it('forwards explicit QHexRT registration metadata through the core API', () => {
+    const bundle = NPU_BUNDLES.find((row) => row.id === 'qwen3_5_0_8b');
     expect(bundle).toBeDefined();
-    const request = toNpuRegistrationRequest(bundle!);
 
-    expect(request).toMatchObject({
+    expect(toNpuModelRegistration(bundle!)).toMatchObject({
       id: 'qwen3_5_0_8b',
-      name: 'Qwen3.5 0.8B (HNPU)',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      source: ModelSource.MODEL_SOURCE_REMOTE,
-      memoryRequiredBytes: 2_046_527_848,
+      memoryRequirementBytes: 2_046_527_848,
       downloadSizeBytes: 2_046_527_848,
       contextLength: 1_024,
       supportsThinking: true,
       supportsLora: false,
-      description: 'Qualcomm Hexagon NPU model bundle.',
     });
   });
 
