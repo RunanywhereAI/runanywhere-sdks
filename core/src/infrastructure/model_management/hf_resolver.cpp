@@ -713,6 +713,22 @@ static std::unordered_set<std::string> manifest_referenced_paths(
             refs.insert(s);
             continue;
         }
+        // A manifest leaf can name a SUBDIRECTORY instead of a file (QHexRT bundles
+        // carry a "fixture_dir": "vlm" naming the host-weight folder). Keep every
+        // file under that prefix: a directory's contents are not enumerated
+        // elsewhere, so the >=1 MiB prune below would drop the projector/positional
+        // weights and ship a VLM that fails at load with ArtifactMissing.
+        const std::string dir_prefix = (!s.empty() && s.back() == '/') ? s : s + "/";
+        bool any_under = false;
+        for (const auto& p : bundle_paths) {
+            if (p.starts_with(dir_prefix)) {
+                refs.insert(p);
+                any_under = true;
+            }
+        }
+        if (any_under) {
+            continue;
+        }
         const std::string base = basename_of(s);
         // Otherwise fall back to basename matching only when that basename is unambiguous.
         const auto it = unique_basename_to_path.find(base);
