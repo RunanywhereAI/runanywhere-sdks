@@ -613,7 +613,14 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         return status;
 
     if (out_result) {
-        out_result->text = !g_out.answer.empty() ? rac_strdup(g_out.answer.c_str()) : nullptr;
+        if (!g_out.answer.empty()) {
+            out_result->text = rac_strdup(g_out.answer.c_str());
+            if (out_result->text == nullptr) {
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+        } else {
+            out_result->text = nullptr;
+        }
         out_result->completion_tokens = 0;
         out_result->prompt_tokens = 0;
         out_result->total_tokens = 0;
