@@ -111,6 +111,11 @@ bool is_model_loaded(const char* model_id);
  * entry matched, so `is_model_loaded() == false` and this returning
  * MODEL_NOT_LOADED agree.
  *
+ * That agreement holds only where RAC_HAVE_PROTOBUF is defined. Without it the
+ * lifecycle store is unavailable, so is_model_loaded() still reports false but
+ * this returns RAC_ERROR_FEATURE_NOT_AVAILABLE rather than
+ * MODEL_NOT_LOADED. Callers that branch on the specific code must handle both.
+ *
  * MUST NOT be called while holding the lifecycle mutex: the backend teardown it
  * drives reacquires that mutex to drain active refs, and it publishes component
  * lifecycle events whose subscribers may re-enter lifecycle APIs.
