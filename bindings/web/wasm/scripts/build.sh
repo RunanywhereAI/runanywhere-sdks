@@ -99,6 +99,13 @@ while [[ $# -gt 0 ]]; do
         --webgpu)
             WEBGPU="ON"
             LLAMACPP="ON"  # WebGPU accelerates llama.cpp
+            # Same reason --onnx-webgpu sets it below. core/CMakeLists.txt
+            # force-sets RAC_BACKEND_RAG=OFF on Emscripten unless ONNX or
+            # RAC_WASM_RAG_STANDALONE is on, and this target enables neither, so
+            # without it the WebGPU bundle silently ships without the eight
+            # rac_rag_*_proto exports its CPU twin has (that twin only keeps
+            # them because it is built in the same invocation as --onnx).
+            RAG="ON"
             shift
             ;;
         --onnx-webgpu)
