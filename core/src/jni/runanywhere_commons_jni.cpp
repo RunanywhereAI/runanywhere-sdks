@@ -4088,9 +4088,13 @@ static rac_result_t jni_storage_is_model_loaded(const char* /*model_id*/, rac_bo
     return RAC_SUCCESS;
 }
 
-static rac_result_t jni_storage_unload_model(const char* /*model_id*/, void* /*user_data*/) {
-    return RAC_SUCCESS;
-}
+// No jni_storage_unload_model: the old stub returned RAC_SUCCESS without
+// unloading anything, so commons believed a model had been closed and deleted
+// its files underneath the open backend. Commons now unloads through the
+// lifecycle store it loaded from (rac::lifecycle::unload_model), which is the
+// only path Android ever loads by, so leaving the slot NULL is both honest and
+// unreachable, and if a host ever does load outside commons it gets a real
+// "no unload callback is set" failure instead of a silent success.
 
 static rac_storage_callbacks_t build_jni_storage_callbacks() {
     rac_storage_callbacks_t cb = {};
@@ -4101,7 +4105,6 @@ static rac_storage_callbacks_t build_jni_storage_callbacks() {
     cb.get_total_space = jni_fc_get_total_space;
     cb.delete_path = jni_fc_delete_path;
     cb.is_model_loaded = jni_storage_is_model_loaded;
-    cb.unload_model = jni_storage_unload_model;
     cb.user_data = nullptr;
     return cb;
 }

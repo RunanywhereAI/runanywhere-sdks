@@ -218,8 +218,12 @@ echo ""
 echo ">> Swift SDK:"
 bump_line "${REPO_ROOT}/Package.swift" \
     'let sdkVersion = "[^"]+"' "let sdkVersion = \"${NEW_VERSION}\""
+# The external-consumer example points at the Swift distribution repo, not this
+# monorepo. bump_line returns 1 on a missing pattern and the script runs under
+# `set -euo pipefail`, so an anchor that stops matching aborts the bump midway
+# with core/VERSION already written.
 bump_line "${REPO_ROOT}/Package.swift" \
-    '(\.package\(url: "https://github\.com/RunanywhereAI/runanywhere-sdks", from: ")[^"]+("\))' \
+    '(\.package\(url: "https://github\.com/RunanywhereAI/runanywhere-swift\.git", from: ")[^"]+("\))' \
     "\\1${NEW_VERSION}\\2"
 # Swift SDK VERSION file (read by release tooling)
 SWIFT_VERSION_FILE="${REPO_ROOT}/bindings/swift/VERSION"

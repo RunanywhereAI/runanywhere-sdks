@@ -57,8 +57,13 @@ extension CppBridge {
             callbacks.get_available_space = storageGetAvailableSpaceCallback
             callbacks.get_total_space = storageGetTotalSpaceCallback
             callbacks.delete_path = storageDeletePathCallback
-            callbacks.is_model_loaded = nil  // C++ treats missing callback as "loaded state unavailable"
-            callbacks.unload_model = nil     // C++ refuses to unload-then-delete when callback is NULL
+            // Both stay nil on purpose: commons performed the load, so it answers
+            // both questions from its own lifecycle store: it reports a
+            // commons-loaded model as loaded and unloads it before deleting.
+            // These slots are only consulted for a model a host loaded outside
+            // commons, which Swift never does.
+            callbacks.is_model_loaded = nil
+            callbacks.unload_model = nil
             callbacks.user_data = nil  // We use global FileManager
 
             var handlePtr: rac_storage_analyzer_handle_t?

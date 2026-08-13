@@ -282,11 +282,18 @@ bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
         return false;
     }
 
-    // Update legacy struct
-    if (model->local_path) {
-        free(model->local_path);
+    // Update legacy struct. Check the allocation before mutating anything else:
+    // on failure the struct would keep an empty local_path while the proto
+    // snapshot below claimed folder_str, so proto-based reads would report the
+    // model downloaded and rac_model_registry_get_downloaded(), which walks the
+    // struct, would not. Report a miss instead of a divergent success.
+    char* reconciled_path = rac_strdup(folder_str.c_str());
+    if (!reconciled_path) {
+        RAC_LOG_WARNING("ModelRegistry", "Reconcile miss '%s': out of memory", model->id);
+        return false;
     }
-    model->local_path = rac_strdup(folder_str.c_str());
+    free(model->local_path);
+    model->local_path = reconciled_path;
     // Proto ModelInfo.updated_at_unix_ms — milliseconds, not seconds.
     model->updated_at = rac_get_current_time_ms();
 

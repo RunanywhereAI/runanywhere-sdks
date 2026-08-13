@@ -137,6 +137,16 @@ export type {
 export type { RagSession } from './Public/API/Namespaces/rag.js';
 export type { VoiceSession, VoiceSessionOptions } from './Public/API/Namespaces/voice.js';
 
+// `RunAnywhere.solutions.run(input)` takes SolutionRunInput and returns a
+// SolutionHandle, so a consumer cannot annotate either side of that call
+// without these. Type-only: SolutionHandle is constructed by SolutionAdapter.run,
+// never by callers. SolutionConfig is deliberately absent: it comes straight
+// from @runanywhere/proto-ts/solutions, which consumers depend on directly.
+export type {
+  SolutionHandle,
+  SolutionRunInput,
+} from './Public/Extensions/RunAnywhere+Solutions.js';
+
 // Errors — one typed exception carrying the generated proto error taxonomy.
 export { SDKException, isSDKException } from './Foundation/SDKException.js';
 export type { ProtoSDKError } from './Foundation/SDKException.js';

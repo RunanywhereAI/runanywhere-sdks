@@ -102,6 +102,21 @@ void release_lifecycle_segmentation(LifecycleSegmentationRef* ref);
  */
 bool is_model_loaded(const char* model_id);
 
+/**
+ * @brief Unload @p model_id from the lifecycle store, if commons holds it.
+ *
+ * The companion to is_model_loaded(): a caller that must clear a model before
+ * acting on its files can do so without a host callback, because commons is
+ * what performed the load. Returns RAC_ERROR_MODEL_NOT_LOADED when no lifecycle
+ * entry matched, so `is_model_loaded() == false` and this returning
+ * MODEL_NOT_LOADED agree.
+ *
+ * MUST NOT be called while holding the lifecycle mutex: the backend teardown it
+ * drives reacquires that mutex to drain active refs, and it publishes component
+ * lifecycle events whose subscribers may re-enter lifecycle APIs.
+ */
+rac_result_t unload_model(const char* model_id);
+
 }  // namespace rac::lifecycle
 
 #endif  // RAC_FEATURES_RAC_NONLLM_LIFECYCLE_BRIDGE_H

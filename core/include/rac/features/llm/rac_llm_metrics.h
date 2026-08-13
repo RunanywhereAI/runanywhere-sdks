@@ -223,8 +223,16 @@ RAC_API rac_result_t rac_streaming_metrics_mark_failed(rac_streaming_metrics_han
  * Only valid after markComplete() is called.
  *
  * @param handle Collector handle
- * @param out_result Output: Streaming result (must be freed with rac_streaming_result_free)
- * @return RAC_SUCCESS or error code
+ * @param out_result Output: Streaming result (must be freed with
+ *                   rac_streaming_result_free). The struct is unconditionally
+ *                   overwritten with RAC_STREAMING_RESULT_DEFAULT before it is
+ *                   populated, so it must not already own allocated strings.
+ *                   Passing a reused result that still holds text/model_id/
+ *                   thinking_content leaks them.
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT if handle or out_result is
+ *         NULL, or RAC_ERROR_OUT_OF_MEMORY if an owned string could not be
+ *         allocated. On RAC_ERROR_OUT_OF_MEMORY *out_result owns nothing and
+ *         needs no free.
  */
 RAC_API rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t handle,
                                                       rac_streaming_result_t* out_result);
