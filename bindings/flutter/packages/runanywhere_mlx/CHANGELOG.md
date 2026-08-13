@@ -1,3 +1,11 @@
+## [0.20.18] - 2026-08-12
+
+- Commons: backend registration failures are isolated. An engine that cannot
+  register is recorded as unavailable instead of aborting SDK initialization,
+  so the remaining backends keep serving.
+- Suite version bump. This release also rebuilds the Electron backend plugin
+  natives; that part does not affect this package.
+
 ## [0.20.17] - 2026-08-11
 
 - Electron QHexRT backend and its commons platform-capability changes.

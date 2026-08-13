@@ -177,7 +177,23 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: RunanywhereAI/neurun
-          ref: 1c44fd150c84976dea1ab4c894f2f03ebcdcee04
+          # Bumped from 1c44fd15 (2026-08-09), which no longer compiles: commons
+          # widened rac_llm_stream_callback_fn with `tokens_in_delta`, and that
+          # pin still passes 4 arguments. It failed `native_ios` at
+          # rac_llm_ops_neurt.cpp:301 and :325 with "too few arguments to
+          # function call, expected 5, have 4" for v0.20.15, v0.20.16 AND
+          # v0.20.17 — and because every packaging job needs native_ios, all
+          # three releases shipped ONLY the 9 hand-uploaded iOS zips. The
+          # Android/Linux/Windows/WASM commons, the rcli tarballs, the Kotlin
+          # Maven zip and the npm tgz assets were simply absent, which is why
+          # Flutter's `downloadNativeLibs` 404s on RACommons-android-*.zip.
+          # Verify a bump with a syntax-only compile before changing this:
+          #   clang++ -std=c++20 -fsyntax-only -DNEURT_WITH_RAC_HEADERS \
+          #     -Icore/include -I<neurun>/NeuRT/include -I<neurun>/NeuRT/src \
+          #     <neurun>/NeuRT/src/sdk/rac_llm_ops_neurt.cpp
+          # NEURT_WITH_RAC_HEADERS is required: without it the file compiles
+          # against its own mirrored typedefs and passes even when broken.
+          ref: 0f773fe8446befde4242778b0987055939e410b9
           token: ${{ secrets.NEURUN_TOKEN }}
           path: neurun
       - uses: ./.github/actions/setup-toolchain

@@ -158,7 +158,7 @@ from .results import (
     Word,
 )
 
-__version__ = "0.20.17"
+__version__ = "0.20.18"
 
 
 def initialize(
