@@ -82,6 +82,10 @@ class ModelRegistration {
     ModelCategory category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     ArchiveType? archiveType,
     int? memoryRequirementBytes,
+    int? downloadSizeBytes,
+    int? contextLength,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
     String? cuaProfile,
@@ -95,6 +99,10 @@ class ModelRegistration {
     archiveStructure: structure,
     archiveType: archiveType,
     memoryRequirementBytes: memoryRequirementBytes,
+    downloadSizeBytes: downloadSizeBytes,
+    contextLength: contextLength,
+    source: source,
+    description: description,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
     cuaProfile: cuaProfile,
@@ -111,6 +119,7 @@ class ModelRegistration {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     String? cuaProfile,
   }) => ModelRegistration._(
     kind: ModelArtifactKind.multiFile,
@@ -123,6 +132,7 @@ class ModelRegistration {
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,
+    description: description,
     cuaProfile: cuaProfile,
   );
 

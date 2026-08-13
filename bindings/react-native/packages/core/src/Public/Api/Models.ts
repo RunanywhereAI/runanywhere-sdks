@@ -223,6 +223,16 @@ export const models = {
       ...(model.memoryRequirementBytes !== undefined
         ? { memoryRequirement: model.memoryRequirementBytes }
         : {}),
+      ...(model.downloadSizeBytes !== undefined
+        ? { downloadSize: model.downloadSizeBytes }
+        : {}),
+      ...(model.contextLength !== undefined
+        ? { contextLength: model.contextLength }
+        : {}),
+      ...(model.source !== undefined ? { source: model.source } : {}),
+      ...(model.description !== undefined
+        ? { description: model.description }
+        : {}),
       ...(model.supportsThinking !== undefined
         ? { supportsThinking: model.supportsThinking }
         : {}),
