@@ -62,6 +62,12 @@ constexpr ModelPolicy kModelPolicies[] = {
     // v75/v79/v81 context binaries are published (public repo, no HF auth gate). v75 + v81 ship the 2-part
     // hybrid decode split (each part < 2 GiB); v79 ships the monolithic decode.
     {"lfm2_5_2_6b", kAllSupportedArches, false},
+    // v81 only, and published public (runanywhere/lfm2_5_1_2b_thinking_HNPU has
+    // just a v81/ tree, no auth gate). Without this row the engine answers
+    // RAC_ERROR_QHEXRT_UNKNOWN_MODEL (-259, "unknown QHexRT native catalog model
+    // id") for a model the app catalogs already ship, which is what the Android
+    // app hits at startup: "npu catalog: lfm2_5_1_2b_thinking failed".
+    {"lfm2_5_1_2b_thinking", kV81, false},
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
