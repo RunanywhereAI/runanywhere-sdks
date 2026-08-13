@@ -507,9 +507,22 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
     char formatted[512];
     std::snprintf(formatted, sizeof(formatted), "%s failed with code %d: %s", operation, status,
                   detail);
-    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    jclass exClass =
+        env->FindClass("com/runanywhere/sdk/native/bridge/NativeProtoException");
     if (exClass != nullptr) {
-        env->ThrowNew(exClass, formatted);
+        jmethodID constructor = env->GetMethodID(exClass, "<init>", "(ILjava/lang/String;)V");
+        jstring javaMessage = env->NewStringUTF(formatted);
+        if (constructor != nullptr && javaMessage != nullptr) {
+            jobject exception = env->NewObject(exClass, constructor, static_cast<jint>(status),
+                                               javaMessage);
+            if (exception != nullptr) {
+                env->Throw(static_cast<jthrowable>(exception));
+                env->DeleteLocalRef(exception);
+            }
+        }
+        if (javaMessage != nullptr) {
+            env->DeleteLocalRef(javaMessage);
+        }
         env->DeleteLocalRef(exClass);
     }
 }
