@@ -318,9 +318,16 @@ jobs:
       # core/include + core/src/generated/proto without ever configuring CMake,
       # so the configure-time codegen hook does not cover this job. Both are
       # protoc output and neither is tracked — generate them here.
+      # cpp for the C headers this job reads without configuring CMake, AND
+      # swift because the step below runs `swift build` over the root
+      # Package.swift, which compiles the generated *Swift* bindings
+      # (RALLMStreamEvent, RAVoiceEvent, RADownloadPlanResult, ...). Generating
+      # only cpp left those absent and the build failed with a wall of
+      # "cannot find type 'RA...' in scope", plus cascading "'Any' cannot be
+      # constructed" noise from the resulting bad inference.
       - uses: ./.github/actions/generate-idl
         with:
-          languages: cpp
+          languages: cpp,swift
       - uses: actions/download-artifact@v8
         with:
           name: native-ios-macos
@@ -856,6 +863,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. Web packaging runs ensure_generated.sh --only ts; without ts-proto it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
       - name: Download Web natives
         uses: actions/download-artifact@v8
         with:
@@ -902,6 +915,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. RN packaging runs ensure_generated.sh --only ts; without ts-proto it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
       # The RN tree pins `packageManager: yarn@3.6.1` (Yarn Berry). Activate it
       # via Corepack at the workflow level so package-sdk.sh (and any later
       # `yarn` invocation against the RN workspace) doesn't silently fall back
@@ -1542,6 +1561,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. Flutter packaging runs ensure_generated.sh --only dart; without protoc-gen-dart it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: dart
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

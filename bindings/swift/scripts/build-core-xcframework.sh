@@ -1384,18 +1384,43 @@ build_mlx_runtime_swift_slice() {
 
     echo "▶ Build ${label} canonical Swift MLX runtime"
     run rm -rf "${scratch}"
-    run env \
-        RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK=1 \
-        RUNANYWHERE_USE_LOCAL_NATIVES=1 \
-        swift build \
-        --package-path "${REPO_ROOT}" \
-        --configuration release \
-        --product RunAnywhereMLXRuntime \
-        --jobs "${BUILD_JOBS}" \
-        --triple "${triple}" \
-        --sdk "${sdk_path}" \
-        --scratch-path "${scratch}" \
-        "${prefix_flags[@]}"
+    # SwiftPM fetches this package's ~20 dependencies CONCURRENTLY into the
+    # shared repositories cache, and that fetch races with itself: a clone
+    # directory the resolver has already recorded disappears mid-resolve, e.g.
+    #   error: Git command 'git -C .../repositories/mlx-swift-064e4cad config
+    #          --get remote.origin.url' failed: ... No such file or directory
+    #   error: binary target 'RACommonsBinary' could not be mapped to an
+    #          artifact with expected name 'RACommonsBinary'
+    # The second error is FALLOUT, not the cause: resolution aborted, so no
+    # artifact mapping happened. Do not chase it as a checksum problem.
+    # Observed on two different packages (mlx-swift, swift-transformers) across
+    # separate runs, so it is a race and not one bad pin. Purge the cache and
+    # retry; a warm, complete cache resolves cleanly.
+    local attempt=1 max_attempts=3
+    while :; do
+        if run env \
+            RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK=1 \
+            RUNANYWHERE_USE_LOCAL_NATIVES=1 \
+            swift build \
+            --package-path "${REPO_ROOT}" \
+            --configuration release \
+            --product RunAnywhereMLXRuntime \
+            --jobs "${BUILD_JOBS}" \
+            --triple "${triple}" \
+            --sdk "${sdk_path}" \
+            --scratch-path "${scratch}" \
+            "${prefix_flags[@]}"; then
+            break
+        fi
+        if [ "${attempt}" -ge "${max_attempts}" ]; then
+            echo "ERROR: swift build for ${label} failed ${max_attempts} times" >&2
+            return 1
+        fi
+        echo "WARN: swift build for ${label} failed (attempt ${attempt}/${max_attempts}); purging the SwiftPM repositories cache and retrying" >&2
+        rm -rf "${HOME}/Library/Caches/org.swift.swiftpm/repositories" 2>/dev/null || true
+        rm -rf "${scratch}"
+        attempt=$((attempt + 1))
+    done
 
     run mkdir -p "$(dirname "${staged_archive}")"
     run cp "${built_archive}" "${staged_archive}"
