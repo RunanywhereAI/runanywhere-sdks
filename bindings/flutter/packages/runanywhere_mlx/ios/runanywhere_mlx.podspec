@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => 'c0495cf3430401cf675d2fdf036bf3f98c991985b5421906d240dc322f0cbb75',
+  'RunAnywhereMLXRuntime' => 'adf1bc80e2fcc92625cb114fd6efe7a46905d0bc87292cb652edb864b8c279df',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => '70de4c70143b4544204b2c0e8af296546bc31ccf3ffda2f7b813fffb5b720ae9'
 }.freeze
