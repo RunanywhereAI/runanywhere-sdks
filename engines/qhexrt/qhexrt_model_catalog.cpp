@@ -96,6 +96,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"cosmos3_edge_vlm", kV79V81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v79 + v81
     {"cosmos3_edge_diffusion", kV79V81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v79 + v81
     {"internvl3_5_1b", kAllSupportedArches, false},
+    // SigLIP2-NaFlex vision + LFM2.5 hybrid W8 decode. Only the v81 bundle is published.
+    {"lfm2_5_vl_3b", kV81, false},
     {"gemma4_e2b_vlm", kV79V81, false},
     {"gemma4_e4b_vlm", kV81, false},
     {"nemotron_nano_vl_8b", kV81, false},

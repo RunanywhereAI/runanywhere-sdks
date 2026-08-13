@@ -36,6 +36,18 @@ constexpr CatalogFile kLfm2VlFiles[] = {
      "mmproj-LFM2-VL-450M-Q8_0.gguf", true},
 };
 
+// LiquidAI's own GGUF export. general.architecture is "lfm2" (same as the
+// LFM2-VL 450M row above) and the mmproj is a standard clip/mmproj projector,
+// verified by reading both GGUF headers off HF.
+constexpr CatalogFile kLfm2_5Vl3BFiles[] = {
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF/resolve/main/"
+     "LFM2.5-VL-3B-Q4_K_M.gguf",
+     "LFM2.5-VL-3B-Q4_K_M.gguf", true, 1674454240LL},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF/resolve/main/"
+     "mmproj-LFM2.5-VL-3B-Q8_0.gguf",
+     "mmproj-LFM2.5-VL-3B-Q8_0.gguf", true, 583109120LL},
+};
+
 constexpr CatalogFile kQwen2VlFiles[] = {
     {"https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/"
      "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
@@ -343,6 +355,43 @@ constexpr CatalogFile kMlxFastVlm05BFiles[] = {
     {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
      "vocab.json",
      "vocab.json", true},
+};
+
+// LiquidAI's own MLX 4-bit export. config.json model_type is "lfm2_vl", which
+// the pinned mlx-swift-lm 3.31.4 registers in VLMModelFactory (together with
+// the "Lfm2VlProcessor" processor class this repo declares). It ships no
+// merges.txt/vocab.json — tokenizer.json is the self-contained fast-tokenizer
+// format — and its processor lives in processor_config.json rather than
+// preprocessor_config.json, which the factory also accepts. Verified via the HF
+// API file listing this session; do not add filenames that are not below.
+constexpr CatalogFile kMlxLfm2_5Vl3BFiles[] = {
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/LiquidAI/LFM2.5-VL-3B-MLX-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
 };
 
 constexpr CatalogFile kMlxQwen3Embedding06BFiles[] = {
@@ -757,6 +806,12 @@ constexpr CatalogEntry kCatalog[] = {
     {"lfm2-vl-450m-q8_0", "lfm2-vl", "LFM2-VL 450M Q8_0",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
      v1::MODEL_FORMAT_GGUF, nullptr, kLfm2VlFiles, 2, 600 * MB, 0, false},
+    // Native window is 128k (lfm2.context_length in the GGUF); 4096 is the
+    // on-device working context, matching the other multi-GB VLM row.
+    {"lfm2.5-vl-3b-q4_k_m", "lfm2.5-vl", "LFM2.5-VL 3B Q4_K_M",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF, nullptr, kLfm2_5Vl3BFiles, 2, 2257563360LL, 4096,
+     false},
     {"qwen2-vl-2b-instruct-q4_k_m", "qwen2-vl", "Qwen2-VL 2B Instruct Q4_K_M",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
      v1::MODEL_FORMAT_GGUF, nullptr, kQwen2VlFiles, 2, 1800 * MB, 2048, false},
@@ -949,6 +1004,10 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14, 1256926974,
      2048, false},
+    {"mlx-lfm2.5-vl-3b-4bit", "mlx-lfm2.5-vl", "LFM2.5-VL 3B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxLfm2_5Vl3BFiles, 9,
+     2388258432LL, 4096, false},
     {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
      "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
