@@ -848,6 +848,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. Web packaging runs ensure_generated.sh --only ts; without ts-proto it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
       - name: Download Web natives
         uses: actions/download-artifact@v8
         with:
@@ -894,6 +900,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. RN packaging runs ensure_generated.sh --only ts; without ts-proto it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
       # The RN tree pins `packageManager: yarn@3.6.1` (Yarn Berry). Activate it
       # via Corepack at the workflow level so package-sdk.sh (and any later
       # `yarn` invocation against the RN workspace) doesn't silently fall back
@@ -1534,6 +1546,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
+      # Generated protobuf bindings are NOT committed. The packaging script
+      # this job runs regenerates them, which needs the codegen toolchain on
+      # PATH. Flutter packaging runs ensure_generated.sh --only dart; without protoc-gen-dart it exits 127.
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: dart
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
