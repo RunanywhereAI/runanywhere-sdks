@@ -221,8 +221,10 @@ rac_result_t configure_request(EasyHandle& handle, const rac_http_request_t* req
 
 // Fills status / headers / redirected_url / elapsed_ms from a completed
 // transfer. Header + url strings are malloc-allocated for rac_http_response_free.
-void populate_response_meta(CURL* curl, const rac_http_request_t* req, const RequestContext& ctx,
-                            rac_http_response_t* out_resp) {
+// Returns RAC_SUCCESS, or RAC_ERROR_OUT_OF_MEMORY after releasing everything
+// allocated so far so *out_resp stays consistent for rac_http_response_free.
+rac_result_t populate_response_meta(CURL* curl, const rac_http_request_t* req,
+                                    const RequestContext& ctx, rac_http_response_t* out_resp) {
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
     out_resp->status = static_cast<int32_t>(status);
@@ -230,26 +232,40 @@ void populate_response_meta(CURL* curl, const rac_http_request_t* req, const Req
     if (!ctx.headers.empty()) {
         auto* kvs = static_cast<rac_http_header_kv_t*>(
             std::calloc(ctx.headers.size(), sizeof(rac_http_header_kv_t)));
-        if (kvs) {
-            for (size_t i = 0; i < ctx.headers.size(); ++i) {
-                kvs[i].name = rac_strdup(ctx.headers[i].first.c_str());
-                kvs[i].value = rac_strdup(ctx.headers[i].second.c_str());
-            }
-            out_resp->headers = kvs;
-            out_resp->header_count = ctx.headers.size();
+        if (!kvs) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        for (size_t i = 0; i < ctx.headers.size(); ++i) {
+            kvs[i].name = rac_strdup(ctx.headers[i].first.c_str());
+            kvs[i].value = rac_strdup(ctx.headers[i].second.c_str());
+            if (!kvs[i].name || !kvs[i].value) {
+                // Release the partially populated array (entries [0, i] are the
+                // only ones filled; null name/value entries are free-safe).
+                out_resp->headers = kvs;
+                out_resp->header_count = i + 1;
+                rac_http_response_free(out_resp);
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+        }
+        out_resp->headers = kvs;
+        out_resp->header_count = ctx.headers.size();
     }
 
     char* effective_url = nullptr;
     if (curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective_url) == CURLE_OK &&
         effective_url && req->url && std::strcmp(effective_url, req->url) != 0) {
         out_resp->redirected_url = rac_strdup(effective_url);
+        if (!out_resp->redirected_url) {
+            rac_http_response_free(out_resp);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
     curl_off_t elapsed_us = 0;
     if (curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME_T, &elapsed_us) == CURLE_OK) {
         out_resp->elapsed_ms = static_cast<uint64_t>(elapsed_us / 1000);
     }
+    return RAC_SUCCESS;
 }
 
 // -----------------------------------------------------------------------------
@@ -278,7 +294,10 @@ rac_result_t curl_request_send(void* /*user_data*/, const rac_http_request_t* re
         return map_curl_code(code, ctx);
     }
 
-    populate_response_meta(handle.curl, req, ctx, out_resp);
+    const rac_result_t meta_rc = populate_response_meta(handle.curl, req, ctx, out_resp);
+    if (meta_rc != RAC_SUCCESS) {
+        return meta_rc;
+    }
 
     if (!ctx.body.empty()) {
         auto* body = static_cast<uint8_t*>(std::malloc(ctx.body.size()));
@@ -326,8 +345,7 @@ rac_result_t run_streaming(const rac_http_request_t* req, uint64_t resume_from_b
         return map_curl_code(code, ctx);
     }
 
-    populate_response_meta(handle.curl, req, ctx, out_resp_meta);
-    return RAC_SUCCESS;
+    return populate_response_meta(handle.curl, req, ctx, out_resp_meta);
 }
 
 rac_result_t curl_request_stream(void* /*user_data*/, const rac_http_request_t* req,
