@@ -1,6 +1,6 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Verified state: 2026-07-12 against the 0.20.18 package architecture.
+Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.18.
 
 ## Repository Structure
 

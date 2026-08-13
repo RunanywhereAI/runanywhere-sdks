@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.20.18] - 2026-08-12
 
-- Rebuilt the Electron backend plugin natives. 0.20.17 shipped a non-routable
-  sherpa carrier that referenced none of its STT/TTS/VAD ops tables, so the
-  plugin registry declined it and the backend served nothing.
-- Backend registration failures are now isolated: one unavailable engine no
-  longer prevents the rest of the SDK from initializing.
+- Commons: backend registration failures are isolated. An engine that cannot
+  register is recorded as unavailable instead of aborting SDK initialization,
+  so the remaining backends keep serving.
+- Suite version bump. This release also rebuilds the Electron backend plugin
+  natives; that part does not affect this package.
 
 ## [0.20.17] - 2026-08-11
 
