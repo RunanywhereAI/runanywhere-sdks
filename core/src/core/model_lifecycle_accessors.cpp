@@ -17,6 +17,7 @@
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "rac/core/rac_model_lifecycle.h"
 
 namespace rac::llm {
 
@@ -469,13 +470,13 @@ void release_lifecycle_segmentation(LifecycleSegmentationRef* ref) {
 }  // namespace rac::lifecycle
 
 // ---------------------------------------------------------------------------
-// Loaded-state query
+// Loaded-state query and unload
 //
 // The storage delete path needs to know whether a model is open before it
-// removes files underneath it. Hosts answer that through
-// rac_storage_callbacks_t::is_model_loaded, but commons is the component that
-// performed the load and already tracks it in g_loaded, so it can answer
-// without asking anyone. Internal on purpose: the only caller is inside
+// removes files underneath it, and needs to close it when it is. Hosts answer
+// both through rac_storage_callbacks_t, but commons is the component that
+// performed the load and already tracks it in g_loaded, so it can answer and
+// act without asking anyone. Internal on purpose: the only caller is inside
 // commons, so this stays off the public C ABI.
 // ---------------------------------------------------------------------------
 
@@ -489,7 +490,15 @@ bool is_model_loaded(const char* model_id) {
     std::lock_guard<std::mutex> lock(rac::core::model_lifecycle::detail::g_lifecycle_mutex);
     for (const auto& entry : rac::core::model_lifecycle::detail::g_loaded) {
         const auto& loaded = entry.second;
-        if (loaded && loaded->model_id == model_id) {
+        // READY is the discriminator, not mere presence in g_loaded. A load that
+        // failed leaves an ERROR sentinel carrying the failed request's model_id
+        // (install_failed_entry_preserving), and that model has no backend at
+        // all, so reporting it loaded made it undeletable, which is the opposite
+        // of what a user wants after a failed load. READY and ERROR are the only
+        // states ever installed, so this is exact, and it matches what
+        // acquire_lifecycle_llm / acquire_component already require.
+        if (loaded && loaded->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
+            loaded->model_id == model_id) {
             return true;
         }
     }
@@ -497,6 +506,45 @@ bool is_model_loaded(const char* model_id) {
 #else
     (void)model_id;
     return false;
+#endif
+}
+
+rac_result_t unload_model(const char* model_id) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (model_id == nullptr || *model_id == '\0') {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    // Delegate to the one unload implementation rather than re-walking g_loaded
+    // here: it already erases under the lifecycle mutex, destroys the backends
+    // outside it, and publishes UNLOADING->NOT_LOADED for each entry. A second
+    // hand-rolled copy of that sequence is exactly how the two paths drift.
+    runanywhere::v1::ModelUnloadRequest request;
+    request.set_model_id(model_id);
+    std::string bytes;
+    if (!request.SerializeToString(&bytes)) {
+        return RAC_ERROR_INTERNAL;
+    }
+    rac_proto_buffer_t out{};
+    rac_result_t rc = rac_model_lifecycle_unload_proto(
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+    if (rc == RAC_SUCCESS) {
+        // The C entry point reports "nothing matched" inside the result, not in
+        // its return code, so an unmatched id would otherwise read as success.
+        runanywhere::v1::ModelUnloadResult result;
+        if (out.data != nullptr && out.size > 0 &&
+            result.ParseFromArray(out.data, static_cast<int>(out.size))) {
+            if (result.unloaded_model_ids_size() == 0) {
+                rc = RAC_ERROR_MODEL_NOT_LOADED;
+            }
+        } else {
+            rc = RAC_ERROR_MODEL_NOT_LOADED;
+        }
+    }
+    rac_proto_buffer_free(&out);
+    return rc;
+#else
+    (void)model_id;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
 }
 

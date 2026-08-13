@@ -75,6 +75,21 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         RAC_QHEXRT_HEXAGON_ARCH_V81,
     };
 
+    // The union of every arch bit this test actually enumerates. A row whose
+    // mask sets a bit outside this union is unreachable on every supported
+    // device, yet the per-arch loop below would still agree with the lookups
+    // and stay green. Catches a stray bit, a mixed mask like kV81 | (1U << 3),
+    // and an arch added to the table without being added to `arches`.
+    uint8_t known_arch_bits = 0;
+    for (const rac_qhexrt_hexagon_arch_t arch : arches) {
+        known_arch_bits |= rac::qhexrt::catalog::policy_arch_bit(arch);
+    }
+
+    // Row ids must be unique: find_model_policy() stops at the first match, so a
+    // duplicated id silently makes the second row dead policy. The deleted
+    // `all.size() == model_count()` union guard used to reject this implicitly.
+    std::unordered_set<std::string> seen_ids;
+
     size_t private_row_count = 0;
     for (size_t i = 0; i < row_count; ++i) {
         rac::qhexrt::catalog::PolicyRow row{};
@@ -84,11 +99,14 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         // the same size across an add-plus-remove.
         ASSERT_TRUE(rac::qhexrt::catalog::policy_row_at(i, &row));
         ASSERT_TRUE(row.id != nullptr && std::strlen(row.id) > 0);
+        ASSERT_TRUE(seen_ids.insert(std::string(row.id)).second);
         ASSERT_EQ(rac_qhexrt_catalog_model_is_known(row.id), RAC_TRUE);
 
         // Every row must be reachable on at least one arch, or it can never be
-        // registered on any device.
+        // registered on any device, and every bit it sets must be an arch this
+        // test knows about, or "reachable" is a claim about nothing.
         ASSERT_TRUE(row.arch_mask != 0);
+        ASSERT_EQ(static_cast<uint8_t>(row.arch_mask & ~known_arch_bits), static_cast<uint8_t>(0));
 
         for (const rac_qhexrt_hexagon_arch_t arch : arches) {
             const bool expected =

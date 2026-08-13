@@ -195,10 +195,14 @@ expect_spm_version() {
   FAILURES=$((FAILURES + 1))
 }
 
+# The external-consumer example in Package.swift points at the Swift
+# DISTRIBUTION repo, never this monorepo: this repo's tags do not compile as a
+# Swift package (the generated Sources/ are no longer committed). Assert that
+# exact literal so the documented URL cannot silently drift back.
 if [ "${SPM_TEMP_PIN}" -eq 1 ]; then
-  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${SPM_VERSION}\")"
+  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-swift.git\", from: \"${SPM_VERSION}\")"
 else
-  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${VERSION}\")"
+  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-swift.git\", from: \"${VERSION}\")"
 fi
 expect_exact_file "bindings/swift/VERSION" "${VERSION}"
 expect_literal "bindings/swift/Sources/RunAnywhere/Generated/Versions.swift" \
@@ -385,6 +389,7 @@ for release_doc in \
   bindings/flutter/docs/ARCHITECTURE.md \
   bindings/flutter/docs/Documentation.md \
   bindings/swift/ARCHITECTURE.md \
+  bindings/swift/README.md \
   bindings/swift/Sources/LlamaCPPRuntime/README.md \
   bindings/swift/Sources/ONNXRuntime/README.md \
   bindings/kotlin/README.md; do
