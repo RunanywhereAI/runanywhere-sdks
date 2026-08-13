@@ -78,9 +78,28 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CURRENT_VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/core/VERSION")"
 CURRENT_VERSION_REGEX="${CURRENT_VERSION//./\\.}"
 
+# --- Two-phase bump: validate everything, then write everything ------------
+#
+# Every edit is VALIDATED as it is reached but QUEUED rather than applied. The
+# queue is flushed only after the last one validates, which makes the bump
+# atomic with respect to a stale anchor.
+#
+# Without this, `set -euo pipefail` plus ~32 bump_line calls means a pattern
+# that stopped matching (a file reformatted, a literal reworded) aborts partway
+# with the earlier files, including core/VERSION, already rewritten. The
+# checkout is then left claiming two different versions at once, which is worse
+# than not bumping at all: the next gate reports a confusing mismatch instead of
+# the real cause.
+_BUMP_FILES=()
+_BUMP_PATTERNS=()
+_BUMP_REPLACEMENTS=()
+_WRITE_FILES=()
+_WRITE_CONTENTS=()
+_WRITE_MODES=()
+_LOCK_FILES=()
+
 bump_line() {
-    # Replaces a line matching $pattern with $replacement, in $file.
-    # Cross-platform sed -i (BSD sed on macOS needs '' after -i).
+    # Validates now; the edit is applied by flush_pending_edits.
     local file="$1" pattern="$2" replacement="$3"
     if [ ! -f "$file" ]; then
         echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
@@ -91,12 +110,40 @@ bump_line() {
         echo "       pattern: $pattern" >&2
         return 1
     fi
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' -E "s|${pattern}|${replacement}|" "$file"
-    else
-        sed -i -E "s|${pattern}|${replacement}|" "$file"
-    fi
+    _BUMP_FILES+=("$file")
+    _BUMP_PATTERNS+=("$pattern")
+    _BUMP_REPLACEMENTS+=("$replacement")
     echo "  bumped: $file"
+}
+
+queue_write() {
+    # Deferred counterpart to `echo x > file` / `>>`, so a later validation
+    # failure cannot leave these written while the sed edits never happen.
+    local file="$1" content="$2" mode="${3:-truncate}"
+    _WRITE_FILES+=("$file")
+    _WRITE_CONTENTS+=("$content")
+    _WRITE_MODES+=("$mode")
+}
+
+flush_pending_edits() {
+    local i
+    for i in "${!_BUMP_FILES[@]}"; do
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' -E "s|${_BUMP_PATTERNS[$i]}|${_BUMP_REPLACEMENTS[$i]}|" "${_BUMP_FILES[$i]}"
+        else
+            sed -i -E "s|${_BUMP_PATTERNS[$i]}|${_BUMP_REPLACEMENTS[$i]}|" "${_BUMP_FILES[$i]}"
+        fi
+    done
+    for i in "${!_LOCK_FILES[@]}"; do
+        apply_npm_lock_root_version "${_LOCK_FILES[$i]}"
+    done
+    for i in "${!_WRITE_FILES[@]}"; do
+        if [ "${_WRITE_MODES[$i]}" = "append" ]; then
+            printf '%s\n' "${_WRITE_CONTENTS[$i]}" >> "${_WRITE_FILES[$i]}"
+        else
+            printf '%s\n' "${_WRITE_CONTENTS[$i]}" > "${_WRITE_FILES[$i]}"
+        fi
+    done
 }
 
 bump_json_version() {
@@ -105,11 +152,27 @@ bump_json_version() {
 }
 
 bump_npm_lock_root_version() {
+    # Validates now, rewrites in flush_pending_edits, so a stale anchor later in
+    # the run cannot leave a lockfile bumped while everything else is not.
     local file="$1"
     if [ ! -f "$file" ]; then
         echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
         return 1
     fi
+    node - "$file" <<'NODE'
+const fs = require('node:fs');
+const [file] = process.argv.slice(2);
+const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (typeof lock.version !== 'string' || typeof lock.packages?.['']?.version !== 'string') {
+  throw new Error(`package-lock root version fields are missing: ${file}`);
+}
+NODE
+    _LOCK_FILES+=("$file")
+    echo "  bumped: $file"
+}
+
+apply_npm_lock_root_version() {
+    local file="$1"
     node - "$file" "$NEW_VERSION" <<'NODE'
 const fs = require('node:fs');
 const [file, version] = process.argv.slice(2);
@@ -208,7 +271,7 @@ bump_line "${REPO_ROOT}/AGENTS.md" \
     '(\*\*Current version\*\*: `)[^`]+(` \(canonical source: `core/VERSION`\))' \
     "\\1${NEW_VERSION}\\2"
 echo ">> commons:"
-echo "$NEW_VERSION" > "${REPO_ROOT}/core/VERSION"
+queue_write "${REPO_ROOT}/core/VERSION" "$NEW_VERSION"
 echo "  bumped: core/VERSION"
 bump_line "${REPO_ROOT}/core/VERSIONS" \
     '^PROJECT_VERSION=.*' "PROJECT_VERSION=${NEW_VERSION}"
@@ -218,13 +281,17 @@ echo ""
 echo ">> Swift SDK:"
 bump_line "${REPO_ROOT}/Package.swift" \
     'let sdkVersion = "[^"]+"' "let sdkVersion = \"${NEW_VERSION}\""
+# The external-consumer example points at the Swift distribution repo, not this
+# monorepo. bump_line returns 1 on a missing pattern and the script runs under
+# `set -euo pipefail`, so an anchor that stops matching aborts the bump midway
+# with core/VERSION already written.
 bump_line "${REPO_ROOT}/Package.swift" \
-    '(\.package\(url: "https://github\.com/RunanywhereAI/runanywhere-sdks", from: ")[^"]+("\))' \
+    '(\.package\(url: "https://github\.com/RunanywhereAI/runanywhere-swift\.git", from: ")[^"]+("\))' \
     "\\1${NEW_VERSION}\\2"
 # Swift SDK VERSION file (read by release tooling)
 SWIFT_VERSION_FILE="${REPO_ROOT}/bindings/swift/VERSION"
 if [ -f "$SWIFT_VERSION_FILE" ]; then
-    echo "$NEW_VERSION" > "$SWIFT_VERSION_FILE"
+    queue_write "$SWIFT_VERSION_FILE" "$NEW_VERSION"
     echo "  bumped: bindings/swift/VERSION"
 fi
 # SDKConstants.swift is intentionally NOT bumped here: its `version` constant
@@ -249,7 +316,7 @@ if [ -f "$KOTLIN_PROPS" ]; then
         bump_line "$KOTLIN_PROPS" \
             '^runanywhere\.nativeLibVersion=.*' "runanywhere.nativeLibVersion=${NEW_VERSION}"
     else
-        echo "runanywhere.nativeLibVersion=${NEW_VERSION}" >> "$KOTLIN_PROPS"
+        queue_write "$KOTLIN_PROPS" "runanywhere.nativeLibVersion=${NEW_VERSION}" append
         echo "  appended: runanywhere.nativeLibVersion to $KOTLIN_PROPS"
     fi
     if grep -q '^SDK_VERSION=' "$KOTLIN_PROPS"; then
@@ -462,6 +529,10 @@ for release_doc in \
     "${REPO_ROOT}/bindings/kotlin/README.md"; do
     bump_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
 done
+
+# Every anchor above validated. Only now does anything on disk change, so a
+# stale pattern aborts with the working tree untouched rather than half-bumped.
+flush_pending_edits
 
 echo ""
 echo ">> Done. Verify with:"

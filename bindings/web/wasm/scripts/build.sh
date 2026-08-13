@@ -20,7 +20,10 @@ set -euo pipefail
 #   --debug      Debug build with assertions and safe heap
 #   --pthreads   Enable pthreads (default except WebGPU; requires Cross-Origin Isolation)
 #   --no-pthreads Disable pthreads
-#   --rag        Pull in RAG (requires --onnx)
+#   --rag        Emit the rac_rag_*_proto exports. Vestigial: every target
+#                (--llamacpp, --webgpu, --onnx, --onnx-webgpu, --all-backends)
+#                already implies it. It does NOT require --onnx; standalone RAG
+#                is what RAC_WASM_RAG_STANDALONE exists for.
 #   --clean      Clean the matching build directory before building
 #
 # Prerequisites:
@@ -73,6 +76,17 @@ while [[ $# -gt 0 ]]; do
             ;;
         --llamacpp)
             LLAMACPP="ON"
+            # Same reason --webgpu and --onnx-webgpu set it. core/CMakeLists.txt
+            # force-sets RAC_BACKEND_RAG=OFF on Emscripten unless ONNX or
+            # RAC_WASM_RAG_STANDALONE is on, and this target enables neither, so
+            # without it the CPU llamacpp bundle silently ships without the
+            # eight rac_rag_*_proto exports the released one has. Release CI
+            # only keeps them because `--core --llamacpp --onnx` is a single
+            # invocation and --onnx sets RAG=ON, so a bundle built by the
+            # documented `npm run build:wasm -- --llamacpp` differed from the
+            # shipped one by exactly those eight symbols. This is the bundle the
+            # Web Docs/RAG tab auto-loads.
+            RAG="ON"
             shift
             ;;
         --onnx)
@@ -86,13 +100,13 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --rag)
-            # --rag emits the rac_rag_*_proto symbols
-            # into every requested target (llamacpp, webgpu, onnx). The default
-            # `--onnx` path already pulls in RAG via the ONNX embedding provider.
-            # `--rag` without `--onnx` is the Docs/RAG path where the llamacpp
-            # bundle exports the proto-byte ABI and the runtime layer surfaces
-            # RAC_ERROR_FEATURE_NOT_AVAILABLE when the embeddings provider has
-            # not been registered yet (matches the non-WASM platform contract).
+            # Now vestigial: every target arm sets RAG=ON itself, so this flag
+            # can no longer change the outcome of any invocation. Kept because
+            # it is documented in three places and scripts pass it. It never
+            # required --onnx: `--llamacpp --rag` was the Docs/RAG path where
+            # the llamacpp bundle exports the proto-byte ABI and the runtime
+            # layer surfaces RAC_ERROR_FEATURE_NOT_AVAILABLE until an embeddings
+            # provider registers (matches the non-WASM platform contract).
             RAG="ON"
             shift
             ;;
@@ -144,7 +158,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --debug          Debug build with assertions and safe heap"
             echo "  --pthreads       Enable pthreads (default except WebGPU; requires Cross-Origin Isolation)"
             echo "  --no-pthreads    Disable pthreads"
-            echo "  --rag            Pull in RAG (requires --onnx)"
+            echo "  --rag            Emit the rac_rag_*_proto exports (implied by every target: --llamacpp, --webgpu, --onnx, --onnx-webgpu, --all-backends)"
             echo "  --clean          Clean matching build dirs before building"
             echo "  --help           Show this help"
             exit 0
@@ -160,6 +174,9 @@ done
 # `npm run build:wasm` invocations that pass no flags).
 if [ "$BUILD_CORE" = "OFF" ] && [ "$LLAMACPP" = "OFF" ] && [ "$ONNX" = "OFF" ] && [ "$WEBGPU" = "OFF" ]; then
     LLAMACPP="ON"
+    # Identical to the explicit --llamacpp arm above: this default builds the
+    # same artifact, so it must configure it the same way.
+    RAG="ON"
 fi
 
 # Check Emscripten. Accepting whichever emsdk happens to be first on PATH can
@@ -496,6 +513,29 @@ build_target() {
                 exit 1
             fi
             echo "  WASM gzip-fallback string scan: clean (no 'gzip -d' literal)"
+        fi
+
+        # Prove the RAG exports actually made it into the glue. The whole
+        # RAG-drops-out bug class is silent: the build succeeds, the artifact is
+        # non-empty, and release packaging only checks that the JS/WASM files
+        # exist and are non-empty, so a bundle missing all eight
+        # rac_rag_*_proto symbols ships looking healthy. PR CI never runs this
+        # script at all (the `wasm` job uses `cmake --preset wasm` directly), so
+        # this check is the only pre-ship signal.
+        # Scoped to the engine targets: only the llamacpp and onnx export lists
+        # append RAC_EXPORTED_FUNCTIONS_RAG. The commons-only core target never
+        # exports RAG symbols, even when configured with RAC_BACKEND_RAG=ON.
+        if [ "${RAG}" = "ON" ] &&
+           { [ "${wasm_llamacpp}" = "ON" ] || [ "${wasm_onnx}" = "ON" ]; }; then
+            if ! grep -q "_rac_rag_session_create_proto" "${js_file}"; then
+                echo "ERROR: '${js_file}' was built with RAG=ON but exports no rac_rag_*_proto symbols."
+                echo "       Expected _rac_rag_session_create_proto in the emitted glue."
+                echo "       Most likely RAC_BACKEND_RAG was force-set OFF during configure"
+                echo "       (core/CMakeLists.txt does that on Emscripten unless RAC_BACKEND_ONNX"
+                echo "       or RAC_WASM_RAG_STANDALONE is on)."
+                exit 1
+            fi
+            echo "  RAG export check: rac_rag_*_proto present in ${out_name}.js"
         fi
 
         if [ "$pthreads_for_target" = "ON" ]; then

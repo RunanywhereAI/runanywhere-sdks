@@ -1136,8 +1136,12 @@ set(RAC_EXPORTED_FUNCTIONS_CLOUD
 # librac_commons whenever RAC_BACKEND_RAG=ON (default ON, gated to ONNX
 # availability on Emscripten — see core/CMakeLists.txt).
 # RAG routes embeddings through the rac_embeddings_service vtable at runtime,
-# so these exports are only meaningful on the ONNX-sherpa WASM target where
-# the ONNX embedding provider is also linked. Appended to that target only.
+# so a bundle without the ONNX embedding provider linked can reach these exports
+# but gets RAC_ERROR_FEATURE_NOT_AVAILABLE until some provider registers. They
+# are therefore appended to BOTH engine targets: onnx-sherpa (where the provider
+# is present) and llamacpp/webgpu (where the Docs/RAG tab needs the proto-byte
+# ABI to exist so the TS bridge can surface that runtime answer at all). The
+# commons-only core target never gets them.
 set(RAC_EXPORTED_FUNCTIONS_RAG
     "_rac_rag_session_create_proto"
     "_rac_rag_session_destroy_proto"
@@ -1458,12 +1462,12 @@ if(RAC_WASM_LLAMACPP)
     set(_llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
     list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_LLAMACPP})
 
-    # When RAG is enabled on the llamacpp WASM target
-    # (e.g. via build.sh --rag for the auto-loaded Docs/RAG bundle), append the
-    # rac_rag_*_proto exports so the TS proto-byte bridge can reach the symbols.
+    # build.sh now enables RAG unconditionally for the llamacpp WASM target,
+    # since it is the auto-loaded Docs/RAG bundle. Append the rac_rag_*_proto
+    # exports so the TS proto-byte bridge can reach the symbols.
     # The RAG OBJECT library has already been folded into librac_commons by
     # core/CMakeLists.txt — we just need to expose the
-    # 6 rac_rag_*_proto symbols in the emitted JS glue. The runtime layer
+    # 8 rac_rag_*_proto symbols in the emitted JS glue. The runtime layer
     # returns RAC_ERROR_FEATURE_NOT_AVAILABLE if no embeddings provider is
     # registered (matches the non-WASM platform contract).
     if(RAC_BACKEND_RAG)
