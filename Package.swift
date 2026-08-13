@@ -9,9 +9,29 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.18")
-//   No environment override is needed. SPM downloads the checksum-verified
-//   XCFramework archives from the GitHub release by default.
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.18")
+//
+//   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
+//   the first one is fatal:
+//
+//   1. This repo's tags DO NOT COMPILE as a Swift package. The generated
+//      protobuf Swift sources under bindings/swift/Sources/RunAnywhere/Generated/
+//      are no longer committed (they are codegen output), so tag v0.20.18
+//      carries 1 file there where v0.20.17 carried 42. Resolving this URL by
+//      version yields ~347 errors of the form
+//      "cannot find type 'RAModelInfo' in scope". The distribution repo is
+//      generated WITH those sources, so it builds.
+//   2. This monorepo is ~340 MB of C++, Kotlin, WASM and Dart. The distribution
+//      repo is ~3 MB of Swift.
+//
+//   Both manifests declare the SAME remote binaryTargets with the SAME
+//   checksums, pointing at the SAME release assets on runanywhere-sdks, so the
+//   XCFrameworks are never duplicated or re-uploaded. No environment override is
+//   needed; SPM downloads the checksum-verified archives from the GitHub release.
+//
+//   bindings/swift/scripts/sync-dist-repo.sh cuts that repo, and
+//   scripts/validation/gates/check_swift_dist_repo_sync.sh fails every PR here
+//   until it carries the matching tag.
 //
 // FOR LOCAL DEVELOPMENT:
 //   1. Build native XCFrameworks from the repo root:
