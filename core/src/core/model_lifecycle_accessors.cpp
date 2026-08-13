@@ -467,3 +467,37 @@ void release_lifecycle_segmentation(LifecycleSegmentationRef* ref) {
 }
 
 }  // namespace rac::lifecycle
+
+// ---------------------------------------------------------------------------
+// Loaded-state query
+//
+// The storage delete path needs to know whether a model is open before it
+// removes files underneath it. Hosts answer that through
+// rac_storage_callbacks_t::is_model_loaded, but commons is the component that
+// performed the load and already tracks it in g_loaded, so it can answer
+// without asking anyone. Internal on purpose: the only caller is inside
+// commons, so this stays off the public C ABI.
+// ---------------------------------------------------------------------------
+
+namespace rac::lifecycle {
+
+bool is_model_loaded(const char* model_id) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (model_id == nullptr || *model_id == '\0') {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(rac::core::model_lifecycle::detail::g_lifecycle_mutex);
+    for (const auto& entry : rac::core::model_lifecycle::detail::g_loaded) {
+        const auto& loaded = entry.second;
+        if (loaded && loaded->model_id == model_id) {
+            return true;
+        }
+    }
+    return false;
+#else
+    (void)model_id;
+    return false;
+#endif
+}
+
+}  // namespace rac::lifecycle

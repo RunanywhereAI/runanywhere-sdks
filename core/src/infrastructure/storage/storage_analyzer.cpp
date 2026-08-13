@@ -32,6 +32,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
@@ -161,7 +162,23 @@ int64_t model_metric_size(rac_storage_analyzer_handle_t handle, const rac_model_
 
 bool known_loaded_state(rac_storage_analyzer_handle_t handle, const char* model_id,
                         bool* out_is_loaded) {
-    if (!handle || !model_id || !out_is_loaded || !handle->callbacks.is_model_loaded) {
+    if (!handle || !model_id || !out_is_loaded) {
+        return false;
+    }
+    // Ask commons before asking the host. The lifecycle store is what actually
+    // performed the load, whereas the callback is unanswerable for several
+    // hosts: the JNI one reports RAC_FALSE unconditionally, and Swift and
+    // Electron leave the slot NULL, which used to make every model look
+    // unloaded and let the delete path run underneath an open model.
+    //
+    // Only the positive answer is taken as final. A false answer means commons
+    // did not load it, not that nobody did, so that case still defers to the
+    // host. This can therefore only prevent a delete, never permit a new one.
+    if (rac::lifecycle::is_model_loaded(model_id)) {
+        *out_is_loaded = true;
+        return true;
+    }
+    if (!handle->callbacks.is_model_loaded) {
         return false;
     }
     rac_bool_t is_loaded = RAC_FALSE;
