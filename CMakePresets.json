@@ -308,6 +308,44 @@
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
         {
+            "name": "electron-win-arm64",
+            "displayName": "Electron \u2014 Windows ARM64 thin addon (Hexagon NPU, QHexRT only)",
+            "description": "Option A packaging for Snapdragon X / X2 Elite: rac_commons.dll + runanywhere_qhexrt.dll + thin runanywhere_native.node, built ARM64-native. This is the NPU lane and it is mutually exclusive with electron-windows — QAIRT ships no QnnHtp*Stub for x86_64, so x64 can never reach the DSP, and the three CPU engines cannot compile for ARM64 (see the per-option comments). Requires an ARM64 Windows host and the ARM64 Native Tools prompt; MSVC's arm64_x64 cross toolset builds the OTHER lane, not this one. Pass, as electron-windows does, -DRAC_NODE_DEV_DIR=<node-gyp cache> and -DQHEXRT_ROOT=<engines/qhexrt/prebuilt/versions/<receipt>> (the global prebuilt/current symlink cannot name an Android and a Windows payload at once). RAC_DESKTOP_ADAPTER=ON needs libcurl and crypt32: crypt32 is a system library, but curl is not, so also pass -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-windows-static after `vcpkg install curl:arm64-windows-static`. Without the adapter this lane has no HTTP transport at all — no model downloads, no telemetry, no auth.",
+            "inherits": "base-release",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "ARM64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_STATIC_PLUGINS": "OFF",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_QHEXRT": "ON",
+                "_comment_llamacpp": "ggml hard-errors 'MSVC is not supported for ARM, use clang' (ggml-cpu/CMakeLists.txt). Switching the toolset to ClangCL clears that but then Abseil fails instead (AbseilDll.cmake:745), so neither toolset builds it here yet.",
+                "RAC_BACKEND_LLAMACPP": "OFF",
+                "_comment_onnx": "cmake/FetchONNXRuntime.cmake selects its download by CMAKE_SIZEOF_VOID_P==8, which is TRUE on ARM64, so it would fetch the x64 ONNX Runtime and fail at link with LNK1112 (module machine type mismatch). There is no win-arm64 URL in it yet.",
+                "RAC_BACKEND_ONNX": "OFF",
+                "RAC_RUNTIME_ONNXRT": "OFF",
+                "RAC_BACKEND_SHERPA": "OFF",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_NEURT": "OFF",
+                "_comment_rag": "Pulls protobuf + Abseil, which is the same Abseil that fails above.",
+                "RAC_BACKEND_RAG": "OFF",
+                "RAC_BUILD_SERVER": "OFF",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_ELECTRON_ADDON": "ON",
+                "RAC_ELECTRON_THIN_ADDON": "ON",
+                "GGML_METAL": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "electron-win-arm64-vs2026",
+            "displayName": "Electron \u2014 Windows ARM64 thin addon on the VS 2026 toolset",
+            "description": "Identical to electron-win-arm64 but pinned to Visual Studio 18 2026, for workstations that only have the newer toolset installed. Requires a CMake build that provides this generator (upstream CMake 4.2+). Note that this preset's binaryDir differs from electron-win-arm64's, so bindings/electron overlay tooling that hardcodes build/electron-win-arm64 needs RA_SDK_BUILD pointed here.",
+            "inherits": "electron-win-arm64",
+            "generator": "Visual Studio 18 2026"
+        },
+        {
             "name": "windows-arm64-release",
             "displayName": "Windows ARM64 \u2014 Release (Snapdragon X/X2 Elite, experimental)",
             "description": "Native ARM64 MSVC build for Snapdragon X / X2 Elite. The Electron addon links arm64/node.lib and the QHexRT engine looks for a lib/win-arm64 prebuilt. Add -DRAC_BACKEND_QHEXRT=ON (+ -DQHEXRT_ROOT=<path>) to link the NPU engine. The four backends turned OFF below CANNOT build on Windows ARM64 today and each fails at CONFIGURE time, so leaving them on would make this preset unusable rather than merely feature-poor — see the per-option comments. Re-enable one only after its upstream blocker is fixed, and MEASURE it.",
@@ -357,6 +395,8 @@
         { "name": "windows-release",  "configurePreset": "windows-release" },
         { "name": "electron-macos",   "configurePreset": "electron-macos" },
         { "name": "electron-windows", "configurePreset": "electron-windows", "configuration": "Release" },
+        { "name": "electron-win-arm64", "configurePreset": "electron-win-arm64", "configuration": "Release" },
+        { "name": "electron-win-arm64-vs2026", "configurePreset": "electron-win-arm64-vs2026", "configuration": "Release" },
         { "name": "windows-arm64-release", "configurePreset": "windows-arm64-release", "configuration": "Release" },
         { "name": "windows-arm64-release-vs2026", "configurePreset": "windows-arm64-release-vs2026", "configuration": "Release" }
     ],
