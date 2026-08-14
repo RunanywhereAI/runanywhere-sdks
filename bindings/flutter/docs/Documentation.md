@@ -534,7 +534,7 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 ## Versioning
 
-- Canonical SDK version: `RunAnywhere.version` (currently `0.20.18`).
+- Canonical SDK version: `RunAnywhere.version` (currently `0.20.19`).
 - Native commons version: vendored `RACommons` build (`0.1.6`).
 - llama.cpp engine: `b7199`.
 - ONNX Runtime: `1.24.3`.
