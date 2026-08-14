@@ -109,6 +109,24 @@ DISPROOF: dict[str, tuple[str, ...]] = {
     "qhexrt": ("qhexrt:engine-unavailable", "g_qhexrt_unavailable_vtable"),
 }
 
+# Backends whose evidence is a string LITERAL in the binary rather than a symbol
+# NAME, and which therefore need the raw bytes even when a symbol dumper works.
+#
+# `nm`/`llvm-nm`/`dumpbin` report the symbol table. "qhexrt:engine-available" is
+# never in it — it is `.rodata` returned by qhexrt_backend_build_info(). So on
+# any host with a working dumper the marker would be absent from the dumper's
+# output and a perfectly routable QHexRT would be rejected. (This hid easily:
+# `nm` cannot read a PE, so a .dll checked on macOS falls through to the byte
+# scan and passes. `llvm-nm` CAN read COFF, so the same file fails the moment
+# LLVM is on PATH.)
+#
+# Scoped to literal contracts on purpose. Appending raw bytes for EVERY backend
+# would let a carrier satisfy its contract on a stray occurrence of an ops name
+# anywhere in the file — a debug string, an assertion — instead of on a real
+# symbol-table reference, which is precisely the stub detection this gate exists
+# to perform.
+LITERAL_CONTRACTS = frozenset({"qhexrt"})
+
 # Shared-library file name -> backend id. Mirrors entry_symbol_from_path() in
 # core/src/plugin/plugin_loader.cpp: strip `lib`, strip `runanywhere_`, strip
 # the extension. The plugin FILE NAME is a load-bearing contract (the loader
@@ -198,6 +216,9 @@ def check_plugin(path: Path, display: str) -> Finding | None:
         # An out-of-tree plugin we have no contract for. Not our call to fail.
         return None
     text, method = symbol_text(path)
+    if backend in LITERAL_CONTRACTS and method != "byte scan":
+        text = f"{text}\n{path.read_bytes().decode('latin-1')}"
+        method = f"{method} + byte scan"
     missing = [sym for sym in required if sym not in text]
     disproved = [sym for sym in DISPROOF.get(backend, ()) if sym in text]
     return Finding(path, display, backend, missing, disproved, method)
