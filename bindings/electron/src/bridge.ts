@@ -556,6 +556,10 @@ function prepareNativeLoad(addonPath: string): void {
   }
 }
 
+// Platforms this release actually ships a prebuilt addon for. Kept next to the
+// resolver so it cannot drift from what bundle-native staged.
+const PREBUILT_PLATFORMS: readonly string[] = ['darwin-arm64'];
+
 function resolveAddon(): NativeAddon {
   const candidates = [
     process.env.RUNANYWHERE_NATIVE_PATH,
@@ -586,9 +590,24 @@ function resolveAddon(): NativeAddon {
     .filter((p) => !fs.existsSync(p))
     .map((p) => `  missing backend plugin: ${p}`);
 
+  // Say plainly when this platform ships no prebuild at all. Without this the
+  // message reads as "your install is broken" on linux/win32, when the truth is
+  // that the release never carried a binary for them. package.json deliberately
+  // keeps os/cpu permissive, because the TypeScript facade IS cross-platform and
+  // narrowing them would also block TS-only consumers and our own Linux CI.
+  const here = `${process.platform}-${process.arch}`;
+  const unsupported = !PREBUILT_PLATFORMS.includes(here);
+
   throw new Error(
     [
       'runanywhere_native.node not found (core addon).',
+      ...(unsupported
+        ? [
+            `No prebuild ships for ${here}. This release carries ${PREBUILT_PLATFORMS.join(', ')} only.`,
+            'This is a packaging gap, not a broken install: build the addon from source',
+            'or use a supported platform.',
+          ]
+        : []),
       'Set RUNANYWHERE_NATIVE_PATH to the built addon, or run scripts/bundle-native.',
       'Tried:',
       ...tried.map((p) => `  ${p}`),

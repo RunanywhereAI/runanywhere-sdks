@@ -94,13 +94,27 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
 
 - Document what is true today. Do not claim encryption or remote Phase-2 auth unless
   packaging and runtime are wired end-to-end.
-- **Windows QHexRT/NPU is wired** on Windows ARM64 (Snapdragon X / X2 Elite, Hexagon
-  v81): `@runanywhere/electron-qhexrt` ships `runanywhere_qhexrt.dll` plus the flat
-  QAIRT set in its own `prebuilds/win32-arm64/`, and a v81 bundle loads and generates
-  through the thin addon. What is NOT wired on that host: llama.cpp, ONNX and Sherpa
-  do not build for win-arm64 (ggml rejects MSVC for ARM; `FetchONNXRuntime.cmake` has
-  no win-arm64 URL — see the `windows-arm64-release` preset comments), so the NPU is
-  the only engine there and there is no CPU fallback to hide behind.
+- **Windows QHexRT/NPU is NOT wired, and neither is Windows.** As of 0.20.18 this SDK
+  ships prebuilds for **`darwin-arm64` only** — the addon at `prebuilds/darwin-arm64/`
+  plus one directory each in the llamacpp / onnx / sherpa packages. There is nothing
+  for linux, win32, or x64. `package.json` keeps `os`/`cpu` permissive on purpose,
+  because the TypeScript facade genuinely is cross-platform and narrowing them would
+  also block TS-only consumers and our own Linux CI; `resolveAddon()` in
+  `src/bridge.ts` instead names the gap explicitly against `PREBUILT_PLATFORMS`.
+- **`@runanywhere/electron-qhexrt` ships no native plugin on any platform.** It is
+  pinned at 0.20.17 and npm-deprecated saying so. `register()` records a path with no
+  binary behind it, so the plugin never loads and the app must degrade gracefully.
+  Windows ARM64 (Snapdragon X / X2 Elite, Hexagon v81) is the only host where it could
+  ever work, and that build does not exist: every payload under
+  `engines/qhexrt/prebuilt/` is Android `arm64-v8a` only, and a win-arm64 runner
+  hard-fails at configure on the "Partial QHexRT prebuilt" FATAL_ERROR. Do not
+  describe this package as NPU-accelerated until a real win-arm64 DLL passes
+  `check_plugin_natives.py`; a shell build exports `rac_plugin_entry_qhexrt` and looks
+  healthy by size and export count, so gate on `g_qhexrt_llm_ops` via `nm -a`.
+- What is separately true on that host once it lands: llama.cpp, ONNX and Sherpa do not
+  build for win-arm64 (ggml rejects MSVC for ARM; `FetchONNXRuntime.cmake` has no
+  win-arm64 URL — see the `windows-arm64-release` preset comments), so the NPU would be
+  the only engine there with no CPU fallback to hide behind.
 - Win32 secure store is DPAPI; do not label it "plaintext M0" in headers/docs.
 - Phase-2 `completeServicesInitialization` is a local lifecycle seam unless real auth
   lands.
