@@ -350,6 +350,14 @@ if [ -n "$NATIVES_FROM" ]; then
             qhexrt_include="$RN_ROOT/packages/qhexrt/android/src/main/jniLibs/include"
             mkdir -p "$qhexrt_include"
             cp -R "$REPO_ROOT/engines/qhexrt/include/." "$qhexrt_include/"
+            # The QHexRT engine headers #include the public RAC C API
+            # (rac/core/rac_error.h, rac/core/rac_types.h,
+            # rac/foundation/rac_proto_buffer.h, ...). Shipping engines/qhexrt/include
+            # alone leaves those dangling, so a consumer native build fails at compile
+            # time. Published 0.20.18 has exactly that gap. Stage the public tree
+            # beside them so the #include closure resolves inside the tarball.
+            mkdir -p "$qhexrt_include/rac"
+            cp -R "$REPO_ROOT/core/include/rac/." "$qhexrt_include/rac/"
         fi
     fi
 
