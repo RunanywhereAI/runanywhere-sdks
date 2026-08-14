@@ -550,6 +550,7 @@ tasks.register("downloadJniLibs") {
         tempDir.mkdirs()
 
         var totalDownloaded = 0
+        val downloadFailures = mutableListOf<String>()
 
         targetAbis.forEach { abi ->
             val abiOutputDir = file("$outputDir/$abi")
@@ -581,11 +582,38 @@ tasks.register("downloadJniLibs") {
 
                 tempZip.delete()
             } catch (e: Exception) {
-                logger.warn("Failed to download $packageName: ${e.message}")
+                // FAIL CLOSED. This used to be a bare logger.warn, which meant a 404
+                // (or any network error) produced an AAR with ZERO .so files, no build
+                // error, and — because the version marker was written unconditionally
+                // below — a cache entry that made every later build skip the download
+                // too. The result installs fine and dies at runtime with
+                // UnsatisfiedLinkError. That is exactly how empty backend AARs shipped
+                // before; a release must never be able to publish a native-less AAR.
+                downloadFailures += "$packageName: ${e.message}"
+                logger.error("Failed to download $packageName: ${e.message}")
             }
         }
 
         tempDir.deleteRecursively()
+
+        if (downloadFailures.isNotEmpty()) {
+            throw GradleException(
+                "downloadJniLibs failed for ${downloadFailures.size} archive(s) from $releaseBaseUrl:\n" +
+                    downloadFailures.joinToString("\n") { "  - $it" } +
+                    "\nCheck that the v$nativeLibVersion GitHub release exists and carries " +
+                    "$packageType-<abi>-v$nativeLibVersion.zip. Set runanywhere.nativeLibVersion " +
+                    "to a release that has assets, or build with -Prunanywhere.useLocalNatives=true.",
+            )
+        }
+        if (totalDownloaded == 0) {
+            throw GradleException(
+                "downloadJniLibs produced 0 .so files from $releaseBaseUrl. Refusing to write the " +
+                    "version marker: an AAR with no native libraries would install and then fail at " +
+                    "runtime with UnsatisfiedLinkError.",
+            )
+        }
+
+        // Only now is it safe to record the cache marker.
         nativeLibVersionMarker.parentFile.mkdirs()
         nativeLibVersionMarker.writeText(nativeLibVersion)
         logger.lifecycle("Commons JNI libs: $totalDownloaded .so files downloaded")
