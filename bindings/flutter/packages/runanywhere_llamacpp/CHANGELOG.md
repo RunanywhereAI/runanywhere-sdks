@@ -5,6 +5,14 @@ All notable changes to the RunAnywhere LlamaCpp Backend will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.20] - 2026-08-14
+
+### Changed
+
+- Version bump only. This release exists so the Electron packages can be
+  republished with the staging telemetry URL baked in; the Dart/Flutter surface
+  is unchanged from 0.20.19 and no 0.20.20 native artifacts are published.
+
 ## [0.20.19] - 2026-08-14
 
 - Suite version bump. No change to this package's Dart, podspec, or Gradle

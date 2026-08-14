@@ -1,3 +1,11 @@
+## [0.20.20] - 2026-08-14
+
+### Changed
+
+- Version bump only. This release exists so the Electron packages can be
+  republished with the staging telemetry URL baked in; the Dart/Flutter surface
+  is unchanged from 0.20.19 and no 0.20.20 native artifacts are published.
+
 ## [0.20.19] - 2026-08-14
 
 - Suite version bump. No change to this package's Dart or podspec surface. The
