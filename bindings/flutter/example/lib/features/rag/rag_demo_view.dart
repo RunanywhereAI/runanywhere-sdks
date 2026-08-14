@@ -113,14 +113,18 @@ class _RagDemoViewState extends State<RagDemoView> {
     if (embeddingModel == null || llmModel == null) return;
 
     try {
-      // file_picker 11.x: removed `FilePicker.platform` getter; `pickFiles`
-      // is now a static method directly on `FilePicker`.
+      // file_picker 11.x: removed the `FilePicker.platform` getter; `pickFiles`
+      // is a static method directly on `FilePicker`.
+      // file_picker 12.0.0: `pickFiles` returns a non-nullable
+      // `List<PlatformFile>` instead of `FilePickerResult?`, so the selection is
+      // the list itself — there is no `.files` wrapper and no null to check.
+      // A cancelled picker now yields an empty list.
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'json'],
       );
-      if (result == null || result.files.isEmpty) return;
-      final filePath = result.files.first.path;
+      if (result.isEmpty) return;
+      final filePath = result.first.path;
       if (filePath == null) return;
 
       await _viewModel.loadDocument(filePath, embeddingModel, llmModel);
