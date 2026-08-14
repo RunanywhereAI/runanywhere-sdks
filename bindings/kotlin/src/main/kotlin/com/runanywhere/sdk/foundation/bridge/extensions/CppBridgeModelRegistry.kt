@@ -224,13 +224,14 @@ object CppBridgeModelRegistry {
      * → registry save) and returns the persisted [ProtoModelInfo].
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
-        val bytes = try {
-            RunAnywhereBridge.racRegisterModelFromUrlProto(
-                ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-            )
-        } catch (error: NativeProtoException) {
-            throw SDKException.fromRACResult(error.resultCode) ?: error
-        } ?: return null
+        val bytes =
+            try {
+                RunAnywhereBridge.racRegisterModelFromUrlProto(
+                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } catch (error: NativeProtoException) {
+                throw SDKException.fromRACResult(error.resultCode) ?: error
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
