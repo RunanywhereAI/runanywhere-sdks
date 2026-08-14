@@ -67,8 +67,9 @@ rac_result_t qhexrt_capability_check(void) {
 extern "C" {
 
 // Build marker (both modes) — lets tests assert engine visibility without the
-// private QHexRT header.
-const char* qhexrt_backend_build_info(void) {
+// private QHexRT header. Exported (see the declaration in qhexrt_backend.h):
+// on MSVC an unexported, unreferenced marker is discarded along with its string.
+RAC_PLUGIN_API const char* qhexrt_backend_build_info(void) {
 #if RAC_QHEXRT_ROUTABLE
     return "qhexrt:engine-available";
 #else

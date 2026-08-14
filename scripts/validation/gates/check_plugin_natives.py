@@ -32,6 +32,25 @@ whether the ops names appear at all:
 That is what this script measures: defined OR undefined, either counts, because
 either proves the entry TU compiled its routable branch.
 
+THE ENGINE THAT HAS NO CARRIER: QHEXRT
+--------------------------------------
+QHexRT is the exception, and an ops name cannot be its evidence. It keeps its
+entry and its six op vtables in the SAME binary (engines/qhexrt/CMakeLists.txt
+explains why: MSVC cannot resolve an imported data symbol whose declaration is
+the plain `extern "C" const` shared with the ELF/Mach-O builds). A single-DLL
+engine references those tables internally, so on a PE they are neither exported
+nor imported and vanish from the file entirely — `g_qhexrt_llm_ops` scores zero
+against a perfectly healthy win-arm64 NPU build that demonstrably generates
+tokens.
+
+Its evidence is instead the marker `qhexrt_backend_build_info()` returns, which
+flips with the very same `RAC_QHEXRT_ROUTABLE` switch that admits the op tables,
+and is a string literal so it survives on every object format. That marker is
+already how scripts/build/build-core-android.sh and
+scripts/release/prepublish_check.py answer this question; this gate now agrees
+with them. It only survives MSVC because the declaration is exported — see
+engines/qhexrt/qhexrt_backend.h.
+
 USAGE
     check_plugin_natives.py <path> [<path> ...]     # files and/or directories
     check_plugin_natives.py --tarball <pkg.tgz>     # an npm tarball
@@ -76,7 +95,18 @@ REQUIRED_OPS: dict[str, tuple[str, ...]] = {
     "sherpa": ("g_sherpa_stt_ops", "g_sherpa_tts_ops", "g_sherpa_vad_ops"),
     "llamacpp": ("g_llamacpp_ops",),
     "onnx": ("g_onnx_segmentation_ops", "g_onnx_diarization_ops", "g_onnx_embeddings_ops"),
-    "qhexrt": ("g_qhexrt_llm_ops",),
+    # Not an ops name: QHexRT has no carrier, so its tables are internal and a PE
+    # keeps none of them. See "THE ENGINE THAT HAS NO CARRIER" above.
+    "qhexrt": ("qhexrt:engine-available",),
+}
+
+# A token whose PRESENCE disproves routability, per backend. Requiring the
+# positive marker above is already sufficient — these exist so the failure reads
+# as the diagnosis it is ("you shipped the public shell") rather than as an
+# absence, which is the difference between an actionable gate and a puzzling one.
+# Mirrors check_qhexrt() in scripts/release/prepublish_check.py.
+DISPROOF: dict[str, tuple[str, ...]] = {
+    "qhexrt": ("qhexrt:engine-unavailable", "g_qhexrt_unavailable_vtable"),
 }
 
 # Shared-library file name -> backend id. Mirrors entry_symbol_from_path() in
@@ -96,7 +126,8 @@ BACKEND_TARBALL_RE = re.compile(
 
 
 class Finding:
-    def __init__(self, path: Path, display: str, backend: str, missing: list[str], method: str):
+    def __init__(self, path: Path, display: str, backend: str, missing: list[str],
+                 disproved: list[str], method: str):
         self.path = path
         # Where the caller can find this plugin: the path they passed, or
         # "<tarball>:<archive-relative path>" for a tarball member. The basename
@@ -105,7 +136,20 @@ class Finding:
         self.display = display
         self.backend = backend
         self.missing = missing
+        self.disproved = disproved
         self.method = method
+
+    @property
+    def failed(self) -> bool:
+        return bool(self.missing or self.disproved)
+
+    @property
+    def reason(self) -> str:
+        # A positive disproof is the more specific diagnosis, so lead with it.
+        if self.disproved:
+            return (f"shipped the NON-ROUTABLE shell — carries "
+                    f"{', '.join(self.disproved)}")
+        return f"does not reference {', '.join(self.missing)}"
 
 
 def _run(cmd: list[str]) -> str | None:
@@ -155,7 +199,8 @@ def check_plugin(path: Path, display: str) -> Finding | None:
         return None
     text, method = symbol_text(path)
     missing = [sym for sym in required if sym not in text]
-    return Finding(path, display, backend, missing, method)
+    disproved = [sym for sym in DISPROOF.get(backend, ()) if sym in text]
+    return Finding(path, display, backend, missing, disproved, method)
 
 
 def collect(paths: list[Path]) -> list[tuple[Path, str]]:
@@ -269,13 +314,12 @@ def main() -> int:
                 continue
             checked += 1
             label = f"{finding.backend:<9} {finding.display}"
-            if finding.missing:
-                print(f"  FAIL  {label}  [{finding.method}]  missing: "
-                      f"{', '.join(finding.missing)}")
+            if finding.failed:
+                print(f"  FAIL  {label}  [{finding.method}]  {finding.reason}")
                 findings.append(finding)
             else:
-                print(f"  ok    {label}  [{finding.method}]  "
-                      f"references all {len(REQUIRED_OPS[finding.backend])} ops tables")
+                print(f"  ok    {label}  [{finding.method}]  satisfies its "
+                      f"routability contract: {', '.join(REQUIRED_OPS[finding.backend])}")
 
     failed = bool(findings or empty_backends or version_mismatches or unsafe_members)
     if not failed and checked == 0:
@@ -286,8 +330,7 @@ def main() -> int:
         print("\nERROR: these plugins must not be published:")
         for finding in findings:
             print(f"  - {finding.display}")
-            print(f"      backend '{finding.backend}' does not reference "
-                  f"{', '.join(finding.missing)}")
+            print(f"      backend '{finding.backend}' {finding.reason}")
         for line in empty_backends:
             print(f"  - {line}")
         for line in version_mismatches:
