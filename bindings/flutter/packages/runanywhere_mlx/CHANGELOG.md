@@ -1,3 +1,8 @@
+## [0.20.19] - 2026-08-14
+
+- Suite version bump. No change to this package's Dart or podspec surface. The
+  four checksum-pinned MLX archives are re-pinned to this release's assets.
+
 ## [0.20.18] - 2026-08-12
 
 - Commons: backend registration failures are isolated. An engine that cannot

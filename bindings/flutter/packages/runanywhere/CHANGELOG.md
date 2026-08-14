@@ -5,6 +5,17 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.19] - 2026-08-14
+
+- Commons: `is_model_loaded` now answers from the lifecycle store's READY state
+  rather than matching on `model_id` alone, so a model whose load FAILED is no
+  longer reported as loaded and no longer becomes undeletable.
+- Commons: `rac_model_registry_update_download_status` allocates the replacement
+  download path before mutating the registry, so a failed allocation preserves
+  the existing path instead of losing it.
+- Commons: streaming results report `RAC_ERROR_OUT_OF_MEMORY` on a failed string
+  allocation instead of returning success with a null field.
+
 ## [0.20.18] - 2026-08-12
 
 - Commons: backend registration failures are isolated. An engine that cannot

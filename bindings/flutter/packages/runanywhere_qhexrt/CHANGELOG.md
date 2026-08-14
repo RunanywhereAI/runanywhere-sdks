@@ -5,6 +5,19 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.19] - 2026-08-14
+
+- QHexRT catalog: added the `lfm2_5_1_2b_thinking` policy row. The app catalogs
+  already shipped that model, but the engine had no row for it, so device-aware
+  registration failed with `-259` ("unknown QHexRT native catalog model id") on
+  a real v81 device. The bundle is public and v81 only.
+- QHexRT catalog: `lfm2_5_vl_3b` no longer requires an HF token. Its repo
+  (`runanywhere/lfm2_5_vl_3b_HNPU`) is public, so the stale auth gate was
+  hiding a public model from the picker.
+- Note: this package still ships no natives from pub.dev by design. The
+  Qualcomm QNN libraries are private and must be staged separately; without
+  them the SDK reports QHexRT unavailable and continues.
+
 ## [0.20.18] - 2026-08-12
 
 - Commons: backend registration failures are isolated. An engine that cannot

@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron",
-  "version": "0.20.18",
+  "version": "0.20.19",
   "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (ships macOS arm64 prebuilds only today; QHexRT NPU seam open, not claimed).",
   "publishConfig": {
     "access": "public"
@@ -75,7 +75,7 @@
     "@runanywhere/proto-ts": "file:../proto-ts"
   },
   "peerDependencies": {
-    "@runanywhere/proto-ts": "^0.20.18"
+    "@runanywhere/proto-ts": "^0.20.19"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

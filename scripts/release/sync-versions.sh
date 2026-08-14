@@ -97,6 +97,9 @@ _WRITE_FILES=()
 _WRITE_CONTENTS=()
 _WRITE_MODES=()
 _LOCK_FILES=()
+_GBUMP_FILES=()
+_GBUMP_PATTERNS=()
+_GBUMP_REPLACEMENTS=()
 
 bump_line() {
     # Validates now; the edit is applied by flush_pending_edits.
@@ -116,6 +119,29 @@ bump_line() {
     echo "  bumped: $file"
 }
 
+bump_all_on_line() {
+    # Like bump_line but replaces EVERY match on a line, not just the first.
+    # Release docs put the version in prose, so one line can legitimately carry
+    # it several times: bindings/swift/README.md line 35 says
+    #   Select version **`X`** (or `from: "X"`) ... if `X` binary assets ...
+    # bump_line's sed has no /g, so that line kept two stale versions and the
+    # coherence gate then failed on a file the bump had "already handled".
+    local file="$1" pattern="$2" replacement="$3"
+    if [ ! -f "$file" ]; then
+        echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
+        return 1
+    fi
+    if ! grep -Eq "${pattern}" "$file"; then
+        echo "ERROR: version pattern not found (sync-versions configuration is stale): $file" >&2
+        echo "       pattern: $pattern" >&2
+        return 1
+    fi
+    _GBUMP_FILES+=("$file")
+    _GBUMP_PATTERNS+=("$pattern")
+    _GBUMP_REPLACEMENTS+=("$replacement")
+    echo "  bumped: $file"
+}
+
 queue_write() {
     # Deferred counterpart to `echo x > file` / `>>`, so a later validation
     # failure cannot leave these written while the sed edits never happen.
@@ -132,6 +158,13 @@ flush_pending_edits() {
             sed -i '' -E "s|${_BUMP_PATTERNS[$i]}|${_BUMP_REPLACEMENTS[$i]}|" "${_BUMP_FILES[$i]}"
         else
             sed -i -E "s|${_BUMP_PATTERNS[$i]}|${_BUMP_REPLACEMENTS[$i]}|" "${_BUMP_FILES[$i]}"
+        fi
+    done
+    for i in "${!_GBUMP_FILES[@]}"; do
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
+        else
+            sed -i -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
         fi
     done
     for i in "${!_LOCK_FILES[@]}"; do
@@ -524,10 +557,11 @@ for release_doc in \
     "${REPO_ROOT}/bindings/flutter/docs/ARCHITECTURE.md" \
     "${REPO_ROOT}/bindings/flutter/docs/Documentation.md" \
     "${REPO_ROOT}/bindings/swift/ARCHITECTURE.md" \
+    "${REPO_ROOT}/bindings/swift/README.md" \
     "${REPO_ROOT}/bindings/swift/Sources/LlamaCPPRuntime/README.md" \
     "${REPO_ROOT}/bindings/swift/Sources/ONNXRuntime/README.md" \
     "${REPO_ROOT}/bindings/kotlin/README.md"; do
-    bump_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
+    bump_all_on_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
 done
 
 # Every anchor above validated. Only now does anything on disk change, so a

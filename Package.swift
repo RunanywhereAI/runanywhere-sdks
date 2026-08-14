@@ -9,16 +9,16 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.18")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.19")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
 //
 //   1. This repo's tags DO NOT COMPILE as a Swift package. The generated
 //      protobuf Swift sources under bindings/swift/Sources/RunAnywhere/Generated/
-//      are no longer committed (they are codegen output), so tag v0.20.18
-//      carries 1 file there where v0.20.17 carried 42. Resolving this URL by
-//      version yields ~347 errors of the form
+//      are no longer committed (they are codegen output), so every tag cut after
+//      that de-commit carries only Versions.swift there, where v0.20.17 carried
+//      42 files. Resolving this URL by version yields ~347 errors of the form
 //      "cannot find type 'RAModelInfo' in scope". The distribution repo is
 //      generated WITH those sources, so it builds.
 //   2. This monorepo is ~340 MB of C++, Kotlin, WASM and Dart. The distribution
@@ -109,7 +109,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.18"
+let sdkVersion = "0.20.19"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
