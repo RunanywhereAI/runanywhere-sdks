@@ -208,7 +208,19 @@ expect_exact_file "bindings/swift/VERSION" "${VERSION}"
 expect_literal "bindings/swift/Sources/RunAnywhere/Generated/Versions.swift" \
   "public static let sdkVersion = \"${VERSION}\""
 
-expect_literal "bindings/kotlin/gradle.properties" "runanywhere.nativeLibVersion=${VERSION}"
+# nativeLibVersion is an ASSET version, not a package version: build.gradle.kts
+# builds releases/download/v$nativeLibVersion/RACommons-android-*.zip from it. When
+# the repo version leads the published assets it must stay on the last release that
+# has them, exactly like the SwiftPM pin and the podspec asset_version.
+if grep -Fq -- "runanywhere.nativeLibVersion=${VERSION}" "${REPO_ROOT}/bindings/kotlin/gradle.properties"; then
+  :
+elif [ "${SPM_TEMP_PIN}" -eq 1 ] && \
+     grep -Fq -- "runanywhere.nativeLibVersion=${SPM_VERSION}" "${REPO_ROOT}/bindings/kotlin/gradle.properties"; then
+  echo "[OK] bindings/kotlin/gradle.properties pins nativeLibVersion ${SPM_VERSION} until v${VERSION} assets are published"
+else
+  echo "[FAIL] bindings/kotlin/gradle.properties: expected runanywhere.nativeLibVersion=${VERSION} (or ${SPM_VERSION} under the unpublished-assets pin)" >&2
+  FAILURES=$((FAILURES + 1))
+fi
 expect_literal "bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
   "const val VERSION = \"${VERSION}\""
 for kotlin_publication in \
