@@ -26,6 +26,12 @@ end
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
   s.version          = '0.20.20'
+  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
+  # s.version leads the published release because 0.20.20 republished only the
+  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
+  # the checksums below are still the 0.20.19 ones. Bump this back to
+  # s.version once a matching release exists.
+  asset_version      = '0.20.19'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,
@@ -119,7 +125,7 @@ download_archive() {
   asset_name="$1"
   expected_checksum="$2"
   archive="$work_root/$asset_name.zip"
-  archive_url="$release_base_url/v#{s.version}/$asset_name-ios-v#{s.version}.zip"
+  archive_url="$release_base_url/v#{asset_version}/$asset_name-ios-v#{asset_version}.zip"
   case "$archive_url" in
     https://*|file://*) ;;
     *) fail "unsupported release URL: $archive_url" ;;

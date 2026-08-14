@@ -362,12 +362,25 @@ expect_count "bindings/flutter/packages/runanywhere/ios/runanywhere/Sources/runa
 expect_literal "bindings/flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
   "private const val BACKEND_VERSION = \"${VERSION}\""
 
+# The podspecs carry TWO versions, and conflating them ships a dangling download.
+# `s.version` is the CocoaPods version and tracks the canonical release, but the
+# iOS archives are fetched from a GitHub release URL built from `asset_version`.
+# When the repo version leads the published assets — as it does whenever a release
+# republishes only some packages — an `s.version`-derived URL 404s, and the
+# checksums in the podspec still describe the OLDER archives anyway, because
+# sync-versions.sh deliberately never rewrites checksums. So asset_version must
+# track the SwiftPM pin (both name the last release that actually has assets).
 for podspec in \
   bindings/flutter/packages/runanywhere/ios/runanywhere.podspec \
   bindings/flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec \
   bindings/flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec \
   bindings/flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec; do
   expect_literal "${podspec}" "s.version          = '${VERSION}'"
+  expect_literal "${podspec}" "asset_version      = '${SPM_VERSION}'"
+  if grep -qF 'ios-v#{s.version}' "${REPO_ROOT}/${podspec}" 2>/dev/null; then
+    echo "[FAIL] ${podspec}: archive URL interpolates s.version; it must use asset_version so it points at a release that exists" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
 done
 
 for package_manifest in \
