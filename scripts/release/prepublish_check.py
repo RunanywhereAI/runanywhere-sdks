@@ -136,6 +136,33 @@ def check_qhexrt(path: Path, f: Findings, elf: bool) -> None:
         f.note(f"{path.name}: QHexRT state indeterminate, NOT verified")
 
 
+def check_tracking(path: Path, f: Findings) -> None:
+    """A commons build must carry the real staging backend origin, not the placeholder.
+
+    core/CMakeLists.txt compiles the credential-free development_config.cpp.template
+    and substitutes $ENV{STAGING_BASE_URL} into it. CI always sets that (release.yml
+    fails closed if the secret is missing), but a LOCAL build with the variable unset
+    passes the placeholder straight through. rac_dev_config_is_usable_http_url then
+    rejects "YOUR_STAGING_BASE_URL", the SDK cannot keyless-resolve a development
+    backend, and the release silently ships with no telemetry at all.
+
+    This is invisible to every other check: the binary is the right size, exports the
+    right symbols, and its carriers reference all their ops tables. Shipped exactly
+    that way in the 0.20.19 Electron packages before this check existed.
+    """
+    blob = path.read_bytes()
+    if b"YOUR_STAGING_BASE_URL" in blob:
+        f.fail(
+            f"{path.name}: NO TELEMETRY. Built with the placeholder staging URL, so "
+            f"rac_dev_config rejects it and no metrics are reported. Rebuild with "
+            f"STAGING_BASE_URL set in the environment."
+        )
+    elif b"runanywhere-backend-staging" in blob:
+        f.ok(f"{path.name}: staging backend URL baked in (telemetry will report)")
+    else:
+        f.note(f"{path.name}: no staging URL marker found, NOT verified")
+
+
 def scan_natives(root: Path, f: Findings) -> None:
     for p in sorted(root.rglob("*")):
         if not p.is_file():
@@ -152,6 +179,10 @@ def scan_natives(root: Path, f: Findings) -> None:
             check_carrier(p, m.group(1), f, elf)
         elif "rac_backend_qhexrt" in n:
             check_qhexrt(p, f, elf)
+        elif re.match(r"(?:lib)?rac_commons\.(so|dylib|a)$", n) or n == "librac_commons.dylib":
+            check_tracking(p, f)
+        elif n.endswith(".wasm"):
+            check_tracking(p, f)
 
 
 def check_npm(tgz: Path, version: str, f: Findings) -> None:
