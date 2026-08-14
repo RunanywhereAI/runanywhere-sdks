@@ -37,7 +37,29 @@
 #if defined(_WIN32)
 #include <windows.h>
 using rac_lib_handle_t = HMODULE;
+/* A plugin's siblings (`rac_backend_<id>.dll`, `rac_commons.dll`, the
+ * onnxruntime / sherpa sidecars) are staged in the SAME directory as the
+ * plugin. Plain `LoadLibraryA` does NOT search that directory: the standard
+ * search order starts at the directory of the *executable* (electron.exe,
+ * node.exe), so every dependency beside the plugin is invisible and the load
+ * fails with ERROR_MOD_NOT_FOUND (126) — reported here only as the useless
+ * "LoadLibrary failed".
+ *
+ * `LOAD_WITH_ALTERED_SEARCH_PATH` replaces that first entry with the directory
+ * of the DLL being loaded, which is exactly the sidecar contract the Electron
+ * packaging already relies on (and what QHexRT's own platform::DynLib does).
+ * The flag is only meaningful for an absolute path, so fall back to the plain
+ * call otherwise rather than silently changing relative-path semantics. */
+static bool rac_path_is_absolute(const char* p) {
+    if (p == nullptr || p[0] == '\0')
+        return false;
+    if (p[0] == '\\' || p[0] == '/')
+        return true;
+    return p[1] == ':' && (p[2] == '\\' || p[2] == '/');
+}
 static rac_lib_handle_t rac_dl_open(const char* p) {
+    if (rac_path_is_absolute(p))
+        return LoadLibraryExA(p, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
     return LoadLibraryA(p);
 }
 static void* rac_dl_sym(rac_lib_handle_t h, const char* s) {
@@ -46,8 +68,29 @@ static void* rac_dl_sym(rac_lib_handle_t h, const char* s) {
 static void rac_dl_close(rac_lib_handle_t h) {
     FreeLibrary(h);
 }
+/* Carry the Win32 error code: "module could not be found" (a missing sidecar)
+ * and "is not a valid Win32 application" (an arch mismatch) are different bugs
+ * and used to be indistinguishable in the log. */
 static const char* rac_dl_error() {
-    return "LoadLibrary failed";
+    static thread_local char buffer[256];
+    const DWORD code = GetLastError();
+    char* text = nullptr;
+    const DWORD len = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr, code, 0, reinterpret_cast<LPSTR>(&text), 0, nullptr);
+    if (len == 0 || text == nullptr) {
+        std::snprintf(buffer, sizeof(buffer), "LoadLibrary failed (error %lu)",
+                      static_cast<unsigned long>(code));
+    } else {
+        size_t trimmed = len;
+        while (trimmed > 0 && (text[trimmed - 1] == '\n' || text[trimmed - 1] == '\r'))
+            text[--trimmed] = '\0';
+        std::snprintf(buffer, sizeof(buffer), "LoadLibrary failed (error %lu: %s)",
+                      static_cast<unsigned long>(code), text);
+    }
+    if (text != nullptr)
+        LocalFree(text);
+    return buffer;
 }
 #else
 #include <dlfcn.h>
