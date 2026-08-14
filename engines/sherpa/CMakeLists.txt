@@ -449,7 +449,11 @@ rac_add_engine_plugin(sherpa
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
                         ${RAC_COMMONS_ROOT_DIR}/src
                         ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
-    COMPILE_DEFINITIONS ${SHERPA_COMPILE_DEFS}
+    # RAC_SHERPA_BUILDING is intentionally NOT in SHERPA_COMPILE_DEFS: that list
+    # is shared with the thin carrier (which must see RAC_SHERPA_API as
+    # dllimport to reach g_sherpa_*_ops across the DLL boundary), while this
+    # target is the one that defines and exports them.
+    COMPILE_DEFINITIONS ${SHERPA_COMPILE_DEFS} RAC_SHERPA_BUILDING
 )
 
 # Platform tweaks — hidden visibility handled by rac_add_engine_plugin when

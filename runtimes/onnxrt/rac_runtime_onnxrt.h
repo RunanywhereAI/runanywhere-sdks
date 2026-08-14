@@ -115,7 +115,7 @@ extern "C" {
  * Returns `RAC_SUCCESS` when the runtime is registered, else
  * `RAC_ERROR_BACKEND_UNAVAILABLE`.
  */
-rac_result_t rac_onnxrt_runtime_require_available(void);
+RAC_PLUGIN_API rac_result_t rac_onnxrt_runtime_require_available(void);
 
 #ifdef __cplusplus
 }

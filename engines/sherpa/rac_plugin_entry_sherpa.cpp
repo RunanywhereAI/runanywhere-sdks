@@ -19,6 +19,7 @@
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac_sherpa_api.h"
 
 #if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE && \
     defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) && RAC_SHERPA_SPEECH_OPS_AVAILABLE
@@ -29,10 +30,13 @@
 
 extern "C" {
 
+/* RAC_SHERPA_API → dllimport on Windows shared consumers. These are DATA
+ * symbols living in rac_backend_sherpa.dll; without the import attribute the
+ * carrier link fails with LNK2001. */
 #if RAC_SHERPA_ROUTABLE
-extern const rac_stt_service_ops_t g_sherpa_stt_ops;
-extern const rac_tts_service_ops_t g_sherpa_tts_ops;
-extern const rac_vad_service_ops_t g_sherpa_vad_ops;
+extern RAC_SHERPA_API const rac_stt_service_ops_t g_sherpa_stt_ops;
+extern RAC_SHERPA_API const rac_tts_service_ops_t g_sherpa_tts_ops;
+extern RAC_SHERPA_API const rac_vad_service_ops_t g_sherpa_vad_ops;
 #endif
 
 static rac_result_t sherpa_capability_check(void) {

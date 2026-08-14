@@ -979,19 +979,19 @@ const rac_runtime_vtable_t* runtime_vtable() {
  * the C++ `Session::create` symbol, and only under RAC_BACKEND_RAG=ON), so a
  * RAG-off iOS/static build could strip the registrar and leave
  * `rac_runtime_is_registered(RAC_RUNTIME_ONNXRT)` returning 0. */
-extern "C" RAC_API rac_result_t rac_onnxrt_runtime_require_available(void) {
+extern "C" RAC_PLUGIN_API rac_result_t rac_onnxrt_runtime_require_available(void) {
     return rac_runtime_get_by_id(RAC_RUNTIME_ONNXRT) != nullptr ? RAC_SUCCESS
                                                                 : RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
-extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
+extern "C" RAC_PLUGIN_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
     return &k_onnxrt_vtable;
 }
 
 /* Execution-provider configuration surface. Real linkage is only
  * wired for CoreML today; other EPs accept activation but run on CPU until
  * their follow-up rows bring the ORT append paths online. */
-extern "C" RAC_API rac_result_t
+extern "C" RAC_PLUGIN_API rac_result_t
 rac_onnxrt_runtime_enable_execution_provider(const rac_onnxrt_ep_config_t* config) {
     if (config == nullptr)
         return RAC_ERROR_NULL_POINTER;
@@ -1002,31 +1002,31 @@ rac_onnxrt_runtime_enable_execution_provider(const rac_onnxrt_ep_config_t* confi
     return RAC_SUCCESS;
 }
 
-extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_active_ep(rac_onnxrt_ep_type_t* out) {
+extern "C" RAC_PLUGIN_API rac_result_t rac_onnxrt_runtime_get_active_ep(rac_onnxrt_ep_type_t* out) {
     if (out == nullptr)
         return RAC_ERROR_NULL_POINTER;
     *out = runanywhere::runtime::onnxrt::ep_state().snapshot(nullptr);
     return RAC_SUCCESS;
 }
 
-extern "C" RAC_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t type) {
+extern "C" RAC_PLUGIN_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t type) {
     return runanywhere::runtime::onnxrt::ep_is_compiled_in(type) ? 1 : 0;
 }
 
-extern "C" RAC_API rac_device_class_t
+extern "C" RAC_PLUGIN_API rac_device_class_t
 rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type) {
     return runanywhere::runtime::onnxrt::ep_info(type).device_class;
 }
 
-extern "C" RAC_API int rac_onnxrt_probe_webgpu_ep(void) {
+extern "C" RAC_PLUGIN_API int rac_onnxrt_probe_webgpu_ep(void) {
     return runanywhere::runtime::onnxrt::probe_webgpu_ep();
 }
 
-extern "C" RAC_API int rac_onnxrt_activate_preferred_wasm_ep(int prefer_webgpu) {
+extern "C" RAC_PLUGIN_API int rac_onnxrt_activate_preferred_wasm_ep(int prefer_webgpu) {
     return runanywhere::runtime::onnxrt::activate_preferred_wasm_ep(prefer_webgpu);
 }
 
-extern "C" RAC_API const char* rac_onnxrt_last_webgpu_probe_error(void) {
+extern "C" RAC_PLUGIN_API const char* rac_onnxrt_last_webgpu_probe_error(void) {
     return runanywhere::runtime::onnxrt::last_webgpu_probe_error();
 }
 

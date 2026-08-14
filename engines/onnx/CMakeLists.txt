@@ -147,7 +147,13 @@ endif()
 # Compose link libs + compile defs. ORT C API ownership lives in
 # runtimes/onnxrt; this engine uses only its thin session wrapper.
 set(ONNX_LINK_LIBS rac_runtime_onnxrt nlohmann_json::nlohmann_json)
-set(ONNX_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX)
+# FEATURE flags only — shared by rac_backend_onnx and the thin carrier, which
+# compile rac_plugin_entry_onnx.cpp from the same source and must agree on
+# macro state. RAC_ONNX_BUILDING is deliberately NOT here: it flips
+# RAC_ONNX_API to dllexport and belongs to the backend target alone (the
+# carrier needs the dllimport side to reach g_onnx_*_ops across the DLL
+# boundary). Same split as RAC_LLAMACPP_BUILDING in engines/llamacpp.
+set(ONNX_COMPILE_DEFS RAC_HAS_ONNX)
 # Propagate RAG state so rac_plugin_entry_onnx.cpp can NULL the embeddings
 # slot when onnx_embedding_provider.cpp is not compiled in (otherwise the
 # extern symbol g_onnx_embeddings_ops is unresolved at link time).
@@ -181,7 +187,7 @@ rac_add_engine_plugin(onnx
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
                         ${RAC_COMMONS_ROOT_DIR}/src
                         ${ONNX_EXTRA_INCLUDES}
-    COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS}
+    COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS} RAC_ONNX_BUILDING
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        rac_backend_onnx
