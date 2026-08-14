@@ -24,7 +24,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
-  s.version          = '0.20.19'
+  s.version          = '0.20.20'
   s.summary          = 'RunAnywhere ONNX: STT, TTS, VAD for Flutter'
   s.description      = <<-DESC
 ONNX Runtime backend for RunAnywhere Flutter SDK. Provides speech-to-text (STT),
