@@ -395,6 +395,24 @@ for podspec in \
   fi
 done
 
+# The RN podspecs have the same failure in a different shape: they resolve their
+# source from a GIT TAG rather than a release archive. `s.version` comes from
+# package.json, so a tag built from it points at a tag that was never pushed
+# whenever the repo version leads the last tagged release, and `pod install`
+# fails outright rather than degrading. Pin it to the same release the SwiftPM
+# manifests do.
+for podspec in \
+  bindings/react-native/packages/core/RunAnywhereCore.podspec \
+  bindings/react-native/packages/llamacpp/RunAnywhereLlama.podspec \
+  bindings/react-native/packages/mlx/RunAnywhereMLX.podspec \
+  bindings/react-native/packages/onnx/RunAnywhereONNX.podspec; do
+  expect_literal "${podspec}" "source_tag_version = '${SPM_VERSION}'"
+  if grep -qF ':tag => "v#{s.version}"' "${REPO_ROOT}/${podspec}" 2>/dev/null; then
+    echo "[FAIL] ${podspec}: source tag interpolates s.version; it must use source_tag_version so it points at a tag that exists" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+done
+
 for package_manifest in \
   bindings/flutter/packages/runanywhere/ios/runanywhere/Package.swift \
   bindings/flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift \
