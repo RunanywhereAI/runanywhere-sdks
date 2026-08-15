@@ -1,3 +1,13 @@
+## [0.20.22] - 2026-08-15
+
+### Changed
+
+- Version bump only. This release exists so the Electron packages can be
+  republished with their Windows native staging fixed: `0.20.21` shipped the
+  ONNX and Sherpa backends without the vendor runtimes they link, so those two
+  engines could not load on Windows x64. The Dart/Flutter surface is unchanged
+  from 0.20.19 and no 0.20.22 native artifacts are produced for it.
+
 ## [0.20.21] - 2026-08-14
 
 ### Changed

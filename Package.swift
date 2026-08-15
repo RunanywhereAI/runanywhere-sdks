@@ -109,11 +109,11 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-// TEMP: pin to 0.20.19 until the v0.20.21 GitHub release assets are published.
+// TEMP: pin to 0.20.19 until the v0.20.22 GitHub release assets are published.
 // This release bumps the suite version only so the Electron packages can be
-// republished carrying Windows x64 and ARM64 natives; neither a v0.20.20 nor a
-// v0.20.21 tag exists and neither has release assets, so the remote
-// binaryTargets must keep resolving 0.20.19.
+// republished carrying Windows x64 and ARM64 natives, and 0.20.22 fixes their
+// packaging; none of v0.20.20, v0.20.21 or v0.20.22 exists as a tag with
+// release assets, so the remote binaryTargets must keep resolving 0.20.19.
 let sdkVersion = "0.20.19"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]

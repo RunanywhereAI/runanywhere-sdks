@@ -20,7 +20,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_llamacpp'
-  s.version          = '0.20.21'
+  s.version          = '0.20.22'
   # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
   # s.version leads the published release because 0.20.20 republished only the
   # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
