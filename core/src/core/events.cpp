@@ -257,6 +257,10 @@ void emit_stt_transcription_completed(const char* transcription_id, const char* 
     voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
     voice.set_input_audio_bytes(audio_size_bytes);
     voice.set_word_count(word_count);
+    // Tag 18 exists for exactly this and was the one argument the function
+    // accepted and then dropped, so the field stayed 0 for every subscriber no
+    // matter what a caller measured.
+    voice.set_real_time_factor(real_time_factor);
     if (language)
         voice.set_language(language);
     voice.set_sample_rate(sample_rate);
