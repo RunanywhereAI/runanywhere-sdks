@@ -1,3 +1,12 @@
+## [0.20.21] - 2026-08-14
+
+### Changed
+
+- Version bump only. This release exists so the Electron packages can be
+  republished carrying Windows x64 and Windows ARM64 natives; the Dart/Flutter
+  surface is unchanged from 0.20.19 and no 0.20.21 native artifacts are
+  published.
+
 ## [0.20.20] - 2026-08-14
 
 ### Changed
