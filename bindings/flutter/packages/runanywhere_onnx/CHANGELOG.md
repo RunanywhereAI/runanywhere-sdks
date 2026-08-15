@@ -5,6 +5,15 @@ All notable changes to the RunAnywhere ONNX Backend will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.21] - 2026-08-14
+
+### Changed
+
+- Version bump only. This release exists so the Electron packages can be
+  republished carrying Windows x64 and Windows ARM64 natives; the Dart/Flutter
+  surface is unchanged from 0.20.19 and no 0.20.21 native artifacts are
+  published.
+
 ## [0.20.20] - 2026-08-14
 
 ### Changed
