@@ -358,11 +358,19 @@ jobs:
       - uses: ./.github/actions/generate-idl
         with:
           languages: python
+      # patchelf comes from PyPI, not apt. ubuntu-22.04 ships 0.14.3 and current
+      # auditwheel requires >= 0.14.5, so `auditwheel repair` died with
+      # "patchelf 0.14.3 found. auditwheel repair requires patchelf >= 0.14.5".
+      # Only 3.12 failed: 3.9 resolves an older auditwheel that still accepts
+      # 0.14.3, which is why this surfaced as one red cell rather than a red job.
+      # Both tools now come from the same resolver, so they cannot drift apart
+      # again the way an apt package and a pip package silently did.
       - name: Build tools (patchelf is required by auditwheel)
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q patchelf ninja-build
-          python -m pip install --upgrade pip build auditwheel pytest
+          sudo apt-get install -y -q ninja-build
+          python -m pip install --upgrade pip build auditwheel patchelf pytest
+          patchelf --version
       - name: Sherpa-ONNX prebuilts
         run: |
           ./core/scripts/linux/download-sherpa-onnx.sh
