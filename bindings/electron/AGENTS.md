@@ -94,7 +94,9 @@ Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
 
 - Document what is true today. Do not claim encryption or remote Phase-2 auth unless
   packaging and runtime are wired end-to-end.
-- **Windows ships at 0.20.21.** Prebuilds: `darwin-arm64` (llamacpp / ONNX / Sherpa),
+- **Windows ships at 0.20.22.** 0.20.21 was the first release carrying Windows
+  natives and went out with two staging defects; 0.20.22 is the first one that
+  works. Prebuilds: `darwin-arm64` (llamacpp / ONNX / Sherpa),
   `win32-x64` (llamacpp / ONNX / Sherpa), `win32-arm64` (QHexRT / Hexagon NPU only).
   Linux still has no prebuild. `package.json` keeps `os`/`cpu` permissive on purpose,
   because the TypeScript facade genuinely is cross-platform and narrowing them would
