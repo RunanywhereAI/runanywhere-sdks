@@ -98,13 +98,40 @@ export function pluginPrebuildDir(locator: PluginArtifactLocator): string {
 }
 
 /**
+ * Rewrite a path that lands inside `app.asar` to the unpacked copy beside it.
+ *
+ * A packaged Electron app resolves this package's root from `__dirname`, which
+ * is a path INTO the asar archive — virtual, with no file behind it. Native
+ * code cannot load from there, so electron-builder's `asarUnpack` writes the
+ * real bytes to `app.asar.unpacked/...`. Electron's `fs` shim reads both
+ * transparently, so the existence check below passes on the virtual path and
+ * hands the OS loader a file it cannot open: the addon comes up, every backend
+ * then reports "the plugin library could not be loaded", and nothing names the
+ * archive. Every packaged consumer hits this, so the rewrite belongs here
+ * rather than in each app.
+ *
+ * Only rewritten when the unpacked file is actually there, so an app that
+ * unpacks nothing, or a plain unpackaged tree, is left exactly as it was.
+ */
+function asarUnpacked(filePath: string): string {
+  if (!filePath.includes(`app.asar${path.sep}`)) return filePath;
+  const unpacked = filePath.replace(
+    `app.asar${path.sep}`,
+    `app.asar.unpacked${path.sep}`
+  );
+  return isExistingFile(unpacked) ? unpacked : filePath;
+}
+
+/**
  * Absolute path where Track A stages the loadable plugin. Does not require
  * the file to exist yet — fat-addon builds leave this empty until the shared
  * dylib spike lands.
  */
 export function resolvePluginArtifactPath(locator: PluginArtifactLocator): string {
   const platform = locator.platform ?? process.platform;
-  return path.join(pluginPrebuildDir(locator), pluginLibraryFileName(locator.id, platform));
+  return asarUnpacked(
+    path.join(pluginPrebuildDir(locator), pluginLibraryFileName(locator.id, platform))
+  );
 }
 
 /** Whether the resolved artifact is present on disk (thin-addon ready). */
