@@ -202,6 +202,33 @@ function backendCandidates(id: BundlePackageId): readonly string[] {
   ];
 }
 
+/**
+ * Vendor runtimes a backend links directly, by platform-correct file name.
+ * ONNX Runtime is shared by both engines; sherpa additionally needs its C API.
+ */
+function vendorRuntimeNames(id: BundlePackageId): readonly string[] {
+  const ort = win
+    ? ['onnxruntime.dll', 'onnxruntime_providers_shared.dll']
+    : mac
+      ? ['libonnxruntime.dylib']
+      : ['libonnxruntime.so.1', 'libonnxruntime.so'];
+  if (id === BundlePackageId.Sherpa) {
+    return [...ort, win ? 'sherpa-onnx-c-api.dll' : mac ? 'libsherpa-onnx-c-api.dylib' : 'libsherpa-onnx-c-api.so'];
+  }
+  return ort;
+}
+
+/** Everywhere a vendor runtime may have been produced or vendored. */
+function vendorRuntimeCandidates(name: string): readonly string[] {
+  return [
+    path.join(buildDir, name),
+    path.join(buildRoot, '_deps', 'onnxruntime-src', 'lib', name),
+    path.join(repoRoot, 'core', 'third_party', 'sherpa-onnx-windows', 'lib', name),
+    path.join(repoRoot, 'core', 'third_party', 'sherpa-onnx-macos', 'lib', name),
+    path.join(repoRoot, 'core', 'third_party', 'sherpa-onnx-linux', 'lib', name),
+  ];
+}
+
 /** Stage an optional sidecar into `packageId` when the file exists. */
 function pushOptionalSidecar(
   files: StagedFile[],
@@ -332,6 +359,20 @@ function buildStagingPlan(
       // stage both beside the plugin so dlopen does not need a manual cp step.
       pushOptionalSidecar(files, id, findExisting(backendCandidates(id)));
       pushOptionalSidecar(files, id, commonsPath);
+
+      // The vendor runtime each backend links has to sit beside THAT backend,
+      // not only in core. `rac_backend_onnx` imports onnxruntime and
+      // `rac_backend_sherpa` imports sherpa-onnx-c-api, and commons loads a
+      // plugin with LOAD_WITH_ALTERED_SEARCH_PATH / @loader_path / $ORIGIN —
+      // all of which search the PLUGIN's own directory. Core's copy is not on
+      // that path, so staging it there alone leaves the published package
+      // unusable: onnx reports "Backend not ready" and sherpa takes the
+      // utility host down with an access violation (0xC0000005).
+      if (id === BundlePackageId.ONNX || id === BundlePackageId.Sherpa) {
+        for (const sidecar of vendorRuntimeNames(id)) {
+          pushOptionalSidecar(files, id, findExisting(vendorRuntimeCandidates(sidecar)));
+        }
+      }
     }
   }
 
