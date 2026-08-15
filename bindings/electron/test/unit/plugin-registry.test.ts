@@ -19,6 +19,7 @@ import {
 
 /** A throwaway `<root>/app.asar[.unpacked]/...` layout for one backend. */
 function stageAsarLayout(options: { unpack: boolean }): {
+  root: string;
   packageRoot: string;
   unpackedFile: string;
 } {
@@ -39,7 +40,7 @@ function stageAsarLayout(options: { unpack: boolean }): {
     fs.mkdirSync(path.dirname(unpackedFile), { recursive: true });
     fs.writeFileSync(unpackedFile, 'not a real dylib');
   }
-  return { packageRoot, unpackedFile };
+  return { root, packageRoot, unpackedFile };
 }
 
 test('a plain package root resolves to prebuilds/<platform>-<arch>/<lib>', () => {
@@ -56,23 +57,31 @@ test('a plain package root resolves to prebuilds/<platform>-<arch>/<lib>', () =>
 });
 
 test('a path inside app.asar resolves to the unpacked file that really exists', () => {
-  const { packageRoot, unpackedFile } = stageAsarLayout({ unpack: true });
-  assert.equal(
-    resolvePluginArtifactPath({ id: BackendPluginId.Sherpa, packageRoot }),
-    unpackedFile
-  );
+  const { root, packageRoot, unpackedFile } = stageAsarLayout({ unpack: true });
+  try {
+    assert.equal(
+      resolvePluginArtifactPath({ id: BackendPluginId.Sherpa, packageRoot }),
+      unpackedFile
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('app.asar is left alone when nothing was unpacked beside it', () => {
   // Rewriting unconditionally would replace a path that at least resolves
   // through Electron's fs shim with one that exists nowhere at all.
-  const { packageRoot } = stageAsarLayout({ unpack: false });
-  const resolved = resolvePluginArtifactPath({ id: BackendPluginId.Sherpa, packageRoot });
-  assert.ok(
-    resolved.includes(`app.asar${path.sep}`),
-    'unpacked copy is absent, so the original path must survive'
-  );
-  assert.ok(!resolved.includes('app.asar.unpacked'), 'must not invent an unpacked path');
+  const { root, packageRoot } = stageAsarLayout({ unpack: false });
+  try {
+    const resolved = resolvePluginArtifactPath({ id: BackendPluginId.Sherpa, packageRoot });
+    assert.ok(
+      resolved.includes(`app.asar${path.sep}`),
+      'unpacked copy is absent, so the original path must survive'
+    );
+    assert.ok(!resolved.includes('app.asar.unpacked'), 'must not invent an unpacked path');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a package root merely containing the text "asar" is not rewritten', () => {
