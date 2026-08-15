@@ -2,7 +2,7 @@
 
 On-device **LLM, VLM, STT, TTS, and embeddings** for Electron and Node. The SDK is a native N-API addon over the RunAnywhere `rac_*` C ABI and llama.cpp / ONNX Runtime / Sherpa-ONNX. Inference runs in an isolated Electron **utility process**, streaming results to the renderer over a `MessagePort`.
 
-> **Status:** Unpublished preview (`private: true`, version `0.1.0`), not on npm. Windows x64 and Linux x64 build and run; build from source in this repository.
+> **Status:** Published on npm. Native prebuilds ship for `darwin-arm64` and `win32-x64` (llama.cpp / ONNX / Sherpa) and for `win32-arm64` (QHexRT on the Qualcomm Hexagon NPU, via `@runanywhere/electron-qhexrt`). Linux builds from source.
 
 ## Capabilities
 
@@ -13,19 +13,39 @@ On-device **LLM, VLM, STT, TTS, and embeddings** for Electron and Node. The SDK 
 - Encrypted secure store (Windows DPAPI)
 - Built-in energy VAD
 
+## Install
+
+```bash
+npm install @runanywhere/electron
+npm install @runanywhere/electron-llamacpp @runanywhere/electron-onnx @runanywhere/electron-sherpa
+npm install @runanywhere/electron-qhexrt   # Hexagon NPU, win32-arm64
+```
+
+Every backend package can be declared unconditionally. One with no payload for the
+running platform records a path that does not exist, and the existence filter drops
+it before the utility host forks, so it never loads and never appears in
+`capabilities().backends`.
+
 ## Build from source
 
-This package is not published to npm. Clone the repository and build the native addon on Windows:
+Only needed for Linux, or to run against local native changes:
 
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks/bindings/electron
 npm install
 npm run build
-npm run bundle:native   # copies .node + DLLs into prebuilds/win32-x64/
+npm run bundle:native   # stages the built .node + libs into prebuilds/<platform>-<arch>/
 ```
 
-Prerequisites: MSVC, Node.js, and a `windows-release` build of `runanywhere-commons` with backends enabled. See [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) for CUDA builds, integration tests, and contributor details.
+`bundle:native` compiles only itself (`tsconfig.bundle.json`), so it runs on a machine
+that builds natives and never builds the SDK's TypeScript. Point it at a specific CMake
+tree with `RA_NATIVE_DIR`, and stage the QAIRT runtime into the qhexrt package with
+`RA_QNN_RUNTIME_DIR`.
+
+Prerequisites: a C++ toolchain (MSVC on Windows), Node.js, and a `runanywhere-commons`
+build with backends enabled. See [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) for CUDA
+builds, integration tests, and contributor details.
 
 ## Quick start (Node)
 
