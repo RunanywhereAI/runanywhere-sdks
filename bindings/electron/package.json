@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.20.21",
-  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (ships macOS arm64 prebuilds only today; QHexRT NPU seam open, not claimed).",
+  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (prebuilds: darwin-arm64, win32-x64; win32-arm64 QHexRT/Hexagon NPU).",
   "publishConfig": {
     "access": "public"
   },
@@ -59,7 +59,7 @@
     "build:test": "tsc -p tsconfig.test.json",
     "build:scripts": "tsc -p tsconfig.scripts.json",
     "build:native-smoke": "tsc -p tsconfig.native.json",
-    "bundle:native": "npm run build:scripts && node dist-scripts/bundle-native.js",
+    "bundle:native": "tsc -p tsconfig.bundle.json && node dist-scripts/bundle-native.js",
     "pretest": "npm run build && npm run build:test",
     "test": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\"",
     "pretest:feature": "npm run build && npm run build:test",

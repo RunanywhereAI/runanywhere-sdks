@@ -558,7 +558,7 @@ function prepareNativeLoad(addonPath: string): void {
 
 // Platforms this release actually ships a prebuilt addon for. Kept next to the
 // resolver so it cannot drift from what bundle-native staged.
-const PREBUILT_PLATFORMS: readonly string[] = ['darwin-arm64'];
+const PREBUILT_PLATFORMS: readonly string[] = ['darwin-arm64', 'win32-x64', 'win32-arm64'];
 
 function resolveAddon(): NativeAddon {
   const candidates = [
