@@ -202,6 +202,77 @@ function backendCandidates(id: BundlePackageId): readonly string[] {
   ];
 }
 
+/**
+ * Vendor runtimes a backend links DYNAMICALLY, by platform-correct file name.
+ *
+ * macOS stages none: the vendor libraries are linked statically into
+ * `librac_backend_<id>.dylib`, which is why the darwin packages ship three files
+ * and no `libonnxruntime`. Windows and Linux link them dynamically.
+ */
+function vendorRuntimeNames(id: BundlePackageId): readonly string[] {
+  if (mac) return [];
+  const ort = win
+    ? ['onnxruntime.dll', 'onnxruntime_providers_shared.dll']
+    : ['libonnxruntime.so.1', 'libonnxruntime.so'];
+  if (id === BundlePackageId.Sherpa) {
+    return [...ort, win ? 'sherpa-onnx-c-api.dll' : 'libsherpa-onnx-c-api.so'];
+  }
+  return ort;
+}
+
+/**
+ * Whether a missing vendor runtime should fail the bundle rather than warn.
+ *
+ * Windows is a proven contract: `rac_backend_onnx.dll` and
+ * `rac_backend_sherpa.dll` name these in their PE import tables, so a package
+ * staged without them is guaranteed broken — 0.20.21 shipped exactly that.
+ * Linux stays best-effort because no Linux prebuild is published and its file
+ * set is unverified; failing there would break local staging on a guess rather
+ * than on evidence.
+ */
+const VENDOR_RUNTIME_REQUIRED = win;
+
+/** Everywhere a vendor runtime may have been produced or vendored. */
+function vendorRuntimeCandidates(name: string): readonly string[] {
+  return [
+    path.join(buildDir, name),
+    path.join(buildRoot, '_deps', 'onnxruntime-src', 'lib', name),
+    path.join(repoRoot, 'core', 'third_party', 'sherpa-onnx-windows', 'lib', name),
+    path.join(repoRoot, 'core', 'third_party', 'sherpa-onnx-linux', 'lib', name),
+  ];
+}
+
+/**
+ * Stage a vendor runtime beside its backend, refusing to plan an unusable
+ * package where the dependency is known to be dynamic.
+ *
+ * Staging this best-effort is what let 0.20.21 publish: the file was absent, the
+ * bundler said nothing, and the defect surfaced on a user's machine as
+ * "Backend not ready" and an access violation with no mention of a missing DLL.
+ */
+function pushVendorRuntime(
+  files: StagedFile[],
+  packageId: BundlePackageId,
+  name: string
+): void {
+  const candidates = vendorRuntimeCandidates(name);
+  const found = findExisting(candidates);
+  if (found) {
+    files.push({ name: path.basename(found), dir: path.dirname(found), packageId });
+    return;
+  }
+  if (!VENDOR_RUNTIME_REQUIRED) {
+    console.error(`  skipped (not built): ${name} for ${packageId}`);
+    return;
+  }
+  console.error(
+    `MISSING vendor runtime '${name}' for backend '${packageId}' on ${platformArch}.\n` +
+      `  ${packageId} links it dynamically, so a package staged without it cannot load.\n` +
+      `  Looked in:\n${candidates.map((c) => `    ${c}`).join('\n')}`
+  );
+  process.exit(1);
+}
+
 /** Stage an optional sidecar into `packageId` when the file exists. */
 function pushOptionalSidecar(
   files: StagedFile[],
@@ -332,6 +403,20 @@ function buildStagingPlan(
       // stage both beside the plugin so dlopen does not need a manual cp step.
       pushOptionalSidecar(files, id, findExisting(backendCandidates(id)));
       pushOptionalSidecar(files, id, commonsPath);
+
+      // The vendor runtime each backend links has to sit beside THAT backend,
+      // not only in core. `rac_backend_onnx` imports onnxruntime and
+      // `rac_backend_sherpa` imports sherpa-onnx-c-api, and commons loads a
+      // plugin with LOAD_WITH_ALTERED_SEARCH_PATH / @loader_path / $ORIGIN —
+      // all of which search the PLUGIN's own directory. Core's copy is not on
+      // that path, so staging it there alone leaves the published package
+      // unusable: onnx reports "Backend not ready" and sherpa takes the
+      // utility host down with an access violation (0xC0000005).
+      if (id === BundlePackageId.ONNX || id === BundlePackageId.Sherpa) {
+        for (const sidecar of vendorRuntimeNames(id)) {
+          pushVendorRuntime(files, id, sidecar);
+        }
+      }
     }
   }
 
