@@ -50,10 +50,22 @@ if(RAC_BUILD_ELECTRON_ADDON)
         # build resolves these via cmake-js (CMAKE_JS_INC / CMAKE_JS_LIB) instead.
         set(RAC_NODE_DEV_DIR "$ENV{LOCALAPPDATA}/node-gyp/Cache/24.15.0"
             CACHE PATH "node-gyp dev files dir (contains include/node + <arch>/node.lib)")
-        # node-gyp keys the import library by target arch, so an ARM64 addon must
+        # node-gyp keys the import library by TARGET arch, so an ARM64 addon must
         # link arm64/node.lib — x64/node.lib fails the link with LNK1112.
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$" OR
-           CMAKE_GENERATOR_PLATFORM MATCHES "^([Aa][Rr][Mm]64)$")
+        #
+        # Only the target matters here, never the host. CMAKE_GENERATOR_PLATFORM
+        # (-A) is authoritative when set: building the win32-x64 addon on an
+        # ARM64 workstation is a supported cross-compile (MSVC's arm64_x64
+        # toolset), and there CMAKE_SYSTEM_PROCESSOR still reports the ARM64
+        # HOST. Consulting it picked arm64/node.lib for an x64 target, which
+        # links with only a LNK4272 warning and then dies on 65 unresolved
+        # __imp_napi_* externals.
+        if(CMAKE_GENERATOR_PLATFORM)
+            set(_ra_node_target_arch "${CMAKE_GENERATOR_PLATFORM}")
+        else()
+            set(_ra_node_target_arch "${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
+        if(_ra_node_target_arch MATCHES "^([Aa][Rr][Mm]64|aarch64|AARCH64)$")
             set(_ra_node_arch "arm64")
         else()
             set(_ra_node_arch "x64")

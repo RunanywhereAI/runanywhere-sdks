@@ -28,6 +28,7 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
+#include "rac_sherpa_api.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -357,7 +358,7 @@ static rac_result_t sherpa_stt_vtable_stream_destroy(void* impl, rac_handle_t st
 // Offline models return RAC_ERROR_NOT_SUPPORTED from stream_create, preserving
 // commons' one-shot fallback. Online transducers keep one Sherpa stream across
 // chunks, emit deduplicated partials, and emit/reset a final at each endpoint.
-extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
+extern "C" RAC_SHERPA_API const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .initialize = sherpa_stt_vtable_initialize,
     .transcribe = sherpa_stt_vtable_transcribe,
     .transcribe_stream = sherpa_stt_vtable_transcribe_stream,
@@ -449,7 +450,7 @@ static rac_result_t sherpa_tts_vtable_get_languages(void* impl, char** out_json)
 
 }  // namespace
 
-extern "C" const rac_tts_service_ops_t g_sherpa_tts_ops = {
+extern "C" RAC_SHERPA_API const rac_tts_service_ops_t g_sherpa_tts_ops = {
     .initialize = sherpa_tts_vtable_initialize,
     .synthesize = sherpa_tts_vtable_synthesize,
     .synthesize_stream = sherpa_tts_vtable_synthesize_stream,
@@ -517,7 +518,7 @@ RAC_DEFINE_CREATE_ADAPTER(vad, sherpa)
 
 }  // namespace
 
-extern "C" const rac_vad_service_ops_t g_sherpa_vad_ops = {
+extern "C" RAC_SHERPA_API const rac_vad_service_ops_t g_sherpa_vad_ops = {
     .process = sherpa_vad_vtable_process,
     .start = sherpa_vad_vtable_start,
     .stop = sherpa_vad_vtable_stop,

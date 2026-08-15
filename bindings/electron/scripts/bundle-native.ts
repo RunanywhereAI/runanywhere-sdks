@@ -68,10 +68,19 @@ const winArm64 = win && process.arch === 'arm64';
 const platformArch = `${process.platform}-${process.arch}` as const;
 
 // One CMake preset per Windows architecture — the ARM64 build tree is separate
-// because the generator platform (and therefore node.lib) differs. macOS builds
-// through the macos-release preset; the plan's verified local tree is
-// build/electron-macos (fat) and build/electron-shared-macos (thin spike).
-const winPreset = winArm64 ? 'windows-arm64-release' : 'windows-release';
+// because the generator platform (and therefore node.lib) differs, and because
+// the two lanes carry disjoint engines (x64 has no Hexagon stub in QAIRT; ggml
+// and ONNX Runtime have no ARM64 Windows build).
+//
+// These MUST be the electron-* presets. `windows-release` and
+// `windows-arm64-release` both set RAC_BUILD_SHARED=OFF and leave
+// RAC_BUILD_ELECTRON_ADDON off, so they never emit runanywhere_native.node or
+// any plugin DLL at all: staging pointed at a tree that cannot contain what it
+// is looking for, reported nothing found, and every Windows package shipped
+// empty. macOS builds through the macos-release preset; the plan's verified
+// local tree is build/electron-macos (fat) and build/electron-shared-macos
+// (thin spike).
+const winPreset = winArm64 ? 'electron-win-arm64' : 'electron-windows';
 const nativeSubPath = path.join('bindings', 'electron', 'native');
 const macBuildDirs = [
   // Prefer the known-good fat tree for local apps; shared/thin is opt-in via

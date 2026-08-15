@@ -1302,6 +1302,15 @@ if(WIN32)
     if(TARGET bz2_bundled)
         target_link_libraries(rac_commons PUBLIC bz2_bundled)
     endif()
+    # zlibstatic / bz2_bundled travel in this INTERFACE link line as BARE NAMES
+    # (libarchive's internal find_package stores them as plain strings — see the
+    # MSVC block above). `link_directories("${RAC_BUNDLED_LIB_DIR}")` there is
+    # DIRECTORY-scoped, so it reaches core/ and its children but not siblings
+    # like engines/ or bindings/. Every sibling consumer therefore inherited the
+    # bare name without the directory that resolves it and died on
+    # "LNK1181: cannot open input file 'bz2_bundled.lib'". Carry the search path
+    # on the INTERFACE that carries the names, so any consumer resolves both.
+    target_link_directories(rac_commons INTERFACE "${RAC_BUNDLED_LIB_DIR}")
 else()
     target_link_libraries(rac_commons PRIVATE archive_static)
 endif()

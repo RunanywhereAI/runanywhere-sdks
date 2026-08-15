@@ -5,6 +5,7 @@
 #include <memory>
 #include <new>
 
+#include "rac_onnx_api.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 
 namespace {
@@ -78,7 +79,7 @@ rac_result_t create(const char* model_id, const char*, void** out_impl) {
 
 }  // namespace
 
-extern "C" const rac_segmentation_service_ops_t g_onnx_segmentation_ops = {
+extern "C" RAC_ONNX_API const rac_segmentation_service_ops_t g_onnx_segmentation_ops = {
     .initialize = initialize,
     .segment = segment,
     .cleanup = cleanup,

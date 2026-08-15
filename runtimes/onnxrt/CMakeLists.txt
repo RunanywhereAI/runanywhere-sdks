@@ -53,6 +53,15 @@ target_link_libraries(rac_runtime_onnxrt PUBLIC
     rac_commons
 )
 
+# These C ABI symbols live in this static archive, which is linked into the
+# runanywhere_onnx plugin DLL — not rac_commons.dll. Linking shared commons
+# injects RAC_USING_SHARED, so RAC_API becomes dllimport and MSVC rejects
+# defining those functions here (C2491). RAC_PLUGIN_API is dllexport only
+# when RAC_BUILDING_PLUGIN is set, matching rac_plugin_entry.h.
+if(WIN32 AND RAC_BUILD_SHARED)
+    target_compile_definitions(rac_runtime_onnxrt PRIVATE RAC_BUILDING_PLUGIN=1)
+endif()
+
 target_compile_definitions(rac_runtime_onnxrt PUBLIC RAC_HAS_ONNX)
 
 if(ANDROID OR RAC_PLATFORM_ANDROID)

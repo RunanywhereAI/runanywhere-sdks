@@ -72,8 +72,19 @@ extern "C" {
  *
  * Lets tests assert the engine compiled against the expected QHexRT visibility
  * without pulling the private QHexRT header.
+ *
+ * RAC_PLUGIN_API is load-bearing, not decoration. QHexRT is the one engine that
+ * keeps WINDOWS_EXPORT_ALL_SYMBOLS off (it has no carrier to export data to), so
+ * on MSVC an undecorated marker is referenced by nothing and exported nowhere —
+ * the linker drops the function AND its string literal, and every consumer below
+ * silently loses its only routability signal on the one platform where the
+ * `g_qhexrt_*_ops` fallback cannot work either (single DLL, internal symbols,
+ * stripped from the PE). Exporting it makes the function a root that survives.
+ *
+ * Consumers: scripts/validation/gates/check_plugin_natives.py,
+ * scripts/release/prepublish_check.py, scripts/build/build-core-android.sh.
  */
-const char* qhexrt_backend_build_info(void);
+RAC_PLUGIN_API const char* qhexrt_backend_build_info(void);
 
 #ifdef __cplusplus
 }

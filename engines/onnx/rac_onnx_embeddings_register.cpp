@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "rac_onnx_api.h"
 #include "rac/backends/rac_embeddings_onnx.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -225,7 +226,7 @@ static rac_result_t onnx_embed_create_impl(const char* model_id, const char* con
 // to fill the unified g_onnx_engine_vtable.embedding_ops slot. Follows
 // the same pattern as g_onnx_{stt,tts,vad}_ops in the sibling
 // engines/onnx/rac_backend_onnx_register.cpp.
-extern "C" const rac_embeddings_service_ops_t g_onnx_embeddings_ops = {
+extern "C" RAC_ONNX_API const rac_embeddings_service_ops_t g_onnx_embeddings_ops = {
     .initialize = onnx_embed_vtable_initialize,
     .embed = onnx_embed_vtable_embed,
     .embed_batch = onnx_embed_vtable_embed_batch,

@@ -32,6 +32,13 @@
 #endif
 
 #include "rac/core/rac_core.h"
+// RAC_LOG_* is used unconditionally (load_plugins_from_env), so it cannot ride
+// in on the desktop-adapter block below. Without this, a build with
+// RAC_DESKTOP_ADAPTER=OFF — the win-arm64 / QHexRT lane — still sees the
+// `rac_log_level_t` enum via rac_core.h but not the macro, so
+// `RAC_LOG_WARNING(...)` parses as a call on an enum constant and fails with
+// "C2064: term does not evaluate to a function taking 4 arguments".
+#include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_plugin_loader.h"
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry.h"
@@ -80,7 +87,6 @@
 // (RAC_ELECTRON_HAVE_DESKTOP, set by native/CMakeLists.txt when
 // RAC_DESKTOP_ADAPTER=ON).
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
-#include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"

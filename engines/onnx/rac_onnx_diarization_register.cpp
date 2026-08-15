@@ -5,6 +5,7 @@
 #include <memory>
 #include <new>
 
+#include "rac_onnx_api.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 
 namespace {
@@ -122,7 +123,7 @@ rac_result_t create(const char* model_id, const char*, void** out_impl) {
 
 }  // namespace
 
-extern "C" const rac_diarization_service_ops_t g_onnx_diarization_ops = {
+extern "C" RAC_ONNX_API const rac_diarization_service_ops_t g_onnx_diarization_ops = {
     .initialize = initialize,
     .diarize = diarize,
     .stream_create = stream_create,

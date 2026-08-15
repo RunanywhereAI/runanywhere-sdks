@@ -9,6 +9,7 @@
 
 #include "rac_runtime_onnxrt.h"
 
+#include "rac_onnx_api.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
@@ -38,11 +39,14 @@ void* const volatile rac_onnxrt_runtime_anchor =
  * RAC_BACKEND_RAG is off, onnx_embedding_provider.cpp is not compiled
  * and the symbol is unresolved — the vtable slot stays nullptr below
  * to match. */
+/* RAC_ONNX_API → dllimport on Windows shared consumers. These are DATA
+ * symbols living in rac_backend_onnx.dll; without the import attribute the
+ * carrier link fails with LNK2001. */
 #if defined(RAC_BACKEND_RAG)
-extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
+extern RAC_ONNX_API const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 #endif
-extern const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
-extern const rac_diarization_service_ops_t g_onnx_diarization_ops;
+extern RAC_ONNX_API const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
+extern RAC_ONNX_API const rac_diarization_service_ops_t g_onnx_diarization_ops;
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
     RAC_RUNTIME_ONNXRT,
