@@ -380,12 +380,16 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
                         all_models.push_back(models[i]);
                     }
                 }
-                std::free(models);
-            } else if (list_result != RAC_ERROR_NOT_FOUND) {
+            }
+
+            // Strategies may allocate partial output before returning an error.
+            // The registry owns and releases any array returned by the callback.
+            std::free(models);
+
+            if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
                 // Preserve genuine strategy failures (allocation, init,
                 // backend) instead of reporting a successful empty/partial
                 // list. Only RAC_ERROR_NOT_FOUND falls through.
-                std::free(models);
                 RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
                                 strategy.name, static_cast<int>(list_result));
                 return list_result;
@@ -421,9 +425,11 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
     rac_diffusion_model_def_t model_def;
 
-    if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)",
-                      model_id ? model_id : "(null)");
+    rac_result_t result = rac_diffusion_model_registry_get(model_id, &model_def);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT,
+                      "Model lookup failed for '%s' (result %d), using CoreML (Apple only)",
+                      model_id ? model_id : "(null)", static_cast<int>(result));
         return RAC_DIFFUSION_BACKEND_COREML;
     }
 

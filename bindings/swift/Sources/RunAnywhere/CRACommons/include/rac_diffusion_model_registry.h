@@ -324,7 +324,9 @@ RAC_API rac_bool_t rac_diffusion_model_registry_is_available(const char* model_i
  * the current platform.
  *
  * @param out_def Output model definition (filled on success)
- * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND if no recommendation
+ * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND if no recommendation,
+ *         RAC_ERROR_INVALID_ARGUMENT for a null output, or a strategy/listing
+ *         error returned as-is
  */
 RAC_API rac_result_t
 rac_diffusion_model_registry_get_recommended(rac_diffusion_model_def_t* out_def);
