@@ -365,14 +365,13 @@ void test_cluster_orchestration() {
     v1::ClusterJoinRequest join_request;
     join_request.set_cluster_id("cluster-alpha");
     join_request.set_instance_id("android-snapdragon");
-    *join_request.mutable_cluster_start() = valid_request;
     join_request.mutable_peer_capability()->set_instance_id("android-snapdragon");
     join_request.mutable_peer_capability()->set_available_memory_bytes(8589934592ULL);
     join_request.mutable_peer_capability()->set_acceleration(v1::ACCELERATION_PREFERENCE_NPU);
 
     v1::ClusterStartResponse join_response;
     CHECK(call_proto(rac_connect_cluster_join_proto, join_request, &join_response) == RAC_SUCCESS,
-          "Peer join request is validated successfully");
+          "Peer join request is validated successfully against active cluster");
     CHECK(join_response.accepted(), "Peer join response is accepted");
     CHECK(join_response.peer_capability().available_memory_bytes() == 8589934592ULL,
           "Peer capability is populated in join response");
@@ -380,6 +379,7 @@ void test_cluster_orchestration() {
     // 8. Peer join with unknown instance_id is rejected
     v1::ClusterJoinRequest unknown_peer_join = join_request;
     unknown_peer_join.set_instance_id("unknown-device");
+    unknown_peer_join.mutable_peer_capability()->set_instance_id("unknown-device");
     v1::ClusterStartResponse unknown_peer_response;
     CHECK(call_proto(rac_connect_cluster_join_proto, unknown_peer_join, &unknown_peer_response) == RAC_SUCCESS,
           "Unknown peer join returns typed validation response");

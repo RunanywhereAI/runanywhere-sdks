@@ -259,8 +259,7 @@ message ClusterStartRequest {
 message ClusterJoinRequest {
     string cluster_id = 1;
     string instance_id = 2;
-    ClusterStartRequest cluster_start = 3;
-    ClusterPeerCapability peer_capability = 4;
+    ClusterPeerCapability peer_capability = 3;
 }
 
 message ClusterStartResponse {

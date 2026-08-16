@@ -814,34 +814,37 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
         return parse_result;
     }
 
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    const ClusterRuntime& cluster = cluster_runtime();
+
     v1::ClusterStartResponse response;
-    std::string rejection;
     if (request.cluster_id().empty()) {
         response.set_accepted(false);
         response.set_rejection_reason("Cluster ID is empty");
     } else if (request.instance_id().empty()) {
         response.set_accepted(false);
         response.set_rejection_reason("Peer instance_id is empty");
-    } else if (!is_valid_model(request.cluster_start().model())) {
+    } else if (!cluster.is_active) {
         response.set_accepted(false);
-        response.set_rejection_reason("Invalid model descriptor in cluster start");
-    } else if (!validate_layer_assignments(request.cluster_start().assignments(), &rejection)) {
+        response.set_rejection_reason("Cluster is not active");
+    } else if (request.cluster_id() != cluster.cluster_id) {
         response.set_accepted(false);
-        response.set_rejection_reason(rejection);
+        response.set_rejection_reason("Cluster ID does not match active cluster");
+    } else if (!request.peer_capability().instance_id().empty() &&
+               request.peer_capability().instance_id() != request.instance_id()) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Peer capability instance_id does not match request identity");
     } else {
-        bool peer_found = false;
-        for (const auto& a : request.cluster_start().assignments()) {
-            if (a.instance_id() == request.instance_id()) {
-                peer_found = true;
-                break;
-            }
-        }
-        if (!peer_found) {
+        auto it = cluster.peer_assignments.find(request.instance_id());
+        if (it == cluster.peer_assignments.end()) {
             response.set_accepted(false);
             response.set_rejection_reason("Peer instance_id not found in cluster layer assignments");
         } else {
             response.set_accepted(true);
             *response.mutable_peer_capability() = request.peer_capability();
+            if (response.peer_capability().instance_id().empty()) {
+                response.mutable_peer_capability()->set_instance_id(request.instance_id());
+            }
         }
     }
 
