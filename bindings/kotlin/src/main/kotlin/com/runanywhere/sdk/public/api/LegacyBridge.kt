@@ -148,6 +148,10 @@ internal suspend fun legacyRegisterArchive(model: ModelRegistration): ModelInfo 
         modality = model.category,
         archiveType = model.archiveType,
         memoryRequirement = model.memoryBytes,
+        downloadSize = model.downloadBytes,
+        contextLength = model.contextLength,
+        source = model.source,
+        description = model.description,
         supportsThinking = model.supportsThinking,
         supportsLora = model.supportsLora,
         cuaProfile = model.cuaProfile,
@@ -163,7 +167,10 @@ internal suspend fun legacyRegisterMultiFile(model: ModelRegistration): ModelInf
         memoryRequirement = model.memoryBytes,
         contextLength = model.contextLength,
         supportsThinking = model.supportsThinking,
+        supportsLora = model.supportsLora,
+        source = model.source,
         downloadSize = model.downloadBytes,
+        description = model.description,
         cuaProfile = model.cuaProfile,
     )
 
