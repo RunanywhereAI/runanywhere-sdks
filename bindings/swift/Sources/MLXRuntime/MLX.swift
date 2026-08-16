@@ -1387,10 +1387,19 @@ private struct MLXModelConfigHints: Decodable {
     let architecture: String?
     let architectures: [String]?
 
+    /// NeMo exports (every Parakeet and Nemotron ASR checkpoint) carry no
+    /// `model_type` at all. They name the implementing class in `target`, e.g.
+    /// `nemo.collections.asr.models.rnnt_bpe_models.EncDecRNNTBPEModel` — the
+    /// exact string `loadSpeechRecognitionModel` matches on, which until this
+    /// field existed could never appear in the hints and made that branch
+    /// unreachable for every published Parakeet repo.
+    let target: String?
+
     enum CodingKeys: String, CodingKey {
         case modelType = "model_type"
         case architecture
         case architectures
+        case target
     }
 }
 
@@ -1541,6 +1550,9 @@ private func architectureHints(from directory: URL) -> [String] {
         }
         if let architecture = config.architecture {
             hints.append(architecture)
+        }
+        if let target = config.target {
+            hints.append(target)
         }
         hints.append(contentsOf: config.architectures ?? [])
     }
