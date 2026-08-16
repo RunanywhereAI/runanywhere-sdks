@@ -630,4 +630,250 @@ rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes
 #endif
 }
 
+/* ===========================================================================
+ * Cluster Orchestration Implementations (Issue #541)
+ * =========================================================================== */
+
+#if defined(RAC_HAVE_PROTOBUF)
+struct ClusterRuntime {
+    bool is_active = false;
+    std::string cluster_id;
+    v1::ConnectModelDescriptor model;
+    std::vector<v1::ClusterLayerAssignment> assignments;
+    std::unordered_map<std::string, v1::ClusterLayerAssignment> peer_assignments;
+};
+
+ClusterRuntime& cluster_runtime() {
+    static ClusterRuntime instance;
+    return instance;
+}
+
+bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
+                                std::string* out_rejection_reason) {
+    if (assignments.empty()) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have at least one layer assignment";
+        }
+        return false;
+    }
+
+    uint32_t expected_start = 0;
+    for (int i = 0; i < assignments.size(); ++i) {
+        const v1::ClusterLayerAssignment& assignment = assignments[i];
+        if (assignment.instance_id().empty()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Peer assignment has empty instance_id";
+            }
+            return false;
+        }
+        if (assignment.layer_start() != expected_start) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Layer range gap or mismatch in cluster assignment";
+            }
+            return false;
+        }
+        if (assignment.layer_end() <= assignment.layer_start()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Invalid layer range: layer_end must be greater than layer_start";
+            }
+            return false;
+        }
+        expected_start = assignment.layer_end();
+    }
+    return true;
+}
+#endif
+
+rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                             size_t request_size,
+                                             rac_proto_buffer_t* out_cluster_state) {
+    if (out_cluster_state == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_cluster_state);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterStartRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_cluster_state,
+                      "Invalid ClusterStartRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    ClusterRuntime& cluster = cluster_runtime();
+
+    if (request.cluster_id().empty()) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStartRequest missing cluster_id");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!is_valid_model(request.model())) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStartRequest missing or invalid model descriptor");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::string rejection;
+    if (!validate_layer_assignments(request.assignments(), &rejection)) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   rejection.c_str());
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    cluster.is_active = true;
+    cluster.cluster_id = request.cluster_id();
+    cluster.model = request.model();
+    cluster.assignments.clear();
+    cluster.peer_assignments.clear();
+
+    v1::ClusterState state;
+    state.set_is_active(true);
+    state.set_cluster_id(cluster.cluster_id);
+    *state.mutable_model() = cluster.model;
+
+    for (const v1::ClusterLayerAssignment& item : request.assignments()) {
+        cluster.assignments.push_back(item);
+        cluster.peer_assignments[item.instance_id()] = item;
+        *state.add_assignments() = item;
+    }
+    state.set_peer_count(static_cast<uint32_t>(request.assignments_size()));
+
+    return serialize_message(state, out_cluster_state);
+#endif
+}
+
+rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                            size_t request_size,
+                                            rac_proto_buffer_t* out_response) {
+    if (out_response == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_response);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_response, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterStartRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_response,
+                      "Invalid ClusterStartRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    v1::ClusterStartResponse response;
+    std::string rejection;
+    if (request.cluster_id().empty()) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Cluster ID is empty");
+    } else if (!is_valid_model(request.model())) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Invalid model descriptor in cluster start");
+    } else if (!validate_layer_assignments(request.assignments(), &rejection)) {
+        response.set_accepted(false);
+        response.set_rejection_reason(rejection);
+    } else {
+        response.set_accepted(true);
+    }
+
+    return serialize_message(response, out_response);
+#endif
+}
+
+rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                            size_t request_size,
+                                            rac_proto_buffer_t* out_cluster_state) {
+    if (out_cluster_state == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_cluster_state);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterStopRequest request;
+    if (request_bytes != nullptr && request_size > 0) {
+        const rac_result_t parse_result =
+            parse_message(request_bytes, request_size, &request, out_cluster_state,
+                          "Invalid ClusterStopRequest protobuf payload");
+        if (parse_result != RAC_SUCCESS) {
+            return parse_result;
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    ClusterRuntime& cluster = cluster_runtime();
+    cluster.is_active = false;
+    cluster.cluster_id.clear();
+    cluster.assignments.clear();
+    cluster.peer_assignments.clear();
+
+    v1::ClusterState state;
+    state.set_is_active(false);
+    state.set_peer_count(0);
+    return serialize_message(state, out_cluster_state);
+#endif
+}
+
+rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                                           size_t request_size,
+                                                           rac_proto_buffer_t* out_validation) {
+    if (out_validation == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_validation);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_validation, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterActivation request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_validation,
+                      "Invalid ClusterActivation protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    v1::ConnectInvocationValidation validation;
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    const ClusterRuntime& cluster = cluster_runtime();
+
+    if (!cluster.is_active) {
+        validation.set_rejection_reason("Cluster is not active");
+    } else if (request.cluster_id() != cluster.cluster_id) {
+        validation.set_rejection_reason("Cluster ID mismatch on activation tensor");
+    } else if (request.request_id().empty()) {
+        validation.set_rejection_reason("Activation request_id is empty");
+    } else if (request.tensor_data().empty()) {
+        validation.set_rejection_reason("Activation tensor_data is empty");
+    } else if (request.seq_len() == 0 || request.hidden_size() == 0) {
+        validation.set_rejection_reason("Invalid activation tensor dimensions (seq_len/hidden_size zero)");
+    } else {
+        validation.set_accepted(true);
+    }
+    return serialize_message(validation, out_validation);
+#endif
+}
+
 }  // extern "C"
