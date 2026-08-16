@@ -2024,7 +2024,7 @@ jobs:
             echo "::warning::no notarized rcli DMG in this release — Developer ID/notary secrets are not configured"
           fi
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
-          if [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip" ] && [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip.sha256" ]; then
+          if [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip" ] || [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip.sha256" ]; then
             assert_pair "rcli Windows x86_64 (advisory)" "rcli-windows-x86_64-v${VERSION}.zip"
           else
             echo "  SKIP: rcli Windows x86_64 advisory artifact absent (job failed/skipped)"
