@@ -267,7 +267,10 @@ RAC_API rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t 
  * @param registry_handle Model registry handle
  * @param model_id Model identifier
  * @param framework Inference framework
- * @param out_metrics Output: Model metrics
+ * @param out_metrics Output: Model metrics. On success the caller owns
+ *        model_id, model_name and local_path and must release them with
+ *        rac_model_storage_metrics_free(). rac_storage_info_free() covers the
+ *        array returned by rac_storage_analyzer_get_info(), not this call.
  * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT on a null argument,
  *         RAC_ERROR_NOT_FOUND if the model is not in the registry, or
  *         RAC_ERROR_OUT_OF_MEMORY if a string copy into out_metrics fails
@@ -277,6 +280,19 @@ RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
     const char* model_id, rac_inference_framework_t framework,
     rac_model_storage_metrics_t* out_metrics);
+
+/**
+ * @brief Release the strings a single rac_model_storage_metrics_t owns
+ *
+ * Frees model_id, model_name and local_path and zeroes the struct. Null-safe,
+ * and safe to call twice because the struct is zeroed. Only for a struct
+ * filled by rac_storage_analyzer_get_model_metrics(); the entries inside
+ * rac_storage_info_t are owned by that array and released by
+ * rac_storage_info_free().
+ *
+ * @param metrics Metrics to release, may be NULL
+ */
+RAC_API void rac_model_storage_metrics_free(rac_model_storage_metrics_t* metrics);
 
 /**
  * @brief Check if storage is available for a download

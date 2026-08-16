@@ -1427,6 +1427,19 @@ rac_result_t rac_storage_analyzer_calculate_size(rac_storage_analyzer_handle_t h
 // CLEANUP
 // =============================================================================
 
+void rac_model_storage_metrics_free(rac_model_storage_metrics_t* metrics) {
+    if (!metrics)
+        return;
+
+    free(const_cast<char*>(metrics->model_id));
+    free(const_cast<char*>(metrics->model_name));
+    free(const_cast<char*>(metrics->local_path));
+
+    // Zeroing is what makes a second call safe, which matters because the
+    // error paths in get_model_metrics already zero the struct themselves.
+    memset(metrics, 0, sizeof(rac_model_storage_metrics_t));
+}
+
 void rac_storage_info_free(rac_storage_info_t* info) {
     if (!info)
         return;

@@ -219,6 +219,10 @@ std::optional<ModelStorageMetrics> StorageBridge::getModelStorageMetrics(
     metrics.localPath = cMetrics.local_path ? cMetrics.local_path : "";
     metrics.sizeOnDisk = cMetrics.size_on_disk;
 
+    // The three strings above are heap copies owned by the caller; the
+    // std::strings have taken their own copies by now.
+    rac_model_storage_metrics_free(&cMetrics);
+
     return metrics;
 }
 
