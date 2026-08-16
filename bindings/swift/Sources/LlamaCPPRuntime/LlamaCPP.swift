@@ -52,7 +52,7 @@ public enum LlamaCPP {
     public static let version = "2.0.0"
 
     /// LlamaCPP library version (underlying C++ library)
-    public static let llamaCppVersion = "b7199"
+    public static let llamaCppVersion = "runanywhere-b10453.4"
 
     // MARK: - Registration State
 

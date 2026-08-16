@@ -426,8 +426,8 @@ lives in the bundled native backend (C++ engines or the Swift MLX runtime).
 | `runanywhere_onnx` | 0.20.22 |
 | `runanywhere_qhexrt` | 0.20.22 |
 | `RACommons` native | 0.1.6 |
-| llama.cpp engine | b7199 |
-| ONNX Runtime | 1.24.3 |
+| llama.cpp engine | runanywhere-b10453.4 |
+| ONNX Runtime | 1.28.0 |
 | Android NDK | 28.2.13676358 |
 | iOS deployment target | 17.5 |
 | Canonical source | `core/VERSION` |

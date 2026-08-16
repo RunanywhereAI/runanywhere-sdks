@@ -227,6 +227,10 @@ constexpr CatalogFile kMlxMaplePreviewFiles[] = {
      "model-00003-of-00003.safetensors", true, 958711742LL},
     {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
      "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model-flashhead.safetensors",
+     "model-flashhead.safetensors", true, 6087456LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
      "model.safetensors.index.json",
      "model.safetensors.index.json", true, 40054LL},
     {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
@@ -427,7 +431,7 @@ constexpr CatalogFile kMlxFastVlm05BFiles[] = {
 };
 
 // LiquidAI's own MLX 4-bit export. config.json model_type is "lfm2_vl", which
-// the pinned mlx-swift-lm 3.31.4 registers in VLMModelFactory (together with
+// the pinned mlx-swift-lm 3.31.5 registers in VLMModelFactory (together with
 // the "Lfm2VlProcessor" processor class this repo declares). It ships no
 // merges.txt/vocab.json — tokenizer.json is the self-contained fast-tokenizer
 // format — and its processor lives in processor_config.json rather than
@@ -820,7 +824,7 @@ constexpr CatalogFile kNemotronOmniReasoningFiles[] = {
 };
 
 // mlx-community/gemma-4-e2b-it-4bit — config.json model_type "gemma4",
-// registered in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry/VLMTypeRegistry
+// registered in the pinned mlx-swift-lm 3.31.5 LLMTypeRegistry/VLMTypeRegistry
 // alike. File list + sizes verified via HF API blobs this session.
 constexpr CatalogFile kMlxGemma4E2BFiles[] = {
     {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/main/"
@@ -990,7 +994,7 @@ constexpr CatalogFile kMlxGemma4_31BFiles[] = {
 };
 
 // mlx-community/Qwen3.6-35B-A3B-4bit (MoE) — config.json model_type
-// "qwen3_5_moe", registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+// "qwen3_5_moe", registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
 constexpr CatalogFile kMlxQwen3_6_35BA3BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/main/"
      "chat_template.jinja",
@@ -1040,7 +1044,7 @@ constexpr CatalogFile kMlxQwen3_6_35BA3BFiles[] = {
 };
 
 // mlx-community/Qwen3.8-27B-4bit (dense) — config.json model_type "qwen3_5",
-// registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+// registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
 constexpr CatalogFile kMlxQwen3_8_27BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/main/"
      "chat_template.jinja",
@@ -1084,7 +1088,7 @@ constexpr CatalogFile kMlxQwen3_8_27BFiles[] = {
 };
 
 // IBM Granite 4.1 MLX — config.json model_type "granite" (registered in
-// mlx-swift-lm 3.31.4's LLMTypeRegistry). File set verified via HF API.
+// mlx-swift-lm 3.31.5's LLMTypeRegistry). File set verified via HF API.
 constexpr CatalogFile kMlxGranite4_1_3BFiles[] = {
     {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/main/"
      "chat_template.jinja",
@@ -1559,7 +1563,7 @@ constexpr CatalogEntry kCatalog[] = {
     {"mlx-maple-preview-2bit", "mlx-maple-preview",
      "DeepGrove Maple Preview 2-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
-     kMlxMaplePreviewFiles, 12, 5324164826LL, 128000, false},
+     kMlxMaplePreviewFiles, 13, 5330252282LL, 128000, false},
     {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", "mlx-nemotron-nano",
      "NVIDIA Llama 3.1 Nemotron Nano 8B 4-bit (MLX)",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
@@ -1673,7 +1677,7 @@ constexpr CatalogEntry kCatalog[] = {
 
     // Google Gemma 4 family (MLX). config.json model_type "gemma4" /
     // "gemma4_unified" (12B), both registered in the pinned mlx-swift-lm
-    // 3.31.4 LLMTypeRegistry/VLMTypeRegistry — verified by reading the
+    // 3.31.5 LLMTypeRegistry/VLMTypeRegistry — verified by reading the
     // checked-out package source this session (not assumed). Gemma Terms of
     // Use, not Apache.
     {"mlx-gemma-4-e2b-it-4bit", "mlx-gemma4-e2b", "Gemma 4 E2B IT 4-bit (MLX)",
@@ -1700,7 +1704,7 @@ constexpr CatalogEntry kCatalog[] = {
      18412016676LL, 4096, false},
 
     // Qwen3.6-35B-A3B (MoE) — config.json model_type "qwen3_5_moe",
-    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    // registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
     {"mlx-qwen3.6-35b-a3b-4bit", "mlx-qwen3.6-35b",
      "Qwen3.6 35B-A3B 4-bit (MLX, MoE)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -1712,7 +1716,7 @@ constexpr CatalogEntry kCatalog[] = {
      16054541349LL, 4096, true},
 
     // IBM Granite 4.1 family (MLX). config.json model_type "granite",
-    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    // registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
     {"mlx-granite-4.1-3b-4bit", "mlx-granite4.1-3b",
      "IBM Granite 4.1 3B 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -1732,7 +1736,7 @@ constexpr CatalogEntry kCatalog[] = {
     // Muse Glimmer 30B (MLX) and Nemotron-3-Nano-Omni-30B-A3B-Reasoning (MLX)
     // are deliberately NOT registered here. Their config.json model_types
     // ("muse_glimmer" and "NemotronH_Nano_Omni_Reasoning_V3" respectively) are
-    // NOT present in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry /
+    // NOT present in the pinned mlx-swift-lm 3.31.5 LLMTypeRegistry /
     // VLMTypeRegistry (checked the checked-out package source directly:
     // .build/checkouts/mlx-swift-lm/Libraries/{MLXLLM,MLXVLM}/*Factory.swift —
     // only "nemotron_h" exists, a different string). Loading either would fail

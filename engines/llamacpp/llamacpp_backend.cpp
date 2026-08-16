@@ -423,7 +423,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     // Android: mmap can fail on scoped/adopted storage paths and certain
     // SELinux-restricted app-private directories, causing silent nullptr
     // returns from llama_model_load_from_file.
-    model_params.use_mmap = false;
+    model_params.load_mode = LLAMA_LOAD_MODE_NONE;
 #endif
 
     // If common_fit_params aborts, use the user-provided value

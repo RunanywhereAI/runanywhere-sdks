@@ -294,8 +294,8 @@ TestResult test_catalog_lookup() {
       mlx_maple->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_maple->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
       mlx_maple->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
-      mlx_maple->files == nullptr || mlx_maple->file_count != 12 ||
-      mlx_maple->download_size_bytes != 5324164826LL ||
+      mlx_maple->files == nullptr || mlx_maple->file_count != 13 ||
+      mlx_maple->download_size_bytes != 5330252282LL ||
       mlx_maple->context_length != 128000) {
     result.details = "mlx-maple-preview should be a complete pinned MLX bundle";
     return result;
@@ -742,8 +742,8 @@ TestResult test_mlx_catalog_registration() {
       maple.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       maple.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
       maple.category() != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
-      !maple.has_multi_file() || maple.multi_file().files_size() != 12 ||
-      maple.download_size_bytes() != 5324164826LL ||
+      !maple.has_multi_file() || maple.multi_file().files_size() != 13 ||
+      maple.download_size_bytes() != 5330252282LL ||
       maple.context_length() != 128000) {
     result.details = "registered MLX Maple metadata is incomplete";
     return result;

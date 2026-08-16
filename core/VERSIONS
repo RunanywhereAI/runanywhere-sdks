@@ -225,13 +225,13 @@ SHERPA_ONNX_COMMIT_MACOS=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # publishing, and the downloaders verify both archive checksums and embedded
 # provenance before making them available to CMake.
 SHERPA_ONNX_REPO_DESKTOP=RunanywhereAI/sherpa-onnx
-SHERPA_ONNX_RELEASE_TAG_DESKTOP=v1.13.5-rac-desktop.2
-SHERPA_ONNX_COMMIT_DESKTOP=92bd7cbc16f25e34e23dcf323383407cd668ee40
+SHERPA_ONNX_RELEASE_TAG_DESKTOP=v1.13.5-rac-desktop.4
+SHERPA_ONNX_COMMIT_DESKTOP=c6531299b6c5816a95cb171a093e7f82847e59bb
 SHERPA_ONNX_VERSION_LINUX=1.13.5
-SHERPA_ONNX_LINUX_X64_SHA256=411aa26d9f3460c5616805182ccc1da2cadb3dcf95666ef37b7951bc4fbd214f
-SHERPA_ONNX_LINUX_AARCH64_SHA256=9106bd45a3373ad13b5cf3c87f6d31ca295e7f9ffbc620cb1e761a5689717c45
+SHERPA_ONNX_LINUX_X64_SHA256=2fbadb68ecf45e73982ce20f18c4658639afc1db245ca1b5794accb6544b2fa2
+SHERPA_ONNX_LINUX_AARCH64_SHA256=cb7167b68b4246f01a88d6661551ddb925b49481e39d8b329e6e7aee422f6345
 SHERPA_ONNX_VERSION_WINDOWS=1.13.5
-SHERPA_ONNX_WINDOWS_X64_SHA256=3fa3c02028fb6cc0d9dea4965fd3eb3532a1eb27e702a69b994e88b2be5b343c
+SHERPA_ONNX_WINDOWS_X64_SHA256=f3985b5b91536a8c06fafd3d0118479a09eaa71d4c95795424c5819162a913e9
 
 # Web/WASM matched set with ONNX_VERSION_WEB. Do not reuse Android/iOS
 # prebuilts for this target; the Web vendor scripts validate provenance.
@@ -249,7 +249,7 @@ SHERPA_ONNX_COMMIT_WEB=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # Maple is CPU-only until its ternary expert mul_mm_id kernels exist on GPU;
 # the engine enforces that after reading general.architecture from the GGUF.
 # See the fork's RUNANYWHERE.md before rebasing.
-LLAMACPP_VERSION=runanywhere-b10453.2
+LLAMACPP_VERSION=runanywhere-b10453.4
 # Repository the llama.cpp FetchContent clones. Consumed by
 # engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
 LLAMACPP_GIT_REPOSITORY=https://github.com/RunanywhereAI/llama.cpp.git

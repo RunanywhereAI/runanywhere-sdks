@@ -110,47 +110,6 @@ artifact.write_bytes(payload)
 PY
 }
 
-sanitize_pinned_host_path() {
-    local artifact="$1"
-    local source="$2"
-    local replacement="$3"
-    local expected_count="$4"
-    local raw_digest="$5"
-    local transformed_digest="$6"
-    local label="$7"
-
-    python3 - "${artifact}" "${source}" "${replacement}" "${expected_count}" \
-        "${raw_digest}" "${transformed_digest}" "${label}" <<'PY'
-from hashlib import sha256
-from pathlib import Path
-import sys
-
-artifact = Path(sys.argv[1])
-source = sys.argv[2].encode()
-replacement = sys.argv[3].encode()
-expected_count = int(sys.argv[4])
-raw_digest, transformed_digest, label = sys.argv[5:8]
-payload = artifact.read_bytes()
-
-if len(source) != len(replacement):
-    raise SystemExit(f"ERROR: {label} replacement changes binary offsets")
-
-digest = sha256(payload).hexdigest()
-if digest == raw_digest:
-    if payload.count(source) != expected_count or replacement in payload:
-        raise SystemExit(f"ERROR: {label} embedded-path inventory drifted")
-    payload = payload.replace(source, replacement)
-    if sha256(payload).hexdigest() != transformed_digest:
-        raise SystemExit(f"ERROR: {label} sanitized digest mismatch")
-    artifact.write_bytes(payload)
-elif digest != transformed_digest:
-    raise SystemExit(f"ERROR: unreviewed {label} bytes")
-
-if payload.count(source) or payload.count(replacement) != expected_count:
-    raise SystemExit(f"ERROR: {label} path sanitization was incomplete")
-PY
-}
-
 rm -rf "${STAGE}"
 mkdir -p "${STAGE}/bin" "${STAGE}/lib"
 cp "${BINARY}" "${STAGE}/bin/rcli"
@@ -238,22 +197,6 @@ case "${PLATFORM}" in
             install_name_tool -change "${dep}" "@rpath/${local_name}" "${STAGE}/bin/rcli"
         done
 
-        # The pinned ONNX Runtime 1.24.4 arm64 dylib embeds its upstream CI
-        # checkout prefix in __FILE__ strings. Rewrite only that reviewed
-        # byte prefix, with raw/transformed digests and occurrence count
-        # pinned so an upstream artifact change fails closed.
-        for library in "${STAGE}"/lib/libonnxruntime*.dylib; do
-            [ -e "${library}" ] || continue
-            sanitize_pinned_host_path \
-                "${library}" \
-                "/Users/cloudtest/vss/_work/" \
-                "/runanywhere/vendor/onnxrt/" \
-                843 \
-                "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289" \
-                "3e4f1ac4cef99693c95532f38b436bd106156504c4dd51595af2e51d3c3d00ee" \
-                "ONNX Runtime 1.24.4 arm64 dylib"
-        done
-
         # A copied Homebrew dylib may retain an absolute install ID or refer
         # to another copied dylib through its Cellar path. Make the complete
         # staged set self-contained before validating the executable.
@@ -333,22 +276,6 @@ case "${PLATFORM}" in
                | grep -vE '^(/lib|/usr/lib|/lib64)' || true)
         for src in ${deps}; do
             [ -f "${src}" ] && cp -L "${src}" "${STAGE}/lib/$(basename "${src}")"
-        done
-        # The RunAnywhere Sherpa-ONNX 1.13.5 / ORT 1.28.0 x64 C API library
-        # carries its GitHub Actions source root. Apply the same exact,
-        # byte-preserving fail-closed policy as the macOS runtime input. These
-        # digests are for the fork-owned v1.13.5-rac-desktop.2 artifact, not
-        # upstream's differently linked 1.13.5 archive.
-        for library in "${STAGE}"/lib/libsherpa-onnx-c-api.so*; do
-            [ -e "${library}" ] || continue
-            sanitize_pinned_host_path \
-                "${library}" \
-                "/home/runner/work/sherpa-onnx/sherpa-onnx" \
-                "/runanywhere/vendor/sherpa-onnx/src/root0" \
-                256 \
-                "4ecb243584296230dd29d67651340a5447c545cc7cfad5b833fca942228b845f" \
-                "2cc145b810e1f0c4f4587720922b6223e7e1560fd9d1675b2c906156fd117e25" \
-                "RunAnywhere Sherpa-ONNX 1.13.5 / ORT 1.28.0 x64 C API library"
         done
         command -v patchelf >/dev/null 2>&1 || {
             echo "ERROR: patchelf is required to make the Linux package relocatable" >&2

@@ -26,21 +26,9 @@ add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 # so a fork swap (e.g. the PrismML Bonsai fork) is a VERSIONS-only change.
 # Fall back to upstream when the key is absent (older VERSIONS files).
 if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
-    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/ggerganov/llama.cpp.git")
+    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/ggml-org/llama.cpp.git")
 endif()
 message(STATUS "llama.cpp source: ${RAC_LLAMACPP_GIT_REPOSITORY} @ ${RAC_LLAMACPP_VERSION}")
-
-# Keep the cross-platform armv7 compatibility patch first. On iOS, chain the
-# Metal residency-set capability guard after it instead of replacing it.
-set(LLAMACPP_PATCH_COMMAND
-    ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/patch_ggml_armv7.cmake"
-)
-if(RAC_PLATFORM_IOS)
-    list(APPEND LLAMACPP_PATCH_COMMAND
-        COMMAND git apply --3way --unidiff-zero --ignore-whitespace
-                "${CMAKE_CURRENT_LIST_DIR}/patches/001-metal-residency-set-guard.patch"
-    )
-endif()
 
 FetchContent_Declare(
     llamacpp
@@ -48,9 +36,6 @@ FetchContent_Declare(
     GIT_TAG        ${RAC_LLAMACPP_VERSION}
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
-    # Fix the ggml arch/arm/quants.c armv7 build break (raw AArch64-only vqtbl1q_u8 -> portable wrapper).
-    # Idempotent + no-op when the pattern/file is absent, so it is safe on every arch and future llama.cpp bump.
-    PATCH_COMMAND ${LLAMACPP_PATCH_COMMAND}
 )
 
 # Configure llama.cpp build options
@@ -115,7 +100,7 @@ elseif(RAC_PLATFORM_ANDROID)
 
     # Enable ARM NEON only for ARM architectures (not x86/x86_64). armeabi-v7a keeps
     # NEON on; the ggml arch/arm/quants.c armv7 build break (raw AArch64-only
-    # vqtbl1q_u8) is fixed by the FetchContent PATCH_COMMAND above, not by dropping NEON.
+    # vqtbl1q_u8) is fixed in the pinned llama.cpp fork, not by dropping NEON.
     if(ANDROID_ABI MATCHES "arm64-v8a|armeabi-v7a")
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for ARM ABI: ${ANDROID_ABI}")

@@ -32,5 +32,5 @@ public enum RAVersions {
     public static let swiftCrypto = "3.15.1"
     public static let files = "4.3.0"
     // Mirrors core/VERSIONS::ONNX_VERSION_IOS.
-    public static let onnxRuntimeIOS = "1.24.3"
+    public static let onnxRuntimeIOS = "1.28.0"
 }
