@@ -7,6 +7,7 @@
 /// `runanywhere.v1.NpuCapability` proto message.
 ///
 /// ```dart
+/// import 'package:runanywhere/runanywhere.dart';
 /// import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 ///
 /// final npu = QHexRT.probeNpu();

@@ -177,7 +177,7 @@ export async function registerModel(
     name: input.name,
     framework: input.framework,
     category: modality,
-    source: input.source ?? ModelSource.MODEL_SOURCE_REMOTE,
+    ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
