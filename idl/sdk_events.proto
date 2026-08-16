@@ -518,6 +518,10 @@ message VoiceLifecycleEvent {
     int64               output_audio_duration_ms = 24;   // TTS output audio
     int64               output_audio_bytes       = 25;
     int64               processing_duration_ms   = 26;   // telemetry processing_time_ms
+    // The TTS counterpart to real_time_factor (18). rac_telemetry_tts_payload_t
+    // has carried this field all along; without a home on the wire the value
+    // emit_tts_synthesis_completed was handed had nowhere to go.
+    double              characters_per_second    = 27;   // TTS
 }
 
 enum VoiceEventKind {

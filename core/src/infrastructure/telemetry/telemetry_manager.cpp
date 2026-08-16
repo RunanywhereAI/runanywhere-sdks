@@ -1157,6 +1157,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.audio_duration_ms = static_cast<double>(v.input_audio_duration_ms());
                 payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
                 payload.word_count = v.word_count();
+                payload.real_time_factor = v.real_time_factor();
                 payload.confidence = v.confidence();
                 if (!v.language().empty())
                     payload.language = v.language().c_str();
@@ -1203,6 +1204,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
                 payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
                 payload.has_processing_time_ms = RAC_TRUE;
+                payload.characters_per_second = v.characters_per_second();
                 payload.sample_rate = v.sample_rate();
                 framework_str = framework_proto_to_string(v.framework());
                 payload.framework = framework_str.c_str();
