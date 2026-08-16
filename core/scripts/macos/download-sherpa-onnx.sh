@@ -16,7 +16,7 @@
 # Build time: ~5-10 minutes on Apple Silicon
 # =============================================================================
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -34,8 +34,16 @@ if [ -z "${SHERPA_ONNX_COMMIT_MACOS:-}" ]; then
     echo "ERROR: SHERPA_ONNX_COMMIT_MACOS not loaded from VERSIONS file" >&2
     exit 1
 fi
+if [ -z "${ONNX_VERSION_MACOS:-}" ] || \
+   [ -z "${ONNX_MACOS_STATIC_SHA256:-}" ] || \
+   [ -z "${ONNX_MACOS_ERROR_CODE_HEADER_SHA256:-}" ]; then
+    echo "ERROR: macOS ONNX Runtime version/checksum not loaded from VERSIONS file" >&2
+    exit 1
+fi
 
 SHERPA_VERSION="${SHERPA_ONNX_VERSION_MACOS}"
+RUNTIME_MARKER="sherpa=${SHERPA_VERSION} onnx=${ONNX_VERSION_MACOS} coreml_ep=off"
+VERSION_MARKER="${SHERPA_DIR}/.runtime-versions"
 
 echo "======================================="
 echo "📦 Sherpa-ONNX macOS Static Builder"
@@ -50,7 +58,9 @@ echo "Architecture: arm64 (Apple Silicon)"
 if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ] && \
    [ -f "${SHERPA_DIR}/lib/libonnxruntime.a" ] && \
    [ -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] && \
-   [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
+   [ -f "${SHERPA_DIR}/include/onnxruntime_error_code.h" ] && \
+   [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ] && \
+   [ "$(cat "${VERSION_MARKER}" 2>/dev/null || true)" = "${RUNTIME_MARKER}" ]; then
     echo "✅ Sherpa-ONNX macOS static libs already exist at ${SHERPA_DIR}"
     echo "   To force rebuild, remove: rm -rf ${SHERPA_DIR}"
     exit 0
@@ -80,6 +90,44 @@ if [ "${ACTUAL_COMMIT}" != "${SHERPA_ONNX_COMMIT_MACOS}" ]; then
     exit 1
 fi
 
+# Use the exact cross-platform ORT baseline instead of Sherpa's independently
+# pinned runtime. This prevents two incompatible OrtGetApiBase versions from
+# entering the same SDK process through the generic ONNX and Sherpa engines.
+ONNX_ARCHIVE="${BUILD_TEMP}/onnxruntime-osx-arm64-static.zip"
+ONNX_URL="https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${ONNX_VERSION_MACOS}/onnxruntime-osx-arm64-static_lib-${ONNX_VERSION_MACOS}.zip"
+curl --fail --location --show-error --silent --retry 5 \
+    --output "${ONNX_ARCHIVE}" "${ONNX_URL}"
+ACTUAL_ONNX_SHA256="$(shasum -a 256 "${ONNX_ARCHIVE}" | awk '{print $1}')"
+if [ "${ACTUAL_ONNX_SHA256}" != "${ONNX_MACOS_STATIC_SHA256}" ]; then
+    echo "Error: ONNX Runtime macOS static archive checksum mismatch" >&2
+    echo "  expected: ${ONNX_MACOS_STATIC_SHA256}" >&2
+    echo "  actual:   ${ACTUAL_ONNX_SHA256}" >&2
+    exit 1
+fi
+unzip -q "${ONNX_ARCHIVE}" -d "${BUILD_TEMP}/onnxruntime"
+ONNX_ROOT="$(find "${BUILD_TEMP}/onnxruntime" -maxdepth 1 -type d \
+    -name "onnxruntime-osx-arm64-static_lib-${ONNX_VERSION_MACOS}" -print -quit)"
+if [ -z "${ONNX_ROOT}" ] || [ ! -f "${ONNX_ROOT}/lib/libonnxruntime.a" ]; then
+    echo "Error: verified ONNX Runtime macOS static archive has an unexpected layout" >&2
+    exit 1
+fi
+
+# csukuangfj's static bundle intentionally contains the generated ORT public
+# headers but currently omits onnxruntime_error_code.h, which its own
+# onnxruntime_c_api.h includes. Restore that one file from the exact upstream
+# v${ONNX_VERSION_MACOS} tag and verify its immutable content before use.
+ONNX_ERROR_CODE_HEADER="${ONNX_ROOT}/include/onnxruntime_error_code.h"
+curl --fail --location --show-error --silent --retry 5 \
+    --output "${ONNX_ERROR_CODE_HEADER}" \
+    "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_VERSION_MACOS}/include/onnxruntime/core/session/onnxruntime_error_code.h"
+ACTUAL_ERROR_CODE_HEADER_SHA256="$(shasum -a 256 "${ONNX_ERROR_CODE_HEADER}" | awk '{print $1}')"
+if [ "${ACTUAL_ERROR_CODE_HEADER_SHA256}" != "${ONNX_MACOS_ERROR_CODE_HEADER_SHA256}" ]; then
+    echo "Error: ONNX Runtime error-code header checksum mismatch" >&2
+    echo "  expected: ${ONNX_MACOS_ERROR_CODE_HEADER_SHA256}" >&2
+    echo "  actual:   ${ACTUAL_ERROR_CODE_HEADER_SHA256}" >&2
+    exit 1
+fi
+
 # Build static libraries
 echo ""
 echo "==> Building static libraries for macOS arm64..."
@@ -89,12 +137,14 @@ BUILD_DIR="${BUILD_TEMP}/sherpa-onnx/build-macos-static"
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
+SHERPA_ONNXRUNTIME_LIB_DIR="${ONNX_ROOT}/lib" \
+SHERPA_ONNXRUNTIME_INCLUDE_DIR="${ONNX_ROOT}/include" \
 cmake "${BUILD_TEMP}/sherpa-onnx" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOS_DEPLOYMENT_TARGET}" \
     -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG -ffile-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fmacro-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fdebug-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build" \
-    -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -ffile-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fmacro-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fdebug-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build" \
+    -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -DSHERPA_ONNX_DISABLE_COREML=1 -ffile-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fmacro-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build -fdebug-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/core/build/sherpa-onnx-macos-build" \
     -DBUILD_SHARED_LIBS=OFF \
     -DSHERPA_ONNX_ENABLE_C_API=ON \
     -DSHERPA_ONNX_ENABLE_BINARY=OFF \
@@ -104,7 +154,7 @@ cmake "${BUILD_TEMP}/sherpa-onnx" \
     -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF \
     -DSHERPA_ONNX_ENABLE_GPU=OFF
 
-cmake --build . --config Release -j"$(sysctl -n hw.ncpu)"
+cmake --build . --config Release -j"${RAC_BUILD_JOBS:-2}"
 
 # Collect static libraries and headers
 echo ""
@@ -130,15 +180,8 @@ done
 # packager consumes this exact static runtime for the macOS ONNX slice; using
 # headers from a separately downloaded dylib package would allow the compile
 # and link inputs to drift apart.
-ONNX_LIB=$(find "${BUILD_DIR}" -name "libonnxruntime.a" 2>/dev/null | head -1)
-if [ -n "${ONNX_LIB}" ]; then
-    cp "${ONNX_LIB}" "${SHERPA_DIR}/lib/"
-fi
-
-ONNX_INCLUDE_DIR=$(find "${BUILD_DIR}" -type d -path "*/onnxruntime-src/include" 2>/dev/null | head -1)
-if [ -n "${ONNX_INCLUDE_DIR}" ]; then
-    cp -R "${ONNX_INCLUDE_DIR}/." "${SHERPA_DIR}/include/"
-fi
+cp "${ONNX_ROOT}/lib/libonnxruntime.a" "${SHERPA_DIR}/lib/"
+cp -R "${ONNX_ROOT}/include/." "${SHERPA_DIR}/include/"
 
 # Copy headers
 if [ -d "${BUILD_TEMP}/sherpa-onnx/sherpa-onnx/c-api" ]; then
@@ -169,6 +212,7 @@ if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ] && \
     echo ""
     echo "Headers:"
     find "${SHERPA_DIR}/include" -name "*.h" 2>/dev/null || echo "  (none found)"
+    printf '%s\n' "${RUNTIME_MARKER}" > "${VERSION_MARKER}"
 else
     echo "❌ Build failed - complete Sherpa/ONNX static inventory not found"
     echo ""

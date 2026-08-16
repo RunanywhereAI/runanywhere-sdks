@@ -54,6 +54,7 @@ SHERPA_REQUIRED_FILES=(
 ORT_REQUIRED_FILES=(
   "${ORT_ARCHIVE}"
   "${ORT_DIR}/include/onnxruntime_c_api.h"
+  "${ORT_DIR}/include/onnxruntime_error_code.h"
   "${ORT_DIR}/include/onnxruntime_cxx_api.h"
   "${ORT_DIR}/include/onnxruntime_cxx_inline.h"
   "${ORT_DIR}/include/onnxruntime_float16.h"

@@ -44,7 +44,7 @@ ORT_BUILD_DIR="${SRC_DIR}/build/${_ORT_OS_DIR}/${BUILD_CONFIG}"
 PROVENANCE_FILE="${DEST_DIR}/.rac-wasm-provenance"
 BUILD_PROVENANCE_FILE="${ORT_BUILD_DIR}/.rac-wasm-build-provenance"
 ORT_ARCHIVE_DEST="${DEST_DIR}/lib/libonnxruntime.a"
-# ORT v1.27.1 intentionally pins protobuf v21.12, while RACommons-generated
+# ORT v1.28.0 intentionally pins protobuf v21.12, while RACommons-generated
 # protocol bindings pin protobuf v35.1. Both runtimes are linked into the one
 # canonical ONNX/Sherpa module. Shade ORT's private C++ protobuf namespace so
 # wasm-ld can never resolve its protobuf21 virtual calls to protobuf35 symbols.
@@ -64,6 +64,7 @@ PATCH_STATE=""
 ORT_REQUIRED_FILES=(
   "${ORT_ARCHIVE_DEST}"
   "${DEST_DIR}/include/onnxruntime_c_api.h"
+  "${DEST_DIR}/include/onnxruntime_error_code.h"
   "${DEST_DIR}/include/onnxruntime_cxx_api.h"
   "${DEST_DIR}/include/onnxruntime_cxx_inline.h"
   "${DEST_DIR}/include/onnxruntime_float16.h"
@@ -86,7 +87,7 @@ sha256_file() {
 }
 
 SCRIPT_SHA256="$(sha256_file "${BASH_SOURCE[0]}")"
-# Sherpa-ONNX 1.13.4 creates its WASM Ort::Env through
+# Sherpa-ONNX 1.13.5 creates its WASM Ort::Env through
 # CreateEnvWithGlobalThreadPools. Keep ORT's matching upstream
 # DEFAULT_USE_PER_SESSION_THREADS=false behavior; the legacy per-session patch
 # predated that Sherpa fix and would bypass the validated global pools.
@@ -468,6 +469,7 @@ HEADER_SRC="${SRC_DIR}/include/onnxruntime/core/session"
 # (sherpa-onnx) fail at the very first include.
 for header in \
   onnxruntime_c_api.h \
+  onnxruntime_error_code.h \
   onnxruntime_cxx_api.h \
   onnxruntime_cxx_inline.h \
   onnxruntime_float16.h \
