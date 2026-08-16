@@ -181,22 +181,24 @@ export async function registerAll(
         memoryRequirementBytes: 4_368_438_944,
       }),
       // Gemma (Google)
-      // Gemma 4 license: Google's Gemma Terms of Use (https://ai.google.dev/gemma/terms),
-      // not Apache. Phone-scale rows only (E2B/E4B) — the 12B/26B-A4B/31B dense/MoE
-      // Gemma 4 rows are desktop-scale and this app has no desktop RN target.
+      // Gemma 4 is Apache 2.0. Preserve the license and applicable attribution
+      // notices if downloaded artifacts are redistributed. Phone-scale rows
+      // only (E2B/E4B); larger Gemma 4 variants are desktop-scale.
       registerModel({
         id: 'gemma-4-e2b-it-q4_k_m',
         name: 'Gemma 4 E2B IT Q4_K_M',
         url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 3_106_738_272,
+        // 3,106,738,272 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 3_400_000_000,
       }),
       registerModel({
         id: 'gemma-4-e4b-it-q4_k_m',
         name: 'Gemma 4 E4B IT Q4_K_M',
         url: 'https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 4_977_171_584,
+        // 4,977,171,584 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 5_700_000_000,
       }),
       // Granite (IBM)
       // Apache 2.0. Phone-scale row only (3B) — the 8B/30B Granite 4.1 rows are
@@ -206,7 +208,8 @@ export async function registerAll(
         name: 'IBM Granite 4.1 3B Q4_K_M',
         url: 'https://huggingface.co/unsloth/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 2_099_502_400,
+        // 2,099,502,400 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 2_400_000_000,
       }),
       // Bonsai (PrismML)
       // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
