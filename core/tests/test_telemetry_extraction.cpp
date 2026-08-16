@@ -144,8 +144,29 @@ int main() {
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/stt", "stt: routed to stt endpoint");
         CHECK(!has(cap.body, "nan") && !has(cap.body, "NaN"),
               "stt: NaN confidence does not leak into JSON");
-        CHECK(has(cap.body, "real_time_factor") || has(cap.body, "word_count"),
-              "stt: fields present");
+        CHECK(has(cap.body, "\"word_count\":4"), "stt: word_count = 4");
+        // add_double drops a zero, so the old "key is present" assertion held
+        // while the value was being dropped on the floor twice over: the emit
+        // helper never wrote the proto field, and the extractor never read it.
+        CHECK(has(cap.body, "\"real_time_factor\":0.5"), "stt: real_time_factor = 0.5");
+    }
+
+    // --- TTS: characters_per_second survives emit -> proto -> payload -------
+    {
+        v1::SDKEvent ev;
+        envelope(&ev, v1::SDK_COMPONENT_TTS);
+        auto* vo = ev.mutable_voice();
+        vo->set_kind(v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED);
+        vo->set_model_id("piper-en-us");
+        vo->set_character_count(85);
+        vo->set_output_audio_duration_ms(4000);
+        vo->set_processing_duration_ms(2000);
+        vo->set_characters_per_second(42.5);
+        track(mgr, &cap, ev);
+        CHECK(cap.called, "tts: event delivered to sink");
+        CHECK(cap.endpoint == "/api/v2/sdk/telemetry/tts", "tts: routed to tts endpoint");
+        CHECK(has(cap.body, "\"character_count\":85"), "tts: character_count = 85");
+        CHECK(has(cap.body, "\"characters_per_second\":42.5"), "tts: characters_per_second = 42.5");
     }
 
     // --- Embeddings: total_tokens + batch_size + embedding_dimension --------

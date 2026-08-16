@@ -314,6 +314,7 @@ void emit_tts_synthesis_completed(const char* synthesis_id, const char* model_id
     voice.set_output_audio_duration_ms(static_cast<int64_t>(audio_duration_ms));
     voice.set_output_audio_bytes(audio_size_bytes);
     voice.set_processing_duration_ms(static_cast<int64_t>(processing_duration_ms));
+    voice.set_characters_per_second(characters_per_second);
     voice.set_sample_rate(sample_rate);
     voice.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_TTS, v1::EVENT_CATEGORY_TTS, std::move(voice),
