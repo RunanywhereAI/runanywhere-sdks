@@ -70,6 +70,11 @@ jobs:
             git fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
           fi
           bash scripts/validation/gates/check_release_version_coherence.sh
+      - name: Release-train version coherence gate tests
+        # The step above only proves the tree is coherent today. These prove the
+        # gate still rejects the podspec source-tag shapes it was added for, so
+        # it cannot quietly stop catching them.
+        run: python3 scripts/validation/gates/test_release_version_coherence.py
       - name: Swift distribution repo (runanywhere-swift) is cut at this release
         # RunanywhereAI/runanywhere-swift is the lightweight SPM distribution of
         # bindings/swift. Its tags MUST keep pace with this repo's releases or
