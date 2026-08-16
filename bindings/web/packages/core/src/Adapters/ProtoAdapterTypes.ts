@@ -549,6 +549,7 @@ export function streamCallback<T>(
       let callbackPtr = 0;
       let started = false;
       let finished = false;
+      let failure: unknown = null;
       let callActive = false;
       let emitsSinceYield = 0;
 
@@ -571,6 +572,10 @@ export function streamCallback<T>(
       const fail = (error: unknown): void => {
         if (finished) return;
         finished = true;
+        // Kept for the consumer that is not parked right now (a decode that
+        // throws while earlier events are still buffered, say); without it the
+        // next `next()` would read the stream as a clean end.
+        failure = error;
         while (waiters.length > 0) {
           waiters.shift()!.reject(error);
         }
@@ -699,6 +704,11 @@ export function streamCallback<T>(
           start();
           if (queue.length > 0) {
             return Promise.resolve({ value: queue.shift()!, done: false });
+          }
+          if (failure !== null) {
+            const error = failure;
+            failure = null;
+            return Promise.reject(error);
           }
           if (finished) {
             return Promise.resolve({ value: undefined as T, done: true });

@@ -331,6 +331,11 @@ export class OffscreenRuntimeBridge {
         }> = [];
         let started = false;
         let finished = false;
+        // Rejecting the parked waiters is not enough on its own: a worker that
+        // dies while the consumer is running its loop body has no waiter to
+        // reject, and without this the next `next()` would read the stream as
+        // a clean end.
+        let failure: unknown = null;
 
         const finish = (): void => {
           if (finished) return;
@@ -344,6 +349,7 @@ export class OffscreenRuntimeBridge {
         const fail = (err: unknown): void => {
           if (finished) return;
           finished = true;
+          failure = err;
           this.pending.delete(requestId);
           while (waiters.length > 0) waiters.shift()!.reject(err);
         };
@@ -398,6 +404,11 @@ export class OffscreenRuntimeBridge {
             start();
             if (queue.length > 0) {
               return Promise.resolve({ value: queue.shift()!, done: false });
+            }
+            if (failure !== null) {
+              const err = failure;
+              failure = null;
+              return Promise.reject(err);
             }
             if (finished) {
               return Promise.resolve({ value: undefined as T, done: true });
