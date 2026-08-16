@@ -113,7 +113,7 @@ export function pluginPrebuildDir(locator: PluginArtifactLocator): string {
  * Only rewritten when the unpacked file is actually there, so an app that
  * unpacks nothing, or a plain unpackaged tree, is left exactly as it was.
  */
-function asarUnpacked(filePath: string): string {
+export function asarUnpacked(filePath: string): string {
   if (!filePath.includes(`app.asar${path.sep}`)) return filePath;
   const unpacked = filePath.replace(
     `app.asar${path.sep}`,

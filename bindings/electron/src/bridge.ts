@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { asarUnpacked } from './backend/plugin-registry';
 import { asSDKException } from './errors';
 
 // Re-exported for existing importers (RunAnywhere.ts imports it from here); the
@@ -485,7 +486,12 @@ function commonsLibraryFileName(platform: NodeJS.Platform = process.platform): s
 
 /** Absolute path to shared commons beside a thin addon, or `undefined`. */
 export function resolveCommonsLibrary(addonDir: string): string | undefined {
-  const candidate = path.join(addonDir, commonsLibraryFileName());
+  // Same asar trap resolvePluginArtifactPath guards against: inside a packaged
+  // app this path can point into app.asar, where fs.existsSync succeeds through
+  // Electron's shim but the OS loader sees nothing. The result feeds
+  // addSidecarDirToDllSearch, which is an OS-level call, so it has to be the
+  // real file on disk.
+  const candidate = asarUnpacked(path.join(addonDir, commonsLibraryFileName()));
   return fs.existsSync(candidate) ? candidate : undefined;
 }
 
@@ -547,7 +553,11 @@ function pluginPathCandidatesFromEnv(): string[] {
 }
 
 function prepareNativeLoad(addonPath: string): void {
-  const addonDir = path.dirname(addonPath);
+  // require() can load a .node out of app.asar because Electron patches
+  // process.dlopen to extract it, so addonPath may still be an archive path
+  // here. Everything below hands directories to the OS loader instead, which
+  // cannot look inside the archive, so resolve to the unpacked copy first.
+  const addonDir = path.dirname(asarUnpacked(addonPath));
   addSidecarDirToDllSearch(addonDir);
   const commons = resolveCommonsLibrary(addonDir);
   if (commons) addSidecarDirToDllSearch(path.dirname(commons));
