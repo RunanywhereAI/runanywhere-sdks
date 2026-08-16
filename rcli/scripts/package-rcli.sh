@@ -181,9 +181,15 @@ case "${PLATFORM}" in
                     src="${STAGE}/lib/${local_name}"
                 else
                 # Release archives may contain a dSYM DWARF file with the same
-                # basename as the linked dylib. Search only real lib payloads
+                # basename as the linked dylib. Search only library entries
                 # so filesystem traversal order cannot select debug symbols.
-                    src="$(find "${BUILD_DIR}" -path "*/lib/${local_name}" -type f \
+                    # Versioned runtime archives use symlink chains such as
+                    # libonnxruntime.1.dylib -> libonnxruntime.1.28.0.dylib.
+                    # -type f drops the linked name that Mach-O records, so
+                    # accept both regular files and symlinks here. The -f
+                    # validation below still rejects broken links.
+                    src="$(find "${BUILD_DIR}" -path "*/lib/${local_name}" \
+                        \( -type f -o -type l \) \
                         ! -path "*/.dSYM/*" 2>/dev/null | LC_ALL=C sort | head -1)"
                 fi
             fi
