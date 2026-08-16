@@ -193,15 +193,16 @@ abstract final class ModelCatalogBootstrap {
     // Gemma 4 (Google) — phone-scale MatFormer sizes only (E2B/E4B). The
     // 12B/26B-A4B/31B siblings are desktop-scale and this app ships mobile
     // (iOS/Android) targets only, no Flutter desktop build. License is the
-    // Gemma Terms of Use, not Apache — noted since every other row here is
-    // Apache/MIT-licensed upstream.
+    // Apache 2.0. Preserve the license and applicable attribution notices if
+    // downloaded artifacts are redistributed.
     await _registerLLM(
       id: 'gemma-4-e2b-it-q4_k_m',
       name: 'Gemma 4 E2B IT Q4_K_M',
       url:
           'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 3106738272,
+      // 3,106,738,272 B of weights plus a 4K-context KV/runtime allowance.
+      memoryRequirement: 3400000000,
     );
     await _registerLLM(
       id: 'gemma-4-e4b-it-q4_k_m',
@@ -209,7 +210,8 @@ abstract final class ModelCatalogBootstrap {
       url:
           'https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 4977171584,
+      // 4,977,171,584 B of weights plus a 4K-context KV/runtime allowance.
+      memoryRequirement: 5700000000,
     );
 
     // Granite 4.1 (IBM) — only the 3B row is phone-scale; the 8B/30B
@@ -221,7 +223,8 @@ abstract final class ModelCatalogBootstrap {
       url:
           'https://huggingface.co/unsloth/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_M.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 2099502400,
+      // 2,099,502,400 B of weights plus a 4K-context KV/runtime allowance.
+      memoryRequirement: 2400000000,
     );
 
     // Nemotron (NVIDIA) — portable embedding GGUFs on the llama.cpp backend.
