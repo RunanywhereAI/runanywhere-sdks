@@ -242,6 +242,7 @@ message ClusterPeerCapability {
 // Layer range assigned to a peer by the coordinator.
 message ClusterLayerAssignment {
     string instance_id = 1;
+    // Half-open range: this peer owns layers [layer_start, layer_end), with layer_end excluded.
     uint32 layer_start = 2;
     uint32 layer_end   = 3;
     bool   is_coordinator = 4;
@@ -252,6 +253,14 @@ message ClusterStartRequest {
     string cluster_id = 1;
     ConnectModelDescriptor model = 2;
     repeated ClusterLayerAssignment assignments = 3;
+}
+
+// Sent by a peer device when joining a cluster to validate its assignment and register capabilities.
+message ClusterJoinRequest {
+    string cluster_id = 1;
+    string instance_id = 2;
+    ClusterStartRequest cluster_start = 3;
+    ClusterPeerCapability peer_capability = 4;
 }
 
 message ClusterStartResponse {

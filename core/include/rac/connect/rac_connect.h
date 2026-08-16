@@ -116,8 +116,9 @@ RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_byte
                                                      rac_proto_buffer_t* out_cluster_state);
 
 /**
- * Join a cluster as a peer from a serialized runanywhere.v1.ClusterStartRequest.
- * Validates assigned layer range and returns ClusterStartResponse.
+ * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
+ * Validates the peer's assigned layer range in the cluster and returns
+ * a ClusterStartResponse echoing the peer's capability.
  */
 RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
                                                     size_t request_size,
