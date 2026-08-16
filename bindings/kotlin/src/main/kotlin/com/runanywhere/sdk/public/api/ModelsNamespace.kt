@@ -283,6 +283,24 @@ public class ModelsNamespace internal constructor() {
         unloadAll(category)
     }
 
+    /**
+     * Re-read the registry: rescan local storage, optionally pull the remote
+     * catalog, optionally drop entries whose files are gone.
+     *
+     * Matches `models.refresh` on the Swift namespace, including its defaults.
+     */
+    public suspend fun refresh(
+        rescanLocal: Boolean = true,
+        includeRemoteCatalog: Boolean = false,
+        pruneOrphans: Boolean = false,
+    ) {
+        legacyRefreshModelRegistry(
+            rescanLocal = rescanLocal,
+            includeRemoteCatalog = includeRemoteCatalog,
+            pruneOrphans = pruneOrphans,
+        )
+    }
+
     /** What is resident right now, and how much storage is used and free. */
     public suspend fun state(): ModelsState {
         val loaded = mutableMapOf<ModelCategory, ModelInfo>()
