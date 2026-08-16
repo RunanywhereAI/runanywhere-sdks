@@ -207,7 +207,8 @@ class RunAnywhereStorage {
   /// the model level because each [ModelFileDescriptor] carries its own URL.
   ///
   /// Mirrors Swift `RunAnywhere.registerModel(multiFile:id:name:framework:
-  /// modality:memoryRequirement:contextLength:supportsThinking:source:)`.
+  /// modality:memoryRequirement:downloadSize:contextLength:supportsThinking:
+  /// supportsLora:source:)`.
   static Future<ModelInfo> registerMultiFileModel({
     required List<ModelFileDescriptor> files,
     required String id,
@@ -215,8 +216,10 @@ class RunAnywhereStorage {
     required InferenceFramework framework,
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
+    bool supportsLora = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
     String? description,
     String? cuaProfile,
@@ -234,18 +237,19 @@ class RunAnywhereStorage {
       framework: framework,
       category: modality,
       supportsThinking: supportsThinking,
+      supportsLora: supportsLora,
       source: source,
       files: files,
     );
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
+    if (downloadSize != null) {
+      request.downloadSizeBytes = Int64(downloadSize);
+    }
     if (cuaProfile != null && cuaProfile.isNotEmpty) {
       request.cuaProfile = cuaProfile;
     }
-    // See registerModel: downloadSizeBytes is intentionally left unset so the
-    // post-finalize size guard validates against the actual transfer rather
-    // than the RAM-estimate placeholder.
     final resolvedContextLength =
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
     if (resolvedContextLength != null) {
