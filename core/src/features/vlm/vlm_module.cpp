@@ -688,10 +688,21 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
         final_result.time_to_first_token_ms = ttft_duration.count();
     }
 
-    // Calculate tokens per second
-    if (final_result.total_time_ms > 0) {
+    // Tokens per second over the decode window, not the whole span. This value
+    // is mapped onto TokenUsage.decode_tokens_per_second by
+    // rac_proto_adapters.cpp, and llm_module.cpp states the rule: prefill in
+    // the denominator systematically understates generation speed. TTFT is
+    // computed immediately above, so the window is already known here.
+    // Falls back to the full span when no token was seen, or when TTFT is not
+    // strictly inside the span.
+    const int64_t vlm_decode_ms =
+        (final_result.time_to_first_token_ms > 0 &&
+         final_result.time_to_first_token_ms < final_result.total_time_ms)
+            ? final_result.total_time_ms - final_result.time_to_first_token_ms
+            : final_result.total_time_ms;
+    if (vlm_decode_ms > 0) {
         final_result.tokens_per_second = static_cast<float>(final_result.completion_tokens) /
-                                         (static_cast<float>(final_result.total_time_ms) / 1000.0f);
+                                         (static_cast<float>(vlm_decode_ms) / 1000.0f);
     }
 
     if (complete_callback) {
@@ -1029,6 +1040,7 @@ rac_result_t check_lifecycle_model(const runanywhere::v1::VLMGenerationRequest& 
 struct StreamCtx {
     std::string text;
     int32_t token_count{0};
+    int64_t ttft_ms{0};
 };
 
 void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
@@ -1038,11 +1050,21 @@ void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
     out->mutable_usage()->set_total_tokens(ctx.token_count);
     // processing_time_ms renamed to total_time_ms.
     out->set_total_time_ms(elapsed_ms);
-    if (elapsed_ms > 0) {
-        // TokenUsage has no tokens_per_second field; decode_tokens_per_second
-        // is the decode-phase-only throughput this maps onto.
+    if (ctx.ttft_ms > 0) {
+        out->mutable_usage()->set_ttft_ms(ctx.ttft_ms);
+    }
+    // Rate over the decode window, not the whole span. The field is
+    // decode_tokens_per_second, and llm_module.cpp states the reason: including
+    // prefill in the denominator systematically understates generation speed.
+    // For a VLM the prefill is the image encode, so the gap is wider here than
+    // for text. Falls back to the full span when the first-token time is
+    // unknown or not strictly inside it, which keeps a cancelled stream that
+    // produced no token reporting exactly what it did before.
+    const int64_t decode_ms =
+        (ctx.ttft_ms > 0 && ctx.ttft_ms < elapsed_ms) ? elapsed_ms - ctx.ttft_ms : elapsed_ms;
+    if (decode_ms > 0) {
         out->mutable_usage()->set_decode_tokens_per_second(
-            static_cast<double>(ctx.token_count) / (static_cast<double>(elapsed_ms) / 1000.0));
+            static_cast<double>(ctx.token_count) / (static_cast<double>(decode_ms) / 1000.0));
     }
 }
 
@@ -1054,6 +1076,9 @@ struct GeneratedStreamCtx {
     std::string text;
     int32_t token_count{0};
     int64_t started_ms{0};
+    // now_ms() of the first token that survived the sentinel filter, 0 until
+    // one does. Drives usage.ttft_ms and the decode window above.
+    int64_t first_token_ms{0};
     bool terminal_sent{false};
 
     // Per-stream sentinel filter; see vlm_stream_context::filter.
@@ -1137,6 +1162,9 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
     if (!display.empty()) {
         ctx->text += display;
         ++ctx->token_count;
+        if (ctx->token_count == 1) {
+            ctx->first_token_ms = now_ms();
+        }
     }
 
     runanywhere::v1::SDKEvent event;
@@ -1450,8 +1478,11 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                            rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
     if (cancelled) {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{.text = ctx.text, .token_count = ctx.token_count},
-                                    elapsed_ms, &result);
+        populate_result_from_stream(
+            StreamCtx{.text = ctx.text,
+                      .token_count = ctx.token_count,
+                      .ttft_ms = ctx.first_token_ms > 0 ? ctx.first_token_ms - ctx.started_ms : 0},
+            elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
         rc = RAC_SUCCESS;
@@ -1461,8 +1492,11 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         publish_failure(rc, "vlm.stream", rac_error_message(rc));
     } else {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{.text = ctx.text, .token_count = ctx.token_count},
-                                    elapsed_ms, &result);
+        populate_result_from_stream(
+            StreamCtx{.text = ctx.text,
+                      .token_count = ctx.token_count,
+                      .ttft_ms = ctx.first_token_ms > 0 ? ctx.first_token_ms - ctx.started_ms : 0},
+            elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
         const std::string vlm_stream_res =

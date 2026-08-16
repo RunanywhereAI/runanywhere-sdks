@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -191,6 +192,39 @@ rac_result_t dummy_vlm_stream(void*, const rac_vlm_image_t*, const char*, const 
         return RAC_ERROR_CANCELLED;
     if (callback(" vision", user_data) != RAC_TRUE)
         return RAC_ERROR_CANCELLED;
+    return RAC_SUCCESS;
+}
+
+// Milliseconds spent before the first token, standing in for the image encode.
+// Large relative to the decode burst below so the two windows cannot be
+// confused by scheduler jitter on a loaded runner.
+constexpr int64_t kPrefillMs = 400;
+constexpr int64_t kDecodeGapMs = 10;
+constexpr int kDecodeTokens = 4;
+
+rac_result_t slow_prefill_vlm_stream(void*, const rac_vlm_image_t*, const char*,
+                                     const rac_vlm_options_t*, rac_vlm_stream_callback_fn callback,
+                                     void* user_data) {
+    if (!callback)
+        return RAC_ERROR_NULL_POINTER;
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPrefillMs));
+    for (int i = 0; i < kDecodeTokens; ++i) {
+        if (callback("tok ", user_data) != RAC_TRUE)
+            return RAC_ERROR_CANCELLED;
+        // Decode has to be measurable in whole milliseconds. A tight loop puts
+        // the first token in the same millisecond as the last, and the guard
+        // that requires ttft strictly inside the span then falls back to the
+        // full span for a reason that has nothing to do with the arithmetic.
+        std::this_thread::sleep_for(std::chrono::milliseconds(kDecodeGapMs));
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t silent_vlm_stream(void*, const rac_vlm_image_t*, const char*, const rac_vlm_options_t*,
+                               rac_vlm_stream_callback_fn callback, void* user_data) {
+    (void)callback;
+    (void)user_data;
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
     return RAC_SUCCESS;
 }
 
@@ -628,6 +662,171 @@ int test_vlm_process_stream_events() {
     (void)rac_plugin_unregister("llamacpp");
     rac_model_registry_destroy(stream_registry);
 
+    return 0;
+}
+
+// Stand up a lifecycle-loaded mock VLM under the given stream op and hand back
+// the registry so the caller can tear it down. Everything here mirrors the
+// setup in test_vlm_process_stream_events; only the stream op varies.
+rac_model_registry_handle_t load_mock_vlm(const char* model_id, rac_vlm_service_ops_t* ops,
+                                          rac_engine_vtable_t* vtable) {
+    auto root = temp_root(model_id);
+    auto model_path = root / "model.gguf";
+    write_file(model_path, "GGUFmodel");
+
+    *vtable = make_vtable("llamacpp", nullptr, nullptr, ops);
+    (void)rac_plugin_unregister("llamacpp");
+    CHECK(rac_plugin_register(vtable) == RAC_SUCCESS, "decode-rate test plugin registers");
+
+    rac_model_registry_handle_t registry = nullptr;
+    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
+          "decode-rate test registry creates");
+
+    runanywhere::v1::ModelInfo model;
+    model.set_id(model_id);
+    model.set_name(model_id);
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    model.set_local_path(model_path.string());
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+    model.set_is_available(true);
+    std::vector<uint8_t> model_bytes;
+    CHECK(serialize(model, &model_bytes), "decode-rate ModelInfo serializes");
+    CHECK(rac_model_registry_register_proto(registry, model_bytes.data(), model_bytes.size()) ==
+              RAC_SUCCESS,
+          "decode-rate model registers");
+
+    runanywhere::v1::ModelLoadRequest load;
+    load.set_model_id(model_id);
+    std::vector<uint8_t> load_bytes;
+    CHECK(serialize(load, &load_bytes), "decode-rate ModelLoadRequest serializes");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    runanywhere::v1::ModelLoadResult load_result;
+    CHECK(rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out) ==
+                  RAC_SUCCESS &&
+              parse_buffer(out, &load_result) && !load_result.has_error(),
+          "decode-rate lifecycle load succeeds");
+    rac_proto_buffer_free(&out);
+    return registry;
+}
+
+void unload_mock_vlm(const char* model_id, rac_model_registry_handle_t registry) {
+    runanywhere::v1::ModelUnloadRequest unload;
+    unload.set_model_id(model_id);
+    unload.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    std::vector<uint8_t> unload_bytes;
+    CHECK(serialize(unload, &unload_bytes), "decode-rate unload serializes");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    (void)rac_model_lifecycle_unload_proto(unload_bytes.data(), unload_bytes.size(), &out);
+    rac_proto_buffer_free(&out);
+    (void)rac_plugin_unregister("llamacpp");
+    rac_model_registry_destroy(registry);
+}
+
+std::vector<uint8_t> vlm_stream_request_bytes(const char* request_id) {
+    runanywhere::v1::VLMImage image;
+    image.set_file_path("/tmp/test-image.png");
+    runanywhere::v1::LLMGenerationOptions options;
+    options.set_max_output_tokens(16);
+
+    runanywhere::v1::VLMGenerationRequest request;
+    request.set_request_id(request_id);
+    request.set_prompt("describe");
+    *request.add_images() = image;
+    *request.mutable_options() = options;
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "decode-rate VLMGenerationRequest serializes");
+    return bytes;
+}
+
+// The streaming path used to rate throughput over the whole request span, so
+// the image encode sat in the denominator of a field named
+// decode_tokens_per_second. It also never recorded a first-token time, so
+// usage.ttft_ms was 0 for every streamed VLM generation.
+int test_vlm_stream_decode_rate_excludes_prefill() {
+    rac_sdk_event_clear_queue();
+
+    rac_vlm_service_ops_t ops = make_vlm_ops();
+    ops.process_stream = slow_prefill_vlm_stream;
+    rac_engine_vtable_t vtable{};
+    auto registry = load_mock_vlm("mock-vlm-decode-rate", &ops, &vtable);
+
+    const auto request_bytes = vlm_stream_request_bytes("vlm-decode-rate");
+    StreamCapture capture;
+    CHECK(rac_vlm_stream_proto(request_bytes.data(), request_bytes.size(), vlm_stream_capture,
+                               &capture) == RAC_SUCCESS,
+          "decode-rate stream succeeds");
+
+    runanywhere::v1::VLMStreamEvent terminal;
+    CHECK(!capture.events.empty() &&
+              terminal.ParseFromArray(capture.events.back().data(),
+                                      static_cast<int>(capture.events.back().size())) &&
+              terminal.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED,
+          "decode-rate stream ends with COMPLETED");
+
+    const auto& usage = terminal.result().usage();
+    const int64_t total_ms = terminal.result().total_time_ms();
+    CHECK(usage.total_tokens() == kDecodeTokens, "decode-rate stream counts every token");
+    CHECK(usage.ttft_ms() >= kPrefillMs, "decode-rate stream publishes a real ttft_ms");
+    CHECK(usage.ttft_ms() < total_ms, "ttft_ms stays inside the request span");
+
+    // Both numbers come off the same result, so the expected rate is exact
+    // rather than a tolerance on wall-clock: the assertion pins the formula,
+    // not the machine it ran on.
+    const double decode_window_s = static_cast<double>(total_ms - usage.ttft_ms()) / 1000.0;
+    const double expected_rate = static_cast<double>(kDecodeTokens) / decode_window_s;
+    CHECK(std::fabs(usage.decode_tokens_per_second() - expected_rate) < expected_rate * 1e-6,
+          "decode_tokens_per_second is rated over the decode window");
+
+    // And it is genuinely a different number from what the old arithmetic gave,
+    // so the assertion above cannot pass on a tree that still divides by the
+    // whole span. Strictly greater, not a multiple of it: the two rates differ
+    // by exactly the ttft pinned above, which makes this hold for any prefill a
+    // runner actually produces. A multiple would encode how loaded the machine
+    // was. On the old code ttft is 0, the window collapses to the span, and the
+    // two rates are equal, so this still fails there.
+    const double whole_span_rate =
+        static_cast<double>(kDecodeTokens) / (static_cast<double>(total_ms) / 1000.0);
+    CHECK(usage.decode_tokens_per_second() > whole_span_rate,
+          "the decode-window rate is above the whole-span rate");
+
+    unload_mock_vlm("mock-vlm-decode-rate", registry);
+    return 0;
+}
+
+// A stream that produces no token has no decode window to rate over. The
+// fallback must leave it reporting exactly what it did before rather than
+// dividing by a window it never measured.
+int test_vlm_stream_without_tokens_falls_back() {
+    rac_sdk_event_clear_queue();
+
+    rac_vlm_service_ops_t ops = make_vlm_ops();
+    ops.process_stream = silent_vlm_stream;
+    rac_engine_vtable_t vtable{};
+    auto registry = load_mock_vlm("mock-vlm-silent", &ops, &vtable);
+
+    const auto request_bytes = vlm_stream_request_bytes("vlm-silent");
+    StreamCapture capture;
+    CHECK(rac_vlm_stream_proto(request_bytes.data(), request_bytes.size(), vlm_stream_capture,
+                               &capture) == RAC_SUCCESS,
+          "tokenless stream succeeds");
+
+    runanywhere::v1::VLMStreamEvent terminal;
+    CHECK(!capture.events.empty() &&
+              terminal.ParseFromArray(capture.events.back().data(),
+                                      static_cast<int>(capture.events.back().size())) &&
+              terminal.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED,
+          "tokenless stream ends with COMPLETED");
+
+    const auto& usage = terminal.result().usage();
+    CHECK(usage.total_tokens() == 0, "tokenless stream reports no tokens");
+    CHECK(usage.ttft_ms() == 0, "tokenless stream leaves ttft_ms unset");
+    CHECK(usage.decode_tokens_per_second() == 0.0, "tokenless stream reports no decode rate");
+
+    unload_mock_vlm("mock-vlm-silent", registry);
     return 0;
 }
 
@@ -1754,6 +1953,8 @@ int main() {
     try {
         test_missing_component_and_parse_error();
         test_vlm_process_stream_events();
+        test_vlm_stream_decode_rate_excludes_prefill();
+        test_vlm_stream_without_tokens_falls_back();
         test_vlm_companion_resolution();
         test_embeddings_mocked_result();
         test_embeddings_options_mapping();
