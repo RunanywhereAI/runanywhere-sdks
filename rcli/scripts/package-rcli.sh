@@ -305,16 +305,19 @@ case "${PLATFORM}" in
     macos-*|linux-*) "${STAGE}/bin/rcli" version >/dev/null ;;
 esac
 
-# Release artifacts must not disclose the packager's checkout location. Keep
-# this gate here so both CI smoke packages and tagged releases fail closed.
+# Release artifacts must not disclose the packager's checkout, home, or temp
+# locations. Check the current host's concrete prefixes instead of rejecting
+# every /Users/<name> or /home/<name> string: official third-party binaries
+# (including ONNX Runtime) can legitimately retain their upstream producer's
+# source paths.
 while IFS= read -r -d '' artifact; do
     if LC_ALL=C grep -aF -q -- "${REPO_ROOT}" "${artifact}"; then
         echo "ERROR: packaged artifact embeds the local checkout path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
-    if LC_ALL=C grep -aE -q -- '/Users/[^/]+/|/home/[^/]+/|/var/folders/' "${artifact}" \
-        || LC_ALL=C grep -aE -q -- "[A-Za-z]:\\\\Users\\\\" "${artifact}"; then
-        echo "ERROR: packaged artifact embeds a developer home path: ${artifact#"${STAGE}/"}" >&2
+    if { [ -n "${HOME:-}" ] && LC_ALL=C grep -aF -q -- "${HOME%/}/" "${artifact}"; } \
+        || { [ -n "${TMPDIR:-}" ] && LC_ALL=C grep -aF -q -- "${TMPDIR%/}/" "${artifact}"; }; then
+        echo "ERROR: packaged artifact embeds a packager host path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
 done < <(find "${STAGE}/bin" "${STAGE}/lib" -type f -print0)
