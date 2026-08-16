@@ -5,6 +5,15 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.23] - 2026-08-16
+
+### Changed
+
+- Aligned the native runtime train on ONNX Runtime 1.28.0, Sherpa-ONNX 1.13.5,
+  the maintained RunAnywhere llama.cpp fork, and the compatible MLX Swift line.
+- Added current model catalog support and release-coherence validation across
+  the SDK packages and example applications.
+
 ## [0.20.22] - 2026-08-15
 
 ### Changed

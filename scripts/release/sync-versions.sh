@@ -447,6 +447,18 @@ for gradle_file in \
         "def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : \"${NEW_VERSION}\""
 done
 
+# CocoaPods fetches package sources from the immutable suite tag. Keep these
+# explicit fallbacks aligned even though s.version is derived from package.json.
+for podspec in \
+    "${REPO_ROOT}/bindings/react-native/packages/core/RunAnywhereCore.podspec" \
+    "${REPO_ROOT}/bindings/react-native/packages/llamacpp/RunAnywhereLlama.podspec" \
+    "${REPO_ROOT}/bindings/react-native/packages/mlx/RunAnywhereMLX.podspec" \
+    "${REPO_ROOT}/bindings/react-native/packages/onnx/RunAnywhereONNX.podspec"; do
+    bump_line "$podspec" \
+        "source_tag_version[[:space:]]*=[[:space:]]*'[^']+'" \
+        "source_tag_version = '${NEW_VERSION}'"
+done
+
 # 6. Flutter SDK packages
 echo ""
 echo ">> Flutter SDK:"
@@ -529,6 +541,9 @@ for podspec in \
     bump_line "$podspec" \
         "s\.version[[:space:]]*=[[:space:]]*'[^']+'" \
         "s.version          = '${NEW_VERSION}'"
+    bump_line "$podspec" \
+        "asset_version[[:space:]]*=[[:space:]]*'[^']+'" \
+        "asset_version      = '${NEW_VERSION}'"
 done
 
 echo ""

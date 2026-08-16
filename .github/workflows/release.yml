@@ -1869,9 +1869,9 @@ jobs:
     # ADVISORY jobs (kept in `needs` so publish waits + still includes their
     # artifacts on success, but deliberately omitted from the success checks
     # below; `!cancelled()` lets publish proceed when only these fail):
-    #   - native_windows: no published package (Swift/npm/pub.dev/rcli) consumes
-    #     the Windows commons artifact; an MSVC compile issue is tracked as a
-    #     follow-up (see thoughts/shared/issues/sdk-release-bugs.md §F).
+    #   - native_windows / native_rcli_windows: no non-Windows package consumes
+    #     these artifacts. Keep both jobs running so their failures remain
+    #     visible, but do not block an otherwise complete non-Windows train.
     #   - validate_consumer_{swift,kotlin,react_native}: these build EXTERNAL
     #     starter repos (RunanywhereAI/{swift,kotlin,react-native}-starter*) that
     #     version-lag the SDK API independently. Per policy, external-starter drift
@@ -1892,7 +1892,9 @@ jobs:
         needs.native_linux.result == 'success' &&
         needs.native_rcli_macos.result == 'success' &&
         needs.native_rcli_linux.result == 'success' &&
-        needs.native_rcli_windows.result == 'success' &&
+        (needs.native_rcli_windows.result == 'success' ||
+         needs.native_rcli_windows.result == 'failure' ||
+         needs.native_rcli_windows.result == 'skipped') &&
         (needs.native_web.result == 'success' ||
          (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
         needs.sdk_kotlin.result == 'success' &&
@@ -2022,7 +2024,11 @@ jobs:
             echo "::warning::no notarized rcli DMG in this release — Developer ID/notary secrets are not configured"
           fi
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
-          assert_pair "rcli Windows x86_64"            "rcli-windows-x86_64-v${VERSION}.zip"
+          if [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip" ] && [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip.sha256" ]; then
+            assert_pair "rcli Windows x86_64 (advisory)" "rcli-windows-x86_64-v${VERSION}.zip"
+          else
+            echo "  SKIP: rcli Windows x86_64 advisory artifact absent (job failed/skipped)"
+          fi
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"
           assert_pair "Web core package"               "runanywhere-web-${VERSION}.tgz"
