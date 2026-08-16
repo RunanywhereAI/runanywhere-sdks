@@ -546,7 +546,8 @@ bool register_mlx_backend_or_fail(TestResult *result) {
 }
 
 rac_bool_t append_llm_token_callback(const char *token, rac_bool_t is_final,
-                                     const char * /*finish_reason*/, void *user_data) {
+                                     const char * /*finish_reason*/,
+                                     int32_t /*tokens_in_delta*/, void *user_data) {
   if (is_final) {
     return RAC_TRUE;
   }
