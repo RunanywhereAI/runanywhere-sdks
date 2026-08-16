@@ -723,12 +723,539 @@ constexpr CatalogFile kMlxTernaryBonsai27B2BitFiles[] = {
 #undef BONSAI_MLX_FILES
 #undef TERNARY_BONSAI_MLX_FILES_SMALL
 
+// Meta Muse Glimmer 30B GGUF + mmproj (image-text-to-text; llama.cpp mmproj is
+// image-only, so this is vision-capable, not the checkpoint's full "omni"
+// audio/video marketing claim). Sizes verified via HF API blobs this session.
+constexpr CatalogFile kMuseGlimmer30BFiles[] = {
+    {"https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/"
+     "faa5b025c584459c13febfa5c59883516710ae39/"
+     "Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+     "Muse-Glimmer-30B-UD-Q4_K_XL.gguf", true, 15878222368LL},
+    {"https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/"
+     "faa5b025c584459c13febfa5c59883516710ae39/"
+     "mmproj-Muse-Glimmer-30B-Q8_0.gguf",
+     "mmproj-Muse-Glimmer-30B-Q8_0.gguf", true, 2051685088LL},
+};
+
+// NVIDIA Nemotron-3-Nano-Omni-30B-A3B-Reasoning GGUF + mmproj. Same
+// image-only mmproj caveat as Muse Glimmer above: this is vision-capable via
+// llama.cpp, not the model's full audio/video "omni" surface.
+constexpr CatalogFile kNemotronOmniReasoningFiles[] = {
+    {"https://huggingface.co/unsloth/"
+     "NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-GGUF/resolve/"
+     "571758804835f56154718683f5c0e388b7d0fef9/"
+     "NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-UD-Q4_K_M.gguf",
+     "NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-UD-Q4_K_M.gguf", true,
+     23887023552LL},
+    {"https://huggingface.co/unsloth/"
+     "NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-GGUF/resolve/"
+     "571758804835f56154718683f5c0e388b7d0fef9/"
+     "mmproj-F16.gguf",
+     "mmproj-F16.gguf", true, 1587540224LL},
+};
+
+// mlx-community/gemma-4-e2b-it-4bit — config.json model_type "gemma4",
+// registered in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry/VLMTypeRegistry
+// alike. File list + sizes verified via HF API blobs this session.
+constexpr CatalogFile kMlxGemma4E2BFiles[] = {
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "model.safetensors",
+     "model.safetensors", true, 3550670554LL},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
+     "238767527555cb75a05732a84dff5d6ba0dd6809/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/gemma-4-E4B-it-qat-4bit — model_type "gemma4" (registered).
+constexpr CatalogFile kMlxGemma4E4BFiles[] = {
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "model-00001-of-00002.safetensors",
+     "model-00001-of-00002.safetensors", true, 4249502053LL},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "model-00002-of-00002.safetensors",
+     "model-00002-of-00002.safetensors", true, 2548805689LL},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-E4B-it-qat-4bit/resolve/"
+     "0f35c6f6d386f7f74e628bd7c6526ce531212300/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/gemma-4-12B-it-qat-4bit — model_type "gemma4_unified"
+// (registered in both LLMTypeRegistry and VLMTypeRegistry).
+constexpr CatalogFile kMlxGemma4_12BFiles[] = {
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "model-00001-of-00003.safetensors",
+     "model-00001-of-00003.safetensors", true, 5343482357LL},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "model-00002-of-00003.safetensors",
+     "model-00002-of-00003.safetensors", true, 5315166254LL},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "model-00003-of-00003.safetensors",
+     "model-00003-of-00003.safetensors", true, 329123819LL},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-12B-it-qat-4bit/resolve/"
+     "e70c6b3ba0979b3357dcd2f223ad8bde7787a6b6/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/gemma-4-26b-a4b-it-4bit (MoE) — model_type "gemma4"
+// (registered).
+constexpr CatalogFile kMlxGemma4_26BA4BFiles[] = {
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "model-00001-of-00003.safetensors",
+     "model-00001-of-00003.safetensors", true, 5320218487LL},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "model-00002-of-00003.safetensors",
+     "model-00002-of-00003.safetensors", true, 5363328422LL},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "model-00003-of-00003.safetensors",
+     "model-00003-of-00003.safetensors", true, 4657658867LL},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-4bit/resolve/"
+     "0d77464eeb233a2da68ebf9d7dc4edaac7db956d/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/gemma-4-31b-it-4bit — the plain 4bit variant, NOT
+// "-qat-4bit" (that name 404s / does not exist as a clean repo; verified this
+// session). model_type "gemma4" (registered).
+constexpr CatalogFile kMlxGemma4_31BFiles[] = {
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "model-00001-of-00004.safetensors",
+     "model-00001-of-00004.safetensors", true, 5366617512LL},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "model-00002-of-00004.safetensors",
+     "model-00002-of-00004.safetensors", true, 5361642573LL},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "model-00003-of-00004.safetensors",
+     "model-00003-of-00004.safetensors", true, 5367276094LL},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "model-00004-of-00004.safetensors",
+     "model-00004-of-00004.safetensors", true, 2316480497LL},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/gemma-4-31b-it-4bit/resolve/"
+     "696d436c404745a59f30e4939a658162b0a9e57f/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/Qwen3.6-35B-A3B-4bit (MoE) — config.json model_type
+// "qwen3_5_moe", registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+constexpr CatalogFile kMlxQwen3_6_35BA3BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "configuration.json",
+     "configuration.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "model-00001-of-00004.safetensors",
+     "model-00001-of-00004.safetensors", true, 5288196018LL},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "model-00002-of-00004.safetensors",
+     "model-00002-of-00004.safetensors", true, 5368472749LL},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "model-00003-of-00004.safetensors",
+     "model-00003-of-00004.safetensors", true, 5368324139LL},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "model-00004-of-00004.safetensors",
+     "model-00004-of-00004.safetensors", true, 4377211365LL},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "video_preprocessor_config.json",
+     "video_preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
+     "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+// mlx-community/Qwen3.8-27B-4bit (dense) — config.json model_type "qwen3_5",
+// registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+constexpr CatalogFile kMlxQwen3_8_27BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "model-00001-of-00003.safetensors",
+     "model-00001-of-00003.safetensors", true, 5343268662LL},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "model-00002-of-00003.safetensors",
+     "model-00002-of-00003.safetensors", true, 5354185130LL},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "model-00003-of-00003.safetensors",
+     "model-00003-of-00003.safetensors", true, 5357087557LL},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "video_preprocessor_config.json",
+     "video_preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
+     "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+// IBM Granite 4.1 MLX — config.json model_type "granite" (registered in
+// mlx-swift-lm 3.31.4's LLMTypeRegistry). File set verified via HF API.
+constexpr CatalogFile kMlxGranite4_1_3BFiles[] = {
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "model.safetensors",
+     "model.safetensors", true, 2127162429LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
+     "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// mlx-community/granite-4.1-8b-4bit — NOT in the original ask (which assumed
+// no clean official MLX 8B quant existed), but a real, official mlx-community
+// repo does exist: Apache-2.0, base_model ibm-granite/granite-4.1-8b,
+// model_type "granite" (registered). Verified via HF API this session; added
+// for parity with the 3B/30B MLX rows below.
+constexpr CatalogFile kMlxGranite4_1_8BFiles[] = {
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "model.safetensors",
+     "model.safetensors", true, 5238406779LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-8b-4bit/resolve/"
+     "08fb1e272f7bd49fa83ce279bbdc496c980380ac/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+constexpr CatalogFile kMlxGranite4_1_30BFiles[] = {
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "model-00001-of-00004.safetensors",
+     "model-00001-of-00004.safetensors", true, 5360664833LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "model-00002-of-00004.safetensors",
+     "model-00002-of-00004.safetensors", true, 5363828231LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "model-00003-of-00004.safetensors",
+     "model-00003-of-00004.safetensors", true, 5363828281LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "model-00004-of-00004.safetensors",
+     "model-00004-of-00004.safetensors", true, 1953655228LL},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/granite-4.1-30b-4bit/resolve/"
+     "03e8065d3219e525aa27fc4aaa9b375fe2cd6cb8/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+// Supertone Supertonic v3 TTS via Sherpa-ONNX. NOT the raw Supertone/
+// supertonic-3 HF repo — its JSON voice styles / unicode indexer do not match
+// what sherpa-onnx's OfflineTtsSupertonicModelConfig loader expects (a binary
+// voice.bin + unicode_indexer.bin). This is the pre-converted bundle whose
+// 7 filenames match that loader's fields 1:1 (see
+// sherpa-onnx/csrc/offline-tts-supertonic-model-config.h). MIT license.
+// Requires sherpa-onnx >= 1.13.2 (pinned SHERPA_ONNX_VERSION_* in
+// core/VERSIONS already satisfies this).
+constexpr CatalogFile kSherpaSupertonicV3Files[] = {
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/"
+     "duration_predictor.int8.onnx",
+     "duration_predictor.int8.onnx", true, 3700147LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/"
+     "text_encoder.int8.onnx",
+     "text_encoder.int8.onnx", true, 36416150LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/tts.json",
+     "tts.json", true, 8253LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/"
+     "unicode_indexer.bin",
+     "unicode_indexer.bin", true, 262144LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/"
+     "vector_estimator.int8.onnx",
+     "vector_estimator.int8.onnx", true, 78400833LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/"
+     "vocoder.int8.onnx",
+     "vocoder.int8.onnx", true, 25991073LL},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/"
+     "cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/voice.bin",
+     "voice.bin", true, 517168LL},
+};
+
 constexpr int64_t MB = 1024LL * 1024LL;
 
 // ids/URLs verbatim from the consumer apps (RunanywhereAI/runanywhere-{ios,
-// android,web}: ModelCatalogBootstrap.swift, ModelCatalog.kt, model-catalog.ts) and
-// tests/scripts/download-test-models.sh (qwen3-0.6b Q8_0 matches the Linux test
-// rig's LlamaCpp/qwen3-0.6b layout).
+// android,web}: ModelCatalogBootstrap.swift, ModelCatalog.kt, model-catalog.ts)
+// and tests/scripts/download-test-models.sh (qwen3-0.6b Q8_0 matches the Linux
+// test rig's LlamaCpp/qwen3-0.6b layout).
 constexpr CatalogEntry kCatalog[] = {
     // --- LLM (LlamaCpp / GGUF) ---
     {"qwen3-0.6b", "qwen3", "Qwen3 0.6B Q8_0", v1::MODEL_CATEGORY_LANGUAGE,
@@ -798,6 +1325,92 @@ constexpr CatalogEntry kCatalog[] = {
      "SmolLM2-360M.Q8_0.gguf",
      nullptr, 0, 386 * MB, 2048, false},
 
+    // Google Gemma 4 family (GGUF). Licensed under Apache 2.0; preserve the
+    // upstream license and attribution notices when redistributing.
+    {"gemma-4-e2b-it-q4_k_m", "gemma4-e2b", "Gemma 4 E2B IT Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/"
+     "0314792d7f1f7e229411f620751375812bb9faf2/"
+     "gemma-4-E2B-it-Q4_K_M.gguf",
+     nullptr, 0, 3106738272LL, 4096, false},
+    {"gemma-4-e4b-it-q4_k_m", "gemma4-e4b", "Gemma 4 E4B IT Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/"
+     "bfc15c382204943c3a8fff0c750b94ae2364d7a3/"
+     "gemma-4-E4B-it-Q4_K_M.gguf",
+     nullptr, 0, 4977171584LL, 4096, false},
+    {"gemma-4-12b-it-q4_k_m", "gemma4-12b", "Gemma 4 12B IT Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/"
+     "fc034cfff751157913579611efad8462ac1be606/"
+     "gemma-4-12b-it-Q4_K_M.gguf",
+     nullptr, 0, 7121861440LL, 4096, false},
+    {"gemma-4-26b-a4b-it-q4_k_xl", "gemma4-26b-a4b",
+     "Gemma 4 26B-A4B IT UD-Q4_K_XL (MoE)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/"
+     "c099eb48e663fd284577b04978a94ffccb261841/"
+     "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf",
+     nullptr, 0, 17010980576LL, 4096, false},
+    {"gemma-4-31b-it-q4_k_m", "gemma4-31b", "Gemma 4 31B IT Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/"
+     "c1ac76e99d5513b141e8adde7288b85c3f9c32ec/"
+     "gemma-4-31B-it-Q4_K_M.gguf",
+     nullptr, 0, 18323733440LL, 4096, false},
+    // Smaller quant of the same 31B model for tighter RAM budgets.
+    {"gemma-4-31b-it-ud-q2_k_xl", "gemma4-31b-q2", "Gemma 4 31B IT UD-Q2_K_XL",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/"
+     "c1ac76e99d5513b141e8adde7288b85c3f9c32ec/"
+     "gemma-4-31B-it-UD-Q2_K_XL.gguf",
+     nullptr, 0, 11774991296LL, 4096, false},
+
+    // Qwen3.6-35B-A3B (MoE, agentic-coding, Apache 2.0).
+    {"qwen3.6-35b-a3b-q4_k_m", "qwen3.6-35b", "Qwen3.6 35B-A3B UD-Q4_K_M (MoE)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/"
+     "a483e9e6cbd595906af30beda3187c2663a1118c/"
+     "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+     nullptr, 0, 22134528992LL, 4096, true},
+    // Qwen3.8-27B (dense, newest Qwen, Apache 2.0).
+    {"qwen3.8-27b-q4_k_m", "qwen3.8-27b", "Qwen3.8 27B Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/"
+     "f1bfb127c64f7072bdd2cad55f258b9c8b2910fe/"
+     "Qwen3.8-27B-Q4_K_M.gguf",
+     nullptr, 0, 17106775008LL, 4096, true},
+
+    // IBM Granite 4.1 family (Apache 2.0).
+    {"granite-4.1-3b-q4_k_m", "granite4.1-3b", "IBM Granite 4.1 3B Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/granite-4.1-3b-GGUF/resolve/"
+     "5b88826e4b80789548180f8faab39c5cf68772c9/"
+     "granite-4.1-3b-Q4_K_M.gguf",
+     nullptr, 0, 2099502400LL, 4096, false},
+    {"granite-4.1-8b-q4_k_m", "granite4.1-8b", "IBM Granite 4.1 8B Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/granite-4.1-8b-GGUF/resolve/"
+     "6f9671f73eb03273bc09319194b8a4e810e03a8f/"
+     "granite-4.1-8b-Q4_K_M.gguf",
+     nullptr, 0, 5347915136LL, 4096, false},
+    {"granite-4.1-30b-q4_k_m", "granite4.1-30b", "IBM Granite 4.1 30B Q4_K_M",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/unsloth/granite-4.1-30b-GGUF/resolve/"
+     "6cb34f31b11ca4c1433de1af7391dac46de4e666/"
+     "granite-4.1-30b-Q4_K_M.gguf",
+     nullptr, 0, 17490241472LL, 4096, false},
+
     // --- VLM (gguf + mmproj pairs) ---
     {"smolvlm2-256m-video-instruct-q8_0", "smolvlm2",
      "SmolVLM2 256M Video Instruct Q8_0", v1::MODEL_CATEGORY_MULTIMODAL,
@@ -817,8 +1430,22 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_FORMAT_GGUF, nullptr, kQwen2VlFiles, 2, 1800 * MB, 2048, false},
     {"fara1.5-4b-q4_k_m", "fara", "Fara1.5 4B Computer-Use Agent Q4_K_M",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
-     v1::MODEL_FORMAT_GGUF, nullptr, kFara15GgufFiles, 2, 3300 * MB, 4096, false,
+     v1::MODEL_FORMAT_GGUF, nullptr, kFara15GgufFiles, 2, 3300 * MB, 4096,
+     false,
      /*memory_required_bytes*/ 0, /*cua_profile*/ "fara"},
+    // Meta Muse Glimmer 30B (Apache 2.0). llama.cpp's mmproj is image-only —
+    // vision-capable, not the checkpoint's marketed audio/video "omni" surface.
+    {"muse-glimmer-30b-q4_k_xl", "muse-glimmer", "Muse Glimmer 30B UD-Q4_K_XL",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF, nullptr, kMuseGlimmer30BFiles, 2, 17929907456LL,
+     4096, false},
+    // NVIDIA Nemotron-3-Nano-Omni-30B-A3B-Reasoning (MoE, NVIDIA Open Model
+    // License). Same image-only mmproj caveat as Muse Glimmer above.
+    {"nemotron-3-nano-omni-30b-a3b-reasoning-q4_k_m", "nemotron-omni",
+     "NVIDIA Nemotron-3-Nano-Omni 30B-A3B Reasoning UD-Q4_K_M (vision, MoE)",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF, nullptr, kNemotronOmniReasoningFiles, 2,
+     25474563776LL, 4096, true},
 
     // --- Speech (Sherpa-ONNX archives; orchestrator extracts in-core) ---
     {"sherpa-onnx-whisper-tiny.en", "whisper-tiny",
@@ -857,6 +1484,13 @@ constexpr CatalogEntry kCatalog[] = {
      "runanywhere-models-v1/"
      "vits-piper-en_US-lessac-medium.tar.gz",
      nullptr, 0, 65 * MB, 0, false},
+    // Supertone Supertonic v3 (MIT). Not the raw Supertone/supertonic-3 repo —
+    // see kSherpaSupertonicV3Files for why. Needs sherpa-onnx >= 1.13.2.
+    {"sherpa-supertonic-3-tts-int8", "supertonic",
+     "Supertone Supertonic v3 TTS INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaSupertonicV3Files, 7, 145295768LL,
+     0, false},
 
     // --- VAD ---
     // Exact artifact size (matches iOS ModelCatalogBootstrap.swift): the
@@ -1050,6 +1684,74 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxSoprano1180M5BitFiles, 7,
      82220814, 0, false},
+
+    // Google Gemma 4 family (MLX). config.json model_type "gemma4" /
+    // "gemma4_unified" (12B), both registered in the pinned mlx-swift-lm
+    // 3.31.4 LLMTypeRegistry/VLMTypeRegistry — verified by reading the
+    // checked-out package source this session (not assumed). Licensed under
+    // Apache 2.0; preserve the upstream license and attribution notices.
+    {"mlx-gemma-4-e2b-it-4bit", "mlx-gemma4-e2b", "Gemma 4 E2B IT 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxGemma4E2BFiles, 8, 3550670554LL,
+     4096, false},
+    {"mlx-gemma-4-e4b-it-qat-4bit", "mlx-gemma4-e4b",
+     "Gemma 4 E4B IT QAT 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGemma4E4BFiles, 9, 6798307742LL, 4096, false},
+    {"mlx-gemma-4-12b-it-qat-4bit", "mlx-gemma4-12b",
+     "Gemma 4 12B IT QAT 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGemma4_12BFiles, 10, 10987772430LL, 4096, false},
+    {"mlx-gemma-4-26b-a4b-it-4bit", "mlx-gemma4-26b-a4b",
+     "Gemma 4 26B-A4B IT 4-bit (MLX, MoE)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGemma4_26BA4BFiles, 10, 15341205776LL, 4096, false},
+    // The plain 4bit variant, NOT "-qat-4bit" — that name does not resolve to
+    // a clean repo (verified this session); this is the largest dense Gemma 4.
+    {"mlx-gemma-4-31b-it-4bit", "mlx-gemma4-31b", "Gemma 4 31B IT 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxGemma4_31BFiles, 11,
+     18412016676LL, 4096, false},
+
+    // Qwen3.6-35B-A3B (MoE) — config.json model_type "qwen3_5_moe",
+    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    {"mlx-qwen3.6-35b-a3b-4bit", "mlx-qwen3.6-35b",
+     "Qwen3.6 35B-A3B 4-bit (MLX, MoE)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxQwen3_6_35BA3BFiles, 15, 20402204271LL, 4096, true},
+    // Qwen3.8-27B (dense) — config.json model_type "qwen3_5", registered.
+    {"mlx-qwen3.8-27b-4bit", "mlx-qwen3.8-27b", "Qwen3.8 27B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_8_27BFiles, 13,
+     16054541349LL, 4096, true},
+
+    // IBM Granite 4.1 family (MLX). config.json model_type "granite",
+    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    {"mlx-granite-4.1-3b-4bit", "mlx-granite4.1-3b",
+     "IBM Granite 4.1 3B 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGranite4_1_3BFiles, 7, 2127162429LL, 4096, false},
+    // A real, official mlx-community 8B 4-bit quant does exist (Apache-2.0,
+    // model_type "granite") — verified via HF API this session, despite the
+    // original assumption that none did; added for parity with 3B/30B.
+    {"mlx-granite-4.1-8b-4bit", "mlx-granite4.1-8b",
+     "IBM Granite 4.1 8B 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGranite4_1_8BFiles, 7, 5238406779LL, 4096, false},
+    {"mlx-granite-4.1-30b-4bit", "mlx-granite4.1-30b",
+     "IBM Granite 4.1 30B 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGranite4_1_30BFiles, 10, 18041976573LL, 4096, false},
+
+    // Muse Glimmer 30B (MLX) and Nemotron-3-Nano-Omni-30B-A3B-Reasoning (MLX)
+    // are deliberately NOT registered here. Their config.json model_types
+    // ("muse_glimmer" and "NemotronH_Nano_Omni_Reasoning_V3" respectively) are
+    // NOT present in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry /
+    // VLMTypeRegistry (checked the checked-out package source directly:
+    // .build/checkouts/mlx-swift-lm/Libraries/{MLXLLM,MLXVLM}/*Factory.swift —
+    // only "nemotron_h" exists, a different string). Loading either would fail
+    // with ModelFactoryError.unsupportedModelType. The GGUF+mmproj rows above
+    // (llama.cpp) remain the way to run these two on rcli.
 };
 
 constexpr size_t kCatalogCount = sizeof(kCatalog) / sizeof(kCatalog[0]);
