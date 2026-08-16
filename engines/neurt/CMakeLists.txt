@@ -228,6 +228,21 @@ target_compile_options(rac_neurt_llm_ops PRIVATE ${_neurt_prefix_maps})
 set_target_properties(rac_neurt_llm_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(rac_neurt_llm_ops PUBLIC rac_neurt_core)
 
+# rac_neurt_stt_ops — the SPEECH modality's op-table adapter, same shape and same reasoning.
+#
+# Supplies `g_neurt_stt_ops` for the vtable's stt_ops slot. Also compiled against the real headers:
+# its standalone mirror had FOUR drifts on the first pass, including `sample_rate` at the wrong
+# offset, and this lane is what caught them before anything linked.
+add_library(rac_neurt_stt_ops STATIC ${_neurt_sdk_dir}/rac_stt_ops_neurt.cpp)
+target_include_directories(rac_neurt_stt_ops PRIVATE
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${NEURT_ROOT}/NeuRT/include)
+target_compile_definitions(rac_neurt_stt_ops PRIVATE NEURT_WITH_RAC_HEADERS=1)
+target_compile_features(rac_neurt_stt_ops PRIVATE cxx_std_17)
+target_compile_options(rac_neurt_stt_ops PRIVATE ${_neurt_prefix_maps})
+set_target_properties(rac_neurt_stt_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(rac_neurt_stt_ops PUBLIC rac_neurt_core)
+
 else()
     # Shell mode: no neurun sources to derive, so no rac_neurt_core /
     # rac_neurt_llm_ops targets exist. `_neurt_prefix_maps` is still referenced
@@ -264,7 +279,7 @@ if(_neurt_available)
     )
     set(_neurt_extra_includes ${_neurt_sdk_dir})
     set(_neurt_generate_available 1)
-    set(_neurt_extra_links rac_neurt_llm_ops)
+    set(_neurt_extra_links rac_neurt_llm_ops rac_neurt_stt_ops)
 else()
     # Shell only. No neurun source, no private include dir, no rac_neurt_llm_ops
     # to link — RAC_NEURT_GENERATE_AVAILABLE=0 makes the entry file compile its
