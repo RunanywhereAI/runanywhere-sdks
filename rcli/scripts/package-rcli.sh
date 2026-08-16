@@ -334,19 +334,21 @@ case "${PLATFORM}" in
         for src in ${deps}; do
             [ -f "${src}" ] && cp -L "${src}" "${STAGE}/lib/$(basename "${src}")"
         done
-        # The pinned Sherpa-ONNX 1.13.2 x64 C API library carries its
-        # upstream GitHub Actions source root. Apply the same exact,
-        # byte-preserving fail-closed policy as the macOS runtime input.
+        # The RunAnywhere Sherpa-ONNX 1.13.5 / ORT 1.28.0 x64 C API library
+        # carries its GitHub Actions source root. Apply the same exact,
+        # byte-preserving fail-closed policy as the macOS runtime input. These
+        # digests are for the fork-owned v1.13.5-rac-desktop.2 artifact, not
+        # upstream's differently linked 1.13.5 archive.
         for library in "${STAGE}"/lib/libsherpa-onnx-c-api.so*; do
             [ -e "${library}" ] || continue
             sanitize_pinned_host_path \
                 "${library}" \
                 "/home/runner/work/sherpa-onnx/sherpa-onnx" \
                 "/runanywhere/vendor/sherpa-onnx/src/root0" \
-                250 \
-                "744cabaf8bdc079414e3f07d3cdf3550a5c74798a4b50c789468e7b038b7907f" \
-                "b6fecd4a48bea06c50bf6bfd69e08ff241071b47251f90b8549491a120af0498" \
-                "Sherpa-ONNX 1.13.2 x64 C API library"
+                256 \
+                "4ecb243584296230dd29d67651340a5447c545cc7cfad5b833fca942228b845f" \
+                "2cc145b810e1f0c4f4587720922b6223e7e1560fd9d1675b2c906156fd117e25" \
+                "RunAnywhere Sherpa-ONNX 1.13.5 / ORT 1.28.0 x64 C API library"
         done
         command -v patchelf >/dev/null 2>&1 || {
             echo "ERROR: patchelf is required to make the Linux package relocatable" >&2

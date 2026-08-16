@@ -199,7 +199,9 @@ llama_sampler* build_sampler_chain(llama_model* model, const TextGenerationReque
         // (idl/llm_options.proto:100-101) into the penalty sampler; 0.0 leaves
         // each disabled exactly as before.
         llama_sampler_chain_add(
-            sampler, llama_sampler_init_penalties(kRepeatPenaltyWindow, request.repetition_penalty,
+            sampler, llama_sampler_init_penalties(
+                         llama_vocab_n_tokens(llama_model_get_vocab(model)),
+                         kRepeatPenaltyWindow, request.repetition_penalty,
                                                   request.frequency_penalty,
                                                   request.presence_penalty));
 
@@ -602,6 +604,32 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     if (!model_) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "Failed to load model from: %s", resolved_path.c_str());
         return false;
+    }
+
+    // Maple's current llama.cpp port implements its ternary expert graph on
+    // CPU only. GPU model loading succeeds, but context/decode construction
+    // reaches a missing mul_mm_id pipeline and aborts (Metal is the first
+    // confirmed failure). Inspect the model's canonical GGUF architecture and
+    // reload before context creation so callers cannot accidentally select an
+    // unsupported GPU path via auto-fit or an explicit gpu_layers override.
+    char architecture[64] = {0};
+    const int32_t architecture_len =
+        llama_model_meta_val_str(model_, "general.architecture", architecture,
+                                 sizeof(architecture));
+    if (model_params.n_gpu_layers != 0 && architecture_len > 0 &&
+        std::strcmp(architecture, "maple") == 0) {
+        RAC_LOG_WARNING("LLM.LlamaCpp",
+                        "Maple GPU expert kernels are unavailable; reloading with "
+                        "n_gpu_layers=0 for CPU execution");
+        llama_model_free(model_);
+        model_ = nullptr;
+        model_params.n_gpu_layers = 0;
+        model_ = llama_model_load_from_file(resolved_path.c_str(), model_params);
+        if (!model_) {
+            RAC_LOG_ERROR("LLM.LlamaCpp", "Failed to reload Maple model on CPU: %s",
+                          resolved_path.c_str());
+            return false;
+        }
     }
 
     int model_train_ctx = llama_model_n_ctx_train(model_);

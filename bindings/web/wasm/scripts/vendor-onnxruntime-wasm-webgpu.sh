@@ -60,6 +60,7 @@ PATCH_STATE="absent"
 ORT_REQUIRED_FILES=(
   "${ORT_ARCHIVE_DEST}"
   "${DEST_DIR}/include/onnxruntime_c_api.h"
+  "${DEST_DIR}/include/onnxruntime_error_code.h"
   "${DEST_DIR}/include/onnxruntime_cxx_api.h"
   "${DEST_DIR}/include/onnxruntime_cxx_inline.h"
   "${DEST_DIR}/include/onnxruntime_float16.h"
@@ -482,6 +483,7 @@ cp "${ORT_ARCHIVE}" "${DEST_DIR}/lib/libonnxruntime.a"
 HEADER_SRC="${SRC_DIR}/include/onnxruntime/core/session"
 for header in \
   onnxruntime_c_api.h \
+  onnxruntime_error_code.h \
   onnxruntime_cxx_api.h \
   onnxruntime_cxx_inline.h \
   onnxruntime_float16.h \

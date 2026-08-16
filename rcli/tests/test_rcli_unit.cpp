@@ -277,6 +277,46 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
+  const rcli::catalog::CatalogEntry *maple_gguf =
+      rcli::catalog::find("maple-preview");
+  if (!maple_gguf ||
+      maple_gguf->framework != runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP ||
+      maple_gguf->format != runanywhere::v1::MODEL_FORMAT_GGUF ||
+      maple_gguf->download_size_bytes != 4984016416LL ||
+      maple_gguf->context_length != 4096 || !maple_gguf->supports_thinking) {
+    result.details = "maple-preview should resolve to the pinned GGUF bundle";
+    return result;
+  }
+
+  const rcli::catalog::CatalogEntry *mlx_maple =
+      rcli::catalog::find("mlx-maple-preview");
+  if (!mlx_maple ||
+      mlx_maple->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      mlx_maple->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      mlx_maple->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      mlx_maple->files == nullptr || mlx_maple->file_count != 12 ||
+      mlx_maple->download_size_bytes != 5324164826LL ||
+      mlx_maple->context_length != 128000) {
+    result.details = "mlx-maple-preview should be a complete pinned MLX bundle";
+    return result;
+  }
+  int64_t mlx_maple_file_total = 0;
+  for (size_t i = 0; i < mlx_maple->file_count; ++i) {
+    const rcli::catalog::CatalogFile &file = mlx_maple->files[i];
+    if (file.size_bytes <= 0 ||
+        std::string(file.url).find(
+            "/resolve/d0a7314d6bf14c880201b599d7a701cfbc8717e6/") ==
+            std::string::npos) {
+      result.details = "mlx-maple-preview files must use the pinned revision";
+      return result;
+    }
+    mlx_maple_file_total += file.size_bytes;
+  }
+  if (mlx_maple_file_total != mlx_maple->download_size_bytes) {
+    result.details = "mlx-maple-preview file sizes must sum to the bundle size";
+    return result;
+  }
+
   const rcli::catalog::CatalogEntry *mlx_vlm =
       rcli::catalog::find("mlx-qwen2-vl");
   if (!mlx_vlm ||
@@ -659,6 +699,7 @@ TestResult test_mlx_catalog_registration() {
   }
   RegisteredModelCleanup cleanup({
       "mlx-qwen3-0.6b-4bit",
+      "mlx-maple-preview-2bit",
       "mlx-llama-3.2-1b-instruct-4bit",
       "mlx-qwen2-vl-2b-instruct-4bit",
       "mlx-fastvlm-0.5b-bf16",
@@ -678,6 +719,7 @@ TestResult test_mlx_catalog_registration() {
       "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
       "sherpa-nemo-parakeet-ctc-1.1b-int8",
       "sherpa-nemo-canary-180m-flash-int8",
+      "sherpa-nemotron-3.5-asr-streaming-0.6b-320ms-int8",
   });
 
   runanywhere::v1::ModelInfo qwen;
@@ -692,6 +734,18 @@ TestResult test_mlx_catalog_registration() {
       !qwen.has_multi_file() || qwen.multi_file().files_size() != 9 ||
       qwen.download_size_bytes() != 351383618 || !qwen.supports_thinking()) {
     result.details = "registered MLX Qwen3 metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo maple;
+  if (!get_registered_model("mlx-maple-preview-2bit", &maple, &error) ||
+      maple.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      maple.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      maple.category() != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      !maple.has_multi_file() || maple.multi_file().files_size() != 12 ||
+      maple.download_size_bytes() != 5324164826LL ||
+      maple.context_length() != 128000) {
+    result.details = "registered MLX Maple metadata is incomplete";
     return result;
   }
 
@@ -810,6 +864,8 @@ TestResult test_mlx_catalog_registration() {
       {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", 4, 670478772LL},
       {"sherpa-nemo-parakeet-ctc-1.1b-int8", 2, 1110024519LL},
       {"sherpa-nemo-canary-180m-flash-int8", 3, 207170046LL},
+      {"sherpa-nemotron-3.5-asr-streaming-0.6b-320ms-int8", 4,
+       682215471LL},
   };
   for (const RegisteredSherpaCase &test_case : registered_sherpa_cases) {
     runanywhere::v1::ModelInfo model;
