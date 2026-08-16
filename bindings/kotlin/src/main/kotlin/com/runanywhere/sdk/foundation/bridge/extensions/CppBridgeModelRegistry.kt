@@ -225,12 +225,10 @@ object CppBridgeModelRegistry {
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
         val bytes =
-            try {
+            mapNativeRegistrationFailure {
                 RunAnywhereBridge.racRegisterModelFromUrlProto(
                     ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
                 )
-            } catch (error: NativeProtoException) {
-                throw SDKException.fromRACResult(error.resultCode) ?: error
             } ?: return null
 
         return decodeProtoModel(bytes)
@@ -245,9 +243,11 @@ object CppBridgeModelRegistry {
      */
     fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterMultiFileModelProto(
-                ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
-            ) ?: return null
+            mapNativeRegistrationFailure {
+                RunAnywhereBridge.racRegisterMultiFileModelProto(
+                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -412,6 +412,13 @@ object CppBridgeModelRegistry {
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode $label proto: ${e.message}")
             null
+        }
+
+    private inline fun <T> mapNativeRegistrationFailure(block: () -> T): T =
+        try {
+            block()
+        } catch (error: NativeProtoException) {
+            throw SDKException.fromRACResult(error.resultCode) ?: error
         }
 
     /**

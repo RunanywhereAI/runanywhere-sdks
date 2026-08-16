@@ -18,20 +18,16 @@
  *
  * // Warn unsupported devices up front (no QNN load).
  * const npu = await QHexRT.probeNpu();
- * if (!npu.supported) {
+ * if (npu.supported && await QHexRT.register()) {
+ *   await RunAnywhere.models.register({
+ *     id: 'my-qhexrt-model',
+ *     name: 'My QHexRT Model',
+ *     url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
+ *     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+ *   });
+ * } else {
  *   console.warn(`Hexagon ${npu.socModel} is outside V75/V79/V81`);
  * }
- *
- * // Register the QHexRT backend (covers LLM, VLM, STT, TTS).
- * await QHexRT.register();
- *
- * // Register the exact dedicated model URL through the core SDK.
- * await RunAnywhere.registerModel({
- *   id: 'my-qhexrt-model',
- *   name: 'My QHexRT Model',
- *   url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
- *   framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
- * });
  * ```
  *
  * @packageDocumentation

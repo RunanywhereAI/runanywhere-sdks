@@ -403,8 +403,9 @@ export function toNpuModelRegistration(
       : {}),
     source: ModelSource.MODEL_SOURCE_REMOTE,
     description: HNPU_DESCRIPTION,
-    supportsThinking: bundle.supportsThinking ?? false,
-    supportsLora: false,
+    ...(bundle.supportsThinking === true
+      ? { supportsThinking: true }
+      : {}),
   };
 }
 
