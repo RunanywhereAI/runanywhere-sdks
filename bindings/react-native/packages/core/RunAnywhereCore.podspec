@@ -13,7 +13,15 @@ Pod::Spec.new do |s|
 
   s.platforms    = { :ios => "17.5" }
   s.swift_version = "6.2"
-  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
+  # TEMP: the source tag is pinned to the last release that was actually
+  # tagged, not to s.version. s.version tracks package.json and leads the
+  # published release whenever a release republishes only some packages, and
+  # a tag built from s.version then resolves to one that was never pushed, so
+  # `pod install` fails outright. Mirrors asset_version in the Flutter
+  # podspecs. Bump back in step with the SwiftPM pin once a matching release
+  # exists; check_release_version_coherence.sh enforces that they agree.
+  source_tag_version = '0.20.19'
+  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{source_tag_version}" }
 
   # =============================================================================
   # Core SDK - RACommons xcframework is bundled in npm package
