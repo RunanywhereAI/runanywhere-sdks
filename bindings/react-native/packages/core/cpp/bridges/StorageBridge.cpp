@@ -213,6 +213,14 @@ std::optional<ModelStorageMetrics> StorageBridge::getModelStorageMetrics(
         return std::nullopt;
     }
 
+    // The three strings are heap copies owned by us from here on. The
+    // std::string assignments below allocate and can throw, so the release has
+    // to survive unwinding rather than sit at the end of the happy path.
+    struct MetricsOwner {
+        rac_model_storage_metrics_t* metrics;
+        ~MetricsOwner() { rac_model_storage_metrics_free(metrics); }
+    } owner{&cMetrics};
+
     ModelStorageMetrics metrics;
     metrics.modelId = cMetrics.model_id ? cMetrics.model_id : "";
     metrics.modelName = cMetrics.model_name ? cMetrics.model_name : "";

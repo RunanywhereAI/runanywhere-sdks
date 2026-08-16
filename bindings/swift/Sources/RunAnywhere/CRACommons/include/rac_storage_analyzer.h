@@ -254,6 +254,19 @@ RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
     rac_model_storage_metrics_t* out_metrics);
 
 /**
+ * @brief Release the strings a single rac_model_storage_metrics_t owns
+ *
+ * Frees model_id, model_name and local_path and zeroes the struct. Null-safe,
+ * and safe to call twice because the struct is zeroed. Only for a struct
+ * filled by rac_storage_analyzer_get_model_metrics(); the entries inside
+ * rac_storage_info_t are owned by that array and released by
+ * rac_storage_info_free().
+ *
+ * @param metrics Metrics to release, may be NULL
+ */
+RAC_API void rac_model_storage_metrics_free(rac_model_storage_metrics_t* metrics);
+
+/**
  * @brief Check if storage is available for a download
  *
  * @param handle Analyzer handle
