@@ -9,9 +9,9 @@
 
 mlx_checksums = {
   'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => '8e6f818b46325b8a70b2d473e34e5b0e19544adcdc48b7ba86a75142c17d811b',
+  'RunAnywhereMLXRuntime' => '358b3bb7c06476b3746fcb89694e6b2f94941d470653d2c9d1d76e483422af76',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
-  'RunAnywhereMLXResources' => '70de4c70143b4544204b2c0e8af296546bc31ccf3ffda2f7b813fffb5b720ae9'
+  'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
 
 checksum_for = lambda do |name|
