@@ -330,10 +330,11 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_string("voice", payload->voice);
         json.add_double("output_duration_ms", payload->output_duration_ms);
     } else if (strcmp(modality, "vlm") == 0) {
-        // VLM = LLM token fields PLUS vision fields. The token fields are now
-        // populated via the properties carrier (input/total tokens, tps, ttft,
-        // generation_time). The vision-specific fields (vision_tokens,
-        // vision_encode_time_ms, image_resolution) still need carriers.
+        // VLM = LLM token fields PLUS vision fields. Both groups ride the
+        // properties carrier now: vlm_module.cpp writes input/total tokens,
+        // tps, ttft, prompt_eval_time_ms, vision_tokens, vision_encode_time_ms
+        // and image_resolution, and the SDK_COMPONENT_VLM arm of
+        // telemetry_manager.cpp reads every one of them back.
         json.add_int("input_tokens", payload->input_tokens);
         json.add_int("output_tokens", payload->output_tokens);
         json.add_int("total_tokens", payload->total_tokens);
