@@ -1712,16 +1712,16 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${ONNX_MAC_LIB}"
     sanitize_and_validate_archive_host_paths \
         "${ONNX_DEV_LIB}" "ios-device RABackendONNX" \
-        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
-        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 552 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 108
     sanitize_and_validate_archive_host_paths \
         "${ONNX_SIM_LIB}" "ios-simulator RABackendONNX" \
-        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
-        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 552 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 108
     sanitize_and_validate_archive_host_paths \
         "${ONNX_MAC_LIB}" "macos RABackendONNX" \
         "/Users/runner/work/onnxruntime-build/onnxruntime-build" \
-        "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1632
+        "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1772
     build_xcframework_from_paths_with_macos "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "${ONNX_MAC_LIB}" "RABackendONNX.xcframework"
 else
     run rm -rf "${DEST}/RABackendONNX.xcframework"
@@ -1743,11 +1743,11 @@ if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_DEV_LIB}" "ios-device RABackendSherpa" \
             "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
-            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+            "/runanywhere/vendor/sherpa-onnx/src/source" 280
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_SIM_LIB}" "ios-simulator RABackendSherpa" \
             "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
-            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+            "/runanywhere/vendor/sherpa-onnx/src/source" 280
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_MAC_LIB}" "macos RABackendSherpa"
         build_xcframework_from_paths_with_macos "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "${SHERPA_MAC_LIB}" "RABackendSherpa.xcframework"

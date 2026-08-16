@@ -343,7 +343,7 @@ rac_result_t llamacpp_rerank_initialize(void* implementation, const char* model_
 
     llama_model_params model_params = llama_model_default_params();
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-    model_params.use_mmap = false;
+    model_params.load_mode = LLAMA_LOAD_MODE_NONE;
 #endif
 #if defined(GGML_USE_METAL) || defined(GGML_USE_CUDA) || defined(GGML_USE_VULKAN) || \
     defined(GGML_USE_WEBGPU)

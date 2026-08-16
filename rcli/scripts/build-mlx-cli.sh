@@ -23,6 +23,7 @@ if [[ "$CONFIGURATION" == "release" ]]; then
 fi
 
 echo "building $PRODUCT ($CONFIGURATION, jobs=$SWIFT_BUILD_JOBS)"
+"$REPO_ROOT/idl/codegen/generate_all.sh" --only swift
 swift build "${swift_args[@]}"
 
 if [[ "$CONFIGURATION" == "release" ]]; then

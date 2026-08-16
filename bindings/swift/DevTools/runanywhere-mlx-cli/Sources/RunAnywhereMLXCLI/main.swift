@@ -73,6 +73,11 @@ private enum MLXCatalog {
                 sizeBytes: 958_711_742
             ),
             .init(
+                "\(maplePreviewBaseURL)/model-flashhead.safetensors",
+                "model-flashhead.safetensors",
+                sizeBytes: 6_087_456
+            ),
+            .init(
                 "\(maplePreviewBaseURL)/model.safetensors.index.json",
                 "model.safetensors.index.json",
                 sizeBytes: 40_054
@@ -90,7 +95,7 @@ private enum MLXCatalog {
             ),
             .init("\(maplePreviewBaseURL)/vocab.json", "vocab.json", sizeBytes: 2_776_833),
         ],
-        memoryRequirement: 5_324_164_826,
+        memoryRequirement: 5_330_252_282,
         contextLength: 128_000,
         supportsThinking: true
     )
