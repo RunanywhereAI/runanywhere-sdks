@@ -30,7 +30,7 @@ ORT_PROVENANCE_FILE="${ORT_DIR}/.rac-wasm-provenance"
 ORT_VENDOR_SCRIPT="${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh"
 # These schemas belong to different provenance producers. Never use the
 # Sherpa schema to validate ORT just because the records are checked together.
-SHERPA_RECIPE_SCHEMA="4"
+SHERPA_RECIPE_SCHEMA="5"
 ORT_RECIPE_SCHEMA="6"
 PATCH_DIR="${WASM_DIR}/patches"
 SHERPA_PATCH="${PATCH_DIR}/sherpa-onnx-c-api-try-catch.patch"
@@ -338,10 +338,10 @@ emcmake cmake \
   -B "${BUILD_DIR}" \
   -S "${SRC_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
-  -DCMAKE_CXX_FLAGS="-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fexceptions" \
-  -DCMAKE_SHARED_LINKER_FLAGS="-fexceptions" \
+  -DCMAKE_C_FLAGS="-pthread -fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
+  -DCMAKE_CXX_FLAGS="-pthread -fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
+  -DCMAKE_EXE_LINKER_FLAGS="-pthread -fexceptions" \
+  -DCMAKE_SHARED_LINKER_FLAGS="-pthread -fexceptions" \
   -DBUILD_SHARED_LIBS=OFF \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_ENABLE_TESTS=OFF \
