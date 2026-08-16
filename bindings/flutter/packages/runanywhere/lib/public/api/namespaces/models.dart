@@ -68,6 +68,31 @@ class ModelsApi {
     return List<ModelInfo>.unmodifiable(result.models.models);
   }
 
+  /// Re-read the registry: rescan local storage, optionally pull the remote
+  /// catalog, optionally drop entries whose files are gone.
+  ///
+  /// Matches `models.refresh` on the Swift and Kotlin namespaces, including
+  /// its defaults. [list] does a lazy rescan of its own when the registry is
+  /// dirty; this is the explicit verb for the other two.
+  ///
+  /// Deliberately leaves `_registryDirty` alone. `refreshModelRegistry` is a
+  /// no-op before the SDK is initialized and logs a native failure rather than
+  /// raising, so this method cannot tell a completed refresh from a skipped
+  /// one. Clearing the flag here would let a failed refresh cancel [list]'s
+  /// pending rescan and serve stale entries; leaving it costs at most one
+  /// redundant rescan.
+  Future<void> refresh({
+    bool rescanLocal = true,
+    bool includeRemoteCatalog = false,
+    bool pruneOrphans = false,
+  }) async {
+    await RunAnywhereModels.shared.refreshModelRegistry(
+      rescanLocal: rescanLocal,
+      includeRemoteCatalog: includeRemoteCatalog,
+      pruneOrphans: pruneOrphans,
+    );
+  }
+
   /// The registry entry for [id], or null when it is unknown.
   Future<ModelInfo?> get(String id) async {
     final result = await RunAnywhereModels.shared.getModel(

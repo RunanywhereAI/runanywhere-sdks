@@ -130,6 +130,10 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
 suspend fun RunAnywhere.downloadedModels(): ModelListResult =
     queryModels(ModelQuery(downloaded_only = true))
 
+@Deprecated(
+    "Use RunAnywhere.models.refresh(rescanLocal, includeRemoteCatalog, pruneOrphans).",
+    ReplaceWith("RunAnywhere.models.refresh(rescanLocal, includeRemoteCatalog, pruneOrphans)"),
+)
 suspend fun RunAnywhere.refreshModelRegistry(
     rescanLocal: Boolean = true,
     includeRemoteCatalog: Boolean = false,

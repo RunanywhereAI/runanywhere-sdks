@@ -61,6 +61,7 @@ import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.processImageStream
+import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.rerank
 import com.runanywhere.sdk.public.extensions.segment
@@ -108,6 +109,17 @@ internal fun legacyUnregisterModel(modelId: String) {
 
 internal suspend fun legacyStorageInfo(request: StorageInfoRequest): StorageInfoResult =
     RunAnywhere.getStorageInfo(request)
+
+@Suppress("DEPRECATION")
+internal suspend fun legacyRefreshModelRegistry(
+    rescanLocal: Boolean,
+    includeRemoteCatalog: Boolean,
+    pruneOrphans: Boolean,
+) = RunAnywhere.refreshModelRegistry(
+    rescanLocal = rescanLocal,
+    includeRemoteCatalog = includeRemoteCatalog,
+    pruneOrphans = pruneOrphans,
+)
 
 internal suspend fun legacyRegisterFromUrl(model: ModelRegistration): ModelInfo =
     RunAnywhere.registerModel(
