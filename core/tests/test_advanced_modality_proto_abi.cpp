@@ -783,12 +783,15 @@ int test_vlm_stream_decode_rate_excludes_prefill() {
 
     // And it is genuinely a different number from what the old arithmetic gave,
     // so the assertion above cannot pass on a tree that still divides by the
-    // whole span. Prefill is 400ms against a ~40ms decode, so the gap is wide
-    // enough that no runner jitter closes it.
+    // whole span. Strictly greater, not a multiple of it: the two rates differ
+    // by exactly the ttft pinned above, which makes this hold for any prefill a
+    // runner actually produces. A multiple would encode how loaded the machine
+    // was. On the old code ttft is 0, the window collapses to the span, and the
+    // two rates are equal, so this still fails there.
     const double whole_span_rate =
         static_cast<double>(kDecodeTokens) / (static_cast<double>(total_ms) / 1000.0);
-    CHECK(usage.decode_tokens_per_second() > whole_span_rate * 3.0,
-          "the decode-window rate is well clear of the whole-span rate");
+    CHECK(usage.decode_tokens_per_second() > whole_span_rate,
+          "the decode-window rate is above the whole-span rate");
 
     unload_mock_vlm("mock-vlm-decode-rate", registry);
     return 0;
