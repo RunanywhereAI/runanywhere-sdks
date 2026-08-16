@@ -180,6 +180,37 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirementBytes: 4_368_438_944,
       }),
+      // Gemma (Google)
+      // Gemma 4 is Apache 2.0. Preserve the license and applicable attribution
+      // notices if downloaded artifacts are redistributed. Phone-scale rows
+      // only (E2B/E4B); larger Gemma 4 variants are desktop-scale.
+      registerModel({
+        id: 'gemma-4-e2b-it-q4_k_m',
+        name: 'Gemma 4 E2B IT Q4_K_M',
+        url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // 3,106,738,272 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 3_400_000_000,
+      }),
+      registerModel({
+        id: 'gemma-4-e4b-it-q4_k_m',
+        name: 'Gemma 4 E4B IT Q4_K_M',
+        url: 'https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // 4,977,171,584 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 5_700_000_000,
+      }),
+      // Granite (IBM)
+      // Apache 2.0. Phone-scale row only (3B) — the 8B/30B Granite 4.1 rows are
+      // desktop-scale and this app has no desktop RN target.
+      registerModel({
+        id: 'granite-4.1-3b-q4_k_m',
+        name: 'IBM Granite 4.1 3B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // 2,099,502,400 B of weights plus a 4K-context KV/runtime allowance.
+        memoryRequirementBytes: 2_400_000_000,
+      }),
       // Bonsai (PrismML)
       // PrismML Bonsai-27B at 1.125-bit (Q1_0, qwen3_5 GatedDeltaNet). The
       // canonical-first RunAnywhere llama.cpp fork preserves this support beside
@@ -431,6 +462,11 @@ export async function registerAll(
         category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirementBytes: 75_000_000,
       }),
+      // NOTE: NVIDIA Nemotron-3.5-ASR-Streaming 0.6B is intentionally NOT registered
+      // here. It needs sherpa-onnx >=1.13.4/1.13.5; this app's vendored sherpa-onnx
+      // for both iOS and Android (core/VERSIONS: SHERPA_ONNX_VERSION_IOS /
+      // SHERPA_ONNX_VERSION_ANDROID) is still pinned to 1.13.2. Revisit once either
+      // platform's pin is bumped.
     ]);
   }
 
@@ -455,6 +491,59 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
         category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirementBytes: 65_000_000,
+      }),
+      // Supertone (Supertonic TTS)
+      // Supertone/supertonic-3 ships fp32 ONNX weights that sherpa-onnx's Supertonic
+      // provider cannot load directly — it expects INT8-quantized *.int8.onnx weights
+      // plus a converted voice.bin/unicode_indexer.bin. This row points at
+      // csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11, the pre-converted
+      // export sherpa-onnx's own examples use, pinned to its exact commit. sherpa-onnx
+      // added Supertonic 3 support in v1.13.2; this app's vendored sherpa-onnx (both
+      // iOS and Android, core/VERSIONS) is pinned to exactly 1.13.2, which is enough.
+      registerModel({
+        id: 'sherpa-supertonic-3-tts-int8',
+        name: 'Supertonic 3 TTS INT8 (Sherpa-ONNX)',
+        files: [
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/duration_predictor.int8.onnx',
+            filename: 'duration_predictor.int8.onnx',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/text_encoder.int8.onnx',
+            filename: 'text_encoder.int8.onnx',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/vector_estimator.int8.onnx',
+            filename: 'vector_estimator.int8.onnx',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/vocoder.int8.onnx',
+            filename: 'vocoder.int8.onnx',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/tts.json',
+            filename: 'tts.json',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/unicode_indexer.bin',
+            filename: 'unicode_indexer.bin',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/voice.bin',
+            filename: 'voice.bin',
+            required: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        // Sum of file Content-Lengths.
+        memoryRequirementBytes: 145_295_768,
       }),
     ]);
   }

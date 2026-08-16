@@ -34,6 +34,7 @@ echo "Version: ${SHERPA_VERSION}"
 # Check if already exists and is valid
 if [ -d "${SHERPA_DIR}/sherpa-onnx.xcframework" ]; then
     if [ "$(cat "${VERSION_MARKER}" 2>/dev/null || true)" = "${SHERPA_VERSION}" ] && \
+       [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/Info.plist" ] && \
        [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/ios-arm64/libsherpa-onnx.a" ] && \
        [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator/libsherpa-onnx.a" ] && \
        grep -q 'SherpaOnnxOfflineTtsGenerateWithConfig' \
@@ -91,13 +92,24 @@ fi
 
 rm -rf "${SHERPA_DIR}"
 NORMALIZED_XCFRAMEWORK="${SHERPA_DIR}/sherpa-onnx.xcframework"
+NORMALIZED_INPUT="${TEMP_DIR}/normalized-input"
 for slice in ios-arm64 ios-arm64_x86_64-simulator; do
     source_framework="${XCFRAMEWORK}/${slice}/SherpaOnnxC.framework"
-    destination_slice="${NORMALIZED_XCFRAMEWORK}/${slice}"
+    destination_slice="${NORMALIZED_INPUT}/${slice}"
     mkdir -p "${destination_slice}"
     cp "${source_framework}/SherpaOnnxC" "${destination_slice}/libsherpa-onnx.a"
     cp -R "${source_framework}/Headers" "${destination_slice}/Headers"
 done
+
+# Repackage the two static-library slices with xcodebuild so the normalized
+# bundle has a valid root Info.plist and can be consumed as a real XCFramework.
+mkdir -p "${SHERPA_DIR}"
+xcodebuild -create-xcframework \
+    -library "${NORMALIZED_INPUT}/ios-arm64/libsherpa-onnx.a" \
+    -headers "${NORMALIZED_INPUT}/ios-arm64/Headers" \
+    -library "${NORMALIZED_INPUT}/ios-arm64_x86_64-simulator/libsherpa-onnx.a" \
+    -headers "${NORMALIZED_INPUT}/ios-arm64_x86_64-simulator/Headers" \
+    -output "${NORMALIZED_XCFRAMEWORK}"
 printf '%s\n' "${SHERPA_VERSION}" > "${VERSION_MARKER}"
 
 echo ""

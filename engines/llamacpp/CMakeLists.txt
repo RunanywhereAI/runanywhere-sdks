@@ -24,9 +24,10 @@ add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 
 # Repo + tag both come from core/VERSIONS (via LoadVersions)
 # so a fork swap (e.g. the PrismML Bonsai fork) is a VERSIONS-only change.
-# Fall back to upstream when the key is absent (older VERSIONS files).
+# Fall back to the maintained RunAnywhere fork when the key is absent (older
+# VERSIONS files), because the pinned compatibility tag may not exist upstream.
 if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
-    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/ggml-org/llama.cpp.git")
+    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/RunanywhereAI/llama.cpp.git")
 endif()
 message(STATUS "llama.cpp source: ${RAC_LLAMACPP_GIT_REPOSITORY} @ ${RAC_LLAMACPP_VERSION}")
 
