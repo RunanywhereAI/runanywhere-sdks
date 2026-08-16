@@ -720,6 +720,7 @@ _rac_file_manager_models_storage_used
 _rac_storage_analyzer_analyze
 _rac_storage_analyzer_calculate_size
 _rac_storage_analyzer_get_model_metrics
+_rac_model_storage_metrics_free
 _rac_storage_info_free
 
 # Model registry non-proto ABI — still used by Swift CppBridge+ModelRegistry.swift
