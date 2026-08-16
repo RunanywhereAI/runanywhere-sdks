@@ -36,12 +36,8 @@ if "%~1"=="-h" goto :show_help
 
 :: Check if the exact pinned stack is already downloaded.
 set "CACHE_VALID=0"
-if exist "%DEST_DIR%\PROVENANCE.txt" (
-    findstr /x /c:"sherpa_onnx_version=%VERSION%" "%DEST_DIR%\PROVENANCE.txt" >nul && ^
-    findstr /x /c:"runanywhere_source_commit=%SOURCE_COMMIT%" "%DEST_DIR%\PROVENANCE.txt" >nul && ^
-    findstr /x /c:"onnxruntime_version=%ONNX_VERSION_WINDOWS%" "%DEST_DIR%\PROVENANCE.txt" >nul && ^
-    set "CACHE_VALID=1"
-)
+call :verify_provenance >nul 2>&1
+if not errorlevel 1 set "CACHE_VALID=1"
 if "%CACHE_VALID%"=="1" if "%FORCE%"=="0" (
     echo [OK] Exact Sherpa-ONNX stack already downloaded at %DEST_DIR%
     echo      Use --force to re-download.
@@ -150,9 +146,11 @@ if not exist "%DEST_DIR%\PROVENANCE.txt" (
     echo [ERROR] Release provenance file not found
     set "VERIFY_OK=0"
 ) else (
-    findstr /x /c:"sherpa_onnx_version=%VERSION%" "%DEST_DIR%\PROVENANCE.txt" >nul || set "VERIFY_OK=0"
-    findstr /x /c:"runanywhere_source_commit=%SOURCE_COMMIT%" "%DEST_DIR%\PROVENANCE.txt" >nul || set "VERIFY_OK=0"
-    findstr /x /c:"onnxruntime_version=%ONNX_VERSION_WINDOWS%" "%DEST_DIR%\PROVENANCE.txt" >nul || set "VERIFY_OK=0"
+    call :verify_provenance
+    if errorlevel 1 (
+        echo [ERROR] Release provenance does not match the pinned runtime stack
+        set "VERIFY_OK=0"
+    )
 )
 
 if "%VERIFY_OK%"=="0" (
@@ -190,3 +188,8 @@ for /f "usebackq tokens=1,* delims==" %%a in ("%VERSIONS_FILE%") do (
     if not "!line:~0,1!"=="#" if not "%%a"=="" set "%%a=%%b"
 )
 goto :eof
+
+:verify_provenance
+if not exist "%DEST_DIR%\PROVENANCE.txt" exit /b 1
+powershell -NoProfile -Command "$lines = [IO.File]::ReadAllLines((Join-Path $env:DEST_DIR 'PROVENANCE.txt')); if (($lines -notcontains ('sherpa_onnx_version=' + $env:VERSION)) -or ($lines -notcontains ('runanywhere_source_commit=' + $env:SOURCE_COMMIT)) -or ($lines -notcontains ('onnxruntime_version=' + $env:ONNX_VERSION_WINDOWS))) { exit 1 }"
+exit /b %errorlevel%
