@@ -48,6 +48,8 @@ CPU and WebGPU are separate llama.cpp builds owned by one npm package. ONNX Runt
 
 The canonical `.js` files are required at runtime by threaded Emscripten workers. A deployment must serve every pair as a real static asset, never as an SPA HTML fallback.
 
+Every canonical `.js` file is mandatory Emscripten runtime glue, but bundlers may treat the two build flavors differently: a bundler may hash the main-thread import, while pthread-enabled CPU/ONNX modules can also request their canonical self-name from worker threads. The WebGPU release variant is deliberately non-threaded because its asynchronous waits use Asyncify instead of pthreads, but its canonical glue file is still required. Package and deployment gates must verify all four canonical JS/WASM pairs are non-empty, syntactically valid, served as JavaScript/`application/wasm`, and never answered by an SPA HTML fallback.
+
 ## Quality and release gates
 
 TypeScript is strict and builds must fail on type errors. External data begins as `unknown`, is validated, and is narrowed before it reaches SDK or WASM boundaries. Do not add `any`, `@ts-ignore`, unchecked JSON casts, or duplicate hand-written proto DTOs.

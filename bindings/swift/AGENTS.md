@@ -1,233 +1,218 @@
-# AGENTS.md
+# AGENTS.md — Swift SDK
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for working in `bindings/swift/`, the iOS/macOS bridge (XCFramework) onto the
+C++ `runanywhere-commons` core. Read the repo-root `AGENTS.md` first for cross-SDK
+architecture and layering rules; this file covers what's specific to Swift.
+
+Deeper references, not repeated here:
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — exhaustive, line-referenced walkthrough of every
+  file (source of truth for anything below not covered in enough detail).
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — first-time setup, full command reference,
+  PR process.
+- [`README.md`](README.md) — consumer-facing install/usage, capability table, Connect (LAN
+  session sharing) feature.
 
 ## Build commands
 
 ```bash
-# Build
-RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build
-
-# Run tests
-RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test
-
-# Lint
-swiftlint
-
-# Lint with autofix
-swiftlint --fix
-
-# Analyzer (requires Xcode build log)
-swiftlint analyze --compiler-log-path <path-to-xcodebuild-log>
-
-# Unused code detection
-periphery scan
-
-# Build validation with XCFrameworks
-./scripts/package-sdk.sh --mode local
-
-# Build for specific platform via Xcode
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build     # build (needs Binaries/, see below)
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test      # run tests
+swiftlint                                       # lint (swiftlint --fix to autofix)
+periphery scan                                  # unused-code detection
+./scripts/package-sdk.sh --mode local           # packaging validation against Binaries/
 xcodebuild build -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_REQUIRED=NO
 ```
 
+`Binaries/` (git-ignored XCFrameworks) must be staged first via
+`./scripts/build-core-xcframework.sh`, or `swift build` fails; `docs/DEVELOPMENT.md` has
+the full first-run sequence. `swiftlint analyze` needs a compiler log
+(`--compiler-log-path <xcodebuild.log>`); pre-commit runs `swiftlint --strict`, which
+also fails on warning-level rules (e.g. the TODO-must-reference-an-issue custom rule).
+
 ## Package structure
 
-Two `Package.swift` files exist:
-- Root (`runanywhere-sdks/Package.swift`): for external SPM consumers; downloads XCFrameworks from GitHub releases.
-- Local (`bindings/swift/Package.swift`): for SDK development; references the git-ignored `Binaries/` directory.
+Two `Package.swift` files: the repo-root one is for external SPM consumers (downloads
+XCFrameworks from GitHub releases); `bindings/swift/Package.swift` is for SDK development
+(references the git-ignored `Binaries/`). Swift tools version 6.2; platforms iOS 17.5+ /
+macOS 14.5+ (Xcode 26+ is a hard floor because the MLX target needs the 6.2 toolchain).
 
-Products: `RunAnywhere` (all backends), `RunAnywhereCore` (core only), `RunAnywhereLlamaCPP`, `RunAnywhereONNX`.
-
-Platforms: iOS 17.5+, macOS 14.5+. Swift tools version 5.9.
-
-Three `.grpc.swift` files are excluded from compilation (require macOS 15/iOS 18).
+Products: `RunAnywhere` (core only — model lifecycle, events; no backend does anything
+without one of the below), `RunAnywhereLlamaCPP` (LLM+VLM via llama.cpp),
+`RunAnywhereONNX` (STT/TTS/VAD via ONNX + Sherpa), `RunAnywhereMLX` (Apple MLX
+LLM/VLM/STT/TTS), `RunAnywhereNeuRT` (Apple Neural Engine text gen + CoreML diffusion).
+Three `.grpc.swift` files under `Generated/` are excluded from compilation (need iOS
+18/macOS 15, above the SDK floor); an in-process C callback path replaces gRPC.
 
 ## Architecture
 
 ### Three-layer design
 
-All business logic lives in the C++ `RACommons.xcframework`. Swift's role is platform adaptation.
+All business logic lives in the C++ `RACommons.xcframework`; Swift's job is platform
+adaptation. The public API (`RunAnywhere` enum + extensions) calls `CppBridge`, which
+calls the `rac_*` C ABI from the `CRACommons` module — implemented by the prebuilt
+xcframework, never by Swift.
 
-The public API (the `RunAnywhere` enum and its extensions) calls `CppBridge`, an enum
-namespace with actor sub-namespaces. `CppBridge` calls the `rac_*` C ABI from the CRACommons
-module, which is implemented by the prebuilt `RACommons.xcframework`.
+### Entry point and two-phase init
 
-### Entry point
+`RunAnywhere` (`Sources/RunAnywhere/Public/RunAnywhere.swift`) is a `public enum`
+namespace, never instantiated; all consumer API is static methods on it or its
+extensions. The public surface follows the cross-SDK v3 contract (14 namespaces —
+`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rerank`, `images`, `diarization`,
+`segmentation`, `voice`, `rag`, `models`, `lora` — plus core members `initialize`,
+`reset`, `isReady`, `version`, `deviceId`, `events`) under `Public/API/`; option
+defaults are read from generated IDL `defaults()`, never hand-copied, so `idl/*.proto`
+stays the single source of truth. `Public/Extensions/` carries the older flat verbs
+(`loadModel`, `transcribe`, `ragQuery`, …) as `@available(*, deprecated)` forwarders —
+new code calls the namespaces. `voice.createSession(...)` and `rag.open(...)` hand back
+long-lived sessions (`VoiceSession`, `RagSession`) with their own native handles.
 
-`RunAnywhere` is a `public enum` (namespace, never instantiated) at `Sources/RunAnywhere/Public/RunAnywhere.swift`. All consumer API is static methods on this enum or its extensions.
+- **Phase 1** (sync, ~1–5ms): validates params, registers platform callbacks (logging,
+  file I/O, Keychain, HTTP transport, telemetry, device), stores to Keychain, sets
+  `_isInitialized = true`.
+- **Phase 2** (async background `Task`, guarded by `_servicesInitLock` so concurrent
+  callers can't double-init): HTTP transport, auth, C++ state, platform services
+  (`@MainActor`), model paths, device registration, downloaded-model discovery.
 
-The public surface follows the cross-SDK v3 contract in
-`thoughts/shared/plans/public_api_spec.md`: 14 namespaces (`llm`, `vlm`, `stt`,
-`tts`, `vad`, `embeddings`, `rerank`, `images`, `diarization`, `segmentation`,
-`voice`, `rag`, `models`, `lora`) plus core members (`initialize`, `reset`,
-`isReady`, `version`, `deviceId`, `events`). Those live in
-`Sources/RunAnywhere/Public/API/`, with shared option, input, result, and event
-types in `Options.swift`, `Inputs.swift`, `Results.swift`, and `Events.swift`.
-Option defaults are read from the generated IDL `defaults()` rather than
-hand-copied, so `idl/*.proto` stays the single source of truth.
-
-`Public/Extensions/` carries the older flat verbs (`loadModel`, `transcribe`,
-`ragQuery`, and the rest) as `@available(*, deprecated)` forwarders. Each one
-behaves exactly as it always did; new code calls the namespaces instead.
-
-Two verbs hand back long-lived sessions. `voice.createSession(...)` returns a
-`VoiceSession`, and its `start()` is the only thing that opens the microphone,
-so subscribing to `session.events` is safe on its own. `rag.open(...)` returns a
-`RagSession` with its own native handle, so two corpora can be open at once.
-
-### Two-phase initialization
-
-- Phase 1 (synchronous, roughly 1 to 5 ms): Validates params, registers platform callbacks (logging, file I/O, Keychain, HTTP transport, telemetry, device), stores to Keychain. Sets `_isInitialized = true`.
-- Phase 2 (async background `Task`): Sets up HTTP transport, authenticates, initializes C++ state, registers platform services (`@MainActor`), sets model paths, registers device, discovers downloaded models. Guarded by a single shared `Task` under `_servicesInitLock: DispatchQueue` to prevent duplicate concurrent inits.
-
-Every public API method calls `ensureServicesReady()` which is O(1) after Phase 2 completes. If HTTP failed during offline init, it retries via `retryHTTPSetup()`.
+Every public API call goes through `ensureServicesReady()` (O(1) once Phase 2 is done);
+if HTTP failed during offline init, it retries via `retryHTTPSetup()`.
 
 ### CppBridge
 
-`CppBridge` at `Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift` is an enum namespace. Its state is guarded by `OSAllocatedUnfairLock<CppBridgeSharedState>`. Sub-namespaces are organized as extensions in `Foundation/Bridge/Extensions/CppBridge+*.swift` (~26 extension files).
+`CppBridge` (`Foundation/Bridge/CppBridge.swift`) is an enum namespace whose state is
+guarded by `OSAllocatedUnfairLock<CppBridgeSharedState>`; sub-namespaces live as
+extensions in `Foundation/Bridge/Extensions/CppBridge+*.swift` (34 files). Most
+capability sub-namespaces are Swift `actor`s, each wrapping one opaque `rac_handle_t`
+with lazy `getHandle()` and a `destroy()`: `LLM`, `STT`, `TTS`, `VAD`, `VLM`,
+`VoiceAgent`, `RAG`, `Diffusion`, `Rerank`, `Diarization`, `Storage`, `LoraRegistry`,
+`ModelRegistry`, `Download`. `VoiceAgent.getHandle()` is `async throws` because it
+gathers handles from four component actors before building its composite handle.
+Everything else (`PlatformAdapter`, `Environment`, `Events`, `Telemetry`, `Device`,
+`HTTP`, `Auth`, `ModelPaths`, `Connect`, …) is a plain namespace, no actor. `Connect`
+backs `ConnectSession`, trusted-LAN model sharing (macOS host, iOS/iPadOS client) — see
+README.md for the feature, ARCHITECTURE.md §6.5 for the bridge slice.
 
-Component actors, one per AI domain: `CppBridge.LLM`, `.STT`, `.TTS`, `.VAD`, `.VLM`, `.VoiceAgent`. Each is a Swift `actor` holding a single opaque `rac_handle_t`, with lazy creation via `getHandle()`, and `destroy()` for cleanup. `VoiceAgent.getHandle()` is `async throws` because it must gather handles from all four component actors before creating its composite handle.
-
-Infrastructure actors: `CppBridge.ModelRegistry` and `CppBridge.Download`, also Swift actors wrapping C++ state.
-
-Pure namespaces, no actors: `CppBridge.PlatformAdapter`, `.Environment`, `.DevConfig`, `.Endpoints`, `.Events`, `.Telemetry`, `.Device`, `.State`, `.HTTP`, `.Auth`, `.ModelPaths`, `.Services`, `.Platform`, `.FileManager`, `.Storage`, `.Strategy`, `.LoraRegistry`.
-
-Shutdown sequence in `CppBridge.shutdown()`: destroys AI actors sequentially (LLM → STT → TTS → VAD → VoiceAgent → VLM), then Telemetry and Events.
+Shutdown (`CppBridge.shutdown()`) destroys AI actors sequentially — LLM → STT → TTS →
+VAD → VoiceAgent → VLM — then Telemetry and Events.
 
 ### C to Swift interop
 
-All cross-boundary communication uses vtable-based function pointer structs:
-- `rac_platform_adapter_t`: file ops, logging, Keychain, clock, memory
-- `rac_http_transport_ops_t`: HTTP transport (URLSession)
-- `rac_secure_storage_t`: auth token persistence
-- `rac_platform_llm/tts/diffusion_callbacks_t`: Apple platform services
-- `rac_discovery_callbacks_t`: filesystem callbacks for model discovery
-
-Async Swift bridged to synchronous C ABI via `DispatchSemaphore` or `DispatchGroup.wait()`.
+Cross-boundary calls use vtable-based function-pointer structs: `rac_platform_adapter_t`
+(file ops, logging, Keychain, clock, memory), `rac_http_transport_ops_t` (URLSession),
+`rac_secure_storage_t` (auth tokens), `rac_platform_llm/tts/diffusion_callbacks_t`
+(Apple platform services), `rac_discovery_callbacks_t` (model-discovery filesystem
+callbacks). Async Swift bridges to the synchronous C ABI via `DispatchSemaphore` or
+`DispatchGroup.wait()`.
 
 ### Backend module pattern
 
-Each runtime backend (`LlamaCPPRuntime`, `ONNXRuntime`) is a thin `public enum` exposing static `register(priority:)` / `unregister()` / `autoRegister` whose primary job is calling the relevant `rac_backend_*_register()` C function. Registration state is main-actor isolated so register/unregister cannot race; ONNX also explicitly registers/unregisters the Sherpa engine plugin for STT/TTS/VAD parity.
+Each backend is a thin `public enum` with static `register(priority:)` /
+`unregister()` / `autoRegister`, whose job is calling `rac_backend_*_register()`.
+Registration state is main-actor isolated so register/unregister can't race.
 
-| Module | Capabilities | Framework |
-|--------|-------------|-----------|
-| `LlamaCPP` | LLM + VLM (unified llama.cpp vtable) | `.llamaCpp` |
-| `ONNX` | Embeddings + Sherpa-ONNX engine plugin (STT / TTS / VAD) | `.onnx` |
+| Module | Capabilities | Framework case |
+|--------|-------------|-----------------|
+| `LlamaCPPRuntime` | LLM + VLM (unified llama.cpp vtable) | `.llamaCpp` |
+| `ONNXRuntime` | Embeddings + Sherpa-ONNX plugin (STT/TTS/VAD) | `.onnx`; also registers Sherpa separately |
+| `MLXRuntime` | LLM/VLM/embeddings (mlx-swift-lm) + STT/TTS/VAD (mlx-audio-swift) | `.mlx` |
+| `NeuRTRuntime` | Apple Neural Engine text gen + CoreML diffusion | `.coreml` — **not** `.neurt`; commons maps `INFERENCE_FRAMEWORK_COREML` → `RAC_ENGINE_ID_NEURT`, there is no `.neurt` framework case |
 
-### Streaming architecture
+### Streaming, HTTP, types, errors, events
 
-`LLMStreamAdapter` and `VoiceAgentStreamAdapter` use a fan-out pattern: one C callback registration per native handle, fanning out to multiple Swift `AsyncStream` consumers via UUID-keyed continuations. State guarded by `OSAllocatedUnfairLock`. Proto events deserialized from bytes via `RALLMStreamEvent(serializedBytes:)` / `RAVoiceEvent(serializedBytes:)`.
+`LLMStreamAdapter` / `VoiceAgentStreamAdapter` fan out one C callback per handle to
+multiple Swift `AsyncStream` consumers via UUID-keyed continuations
+(`OSAllocatedUnfairLock`-guarded), deserializing proto events with
+`RALLMStreamEvent(serializedBytes:)` / `RAVoiceEvent(serializedBytes:)`.
 
-### HTTP layer
+`URLSessionHttpTransport` is the registered `rac_http_transport_ops_t` vtable (all C++
+HTTP flows through it: buffered `request_send`, per-chunk `request_stream`, resumable
+`request_resume` with `Range:` headers). `HTTPClientAdapter` (actor, aliased
+`HTTPService`) separately wraps `rac_http_client_*` for SDK-level requests (auth,
+device registration, telemetry) on a concurrent `DispatchQueue`.
 
-Two paths sharing the same transport vtable:
-- `URLSessionHttpTransport` is registered as the `rac_http_transport_ops_t` vtable; three slots: `request_send` (buffered), `request_stream` (per-chunk), `request_resume` (with `Range: bytes=N-` header). All C++ HTTP flows through Apple's URLSession.
-- `HTTPClientAdapter` (an actor aliased as `HTTPService`) wraps `rac_http_client_*` for SDK-level requests (auth, device registration, telemetry). Runs blocking calls on a concurrent `DispatchQueue`.
+Proto-generated `RA*`-prefixed types (`.pb.swift` in `Generated/`) are canonical; a
+handful of public typealiases strip the prefix at the SDK surface (e.g.
+`InferenceFramework = RAInferenceFramework`). Extensions add C-bridge methods
+(`withCOptions<T>(_:)`, `init(from cResult:)`) and `Codable` conformance.
 
-### Type system
+`SDKException` (`Foundation/Errors/SDKException.swift`) wraps proto `RASDKError`,
+captures `Thread.callStackSymbols` at construction, and exposes category factories
+(`.stt(...)`, `.llm(...)`, `.network(...)`). `.cancelled` / `.streamCancelled` are
+"expected" and suppress logging.
 
-Proto-generated types (`RA*` prefix from `.pb.swift` files in `Generated/`) are the canonical wire types. A small set of public Swift typealiases strip the prefix where the type is part of the SDK surface (e.g., `typealias InferenceFramework = RAInferenceFramework` in `Public/Extensions/Models/ModelTypes.swift`); the rest of the SDK uses the `RA`-prefixed proto types directly (e.g., `RASDKComponent` on `Public/Extensions/Models/RunAnywhere+ModelLifecycle.swift`). Extensions on these types add Swift-side computed properties, C-bridge methods (`withCOptions<T>(_:)`, `init(from cResult:)`), and `Codable` conformance.
+`EventBus` (singleton, Combine `PassthroughSubject<any SDKEvent, Never>`) covers `sdk`,
+`model`, `llm`, `stt`, `tts`, `voice`, `rag`, `storage`, `device`, `network`, `error` —
+accessed via `RunAnywhere.events`.
 
-### Error system
+### Model management, security, logging
 
-`SDKException` (struct at `Foundation/Errors/SDKException.swift`) wraps proto `RASDKError`. Captures `Thread.callStackSymbols` at construction. Category-specific static factories: `.stt(code, message)`, `.llm(...)`, `.network(...)`, etc. Codes `.cancelled` and `.streamCancelled` are classified as "expected" (suppress logging).
+Models live at `Documents/RunAnywhere/Models/{framework}/{modelId}/`; path computation
+and model-file-extension → framework detection (`.gguf`/`.bin`→LlamaCPP,
+`.onnx`/`.ort`→ONNX, `.mlmodelc`/`.mlpackage`→CoreML, `.json` QNN bundles→QHexRT) are
+commons-side, reached via `rac_model_paths_*`. Download orchestration
+(`rac_http_download_execute`) runs on a concurrent `DispatchQueue`; cancellation is an
+`OSAllocatedUnfairLock<Bool>` polled by the C++ progress callback.
 
-### Event system
+`KeychainManager` uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` (no iCloud sync)
+under service `com.runanywhere.sdk`. `DeviceIdentity.persistentUUID` resolves Keychain →
+`identifierForVendor` (iOS) → new UUID.
 
-`EventBus` (singleton) backed by Combine `PassthroughSubject<any SDKEvent, Never>`. Categories: `sdk`, `model`, `llm`, `stt`, `tts`, `voice`, `rag`, `storage`, `device`, `network`, `error`. Accessed via `RunAnywhere.events`.
+`SDKLogger` wraps `Logging.shared`; `debug()` is `@inlinable` and no-ops outside
+`DEBUG`. Metadata keys containing `key`/`secret`/`password`/`token`/`auth`/`credential`
+are auto-redacted. C++ logs arrive via `platformLogCallback`, parsing structured
+`"message | key=value"` metadata.
 
-### Model management
+## Conventions enforced by SwiftLint
 
-Models stored at `Documents/RunAnywhere/Models/{framework}/{modelId}/`. Path computation delegated to C++ via `rac_model_paths_*`. Model registry is a Swift actor wrapping the C++ global registry. Model file type detection: `.gguf`/`.bin` → LlamaCPP, `.onnx`/`.ort` → ONNX, `.mlmodelc`/`.mlpackage` → CoreML, `.json` QNN bundles → QHexRT when explicitly registered as that framework.
+Errors (block CI and `--strict` pre-commit): no `print()`/`NSLog()`/`os_log()`/
+`debugPrint()`/`Logger(` — use `SDKLogger` only; no `as!`/`force_cast`/`force_try`.
 
-Download orchestration runs `rac_http_download_execute` on a concurrent `DispatchQueue`. Cancellation via `OSAllocatedUnfairLock<Bool>` polled by the C++ progress callback.
+Warnings (still block `--strict` pre-commit, not plain `swiftlint`): no `Any`/
+`AnyObject`/`[String: Any]`; no implicitly-unwrapped optionals; sorted imports; TODOs
+must reference an issue (`// TODO: #123 - description`); lines warn@150/error@200;
+files warn@800/error@1500; function bodies warn@80/error@300; cyclomatic complexity
+warn@15/error@30.
 
-### Security
+Concurrency: never `NSLock` — use `OSAllocatedUnfairLock` or a Swift actor; C callback
+trampolines are `@convention(c)` free functions (no captures) using
+`Unmanaged.passRetained`/`.release()` for context. Naming: platform impls get an
+explicit prefix (`AndroidTTSService`); `CppBridge+{Domain}.swift` per extension.
 
-`KeychainManager` uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` (no iCloud sync) under service `com.runanywhere.sdk`. Stores API key, base URL, environment, device UUID, and auth tokens.
-
-`DeviceIdentity.persistentUUID` resolution: Keychain → `identifierForVendor` (iOS) → new UUID.
-
-### Logging
-
-`SDKLogger` struct wraps `Logging.shared` singleton. `debug()` is `@inlinable` and no-ops in non-`DEBUG` builds. Metadata keys containing `key`, `secret`, `password`, `token`, `auth`, `credential` are auto-redacted.
-
-C++ logs arrive via `platformLogCallback`; structured metadata in `"message | key=value"` format is parsed.
-
-## Conventions and rules
-
-### Enforced by SwiftLint (errors, not warnings)
-
-- No `print()`, `NSLog()`, `os_log()`, `debugPrint()`, or `Logger(`; use `SDKLogger` exclusively
-- No `as!` force casts
-- No `force_cast`, `force_try`
-- TODOs must reference a GitHub issue number: `// TODO: #123 - description`
-
-### Enforced by SwiftLint (warnings)
-
-- No `Any` or `AnyObject` types; use specific types or protocols
-- No `[String: Any]` dictionaries; define a struct
-- No implicitly unwrapped optionals
-- Sorted imports
-- Lines: warn at 150 chars, error at 200
-- Files: warn at 800 lines, error at 1500
-- Function bodies: warn at 80 lines, error at 300
-- Cyclomatic complexity: warn at 15, error at 30
-
-### Concurrency
-
-- Never use `NSLock`; use `OSAllocatedUnfairLock` (Swift 6 API) or Swift actors
-- Bridge actors hold one opaque C handle each; all access is concurrency-safe via actor isolation
-- C callback trampolines use `@convention(c)` free functions (no captures) with `Unmanaged.passRetained`/`.release()` for context passing
-- Async-to-sync bridging uses `DispatchSemaphore` or `DispatchGroup.wait()`, required because the C ABI is synchronous
-
-### Naming
-
-- Platform-specific implementations use prefixes: `AndroidTTSService`, `JvmTTSService`, etc.
-- Proto-generated types keep `RA` prefix; public typealiases strip it
-- CppBridge extensions follow `CppBridge+{Domain}.swift` naming
-
-### Periphery (unused code detection)
-
-Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRuntime` targets. `retain_public: true`, `retain_codable_properties: true`.
+Periphery (`.periphery.yml`) scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRuntime`
+(not the MLX/NeuRT targets) with `retain_public: true`, `retain_codable_properties: true`.
 
 ## Key file locations
 
 | File | Purpose |
 |------|---------|
 | `Sources/RunAnywhere/Public/RunAnywhere.swift` | SDK entry point, two-phase init |
-| `Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift` | Bridge coordinator, init sequence, shutdown |
-| `Sources/RunAnywhere/Foundation/Bridge/Extensions/` | ~26 CppBridge domain extensions |
+| `Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift` | Bridge coordinator, init/shutdown |
+| `Sources/RunAnywhere/Foundation/Bridge/Extensions/` | 42 CppBridge domain extensions |
 | `Sources/RunAnywhere/Adapters/` | LLMStreamAdapter, VoiceAgentStreamAdapter, HTTPClientAdapter |
-| `Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift` | HTTP vtable (Apple URLSession) |
-| `Sources/RunAnywhere/Public/Extensions/` | All RunAnywhere+{Feature}.swift public API extensions |
-| `Sources/RunAnywhere/Generated/` | Proto-generated .pb.swift files (do not edit) |
+| `Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift` | HTTP vtable |
+| `Sources/RunAnywhere/Public/Extensions/` | Public API extensions, one per feature |
+| `Sources/RunAnywhere/Generated/` | Proto-generated `.pb.swift` (never hand-edit) |
 | `Sources/RunAnywhere/CRACommons/include/` | C header umbrella for RACommons.xcframework |
-| `Sources/RunAnywhere/Foundation/Security/KeychainManager.swift` | Keychain CRUD |
-| `Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift` | Logging system |
-| `Sources/RunAnywhere/Foundation/Errors/SDKException.swift` | Error type wrapping RASDKError |
-| `Sources/{LlamaCPPRuntime,ONNXRuntime}/` | Backend module registrations |
-| `Sources/RunAnywhere/Features/` | Platform services (AudioCapture, AudioPlayback, SystemTTS, FoundationModels, Diffusion) |
+| `Sources/{LlamaCPPRuntime,ONNXRuntime,MLXRuntime,NeuRTRuntime}/` | Backend module registrations |
+| `Sources/RunAnywhere/Features/` | Platform services (audio capture/playback, system TTS, Foundation Models) |
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| swift-crypto | Cryptographic operations |
+| swift-crypto, swift-protobuf | Crypto ops; proto-generated type support |
 | Files (JohnSundell) | Filesystem abstractions |
 | DeviceKit | Device model identification |
-| ml-stable-diffusion | CoreML image generation |
-| swift-protobuf | Proto-generated type support |
+| mlx-swift, mlx-swift-lm (RunanywhereAI forks) | MLX core + LLM/VLM/embeddings — pin exactly, mirrored in `Generated/Versions.swift` |
+| mlx-audio-swift (RunanywhereAI fork) | MLX STT/TTS/VAD/diarization |
+| swift-transformers (huggingface) | Tokenizers for MLX |
 
 ## Capability notes
 
-Speaker diarization is exposed through `RunAnywhere.diarization` and semantic
-segmentation through `RunAnywhere.segmentation`, both of which require the
-matching backend to be registered. There is no wake-word facade.
+Speaker diarization (`RunAnywhere.diarization`) and semantic segmentation
+(`RunAnywhere.segmentation`) each require their backend registered. There is no
+wake-word facade.
 
-Three spec fields have no commons emitter behind them, so they read as absent
-rather than wrong: `VoiceEvent` has no audio-level event (nothing in commons
-populates `AudioLevelEvent`), `SegmentationOptions.includeDiagnosticImage` has
-no field on `SegmentationResult` to land in, and `LoadOptions.contextLength`,
-`.threads`, and `.useGpu` are logged and dropped because the commons load ABI
-does not carry them.
+Three spec fields have no commons emitter, so they read as absent rather than wrong:
+`VoiceEvent` has no audio-level event; `SegmentationOptions.includeDiagnosticImage` has
+no field on `SegmentationResult` to land in; `LoadOptions.contextLength`, `.threads`,
+`.useGpu` are logged and dropped (commons load ABI doesn't carry them).
