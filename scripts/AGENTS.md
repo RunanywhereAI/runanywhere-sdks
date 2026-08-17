@@ -51,9 +51,9 @@ python3 scripts/validation/gates/test_release_version_coherence.py
 ```
 
 `validate-qhexrt-prebuilt.py` exits **3** (not 1) when no prebuilt is selected — that's the
-intentional public/stub-build path, not a failure. Only a *partial* or
-identity-mismatched selection exits 1. Treat every nonzero exit as failure here and you
-break the OSS build.
+intentional public/stub-build path, not a failure. Do not treat every nonzero exit as
+failure here: exit 3 is the intentional no-prebuilt path, while exit 1 indicates a partial
+or identity-mismatched selection.
 
 ## Skills: `.claude/skills/` is canonical, `.agents/skills/` is a generated mirror
 

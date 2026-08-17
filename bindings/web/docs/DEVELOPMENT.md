@@ -48,7 +48,9 @@ CPU and WebGPU are separate llama.cpp builds owned by one npm package. ONNX Runt
 
 The canonical `.js` files are required at runtime by threaded Emscripten workers. A deployment must serve every pair as a real static asset, never as an SPA HTML fallback.
 
-Every canonical `.js` file is mandatory Emscripten runtime glue, but bundlers may treat the two build flavors differently: a bundler may hash the main-thread import, while pthread-enabled CPU/ONNX modules can also request their canonical self-name from worker threads. The WebGPU release variant is deliberately non-threaded because its asynchronous waits use Asyncify instead of pthreads, but its canonical glue file is still required. Package and deployment gates must verify all four canonical JS/WASM pairs are non-empty, syntactically valid, served as JavaScript/`application/wasm`, and never answered by an SPA HTML fallback.
+Every canonical `.js` file is mandatory Emscripten runtime glue, but bundlers may treat the two build flavors differently: a bundler may hash the main-thread import, while pthread-enabled CPU/ONNX modules can also request their canonical self-name from worker threads. The WebGPU release variant is deliberately non-threaded because its asynchronous waits use Asyncify instead of pthreads, but its canonical glue file is still required. Package and deployment gates must verify all four mandatory canonical JS/WASM pairs are non-empty, syntactically valid, served as JavaScript/`application/wasm`, and never answered by an SPA HTML fallback.
+
+**The optional ONNX-WebGPU pair is verified at the package level, not yet in the example.** `packages/onnx`'s own `prepack`/`verify:package` gate checks `racommons-onnx-sherpa-webgpu.{js,wasm}` (it ships in the npm package unconditionally). The in-repo minimal example's `vite.config.ts` copy-wasm plugin and `tests/browser/release-app.e2e.spec.ts`, however, currently only build/verify the four mandatory pairs — they do not exercise `ONNX.register({ acceleration: 'webgpu' })`. If you add WebGPU speech acceleration to the example, add this fifth pair to both.
 
 ## Quality and release gates
 

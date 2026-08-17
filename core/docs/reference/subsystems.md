@@ -95,5 +95,7 @@ Okapi BM25 inverted index (`bm25_index.cpp`). Per-session `RAGBackend` guarded b
   consolidated here).
 - Persisted indexes are fingerprint-guarded (embedding model + dim + format version).
   On mismatch, discard and re-embed; never load stale vectors against a different embedder.
-- Proto changes to `idl/rag.proto` are additive only (new optional fields); regenerate
-  all SDK bindings, no version bump.
+- Proto changes to `idl/rag.proto` are additive only (new optional fields), but per
+  `idl/AGENTS.md` that still requires a minor `idl/VERSION` bump (patch is
+  comments/docs-only) plus a regenerated `SCHEMA_LOCK` and all SDK bindings — CI's
+  `schema_lock.sh --check --require-bump` enforces the bump.

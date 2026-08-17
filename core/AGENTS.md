@@ -130,8 +130,8 @@ Primitive enum → vtable field → who implements it today:
 | `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, qhexrt |
 | `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, qhexrt |
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
-| `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
-| `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
+| `RAC_PRIMITIVE_EMBED` | `embedding_ops` | llamacpp, onnx |
+| `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp, qhexrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | neurt (Core ML, Apple), platform (Apple) |
 | `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | onnx (Sortformer) |
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
@@ -197,8 +197,7 @@ these, especially RAG, which has "do not relitigate" design rules:
 
 | Backend | Primitives | Models | Engine | Registration |
 |---------|-----------|--------|--------|-------------|
-| **llamacpp** | LLM | GGUF | llama.cpp (FetchContent) | `rac_backend_llamacpp_register()` |
-| **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
+| **llamacpp** | LLM, Embed, VLM, Rerank | GGUF (+ mmproj for VLM) | llama.cpp (FetchContent) + mtmd | `rac_backend_llamacpp_register()` (one plugin, no separate VLM registration) |
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx** | Segment; Embed when RAG is enabled | ONNX | `runtimes/onnxrt` Session | `rac_plugin_entry_onnx()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |

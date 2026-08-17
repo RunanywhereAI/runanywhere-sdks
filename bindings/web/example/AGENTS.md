@@ -45,7 +45,8 @@ documented two-phase init:
 ```ts
 await RunAnywhere.initialize({ environment: 'development' });  // loads racommons.wasm
 await LlamaCPP.register({ acceleration: 'auto' });             // loads racommons-llamacpp[-webgpu].wasm
-await RunAnywhere.completeServicesInitialization();            // deprecated no-op; initialize() folds both phases
+await RunAnywhere.completeServicesInitialization();            // deprecated entry point, but not inert here: initialize() already
+                                                                 // kicks Phase 2 off in the background, and this call joins/awaits it
 RunAnywhere.models.register({ id: 'smollm2-360m-q8_0', ... }); // the catalog is app-owned
 ```
 

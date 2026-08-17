@@ -85,7 +85,9 @@ applications of it:)
 ### Security basics
 
 - Validate all external inputs (URLs, archive members, secure keys, model ids).
-- SSRF: connect-by-IP, no open redirects on host download paths.
+- SSRF: resolve and validate the destination address; block loopback, private,
+  link-local, IPv6-local, and cloud-metadata ranges; disable redirects or
+  revalidate every redirect target before connecting.
 - Do not require cloud credentials to initialize or run unit tests.
 - Treat AI output as untrusted: structured/tool paths parse and validate before use.
 

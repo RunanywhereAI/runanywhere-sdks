@@ -67,9 +67,10 @@ Gotchas not obvious from that diagram:
 1. **FFI scheduling is gated on callback safety**, not just "is this slow." A blocking
    call may only move to a worker isolate when its C++ path cannot publish back through
    an isolate-local Dart callback, or when the callback is proven safe with
-   `NativeCallable.listener`. Streaming and SDK event fan-out always use
+   `NativeCallable.listener`. SDK event fan-out and low-risk callbacks use
    `NativeCallable.listener` with broadcast `StreamController`s (`dart:async`, never
-   rxdart — it is not a dependency).
+   rxdart — it is not a dependency); high-risk proto streams (LLM/VLM/STT/TTS/voice-agent)
+   do NOT — see "Streaming Callbacks: Native-Port Helpers" below for why and how.
 2. **Two-phase init, Phase 2 is genuinely fire-and-forget.** It's assigned to
    `_servicesInitFuture` without awaiting (Swift `Task.detached` parity). A prior
    implementation eagerly awaited despite a doc comment claiming otherwise — don't trust

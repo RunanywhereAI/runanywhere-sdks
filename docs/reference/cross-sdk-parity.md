@@ -10,5 +10,5 @@ that all five stayed in sync after a change.
 | Bridge layer | `CppBridge` enum + extensions | `CppBridge` object + extensions | `DartBridge` + `DartBridge*.dart` | `HybridRunAnywhereCore` (Nitro) | `LlamaCppBridge` + `SherpaONNXBridge` |
 | Streaming | `AsyncStream` | `Flow` | `Stream` (`StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |
 | Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (broadcast `StreamController`) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
-| Secure storage | Keychain | Android Keystore | Keychain (iOS) / Keystore + atomic no-backup files (Android) | Keychain (iOS) / Keystore (Android) | localStorage |
+| Secure storage | Keychain | Android Keystore | Keychain (iOS) / Keystore + atomic no-backup files (Android) | Keychain (iOS) / Keystore (Android) | localStorage — **not secure**, no secrets belong here |
 | HTTP transport | URLSession | OkHttp | OkHttp (Android) / URLSession (iOS) | OkHttp (Android) / URLSession (iOS) | `emscripten_fetch` / `fetch()` |
