@@ -68,7 +68,7 @@ struct ServerOptions {
     uint16_t port = 8080;
     int32_t threads = 4;
     int32_t contextSize = 8192;
-    int32_t gpuLayers = 0;
+    int32_t gpuLayers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO;  // -1 all, 0 CPU
     bool enableCors = true;
     bool verbose = false;
     bool showHelp = false;
