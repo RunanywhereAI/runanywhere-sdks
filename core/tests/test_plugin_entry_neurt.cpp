@@ -147,8 +147,17 @@ int main() {
                          "not linked in (check that g_neurt_llm_ops is declared `extern`)\n");
             return 1;
         }
-        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT only, today.
-        if (vt->stt_ops != nullptr || vt->tts_ops != nullptr || vt->vad_ops != nullptr ||
+        // Same linkage guard for the speech op table. A missing `extern` here fails exactly the
+        // way the LLM one did: everything builds, the archive is tiny, and the slot is silently
+        // null at dispatch.
+        if (vt->stt_ops == nullptr) {
+            std::fprintf(stderr,
+                         "routable neurt engine has NULL stt_ops slot — the NeuRT ASR op-table is "
+                         "not linked in (check that g_neurt_stt_ops is declared `extern`)\n");
+            return 1;
+        }
+        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT + TRANSCRIBE, and nothing else.
+        if (vt->tts_ops != nullptr || vt->vad_ops != nullptr ||
             vt->vlm_ops != nullptr || vt->embedding_ops != nullptr) {
             std::fprintf(stderr, "neurt engine advertised an unserved ops slot\n");
             return 1;
@@ -173,6 +182,20 @@ int main() {
         if (rac_plugin_find_for_engine(RAC_PRIMITIVE_GENERATE_TEXT, RAC_ENGINE_ID_NEURT) != vt) {
             std::fprintf(stderr,
                          "plugin_find_for_engine(GENERATE_TEXT, \"%s\") did not pin the neurt "
+                         "engine\n",
+                         RAC_ENGINE_ID_NEURT);
+            rac_plugin_unregister(vt->metadata.name);
+            return 1;
+        }
+        // Speech routes the same way, and this doubles as the manifest check: the registry only
+        // resolves a primitive the manifest ADVERTISES, so a filled stt_ops slot with no
+        // RAC_PRIMITIVE_TRANSCRIBE entry fails right here rather than being unreachable in the
+        // field. sherpa serves TRANSCRIBE at priority 90 and cloud at 50, so an unpinned request is
+        // a priority question this engine should not silently win; the pinned path is the one an
+        // ANE bundle actually arrives on.
+        if (rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, RAC_ENGINE_ID_NEURT) != vt) {
+            std::fprintf(stderr,
+                         "plugin_find_for_engine(TRANSCRIBE, \"%s\") did not pin the neurt "
                          "engine\n",
                          RAC_ENGINE_ID_NEURT);
             rac_plugin_unregister(vt->metadata.name);

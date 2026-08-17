@@ -36,6 +36,7 @@
 // `rac_llm_service_ops_t` lives here; the vtable header forward-declares the slot but not the
 // type, so the entry file must include it to name the NeuRT op table.
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(__APPLE__) && defined(RAC_NEURT_GENERATE_AVAILABLE) && \
@@ -169,6 +170,10 @@ static const uint32_t k_neurt_formats[] = {
 
 static const rac_primitive_t k_neurt_primitives[] = {
     RAC_PRIMITIVE_DIFFUSION,
+    // Speech-to-text on the Neural Engine, backed by NeuRT's ASR drivers. Four bundle shapes are
+    // served through one op table: Parakeet TDT and RNNT (transducer), Whisper and Moonshine
+    // (attention decoder), and Parakeet CTC.
+    RAC_PRIMITIVE_TRANSCRIBE,
     // NOTE: the text-generation primitive is RAC_PRIMITIVE_GENERATE_TEXT. There is no
     // RAC_PRIMITIVE_LLM — SDK_PATCH.md's diff names one and the enum has never had it.
     RAC_PRIMITIVE_GENERATE_TEXT,
@@ -271,6 +276,9 @@ static const rac_engine_manifest_t k_neurt_manifest = {
 // `extern` there the symbol is never emitted and this declaration fails to resolve at the first
 // real link (a static archive never resolves symbols, so the engine target alone builds green).
 extern "C" const rac_llm_service_ops_t g_neurt_llm_ops;
+// The speech modality, implemented in NeuRT (neurun/NeuRT/src/sdk/rac_stt_ops_neurt.cpp) and linked
+// in via `rac_neurt_stt_ops` -> `rac_neurt_core`.
+extern "C" const rac_stt_service_ops_t g_neurt_stt_ops;
 
 static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_neurt_manifest),
@@ -287,7 +295,12 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 #else
     nullptr,
 #endif
-    /* stt_ops          */ nullptr,
+/* stt_ops          */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_stt_ops,  // TRANSCRIBE on the Apple Neural Engine, backed by NeuRT
+#else
+    nullptr,
+#endif
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,

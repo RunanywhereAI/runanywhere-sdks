@@ -853,9 +853,15 @@ merge_neurt_backend_slice() {
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
     )
     local _neurt_llm_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
+    local _neurt_stt_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_stt_ops.a"
     local _neurt_core="${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
     if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
         inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
+        # The SPEECH op table, same story as the LLM one above: its own CMake target, so its
+        # objects are not in librac_backend_neurt.a, and omitting it ships an archive carrying
+        # `U _g_neurt_stt_ops`. Measured exactly that — every target compiled, the xcframework
+        # packaged, and the iOS app failed at its own link.
+        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
     else
         echo "note: NeuRT private archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
     fi
@@ -880,9 +886,11 @@ merge_neurt_backend_macos_slice() {
         "${build_root}/engines/neurt/librac_backend_neurt.a"
     )
     local _neurt_llm_ops="${build_root}/engines/neurt/librac_neurt_llm_ops.a"
+    local _neurt_stt_ops="${build_root}/engines/neurt/librac_neurt_stt_ops.a"
     local _neurt_core="${build_root}/engines/neurt/librac_neurt_core.a"
     if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
         inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
+        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
     else
         echo "note: NeuRT private archives absent — packaging the non-routable shell slice (macos)" >&2
     fi
