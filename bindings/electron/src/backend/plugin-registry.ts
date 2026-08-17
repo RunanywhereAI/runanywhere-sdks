@@ -22,6 +22,7 @@ export const BackendPluginId = {
   ONNX: 'onnx',
   Sherpa: 'sherpa',
   QHexRT: 'qhexrt',
+  NeuRT: 'neurt',
 } as const;
 
 export type BackendPluginId = (typeof BackendPluginId)[keyof typeof BackendPluginId];
@@ -57,16 +58,17 @@ const ENV_PLUGIN_PATHS = 'RUNANYWHERE_PLUGIN_PATHS' as const;
 /**
  * Canonical id order used when no insertion history is needed.
  *
- * QHexRT is last so a host that loads every registered plugin brings the CPU/GPU
- * engines up first. Ordering does not decide routing — the router picks by
- * primitive and model format — but a plugin that fails to load should not be the
- * one holding up the engines that would have worked.
+ * QHexRT and NeuRT are last so a host that loads every registered plugin brings
+ * the CPU/GPU engines up first. Ordering does not decide routing — the router
+ * picks by primitive and model format — but a plugin that fails to load should
+ * not be the one holding up the engines that would have worked.
  */
 const CANONICAL_ORDER: readonly BackendPluginId[] = [
   BackendPluginId.LlamaCPP,
   BackendPluginId.ONNX,
   BackendPluginId.Sherpa,
   BackendPluginId.QHexRT,
+  BackendPluginId.NeuRT,
 ];
 
 /** Insertion-ordered queue (id → registration). Replace keeps position. */
