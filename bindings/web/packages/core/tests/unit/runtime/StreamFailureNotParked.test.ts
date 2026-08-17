@@ -54,29 +54,28 @@ class CrashingWorker {
   private requestId: string | null = null;
 
   constructor() {
-    queueMicrotask(() => this.deliver({ type: 'ready' } as WorkerResponse));
+    queueMicrotask(() => this.deliver({ type: 'ready' }));
   }
 
   postMessage(msg: WorkerRequest): void {
-    // The stream request carries its kind in `type`; only `init` and `cancel`
-    // are fixed names.
-    const requestId = (msg as { requestId?: string }).requestId;
-    if (!requestId || msg.type === 'cancel') return;
-    this.requestId = requestId;
+    // Everything that is not `init` or `cancel` is a stream request, and the
+    // union narrows to the variants carrying `requestId`.
+    if (msg.type === 'init' || msg.type === 'cancel') return;
+    this.requestId = msg.requestId;
     this.deliver({
       type: 'callback',
-      requestId,
+      requestId: msg.requestId,
       payloadBytes: encodeU32(1),
-    } as unknown as WorkerResponse);
+    });
   }
 
   /** The worker dies mid-stream, the way a WASM OOM kills it. */
   crash(message: string): void {
     this.deliver({
       type: 'error',
-      requestId: this.requestId,
+      requestId: this.requestId ?? undefined,
       message,
-    } as unknown as WorkerResponse);
+    });
   }
 
   terminate(): void {}
@@ -177,5 +176,27 @@ describe('a stream failure that lands while the consumer is not parked', () => {
     expect(await iterator.next()).toEqual({ value: 2, done: false });
 
     await expect(iterator.next()).rejects.toThrow('native call failed');
+  });
+
+  it('lets an explicit cancel outrank a failure the consumer never read', async () => {
+    setStreamWorkerInit({ wasmBytes: new ArrayBuffer(0), moduleFactoryId: 'fake-factory' });
+    setStreamWorkerFactory(() => {
+      worker = new CrashingWorker();
+      return worker as unknown as Worker;
+    });
+
+    const stream = OffscreenRuntimeBridge.tryGet('worker')!.getStreamIterator(
+      { kind: 'stream.llm.generate', handle: 0, requestBytes: new Uint8Array() },
+      uint32Codec,
+    );
+    const iterator = stream[Symbol.asyncIterator]();
+
+    expect(await iterator.next()).toEqual({ value: 1, done: false });
+    worker!.crash('worker died');
+
+    // The consumer walked away instead of reading the error, so it should not
+    // be handed that error afterwards.
+    await iterator.return?.();
+    expect(await iterator.next()).toEqual({ value: undefined, done: true });
   });
 });
