@@ -28,6 +28,10 @@
 #include <cstdlib>
 #endif
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #include "qhexrt_bundle_policy.h"
 
 #include "rac/core/rac_logger.h"
@@ -193,14 +197,51 @@ rac_qhexrt_set_skel_directory(const char* path) {
 }
 #endif
 
+#if defined(_WIN32)
+// QnnHtp.dll / QnnSystem.dll are not load-time imports of this DLL, so the
+// LOAD_WITH_ALTERED_SEARCH_PATH the plugin loader uses to load *us* (see
+// core/src/plugin/plugin_loader.cpp) never applies to them: that flag only
+// widens the search for the DLL being loaded by that specific call, not for
+// LoadLibrary calls made later by code already running inside it. Passing
+// nullptr here leaves qhx_runtime_create() to fall back to the OS's default
+// search order, which does not include this plugin's own directory — a
+// sibling next to a dynamically-loaded plugin DLL is otherwise invisible.
+// Resolve our own module directory instead and hand qhx_runtime_create
+// explicit paths there.
+std::string this_module_directory() {
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCSTR>(&this_module_directory), &module)) {
+        return {};
+    }
+    char buf[MAX_PATH];
+    DWORD len = GetModuleFileNameA(module, buf, sizeof(buf));
+    if (len == 0 || len >= sizeof(buf)) {
+        return {};
+    }
+    std::string path(buf, len);
+    auto slash = path.find_last_of("\\/");
+    return slash == std::string::npos ? std::string() : path.substr(0, slash);
+}
+#endif
+
 qhx_runtime* runtime_acquire() {
     std::lock_guard<std::mutex> lock(g_rt_mutex);
     if (g_rt == nullptr) {
 #if defined(__ANDROID__)
         static std::once_flag adsp_once;
         std::call_once(adsp_once, configure_adsp_library_path);
-#endif
         g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
+#elif defined(_WIN32)
+        std::string dir = this_module_directory();
+        std::string qnn_htp = dir.empty() ? std::string() : dir + "\\QnnHtp.dll";
+        std::string qnn_system = dir.empty() ? std::string() : dir + "\\QnnSystem.dll";
+        g_rt = qhx_runtime_create(qnn_htp.empty() ? nullptr : qnn_htp.c_str(),
+                                   qnn_system.empty() ? nullptr : qnn_system.c_str());
+#else
+        g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
+#endif
         if (g_rt == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "qhx_runtime_create failed (QNN libs unavailable?)");
             return nullptr;
