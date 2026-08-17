@@ -406,7 +406,30 @@ export PATH
 source "${EMSDK}/emsdk_env.sh"
 export EMSCRIPTEN="${EMSDK}/upstream/emscripten"
 export EM_CONFIG="${EMSDK}/.emscripten"
-: "${EMSDK_PYTHON:?emsdk_env.sh did not provide EMSDK_PYTHON}"
+# emsdk 6.x deliberately omits its bundled Python dependency on Linux and
+# therefore does not export EMSDK_PYTHON there. macOS/Windows still provide it.
+# Resolve a host interpreter on Linux, but keep the explicit >=3.10 gate from
+# Emscripten 6 so an older Anaconda/system Python cannot silently win CMake's
+# discovery and fail much later in the Dawn build.
+if [ -z "${EMSDK_PYTHON:-}" ]; then
+  _emsdk_python_candidate="$(command -v python3 || true)"
+  if [ -n "${_emsdk_python_candidate}" ] && \
+      "${_emsdk_python_candidate}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    EMSDK_PYTHON="${_emsdk_python_candidate}"
+  elif [ -x /usr/bin/python3 ] && \
+      /usr/bin/python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    EMSDK_PYTHON=/usr/bin/python3
+  else
+    echo "ERROR: Emscripten ${EMSCRIPTEN_VERSION} requires Python 3.10 or newer." >&2
+    echo "       emsdk_env.sh did not export EMSDK_PYTHON and no compatible python3 was found." >&2
+    exit 1
+  fi
+fi
+if ! "${EMSDK_PYTHON}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+  echo "ERROR: EMSDK_PYTHON must point to Python 3.10 or newer: ${EMSDK_PYTHON}" >&2
+  exit 1
+fi
+export EMSDK_PYTHON
 # Dawn launches Emscripten's Python helpers through CMake's discovered
 # interpreter. A host Anaconda installation can otherwise win discovery and
 # select Python 3.9, which Emscripten 6 rejects. Pin every spelling used by ORT
