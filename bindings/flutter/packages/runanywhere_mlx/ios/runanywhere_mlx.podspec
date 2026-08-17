@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => '358b3bb7c06476b3746fcb89694e6b2f94941d470653d2c9d1d76e483422af76',
+  'RunAnywhereMLXRuntime' => 'a92ce648106304e83d025503e7d21bfffe7c5c50fe540d71c43ce37bd2aa11d3',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
@@ -25,13 +25,13 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.23'
+  s.version          = '0.20.24'
   # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
   # s.version leads the published release because 0.20.20 republished only the
   # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
   # the checksums below are still the 0.20.19 ones. Bump this back to
   # s.version once a matching release exists.
-  asset_version      = '0.20.23'
+  asset_version      = '0.20.24'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

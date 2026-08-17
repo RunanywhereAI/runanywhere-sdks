@@ -5,6 +5,13 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.24] - 2026-08-16
+
+### Changed
+
+- Reissued the 0.20.23 runtime and model-catalog train from the corrected,
+  immutable release manifest after repairing Linux WebGPU packaging.
+
 ## [0.20.23] - 2026-08-16
 
 ### Changed

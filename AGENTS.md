@@ -69,7 +69,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
-**Current version**: `0.20.23` (canonical source: `core/VERSION`)
+**Current version**: `0.20.24` (canonical source: `core/VERSION`)
 
 ### SDK implementations
 | SDK | Path | Bridge Mechanism | Platforms |

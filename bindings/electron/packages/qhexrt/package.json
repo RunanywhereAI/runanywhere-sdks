@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron-qhexrt",
-  "version": "0.20.23",
+  "version": "0.20.24",
   "description": "RunAnywhere Electron SDK \u2014 QHexRT backend plugin (Qualcomm Hexagon NPU; Snapdragon X / X2 Elite on Windows ARM64)",
   "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",
