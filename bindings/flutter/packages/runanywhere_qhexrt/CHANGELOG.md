@@ -5,6 +5,13 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.24] - 2026-08-16
+
+### Changed
+
+- Kept the private QHexRT wrapper aligned with the corrected shared SDK release
+  manifest. This package remains excluded from public publication.
+
 ## [0.20.23] - 2026-08-16
 
 ### Changed

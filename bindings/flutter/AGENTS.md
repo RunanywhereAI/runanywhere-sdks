@@ -1,6 +1,6 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.23.
+Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.24.
 
 ## Repository Structure
 
@@ -31,7 +31,7 @@ runanywhere_onnx    ───┼──→ runanywhere (core)
 runanywhere_qhexrt  ───┘
 ```
 
-All four backend packages depend on `runanywhere ^0.20.23`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
+All four backend packages depend on `runanywhere ^0.20.24`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
 
 ## Development Commands
 
@@ -329,16 +329,16 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere` (Dart package) | 0.20.23 |
-| `runanywhere_llamacpp` | 0.20.23 |
-| `runanywhere_mlx` | 0.20.23 |
-| `runanywhere_onnx` | 0.20.23 |
-| `runanywhere_qhexrt` | 0.20.23 |
+| `runanywhere` (Dart package) | 0.20.24 |
+| `runanywhere_llamacpp` | 0.20.24 |
+| `runanywhere_mlx` | 0.20.24 |
+| `runanywhere_onnx` | 0.20.24 |
+| `runanywhere_qhexrt` | 0.20.24 |
 | `RACommons` native | 0.1.6 |
 | QHexRT native | private staged artifact |
 | llama.cpp engine | runanywhere-b10453.4 |
 | ONNX Runtime | 1.28.0 |
-| Canonical version source | `core/VERSION` (0.20.23) |
+| Canonical version source | `core/VERSION` (0.20.24) |
 
 ## 2026-07 Callback Architecture Update
 

@@ -1,3 +1,10 @@
+## [0.20.24] - 2026-08-16
+
+### Changed
+
+- Reissued the compatible MLX Swift runtime and model support from the
+  corrected release manifest.
+
 ## [0.20.23] - 2026-08-16
 
 ### Changed
