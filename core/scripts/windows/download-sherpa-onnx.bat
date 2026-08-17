@@ -21,7 +21,10 @@ set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 
 :: Load versions
 call :load_versions
-if not defined SHERPA_ONNX_VERSION_WINDOWS set "SHERPA_ONNX_VERSION_WINDOWS=1.12.23"
+if not defined SHERPA_ONNX_VERSION_WINDOWS (
+    echo [ERROR] SHERPA_ONNX_VERSION_WINDOWS is not set. Expected it from %ROOT_DIR%\VERSIONS.
+    exit /b 1
+)
 set "VERSION=%SHERPA_ONNX_VERSION_WINDOWS%"
 set "REPOSITORY=%SHERPA_ONNX_REPO_DESKTOP%"
 set "RELEASE_TAG=%SHERPA_ONNX_RELEASE_TAG_DESKTOP%"
