@@ -177,7 +177,7 @@ fun RunAnywhere.synthesizeStream(
         }
     }
 
-@Deprecated("Use RunAnywhere.tts.stop().")
+@Deprecated("Use interrupt() on the SpeechHandle returned by RunAnywhere.tts.speak().")
 suspend fun RunAnywhere.stopSynthesis() {
     CppBridgeTTS.stop()
 }
@@ -241,7 +241,7 @@ private fun convertPcmToWav(pcmData: ByteArray, sampleRate: Int): ByteArray {
         ?: throw SDKException.tts("Failed to convert PCM to WAV")
 }
 
-@Deprecated("Use RunAnywhere.tts.stop().")
+@Deprecated("Use interrupt() on the SpeechHandle returned by RunAnywhere.tts.speak().")
 suspend fun RunAnywhere.stopSpeaking() {
     ttsAudioPlayback.stop()
     stopSynthesis()
