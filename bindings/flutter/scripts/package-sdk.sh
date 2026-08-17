@@ -455,7 +455,7 @@ validate_mlx_local_payload() {
 validate_public_remote_binary_contract() {
     local pkg component pkg_dir build_gradle binary_config podspec package_manifest
     local file relative expected_target expected_targets expected_count actual_count
-    local actual_pubignore expected_pubignore
+    local actual_pubignore expected_pubignore podspec_version asset_version
     for pkg in runanywhere runanywhere_llamacpp runanywhere_mlx runanywhere_onnx; do
         case "$pkg" in
             runanywhere)
@@ -524,7 +524,14 @@ validate_public_remote_binary_contract() {
         grep -Fq 'RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL' "$podspec" || { echo "ERROR: $pkg podspec is missing the test-only release URL override" >&2; exit 1; }
         grep -Fq "shasum -a 256" "$podspec" || { echo "ERROR: $pkg podspec is missing Apple archive checksum verification" >&2; exit 1; }
         grep -Fq -- "--proto '=https,file'" "$podspec" || { echo "ERROR: $pkg podspec does not restrict download protocols" >&2; exit 1; }
-        grep -Fq -- '-ios-v#{s.version}.zip' "$podspec" || { echo "ERROR: $pkg podspec is missing versioned Apple release archive URLs" >&2; exit 1; }
+        podspec_version="$(sed -nE "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'([^']+)'$/\1/p" "$podspec")"
+        asset_version="$(sed -nE "s/^[[:space:]]*asset_version[[:space:]]*=[[:space:]]*'([^']+)'$/\1/p" "$podspec")"
+        [ -n "$podspec_version" ] || { echo "ERROR: $pkg podspec is missing s.version" >&2; exit 1; }
+        [ "$asset_version" = "$podspec_version" ] || { echo "ERROR: $pkg podspec asset_version must match s.version ($podspec_version)" >&2; exit 1; }
+        apple_archive_name_variable='$name'
+        [ "$pkg" != "runanywhere_mlx" ] || apple_archive_name_variable='$asset_name'
+        apple_archive_template="v#{asset_version}/${apple_archive_name_variable}-ios-v#{asset_version}.zip"
+        grep -Fq -- "$apple_archive_template" "$podspec" || { echo "ERROR: $pkg podspec must use asset_version in the Apple release URL path and filename" >&2; exit 1; }
 
         if [ "$pkg" = "runanywhere_mlx" ]; then
             [ ! -e "$package_manifest" ] || { echo "ERROR: runanywhere_mlx must remain CocoaPods-only; remove its SwiftPM manifest" >&2; exit 1; }
