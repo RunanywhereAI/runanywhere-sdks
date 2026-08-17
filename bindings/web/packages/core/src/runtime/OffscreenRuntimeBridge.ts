@@ -426,6 +426,11 @@ export class OffscreenRuntimeBridge {
               const cancelMsg: WorkerRequest = { type: 'cancel', requestId };
               this.worker.postMessage(cancelMsg);
             }
+            // An explicit cancel outranks an error the consumer never asked
+            // about: `finish()` is a no-op once `fail()` has set `finished`,
+            // so drop the retained failure here rather than replaying it at
+            // the next `next()`.
+            failure = null;
             finish();
             return Promise.resolve({ value: undefined as T, done: true });
           },
