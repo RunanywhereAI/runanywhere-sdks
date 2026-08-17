@@ -105,7 +105,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "ON",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
                 "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
@@ -132,7 +131,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
                 "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
             },
@@ -160,7 +158,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }

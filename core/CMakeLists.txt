@@ -32,11 +32,6 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
-option(
-    RAC_INCLUDE_LOCAL_DEV_CONFIG
-    "Compile the ignored local development_config.cpp (may contain credentials; local development only)"
-    OFF
-)
 # Consumed by the root CMakeLists + engines/ (per-engine compilation); this file
 # does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
@@ -660,45 +655,41 @@ endif()
 # =============================================================================
 # DEVELOPMENT CONFIG SOURCE
 # =============================================================================
-# Release and normal builds must be independent of ignored machine-local state.
-# They compile the credential-free tracked template from the build directory.
-# Developers who explicitly need team development credentials may opt in with
-# -DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON; that mode is never suitable for packaging.
+# EVERY build compiles the credential-free tracked template from the build
+# directory. There is deliberately no opt-in to compile a machine-local file:
+# the SDK's only control-plane write path is the backend REST API, so a build
+# never needs a database URL, project ref, or token baked into it. Which
+# environment it talks to is just the base URL below.
+#
+# The former -DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON escape hatch was removed: it
+# compiled an ignored local development_config.cpp verbatim, and stale copies of
+# that file on developer machines still carried a Supabase project URL, an anon
+# key, and a build token left over from when the C++ wrote analytics rows
+# straight to the database. Nothing has called those accessors for a long time
+# (they are not even declared in rac_dev_config.h), so the only thing the flag
+# still did was give credentials a way back into a binary.
 
-set(DEV_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp")
 set(DEV_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp.template")
 
-if(RAC_INCLUDE_LOCAL_DEV_CONFIG)
-    if(NOT EXISTS "${DEV_CONFIG_FILE}")
-        message(FATAL_ERROR
-            "RAC_INCLUDE_LOCAL_DEV_CONFIG=ON requires ${DEV_CONFIG_FILE}"
-        )
-    endif()
-    set(RAC_DEV_CONFIG_SOURCE "${DEV_CONFIG_FILE}")
-    message(WARNING
-        "Including ignored local development credentials; do not package or distribute this build"
-    )
-else()
-    if(NOT EXISTS "${DEV_CONFIG_TEMPLATE}")
-        message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
-    endif()
-    set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
-    # The tracked template carries only the "YOUR_STAGING_BASE_URL" placeholder
-    # (never a real host). Release/CI builds substitute the neutral backend base
-    # URL from the environment (GitHub Actions secret STAGING_BASE_URL) into the
-    # generated source. When the env is unset (normal local build) the placeholder
-    # passes through and the dev config stays a stub (usability checks treat
-    # "YOUR_*" as unavailable). No credentials, project refs, or tokens are ever
-    # baked — only this neutral base URL.
-    file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
-    if(NOT "$ENV{STAGING_BASE_URL}" STREQUAL "")
-        string(REPLACE "YOUR_STAGING_BASE_URL" "$ENV{STAGING_BASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
-        message(STATUS "Injected staging base URL from environment (CI secret)")
-    else()
-        message(STATUS "Using placeholder staging base URL (no baked backend URL)")
-    endif()
-    file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
+if(NOT EXISTS "${DEV_CONFIG_TEMPLATE}")
+    message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
 endif()
+set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
+# The tracked template carries only the "YOUR_STAGING_BASE_URL" placeholder
+# (never a real host). Release/CI builds substitute the neutral backend base
+# URL from the environment (GitHub Actions secret STAGING_BASE_URL) into the
+# generated source. When the env is unset (normal local build) the placeholder
+# passes through and the dev config stays a stub (usability checks treat
+# "YOUR_*" as unavailable). No credentials, project refs, or tokens are ever
+# baked — only this neutral base URL.
+file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
+if(NOT "$ENV{STAGING_BASE_URL}" STREQUAL "")
+    string(REPLACE "YOUR_STAGING_BASE_URL" "$ENV{STAGING_BASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
+    message(STATUS "Injected staging base URL from environment (CI secret)")
+else()
+    message(STATUS "Using placeholder staging base URL (no baked backend URL)")
+endif()
+file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
 
 # =============================================================================
 # SOURCE FILES
