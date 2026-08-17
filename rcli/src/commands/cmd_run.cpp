@@ -15,8 +15,9 @@
  *   VLM: rac_vlm_generate_proto (unary) returns a VLMResult.
  *   Ctrl-C: rac_llm_cancel_proto from the token callback thread.
  *
- * REPL turns are independent generations (no cross-turn memory yet — that
- * needs a commons chat-session API; tracked in the rcli plan doc).
+ * The REPL remembers the conversation: each turn sends the whole transcript as
+ * LLMGenerateRequest.messages, which is what that field is for. Commons
+ * flattens it to the engine's history array.
  */
 
 #include "commands/commands.h"
@@ -24,9 +25,12 @@
 #include <csignal>
 #include <chrono>
 #include <condition_variable>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "chat.pb.h"
@@ -48,6 +52,7 @@
 #include "io/proto.h"
 #include "progress/progress_bar.h"
 #include "repl/repl.h"
+#include "repl/transcript.h"
 #include "util/term.h"
 
 namespace rcli::commands {
@@ -63,6 +68,13 @@ namespace v1 = runanywhere::v1;
 struct RunParams {
     std::string model;
     std::string image;
+    // Models the chat slash commands reach for. Empty means the built-in
+    // default for that modality, the same one `rcli vlm` / `rcli stt` use.
+    std::string vlm_model;
+    std::string stt_model;
+    std::string tts_voice;
+    std::string accelerator;       // auto | cpu | gpu | npu ("" = engine decides)
+    int32_t context_length = 0;    // 0 = engine default
     std::string system_prompt;
     std::string engine;
     std::string lora;            // optional LoRA adapter (.gguf) to attach before generating
@@ -225,12 +237,13 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
 }
 
 // One blocking streaming generation; returns 0 ok, 1 error, 130 user-cancel.
+// `history` carries the prior conversation (null = single turn); `out_answer`
+// receives the assistant text so a caller can append it to the transcript.
 int stream_once(const GlobalOptions& options, const std::string& model_id,
-                const std::string& prompt, const RunParams& params) {
+                const std::string& prompt, const RunParams& params,
+                const repl::Transcript* history = nullptr, std::string* out_answer = nullptr) {
     v1::LLMGenerateRequest request;
-    v1::ChatMessage* message = request.add_messages();
-    message->set_role(v1::MESSAGE_ROLE_USER);
-    message->set_content(prompt);
+    fill_messages(&request, history, prompt);
     apply_options(params, request.mutable_options());
     (void)model_id;  // lifecycle-owned state knows the loaded model
 
@@ -278,6 +291,9 @@ int stream_once(const GlobalOptions& options, const std::string& model_id,
             out::result_line(json.str());
         } else if (options.verbose) {
             out::status_line("(" + std::to_string(elapsed) + " ms)");
+        }
+        if (exit_code == 0 && out_answer != nullptr) {
+            *out_answer = state.answer;
         }
     }
 
@@ -336,8 +352,27 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
     return 0;
 }
 
+// Placement and sizing knobs ModelLoadRequest has always carried. Before these
+// were wired the CLI sent neither, so every load went out as
+// ACCELERATOR_POLICY_UNSPECIFIED and the engine chose alone.
+struct LoadTuning {
+    v1::AcceleratorPolicy accelerator = v1::ACCELERATOR_POLICY_UNSPECIFIED;
+    int32_t context_length = 0;  // 0 = engine default
+};
+
+LoadTuning tuning_from(const RunParams& params) {
+    LoadTuning tuning;
+    tuning.context_length = params.context_length;
+    std::string error;
+    if (!parse_accelerator(params.accelerator, &tuning.accelerator, &error)) {
+        out::error_line(error);
+    }
+    return tuning;
+}
+
 bool load_model(const GlobalOptions& options, const std::string& model_id,
-                v1::InferenceFramework framework, bool is_vlm) {
+                v1::InferenceFramework framework, bool is_vlm,
+                const LoadTuning& tuning = LoadTuning{}) {
     // Auto-pull (validate_availability) + resolve + engine load, one call.
     progress::DownloadProgressScope progress_scope(model_id,
                                                    !options.no_progress && !options.json);
@@ -349,6 +384,12 @@ bool load_model(const GlobalOptions& options, const std::string& model_id,
     }
     if (is_vlm) {
         request.set_category(v1::MODEL_CATEGORY_MULTIMODAL);
+    }
+    if (tuning.accelerator != v1::ACCELERATOR_POLICY_UNSPECIFIED) {
+        request.set_accelerator_policy(tuning.accelerator);
+    }
+    if (tuning.context_length > 0) {
+        request.set_context_length(tuning.context_length);
     }
     const std::string bytes = proto::serialize(request);
 
@@ -369,6 +410,13 @@ bool load_model(const GlobalOptions& options, const std::string& model_id,
                                                      : result.error().message()));
         return false;
     }
+    // Commons reports here when a load knob was forwarded to an engine that may
+    // not honour it (accelerator_policy and friends travel as advisory
+    // config_json). Dropping these made `--accelerator gpu` look like it worked
+    // on llama.cpp when nothing had changed.
+    for (const std::string& warning : result.warnings()) {
+        out::status_line("note: " + warning);
+    }
     if (options.verbose) {
         out::status_line("loaded " + result.resolved_path());
     }
@@ -376,7 +424,8 @@ bool load_model(const GlobalOptions& options, const std::string& model_id,
 }
 
 int run_vlm(const GlobalOptions& options, const std::string& model_id,
-            const std::string& image_path, const std::string& prompt, const RunParams& params) {
+            const std::string& image_path, const std::string& prompt, const RunParams& params,
+            std::string* out_answer = nullptr) {
     v1::VLMGenerationRequest request;
     request.set_model_id(model_id);
     v1::VLMImage* image = request.add_images();
@@ -457,7 +506,27 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
                              " tok/s)");
         }
     }
+    if (out_answer != nullptr) {
+        *out_answer = result.text();
+    }
     return 0;
+}
+
+// `/image` inside a chat: resolve and load a vision model, then ask it.
+int run_vlm_turn(const GlobalOptions& options, const RunParams& params,
+                 const std::string& image_path, const std::string& question,
+                 std::string* out_answer) {
+    model_ref::Resolved resolved;
+    std::string error;
+    if (model_ref::resolve(params.model, &resolved, &error) != RAC_SUCCESS) {
+        out::error_line(error);
+        return 1;
+    }
+    if (!load_model(options, resolved.model_id, v1::INFERENCE_FRAMEWORK_UNSPECIFIED,
+                    /*is_vlm=*/true, tuning_from(params))) {
+        return 1;
+    }
+    return run_vlm(options, resolved.model_id, image_path, question, params, out_answer);
 }
 
 void print_repl_help() {
@@ -466,15 +535,30 @@ void print_repl_help() {
     out::status_line("  /set temperature <float>    set sampling temperature");
     out::status_line("  /set max-output-tokens <n>  set the generation budget");
     out::status_line("  /show                       show current settings");
+    out::status_line("  /image <path> [question]    ask a vision model about a picture");
+    out::status_line("  /audio <file.wav>           transcribe speech and answer it");
+    out::status_line("  /engine <name>              reload on another engine, keeping the chat");
+    out::status_line("      llamacpp  GGUF on CPU, and GPU when built with Metal");
+    out::status_line("      mlx       Apple Silicon; needs the Swift-hosted rcli");
+    out::status_line("      neurt     Apple Neural Engine (aliases: coreml, ane)");
+    out::status_line("      onnx      embeddings and segmentation");
+    out::status_line("      sherpa    speech models");
+    out::status_line("  /accelerator <policy>       auto | cpu | gpu | npu, keeping the chat");
+    out::status_line("      advisory: an engine may ignore it and will say so");
+    out::status_line("  /say [text]                 speak the last reply, or given text, to a WAV");
+    out::status_line("  /model <name>               switch model, keeping the chat");
+    out::status_line("  /save <file.md>             write the conversation to a file");
+    out::status_line("  /context                    show how much conversation is remembered");
+    out::status_line("  /clear                      forget the conversation, keep settings");
     out::status_line("  /bye                        exit (also Ctrl-D)");
-    out::status_line("note: turns are independent — no conversation memory yet");
 }
 
-int run_repl(const GlobalOptions& options, const std::string& model_id, RunParams params) {
+int run_repl(const GlobalOptions& options, std::string model_id, RunParams params) {
     out::status_line("loaded " + model_id + " — type a prompt, /? for help, /bye to exit");
     repl::LineEditor editor(std::getenv("RUNANYWHERE_NOHISTORY")
                                 ? std::string()
                                 : paths::state_dir() + "/history");
+    repl::Transcript transcript;
 
     std::string line;
     while (editor.read_line("» ", &line)) {
@@ -499,6 +583,190 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
                                                          : "(engine default)"));
             out::status_line("max-output-tokens  " + std::to_string(params.max_output_tokens));
             out::status_line("reasoning          " + params.reasoning);
+            out::status_line("engine             " +
+                             (params.engine.empty() ? "(model default)" : params.engine));
+            out::status_line("accelerator        " +
+                             (params.accelerator.empty() ? "(engine decides)" : params.accelerator));
+            continue;
+        }
+        if (line == "/context") {
+            out::status_line("turns remembered   " + std::to_string(transcript.size()) + " of " +
+                             std::to_string(transcript.max_turns()));
+            if (transcript.trimmed()) {
+                out::status_line("note: oldest turns were dropped to stay under the cap");
+            }
+            continue;
+        }
+        if (line == "/clear" || line == "/reset") {
+            transcript.clear();
+            out::status_line("conversation cleared");
+            continue;
+        }
+        if (line.starts_with("/say")) {
+            const auto [first, rest] = repl::split_first_word(line.substr(4));
+            std::string spoken = first.empty() ? std::string() : first + (rest.empty() ? "" : " " + rest);
+            if (spoken.empty()) {
+                // No text given: voice the model's last reply, which is what
+                // "say that back to me" means in a conversation.
+                for (auto it = transcript.turns().rbegin(); it != transcript.turns().rend(); ++it) {
+                    if (it->role == repl::Role::Assistant) {
+                        spoken = it->content;
+                        break;
+                    }
+                }
+            }
+            if (spoken.empty()) {
+                out::status_line("nothing to say yet — usage: /say [text]");
+                continue;
+            }
+            const std::string wav = paths::state_dir() + "/say.wav";
+            if (synthesize_to_file(options, params.tts_voice, spoken, wav) == 0) {
+                out::status_line("wrote " + wav);
+            }
+            continue;
+        }
+        if (line.starts_with("/save")) {
+            const auto [path, ignored] = repl::split_first_word(line.substr(5));
+            (void)ignored;
+            if (path.empty()) {
+                out::status_line("usage: /save <file.md>");
+                continue;
+            }
+            std::ofstream file(path);
+            if (!file) {
+                out::status_line("cannot write " + path);
+                continue;
+            }
+            for (const repl::Turn& turn : transcript.turns()) {
+                file << (turn.role == repl::Role::User ? "## you\n\n" : "## " + model_id + "\n\n")
+                     << turn.content << "\n\n";
+            }
+            if (!file) {
+                out::status_line("failed while writing " + path);
+                continue;
+            }
+            out::status_line("saved " + std::to_string(transcript.size()) + " turns to " + path);
+            continue;
+        }
+        if (line.starts_with("/model ")) {
+            const auto [name, ignored] = repl::split_first_word(line.substr(7));
+            (void)ignored;
+            if (name.empty()) {
+                out::status_line("usage: /model <name>");
+                continue;
+            }
+            model_ref::Resolved resolved;
+            std::string resolve_error;
+            if (model_ref::resolve(name, &resolved, &resolve_error) != RAC_SUCCESS) {
+                out::status_line(resolve_error);
+                continue;
+            }
+            v1::InferenceFramework framework = v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+            std::string hint_error;
+            if (!parse_engine_hint(params.engine, &framework, &hint_error)) {
+                out::status_line(hint_error);
+                continue;
+            }
+            if (!load_model(options, resolved.model_id, framework, /*is_vlm=*/false,
+                            tuning_from(params))) {
+                out::status_line("keeping " + model_id + "; the conversation is intact");
+                continue;
+            }
+            // The transcript deliberately survives: comparing two models on the
+            // same conversation is the reason to switch mid-session.
+            model_id = resolved.model_id;
+            params.model = resolved.model_id;
+            out::status_line("now " + model_id + "; " + std::to_string(transcript.size()) +
+                             " turns still remembered");
+            continue;
+        }
+        if (line.starts_with("/engine ") || line.starts_with("/accelerator ")) {
+            const bool is_engine = line.starts_with("/engine ");
+            const auto [value, ignored_rest] =
+                repl::split_first_word(line.substr(is_engine ? 7 : 13));
+            (void)ignored_rest;
+            if (value.empty()) {
+                out::status_line(is_engine ? "usage: /engine <mlx|llamacpp|neurt|onnx|sherpa>"
+                                           : "usage: /accelerator <auto|cpu|gpu|npu>");
+                continue;
+            }
+            // Validate before touching the loaded model, so a typo cannot leave
+            // the session with nothing loaded.
+            RunParams next = params;
+            (is_engine ? next.engine : next.accelerator) = value;
+            v1::InferenceFramework framework = v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+            v1::AcceleratorPolicy policy = v1::ACCELERATOR_POLICY_UNSPECIFIED;
+            std::string parse_error;
+            if (!parse_engine_hint(next.engine, &framework, &parse_error) ||
+                !parse_accelerator(next.accelerator, &policy, &parse_error)) {
+                out::status_line(parse_error);
+                continue;
+            }
+            LoadTuning tuning;
+            tuning.accelerator = policy;
+            tuning.context_length = next.context_length;
+            if (!load_model(options, model_id, framework, /*is_vlm=*/false, tuning)) {
+                out::status_line("keeping the previous placement; the conversation is intact");
+                continue;
+            }
+            params = next;  // only after the reload actually succeeded
+            out::status_line(std::string(is_engine ? "engine" : "accelerator") + " set to " +
+                             value + "; " + std::to_string(transcript.size()) +
+                             " turns still remembered");
+            continue;
+        }
+        if (line.starts_with("/image")) {
+            const auto [path, question] = repl::split_first_word(line.substr(6));
+            if (path.empty()) {
+                out::status_line("usage: /image <path> [question]");
+                continue;
+            }
+            if (!std::filesystem::exists(path)) {
+                out::status_line("no such file: " + path);
+                continue;
+            }
+            RunParams vlm_params = params;
+            vlm_params.model = params.vlm_model;
+            std::string answer;
+            if (run_vlm_turn(options, vlm_params, path, question, &answer) == 0 &&
+                !answer.empty()) {
+                // The VLM call itself is single-turn: commons does not read
+                // VLMGenerationRequest.messages. Recording the exchange here is
+                // what lets the following TEXT turns refer back to the picture.
+                transcript.add(repl::Role::User,
+                               (question.empty() ? std::string("Describe this image.") : question) +
+                                   "\n[image: " + path + "]");
+                transcript.add(repl::Role::Assistant, answer);
+            }
+            continue;
+        }
+        if (line.starts_with("/audio")) {
+            const auto [path, ignored] = repl::split_first_word(line.substr(6));
+            (void)ignored;
+            if (path.empty()) {
+                out::status_line("usage: /audio <file.wav>");
+                continue;
+            }
+            if (!std::filesystem::exists(path)) {
+                out::status_line("no such file: " + path);
+                continue;
+            }
+            std::string spoken;
+            if (transcribe_to_text(options, params.stt_model, path, &spoken) != 0) {
+                continue;
+            }
+            if (spoken.empty()) {
+                out::status_line("nothing was transcribed from " + path);
+                continue;
+            }
+            // Speaking is typing: the transcript becomes an ordinary user turn.
+            out::status_line("heard: " + spoken);
+            std::string answer;
+            if (stream_once(options, model_id, spoken, params, &transcript, &answer) == 0 &&
+                !answer.empty()) {
+                transcript.add(repl::Role::User, spoken);
+                transcript.add(repl::Role::Assistant, answer);
+            }
             continue;
         }
         if (line.starts_with("/set ")) {
@@ -531,9 +799,17 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
             continue;
         }
 
-        const int code = stream_once(options, model_id, line, params);
+        std::string answer;
+        const int code = stream_once(options, model_id, line, params, &transcript, &answer);
         if (code == 1) {
             return 1;  // hard error; cancel (130) just returns to the prompt
+        }
+        // A cancelled turn is deliberately not remembered: the answer is a
+        // fragment, and feeding half a reply back as context makes the next
+        // turn worse in a way the user cannot see.
+        if (code == 0 && !answer.empty()) {
+            transcript.add(repl::Role::User, line);
+            transcript.add(repl::Role::Assistant, answer);
         }
     }
     return 0;
@@ -591,6 +867,14 @@ int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& promp
         out::error_line("--model is required (a catalog id, alias, hf.co/... ref or URL)");
         return 2;
     }
+    // Reject an unusable --accelerator here rather than loading without it. A
+    // flag the load call then ignores is worse than no flag at all.
+    v1::AcceleratorPolicy unused_policy = v1::ACCELERATOR_POLICY_UNSPECIFIED;
+    std::string accelerator_error;
+    if (!parse_accelerator(params.accelerator, &unused_policy, &accelerator_error)) {
+        out::error_line(accelerator_error);
+        return 2;
+    }
 
     EngineHintResolution engine_hint;
     std::string engine_error;
@@ -621,7 +905,8 @@ int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& promp
     // catalog entries still fall back to their own declared framework exactly as
     // before; the only behaviour that changes is that asking now works. Mirrors
     // cmd_embed.cpp.
-    if (!load_model(options, resolved.model_id, engine_hint.framework, is_vlm)) {
+    if (!load_model(options, resolved.model_id, engine_hint.framework, is_vlm,
+                    tuning_from(params))) {
         return 1;
     }
     if (!params.lora.empty() && !apply_lora_adapter(params.lora, params.lora_scale)) {
@@ -675,6 +960,10 @@ void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& par
     cmd->add_option("--engine", params->engine,
                     "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
                     "catalog models too, not just URL/HF refs.");
+    cmd->add_option("--accelerator", params->accelerator,
+                    "Where the model runs: auto, cpu, gpu or npu");
+    cmd->add_option("--context-length", params->context_length,
+                    "Context window to load the model with (0 = engine default)");
     cmd->add_option("--temperature,--temp", params->temperature,
                     "Raise for more random sampling (0 = engine default)");
     cmd->add_option("--top-p", params->top_p, "Keep the smallest token set above this probability");
@@ -715,6 +1004,12 @@ void configure_llm(CLI::App* cmd, GlobalOptions& options, LlmVerb verb, ModelArg
         // the documented alias of `vlm generate`.
         cmd->add_option("--image", params->image, "Describe this image instead (VLM models)")
             ->check(CLI::ExistingFile);
+        cmd->add_option("--vlm-model", params->vlm_model,
+                        "Vision model the chat /image command uses");
+        cmd->add_option("--stt-model", params->stt_model,
+                        "Speech model the chat /audio command uses");
+        cmd->add_option("--tts-voice", params->tts_voice,
+                        "Voice the chat /say command speaks with");
     }
     cmd->callback([&options, verb, params, prompt]() {
         const int exit_code = run_llm(options, verb, *prompt, *params);
