@@ -23,6 +23,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <map>
 #include <vector>
 
 #ifdef _WIN32
@@ -171,6 +172,46 @@ int32_t g_next_handle_id = 1;
 // can report state the C ABI does not query back (no rac_llm_component_*_lora
 // getter exists — apply/remove/clear are write-only).
 std::unordered_map<int32_t, std::vector<std::pair<std::string, float>>> g_lora_applied;
+
+// =============================================================================
+// Handle audit / leak detection (RAC_HANDLE_AUDIT env var).
+// Records every loaded handle in an internal map for shutdown reporting.
+// =============================================================================
+
+enum class HandleCategory : int32_t {
+    LLM = 0, VLM = 1, EMBEDDING = 2, STT = 3, TTS = 4,
+    VAD = 5, RAG = 6, RERANK = 7, DIARIZATION = 8, SEGMENTATION = 9,
+};
+
+constexpr const char* HandleCategoryName(HandleCategory c) {
+    switch (c) {
+        case HandleCategory::LLM: return "llm";
+        case HandleCategory::VLM: return "vlm";
+        case HandleCategory::EMBEDDING: return "embedding";
+        case HandleCategory::STT: return "stt";
+        case HandleCategory::TTS: return "tts";
+        case HandleCategory::VAD: return "vad";
+        case HandleCategory::RAG: return "rag";
+        case HandleCategory::RERANK: return "rerank";
+        case HandleCategory::DIARIZATION: return "diarization";
+        case HandleCategory::SEGMENTATION: return "segmentation";
+    }
+    return "unknown";
+}
+
+struct HandleAuditEntry {
+    int32_t id = 0;
+    HandleCategory category = HandleCategory::LLM;
+    std::string model_source;
+};
+
+/** Cached from RAC_HANDLE_AUDIT — evaluated once at module init. */
+static bool g_audit_enabled = []() -> bool {
+    const char* v = std::getenv("RAC_HANDLE_AUDIT");
+    return v != nullptr && v[0] != '\0';
+}();
+
+std::map<int32_t, HandleAuditEntry> g_audit;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
@@ -1277,6 +1318,8 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_llm_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::LLM, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -1539,10 +1582,12 @@ Napi::Value UnloadModel(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "unload_model", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_llm_handles, hid);
-        if (h)
+        if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_llm_component_destroy(h);
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        g_lora_applied.erase(hid);
+            g_lora_applied.erase(hid);
+        }
         return RAC_SUCCESS;
     });
 }
@@ -1689,6 +1734,8 @@ Napi::Value LoadVlmModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_vlm_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::VLM, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -1851,8 +1898,11 @@ Napi::Value UnloadVlmModel(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "vlm unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_vlm_handles, hid);
-        if (h)
+        if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_vlm_component_destroy(h);
+        }
         return RAC_SUCCESS;
     });
 }
@@ -1887,6 +1937,8 @@ Napi::Value LoadEmbeddingModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_embed_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::EMBEDDING, model });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -2028,8 +2080,11 @@ Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "embeddings unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_embed_handles, hid);
-        if (h)
+        if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_embeddings_destroy(h);
+        }
         return RAC_SUCCESS;
     });
 }
@@ -2069,6 +2124,8 @@ Napi::Value LoadSttModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_stt_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::STT, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -2344,8 +2401,11 @@ Napi::Value UnloadSttModel(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "stt unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_stt_handles, hid);
-        if (h)
+        if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_stt_component_destroy(h);
+        }
         return RAC_SUCCESS;
     });
 }
@@ -2385,6 +2445,8 @@ Napi::Value LoadTtsVoice(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_tts_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::TTS, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -2627,10 +2689,42 @@ Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     return RunNativeCall(env, "tts unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_tts_handles, hid);
-        if (h)
+        if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_tts_component_destroy(h);
+        }
         return RAC_SUCCESS;
     });
+}
+
+// =============================================================================
+// handleAudit() -> [{ id, category, model }] — snapshot of all live handles.
+// Used by the TS HandleAuditor to cross-reference loaded slots against native state.
+// =============================================================================
+Napi::Value HandleAudit(const Napi::CallbackInfo& info) {
+    (void)info;
+    Napi::Env env = info.Env();
+
+    std::vector<HandleAuditEntry> entries;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        entries.reserve(g_audit.size());
+        for (const auto& kv : g_audit)
+            entries.push_back(kv.second);
+    }
+
+    Napi::Array out = Napi::Array::New(env, entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        Napi::Object obj = Napi::Object::New(env);
+        obj.Set("id", Napi::Number::New(env, static_cast<double>(entries[i].id)));
+        obj.Set("category", Napi::String::New(env, HandleCategoryName(entries[i].category)));
+        if (!entries[i].model_source.empty()) {
+            obj.Set("model", Napi::String::New(env, entries[i].model_source));
+        }
+        out.Set(static_cast<uint32_t>(i), obj);
+    }
+    return out;
 }
 
 // =============================================================================
@@ -2661,6 +2755,38 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
                     }
                     return true;
                 });
+                // Report leaked handles: entries in g_audit but not found in any handle map.
+                {
+                    const char* audit_env = std::getenv("RAC_HANDLE_AUDIT");
+                    if (audit_env && (std::strcmp(audit_env, "warn") == 0 || std::strcmp(audit_env, "debug") == 0)) {
+                        std::vector<HandleAuditEntry> leaks;
+                        for (const auto& kv : g_audit) {
+                            bool found = false;
+                            if (g_llm_handles.count(kv.first)) found = true;
+                            else if (g_vlm_handles.count(kv.first)) found = true;
+                            else if (g_embed_handles.count(kv.first)) found = true;
+                            else if (g_stt_handles.count(kv.first)) found = true;
+                            else if (g_tts_handles.count(kv.first)) found = true;
+                            else if (g_vad_handles.count(kv.first)) found = true;
+                            else if (g_rerank_handles.count(kv.first)) found = true;
+                            else if (g_diar_handles.count(kv.first)) found = true;
+                            else if (g_seg_handles.count(kv.first)) found = true;
+                            else if (g_rag_handles.count(kv.first)) found = true;
+                            if (!found)
+                                leaks.push_back(kv.second);
+                        }
+                        if (!leaks.empty()) {
+                            std::ostringstream oss;
+                            oss << "Handle leak detected (" << leaks.size() << " handle(s) at shutdown):";
+                            for (const auto& leak : leaks) {
+                                oss << "\n  id=" << leak.id
+                                    << " category=" << HandleCategoryName(leak.category)
+                                    << " model=\"" << leak.model_source << "\"";
+                            }
+                            RAC_LOG_WARNING("HandleAudit", "%s", oss.str().c_str());
+                        }
+                    }
+                }
 #ifdef RAC_ELECTRON_HAVE_RAG
                 // Without the RAG pipeline no session can ever have been created,
                 // so the map is empty and there is nothing to destroy — but the
@@ -2869,6 +2995,8 @@ Napi::Value CreateVad(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_vad_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::VAD, model_path });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -3138,6 +3266,8 @@ Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
         rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
         if (h) {
             ClearVadStreamSlot(hid, h);
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_vad_component_destroy(h);
         }
         return RAC_SUCCESS;
@@ -3178,6 +3308,8 @@ Napi::Value LoadRerankModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_rerank_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::RERANK, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -3263,6 +3395,8 @@ Napi::Value UnloadRerankModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "rerank unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_rerank_handles, hid);
         if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_rerank_cleanup(h);
             rac_rerank_destroy(h);
         }
@@ -3303,6 +3437,8 @@ Napi::Value LoadDiarizationModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_diar_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::DIARIZATION, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -3409,6 +3545,8 @@ Napi::Value UnloadDiarizationModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "diarization unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_diar_handles, hid);
         if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_diarization_cleanup(h);
             rac_diarization_destroy(h);
         }
@@ -3449,6 +3587,8 @@ Napi::Value LoadSegmentationModel(const Napi::CallbackInfo& info) {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
             *slot = g_next_handle_id++;
             g_seg_handles[*slot] = h;
+            if (g_audit_enabled)
+                g_audit.emplace(*slot, HandleAuditEntry{ static_cast<int32_t>(*slot), HandleCategory::SEGMENTATION, id });
             return RAC_SUCCESS;
         },
         [slot](Napi::Env e) { return Napi::Number::New(e, *slot); });
@@ -3571,6 +3711,8 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "segmentation unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_seg_handles, hid);
         if (h) {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            g_audit.erase(hid);
             rac_segmentation_cleanup(h);
             rac_segmentation_destroy(h);
         }
@@ -3835,6 +3977,8 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
             }
             hid = g_next_handle_id++;
             g_rag_handles[hid] = session_;
+            if (g_audit_enabled)
+                g_audit.emplace(hid, HandleAuditEntry{ hid, HandleCategory::RAG, "rag_session" });
             session_ = nullptr;  // ownership transferred to the map
         }
         deferred_.Resolve(Napi::Number::New(Env(), hid));
@@ -4036,8 +4180,11 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
         return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = take_handle_when_idle(g_rag_handles, hid);
-    if (h)
+    if (h) {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        g_audit.erase(hid);
         rac_rag_session_destroy_proto(h);
+    }
     return env.Undefined();
 }
 
@@ -4164,6 +4311,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
         exports.Set(name, Napi::Function::New(env, RagUnavailable));
     }
 #endif
+    exports.Set("handleAudit", Napi::Function::New(env, HandleAudit));
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;
