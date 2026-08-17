@@ -23,6 +23,17 @@ bool parse_engine_hint(const std::string& engine,
                        runanywhere::v1::InferenceFramework* out_framework,
                        std::string* error);
 
+/**
+ * Parse `--accelerator auto|cpu|gpu|npu` into ModelLoadRequest.accelerator_policy.
+ * An empty string is valid and leaves the policy UNSPECIFIED, which is what the
+ * CLI sent unconditionally before this option existed: the engine decides.
+ *
+ * `ane` and `neural-engine` are accepted spellings of `npu`, because on Apple
+ * hardware that is the same request and it is the word people use.
+ */
+bool parse_accelerator(const std::string& accelerator,
+                       runanywhere::v1::AcceleratorPolicy* out_policy, std::string* error);
+
 bool resolve_engine_hint(const std::string& engine, EngineHintResolution* out_resolution,
                          std::string* error);
 

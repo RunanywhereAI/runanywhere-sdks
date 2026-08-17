@@ -70,4 +70,39 @@ bool resolve_engine_hint(const std::string& engine, EngineHintResolution* out_re
     return true;
 }
 
+
+bool parse_accelerator(const std::string& accelerator,
+                       runanywhere::v1::AcceleratorPolicy* out_policy, std::string* error) {
+    if (!out_policy) {
+        return false;
+    }
+    *out_policy = runanywhere::v1::ACCELERATOR_POLICY_UNSPECIFIED;
+    std::string normalized = accelerator;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (normalized.empty()) {
+        return true;
+    }
+    if (normalized == "auto") {
+        *out_policy = runanywhere::v1::ACCELERATOR_POLICY_AUTO;
+        return true;
+    }
+    if (normalized == "cpu") {
+        *out_policy = runanywhere::v1::ACCELERATOR_POLICY_CPU;
+        return true;
+    }
+    if (normalized == "gpu" || normalized == "metal") {
+        *out_policy = runanywhere::v1::ACCELERATOR_POLICY_GPU;
+        return true;
+    }
+    if (normalized == "npu" || normalized == "ane" || normalized == "neural-engine") {
+        *out_policy = runanywhere::v1::ACCELERATOR_POLICY_NPU;
+        return true;
+    }
+    if (error) {
+        *error = "unknown accelerator '" + accelerator + "' (expected auto, cpu, gpu or npu)";
+    }
+    return false;
+}
+
 }  // namespace rcli::commands
