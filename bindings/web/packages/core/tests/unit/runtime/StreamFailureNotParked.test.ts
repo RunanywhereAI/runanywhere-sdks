@@ -23,6 +23,15 @@ import {
 } from '../../../src/runtime/OffscreenRuntimeBridge';
 import { setStreamWorkerFactory } from '../../../src/runtime/StreamWorkerFactoryRegistry';
 import { streamCallback, type ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterTypes';
+import {
+  BackendWorkerHost,
+  type BackendWorkerLike,
+} from '../../../src/runtime/BackendWorkerHost';
+import { runBackendWorker, type BackendWorkerScope } from '../../../src/runtime/BackendWorker';
+import type {
+  BackendWorkerRequest,
+  BackendWorkerResponse,
+} from '../../../src/runtime/BackendWorkerProtocol';
 import type { ProtoCodec } from '../../../src/runtime/ProtoWasm';
 import type { WorkerRequest, WorkerResponse } from '../../../src/runtime/StreamWorker';
 
@@ -198,5 +207,49 @@ describe('a stream failure that lands while the consumer is not parked', () => {
     // be handed that error afterwards.
     await iterator.return?.();
     expect(await iterator.next()).toEqual({ value: undefined, done: true });
+  });
+
+  it('is raised by the backend worker host rather than read as end-of-stream', async () => {
+    // Emits one event, then keeps the stream open so the crash is what ends it.
+    class OneThenHangWorker implements BackendWorkerLike {
+      onmessage: ((event: MessageEvent<BackendWorkerResponse>) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+      private readonly scope: BackendWorkerScope;
+
+      constructor() {
+        this.scope = {
+          onmessage: null,
+          postMessage: (response) =>
+            this.onmessage?.({ data: response } as MessageEvent<BackendWorkerResponse>),
+        };
+        runBackendWorker(this.scope, {
+          init: () => undefined,
+          infer: (_kind, payload) => payload,
+          stream: async function* () {
+            yield 'first';
+            await new Promise<void>(() => {});
+          },
+          cancel: () => undefined,
+        });
+      }
+
+      postMessage(request: BackendWorkerRequest): void {
+        this.scope.onmessage?.({ data: request } as MessageEvent<BackendWorkerRequest>);
+      }
+
+      terminate(): void {}
+    }
+
+    const worker = new OneThenHangWorker();
+    const host = new BackendWorkerHost(() => worker);
+    const iterator = host.stream('tts.synthesize', { text: 'hello' })[Symbol.asyncIterator]();
+
+    expect(await iterator.next()).toEqual({ value: 'first', done: false });
+
+    // The worker dies while the consumer is handling the event it just got.
+    // handleCrash fails every in-flight request, and none of them is parked.
+    worker.onerror?.({ message: 'simulated crash' } as ErrorEvent);
+
+    await expect(iterator.next()).rejects.toThrow();
   });
 });
