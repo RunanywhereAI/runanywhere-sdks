@@ -193,6 +193,12 @@ void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
         payload.created_at_ms = now_ms;
         payload.success = RAC_TRUE;
         payload.has_success = RAC_TRUE;
+        // These metrics are invented, not observed. rac_telemetry_types.h makes
+        // stamping is_probe mandatory for such callers, but emit/blast never
+        // did — so every CI blast row was indistinguishable from a real
+        // inference observation in the analytics tables.
+        payload.is_probe = RAC_TRUE;
+        payload.has_is_probe = RAC_TRUE;
         if (metrics.processing_ms >= 0) {
             payload.processing_time_ms = metrics.processing_ms;
             payload.has_processing_time_ms = RAC_TRUE;
