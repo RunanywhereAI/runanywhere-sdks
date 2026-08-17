@@ -75,5 +75,11 @@ fi
 echo "linking mlx.metallib (${#airs[@]} kernels)"
 xcrun -sdk macosx metallib "${airs[@]}" -o "$BIN_DIR/mlx.metallib"
 
-echo "ready: $EXE"
+# Ship name and dev name are the same thing. package-rcli.sh stages this binary
+# as bin/rcli, so a developer running the macOS build should get `rcli` too;
+# otherwise the binary you test is not the binary users run, and the CMake-built
+# `rcli` next to it is the one WITHOUT an MLX runtime.
+ln -sf "$PRODUCT" "$BIN_DIR/rcli"
+
+echo "ready: $BIN_DIR/rcli -> $PRODUCT"
 echo "metallib: $BIN_DIR/mlx.metallib"

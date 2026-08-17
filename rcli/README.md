@@ -113,7 +113,13 @@ rcli chat qwen3
 
 Features line editing and history (`~/.local/state/runanywhere/history`; disable with `RUNANYWHERE_NOHISTORY=1`).
 
-Slash commands: `/set system <text>`, `/set temperature <f>`, `/set max-output-tokens <n>`, `/show`, `/bye` (or Ctrl-D). One Ctrl-C cancels the current generation.
+The conversation is remembered: every turn sends the whole transcript, and the oldest turns are dropped once it outgrows the window. `/context` shows how much is held, `/clear` forgets it.
+
+Slash commands: `/set system <text>`, `/set temperature <f>`, `/set max-output-tokens <n>`, `/show`, `/context`, `/clear`, `/bye` (or Ctrl-D). One Ctrl-C cancels the current generation.
+
+Other modalities join the same conversation: `/image <path> [question]` asks a vision model about a picture, `/audio <file.wav>` transcribes speech and answers it as if you had typed it, and `/say [text]` speaks the last reply into a WAV. `/model <name>`, `/engine <name>` and `/accelerator <policy>` reload without losing the conversation, and `/save <file.md>` writes it out. Pick the models these use with `--vlm-model`, `--stt-model` and `--tts-voice`.
+
+`/image` asks a single-turn question: commons does not read `VLMGenerationRequest.messages`, so the vision model does not see the prior conversation. Its answer still joins the transcript, so later text turns can refer to the picture.
 
 Thinking models (qwen3 family): thought tokens stream dimmed to **stderr**, answers to **stdout**. `--hide-thinking` keeps the thoughts off your terminal while the model still thinks; `--reasoning off` stops it thinking at all.
 
@@ -180,13 +186,12 @@ bash core/tests/scripts/run-cli-e2e-linux.sh
 ## Known limitations
 
 - `serve` is LLM-only and single-model.
-- REPL turns are independent (no conversation memory yet).
 - `rcli voice` with thinking models may speak reasoning text — use a non-thinking LLM (`--llm lfm2`) until voice-agent thinking control lands.
 - macOS x86_64, Linux ARM64, and Windows ARM64 binaries are not published yet.
 - Spec verbs with no standalone command yet: `tts speak` (commons synthesizes to a buffer and has no playback path), and `rag open` / `rag ingest` (RAG indexes are in-memory per process). `rcli rag query` and `rcli rag search` open, ingest, then ask or retrieve in one invocation instead.
 - `VLMGenerationOptions` was deleted; `vlm generate` (and `run --image`) now share the exact `LLMGenerationOptions` the text path uses, so `--seed`, `--frequency-penalty`, and `--presence-penalty` all apply to VLM generation too.
 - `rcli lora import` was removed: `idl/lora_options.proto` deleted `LoraAdapterImportRequest`/`Result` outright, and commons permanently stubs `rac_lora_adapter_import_proto` to `RAC_ERROR_NOT_IMPLEMENTED`. No replacement verb exists in this namespace yet.
-- `models load` takes `--engine` and `--category` only. `ModelLoadRequest` carries no context length, thread count or GPU switch; `rcli serve` has `--context`, `--threads` and `--gpu-layers` for the server it runs.
+- `models load` takes `--engine` and `--category` only. The generation commands (`llm`, `vlm`, `chat`, `run`) additionally take `--accelerator auto|cpu|gpu|npu` and `--context-length`, which ride on `ModelLoadRequest.accelerator_policy` / `.context_length`. Placement is advisory: commons forwards it to the engine and prints what it forwarded, and an engine is free to ignore it. llama.cpp honours both. `rcli serve` keeps its own `--context`, `--threads` and `--gpu-layers` for the server it runs.
 - `vad detect` exposes `--activation-threshold`. The spec's `minSpeechMs`, `minSilenceMs` and `prefixPaddingMs` are stream-level knobs that the per-frame `rac_vad_component_process` call does not accept.
 - `stt transcribe` has no `--translate-to-english`: `rac_stt_options_t` has no field for it.
 

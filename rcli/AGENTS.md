@@ -71,8 +71,23 @@ cmake --preset rcli-macos-release && cmake --build build/rcli-macos-release -j 2
 Always `-j 2` (repo resource discipline). One heavy build at a time.
 
 macOS release CLI keeps **both** `RAC_BACKEND_LLAMACPP=ON` and `RAC_BACKEND_MLX=ON`.
-MLX inference needs the Swift host (`RunAnywhereMLXCLI` / `build-mlx-cli.sh`);
-the CMake `rcli` binary still links the MLX bridge and ships both catalogs.
+
+**There is one shipped binary, `rcli`, and on macOS it is the Swift-hosted one.**
+`RunAnywhereMLXCLI` is not a second CLI: it is a Swift `@main` that registers the
+MLX and ONNX Swift callbacks and then calls `rcli_run_main()`, the same C++ host.
+`package-rcli.sh` stages it as `bin/rcli`, and `build-mlx-cli.sh` symlinks it as
+`rcli` in the Swift bin dir so the dev name matches the ship name.
+
+The CMake `rcli` links the MLX bridge but **cannot run MLX**: registration needs
+Swift callbacks on the MainActor, which a C++ `main` cannot provide. It says so
+at startup (`warning: mlx backend requires MLX runtime callbacks`). The catalog
+still offers MLX models on purpose, because the models directory is shared
+between RunAnywhere binaries, so pulling with one and running with another is
+valid; `test_rcli_unit.cpp::mlx_catalog_registration` locks that. Do not "fix" it
+by hiding those entries.
+
+So on macOS, build with `build-mlx-cli.sh` when you need MLX, and expect the
+CMake `rcli` to be llama.cpp-only.
 
 ## Vendored third_party
 
