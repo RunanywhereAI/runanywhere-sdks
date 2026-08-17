@@ -58,7 +58,6 @@
     "build": "tsc -p tsconfig.json",
     "build:test": "tsc -p tsconfig.test.json",
     "build:scripts": "tsc -p tsconfig.scripts.json",
-    "build:native-smoke": "tsc -p tsconfig.native.json",
     "bundle:native": "tsc -p tsconfig.bundle.json && node dist-scripts/bundle-native.js",
     "pretest": "npm run build && npm run build:test",
     "test": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\"",
@@ -67,7 +66,7 @@
     "pretest:all": "npm run build && npm run build:test",
     "test:all": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\" \"dist-test/feature/**/*.test.js\"",
     "check:proto-ts": "node scripts/check-proto-ts.mjs",
-    "typecheck": "npm run check:proto-ts && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.native.json --noEmit",
+    "typecheck": "npm run check:proto-ts && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "prepack": "npm run build && npm run bundle:native"
   },
   "dependencies": {

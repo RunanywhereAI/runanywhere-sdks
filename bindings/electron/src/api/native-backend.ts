@@ -11,6 +11,7 @@ import * as path from 'path';
 
 import type { NativeAddon, UnavailablePlugin } from '../bridge';
 import { assertBackendEnginesRegistered } from '../backend/engines';
+import { HandleAuditor, type KnownHandleSet, SLOT_TYPES } from './handle-audit';
 import { ErrorCode, SDKException } from '../errors';
 import {
   assertRemoteSupported,
@@ -142,8 +143,13 @@ export class NativeBackend implements RaBackend {
   private readonly storageAbi = new StorageAbi(this);
   private downloadWatchDone: (() => void) | null = null;
   private loggingWatchDone: (() => void) | null = null;
+  private readonly auditor: HandleAuditor | null;
 
-  constructor(private readonly addon: NativeAddon) {}
+  constructor(private readonly addon: NativeAddon) {
+    const auditEnv = process.env.RAC_HANDLE_AUDIT;
+    this.auditor =
+      auditEnv && auditEnv !== 'off' ? new HandleAuditor(addon) : null;
+  }
 
   // ---- lifecycle ----
 
@@ -166,6 +172,10 @@ export class NativeBackend implements RaBackend {
     // open here would leave its `voiceEvents` promise pending forever.
     for (const session of [...this.voiceSessions.keys()]) {
       await this.voiceClose(session).catch(() => undefined);
+    }
+    if (this.auditor) {
+      this.auditor.report('shutdown');
+      this.auditor.stop();
     }
     await this.addon.shutdown();
   }
@@ -1152,5 +1162,21 @@ export class NativeBackend implements RaBackend {
       case 'segmentation':
         return this.addon.unloadSegmentationModel(handle);
     }
+  }
+
+  /** Snapshot of all handles known to this backend — for cross-reference with audit. */
+  getKnownHandleSet(): KnownHandleSet {
+    const slotHandles = new Map<LoadSlotHandle, number>();
+    for (const [slot, entry] of this.slots.entries()) {
+      if (SLOT_TYPES.includes(slot as LoadSlotHandle)) {
+        slotHandles.set(slot as LoadSlotHandle, entry.handle);
+      }
+    }
+    return {
+      slotHandles,
+      vadHandle: this.vadHandle,
+      ragSessions: this.ragSessions,
+      voiceSessions: this.voiceSessions,
+    };
   }
 }
