@@ -49,6 +49,50 @@ rac_handle_t legacy_handle(void* impl) {
     return runtime_impl ? runtime_impl->legacy_handle : nullptr;
 }
 
+// AcceleratorPolicy wire values (idl/public_api_v4.proto), mirrored the same way
+// core/src/core/model_lifecycle.cpp mirrors them rather than pulling the
+// generated enum in for three integers.
+constexpr int kAcceleratorPolicyCpu = 2;
+constexpr int kAcceleratorPolicyGpu = 3;
+
+// Translate commons' advisory load JSON into llama.cpp's own knobs. Returns
+// false when there was nothing to say, so the caller can keep passing nullptr
+// and leave today's behaviour exactly as it was.
+bool parse_load_options(const char* options_json, rac_llm_llamacpp_config_t* config) {
+    if (options_json == nullptr || options_json[0] == '\0' || config == nullptr) {
+        return false;
+    }
+    nlohmann::json parsed = nlohmann::json::parse(options_json, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_discarded() || !parsed.is_object()) {
+        RAC_LOG_WARNING(LOG_CAT, "ignoring unparseable load options: %s", options_json);
+        return false;
+    }
+
+    bool any = false;
+    if (parsed.contains("context_length") && parsed["context_length"].is_number_integer()) {
+        config->context_size = parsed["context_length"].get<int32_t>();
+        any = true;
+    }
+    // accelerator_policy wins over the deprecated use_gpu when both are present,
+    // matching the proto comment that calls use_gpu an adapter onto it.
+    int policy = 0;
+    if (parsed.contains("accelerator_policy") && parsed["accelerator_policy"].is_number_integer()) {
+        policy = parsed["accelerator_policy"].get<int>();
+    } else if (parsed.contains("use_gpu") && parsed["use_gpu"].is_boolean()) {
+        policy = parsed["use_gpu"].get<bool>() ? kAcceleratorPolicyGpu : kAcceleratorPolicyCpu;
+    }
+    if (policy == kAcceleratorPolicyCpu) {
+        config->gpu_layers = 0;  // every layer stays on the CPU
+        any = true;
+    } else if (policy == kAcceleratorPolicyGpu) {
+        config->gpu_layers = -1;  // offload all of them
+        any = true;
+    }
+    // AUTO and NPU are left alone: AUTO is llama.cpp's own fitting pass, and
+    // llama.cpp has no NPU path, which commons already warns about separately.
+    return any;
+}
+
 rac_result_t llamacpp_cpu_provider_create_session(const rac_runtime_session_desc_t* desc,
                                                   rac_runtime_session_t** out) {
     if (desc == nullptr || out == nullptr)
@@ -58,8 +102,18 @@ rac_result_t llamacpp_cpu_provider_create_session(const rac_runtime_session_desc
         return RAC_ERROR_INVALID_PATH;
     }
 
+    // Commons hands the v4 load knobs down as advisory JSON
+    // ({"context_length":N,"use_gpu":bool,"accelerator_policy":int}, see
+    // model_lifecycle_translation.cpp). Translating them here is what makes
+    // `--accelerator cpu|gpu` and `--context-length` actually reach llama.cpp;
+    // passing nullptr meant every one of them was dropped on the floor.
+    rac_llm_llamacpp_config_t config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
+    config.gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO;
+    const bool have_config = parse_load_options(desc->options_json, &config);
+
     rac_handle_t backend_handle = nullptr;
-    rac_result_t rc = rac_llm_llamacpp_create(desc->model_path, nullptr, &backend_handle);
+    rac_result_t rc = rac_llm_llamacpp_create(desc->model_path,
+                                              have_config ? &config : nullptr, &backend_handle);
     if (rc != RAC_SUCCESS)
         return rc;
     *out = reinterpret_cast<rac_runtime_session_t*>(backend_handle);
@@ -290,10 +344,10 @@ static rac_result_t llamacpp_vtable_get_stream_token_counts(void* impl,
 // limited to the backend library via symbol hiding (the struct is `const`).
 // The `create` adapter called by commons rac_llm_create() after
 // rac_plugin_find picks this plugin. Replaces the legacy factory that was
-// registered via rac_service_provider_t::create. The config_json parameter is
-// reserved for future engine-specific tuning (num_threads, gpu_layers, etc.);
-// today we pass nullptr to rac_llm_llamacpp_create to use defaults.
-rac_result_t llamacpp_llm_create_impl(const char* model_id, const char* /*config_json*/,
+// registered via rac_service_provider_t::create. config_json carries commons'
+// advisory load knobs and rides on the session descriptor to the provider,
+// which translates it into rac_llm_llamacpp_config_t.
+rac_result_t llamacpp_llm_create_impl(const char* model_id, const char* config_json,
                                       void** out_impl) {
     if (!model_id || !out_impl) {
         return RAC_ERROR_NULL_POINTER;
@@ -313,6 +367,9 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id, const char* /*config
     desc.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
     desc.model_format = RAC_MODEL_FORMAT_ID_GGUF;
     desc.model_path = model_id;
+    // The CPU runtime forwards the descriptor untouched, so this is how the
+    // load knobs reach llamacpp_cpu_provider_create_session.
+    desc.options_json = config_json;
 
     rac_runtime_session_t* runtime_session = nullptr;
     rc = runtime->create_session(&desc, &runtime_session);

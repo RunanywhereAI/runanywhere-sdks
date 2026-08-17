@@ -29,6 +29,7 @@
 #ifndef RAC_SERVER_H
 #define RAC_SERVER_H
 
+#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
@@ -91,7 +92,7 @@ static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {.host = "127.0.0.1
                                                               .model_id = RAC_NULL,
                                                               .context_size = 8192,
                                                               .threads = 4,
-                                                              .gpu_layers = 0,
+                                                              .gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,
                                                               .enable_cors = RAC_TRUE,
                                                               .cors_origins = "*",
                                                               .request_timeout_seconds = 300,
