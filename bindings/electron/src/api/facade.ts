@@ -333,6 +333,12 @@ function modalitiesForBackends(backends: readonly InferenceFramework[]): string[
         mods.add('stt');
         mods.add('tts');
         break;
+      case InferenceFramework.COREML:
+        // NeuRT serves LLM + STT + DIFFUSION; diffusion has no Electron facade
+        // (no browser/desktop engine publishes RAC_PRIMITIVE_DIFFUSION here).
+        mods.add('llm');
+        mods.add('stt');
+        break;
       default: {
         const _exhaustive: never = framework;
         void _exhaustive;

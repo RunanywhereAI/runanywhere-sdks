@@ -24,6 +24,7 @@ const BundlePackageId = {
   ONNX: 'onnx',
   Sherpa: 'sherpa',
   QHexRT: 'qhexrt',
+  NeuRT: 'neurt',
 } as const;
 type BundlePackageId = (typeof BundlePackageId)[keyof typeof BundlePackageId];
 
@@ -33,6 +34,7 @@ const ALL_PACKAGES: readonly BundlePackageId[] = [
   BundlePackageId.ONNX,
   BundlePackageId.Sherpa,
   BundlePackageId.QHexRT,
+  BundlePackageId.NeuRT,
 ];
 
 const BACKEND_PACKAGES: readonly BundlePackageId[] = [
@@ -40,6 +42,7 @@ const BACKEND_PACKAGES: readonly BundlePackageId[] = [
   BundlePackageId.ONNX,
   BundlePackageId.Sherpa,
   BundlePackageId.QHexRT,
+  BundlePackageId.NeuRT,
 ];
 
 /** Detected packaging posture for this build tree. */
