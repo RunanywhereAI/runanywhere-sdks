@@ -310,7 +310,7 @@ When bundling into an Electron app, unpack native artifacts from the asar:
 
 ## Handle Leak Detection (RAC_HANDLE_AUDIT)
 
-When the `RAC_HANDLE_AUDIT` environment variable is set, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (i.e., were never properly unloaded) are reported as leaks.
+When `RAC_HANDLE_AUDIT` is set to `warn` or `debug`, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (i.e., were never properly unloaded) are reported as leaks. Any other value (including an empty string) disables tracking with zero runtime overhead.
 
 ### Usage
 
@@ -347,13 +347,14 @@ interface HandleAuditEntry {
 Feature tests that exercise unload paths will surface leaks when run under `RAC_HANDLE_AUDIT=warn`:
 
 ```bash
-RAC_HANDLE_AUDIT=warn RUNANYWHERE_NATIVE_PATH=./build/... node dist-test/feature/lifecycle.feature.test.js
+# Replace <arch> with your target: darwin-arm64, win32-x64, etc.
+RAC_HANDLE_AUDIT=warn RUNANYWHERE_NATIVE_PATH=prebuilds/<arch>/runanywhere_native.node node dist-test/feature/lifecycle.feature.test.js
 ```
 
 A green test run should show zero leaked handles. Any reported leak indicates the unload function for that slot type did not properly destroy and erase its handle before returning.
 
 ### Implementation Details
 
-- Overhead: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy (~8 bytes entry header + string allocation on model_source), plus mutex lock on each operation.
+- Overhead: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy (node allocation proportional to the implementation's internal tree structure), plus `model_source` string allocation (typically small-string optimized on 40–55 bytes; heap-allocated for longer paths), plus mutex lock on each operation.
 - The audit table is guarded by `g_handles_mutex` — the same mutex that protects all handle maps — so no additional locking is needed.
 - When `RAC_HANDLE_AUDIT=off`, a static flag evaluated once at module init avoids per-call `getenv()` overhead.

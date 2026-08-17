@@ -445,7 +445,7 @@ export interface NativeAddon {
   ): void;
   loggingUnsubscribe(): void;
   /** Return all currently-active native handles with their category and model source. */
-  handleAudit(): Array<{ id: number; category: string; model?: string }>;
+  handleAudit(): import('./api/handle-audit').HandleAuditEntry[];
 }
 
 /**

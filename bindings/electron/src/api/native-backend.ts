@@ -11,7 +11,7 @@ import * as path from 'path';
 
 import type { NativeAddon, UnavailablePlugin } from '../bridge';
 import { assertBackendEnginesRegistered } from '../backend/engines';
-import { HandleAuditor, type KnownHandleSet, SLOT_TYPES } from './handle-audit';
+import { HandleAuditor, type KnownHandleSet, type LoadSlotHandle, SLOT_TYPES } from './handle-audit';
 import { ErrorCode, SDKException } from '../errors';
 import {
   assertRemoteSupported,
@@ -148,7 +148,7 @@ export class NativeBackend implements RaBackend {
   constructor(private readonly addon: NativeAddon) {
     const auditEnv = process.env.RAC_HANDLE_AUDIT;
     this.auditor =
-      auditEnv && auditEnv !== 'off' ? new HandleAuditor(addon) : null;
+      auditEnv === 'warn' || auditEnv === 'debug' ? new HandleAuditor(addon) : null;
   }
 
   // ---- lifecycle ----
@@ -161,6 +161,8 @@ export class NativeBackend implements RaBackend {
     const base = opts.baseDir ?? path.join(os.homedir(), '.runanywhere');
     const secure = opts.secureDir ?? path.join(base, 'secure');
     await this.addon.initialize(secure, base);
+    // Start periodic audit once native init succeeds — handles loaded after this point are tracked.
+    this.auditor?.start();
   }
 
   async shutdown(): Promise<void> {
@@ -174,6 +176,11 @@ export class NativeBackend implements RaBackend {
       await this.voiceClose(session).catch(() => undefined);
     }
     if (this.auditor) {
+      // Capture leaks before clearing handle state — getLeaks queries native audit
+      // against the current snapshot of known slots.
+      const leaks = this.auditor.getLeaks(this.getKnownHandleSet());
+      for (const leak of leaks)
+        console.warn(`[handle-audit] shutdown leak: ${leak.details}`);
       this.auditor.report('shutdown');
       this.auditor.stop();
     }

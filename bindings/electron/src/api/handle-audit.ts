@@ -4,10 +4,32 @@
 
 import type { NativeAddon } from '../bridge';
 
+/** Canonical handle categories — source of truth for addon.cpp and bridge.ts. */
+export const HANDLE_CATEGORIES = [
+  'llm',
+  'vlm',
+  'embedding',
+  'stt',
+  'tts',
+  'vad',
+  'rag',
+  'rerank',
+  'diarization',
+  'segmentation',
+] as const;
+
+/** Type-level mirror of HANDLE_CATEGORIES. */
+export type HandleCategory = (typeof HANDLE_CATEGORIES)[number];
+
+/** Strictly validate a category string against the canonical list. */
+export function isHandleCategory(s: string): s is HandleCategory {
+  return (HANDLE_CATEGORIES as readonly string[]).includes(s);
+}
+
 /** One entry returned by native handleAudit(). */
 export interface HandleAuditEntry {
   id: number;
-  category: string;
+  category: HandleCategory;
   model?: string;
 }
 
@@ -23,7 +45,7 @@ export const SLOT_TYPES = [
   'segmentation',
 ] as const;
 
-type LoadSlotHandle = (typeof SLOT_TYPES)[number];
+export type LoadSlotHandle = (typeof SLOT_TYPES)[number];
 
 /** All handle-bearing slots plus special collections. */
 export interface KnownHandleSet {

@@ -205,10 +205,10 @@ struct HandleAuditEntry {
     std::string model_source;
 };
 
-/** Cached from RAC_HANDLE_AUDIT — evaluated once at module init. */
+/** Cached from RAC_HANDLE_AUDIT — evaluated once at module init. Only "warn" and "debug" enable tracking. */
 static bool g_audit_enabled = []() -> bool {
     const char* v = std::getenv("RAC_HANDLE_AUDIT");
-    return v != nullptr && v[0] != '\0';
+    return v != nullptr && (std::strcmp(v, "warn") == 0 || std::strcmp(v, "debug") == 0);
 }();
 
 std::map<int32_t, HandleAuditEntry> g_audit;
@@ -2755,37 +2755,15 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
                     }
                     return true;
                 });
-                // Report leaked handles: entries in g_audit but not found in any handle map.
-                {
-                    const char* audit_env = std::getenv("RAC_HANDLE_AUDIT");
-                    if (audit_env && (std::strcmp(audit_env, "warn") == 0 || std::strcmp(audit_env, "debug") == 0)) {
-                        std::vector<HandleAuditEntry> leaks;
-                        for (const auto& kv : g_audit) {
-                            bool found = false;
-                            if (g_llm_handles.count(kv.first)) found = true;
-                            else if (g_vlm_handles.count(kv.first)) found = true;
-                            else if (g_embed_handles.count(kv.first)) found = true;
-                            else if (g_stt_handles.count(kv.first)) found = true;
-                            else if (g_tts_handles.count(kv.first)) found = true;
-                            else if (g_vad_handles.count(kv.first)) found = true;
-                            else if (g_rerank_handles.count(kv.first)) found = true;
-                            else if (g_diar_handles.count(kv.first)) found = true;
-                            else if (g_seg_handles.count(kv.first)) found = true;
-                            else if (g_rag_handles.count(kv.first)) found = true;
-                            if (!found)
-                                leaks.push_back(kv.second);
-                        }
-                        if (!leaks.empty()) {
-                            std::ostringstream oss;
-                            oss << "Handle leak detected (" << leaks.size() << " handle(s) at shutdown):";
-                            for (const auto& leak : leaks) {
-                                oss << "\n  id=" << leak.id
-                                    << " category=" << HandleCategoryName(leak.category)
-                                    << " model=\"" << leak.model_source << "\"";
-                            }
-                            RAC_LOG_WARNING("HandleAudit", "%s", oss.str().c_str());
-                        }
-                    }
+                // Report all remaining g_audit entries as shutdown leaks.
+                if (!g_audit.empty()) {
+                    std::ostringstream oss;
+                    oss << "Handle leak detected (" << g_audit.size() << " handle(s) at shutdown):";
+                    for (const auto& kv : g_audit)
+                        oss << "\n  id=" << kv.second.id
+                            << " category=" << HandleCategoryName(kv.second.category)
+                            << " model=\"" << kv.second.model_source << "\"";
+                    RAC_LOG_WARNING("HandleAudit", "%s", oss.str().c_str());
                 }
 #ifdef RAC_ELECTRON_HAVE_RAG
                 // Without the RAG pipeline no session can ever have been created,
@@ -2829,6 +2807,7 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
                 g_tts_handles.clear();
                 g_vad_handles.clear();
                 g_rag_handles.clear();
+                g_audit.clear();
                 g_inflight.clear();
             }
 #ifdef RAC_ELECTRON_HAVE_DESKTOP
