@@ -134,6 +134,60 @@ int run_stt(const GlobalOptions& options, const SttParams& params) {
 
 }  // namespace
 
+int transcribe_to_text(const GlobalOptions& options, const std::string& model_ref,
+                       const std::string& audio_path, std::string* out_text) {
+    ResolvedModelPaths model;
+    const int setup =
+        ensure_model_ready(options, model_ref.empty() ? kDefaultSttModel : model_ref, &model);
+    if (setup != 0) {
+        return setup;
+    }
+
+    wav::WavData audio;
+    std::string error;
+    if (!wav::read_wav(audio_path, &audio, &error)) {
+        out::error_line(error);
+        return 1;
+    }
+    const std::vector<int16_t> pcm16 =
+        wav::resample(audio.samples, audio.sample_rate, kSttSampleRate);
+
+    rac_handle_t stt = nullptr;
+    if (rac_stt_component_create(&stt) != RAC_SUCCESS) {
+        out::error_line("failed to create STT component");
+        return 1;
+    }
+    rac_result_t rc =
+        rac_stt_component_load_model(stt, model.primary_path.c_str(), model.model_id.c_str(),
+                                     model.display_name.c_str());
+    if (rc != RAC_SUCCESS) {
+        out::error_line("failed to load STT model: " + out::describe_result(rc));
+        rac_stt_component_destroy(stt);
+        return 1;
+    }
+
+    rac_stt_options_t stt_options = RAC_STT_OPTIONS_DEFAULT;
+    stt_options.detect_language = RAC_TRUE;
+    stt_options.enable_punctuation = RAC_TRUE;
+    stt_options.sample_rate = kSttSampleRate;
+
+    rac_stt_result_t result = {};
+    rc = rac_stt_component_transcribe(stt, pcm16.data(), pcm16.size() * sizeof(int16_t),
+                                      &stt_options, &result);
+    int exit_code = 0;
+    if (rc != RAC_SUCCESS) {
+        out::error_line("transcription failed: " + out::describe_result(rc));
+        exit_code = 1;
+    } else {
+        if (out_text != nullptr) {
+            *out_text = result.text ? result.text : "";
+        }
+        rac_stt_result_free(&result);
+    }
+    rac_stt_component_destroy(stt);
+    return exit_code;
+}
+
 void register_stt(CLI::App& app, GlobalOptions& options) {
     CLI::App* cmd = app.add_subcommand("stt", "Turn recorded speech into text");
     cmd->require_subcommand(0, 1);

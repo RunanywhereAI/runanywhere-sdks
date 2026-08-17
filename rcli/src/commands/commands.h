@@ -88,6 +88,22 @@ void configure_models_delete(CLI::App* cmd, GlobalOptions& options);
 int pull_model_flow(const GlobalOptions& options, const std::string& model_id);
 
 /**
+ * Transcribe an audio file and hand back the text instead of rendering it, so
+ * the chat REPL can turn `/audio <file>` into an ordinary user turn. Downloads
+ * and loads the STT model if needed. Returns 0 / 1 / 2 like a command callback.
+ */
+int transcribe_to_text(const GlobalOptions& options, const std::string& model_ref,
+                       const std::string& audio_path, std::string* out_text);
+
+/**
+ * Speak `text` into a WAV file, so the chat REPL's `/say` can voice a reply.
+ * Commons has no playback path (`tts speak` is unimplemented), so the file is
+ * the deliverable and the caller prints where it landed.
+ */
+int synthesize_to_file(const GlobalOptions& options, const std::string& voice_ref,
+                       const std::string& text, const std::string& output_path);
+
+/**
  * Attach the spec verb name to a namespace whose options live on the namespace
  * itself (`rcli stt transcribe --input a.wav` and `rcli stt --input a.wav` are
  * the same command). The verb is a grammar marker: CLI11 fallthrough hands its

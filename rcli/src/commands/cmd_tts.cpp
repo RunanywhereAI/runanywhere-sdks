@@ -132,6 +132,51 @@ int run_tts(const GlobalOptions& options, const TtsParams& params) {
 
 }  // namespace
 
+int synthesize_to_file(const GlobalOptions& options, const std::string& voice_ref,
+                       const std::string& text, const std::string& output_path) {
+    ResolvedModelPaths voice;
+    const int setup =
+        ensure_model_ready(options, voice_ref.empty() ? kDefaultVoice : voice_ref, &voice);
+    if (setup != 0) {
+        return setup;
+    }
+
+    rac_handle_t tts = nullptr;
+    if (rac_tts_component_create(&tts) != RAC_SUCCESS) {
+        out::error_line("failed to create TTS component");
+        return 1;
+    }
+    rac_result_t rc = rac_tts_component_load_voice(
+        tts, voice.primary_path.c_str(), voice.model_id.c_str(), voice.display_name.c_str());
+    if (rc != RAC_SUCCESS) {
+        out::error_line("failed to load voice: " + out::describe_result(rc));
+        rac_tts_component_destroy(tts);
+        return 1;
+    }
+
+    rac_tts_options_t tts_options = RAC_TTS_OPTIONS_DEFAULT;
+    rac_tts_result_t result = {};
+    rc = rac_tts_component_synthesize(tts, text.c_str(), &tts_options, &result);
+
+    int exit_code = 0;
+    if (rc != RAC_SUCCESS || !result.audio_data || result.audio_size == 0) {
+        out::error_line("synthesis failed: " + out::describe_result(rc));
+        exit_code = 1;
+    } else {
+        const auto* float_samples = static_cast<const float*>(result.audio_data);
+        const size_t sample_count = result.audio_size / sizeof(float);
+        std::string error;
+        if (!wav::write_wav_f32(output_path, float_samples, sample_count, result.sample_rate,
+                                &error)) {
+            out::error_line(error);
+            exit_code = 1;
+        }
+        rac_tts_result_free(&result);
+    }
+    rac_tts_component_destroy(tts);
+    return exit_code;
+}
+
 void register_tts(CLI::App& app, GlobalOptions& options) {
     CLI::App* cmd = app.add_subcommand("tts", "Speak text with an on-device voice");
     cmd->require_subcommand(0, 1);
