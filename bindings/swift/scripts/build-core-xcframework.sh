@@ -66,9 +66,22 @@ fi
 # CI sets RAC_ALLOW_NEURT_STUB=1: it only needs to prove the build compiles and links.
 if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
     _neurt_root_probe="${NEURT_ROOT:-${REPO_ROOT}/../neurun}"
-    if [ ! -f "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" ]; then
-        echo "error: packaging the Swift SDK requires a real NeuRT engine, but the neurun checkout was not found." >&2
-        echo "  looked for: ${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" >&2
+    _neurt_required_paths=(
+        "${_neurt_root_probe}/CMakeLists.txt"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_stt_ops_neurt.cpp"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_diffusion_coreml.mm"
+    )
+    _neurt_missing_paths=()
+    for _neurt_required_path in "${_neurt_required_paths[@]}"; do
+        [ -f "${_neurt_required_path}" ] || _neurt_missing_paths+=("${_neurt_required_path}")
+    done
+    if [ "${#_neurt_missing_paths[@]}" -ne 0 ]; then
+        echo "error: packaging the Swift SDK requires a complete, routable NeuRT engine checkout." >&2
+        echo "  missing required path(s):" >&2
+        for _neurt_missing_path in "${_neurt_missing_paths[@]}"; do
+            echo "    ${_neurt_missing_path}" >&2
+        done
         echo "  Set NEURT_ROOT=/path/to/neurun, or set RAC_ALLOW_NEURT_STUB=1 to package a" >&2
         echo "  non-routable stub on purpose (build verification only — NOT shippable)." >&2
         exit 1

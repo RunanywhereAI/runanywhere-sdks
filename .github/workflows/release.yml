@@ -193,7 +193,10 @@ jobs:
           #     <neurun>/NeuRT/src/sdk/rac_llm_ops_neurt.cpp
           # NEURT_WITH_RAC_HEADERS is required: without it the file compiles
           # against its own mirrored typedefs and passes even when broken.
-          ref: 0f773fe8446befde4242778b0987055939e410b9
+          # Includes the NeuRT STT op table paired with SDK PR #710. Keeping
+          # the older LLM-only pin would make the release build fall back to a
+          # non-routable shell for TRANSCRIBE even though the SDK advertises it.
+          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
           token: ${{ secrets.NEURUN_TOKEN }}
           path: neurun
       - uses: ./.github/actions/setup-toolchain
