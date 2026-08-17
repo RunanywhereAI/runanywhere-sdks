@@ -7,8 +7,17 @@
 #define RCLI_REPL_REPL_H
 
 #include <string>
+#include <utility>
 
 namespace rcli::repl {
+
+/**
+ * Split a slash-command argument string into its first word and the remainder,
+ * e.g. "  shot.png what is this" -> {"shot.png", "what is this"}. Both halves
+ * are empty when there is nothing but whitespace, which is how the REPL detects
+ * a command invoked without its required argument.
+ */
+std::pair<std::string, std::string> split_first_word(const std::string& text);
 
 class LineEditor {
    public:

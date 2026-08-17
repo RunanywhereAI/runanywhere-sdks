@@ -70,4 +70,19 @@ void LineEditor::add_history(const std::string& line) {
     }
 }
 
+
+std::pair<std::string, std::string> split_first_word(const std::string& text) {
+    const size_t begin = text.find_first_not_of(" \t");
+    if (begin == std::string::npos) {
+        return {};
+    }
+    const size_t end = text.find_first_of(" \t", begin);
+    if (end == std::string::npos) {
+        return {text.substr(begin), std::string()};
+    }
+    const size_t rest = text.find_first_not_of(" \t", end);
+    return {text.substr(begin, end - begin),
+            rest == std::string::npos ? std::string() : text.substr(rest)};
+}
+
 }  // namespace rcli::repl

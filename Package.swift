@@ -556,6 +556,7 @@ let package = Package(
                 "src/io/output.cpp",
                 "src/progress/progress_bar.cpp",
                 "src/repl/repl.cpp",
+                "src/repl/transcript.cpp",
                 "src/util/term.cpp",
                 "third_party/linenoise/linenoise.c",
             ],
