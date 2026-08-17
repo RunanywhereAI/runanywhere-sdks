@@ -21,7 +21,9 @@
 #include <system_error>
 #include <vector>
 
+#include "chat.pb.h"
 #include "llm_options.pb.h"
+#include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "vlm_options.pb.h"
 #include "rac/core/rac_core.h"
@@ -37,6 +39,8 @@
 #include "io/image_io.h"
 #include "io/output.h"
 #include "io/proto.h"
+#include "repl/repl.h"
+#include "repl/transcript.h"
 
 namespace {
 
@@ -2114,10 +2118,200 @@ TestResult test_bench_metrics_consume_only() {
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// Chat transcript — what the REPL remembers, and what it puts on the wire.
+// ---------------------------------------------------------------------------
+
+TestResult test_transcript_builds_conversation() {
+  TestResult result;
+  result.test_name = "transcript_builds_conversation";
+
+  rcli::repl::Transcript transcript;
+  transcript.add(rcli::repl::Role::User, "my favourite colour is vermilion");
+  transcript.add(rcli::repl::Role::Assistant, "ok");
+
+  runanywhere::v1::LLMGenerateRequest request;
+  rcli::repl::fill_messages(&request, &transcript, "what is my favourite colour?");
+
+  // Prior turns oldest first, then the turn the model must answer.
+  if (request.messages_size() != 3) {
+    result.expected = "3 messages";
+    result.actual = std::to_string(request.messages_size()) + " messages";
+    return result;
+  }
+  const bool shape_ok =
+      request.messages(0).role() == runanywhere::v1::MESSAGE_ROLE_USER &&
+      request.messages(0).content() == "my favourite colour is vermilion" &&
+      request.messages(1).role() == runanywhere::v1::MESSAGE_ROLE_ASSISTANT &&
+      request.messages(1).content() == "ok" &&
+      request.messages(2).role() == runanywhere::v1::MESSAGE_ROLE_USER &&
+      request.messages(2).content() == "what is my favourite colour?";
+  if (!shape_ok) {
+    result.expected = "user/assistant/user in chronological order";
+    result.actual = "roles or content out of order";
+    return result;
+  }
+  result.passed = true;
+  return result;
+}
+
+TestResult test_transcript_single_turn() {
+  TestResult result;
+  result.test_name = "transcript_single_turn";
+
+  // A one-shot generation passes no history at all.
+  runanywhere::v1::LLMGenerateRequest request;
+  rcli::repl::fill_messages(&request, nullptr, "hello");
+  if (request.messages_size() != 1 || request.messages(0).content() != "hello") {
+    result.expected = "1 message carrying the prompt";
+    result.actual = std::to_string(request.messages_size()) + " messages";
+    return result;
+  }
+  result.passed = true;
+  return result;
+}
+
+TestResult test_transcript_trims_oldest_first() {
+  TestResult result;
+  result.test_name = "transcript_trims_oldest_first";
+
+  rcli::repl::Transcript transcript(4);
+  for (int i = 0; i < 5; ++i) {
+    transcript.add(rcli::repl::Role::User, "u" + std::to_string(i));
+    transcript.add(rcli::repl::Role::Assistant, "a" + std::to_string(i));
+  }
+
+  if (transcript.size() > 4) {
+    result.expected = "at most 4 turns";
+    result.actual = std::to_string(transcript.size()) + " turns";
+    return result;
+  }
+  if (!transcript.trimmed()) {
+    result.expected = "trimmed() true after dropping turns";
+    result.actual = "trimmed() false";
+    return result;
+  }
+  // The newest turn survives and the oldest is gone.
+  if (transcript.turns().back().content != "a4") {
+    result.expected = "newest turn a4 retained";
+    result.actual = transcript.turns().back().content;
+    return result;
+  }
+  // Commons skips a leading assistant turn, so the window must not start on one
+  // or the reported count would overstate what the model sees.
+  if (transcript.turns().front().role != rcli::repl::Role::User) {
+    result.expected = "window starts on a user turn";
+    result.actual = "window starts on an assistant turn";
+    return result;
+  }
+  result.passed = true;
+  return result;
+}
+
+TestResult test_transcript_clear_and_empty() {
+  TestResult result;
+  result.test_name = "transcript_clear_and_empty";
+
+  rcli::repl::Transcript transcript;
+  transcript.add(rcli::repl::Role::User, "remember this");
+  transcript.add(rcli::repl::Role::Assistant, "");  // empty answers are not turns
+  if (transcript.size() != 1) {
+    result.expected = "1 turn (empty content ignored)";
+    result.actual = std::to_string(transcript.size()) + " turns";
+    return result;
+  }
+  transcript.clear();
+  if (!transcript.empty() || transcript.trimmed()) {
+    result.expected = "cleared and not marked trimmed";
+    result.actual = std::to_string(transcript.size()) + " turns";
+    return result;
+  }
+  result.passed = true;
+  return result;
+}
+
+TestResult test_accelerator_parsing() {
+  TestResult result;
+  result.test_name = "accelerator_parsing";
+
+  struct Case {
+    std::string in;
+    bool ok;
+    runanywhere::v1::AcceleratorPolicy expected;
+  };
+  const Case cases[] = {
+      {"", true, runanywhere::v1::ACCELERATOR_POLICY_UNSPECIFIED},
+      {"auto", true, runanywhere::v1::ACCELERATOR_POLICY_AUTO},
+      {"cpu", true, runanywhere::v1::ACCELERATOR_POLICY_CPU},
+      {"GPU", true, runanywhere::v1::ACCELERATOR_POLICY_GPU},
+      {"metal", true, runanywhere::v1::ACCELERATOR_POLICY_GPU},
+      {"npu", true, runanywhere::v1::ACCELERATOR_POLICY_NPU},
+      {"ane", true, runanywhere::v1::ACCELERATOR_POLICY_NPU},
+      {"quantum", false, runanywhere::v1::ACCELERATOR_POLICY_UNSPECIFIED},
+  };
+  for (const Case &c : cases) {
+    runanywhere::v1::AcceleratorPolicy policy =
+        runanywhere::v1::ACCELERATOR_POLICY_NPU;  // poisoned, must be overwritten
+    std::string error;
+    const bool ok = rcli::commands::parse_accelerator(c.in, &policy, &error);
+    if (ok != c.ok || policy != c.expected) {
+      result.expected = std::string(c.ok ? "ok " : "rejected ") + std::to_string(c.expected);
+      result.actual = std::string(ok ? "ok " : "rejected ") + std::to_string(policy);
+      return result;
+    }
+    // A rejection must explain itself; a silent false would strand the caller.
+    if (!ok && error.empty()) {
+      result.expected = "an error message on rejection";
+      result.actual = "empty error";
+      return result;
+    }
+  }
+  result.passed = true;
+  return result;
+}
+
+TestResult test_slash_argument_splitting() {
+  TestResult result;
+  result.test_name = "slash_argument_splitting";
+
+  struct Case {
+    std::string in;
+    std::string first;
+    std::string rest;
+  };
+  // The REPL calls this on everything after the command word, so the empty
+  // cases are how `/image` with no path is detected and reported rather than
+  // ending the session.
+  const Case cases[] = {
+      {" shot.png what is this", "shot.png", "what is this"},
+      {"shot.png", "shot.png", ""},
+      {"   ", "", ""},
+      {"", "", ""},
+      {"  a.wav   ", "a.wav", ""},
+      {" /abs/path with spaces.png describe", "/abs/path", "with spaces.png describe"},
+  };
+  for (const Case &c : cases) {
+    const auto [first, rest] = rcli::repl::split_first_word(c.in);
+    if (first != c.first || rest != c.rest) {
+      result.expected = "{'" + c.first + "','" + c.rest + "'}";
+      result.actual = "{'" + first + "','" + rest + "'}";
+      return result;
+    }
+  }
+  result.passed = true;
+  return result;
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
   TestSuite suite("rcli_unit");
+  suite.add("accelerator_parsing", test_accelerator_parsing);
+  suite.add("slash_argument_splitting", test_slash_argument_splitting);
+  suite.add("transcript_builds_conversation", test_transcript_builds_conversation);
+  suite.add("transcript_single_turn", test_transcript_single_turn);
+  suite.add("transcript_trims_oldest_first", test_transcript_trims_oldest_first);
+  suite.add("transcript_clear_and_empty", test_transcript_clear_and_empty);
   suite.add("json_escape", test_json_escape);
   suite.add("json_writer_shape", test_json_writer_shape);
   suite.add("human_bytes", test_human_bytes);
