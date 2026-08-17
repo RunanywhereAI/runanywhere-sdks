@@ -1087,6 +1087,14 @@ macos_cmake_args=(
     "-DRAC_BACKEND_NEURT=${RAC_BACKEND_NEURT}"
     "-DRAC_BACKEND_MLX=${RAC_BACKEND_MLX}"
     "-DGGML_NATIVE=OFF"
+    # Metal, the same way the iOS slices get it from RAC_PLATFORM_IOS. The
+    # macos-release preset pins GGML_METAL=OFF, so without this the macOS slice
+    # shipped a CPU-only llama.cpp while both iOS slices carried Metal: the
+    # backend logged "no GPU backend active" and every GGUF model ran on the CPU
+    # no matter what placement the caller asked for. EMBED_LIBRARY keeps the
+    # shaders inside the archive so consumers need no sidecar metallib.
+    "-DGGML_METAL=ON"
+    "-DGGML_METAL_EMBED_LIBRARY=ON"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-DCMAKE_OSX_ARCHITECTURES=arm64"
