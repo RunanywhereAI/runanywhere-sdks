@@ -165,6 +165,11 @@ bindings/kotlin/.idea/
 .claude/handoff/plans/
 .claude/handoff/memory/
 
+# Agents. `.agents/skills/` is a generated mirror of `.claude/skills/` for non-Claude
+# tooling (see scripts/setup/sync-skills.sh) — kept local/ignored for now, same as the
+# canonical tree, until there's a decision on what's safe to publish from this public repo.
+.agents/*
+
 # Playwright MCP
 .playwright-mcp/
 
