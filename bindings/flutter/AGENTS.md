@@ -1,6 +1,6 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.22.
+Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.23.
 
 ## Repository Structure
 
@@ -31,7 +31,7 @@ runanywhere_onnx    ───┼──→ runanywhere (core)
 runanywhere_qhexrt  ───┘
 ```
 
-All four backend packages depend on `runanywhere ^0.20.22`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
+All four backend packages depend on `runanywhere ^0.20.23`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
 
 ## Development Commands
 
@@ -200,7 +200,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 - `LlamaCpp.register()` → FFI `rac_backend_llamacpp_register()` + `rac_backend_llamacpp_vlm_register()`
 - Model format: `.gguf` extension
-- Constants: `version='2.0.0'`, `llamaCppVersion='b7199'`
+- Constants: `version='2.0.0'`, `llamaCppVersion='runanywhere-b10453.4'`
 - iOS: `RABackendLLAMACPP.xcframework` (static `.a`); weak-links Metal/MetalKit/MetalPerformanceShaders
 - Android: ships `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` per ABI
 
@@ -208,7 +208,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 - `await Onnx.register()` explicitly registers both the generic ONNX engine and the Sherpa STT/TTS/VAD engine
 - Model detection: `whisper`/`zipformer`/`paraformer` (STT), `piper`/`vits` (TTS), always handles VAD
-- Constants: `version='2.0.0'`, `onnxRuntimeVersion='1.24.3'`
+- Constants: `version='2.0.0'`, `onnxRuntimeVersion='1.28.0'`
 - Custom downloader: `OnnxDownloadStrategy` handles `.tar.bz2` archives via `rac_extract_archive_native`
 - iOS: `RABackendONNX.xcframework` and `RABackendSherpa.xcframework` are both vendored by the podspec
 - Android: 9 `.so` per ABI (`libonnxruntime`, `libsherpa-onnx-{c-api,jni}`, `librac_backend_{onnx,onnx_jni,sherpa}`, `librunanywhere_{onnx,sherpa}`, `libc++_shared`); declares `RECORD_AUDIO` permission; load order: `onnxruntime` → `sherpa-onnx-c-api` → backends
@@ -329,16 +329,16 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere` (Dart package) | 0.20.22 |
-| `runanywhere_llamacpp` | 0.20.22 |
-| `runanywhere_mlx` | 0.20.22 |
-| `runanywhere_onnx` | 0.20.22 |
-| `runanywhere_qhexrt` | 0.20.22 |
+| `runanywhere` (Dart package) | 0.20.23 |
+| `runanywhere_llamacpp` | 0.20.23 |
+| `runanywhere_mlx` | 0.20.23 |
+| `runanywhere_onnx` | 0.20.23 |
+| `runanywhere_qhexrt` | 0.20.23 |
 | `RACommons` native | 0.1.6 |
 | QHexRT native | private staged artifact |
-| llama.cpp engine | b7199 |
-| ONNX Runtime | 1.24.3 |
-| Canonical version source | `core/VERSION` (0.20.22) |
+| llama.cpp engine | runanywhere-b10453.4 |
+| ONNX Runtime | 1.28.0 |
+| Canonical version source | `core/VERSION` (0.20.23) |
 
 ## 2026-07 Callback Architecture Update
 

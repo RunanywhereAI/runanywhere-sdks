@@ -71,10 +71,23 @@ if(NOT DEFINED NEURT_ROOT)
 endif()
 
 set(_neurt_sdk_dir "${NEURT_ROOT}/NeuRT/src/sdk")
-if(NEURT_ROOT AND EXISTS "${_neurt_sdk_dir}/rac_llm_ops_neurt.cpp")
+set(_neurt_required_paths
+    "${NEURT_ROOT}/CMakeLists.txt"
+    "${_neurt_sdk_dir}/rac_llm_ops_neurt.cpp"
+    "${_neurt_sdk_dir}/rac_stt_ops_neurt.cpp"
+    "${_neurt_sdk_dir}/rac_diffusion_coreml.mm")
+
+set(_neurt_available FALSE)
+set(_neurt_missing_required_path "")
+if(NEURT_ROOT)
     set(_neurt_available TRUE)
-else()
-    set(_neurt_available FALSE)
+    foreach(_neurt_required_path IN LISTS _neurt_required_paths)
+        if(NOT EXISTS "${_neurt_required_path}")
+            set(_neurt_available FALSE)
+            set(_neurt_missing_required_path "${_neurt_required_path}")
+            break()
+        endif()
+    endforeach()
 endif()
 
 # Exported because consumers OUTSIDE this directory must distinguish "the engine target exists"
@@ -108,8 +121,11 @@ set(RAC_NEURT_ENGINE_AVAILABLE ${_neurt_available}
 # ---------------------------------------------------------------------------
 if(NOT _neurt_available)
     message(STATUS
-        "  neurt: neurun checkout NOT found — building the non-routable shell "
+        "  neurt: neurun checkout NOT found or incomplete — building the non-routable shell "
         "(registration will be refused with RAC_ERROR_BACKEND_UNAVAILABLE).")
+    if(_neurt_missing_required_path)
+        message(STATUS "  neurt: missing required path: ${_neurt_missing_required_path}")
+    endif()
     message(STATUS
         "  neurt: pass -DNEURT_ROOT=/path/to/neurun for the full Apple engine.")
 endif()

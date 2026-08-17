@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.22
+PROJECT_VERSION=0.20.23
 
 # =============================================================================
 # Platform Deployment Targets
@@ -150,95 +150,109 @@ MIN_CMAKE_VERSION=3.24
 # iOS version MUST match:
 #   1. What sherpa-onnx was built against
 #   2. What's in runanywhere-swift/Binaries/onnxruntime.xcframework
-# sherpa-onnx 1.13.x requires ONNX Runtime 1.24.x. The iOS pod-archive lags
-# upstream by one patch — 1.24.4 was not published as of 2026-05-19, so iOS is
-# pinned to 1.24.3 (ABI-compatible with sherpa 1.13.2 across 1.24.x patches).
-ONNX_VERSION_IOS=1.24.3
+# ONNX Runtime 1.29.0 was released on 2026-08-12, but its Apple pod archive is
+# not published. 1.28.0 is the newest official static XCFramework available
+# from download.onnxruntime.ai and is paired with Sherpa-ONNX 1.13.5 below.
+ONNX_VERSION_IOS=1.28.0
+ONNX_IOS_SHA256=b503cf5949ab718a1dff17d1643237ecc0fecf50ad86264572dcafddb140a327
 
 # Android ONNX Runtime ships inside the pinned Sherpa-ONNX Android archive.
-# The archive's ELF version definition is VERS_1.24.3; keep this source/header
-# commit and the runtime declaration aligned with that inspected binary.
-ONNX_VERSION_ANDROID=1.24.3
-ONNX_COMMIT_ANDROID=3a728b75062256951b6e19ce718907cf1a1d4cf0
+# The fork workflow builds that archive against this exact upstream source
+# commit and validates the runtime before publishing it.
+ONNX_VERSION_ANDROID=1.28.0
+ONNX_COMMIT_ANDROID=da9b5e364c465de65c49d91e696cd6485270757f
 
-# macOS version (can use latest)
-# ORT v1.24+ ships per-arch tarballs only (no more osx-universal2). The
-# FetchONNXRuntime.cmake macOS branch now selects osx-arm64 vs osx-x86_64
-# based on CMAKE_HOST_SYSTEM_PROCESSOR.
-ONNX_VERSION_MACOS=1.24.4
+# macOS release packaging needs a static archive. 1.28.0 is the newest
+# published macOS static build; 1.29.0 currently ships only Microsoft's shared
+# package. Keep this digest pinned to the exact csukuangfj build consumed by
+# core/scripts/macos/download-sherpa-onnx.sh.
+ONNX_VERSION_MACOS=1.28.0
+ONNX_MACOS_STATIC_SHA256=e1b924acecf0cd42d1931e712bda1bc5fa0d111735dce265ea1bfdb024305318
+# The third-party static archive omits this generated public header even
+# though its own onnxruntime_c_api.h includes it. Fetch the missing file from
+# the exact matching upstream tag and verify it before compiling Sherpa.
+ONNX_MACOS_ERROR_CODE_HEADER_SHA256=5ce3b054e798eced8d14f5b86e98692fd33470463f96194ce0700a2d53dd8721
 
-# Linux version (can use latest)
-ONNX_VERSION_LINUX=1.24.4
+# Linux uses the same ORT ABI baseline as every other runtime target. Sherpa's
+# fork-owned release below is built against this exact version.
+ONNX_VERSION_LINUX=1.28.0
 
-# Windows version (can use latest)
-ONNX_VERSION_WINDOWS=1.24.4
+# Windows uses the same ORT ABI baseline as Linux, Apple, Android, and Web.
+ONNX_VERSION_WINDOWS=1.28.0
 
-# Web/WASM version. This is intentionally independent from the native platform
-# pins above: Sherpa-ONNX v1.13.4's upstream WASM bundle is matched to ORT
-# v1.27.1, while the shipped iOS/Android binaries remain on their validated
-# platform-specific versions.
-ONNX_VERSION_WEB=1.27.1
-ONNX_COMMIT_WEB=df2ba1cf8108aa63627cf4cdf8f807880b938616
+# Web/WASM source builds use the common ORT 1.28.0 baseline too. 1.29.0 is not
+# usable here because no matching static WASM/Apple release set is published.
+ONNX_VERSION_WEB=1.28.0
+ONNX_COMMIT_WEB=da9b5e364c465de65c49d91e696cd6485270757f
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
-# iOS version. Consume the upstream release archive directly so every native
-# platform compiles against the same current C API instead of retaining an old
-# integration solely because a mirrored binary lagged behind upstream.
-SHERPA_ONNX_VERSION_IOS=1.13.2
-SHERPA_ONNX_IOS_SHA256=2886a04df4f8d5066c6c8b6e712278d65d7b60fc9e45990223df50262861d38b
+# iOS uses the static XCFramework published on upstream's rolling
+# `xcframework` release. The downloader normalizes its framework-bundle layout
+# back to the raw static-archive layout consumed by the CMake packager.
+SHERPA_ONNX_VERSION_IOS=1.13.5
+SHERPA_ONNX_IOS_SHA256=79214d00e275c864f0c4f7f9d1c252f8b621b185ceb54c13a43906da6f913080
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
 # The downloader invalidates its cache whenever the repository, version,
 # source/header commit, runtime commit, patch hash, or archive digest changes.
-SHERPA_ONNX_VERSION_ANDROID=1.13.2
-# Android prebuilt source repo. This personal-repository release is retained
-# temporarily because its Whisper greedy decoder populates per-token
-# ys_log_probs for hybrid-router confidence. The downloader verifies the exact
-# inspected archive; these pins do not constitute build provenance or an
-# upstream attestation.
-SHERPA_ONNX_REPO_ANDROID=Siddhesh2377/sherpa-onnx-rac
-SHERPA_ONNX_COMMIT_ANDROID=707ffc40b0fd59c04f50998e72989dd816b1dd37
-SHERPA_ONNX_ANDROID_SHA256=6ce931ffb49605cf1448e5fa98f9804fb7fdc5bb72efded3048a84080eea477b
+SHERPA_ONNX_VERSION_ANDROID=1.13.5-rac.4
+# Android consumes the canonical-first RunAnywhere fork release. It retains
+# the existing Whisper confidence behavior on upstream Sherpa 1.13.5, builds
+# all four ABIs with NDK r27d against ORT 1.28.0, proves 16 KiB alignment, and
+# rejects host build paths before publishing.
+SHERPA_ONNX_REPO_ANDROID=RunanywhereAI/sherpa-onnx
+SHERPA_ONNX_COMMIT_ANDROID=12f7112dc8f8161bdb611b31837bd47d70e4603f
+SHERPA_ONNX_ANDROID_SHA256=f7e774d99f03bf51f11ee0b9c155f2737b98c5f299b0575c18821285a338edd5
 # The fork commit is one behavior-only patch over this signed upstream commit.
 # The SHA-256 is for the exact three-file git diff, not the release archive.
-SHERPA_ONNX_UPSTREAM_COMMIT_ANDROID=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
-SHERPA_ONNX_PATCH_SHA256_ANDROID=f71a4ee115b72871c2ef821b7bf1eaed9eeddd2d9c9d59ee002b8fca507dbb35
+SHERPA_ONNX_UPSTREAM_COMMIT_ANDROID=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
+SHERPA_ONNX_PATCH_SHA256_ANDROID=1348660905c79512a571fb11d5fb436485b8cb3e44de5fc3453dcc8ec8e0fcf7
 # Public C/C++ headers are unchanged by the patch; fetch them from the signed
 # upstream source commit instead of the fork's mutable release tag.
 SHERPA_ONNX_HEADER_REPO_ANDROID=k2-fsa/sherpa-onnx
-SHERPA_ONNX_HEADER_COMMIT_ANDROID=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
+SHERPA_ONNX_HEADER_COMMIT_ANDROID=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 
-# macOS version
-SHERPA_ONNX_VERSION_MACOS=1.13.2
-SHERPA_ONNX_COMMIT_MACOS=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
+# Sherpa 1.13.5 contains the corrected NeMo streaming-transducer decode path
+# required by Nemotron 3.5 Streaming ASR. The macOS builder links it against
+# the exact ORT 1.28.0 static archive pinned above.
+SHERPA_ONNX_VERSION_MACOS=1.13.5
+SHERPA_ONNX_COMMIT_MACOS=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 
-# Linux version
-SHERPA_ONNX_VERSION_LINUX=1.13.2
-
-# Windows version
-SHERPA_ONNX_VERSION_WINDOWS=1.13.2
+# Linux and Windows consume fork-owned artifacts built from upstream 1.13.5
+# against ORT 1.28.0. The release workflow builds all three artifacts before
+# publishing, and the downloaders verify both archive checksums and embedded
+# provenance before making them available to CMake.
+SHERPA_ONNX_REPO_DESKTOP=RunanywhereAI/sherpa-onnx
+SHERPA_ONNX_RELEASE_TAG_DESKTOP=v1.13.5-rac-desktop.4
+SHERPA_ONNX_COMMIT_DESKTOP=c6531299b6c5816a95cb171a093e7f82847e59bb
+SHERPA_ONNX_VERSION_LINUX=1.13.5
+SHERPA_ONNX_LINUX_X64_SHA256=2fbadb68ecf45e73982ce20f18c4658639afc1db245ca1b5794accb6544b2fa2
+SHERPA_ONNX_LINUX_AARCH64_SHA256=cb7167b68b4246f01a88d6661551ddb925b49481e39d8b329e6e7aee422f6345
+SHERPA_ONNX_VERSION_WINDOWS=1.13.5
+SHERPA_ONNX_WINDOWS_X64_SHA256=f3985b5b91536a8c06fafd3d0118479a09eaa71d4c95795424c5819162a913e9
 
 # Web/WASM matched set with ONNX_VERSION_WEB. Do not reuse Android/iOS
 # prebuilts for this target; the Web vendor scripts validate provenance.
-SHERPA_ONNX_VERSION_WEB=1.13.4
-SHERPA_ONNX_COMMIT_WEB=142807252687d81b40d6315f23470a1512a00de3
+SHERPA_ONNX_VERSION_WEB=1.13.5
+SHERPA_ONNX_COMMIT_WEB=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# (2026-07-15 Bonsai pin): PrismML fork, NOT an upstream ggerganov b-tag.
-# Tag prism-b9591-62061f9 = upstream b9591 + PrismML Bonsai patches
-# (LLM_ARCH_QWEN35 GatedDeltaNet + GGML_TYPE_Q1_0), required to load
-# prism-ml/Bonsai-27B-gguf Q1_0 artifacts. Additive changes only — existing
-# GGUF type IDs are unchanged. Known trade-off vs the previous upstream
-# b9959 pin: upstream b9591..b9959 work (newer mtmd/OCR models, ARMv7
-# table-lookup fallback) is not included.
-LLAMACPP_VERSION=prism-b9591-62061f9
+# (2026-08-16 runtime/model bump): RunAnywhere's direct fork of canonical
+# ggml-org/llama.cpp at b10453 plus the following narrow compatibility patches:
+# DeepGrove Maple architecture/ternary-expert support. Q1_0 Bonsai remains
+# supported by canonical upstream, and Ternary-Bonsai uses Prism's canonical
+# Q2_0_g64 artifacts instead of its older conflicting 128-value Q2_0 encoding.
+# Maple is CPU-only until its ternary expert mul_mm_id kernels exist on GPU;
+# the engine enforces that after reading general.architecture from the GGUF.
+# See the fork's RUNANYWHERE.md before rebasing.
+LLAMACPP_VERSION=runanywhere-b10453.4
 # Repository the llama.cpp FetchContent clones. Consumed by
 # engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
-LLAMACPP_GIT_REPOSITORY=https://github.com/PrismML-Eng/llama.cpp.git
+LLAMACPP_GIT_REPOSITORY=https://github.com/RunanywhereAI/llama.cpp.git
 
 # =============================================================================
 # nlohmann/json

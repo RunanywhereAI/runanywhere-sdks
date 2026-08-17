@@ -60,6 +60,7 @@ PATCH_STATE="absent"
 ORT_REQUIRED_FILES=(
   "${ORT_ARCHIVE_DEST}"
   "${DEST_DIR}/include/onnxruntime_c_api.h"
+  "${DEST_DIR}/include/onnxruntime_error_code.h"
   "${DEST_DIR}/include/onnxruntime_cxx_api.h"
   "${DEST_DIR}/include/onnxruntime_cxx_inline.h"
   "${DEST_DIR}/include/onnxruntime_float16.h"
@@ -405,7 +406,15 @@ export PATH
 source "${EMSDK}/emsdk_env.sh"
 export EMSCRIPTEN="${EMSDK}/upstream/emscripten"
 export EM_CONFIG="${EMSDK}/.emscripten"
-export PATH="${EMSDK}:${EMSCRIPTEN}:${EMSDK}/upstream/bin:${PATH}"
+: "${EMSDK_PYTHON:?emsdk_env.sh did not provide EMSDK_PYTHON}"
+# Dawn launches Emscripten's Python helpers through CMake's discovered
+# interpreter. A host Anaconda installation can otherwise win discovery and
+# select Python 3.9, which Emscripten 6 rejects. Pin every spelling used by ORT
+# and Dawn to the interpreter shipped with the selected emsdk.
+export PYTHON="${EMSDK_PYTHON}"
+export Python_EXECUTABLE="${EMSDK_PYTHON}"
+export Python3_EXECUTABLE="${EMSDK_PYTHON}"
+export PATH="$(dirname "${EMSDK_PYTHON}"):${EMSDK}:${EMSCRIPTEN}:${EMSDK}/upstream/bin:${PATH}"
 
 echo "Pre-warming Emscripten sysroot at ${EMSDK}..."
 _warmup_c="$(mktemp -t rac_em_warmup.XXXXXX).c"
@@ -441,6 +450,8 @@ set +e
   --cmake_extra_defines \
     CMAKE_POLICY_VERSION_MINIMUM=3.5 \
     onnxruntime_BUILD_UNIT_TESTS=OFF \
+    "Python_EXECUTABLE=${EMSDK_PYTHON}" \
+    "Python3_EXECUTABLE=${EMSDK_PYTHON}" \
     "CMAKE_C_FLAGS=-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
     "CMAKE_CXX_FLAGS=-fexceptions -Dprotobuf=rac_ort_protobuf -DHaveOffsetConverter=rac_ort_have_offset_converter -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
 BUILD_RC=$?
@@ -482,6 +493,7 @@ cp "${ORT_ARCHIVE}" "${DEST_DIR}/lib/libonnxruntime.a"
 HEADER_SRC="${SRC_DIR}/include/onnxruntime/core/session"
 for header in \
   onnxruntime_c_api.h \
+  onnxruntime_error_code.h \
   onnxruntime_cxx_api.h \
   onnxruntime_cxx_inline.h \
   onnxruntime_float16.h \

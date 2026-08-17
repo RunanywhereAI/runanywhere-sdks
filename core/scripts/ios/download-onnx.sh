@@ -1,7 +1,7 @@
 #!/bin/bash
 # Download ONNX Runtime iOS xcframework directly from onnxruntime.ai
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -13,6 +13,10 @@ source "${SCRIPT_DIR}/../load-versions.sh"
 # Use version from VERSIONS file - no hardcoded fallbacks
 if [ -z "${ONNX_VERSION_IOS:-}" ]; then
     echo "ERROR: ONNX_VERSION_IOS not loaded from VERSIONS file" >&2
+    exit 1
+fi
+if [ -z "${ONNX_IOS_SHA256:-}" ]; then
+    echo "ERROR: ONNX_IOS_SHA256 not loaded from VERSIONS file" >&2
     exit 1
 fi
 ONNX_VERSION="${ONNX_VERSION_IOS}"
@@ -31,6 +35,14 @@ curl -L --progress-bar -o "${TEMP_ZIP}" "${DOWNLOAD_URL}"
 # Verify download
 if [ ! -f "${TEMP_ZIP}" ]; then
     echo "Error: Download failed"
+    exit 1
+fi
+
+ACTUAL_SHA256="$(shasum -a 256 "${TEMP_ZIP}" | awk '{print $1}')"
+if [ "${ACTUAL_SHA256}" != "${ONNX_IOS_SHA256}" ]; then
+    echo "ERROR: ONNX Runtime iOS archive checksum mismatch" >&2
+    echo "  expected: ${ONNX_IOS_SHA256}" >&2
+    echo "  actual:   ${ACTUAL_SHA256}" >&2
     exit 1
 fi
 

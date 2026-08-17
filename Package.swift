@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.19")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.23")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -114,34 +114,19 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 // republished carrying Windows x64 and ARM64 natives, and 0.20.22 fixes their
 // packaging; none of v0.20.20, v0.20.21 or v0.20.22 exists as a tag with
 // release assets, so the remote binaryTargets must keep resolving 0.20.19.
-let sdkVersion = "0.20.19"
+let sdkVersion = "0.20.23"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
     ?? "/opt/homebrew"
 
-// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut an
-// upstream tag compatible with mlx-swift-lm 3.x, so this package needs one
-// specific upstream commit (580e952, three commits before upstream v0.1.3) for
-// MLX STT/TTS and speaker-diarization provider plumbing.
-//
-// That commit used to be consumed with `revision:`. SwiftPM refuses to let any
-// package be depended on by version (`from:` / `exact:` / a range) when its own
-// manifest carries a revision- or branch-pinned dependency, which made
-// `.package(url: ".../runanywhere-sdks", from: "0.20.x")` unresolvable for
-// external consumers. We therefore mirror the upstream into RunanywhereAI (we
-// control that org; upstream is pull-only for us) and tag the EXACT same commit
-// so it can be consumed by version:
-//
-//   https://github.com/RunanywhereAI/mlx-audio-swift  tag 0.1.4
-//       == Blaizzy/mlx-audio-swift @ 580e952adda0cd6bdc5c04f402822adbb61525c8
-//
-// The tag number is fork-local bookkeeping, NOT upstream 0.1.4 — the commit
-// predates upstream v0.1.3. `.exact` keeps the resolution byte-identical to the
-// old revision pin. To move to a newer upstream commit: fetch upstream into the
-// fork, tag the new commit with the next fork version, and bump `.exact` here.
+// The MLX stack is canonical-first: RunAnywhere forks track the current Apple
+// and Blaizzy repositories and carry only the Bonsai/Prism kernels, native
+// Maple graph, and dependency-identity alignment needed by this SDK. Exact
+// fork-local tags ensure every direct and transitive SwiftPM edge resolves the
+// same MLX core instead of silently substituting the public package identity.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.4"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.5"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -149,29 +134,8 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioVAD", package: "mlx-audio-swift"),
 ]
 
-// PrismML's Bonsai 1-bit weights require kernels that are not yet available
-// in upstream mlx-swift. PrismML-Eng/mlx-swift @ 563961d is the maintained
-// Prism delta applied directly on top of upstream mlx-swift 0.31.6, which keeps
-// mlx-swift-lm 3.31.x API-compatible while enabling bits=1 / group_size=128
-// models.
-//
-// Consumed by version rather than by `revision:` for the same reason as
-// mlx-audio-swift above: a revision pin anywhere in this manifest makes the
-// whole package unusable via `from:`. PrismML-Eng cut no plain-semver tag (only
-// `v0.0.1-prism`, which SwiftPM still treats as an unstable prerelease), and we
-// only have pull access there, so the commit is mirrored + tagged in our org:
-//
-//   https://github.com/RunanywhereAI/mlx-swift  tag 0.31.7
-//       == PrismML-Eng/mlx-swift @ 563961dfcfd4589755190d285555e4f9eface890
-//
-// 0.31.7 is fork-local bookkeeping, NOT an upstream ml-explore release (their
-// line stops at 0.31.6). It is deliberately inside mlx-swift-lm 3.31.x's
-// `.upToNextMinor(from: "0.31.4")` window, and deliberately a version that
-// exists ONLY in our fork: the `mlx-swift` package identity is shared with
-// ml-explore/mlx-swift (SwiftPM warns about this and resolves to the location
-// declared here), so a fork-only version fails loudly instead of silently
-// resolving to upstream mlx-swift without the Prism 1-bit kernels.
-let prismMLXSwiftVersion: Version = "0.31.7"
+let runAnywhereMLXSwiftVersion: Version = "0.31.8"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.5"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -258,9 +222,12 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
         .package(
             url: "https://github.com/RunanywhereAI/mlx-swift.git",
-            exact: prismMLXSwiftVersion
+            exact: runAnywhereMLXSwiftVersion
         ),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
+        .package(
+            url: "https://github.com/RunanywhereAI/mlx-swift-lm.git",
+            exact: runAnywhereMLXSwiftLMVersion
+        ),
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS/VAD/diarization.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
@@ -748,22 +715,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "4cf87da6d9bcb979effa11575cbb24ef489300b794bb02fda96d9c4db21b4a36"
+                checksum: "7cb5937da941f7e29462551af8a9386297f6f80e0bdcb2a4d2ac19227e6457f9"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "72fe60e1f6166be794035d8c0c5a1f5b98b4b07928b7444c8046d665098d83a7"
+                checksum: "0597442fa030fe6eb69f2f01c63d098e090c0b60469847e2a2614bcf4d32210a"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "49d2b74b7786d38fce5de360c1066a49f6ae427b90f2414cdd6e697b88a9d7f0"
+                checksum: "990dd26b4e743a63068c1c107e44e78fb83b234bef4806971da89defb34e2733"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "95d0621fab7b99200acaca05cd3feceeaf36949751cceafc84e7a1bf7d3cf1ad"
+                checksum: "976029f81edd3ba95cd398fc3c2e6e45b6382ce8d128b0d43f103babab6baa81"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
@@ -773,7 +740,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "b68886c1f954809c31b556ee7daaa2ddec52da942857164cc445224333feaa1c"
+                checksum: "bfdd2718523e5b2c3826d0bb18e65e107f8ede6dc615e38c5836d01e21dd69a3"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",

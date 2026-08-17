@@ -35,6 +35,120 @@ private struct CatalogEntry {
 }
 
 private enum MLXCatalog {
+    private static let maplePreviewBaseURL =
+        "https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/d0a7314d6bf14c880201b599d7a701cfbc8717e6"
+
+    static let maplePreview = CatalogEntry(
+        id: "mlx-maple-preview-2bit",
+        alias: "mlx-maple-preview",
+        name: "DeepGrove Maple Preview 2-bit (MLX)",
+        category: .language,
+        framework: .mlx,
+        files: [
+            .init(
+                "\(maplePreviewBaseURL)/added_tokens.json",
+                "added_tokens.json",
+                sizeBytes: 707
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/chat_template.jinja",
+                "chat_template.jinja",
+                sizeBytes: 3_292
+            ),
+            .init("\(maplePreviewBaseURL)/config.json", "config.json", sizeBytes: 2_710),
+            .init("\(maplePreviewBaseURL)/merges.txt", "merges.txt", sizeBytes: 1_671_853),
+            .init(
+                "\(maplePreviewBaseURL)/model-00001-of-00003.safetensors",
+                "model-00001-of-00003.safetensors",
+                sizeBytes: 2_162_084_350
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/model-00002-of-00003.safetensors",
+                "model-00002-of-00003.safetensors",
+                sizeBytes: 2_187_444_586
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/model-00003-of-00003.safetensors",
+                "model-00003-of-00003.safetensors",
+                sizeBytes: 958_711_742
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/model-flashhead.safetensors",
+                "model-flashhead.safetensors",
+                sizeBytes: 6_087_456
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/model.safetensors.index.json",
+                "model.safetensors.index.json",
+                sizeBytes: 40_054
+            ),
+            .init(
+                "\(maplePreviewBaseURL)/special_tokens_map.json",
+                "special_tokens_map.json",
+                sizeBytes: 613
+            ),
+            .init("\(maplePreviewBaseURL)/tokenizer.json", "tokenizer.json", sizeBytes: 11_422_654),
+            .init(
+                "\(maplePreviewBaseURL)/tokenizer_config.json",
+                "tokenizer_config.json",
+                sizeBytes: 5_432
+            ),
+            .init("\(maplePreviewBaseURL)/vocab.json", "vocab.json", sizeBytes: 2_776_833),
+        ],
+        memoryRequirement: 5_330_252_282,
+        contextLength: 128_000,
+        supportsThinking: true
+    )
+
+    private static let bonsai17BBaseURL =
+        "https://huggingface.co/prism-ml/Bonsai-1.7B-mlx-1bit/resolve/fac480d016cf265838ad087f9f3f2abac4a2c1a5"
+
+    static let bonsai17B = CatalogEntry(
+        id: "mlx-bonsai-1.7b-1bit",
+        alias: "mlx-bonsai-1.7b",
+        name: "PrismML Bonsai 1.7B 1-bit (MLX)",
+        category: .language,
+        framework: .mlx,
+        files: [
+            .init("\(bonsai17BBaseURL)/added_tokens.json", "added_tokens.json", sizeBytes: 707),
+            .init("\(bonsai17BBaseURL)/chat_template.jinja", "chat_template.jinja", sizeBytes: 4_063),
+            .init("\(bonsai17BBaseURL)/config.json", "config.json", sizeBytes: 2_939),
+            .init("\(bonsai17BBaseURL)/generation_config.json", "generation_config.json", sizeBytes: 313),
+            .init("\(bonsai17BBaseURL)/merges.txt", "merges.txt", sizeBytes: 1_671_853),
+            .init("\(bonsai17BBaseURL)/model.safetensors", "model.safetensors", sizeBytes: 269_060_904),
+            .init("\(bonsai17BBaseURL)/model.safetensors.index.json", "model.safetensors.index.json", sizeBytes: 49_731),
+            .init("\(bonsai17BBaseURL)/special_tokens_map.json", "special_tokens_map.json", sizeBytes: 613),
+            .init("\(bonsai17BBaseURL)/tokenizer.json", "tokenizer.json", sizeBytes: 11_422_650),
+            .init("\(bonsai17BBaseURL)/tokenizer_config.json", "tokenizer_config.json", sizeBytes: 348),
+            .init("\(bonsai17BBaseURL)/vocab.json", "vocab.json", sizeBytes: 2_776_833),
+        ],
+        memoryRequirement: 284_990_954,
+        contextLength: 4_096,
+        supportsThinking: true
+    )
+
+    private static let ternaryBonsai17BBaseURL =
+        "https://huggingface.co/prism-ml/Ternary-Bonsai-1.7B-mlx-2bit/resolve/5f3e306330f636cfc6c6241b4850fae6711c5985"
+
+    static let ternaryBonsai17B = CatalogEntry(
+        id: "mlx-ternary-bonsai-1.7b-2bit",
+        alias: "mlx-ternary-bonsai-1.7b",
+        name: "PrismML Ternary-Bonsai 1.7B 2-bit (MLX)",
+        category: .language,
+        framework: .mlx,
+        files: [
+            .init("\(ternaryBonsai17BBaseURL)/chat_template.jinja", "chat_template.jinja", sizeBytes: 4_063),
+            .init("\(ternaryBonsai17BBaseURL)/config.json", "config.json", sizeBytes: 2_939),
+            .init("\(ternaryBonsai17BBaseURL)/model.safetensors", "model.safetensors", sizeBytes: 484_049_216),
+            .init("\(ternaryBonsai17BBaseURL)/model.safetensors.index.json", "model.safetensors.index.json", sizeBytes: 49_731),
+            .init("\(ternaryBonsai17BBaseURL)/tokenizer.json", "tokenizer.json", sizeBytes: 11_422_650),
+            .init("\(ternaryBonsai17BBaseURL)/tokenizer_config.json", "tokenizer_config.json", sizeBytes: 348),
+        ],
+        memoryRequirement: 495_528_947,
+        contextLength: 4_096,
+        supportsThinking: true
+    )
+
     static let qwen3LLM = CatalogEntry(
         id: "mlx-qwen3-0.6b-4bit",
         alias: "mlx-qwen3",
@@ -558,6 +672,9 @@ private enum MLXCatalog {
     )
 
     static let entries = [
+        maplePreview,
+        bonsai17B,
+        ternaryBonsai17B,
         qwen3LLM,
         nemotronNano8BLLM,
         nemotronMini4BLLM,

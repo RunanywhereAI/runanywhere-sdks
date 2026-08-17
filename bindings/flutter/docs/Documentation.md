@@ -534,10 +534,10 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 ## Versioning
 
-- Canonical SDK version: `RunAnywhere.version` (currently `0.20.22`).
+- Canonical SDK version: `RunAnywhere.version` (currently `0.20.23`).
 - Native commons version: vendored `RACommons` build (`0.1.6`).
-- llama.cpp engine: `b7199`.
-- ONNX Runtime: `1.24.3`.
+- llama.cpp engine: `runanywhere-b10453.4`.
+- ONNX Runtime: `1.28.0`.
 
 All four Flutter packages share the same version, bumped together via the
 root `scripts/release/sync-versions.sh`.

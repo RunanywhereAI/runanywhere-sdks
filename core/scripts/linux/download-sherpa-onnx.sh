@@ -14,17 +14,20 @@
 #   - aarch64 (ARM 64-bit, e.g., Raspberry Pi 5)
 # =============================================================================
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-DEST_DIR="${ROOT_DIR}/third_party/sherpa-onnx-linux"
+DEST_DIR="${RAC_SHERPA_DIR:-${ROOT_DIR}/third_party/sherpa-onnx-linux}"
 
 # Load versions from centralized VERSIONS file
 source "${ROOT_DIR}/scripts/load-versions.sh"
 
 VERSION="${SHERPA_ONNX_VERSION_LINUX:-1.12.18}"
-ARCH=$(uname -m)
+REPOSITORY="${SHERPA_ONNX_REPO_DESKTOP:?SHERPA_ONNX_REPO_DESKTOP is not set}"
+RELEASE_TAG="${SHERPA_ONNX_RELEASE_TAG_DESKTOP:?SHERPA_ONNX_RELEASE_TAG_DESKTOP is not set}"
+SOURCE_COMMIT="${SHERPA_ONNX_COMMIT_DESKTOP:?SHERPA_ONNX_COMMIT_DESKTOP is not set}"
+ARCH="${RAC_PLATFORM_ARCH:-$(uname -m)}"
 
 # Colors
 RED='\033[0;31m'
@@ -51,7 +54,7 @@ print_error() {
 
 FORCE_DOWNLOAD=false
 
-while [[ "$1" == --* ]]; do
+while [[ "${1:-}" == --* ]]; do
     case "$1" in
         --force)
             FORCE_DOWNLOAD=true
@@ -73,7 +76,11 @@ done
 # Check if already downloaded
 # =============================================================================
 
-if [ -d "${DEST_DIR}/lib" ] && [ "$FORCE_DOWNLOAD" = false ]; then
+if [ -f "${DEST_DIR}/PROVENANCE.txt" ] && \
+   grep -Fxq "sherpa_onnx_version=${VERSION}" "${DEST_DIR}/PROVENANCE.txt" && \
+   grep -Fxq "runanywhere_source_commit=${SOURCE_COMMIT}" "${DEST_DIR}/PROVENANCE.txt" && \
+   grep -Fxq "onnxruntime_version=${ONNX_VERSION_LINUX}" "${DEST_DIR}/PROVENANCE.txt" && \
+   [ "$FORCE_DOWNLOAD" = false ]; then
     print_success "Sherpa-ONNX already downloaded at ${DEST_DIR}"
     echo "Use --force to re-download"
     exit 0
@@ -84,18 +91,19 @@ fi
 # =============================================================================
 
 if [ "$ARCH" = "aarch64" ]; then
-    URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${VERSION}/sherpa-onnx-v${VERSION}-linux-aarch64-shared-cpu.tar.bz2"
-    ARCHIVE_NAME="sherpa-onnx-v${VERSION}-linux-aarch64-shared-cpu"
+    ASSET_NAME="sherpa-onnx-v${VERSION}-linux-aarch64-shared-rac-ort${ONNX_VERSION_LINUX}.tar.bz2"
+    ARCHIVE_NAME="${ASSET_NAME%.tar.bz2}"
+    EXPECTED_SHA256="${SHERPA_ONNX_LINUX_AARCH64_SHA256:?SHERPA_ONNX_LINUX_AARCH64_SHA256 is not set}"
 elif [ "$ARCH" = "x86_64" ]; then
-    # Note: sherpa-onnx publishes Linux x64 as `-shared` (no `-cpu` suffix);
-    # aarch64 keeps the `-shared-cpu` suffix.
-    URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${VERSION}/sherpa-onnx-v${VERSION}-linux-x64-shared.tar.bz2"
-    ARCHIVE_NAME="sherpa-onnx-v${VERSION}-linux-x64-shared"
+    ASSET_NAME="sherpa-onnx-v${VERSION}-linux-x64-shared-rac-ort${ONNX_VERSION_LINUX}.tar.bz2"
+    ARCHIVE_NAME="${ASSET_NAME%.tar.bz2}"
+    EXPECTED_SHA256="${SHERPA_ONNX_LINUX_X64_SHA256:?SHERPA_ONNX_LINUX_X64_SHA256 is not set}"
 else
     print_error "Unsupported architecture: $ARCH"
     echo "Supported architectures: x86_64, aarch64"
     exit 1
 fi
+URL="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
 
 # =============================================================================
 # Download and Extract
@@ -127,6 +135,13 @@ print_step "Downloading Sherpa-ONNX v${VERSION}..."
 # up being passed to tar/bzip2 below as a 9-byte "Not Found" file.
 curl -L --fail -o "${TEMP_DIR}/sherpa-onnx.tar.bz2" "${URL}"
 
+ACTUAL_SHA256="$(sha256sum "${TEMP_DIR}/sherpa-onnx.tar.bz2" | awk '{print $1}')"
+if [ "${ACTUAL_SHA256}" != "${EXPECTED_SHA256}" ]; then
+    print_error "Archive SHA-256 mismatch: expected ${EXPECTED_SHA256}, got ${ACTUAL_SHA256}"
+    exit 1
+fi
+print_success "Verified archive SHA-256: ${ACTUAL_SHA256}"
+
 # Sanity-check the archive size — anything under 1 MB is almost certainly an
 # error page that slipped past --fail (e.g. proxy-mediated redirect).
 DL_SIZE=$(stat -c%s "${TEMP_DIR}/sherpa-onnx.tar.bz2" 2>/dev/null || stat -f%z "${TEMP_DIR}/sherpa-onnx.tar.bz2")
@@ -142,14 +157,6 @@ tar -xjf "${TEMP_DIR}/sherpa-onnx.tar.bz2" -C "${TEMP_DIR}"
 # Move contents to destination (strip the top-level directory)
 mv "${TEMP_DIR}/${ARCHIVE_NAME}"/* "${DEST_DIR}/"
 
-# Download C API headers (not included in pre-built binaries since v1.12.23+)
-if [ ! -d "${DEST_DIR}/include/sherpa-onnx/c-api" ]; then
-    print_step "Downloading C API headers..."
-    mkdir -p "${DEST_DIR}/include/sherpa-onnx/c-api"
-    curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${VERSION}/sherpa-onnx/c-api/c-api.h" \
-        -o "${DEST_DIR}/include/sherpa-onnx/c-api/c-api.h"
-fi
-
 # =============================================================================
 # Verify Installation
 # =============================================================================
@@ -163,6 +170,13 @@ fi
 
 if [ ! -f "${DEST_DIR}/include/sherpa-onnx/c-api/c-api.h" ]; then
     print_error "C API header not found!"
+    exit 1
+fi
+if [ ! -f "${DEST_DIR}/PROVENANCE.txt" ] || \
+   ! grep -Fxq "sherpa_onnx_version=${VERSION}" "${DEST_DIR}/PROVENANCE.txt" || \
+   ! grep -Fxq "runanywhere_source_commit=${SOURCE_COMMIT}" "${DEST_DIR}/PROVENANCE.txt" || \
+   ! grep -Fxq "onnxruntime_version=${ONNX_VERSION_LINUX}" "${DEST_DIR}/PROVENANCE.txt"; then
+    print_error "Embedded release provenance is missing or does not match the pinned runtime stack."
     exit 1
 fi
 

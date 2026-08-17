@@ -127,6 +127,32 @@ constexpr CatalogFile kSherpaCanary180MFiles[] = {
      "tokens.txt", true, 53555LL},
 };
 
+// Sherpa 1.13.5 is required for the corrected NeMo streaming-transducer
+// decoder. Keep every URL on the immutable HF revision and verify each large
+// artifact independently so a mutable model update cannot enter a release.
+constexpr CatalogFile kSherpaNemotronStreamingAsrFiles[] = {
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11/"
+     "resolve/424ce58898995b713f84341f2e1492f9207a26aa/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 657601518LL,
+     "f79c3fcc149f268b54b7d5754bdc2ba5c47c16b1fc70d15728a56f6efbf60ca5"},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11/"
+     "resolve/424ce58898995b713f84341f2e1492f9207a26aa/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 14978075LL,
+     "19f9c98fc6d0a2c33a65a43b36fdb2e914c26c0aa9764be3aebc502a1e982fb0"},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11/"
+     "resolve/424ce58898995b713f84341f2e1492f9207a26aa/joiner.int8.onnx",
+     "joiner.int8.onnx", true, 9504438LL,
+     "4101c7c679a0bc30483794b27a059e34e79232aa2068d78d51231a22c8b0d7ce"},
+    {"https://huggingface.co/csukuangfj2/"
+     "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11/"
+     "resolve/424ce58898995b713f84341f2e1492f9207a26aa/tokens.txt",
+     "tokens.txt", true, 131440LL,
+     "729cc103155bafa785f9cd45746cd41cabe97eab7182fc04d594129587958f8a"},
+};
+
 // The upstream OpenVoiceOS export omits three metadata_props entries Sherpa
 // requires, so it cannot be loaded as published. This repo is that export with
 // the entries added; provenance and a reproduction script live in its model
@@ -172,6 +198,53 @@ constexpr CatalogFile kMlxQwen3_06BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
      "vocab.json",
      "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxMaplePreviewFiles[] = {
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/added_tokens.json",
+     "added_tokens.json", true, 707LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/chat_template.jinja",
+     "chat_template.jinja", true, 3292LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/config.json",
+     "config.json", true, 2710LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/merges.txt",
+     "merges.txt", true, 1671853LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model-00001-of-00003.safetensors",
+     "model-00001-of-00003.safetensors", true, 2162084350LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model-00002-of-00003.safetensors",
+     "model-00002-of-00003.safetensors", true, 2187444586LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model-00003-of-00003.safetensors",
+     "model-00003-of-00003.safetensors", true, 958711742LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model-flashhead.safetensors",
+     "model-flashhead.safetensors", true, 6087456LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true, 40054LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/special_tokens_map.json",
+     "special_tokens_map.json", true, 613LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/tokenizer.json",
+     "tokenizer.json", true, 11422654LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/tokenizer_config.json",
+     "tokenizer_config.json", true, 5432LL},
+    {"https://huggingface.co/deepgrove/maple-preview-2bit-mlx/resolve/"
+     "d0a7314d6bf14c880201b599d7a701cfbc8717e6/vocab.json",
+     "vocab.json", true, 2776833LL},
 };
 
 constexpr CatalogFile kMlxNemotronNano8BFiles[] = {
@@ -358,7 +431,7 @@ constexpr CatalogFile kMlxFastVlm05BFiles[] = {
 };
 
 // LiquidAI's own MLX 4-bit export. config.json model_type is "lfm2_vl", which
-// the pinned mlx-swift-lm 3.31.4 registers in VLMModelFactory (together with
+// the pinned mlx-swift-lm 3.31.5 registers in VLMModelFactory (together with
 // the "Lfm2VlProcessor" processor class this repo declares). It ships no
 // merges.txt/vocab.json — tokenizer.json is the self-contained fast-tokenizer
 // format — and its processor lives in processor_config.json rather than
@@ -755,7 +828,7 @@ constexpr CatalogFile kNemotronOmniReasoningFiles[] = {
 };
 
 // mlx-community/gemma-4-e2b-it-4bit — config.json model_type "gemma4",
-// registered in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry/VLMTypeRegistry
+// registered in the pinned mlx-swift-lm 3.31.5 LLMTypeRegistry/VLMTypeRegistry
 // alike. File list + sizes verified via HF API blobs this session.
 constexpr CatalogFile kMlxGemma4E2BFiles[] = {
     {"https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit/resolve/"
@@ -973,7 +1046,7 @@ constexpr CatalogFile kMlxGemma4_31BFiles[] = {
 };
 
 // mlx-community/Qwen3.6-35B-A3B-4bit (MoE) — config.json model_type
-// "qwen3_5_moe", registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+// "qwen3_5_moe", registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
 constexpr CatalogFile kMlxQwen3_6_35BA3BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3.6-35B-A3B-4bit/resolve/"
      "38740b847e4cb78f352aba30aa41c76e08e6eb46/"
@@ -1038,7 +1111,7 @@ constexpr CatalogFile kMlxQwen3_6_35BA3BFiles[] = {
 };
 
 // mlx-community/Qwen3.8-27B-4bit (dense) — config.json model_type "qwen3_5",
-// registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+// registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
 constexpr CatalogFile kMlxQwen3_8_27BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/resolve/"
      "3e6447f082e89cc7f0bc6e5441afd38dfce760ff/"
@@ -1095,7 +1168,7 @@ constexpr CatalogFile kMlxQwen3_8_27BFiles[] = {
 };
 
 // IBM Granite 4.1 MLX — config.json model_type "granite" (registered in
-// mlx-swift-lm 3.31.4's LLMTypeRegistry). File set verified via HF API.
+// mlx-swift-lm 3.31.5's LLMTypeRegistry). File set verified via HF API.
 constexpr CatalogFile kMlxGranite4_1_3BFiles[] = {
     {"https://huggingface.co/mlx-community/granite-4.1-3b-4bit/resolve/"
      "b1b476b5a17c46b7d6cd663b4a8ed44b66720aef/"
@@ -1275,13 +1348,10 @@ constexpr CatalogEntry kCatalog[] = {
      "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/"
      "Qwen3-4B-Q4_K_M.gguf",
      nullptr, 0, 2560 * MB, 4096, true},
-    // PrismML Bonsai family Q1_0 — needs PrismML llama.cpp fork
-    // (LLAMACPP_VERSION=prism-b9591-62061f9). Exact artifact byte sizes.
-    // NOTE: Ternary-Bonsai GGUF (Q2_0/PQ2_0) is intentionally NOT registered —
-    // verified via `rcli run hf.co/prism-ml/Ternary-Bonsai-1.7B-gguf:Q2_0`:
-    // the pinned fork rejects it with "invalid ggml type 142" (it only added
-    // Q1_0/plain-Bonsai support, not Ternary-Bonsai's tensor encoding).
-    // Ternary-Bonsai MLX (below) works fine.
+    // RunAnywhere's canonical-based llama.cpp fork supports PrismML's Q1_0
+    // Bonsai artifacts. Ternary-Bonsai uses the explicitly canonical
+    // Q2_0_g64 artifacts below; legacy 128-value Q2_0 remains unsupported.
+    // Exact artifact byte sizes.
     {"bonsai-1.7b-q1_0", "bonsai-1.7b", "Bonsai-1.7B 1-bit Q1_0 (CPU)",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
      v1::MODEL_FORMAT_GGUF,
@@ -1306,6 +1376,35 @@ constexpr CatalogEntry kCatalog[] = {
      "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/"
      "Bonsai-27B-Q1_0.gguf",
      nullptr, 0, 3803452480LL, 4096, true},
+    {"ternary-bonsai-1.7b-q2_0-g64", "ternary-bonsai-1.7b",
+     "Ternary-Bonsai-1.7B Q2_0 g64", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/prism-ml/Ternary-Bonsai-1.7B-gguf/resolve/"
+     "983b5dec2ff16aab79990711ba0f828a499a7e6a/"
+     "Ternary-Bonsai-1.7B-Q2_0_g64.gguf",
+     nullptr, 0, 490163968LL, 4096, true},
+    {"ternary-bonsai-4b-q2_0-g64", "ternary-bonsai-4b",
+     "Ternary-Bonsai-4B Q2_0 g64", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/prism-ml/Ternary-Bonsai-4B-gguf/resolve/"
+     "a3eb42bafe873f9686bc97486c43b72ef7d75ec8/"
+     "Ternary-Bonsai-4B-Q2_0_g64.gguf",
+     nullptr, 0, 1137806656LL, 4096, true},
+    {"ternary-bonsai-8b-q2_0-g64", "ternary-bonsai-8b",
+     "Ternary-Bonsai-8B Q2_0 g64", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/prism-ml/Ternary-Bonsai-8B-gguf/resolve/"
+     "c2aefbeb4b24469cd11579c3384b990404c17a30/"
+     "Ternary-Bonsai-8B-Q2_0_g64.gguf",
+     nullptr, 0, 2310125920LL, 4096, true},
+    {"maple-preview-tq1_0-q4_k", "maple-preview",
+     "DeepGrove Maple Preview TQ1_0 + Q4_K head (CPU)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/"
+     "f5466f918e0c50cdb9d4d47a6f35813509a42a30/"
+     "maple-preview-TQ1_0-head-Q4_K.gguf",
+     nullptr, 0, 4984016416LL, 4096, true},
     {"llama-3.2-3b", "llama3.2", "Llama 3.2 3B Instruct Q4_K_M",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
      v1::MODEL_FORMAT_GGUF,
@@ -1476,6 +1575,12 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
      v1::MODEL_FORMAT_ONNX, nullptr, kSherpaCanary180MFiles, 3, 207170046LL, 0,
      false},
+    {"sherpa-nemotron-3.5-asr-streaming-0.6b-320ms-int8",
+     "nemotron-asr-streaming",
+     "NVIDIA Nemotron 3.5 Streaming ASR 0.6B 320ms INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaNemotronStreamingAsrFiles, 4,
+     682215471LL, 0, false},
     {"vits-piper-en_US-lessac-medium", "piper",
      "Piper TTS US English (Lessac Medium)",
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_SHERPA,
@@ -1575,6 +1680,10 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
      4096, true},
+    {"mlx-maple-preview-2bit", "mlx-maple-preview",
+     "DeepGrove Maple Preview 2-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxMaplePreviewFiles, 13, 5330252282LL, 128000, true},
     {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", "mlx-nemotron-nano",
      "NVIDIA Llama 3.1 Nemotron Nano 8B 4-bit (MLX)",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
@@ -1585,8 +1694,9 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronMini4BFiles, 6,
      2392679103LL, 4096, false},
-    // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
-    // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
+    // PrismML Bonsai family 1-bit MLX. Needs the narrow Prism kernels carried
+    // by the canonical-first RunAnywhere MLX/mlx-swift forks pinned in the
+    // Swift manifests and resolved files.
     {"mlx-bonsai-1.7b-1bit", "mlx-bonsai-1.7b", "MLX Bonsai-1.7B 1-bit",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxBonsai1_7B1BitFiles, 8,
@@ -1687,7 +1797,7 @@ constexpr CatalogEntry kCatalog[] = {
 
     // Google Gemma 4 family (MLX). config.json model_type "gemma4" /
     // "gemma4_unified" (12B), both registered in the pinned mlx-swift-lm
-    // 3.31.4 LLMTypeRegistry/VLMTypeRegistry — verified by reading the
+    // 3.31.5 LLMTypeRegistry/VLMTypeRegistry — verified by reading the
     // checked-out package source this session (not assumed). Licensed under
     // Apache 2.0; preserve the upstream license and attribution notices.
     {"mlx-gemma-4-e2b-it-4bit", "mlx-gemma4-e2b", "Gemma 4 E2B IT 4-bit (MLX)",
@@ -1714,7 +1824,7 @@ constexpr CatalogEntry kCatalog[] = {
      18412016676LL, 4096, false},
 
     // Qwen3.6-35B-A3B (MoE) — config.json model_type "qwen3_5_moe",
-    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    // registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
     {"mlx-qwen3.6-35b-a3b-4bit", "mlx-qwen3.6-35b",
      "Qwen3.6 35B-A3B 4-bit (MLX, MoE)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -1726,7 +1836,7 @@ constexpr CatalogEntry kCatalog[] = {
      16054541349LL, 4096, true},
 
     // IBM Granite 4.1 family (MLX). config.json model_type "granite",
-    // registered in mlx-swift-lm 3.31.4's LLMTypeRegistry.
+    // registered in mlx-swift-lm 3.31.5's LLMTypeRegistry.
     {"mlx-granite-4.1-3b-4bit", "mlx-granite4.1-3b",
      "IBM Granite 4.1 3B 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -1746,7 +1856,7 @@ constexpr CatalogEntry kCatalog[] = {
     // Muse Glimmer 30B (MLX) and Nemotron-3-Nano-Omni-30B-A3B-Reasoning (MLX)
     // are deliberately NOT registered here. Their config.json model_types
     // ("muse_glimmer" and "NemotronH_Nano_Omni_Reasoning_V3" respectively) are
-    // NOT present in the pinned mlx-swift-lm 3.31.4 LLMTypeRegistry /
+    // NOT present in the pinned mlx-swift-lm 3.31.5 LLMTypeRegistry /
     // VLMTypeRegistry (checked the checked-out package source directly:
     // .build/checkouts/mlx-swift-lm/Libraries/{MLXLLM,MLXVLM}/*Factory.swift —
     // only "nemotron_h" exists, a different string). Loading either would fail

@@ -5,6 +5,14 @@ All notable changes to the RunAnywhere ONNX Backend will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.23] - 2026-08-16
+
+### Changed
+
+- Upgraded ONNX Runtime to 1.28.0 and Sherpa-ONNX to 1.13.5 across supported
+  non-Windows platforms.
+- Added Nemotron 3.5 Streaming ASR and Supertonic v3 compatibility.
+
 ## [0.20.22] - 2026-08-15
 
 ### Changed

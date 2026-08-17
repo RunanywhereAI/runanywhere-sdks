@@ -66,9 +66,22 @@ fi
 # CI sets RAC_ALLOW_NEURT_STUB=1: it only needs to prove the build compiles and links.
 if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
     _neurt_root_probe="${NEURT_ROOT:-${REPO_ROOT}/../neurun}"
-    if [ ! -f "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" ]; then
-        echo "error: packaging the Swift SDK requires a real NeuRT engine, but the neurun checkout was not found." >&2
-        echo "  looked for: ${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" >&2
+    _neurt_required_paths=(
+        "${_neurt_root_probe}/CMakeLists.txt"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_stt_ops_neurt.cpp"
+        "${_neurt_root_probe}/NeuRT/src/sdk/rac_diffusion_coreml.mm"
+    )
+    _neurt_missing_paths=()
+    for _neurt_required_path in "${_neurt_required_paths[@]}"; do
+        [ -f "${_neurt_required_path}" ] || _neurt_missing_paths+=("${_neurt_required_path}")
+    done
+    if [ "${#_neurt_missing_paths[@]}" -ne 0 ]; then
+        echo "error: packaging the Swift SDK requires a complete, routable NeuRT engine checkout." >&2
+        echo "  missing required path(s):" >&2
+        for _neurt_missing_path in "${_neurt_missing_paths[@]}"; do
+            echo "    ${_neurt_missing_path}" >&2
+        done
         echo "  Set NEURT_ROOT=/path/to/neurun, or set RAC_ALLOW_NEURT_STUB=1 to package a" >&2
         echo "  non-routable stub on purpose (build verification only — NOT shippable)." >&2
         exit 1
@@ -1720,16 +1733,16 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${ONNX_MAC_LIB}"
     sanitize_and_validate_archive_host_paths \
         "${ONNX_DEV_LIB}" "ios-device RABackendONNX" \
-        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
-        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 552 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 108
     sanitize_and_validate_archive_host_paths \
         "${ONNX_SIM_LIB}" "ios-simulator RABackendONNX" \
-        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
-        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 552 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 108
     sanitize_and_validate_archive_host_paths \
         "${ONNX_MAC_LIB}" "macos RABackendONNX" \
         "/Users/runner/work/onnxruntime-build/onnxruntime-build" \
-        "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1632
+        "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1772
     build_xcframework_from_paths_with_macos "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "${ONNX_MAC_LIB}" "RABackendONNX.xcframework"
 else
     run rm -rf "${DEST}/RABackendONNX.xcframework"
@@ -1751,11 +1764,11 @@ if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_DEV_LIB}" "ios-device RABackendSherpa" \
             "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
-            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+            "/runanywhere/vendor/sherpa-onnx/src/source" 280
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_SIM_LIB}" "ios-simulator RABackendSherpa" \
             "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
-            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+            "/runanywhere/vendor/sherpa-onnx/src/source" 280
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_MAC_LIB}" "macos RABackendSherpa"
         build_xcframework_from_paths_with_macos "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "${SHERPA_MAC_LIB}" "RABackendSherpa.xcframework"

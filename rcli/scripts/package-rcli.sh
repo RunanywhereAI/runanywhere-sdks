@@ -110,47 +110,6 @@ artifact.write_bytes(payload)
 PY
 }
 
-sanitize_pinned_host_path() {
-    local artifact="$1"
-    local source="$2"
-    local replacement="$3"
-    local expected_count="$4"
-    local raw_digest="$5"
-    local transformed_digest="$6"
-    local label="$7"
-
-    python3 - "${artifact}" "${source}" "${replacement}" "${expected_count}" \
-        "${raw_digest}" "${transformed_digest}" "${label}" <<'PY'
-from hashlib import sha256
-from pathlib import Path
-import sys
-
-artifact = Path(sys.argv[1])
-source = sys.argv[2].encode()
-replacement = sys.argv[3].encode()
-expected_count = int(sys.argv[4])
-raw_digest, transformed_digest, label = sys.argv[5:8]
-payload = artifact.read_bytes()
-
-if len(source) != len(replacement):
-    raise SystemExit(f"ERROR: {label} replacement changes binary offsets")
-
-digest = sha256(payload).hexdigest()
-if digest == raw_digest:
-    if payload.count(source) != expected_count or replacement in payload:
-        raise SystemExit(f"ERROR: {label} embedded-path inventory drifted")
-    payload = payload.replace(source, replacement)
-    if sha256(payload).hexdigest() != transformed_digest:
-        raise SystemExit(f"ERROR: {label} sanitized digest mismatch")
-    artifact.write_bytes(payload)
-elif digest != transformed_digest:
-    raise SystemExit(f"ERROR: unreviewed {label} bytes")
-
-if payload.count(source) or payload.count(replacement) != expected_count:
-    raise SystemExit(f"ERROR: {label} path sanitization was incomplete")
-PY
-}
-
 rm -rf "${STAGE}"
 mkdir -p "${STAGE}/bin" "${STAGE}/lib"
 cp "${BINARY}" "${STAGE}/bin/rcli"
@@ -222,9 +181,15 @@ case "${PLATFORM}" in
                     src="${STAGE}/lib/${local_name}"
                 else
                 # Release archives may contain a dSYM DWARF file with the same
-                # basename as the linked dylib. Search only real lib payloads
+                # basename as the linked dylib. Search only library entries
                 # so filesystem traversal order cannot select debug symbols.
-                    src="$(find "${BUILD_DIR}" -path "*/lib/${local_name}" -type f \
+                    # Versioned runtime archives use symlink chains such as
+                    # libonnxruntime.1.dylib -> libonnxruntime.1.28.0.dylib.
+                    # -type f drops the linked name that Mach-O records, so
+                    # accept both regular files and symlinks here. The -f
+                    # validation below still rejects broken links.
+                    src="$(find "${BUILD_DIR}" -path "*/lib/${local_name}" \
+                        \( -type f -o -type l \) \
                         ! -path "*/.dSYM/*" 2>/dev/null | LC_ALL=C sort | head -1)"
                 fi
             fi
@@ -236,22 +201,6 @@ case "${PLATFORM}" in
                 cp "${src}" "${STAGE}/lib/${local_name}"
             fi
             install_name_tool -change "${dep}" "@rpath/${local_name}" "${STAGE}/bin/rcli"
-        done
-
-        # The pinned ONNX Runtime 1.24.4 arm64 dylib embeds its upstream CI
-        # checkout prefix in __FILE__ strings. Rewrite only that reviewed
-        # byte prefix, with raw/transformed digests and occurrence count
-        # pinned so an upstream artifact change fails closed.
-        for library in "${STAGE}"/lib/libonnxruntime*.dylib; do
-            [ -e "${library}" ] || continue
-            sanitize_pinned_host_path \
-                "${library}" \
-                "/Users/cloudtest/vss/_work/" \
-                "/runanywhere/vendor/onnxrt/" \
-                843 \
-                "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289" \
-                "3e4f1ac4cef99693c95532f38b436bd106156504c4dd51595af2e51d3c3d00ee" \
-                "ONNX Runtime 1.24.4 arm64 dylib"
         done
 
         # A copied Homebrew dylib may retain an absolute install ID or refer
@@ -334,20 +283,6 @@ case "${PLATFORM}" in
         for src in ${deps}; do
             [ -f "${src}" ] && cp -L "${src}" "${STAGE}/lib/$(basename "${src}")"
         done
-        # The pinned Sherpa-ONNX 1.13.2 x64 C API library carries its
-        # upstream GitHub Actions source root. Apply the same exact,
-        # byte-preserving fail-closed policy as the macOS runtime input.
-        for library in "${STAGE}"/lib/libsherpa-onnx-c-api.so*; do
-            [ -e "${library}" ] || continue
-            sanitize_pinned_host_path \
-                "${library}" \
-                "/home/runner/work/sherpa-onnx/sherpa-onnx" \
-                "/runanywhere/vendor/sherpa-onnx/src/root0" \
-                250 \
-                "744cabaf8bdc079414e3f07d3cdf3550a5c74798a4b50c789468e7b038b7907f" \
-                "b6fecd4a48bea06c50bf6bfd69e08ff241071b47251f90b8549491a120af0498" \
-                "Sherpa-ONNX 1.13.2 x64 C API library"
-        done
         command -v patchelf >/dev/null 2>&1 || {
             echo "ERROR: patchelf is required to make the Linux package relocatable" >&2
             exit 1
@@ -370,16 +305,19 @@ case "${PLATFORM}" in
     macos-*|linux-*) "${STAGE}/bin/rcli" version >/dev/null ;;
 esac
 
-# Release artifacts must not disclose the packager's checkout location. Keep
-# this gate here so both CI smoke packages and tagged releases fail closed.
+# Release artifacts must not disclose the packager's checkout, home, or temp
+# locations. Check the current host's concrete prefixes instead of rejecting
+# every /Users/<name> or /home/<name> string: official third-party binaries
+# (including ONNX Runtime) can legitimately retain their upstream producer's
+# source paths.
 while IFS= read -r -d '' artifact; do
     if LC_ALL=C grep -aF -q -- "${REPO_ROOT}" "${artifact}"; then
         echo "ERROR: packaged artifact embeds the local checkout path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
-    if LC_ALL=C grep -aE -q -- '/Users/[^/]+/|/home/[^/]+/|/var/folders/' "${artifact}" \
-        || LC_ALL=C grep -aE -q -- "[A-Za-z]:\\\\Users\\\\" "${artifact}"; then
-        echo "ERROR: packaged artifact embeds a developer home path: ${artifact#"${STAGE}/"}" >&2
+    if { [ -n "${HOME:-}" ] && LC_ALL=C grep -aF -q -- "${HOME%/}/" "${artifact}"; } \
+        || { [ -n "${TMPDIR:-}" ] && LC_ALL=C grep -aF -q -- "${TMPDIR%/}/" "${artifact}"; }; then
+        echo "ERROR: packaged artifact embeds a packager host path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
 done < <(find "${STAGE}/bin" "${STAGE}/lib" -type f -print0)

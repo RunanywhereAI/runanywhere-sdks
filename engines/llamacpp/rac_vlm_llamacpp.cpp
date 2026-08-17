@@ -89,11 +89,9 @@ struct MtmdBitmapDelete {
 };
 using MtmdBitmapPtr = std::unique_ptr<mtmd_bitmap, MtmdBitmapDelete>;
 
-// PrismML llama.cpp (prism-b9591 / mtmd before the video-helper split) returns
-// mtmd_bitmap* directly from mtmd_helper_bitmap_init_from_file. Upstream
-// b9959+ returns a {bitmap, video_ctx} wrapper; we pin PrismML for Bonsai
-// Q1_0, so stay on the bitmap-only path. Video frames are still loaded as
-// bitmaps when the helper auto-detects them.
+// The canonical mtmd helper returns a {bitmap, video_ctx} wrapper. This backend
+// accepts still images only, so file-backed video contexts are rejected and
+// released at the input boundary below.
 struct MtmdChunksDelete {
     void operator()(mtmd_input_chunks* c) const {
         if (c)
@@ -635,17 +633,19 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
         // Token-level repetition penalty + frequency/presence penalties.
         // Repetition penalty is caller-controlled now; freq/pres
         // stay at the pre-IDL engine defaults until callers request a knob.
-        llama_sampler_chain_add(backend->sampler,
-                                llama_sampler_init_penalties(256, repetition_penalty, 0.1f, 0.1f));
+        const llama_vocab* vocab = llama_model_get_vocab(backend->model);
+        llama_sampler_chain_add(
+            backend->sampler,
+            llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 256,
+                                         repetition_penalty, 0.1f, 0.1f));
 
         // DRY sampler: catches n-gram (sequence) repetition like "gó gó gó" where
         // individual tokens may alternate. Multiplier=0.8, base=1.75,
         // allowed_length=2, last_n=256.
-        const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         static const char* dry_breakers[] = {"\n", ":", "\"", "*"};
         llama_sampler_chain_add(
-            backend->sampler, llama_sampler_init_dry(vocab, llama_model_n_ctx_train(backend->model),
-                                                     0.8f, 1.75f, 2, 256, dry_breakers, 4));
+            backend->sampler,
+            llama_sampler_init_dry(vocab, 0.8f, 1.75f, 2, 256, dry_breakers, 4));
 
         // top_k only when caller requested it; mirrors LLM backend's
         // build_sampler_chain() in engines/llamacpp/llamacpp_backend.cpp.
@@ -766,9 +766,18 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
     if (image && backend->mtmd_ctx) {
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
-            // PrismML mtmd: returns mtmd_bitmap* (not a {bitmap,video} wrapper).
-            bitmap.reset(
-                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false));
+            auto loaded =
+                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false);
+            if (loaded.video_ctx) {
+                if (loaded.bitmap) {
+                    mtmd_bitmap_free(loaded.bitmap);
+                }
+                mtmd_helper_video_free(loaded.video_ctx);
+                RAC_LOG_ERROR(LOG_CAT,
+                              "Video input is not supported by the RunAnywhere VLM API");
+                return RAC_ERROR_INVALID_INPUT;
+            }
+            bitmap.reset(loaded.bitmap);
         } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
             bitmap.reset(mtmd_bitmap_init(image->width, image->height, image->pixel_data));

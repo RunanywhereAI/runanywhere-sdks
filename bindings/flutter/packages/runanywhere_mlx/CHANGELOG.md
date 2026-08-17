@@ -1,3 +1,12 @@
+## [0.20.23] - 2026-08-16
+
+### Changed
+
+- Updated the compatible MLX Swift, MLX Swift LM, and MLX Audio Swift runtime
+  line used by the shared Apple backend.
+- Added Maple Preview and Nemotron speech support while preserving verified
+  Bonsai/Prism model compatibility.
+
 ## [0.20.22] - 2026-08-15
 
 ### Changed

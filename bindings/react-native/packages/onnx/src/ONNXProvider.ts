@@ -24,7 +24,7 @@ const logger = new SDKLogger('ONNX.Provider');
 export class ONNXProvider {
   static readonly moduleId = 'onnx';
   static readonly moduleName = 'ONNX Runtime';
-  static readonly version = '1.24.3';
+  static readonly version = '1.28.0';
 
   private static registered = false;
 

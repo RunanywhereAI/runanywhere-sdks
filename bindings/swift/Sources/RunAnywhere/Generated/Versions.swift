@@ -24,7 +24,7 @@
 /// Centralized version constants for the Swift SDK. Do not hand-edit;
 /// run scripts/release/sync-versions.sh to refresh.
 public enum RAVersions {
-    public static let sdkVersion = "0.20.22"
+    public static let sdkVersion = "0.20.23"
     public static let swiftToolsVersion = "6.2"
     // Pinned SPM dep version floors (must match Package.swift) — bumped in T5.4.
     public static let swiftProtobuf = "1.38.0"
@@ -32,5 +32,5 @@ public enum RAVersions {
     public static let swiftCrypto = "3.15.1"
     public static let files = "4.3.0"
     // Mirrors core/VERSIONS::ONNX_VERSION_IOS.
-    public static let onnxRuntimeIOS = "1.24.3"
+    public static let onnxRuntimeIOS = "1.28.0"
 }

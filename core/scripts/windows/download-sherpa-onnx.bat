@@ -23,6 +23,10 @@ set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 call :load_versions
 if not defined SHERPA_ONNX_VERSION_WINDOWS set "SHERPA_ONNX_VERSION_WINDOWS=1.12.23"
 set "VERSION=%SHERPA_ONNX_VERSION_WINDOWS%"
+set "REPOSITORY=%SHERPA_ONNX_REPO_DESKTOP%"
+set "RELEASE_TAG=%SHERPA_ONNX_RELEASE_TAG_DESKTOP%"
+set "SOURCE_COMMIT=%SHERPA_ONNX_COMMIT_DESKTOP%"
+set "EXPECTED_SHA256=%SHERPA_ONNX_WINDOWS_X64_SHA256%"
 
 :: Parse options
 set "FORCE=0"
@@ -30,20 +34,20 @@ if "%~1"=="--force" set "FORCE=1"
 if "%~1"=="--help" goto :show_help
 if "%~1"=="-h" goto :show_help
 
-:: Check if already downloaded
-if exist "%DEST_DIR%\lib" if "%FORCE%"=="0" (
-    echo [OK] Sherpa-ONNX already downloaded at %DEST_DIR%
+:: Check if the exact pinned stack is already downloaded.
+set "CACHE_VALID=0"
+call :verify_provenance >nul 2>&1
+if not errorlevel 1 set "CACHE_VALID=1"
+if "%CACHE_VALID%"=="1" if "%FORCE%"=="0" (
+    echo [OK] Exact Sherpa-ONNX stack already downloaded at %DEST_DIR%
     echo      Use --force to re-download.
     exit /b 0
 )
 
 :: Determine URL
-:: k2-fsa publishes the Windows x64 build as MSVC-runtime + config variants;
-:: there is no plain "-win-x64-shared" asset (that URL 404s). Use the static-CRT
-:: Release variant (-MT-Release) so the bundled DLLs carry no VC++ redist
-:: dependency, matching the /MT rcli build (CMAKE_MSVC_RUNTIME_LIBRARY).
-set "URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v%VERSION%/sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release.tar.bz2"
-set "ARCHIVE_NAME=sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release"
+set "ASSET_NAME=sherpa-onnx-v%VERSION%-win-x64-shared-rac-ort%ONNX_VERSION_WINDOWS%.tar.bz2"
+set "URL=https://github.com/%REPOSITORY%/releases/download/%RELEASE_TAG%/%ASSET_NAME%"
+set "ARCHIVE_NAME=%ASSET_NAME:.tar.bz2=%"
 
 echo.
 echo ========================================
@@ -94,6 +98,14 @@ if %DL_SIZE% LSS 1000000 (
     exit /b 1
 )
 
+for /f %%H in ('powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -LiteralPath '%TEMP_DL%\sherpa-onnx.tar.bz2').Hash.ToLower()"') do set "ACTUAL_SHA256=%%H"
+if /i not "%ACTUAL_SHA256%"=="%EXPECTED_SHA256%" (
+    echo [ERROR] Archive SHA-256 mismatch: expected %EXPECTED_SHA256%, got %ACTUAL_SHA256%
+    rmdir /s /q "%TEMP_DL%" 2>nul
+    exit /b 1
+)
+echo [OK] Verified archive SHA-256: %ACTUAL_SHA256%
+
 :: Extract. Windows' bundled bsdtar hangs indefinitely decompressing .tar.bz2
 :: on CI (its bzip2 filter stalls with no console), so use 7-Zip — preinstalled
 :: on GitHub windows runners — to turn .tar.bz2 into a plain .tar, then plain
@@ -115,14 +127,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Download C API headers if missing
-if not exist "%DEST_DIR%\include\sherpa-onnx\c-api\c-api.h" (
-    echo [DOWNLOAD] Downloading C API headers...
-    mkdir "%DEST_DIR%\include\sherpa-onnx\c-api" 2>nul
-    curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v%VERSION%/sherpa-onnx/c-api/c-api.h" ^
-        -o "%DEST_DIR%\include\sherpa-onnx\c-api\c-api.h"
-)
-
 :: Cleanup temp
 rmdir /s /q "%TEMP_DL%" 2>nul
 
@@ -137,6 +141,16 @@ if not exist "%DEST_DIR%\lib" (
 if not exist "%DEST_DIR%\include\sherpa-onnx\c-api\c-api.h" (
     echo [ERROR] C API header not found
     set "VERIFY_OK=0"
+)
+if not exist "%DEST_DIR%\PROVENANCE.txt" (
+    echo [ERROR] Release provenance file not found
+    set "VERIFY_OK=0"
+) else (
+    call :verify_provenance
+    if errorlevel 1 (
+        echo [ERROR] Release provenance does not match the pinned runtime stack
+        set "VERIFY_OK=0"
+    )
 )
 
 if "%VERIFY_OK%"=="0" (
@@ -174,3 +188,8 @@ for /f "usebackq tokens=1,* delims==" %%a in ("%VERSIONS_FILE%") do (
     if not "!line:~0,1!"=="#" if not "%%a"=="" set "%%a=%%b"
 )
 goto :eof
+
+:verify_provenance
+if not exist "%DEST_DIR%\PROVENANCE.txt" exit /b 1
+powershell -NoProfile -Command "$lines = [IO.File]::ReadAllLines((Join-Path $env:DEST_DIR 'PROVENANCE.txt')); if (($lines -notcontains ('sherpa_onnx_version=' + $env:VERSION)) -or ($lines -notcontains ('runanywhere_source_commit=' + $env:SOURCE_COMMIT)) -or ($lines -notcontains ('onnxruntime_version=' + $env:ONNX_VERSION_WINDOWS))) { exit 1 }"
+exit /b %errorlevel%

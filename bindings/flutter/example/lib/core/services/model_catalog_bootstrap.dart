@@ -240,9 +240,9 @@ abstract final class ModelCatalogBootstrap {
     }
 
     // Bonsai (PrismML)
-    // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
-    // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
-    // core/VERSIONS — stock upstream cannot load it.
+    // PrismML Bonsai-27B at 1.125-bit (Q1_0, qwen3_5 GatedDeltaNet). The
+    // canonical-first RunAnywhere llama.cpp fork preserves this support beside
+    // its Maple compatibility delta.
     await _registerLLM(
       id: 'bonsai-27b-q1_0',
       name: 'Bonsai-27B 1-bit Q1_0 (CPU)',
@@ -478,8 +478,8 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 200000000,
     );
     // Bonsai (PrismML)
-    // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
-    // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+    // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental due to its size;
+    // requires the paired RunAnywhere MLX/MLX Swift tags.
     await _registerLLM(
       id: 'mlx-bonsai-27b-1bit',
       name: 'MLX Bonsai-27B 1-bit',

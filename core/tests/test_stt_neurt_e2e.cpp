@@ -81,8 +81,29 @@ std::vector<int16_t> read_wav_i16(const std::string& path, int* sample_rate) {
             if (size > want) f.seekg(size - want, std::ios::cur);
         } else if (std::memcmp(id, "data", 4) == 0) {
             if (bits != 16 || channels < 1) break;
-            std::vector<int16_t> raw(size / sizeof(int16_t));
-            f.read(reinterpret_cast<char*>(raw.data()), size);
+            const std::streampos data_begin = f.tellg();
+            if (data_begin == std::streampos(-1)) {
+                break;
+            }
+            f.seekg(0, std::ios::end);
+            const std::streampos data_end = f.tellg();
+            if (data_end == std::streampos(-1)) {
+                break;
+            }
+            const std::streamoff remaining = data_end - data_begin;
+            if (remaining <= 0 || !f.seekg(data_begin)) {
+                break;
+            }
+            const size_t usable =
+                static_cast<size_t>(std::min<std::streamoff>(size, remaining)) & ~size_t{1};
+            if (usable == 0) {
+                break;
+            }
+            std::vector<int16_t> raw(usable / sizeof(int16_t));
+            if (!f.read(reinterpret_cast<char*>(raw.data()),
+                        static_cast<std::streamsize>(usable))) {
+                break;
+            }
             out.resize(raw.size() / static_cast<size_t>(channels));
             for (size_t i = 0; i < out.size(); ++i) {
                 int acc = 0;
@@ -159,7 +180,6 @@ std::string env_or(const char* key, const char* dflt) {
 }
 
 struct StreamCapture {
-    std::string partials;
     std::string final_text;
     int partial_calls = 0;
     int final_calls = 0;
@@ -172,7 +192,6 @@ void on_stream(const char* text, rac_bool_t is_final, void* user) {
         c->final_text = text;
         ++c->final_calls;
     } else {
-        c->partials += text;
         ++c->partial_calls;
     }
 }
@@ -209,14 +228,18 @@ int main() {
     if (vt->stt_ops == nullptr) return 1;
 
     const rac_stt_service_ops_t* ops = vt->stt_ops;
-    CHECK(ops->create != nullptr && ops->initialize != nullptr && ops->transcribe != nullptr,
+    CHECK(ops->create != nullptr && ops->initialize != nullptr && ops->transcribe != nullptr &&
+              ops->destroy != nullptr,
           "the op table is missing a required entry point");
-    if (ops->create == nullptr || ops->initialize == nullptr || ops->transcribe == nullptr) return 1;
+    if (ops->create == nullptr || ops->initialize == nullptr || ops->transcribe == nullptr ||
+        ops->destroy == nullptr) {
+        return 1;
+    }
 
     void* impl = nullptr;
     rac_result_t rc = ops->create(bundle.c_str(), nullptr, &impl);
     CHECK(rc == RAC_SUCCESS && impl != nullptr, "create failed: %d", static_cast<int>(rc));
-    if (impl == nullptr) return 1;
+    if (rc != RAC_SUCCESS || impl == nullptr) return 1;
 
     rc = ops->initialize(impl, bundle.c_str());
     CHECK(rc == RAC_SUCCESS, "initialize failed: %d", static_cast<int>(rc));
@@ -257,8 +280,8 @@ int main() {
         // human transcript on orthography, and demanding an exact match would gate on luck.
         CHECK(wer <= 0.05, "WER %.4f exceeds the 0.05 gate", wer);
         CHECK(result.processing_time_ms >= 0, "processing_time_ms is negative");
-        std::free(result.text);
     }
+    rac_stt_result_free(&result);
 
     // The streaming path. Same audio, same engine, and the final must agree with the batch call:
     // if they disagree, one of them is reading the buffer differently.
@@ -274,11 +297,6 @@ int main() {
             std::printf("streaming final: %s\n", cap.final_text.c_str());
             std::printf("streaming WER: %.4f (%d partial callbacks)\n", wer, cap.partial_calls);
             CHECK(wer <= 0.05, "streaming WER %.4f exceeds the 0.05 gate", wer);
-            // Partials are the point of the streaming path. A transducer and an attention decoder
-            // both emit per symbol; only CTC legitimately produces none, because its collapse
-            // cannot run until every frame is in.
-            CHECK(cap.partial_calls > 0 || cap.partials.empty(),
-                  "inconsistent: partial text arrived with no partial callbacks");
         }
     }
 
