@@ -328,23 +328,28 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
                          payload->online_core_count > 0);
 
     // ---- Modality-specific fields ------------------------------------------
+    // Measured metrics use `_or_null` with a `>= 0` presence test, because the
+    // payload initializes them to a negative "not measured" sentinel. The old
+    // add_int/add_double skipped zeros, which made a real 0 (an empty
+    // generation, silence with word_count 0) indistinguishable from a value that
+    // was never captured — both arrived as NULL.
     const char* modality = payload->modality ? payload->modality : "system";
     if (strcmp(modality, "llm") == 0) {
-        json.add_int("input_tokens", payload->input_tokens);
-        json.add_int("output_tokens", payload->output_tokens);
-        json.add_int("total_tokens", payload->total_tokens);
-        json.add_double("tokens_per_second", payload->tokens_per_second);
-        json.add_double("time_to_first_token_ms", payload->time_to_first_token_ms);
-        json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
-        json.add_double("generation_time_ms", payload->generation_time_ms);
-        json.add_int("context_length", payload->context_length);
+        json.add_int_or_null("input_tokens", payload->input_tokens, payload->input_tokens >= 0);
+        json.add_int_or_null("output_tokens", payload->output_tokens, payload->output_tokens >= 0);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
+        json.add_double_or_null("tokens_per_second", payload->tokens_per_second, payload->tokens_per_second >= 0);
+        json.add_double_or_null("time_to_first_token_ms", payload->time_to_first_token_ms, payload->time_to_first_token_ms >= 0);
+        json.add_double_or_null("prompt_eval_time_ms", payload->prompt_eval_time_ms, payload->prompt_eval_time_ms >= 0);
+        json.add_double_or_null("generation_time_ms", payload->generation_time_ms, payload->generation_time_ms >= 0);
+        json.add_int_or_null("context_length", payload->context_length, payload->context_length >= 0);
         json.add_double_always("temperature", payload->temperature);
-        json.add_int("max_tokens", payload->max_tokens);
+        json.add_int_or_null("max_tokens", payload->max_tokens, payload->max_tokens >= 0);
     } else if (strcmp(modality, "stt") == 0) {
-        json.add_double("audio_duration_ms", payload->audio_duration_ms);
-        json.add_double("real_time_factor", payload->real_time_factor);
-        json.add_int("word_count", payload->word_count);
-        json.add_double("confidence", payload->confidence);
+        json.add_double_or_null("audio_duration_ms", payload->audio_duration_ms, payload->audio_duration_ms >= 0);
+        json.add_double_or_null("real_time_factor", payload->real_time_factor, payload->real_time_factor >= 0);
+        json.add_int_or_null("word_count", payload->word_count, payload->word_count >= 0);
+        json.add_double_or_null("confidence", payload->confidence, payload->confidence >= 0);
         json.add_string("language", payload->language);
         json.add_int("segment_index", payload->segment_index);
         // Hybrid STT router attribution (null on plain single-backend STT).
@@ -352,28 +357,28 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_bool("was_fallback", payload->was_fallback, payload->has_was_fallback);
         json.add_int("attempt_count", payload->attempt_count);
     } else if (strcmp(modality, "tts") == 0) {
-        json.add_int("character_count", payload->character_count);
-        json.add_double("characters_per_second", payload->characters_per_second);
-        json.add_int("audio_size_bytes", payload->audio_size_bytes);
-        json.add_int("sample_rate", payload->sample_rate);
+        json.add_int_or_null("character_count", payload->character_count, payload->character_count >= 0);
+        json.add_double_or_null("characters_per_second", payload->characters_per_second, payload->characters_per_second >= 0);
+        json.add_int_or_null("audio_size_bytes", payload->audio_size_bytes, payload->audio_size_bytes >= 0);
+        json.add_int_or_null("sample_rate", payload->sample_rate, payload->sample_rate >= 0);
         json.add_string("voice", payload->voice);
-        json.add_double("output_duration_ms", payload->output_duration_ms);
+        json.add_double_or_null("output_duration_ms", payload->output_duration_ms, payload->output_duration_ms >= 0);
     } else if (strcmp(modality, "vlm") == 0) {
         // VLM = LLM token fields PLUS vision fields. Both groups ride the
         // properties carrier now: vlm_module.cpp writes input/total tokens,
         // tps, ttft, prompt_eval_time_ms, vision_tokens, vision_encode_time_ms
         // and image_resolution, and the SDK_COMPONENT_VLM arm of
         // telemetry_manager.cpp reads every one of them back.
-        json.add_int("input_tokens", payload->input_tokens);
-        json.add_int("output_tokens", payload->output_tokens);
-        json.add_int("total_tokens", payload->total_tokens);
-        json.add_double("tokens_per_second", payload->tokens_per_second);
-        json.add_double("time_to_first_token_ms", payload->time_to_first_token_ms);
-        json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
-        json.add_double("generation_time_ms", payload->generation_time_ms);
-        json.add_int("context_length", payload->context_length);
+        json.add_int_or_null("input_tokens", payload->input_tokens, payload->input_tokens >= 0);
+        json.add_int_or_null("output_tokens", payload->output_tokens, payload->output_tokens >= 0);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
+        json.add_double_or_null("tokens_per_second", payload->tokens_per_second, payload->tokens_per_second >= 0);
+        json.add_double_or_null("time_to_first_token_ms", payload->time_to_first_token_ms, payload->time_to_first_token_ms >= 0);
+        json.add_double_or_null("prompt_eval_time_ms", payload->prompt_eval_time_ms, payload->prompt_eval_time_ms >= 0);
+        json.add_double_or_null("generation_time_ms", payload->generation_time_ms, payload->generation_time_ms >= 0);
+        json.add_int_or_null("context_length", payload->context_length, payload->context_length >= 0);
         json.add_double_always("temperature", payload->temperature);
-        json.add_int("max_tokens", payload->max_tokens);
+        json.add_int_or_null("max_tokens", payload->max_tokens, payload->max_tokens >= 0);
         json.add_int("image_count", payload->image_count);
         json.add_int("vision_tokens", payload->vision_tokens);
         json.add_double("vision_encode_time_ms", payload->vision_encode_time_ms);
@@ -397,7 +402,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
         json.add_int("embedding_dimension", payload->embedding_dimension);
-        json.add_int("total_tokens", payload->total_tokens);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
         json.add_int("batch_size", payload->batch_size);
         json.add_string("embedding_model", payload->model_id);
     } else if (strcmp(modality, "voice") == 0) {
@@ -415,7 +420,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("speech_duration_ms", payload->speech_duration_ms);
         json.add_double("silence_duration_ms", payload->silence_duration_ms);
         json.add_int("segment_count", payload->segment_count);
-        json.add_int("sample_rate", payload->sample_rate);
+        json.add_int_or_null("sample_rate", payload->sample_rate, payload->sample_rate >= 0);
     } else if (strcmp(modality, "lora") == 0) {
         // base model rides on model_id; adapter_id + operation + adapter_size_bytes
         // via the carrier (size is stat-ed from the adapter path in rac_lora_service).

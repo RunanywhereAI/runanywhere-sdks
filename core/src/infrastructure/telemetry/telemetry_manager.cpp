@@ -1115,21 +1115,36 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.model_name = !g.model_name().empty()
                                      ? g.model_name().c_str()
                                      : (!g.model_id().empty() ? g.model_id().c_str() : nullptr);
-            payload.input_tokens = g.input_tokens();
+            // Only assign what the producer actually reported. These fields are
+            // `optional` in sdk_events.proto, so has_x() distinguishes "measured
+            // zero" from "never set"; anything not reported keeps the payload's
+            // negative sentinel and serializes as null rather than as a 0 that
+            // was never observed.
+            if (g.has_input_tokens())
+                payload.input_tokens = g.input_tokens();
             // tokens_used/tokens_count folded into output_tokens.
-            payload.output_tokens = g.output_tokens();
-            payload.total_tokens = payload.input_tokens + payload.output_tokens;
+            if (g.has_output_tokens())
+                payload.output_tokens = g.output_tokens();
+            // Derived, so it is only meaningful when both parts are present.
+            if (g.has_input_tokens() && g.has_output_tokens())
+                payload.total_tokens = g.input_tokens() + g.output_tokens();
             // duration_ms/latency_ms (two spellings) collapsed into
             // total_duration_ms; prefill_duration_ms is the new prompt-eval
             // spelling.
-            const double dur = static_cast<double>(g.total_duration_ms());
-            payload.processing_time_ms = dur;
-            payload.has_processing_time_ms = RAC_TRUE;
-            payload.generation_time_ms = dur;
-            payload.tokens_per_second = g.tokens_per_second();
-            payload.prompt_eval_time_ms = static_cast<double>(g.prefill_duration_ms());
+            if (g.has_total_duration_ms()) {
+                const double dur = static_cast<double>(g.total_duration_ms());
+                payload.processing_time_ms = dur;
+                payload.has_processing_time_ms = RAC_TRUE;
+                payload.generation_time_ms = dur;
+            }
+            if (g.has_tokens_per_second())
+                payload.tokens_per_second = g.tokens_per_second();
+            if (g.has_prefill_duration_ms())
+                payload.prompt_eval_time_ms = static_cast<double>(g.prefill_duration_ms());
             // first_token_latency_ms folded into time_to_first_token_ms.
-            payload.time_to_first_token_ms = static_cast<double>(g.time_to_first_token_ms());
+            if (g.has_time_to_first_token_ms())
+                payload.time_to_first_token_ms =
+                    static_cast<double>(g.time_to_first_token_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -1143,8 +1158,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 }
             }
             payload.temperature = g.temperature();
-            payload.max_tokens = g.max_tokens();
-            payload.context_length = g.context_length();
+            if (g.has_max_tokens())
+                payload.max_tokens = g.max_tokens();
+            if (g.has_context_length())
+                payload.context_length = g.context_length();
             // STREAM_COMPLETED deleted -- COMPLETED + is_streaming now covers
             // both the one-shot and streaming terminal case.
             if (ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED &&
@@ -1197,14 +1214,22 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.has_processing_time_ms = RAC_TRUE;
                 // audio_length_ms/audio_size_bytes renamed to
                 // input_audio_duration_ms/input_audio_bytes.
-                payload.audio_duration_ms = static_cast<double>(v.input_audio_duration_ms());
-                payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
-                payload.word_count = v.word_count();
-                payload.real_time_factor = v.real_time_factor();
+                // Presence-gated: word_count 0 on silence, or confidence 0.0, are
+                // real measurements and must not look like "never measured".
+                if (v.has_input_audio_duration_ms())
+                    payload.audio_duration_ms =
+                        static_cast<double>(v.input_audio_duration_ms());
+                if (v.has_input_audio_bytes())
+                    payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
+                if (v.has_word_count())
+                    payload.word_count = v.word_count();
+                if (v.has_real_time_factor())
+                    payload.real_time_factor = v.real_time_factor();
                 payload.confidence = v.confidence();
                 if (!v.language().empty())
                     payload.language = v.language().c_str();
-                payload.sample_rate = v.sample_rate();
+                if (v.has_sample_rate())
+                    payload.sample_rate = v.sample_rate();
                 payload.is_streaming = v.is_streaming() ? RAC_TRUE : RAC_FALSE;
                 payload.has_is_streaming = RAC_TRUE;
                 framework_str = framework_proto_to_string(v.framework());
@@ -1240,15 +1265,24 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.model_name = !v.model_name().empty()
                                          ? v.model_name().c_str()
                                          : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
-                payload.character_count = v.character_count();
+                if (v.has_character_count())
+                    payload.character_count = v.character_count();
                 // audio_duration_ms/audio_size_bytes_tts renamed to
                 // output_audio_duration_ms/output_audio_bytes.
-                payload.output_duration_ms = static_cast<double>(v.output_audio_duration_ms());
-                payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
-                payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
-                payload.has_processing_time_ms = RAC_TRUE;
-                payload.characters_per_second = v.characters_per_second();
-                payload.sample_rate = v.sample_rate();
+                if (v.has_output_audio_duration_ms())
+                    payload.output_duration_ms =
+                        static_cast<double>(v.output_audio_duration_ms());
+                if (v.has_output_audio_bytes())
+                    payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
+                if (v.has_processing_duration_ms()) {
+                    payload.processing_time_ms =
+                        static_cast<double>(v.processing_duration_ms());
+                    payload.has_processing_time_ms = RAC_TRUE;
+                }
+                if (v.has_characters_per_second())
+                    payload.characters_per_second = v.characters_per_second();
+                if (v.has_sample_rate())
+                    payload.sample_rate = v.sample_rate();
                 framework_str = framework_proto_to_string(v.framework());
                 payload.framework = framework_str.c_str();
                 if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED &&

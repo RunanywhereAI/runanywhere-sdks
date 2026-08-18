@@ -307,6 +307,36 @@ int main() {
         rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
     }
 
+    // --- Presence: a measured zero is not the same as "never measured" -------
+    //
+    // These fields are `optional` in sdk_events.proto, so has_x() distinguishes
+    // the two. Before that, extractors read proto3 scalars (which report 0 for
+    // an unset field) and the serializer skipped zeros, so an empty generation
+    // and an unmeasured one both arrived as NULL.
+    {
+        cap.called = false;
+        v1::SDKEvent ev;
+        envelope(&ev, v1::SDK_COMPONENT_LLM);
+        auto* g = ev.mutable_generation();
+        g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
+        g->set_model_id("presence-model");
+        // Explicitly measured as zero: an empty completion.
+        g->set_output_tokens(0);
+        g->set_input_tokens(0);
+        // tokens_per_second / context_length / max_tokens deliberately unset.
+        const std::string bytes = ev.SerializeAsString();
+        rac_telemetry_manager_track_proto(mgr, reinterpret_cast<const uint8_t*>(bytes.data()),
+                                          bytes.size());
+        CHECK(cap.called, "presence: event sent");
+        CHECK(has(cap.body, "\"output_tokens\":0"), "presence: measured 0 output_tokens kept");
+        CHECK(has(cap.body, "\"input_tokens\":0"), "presence: measured 0 input_tokens kept");
+        CHECK(has(cap.body, "\"tokens_per_second\":null"),
+              "presence: unmeasured tokens_per_second is null, not 0");
+        CHECK(has(cap.body, "\"context_length\":null"),
+              "presence: unmeasured context_length is null, not 0");
+        rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
+    }
+
     // --- Closed vocabularies: off-vocabulary values must never reach the wire -
     //
     // framework/platform/sdk_binding/battery_state are enums in the published
