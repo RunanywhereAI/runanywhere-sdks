@@ -203,6 +203,27 @@ class ValidatePublicPackagesTest(unittest.TestCase):
                 _write_dist(self._tmp(), wheel=_build_wheel(sidecars=partial)), VERSION
             )
 
+    def test_versioned_linux_sidecar_is_accepted(self) -> None:
+        """auditwheel keeps the soname, so the vendored ORT is ``.so.1.28.0``.
+
+        The upstream sherpa tarball shipped a flat ``libonnxruntime.so``, so the
+        relocated copy ended in ``.so`` and the suffix check happened to pass. The
+        RunAnywhere desktop asset ships ``libonnxruntime.so.1.28.0``, and the
+        vendored name keeps that version.
+        """
+        dist = self._tmp() / "dist"
+        dist.mkdir(parents=True)
+        wheel = _build_wheel(
+            sidecars={
+                "runanywhere.libs/libonnxruntime-a1b2c3d4.so.1.28.0": CLEAN_BINARY,
+                "runanywhere.libs/libsherpa-onnx-c-api-e5f6a7b8.so": CLEAN_BINARY,
+            }
+        )
+        linux_wheel = f"runanywhere-{VERSION}-cp39-cp39-manylinux_2_39_x86_64.whl"
+        (dist / linux_wheel).write_bytes(wheel)
+        (dist / SDIST_NAME).write_bytes(_build_sdist())
+        V.validate_public_packages(dist, VERSION)
+
     def test_missing_core_extension_is_rejected(self) -> None:
         with self.assertRaisesRegex(V.PackageValidationError, "_core"):
             V.validate_public_packages(

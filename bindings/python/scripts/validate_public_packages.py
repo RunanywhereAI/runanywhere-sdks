@@ -40,6 +40,18 @@ HOST_PATH_MARKERS: tuple[bytes, ...] = (b"/Users/", b"/home/", b"\\Users\\")
 # Compiled-binary suffixes that belong in the wheel but must NEVER appear in the sdist.
 BINARY_SUFFIXES: tuple[str, ...] = (".pyd", ".so", ".dylib", ".dll")
 
+
+def _is_binary_member(name: str) -> bool:
+    """True for compiled artifacts, including ELF names carrying a soname version.
+
+    ``endswith(BINARY_SUFFIXES)`` alone misses ``libonnxruntime-abc123.so.1.28.0``:
+    the ELF convention puts the version *after* the suffix, so a vendored sidecar
+    only ends in ``.so`` when the library it came from was unversioned. That is what
+    ``_basename_stem`` already documents, and both callers below need the same rule.
+    """
+    lowered = name.casefold()
+    return lowered.endswith(BINARY_SUFFIXES) or ".so." in lowered
+
 # The compiled extension is imported as ``runanywhere._native._core``; its file is named
 # ``_core`` with a platform extension suffix (``_core.cp312-win_amd64.pyd`` / ``_core.so`` /
 # ``_core.*.dylib``). Match the stem so the check is interpreter/platform independent.
@@ -152,7 +164,7 @@ def validate_wheel(wheel: Path, expected_version: str, *, gpu: bool = False) -> 
                 for n in names
                 if posixpath.dirname(n) == CORE_DIR
                 and _basename_stem(n) == CORE_STEM
-                and n.casefold().endswith(BINARY_SUFFIXES)
+                and _is_binary_member(n)
             ]
             if not core_members:
                 raise PackageValidationError(
@@ -182,7 +194,7 @@ def validate_wheel(wheel: Path, expected_version: str, *, gpu: bool = False) -> 
                 _basename_stem(n)
                 for n in names
                 if posixpath.dirname(n) == platform.libs_dir
-                and n.casefold().endswith(BINARY_SUFFIXES)
+                and _is_binary_member(n)
             }
             # Repair tools mangle a hash into the name (onnxruntime -> onnxruntime-a1b2c3),
             # so match a stem that equals the expected lib or begins with "<lib>-".
@@ -205,7 +217,7 @@ def validate_wheel(wheel: Path, expected_version: str, *, gpu: bool = False) -> 
                 # and CI runner workspaces themselves live under /home/ or /Users/ — so scanning
                 # binaries yields only false positives. A host path in a TEXT / metadata member
                 # (our .py sources, METADATA, RECORD, WHEEL) IS an avoidable leak and is rejected.
-                if member_name.casefold().endswith(BINARY_SUFFIXES):
+                if _is_binary_member(member_name):
                     continue
                 payload = archive.read(member_name)
                 if any(marker in payload for marker in HOST_PATH_MARKERS):
@@ -262,7 +274,7 @@ def validate_sdist(sdist: Path, expected_version: str) -> None:
                     )
 
             for relative in relative_paths:
-                if relative.casefold().endswith(BINARY_SUFFIXES):
+                if _is_binary_member(relative):
                     raise PackageValidationError(
                         f"{label}: sdist must not contain compiled binaries: {relative}"
                     )
