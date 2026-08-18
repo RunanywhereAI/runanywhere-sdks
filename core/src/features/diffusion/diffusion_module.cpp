@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "features/rac_nonllm_lifecycle_bridge.h"
+#include "rac/core/rac_core.h"  // rac_get_model — resolve the engine for telemetry
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
@@ -113,13 +114,39 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
     (void)rac::events::publish_prebuilt(event);
 }
 
+// The engine a model is registered to run on, as the canonical proto enum name
+// that the telemetry manager's clean_framework() already knows how to
+// canonicalize (same shape LifecycleRef::framework_name carries).
+//
+// Diffusion has no lifecycle ref in scope on the handle path, so the engine is
+// resolved from the model registry — the same lookup the download orchestrator
+// does. Without it every imagegen row landed with framework NULL, because this
+// module's publish_capability had no framework parameter at all.
+std::string framework_name_for_model(const char* model_id) {
+    if (model_id == nullptr || model_id[0] == '\0') {
+        return {};
+    }
+    rac_model_info_t* info = nullptr;
+    if (rac_get_model(model_id, &info) != RAC_SUCCESS || info == nullptr) {
+        return {};
+    }
+    const int32_t proto_value = rac::events::framework_to_proto_int(info->framework);
+    rac_model_info_free(info);
+    if (proto_value == runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        return {};
+    }
+    return runanywhere::v1::InferenceFramework_Name(
+        static_cast<runanywhere::v1::InferenceFramework>(proto_value));
+}
+
 void publish_capability(
     runanywhere::v1::CapabilityOperationEventKind kind, const char* operation, float progress,
     const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
     int32_t prompt_length = 0, int32_t negative_prompt_length = 0, int32_t image_width = 0,
     int32_t image_height = 0, int32_t num_inference_steps = 0, double guidance_scale = 0.0,
     int64_t seed = 0, int64_t output_size_bytes = 0,
-    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL) {
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL,
+    const char* framework = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -134,6 +161,11 @@ void publish_capability(
     cap->set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     if (model_id != nullptr && model_id[0] != '\0') {
         cap->set_model_id(model_id);
+    }
+    // CapabilityOperationEvent has no framework field; it rides the properties
+    // carrier, same as embeddings and VLM.
+    if (framework != nullptr && framework[0] != '\0') {
+        (*event.mutable_properties())["framework"] = framework;
     }
     if (operation) {
         event.set_operation_id(operation);
@@ -285,8 +317,10 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
     }
 
     const char* model_id = service_model_id(handle);
+    const std::string fw = framework_name_for_model(model_id);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id);
+                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id, 0, 0, 0, 0, 0, 0.0, 0, 0,
+                       runanywhere::v1::EVENT_DESTINATION_ALL, fw.empty() ? nullptr : fw.c_str());
     rac_diffusion_result_t result = {};
     rc = rac_diffusion_generate(handle, &options, &result);
     if (rc != RAC_SUCCESS) {
@@ -309,7 +343,8 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
             model_id, options.prompt ? static_cast<int32_t>(strlen(options.prompt)) : 0,
             options.negative_prompt ? static_cast<int32_t>(strlen(options.negative_prompt)) : 0,
             result.width, result.height, options.steps, static_cast<double>(options.guidance_scale),
-            result.seed_used, static_cast<int64_t>(result.image_size));
+            result.seed_used, static_cast<int64_t>(result.image_size),
+            runanywhere::v1::EVENT_DESTINATION_ALL, fw.empty() ? nullptr : fw.c_str());
     } else {
         publish_failure(rc, "diffusion.generate", rac_error_message(rc));
     }
