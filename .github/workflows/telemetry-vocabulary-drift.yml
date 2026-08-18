@@ -77,8 +77,8 @@ jobs:
 
           failures = []
           for fn, schema in (
-              ("framework_proto_to_string", "TelemetryFramework"),
-              ("framework_to_string", "TelemetryFramework"),
+              ("framework_proto_to_string", "TelemetryBackend"),
+              ("framework_to_string", "TelemetryBackend"),
           ):
               m = re.search(rf"const char\* {fn}\(.*?\) \{{(.*?)\n\}}", src, re.S)
               if not m:
