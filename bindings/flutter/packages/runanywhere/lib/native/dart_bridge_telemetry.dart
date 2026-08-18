@@ -117,13 +117,23 @@ class DartBridgeTelemetry {
     final sdkVersion = SDKConstants.version;
     // platform is the OS family (matches iOS "ios"/"macos", Kotlin "android",
     // and the backend telemetry_events.platform contract), NOT the binding.
+    // The final fallback was 'flutter' — the binding name, not an OS. On
+    // Windows and Linux desktop that made every event report its platform as
+    // the binding, the same category error that put 'react-native' in the
+    // platform column in production. 'flutter' is not a member of the
+    // published TelemetryPlatform vocabulary, so commons now drops it and the
+    // dimension is simply absent; naming the real OS keeps it.
     final platform = Platform.isAndroid
         ? 'android'
         : Platform.isIOS
         ? 'ios'
         : Platform.isMacOS
         ? 'macos'
-        : 'flutter';
+        : Platform.isWindows
+        ? 'windows'
+        : Platform.isLinux
+        ? 'linux'
+        : 'unknown';
 
     final createManager = lib
         .lookupFunction<

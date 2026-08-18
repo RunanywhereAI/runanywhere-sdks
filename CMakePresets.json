@@ -240,6 +240,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
             },
@@ -253,6 +254,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
             },
@@ -350,6 +352,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "ARM64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF",
                 "_comment_llamacpp": "ggml hard-errors 'MSVC is not supported for ARM, use clang' (ggml-cpu/CMakeLists.txt). Switching the toolset to ClangCL clears that but then Abseil fails instead (AbseilDll.cmake:745), so neither toolset builds it here yet.",

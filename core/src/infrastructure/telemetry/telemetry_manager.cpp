@@ -71,8 +71,6 @@ struct rac_telemetry_manager {
     std::mutex queue_mutex;
 
     // Batching configuration
-    static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
-    static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
     static constexpr size_t MAX_QUEUE_SIZE = 256;        // Cap while flushes defer (e.g. pre-auth)
     // Cap the poll-path HTTP queue (drop-oldest) — it was unbounded, so a
     // platform that never drains (Flutter isolate gone) grew it without limit.
@@ -562,35 +560,26 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
 
     bool should_flush = false;
     size_t queue_size = 0;
-    int64_t current_time = get_current_timestamp_ms();
-
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
         queue_size = manager->queue.size();
     }
 
-    if (manager->environment == RAC_ENV_DEVELOPMENT) {
-        // Development: Immediate flush for real-time debugging
-        should_flush = true;
-        RAC_LOG_DEBUG("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
-                      queue_size);
-    } else {
-        // Production: Flush based on batch size or timeout
-        // (completion events trigger an immediate flush in rac_telemetry_manager_track_proto)
-        // Flush if queue reaches batch size
-        if (queue_size >= rac_telemetry_manager::BATCH_SIZE_PRODUCTION) {
-            should_flush = true;
-            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                          queue_size, rac_telemetry_manager::BATCH_SIZE_PRODUCTION);
-        }
-        // Flush if timeout reached (5 seconds since last flush)
-        else if (manager->last_flush_time_ms > 0 && (current_time - manager->last_flush_time_ms) >=
-                                                        rac_telemetry_manager::BATCH_TIMEOUT_MS) {
-            should_flush = true;
-            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
-                          current_time - manager->last_flush_time_ms);
-        }
-    }
+    // Flush on every event, in every environment.
+    //
+    // Production previously batched at 10 events or 5 seconds, with an extra
+    // immediate flush only for terminal events.
+    // A non-terminal milestone (model.download.started, stt.transcription
+    // .started, storage.cache.cleared) could therefore sit in memory for up to
+    // five seconds, and there is no disk persistence — a crash, force-quit or
+    // background kill in that window lost it outright.
+    //
+    // Losing telemetry on crash is accepted; leaving a window in which it can
+    // be lost is not. The queue is still bounded (MAX_QUEUE_SIZE) and the
+    // pre-auth gate in flush() still holds events until a token arrives, so
+    // this changes cadence only, not those constraints.
+    should_flush = true;
+    RAC_LOG_DEBUG("Telemetry", "Auto-flushing immediately (queue size: %zu)", queue_size);
 
     if (should_flush) {
         RAC_LOG_DEBUG("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);

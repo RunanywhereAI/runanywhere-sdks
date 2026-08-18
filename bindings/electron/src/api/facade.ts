@@ -82,6 +82,22 @@ export interface InitializeOptions {
    * leaves this unset rather than sending an empty string.
    */
   buildToken?: string;
+  /**
+   * Identity of the HOST application, as it should appear in telemetry.
+   *
+   * Every other binding reads this from the platform (Bundle.main on Apple,
+   * PackageManager on Android). Electron has no equivalent, so the host app
+   * must supply it — without this the SDK reported every Electron app as
+   * `ai.runanywhere.electron` / "RunAnywhere Electron", making a customer's
+   * app indistinguishable from the reference app in the stored telemetry.
+   *
+   * `appVersion` defaults to the SDK version, which is almost never what you
+   * want: pass the host app's own version (Electron apps can read it from
+   * `app.getVersion()`).
+   */
+  appIdentifier?: string;
+  appName?: string;
+  appVersion?: string;
 }
 
 /**
@@ -466,9 +482,12 @@ async function runControlPlane(
       platform,
       sdkVersion: version,
       sdkBinding: 'electron',
-      appIdentifier: 'ai.runanywhere.electron',
-      appName: 'RunAnywhere Electron',
-      appVersion: version,
+      // Host-app identity when supplied; the SDK's own identity only as a
+      // last resort, so an app that never sets it is still attributable to
+      // "some Electron app" rather than being mislabelled as a specific one.
+      appIdentifier: options.appIdentifier ?? 'ai.runanywhere.electron',
+      appName: options.appName ?? 'RunAnywhere Electron',
+      appVersion: options.appVersion ?? version,
       phase1Bytes: phase1,
       phase2Bytes: phase2,
     });
