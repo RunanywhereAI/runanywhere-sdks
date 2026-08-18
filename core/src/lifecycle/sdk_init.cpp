@@ -665,8 +665,18 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
             const char* build_token =
                 request.build_token().empty() ? nullptr : request.build_token().c_str();
             const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
-            if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
-                dev_rc != RAC_ERROR_NOT_INITIALIZED) {
+            if (dev_rc == RAC_ERROR_NOT_INITIALIZED) {
+                // The binding never called rac_device_manager_set_callbacks, so
+                // registration cannot run at all and the backend keeps only the
+                // placeholder row authenticate() created — which is where
+                // "Unknown" devices come from. This used to be swallowed with
+                // the same silence as a transient deferral, so a binding could
+                // ship without device registration and nobody would know.
+                // Electron does exactly that today.
+                append_warning(&result,
+                               "device registration unavailable: no platform device callbacks "
+                               "installed (rac_device_manager_set_callbacks was never called)");
+            } else if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
                 // Surface as a warning rather than aborting — matches Swift's
                 // "Device registration failed (non-critical)" branch.
                 append_warning(&result, warning_from_code("device registration deferred", dev_rc));
@@ -679,12 +689,29 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
             size_t assigned_count = 0;
             const rac_result_t fetch_rc =
                 rac_model_assignment_fetch(RAC_FALSE, &assigned_models, &assigned_count);
-            if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr) {
+            if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr && assigned_count > 0) {
                 result.set_linked_models_count(static_cast<uint32_t>(assigned_count));
                 rac_model_info_array_free(assigned_models, assigned_count);
-            } else if (fetch_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE && fetch_rc != RAC_SUCCESS) {
+            } else if (fetch_rc == RAC_SUCCESS) {
+                if (assigned_models != nullptr) {
+                    rac_model_info_array_free(assigned_models, assigned_count);
+                }
+                // Succeeded and returned nothing. Previously indistinguishable
+                // from "no assignments exist", so a fetch that silently produced
+                // nothing looked identical to an org with an empty catalog: the
+                // backend returns the assigned model over HTTP, but
+                // linked_models_count stays 0 and nothing said why.
                 append_warning(&result,
-                               warning_from_code("model assignment fetch deferred", fetch_rc));
+                               "model assignment fetch returned no models (transport or parse "
+                               "produced an empty list — assignments configured in the console "
+                               "will not be applied)");
+            } else {
+                // Includes RAC_ERROR_FEATURE_NOT_AVAILABLE, which used to be
+                // swallowed: "assignments were not applied" is worth saying
+                // regardless of why, since the visible symptom is identical
+                // (linked_models_count 0) and the cause was unknowable.
+                append_warning(&result,
+                               warning_from_code("model assignments not applied", fetch_rc));
             }
         }
     }
