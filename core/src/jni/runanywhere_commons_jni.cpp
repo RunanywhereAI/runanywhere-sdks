@@ -3971,6 +3971,14 @@ static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries,
         return RAC_ERROR_NOT_INITIALIZED;
 
     jstring jPath = env->NewStringUTF(path);
+    if (jPath == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        *out_entries = nullptr;
+        *out_count = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jobjectArray jEntries = static_cast<jobjectArray>(
         env->CallObjectMethod(g_file_callbacks_obj, g_fc_list_directory, jPath));
     env->DeleteLocalRef(jPath);
@@ -3988,12 +3996,36 @@ static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries,
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
+    // Copy the entries transactionally: any failed JNI/string allocation
+    // frees what has already been copied and reports RAC_ERROR_OUT_OF_MEMORY
+    // instead of returning a partially initialized array or strdup(nullptr).
     for (jsize i = 0; i < count; i++) {
         auto jEntry = static_cast<jstring>(env->GetObjectArrayElement(jEntries, i));
-        const char* entryChars = env->GetStringUTFChars(jEntry, nullptr);
+        const char* entryChars =
+            jEntry != nullptr ? env->GetStringUTFChars(jEntry, nullptr) : nullptr;
+        if (entryChars == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            for (jsize j = 0; j < i; j++) {
+                std::free(entries[j]);
+            }
+            std::free(entries);
+            env->DeleteLocalRef(jEntry);
+            env->DeleteLocalRef(jEntries);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
         entries[i] = strdup(entryChars);
         env->ReleaseStringUTFChars(jEntry, entryChars);
         env->DeleteLocalRef(jEntry);
+        if (entries[i] == nullptr) {
+            for (jsize j = 0; j <= i; j++) {
+                std::free(entries[j]);
+            }
+            std::free(entries);
+            env->DeleteLocalRef(jEntries);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
     env->DeleteLocalRef(jEntries);
