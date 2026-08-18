@@ -81,7 +81,16 @@ bool device_state_is_online(void* user_data) {
     if (scope.env == nullptr) {
         return true;
     }
-    return scope.env->CallBooleanMethod(a->provider, a->mid_is_online) != JNI_FALSE;
+    const jboolean online = scope.env->CallBooleanMethod(a->provider, a->mid_is_online);
+    // The provider is app code. A throw leaves the exception pending on this
+    // thread, and the next JNI call aborts the process with "JNI called with
+    // pending exception", so clear it and fall back to the same answer used
+    // when the JVM is unreachable.
+    if (scope.env->ExceptionCheck() == JNI_TRUE) {
+        scope.env->ExceptionClear();
+        return true;
+    }
+    return online != JNI_FALSE;
 }
 
 int32_t device_state_battery_percent(void* user_data) {
@@ -93,7 +102,12 @@ int32_t device_state_battery_percent(void* user_data) {
     if (scope.env == nullptr) {
         return 100;
     }
-    return static_cast<int32_t>(scope.env->CallIntMethod(a->provider, a->mid_battery_percent));
+    const jint percent = scope.env->CallIntMethod(a->provider, a->mid_battery_percent);
+    if (scope.env->ExceptionCheck() == JNI_TRUE) {
+        scope.env->ExceptionClear();
+        return 100;
+    }
+    return static_cast<int32_t>(percent);
 }
 
 bool device_state_is_thermal_throttled(void* user_data) {
@@ -105,7 +119,12 @@ bool device_state_is_thermal_throttled(void* user_data) {
     if (scope.env == nullptr) {
         return false;
     }
-    return scope.env->CallBooleanMethod(a->provider, a->mid_is_thermal_throttled) != JNI_FALSE;
+    const jboolean throttled = scope.env->CallBooleanMethod(a->provider, a->mid_is_thermal_throttled);
+    if (scope.env->ExceptionCheck() == JNI_TRUE) {
+        scope.env->ExceptionClear();
+        return false;
+    }
+    return throttled != JNI_FALSE;
 }
 
 /** Detach commons from the current adapter and free its GlobalRef. */
