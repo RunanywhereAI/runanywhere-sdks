@@ -30,6 +30,43 @@ jobs:
       - name: Generated header is current
         run: python3 idl/codegen/generate_telemetry_vocabulary.py --check
 
+      - name: Every event type the core can emit is in the vocabulary
+        run: |
+          python3 - <<'PY'
+          import json, re, sys, pathlib
+
+          vocab = set(
+              json.load(open("idl/http/sdk-openapi.json"))
+              ["components"]["schemas"]["TelemetryEventType"]["enum"]
+          )
+          src = pathlib.Path(
+              "core/src/infrastructure/telemetry/telemetry_manager.cpp"
+          ).read_text()
+          start = src.index("proto_event_type_string(")
+          end = src.index("\n}\n", src.index("case SDKEvent::kAuth", start))
+          body = src[start:end]
+
+          emitted = set(re.findall(r'return "([^"]+)";', body))
+          # "unknown" is dropped before send and must never be a stored type.
+          emitted.discard("unknown")
+          # Names built from a prefix: dom is the model domain, p the generation
+          # modality. Expand both so the check covers what actually goes out.
+          for suffix in re.findall(r'return std::string\(dom\) \+ "([^"]+)"', body):
+              emitted.update(d + suffix for d in ("stt.model", "tts.voice", "llm.model"))
+          for suffix in re.findall(r'return std::string\(p\) \+ "([^"]+)"', body):
+              emitted.update(p + suffix for p in ("llm", "vlm"))
+
+          stray = sorted(emitted - vocab)
+          if stray:
+              print("::error::proto_event_type_string() can emit event types absent "
+                    f"from TelemetryEventType: {stray}")
+              print("The backend quarantines anything outside the published set.")
+              print("Add it to schemas/core/enums.py, republish sdk-openapi.json,")
+              print("and regenerate this repo's vocabulary header.")
+              sys.exit(1)
+          print(f"OK - all {len(emitted)} emittable event types are published.")
+          PY
+
       - name: Every framework string the core can emit is in the vocabulary
         run: |
           python3 - <<'PY'

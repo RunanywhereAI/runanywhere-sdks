@@ -154,7 +154,7 @@
                 "type": "null"
               }
             ],
-            "description": "Unique device fingerprint",
+            "description": "The SDK's persistent per-install UUID. This is device IDENTITY and is what authenticate() matches on; registration never overwrites it.",
             "title": "Device Fingerprint"
           },
           "device_model": {
@@ -195,6 +195,18 @@
             ],
             "description": "GPU family identifier",
             "title": "Gpu Family"
+          },
+          "hardware_class_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hash of the hardware CLASS (model + chip + RAM + core count). An attribute, never an identity: every device of the same spec hashes identically. Older SDK builds send this value in device_fingerprint instead, which is why that field is write-once server-side.",
+            "title": "Hardware Class Fingerprint"
           },
           "has_neural_engine": {
             "description": "Whether device has neural engine",
@@ -555,10 +567,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -1042,10 +1051,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -1550,10 +1556,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -2060,10 +2063,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -2449,10 +2449,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -2878,10 +2875,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -4117,10 +4111,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -4565,10 +4556,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -4989,10 +4977,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -5230,6 +5215,118 @@
           "unknown"
         ],
         "title": "TelemetryBatteryState",
+        "type": "string"
+      },
+      "TelemetryEventType": {
+        "description": "Every event_type the SDK can emit, extracted from its own name switch\n(core/src/infrastructure/telemetry/telemetry_manager.cpp).\n\nClosed on purpose. An unrecognized event_type is quarantined rather than\nstored: production accumulated 76 distinct values, 24 of them off-taxonomy,\nand nothing surfaced that until someone queried the table by hand. Anything\noutside this set now lands in telemetry_rejects with its raw payload intact,\nso it is visible and recoverable but never counted.\n\nLegacy snake_case spellings are NOT members \u2014 api/telemetry_normalize.py\nrewrites those to their canonical form before validation.",
+        "enum": [
+          "auth.device_registered",
+          "auth.device_registration_failed",
+          "auth.failed",
+          "auth.requested",
+          "auth.succeeded",
+          "auth.token_expired",
+          "auth.token_refreshed",
+          "cancellation.acknowledged",
+          "cancellation.completed",
+          "cancellation.failed",
+          "cancellation.requested",
+          "capability",
+          "component",
+          "component.model.loaded",
+          "component.model.unloaded",
+          "component.state.changed",
+          "device",
+          "device.registered",
+          "device.registration.failed",
+          "embeddings.embed.completed",
+          "embeddings.embed.failed",
+          "embeddings.embed.started",
+          "failure",
+          "imagegen.generate.completed",
+          "imagegen.generate.failed",
+          "imagegen.generate.progress",
+          "imagegen.generate.started",
+          "llm.generation",
+          "llm.generation.cancelled",
+          "llm.generation.completed",
+          "llm.generation.failed",
+          "llm.generation.first_token",
+          "llm.generation.started",
+          "llm.generation.streaming",
+          "llm.model.load.completed",
+          "llm.model.load.failed",
+          "llm.model.load.started",
+          "lora.attach.completed",
+          "lora.detach.completed",
+          "lora.failed",
+          "model",
+          "model.deleted",
+          "model.download.cancelled",
+          "model.download.completed",
+          "model.download.failed",
+          "model.download.progress",
+          "model.download.started",
+          "model.extraction.completed",
+          "model.extraction.failed",
+          "model.extraction.progress",
+          "model.extraction.started",
+          "network",
+          "network.connectivity.changed",
+          "network.request.completed",
+          "network.request.failed",
+          "network.request.started",
+          "network.request.timeout",
+          "rag.ingestion.completed",
+          "rag.ingestion.started",
+          "rag.query.completed",
+          "rag.query.failed",
+          "rag.query.started",
+          "sdk.init",
+          "sdk.init.completed",
+          "sdk.init.failed",
+          "sdk.init.started",
+          "sdk.models.loaded",
+          "storage",
+          "storage.cache.clear_failed",
+          "storage.cache.cleared",
+          "storage.temp.cleaned",
+          "stt.model.load.completed",
+          "stt.model.load.failed",
+          "stt.model.load.started",
+          "stt.transcription.completed",
+          "stt.transcription.failed",
+          "stt.transcription.partial",
+          "stt.transcription.started",
+          "tts.synthesis.chunk",
+          "tts.synthesis.completed",
+          "tts.synthesis.failed",
+          "tts.synthesis.started",
+          "tts.voice.load.completed",
+          "tts.voice.load.failed",
+          "tts.voice.load.started",
+          "vad.paused",
+          "vad.process",
+          "vad.resumed",
+          "vad.speech.ended",
+          "vad.speech.started",
+          "vad.started",
+          "vad.stopped",
+          "vlm.generation",
+          "vlm.generation.cancelled",
+          "vlm.generation.completed",
+          "vlm.generation.failed",
+          "vlm.generation.first_token",
+          "vlm.generation.started",
+          "vlm.generation.streaming",
+          "vlm.process.completed",
+          "vlm.process.failed",
+          "vlm.process.started",
+          "voice",
+          "voice.pipeline",
+          "voice.turn.metrics"
+        ],
+        "title": "TelemetryEventType",
         "type": "string"
       },
       "TelemetryFramework": {
@@ -5541,10 +5638,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -6063,10 +6157,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [
@@ -6516,10 +6607,7 @@
             "title": "Error Message"
           },
           "event_type": {
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/TelemetryEventType"
           },
           "framework": {
             "anyOf": [

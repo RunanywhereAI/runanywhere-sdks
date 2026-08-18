@@ -40,6 +40,7 @@ HEADER = (
 
 # schema name -> (C identifier stem, doc line)
 VOCABULARIES = {
+    "TelemetryEventType": ("event_type", "Every event type the SDK may emit"),
     "TelemetryFramework": ("framework", "Engine that actually executed the work"),
     "TelemetryPlatform": ("platform", "OS family — never the binding"),
     "TelemetrySdkBinding": ("sdk_binding", "Language binding that produced the event"),
