@@ -379,10 +379,14 @@ jobs:
       - name: Sherpa-ONNX prebuilts
         run: |
           ./core/scripts/linux/download-sherpa-onnx.sh
-          # The prebuilt ships libonnxruntime.so, but _core/sherpa record a versioned
-          # DT_NEEDED (libonnxruntime.so.1); give auditwheel a matching filename to vendor.
+          # _core/sherpa record a versioned DT_NEEDED (libonnxruntime.so.1), so that
+          # name has to exist for auditwheel to vendor it. Only create it when the
+          # prebuilt does not already ship it: the RunAnywhere desktop asset ships the
+          # usual libonnxruntime.so -> .so.1 -> .so.1.<ver> chain, and overwriting the
+          # middle link points .so.1 back at .so, which is a symlink loop that leaves
+          # the real library unreachable and hangs auditwheel.
           lib="core/third_party/sherpa-onnx-linux/lib"
-          ln -sf libonnxruntime.so "$lib/libonnxruntime.so.1"
+          [ -e "$lib/libonnxruntime.so.1" ] || ln -sf libonnxruntime.so "$lib/libonnxruntime.so.1"
       - name: Build wheel
         working-directory: bindings/python
         run: python -m build --wheel -o dist
