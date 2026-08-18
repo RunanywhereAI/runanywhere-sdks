@@ -1,0 +1,61 @@
+name: Telemetry vocabulary drift
+
+# framework/platform/sdk_binding/battery_state are closed vocabularies on the
+# telemetry wire. The accepted sets are published by the (private) backend as
+# idl/http/sdk-openapi.json and generated into a C++ header here. If the two
+# drift, this repo emits values the backend quarantines — which is exactly how
+# four spellings of llama.cpp and both "ios" and "iOS" reached the stored rows.
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    paths:
+      - "idl/http/**"
+      - "idl/codegen/generate_telemetry_vocabulary.py"
+      - "core/include/rac/infrastructure/telemetry/**"
+      - "core/src/infrastructure/telemetry/**"
+      - ".github/workflows/telemetry-vocabulary-drift.yml"
+
+jobs:
+  vocabulary:
+    name: Generated vocabulary matches the published contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generated header is current
+        run: python3 idl/codegen/generate_telemetry_vocabulary.py --check
+
+      - name: Every framework string the core can emit is in the vocabulary
+        run: |
+          python3 - <<'PY'
+          import json, re, sys, pathlib
+
+          vocab = json.load(open("idl/http/sdk-openapi.json"))["components"]["schemas"]
+          src = pathlib.Path("core/src/infrastructure/telemetry/telemetry_manager.cpp").read_text()
+
+          failures = []
+          for fn, schema in (
+              ("framework_proto_to_string", "TelemetryFramework"),
+              ("framework_to_string", "TelemetryFramework"),
+          ):
+              m = re.search(rf"const char\* {fn}\(.*?\) \{{(.*?)\n\}}", src, re.S)
+              if not m:
+                  continue
+              allowed = set(vocab[schema]["enum"])
+              emitted = set(re.findall(r'return "([^"]+)";', m.group(1)))
+              stray = sorted(emitted - allowed)
+              if stray:
+                  failures.append(f"{fn}() emits values absent from {schema}: {stray}")
+
+          if failures:
+              print("::error::" + "; ".join(failures))
+              print("Add the value to the backend enum and republish sdk-openapi.json,")
+              print("or stop emitting it. Values outside the vocabulary are quarantined.")
+              sys.exit(1)
+          print("OK - every emitted framework string is in the published vocabulary.")
+          PY

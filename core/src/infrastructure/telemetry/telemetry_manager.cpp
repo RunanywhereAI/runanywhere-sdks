@@ -178,6 +178,9 @@ void free_payload_strings(rac_telemetry_payload_t& event) {
     free((void*)event.output_format);
     free((void*)event.routed_backend);
     free((void*)event.sdk_binding);
+    free((void*)event.app_identifier);
+    free((void*)event.app_name);
+    free((void*)event.app_version);
     free((void*)event.battery_state);
 }
 
@@ -427,9 +430,27 @@ namespace {
 // optional get_memory_info slot exists; CPU state is read in-process. Every
 // source degrades to unknown sentinels — tracking never fails on this path.
 void stamp_live_device_state(rac_telemetry_manager_t* manager, rac_telemetry_payload_t& copy) {
+    // These fields are manager-owned: free_payload_strings() frees them, so the
+    // manager must be the only thing that ever allocates them. Clearing first
+    // means a caller-provided pointer (a string literal, or memory the caller
+    // still owns) can never reach free() — previously battery_state was freed
+    // unconditionally but only ever dup'd when live device state happened to be
+    // available.
+    copy.sdk_binding = nullptr;
+    copy.app_identifier = nullptr;
+    copy.app_name = nullptr;
+    copy.app_version = nullptr;
+    copy.battery_state = nullptr;
+
     const rac_client_info_t* client_info = rac_sdk_get_client_info();
-    if (client_info && client_info->sdk_binding && client_info->sdk_binding[0] != '\0') {
-        copy.sdk_binding = dup_string(client_info->sdk_binding);
+    if (client_info) {
+        auto stamp = [](const char* value) -> const char* {
+            return (value && value[0] != '\0') ? dup_string(value) : nullptr;
+        };
+        copy.sdk_binding = stamp(client_info->sdk_binding);
+        copy.app_identifier = stamp(client_info->app_identifier);
+        copy.app_name = stamp(client_info->app_name);
+        copy.app_version = stamp(client_info->app_version);
     }
 
     rac_device_live_state_t state = {};

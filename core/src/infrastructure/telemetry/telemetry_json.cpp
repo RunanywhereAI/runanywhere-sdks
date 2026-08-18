@@ -2,9 +2,11 @@
  * @file telemetry_json.cpp
  * @brief JSON serialization for telemetry payloads
  *
- * Environment-aware encoding:
- * - Development (Supabase): Uses sdk_event_id, event_timestamp, includes all fields
- * - Production (FastAPI): Uses id, timestamp, skips modality/device_id (batch level)
+ * The V2 ingest shape is environment-independent: `id`/`timestamp`, with
+ * modality carried by the endpoint path and device_id at the batch level.
+ *
+ * framework/platform/sdk_binding/battery_state are closed vocabularies
+ * (idl/http/sdk-openapi.json); see add_vocabulary_string below.
  */
 
 #include <cmath>
@@ -18,6 +20,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_vocabulary.h"
 
 // =============================================================================
 // JSON BUILDER HELPERS
@@ -212,6 +215,24 @@ bool has_string(const char* value) {
     return value != nullptr && value[0] != '\0';
 }
 
+// Emit a closed-vocabulary field, or null if the value is not a member.
+//
+// framework/platform/sdk_binding/battery_state are enums on the wire (see
+// idl/http/sdk-openapi.json); the backend refuses anything else and quarantines
+// the event. Sending a wrong value is worse than sending none: it silently
+// widens the dimension, which is how four spellings of llama.cpp and both "ios"
+// and "iOS" ended up in the stored rows. Dropping the field keeps the event's
+// metrics while making the bug loud in the device log.
+void add_vocabulary_string(JsonBuilder& json, const char* key, const char* value,
+                           const char* const* table, size_t count) {
+    if (value && !rac_telemetry_vocabulary_contains(table, count, value)) {
+        RAC_LOG_WARNING("Telemetry", "Dropping %s: '%s' is not in the published vocabulary", key,
+                        value);
+        value = nullptr;
+    }
+    json.add_string(key, value);
+}
+
 bool has_client_info(const rac_client_info_t& info) {
     return has_string(info.sdk_binding) || has_string(info.app_identifier) ||
            has_string(info.app_name) || has_string(info.app_version) ||
@@ -267,11 +288,13 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("session_id", payload->session_id);
     json.add_string("model_id", payload->model_id);
     json.add_string("model_name", payload->model_name);
-    json.add_string("framework", payload->framework);
+    add_vocabulary_string(json, "framework", payload->framework, RAC_TELEMETRY_FRAMEWORK_VALUES,
+                          RAC_TELEMETRY_FRAMEWORK_COUNT);
 
     json.add_string("device", payload->device);
     json.add_string("os_version", payload->os_version);
-    json.add_string("platform", payload->platform);
+    add_vocabulary_string(json, "platform", payload->platform, RAC_TELEMETRY_PLATFORM_VALUES,
+                          RAC_TELEMETRY_PLATFORM_COUNT);
     json.add_string("sdk_version", payload->sdk_version);
 
     // processing_time_ms: emit as a real value (including a measured 0 ms) when a
@@ -286,9 +309,15 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_bool("is_probe", payload->is_probe, payload->has_is_probe);
 
     // ---- SDK origin + live device state (stamped by the manager) ----------
-    json.add_string("sdk_binding", payload->sdk_binding);
+    add_vocabulary_string(json, "sdk_binding", payload->sdk_binding,
+                          RAC_TELEMETRY_SDK_BINDING_VALUES, RAC_TELEMETRY_SDK_BINDING_COUNT);
+    json.add_string("app_identifier", payload->app_identifier);
+    json.add_string("app_name", payload->app_name);
+    json.add_string("app_version", payload->app_version);
     json.add_double_or_null("battery_level", payload->battery_level, payload->battery_level >= 0);
-    json.add_string_or_null("battery_state", payload->battery_state);
+    add_vocabulary_string(json, "battery_state", payload->battery_state,
+                          RAC_TELEMETRY_BATTERY_STATE_VALUES,
+                          RAC_TELEMETRY_BATTERY_STATE_COUNT);
     json.add_bool("is_low_power_mode", payload->is_low_power_mode, payload->has_is_low_power_mode);
     json.add_int_or_null("total_memory", payload->total_memory, payload->total_memory > 0);
     json.add_int_or_null("available_memory", payload->available_memory,

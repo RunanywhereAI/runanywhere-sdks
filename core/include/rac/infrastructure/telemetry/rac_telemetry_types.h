@@ -196,6 +196,14 @@ typedef struct rac_telemetry_payload {
     // Live device state + SDK origin (stamped by the telemetry manager at
     // track time — callers never set these; see telemetry_manager.cpp)
     const char* sdk_binding;       // "swift", "kotlin", "flutter", "react-native", "web", "cli"
+    // Host-app identity, stamped from rac_sdk_get_client_info() on EVERY event.
+    // These also ride the one-time device-registration payload, but a device
+    // row is upserted rarely while app builds change often — without them on
+    // the event itself there is no way to attribute an observation to the app
+    // (or app version) that actually produced it.
+    const char* app_identifier;  // bundle id / package name, NULL if unknown
+    const char* app_name;        // host app display name, NULL if unknown
+    const char* app_version;     // host app version, NULL if unknown
     double battery_level;          // 0.0-1.0 sampled at event time, negative if unavailable
     const char* battery_state;     // "charging", "full", "unplugged", NULL if unavailable
     rac_bool_t is_low_power_mode;  // Low power mode at event time
