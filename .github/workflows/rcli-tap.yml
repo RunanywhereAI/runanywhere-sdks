@@ -1,0 +1,78 @@
+name: rcli Homebrew tap
+
+# Keeps RunanywhereAI/homebrew-tap's Formula/rcli.rb pointing at the newest
+# release. Nothing did this before, so the tap sat at 0.20.10 from 14 July while
+# releases went on to 0.20.24: `brew install runanywhereai/tap/rcli` handed
+# people a month-old CLI, which is what "brew install rcli doesn't work" was.
+#
+# This is a SEPARATE workflow on purpose. release.yml creates the GitHub Release
+# as a DRAFT, and update-tap.sh reads the published .sha256 sidecars over HTTPS,
+# so it cannot run inside that job — the assets are not downloadable yet. The
+# `release: published` event fires when a human publishes the draft, which is
+# exactly the moment the tarballs become fetchable. Keeping it out of
+# release.yml also means a tap failure can never fail a release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to point the tap at, without the leading v (e.g. 0.20.24)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update-tap:
+    name: Point the tap at the published release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${INPUT_VERSION:-${RELEASE_TAG#v}}"
+          if [ -z "${version}" ]; then
+            echo "::error::no version to publish"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # The tap is a different repository, so GITHUB_TOKEN cannot write to it.
+      # Mirrors how the rcli signing step degrades: when the credential is
+      # absent, say so and stop rather than failing the run, so an unconfigured
+      # fork or a release cut before the secret exists stays green.
+      - name: Update the tap
+        env:
+          TAP_TOKEN: ${{ secrets.RCLI_TAP_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "::warning::RCLI_TAP_TOKEN not configured — skipping the Homebrew tap update."
+            echo "Grant a token with push access to RunanywhereAI/homebrew-tap, then re-run"
+            echo "this workflow, or update by hand: ./rcli/scripts/update-tap.sh ${VERSION}"
+            exit 0
+          fi
+          export RCLI_TAP_REPO="https://x-access-token:${TAP_TOKEN}@github.com/RunanywhereAI/homebrew-tap.git"
+          ./rcli/scripts/update-tap.sh "${VERSION}"
+
+      # Proves the formula the tap now serves actually installs and runs, on the
+      # same OS a user would install from. `brew test` runs the formula's own
+      # test block, which checks `rcli version` and `rcli backends`.
+      - name: Verify brew install from the tap
+        if: ${{ secrets.RCLI_TAP_TOKEN != '' }}
+        env:
+          TAP_TOKEN: ${{ secrets.RCLI_TAP_TOKEN }}
+        continue-on-error: true
+        run: |
+          brew tap runanywhereai/tap
+          brew install runanywhereai/tap/rcli
+          brew test runanywhereai/tap/rcli
