@@ -844,6 +844,10 @@
             "title": "Name",
             "type": "string"
           },
+          "preferred_framework": {
+            "title": "Preferred Framework",
+            "type": "string"
+          },
           "size": {
             "title": "Size",
             "type": "integer"
@@ -855,6 +859,7 @@
           "category",
           "format",
           "backend",
+          "preferred_framework",
           "download_url",
           "size",
           "context_length"
@@ -5337,7 +5342,7 @@
         "type": "string"
       },
       "TelemetryEventType": {
-        "description": "Every event_type the SDK can emit, extracted from its own name switch\n(core/src/infrastructure/telemetry/telemetry_manager.cpp).\n\nClosed on purpose. An unrecognized event_type is quarantined rather than\nstored: production accumulated 76 distinct values, 24 of them off-taxonomy,\nand nothing surfaced that until someone queried the table by hand. Anything\noutside this set now lands in telemetry_rejects with its raw payload intact,\nso it is visible and recoverable but never counted.\n\nLegacy snake_case spellings are NOT members \u2014 api/telemetry_normalize.py\nrewrites those to their canonical form before validation.",
+        "description": "Every event_type the SDK can emit, extracted from its own name switch\n(core/src/infrastructure/telemetry/telemetry_manager.cpp).\n\nClosed on purpose. An unrecognized event_type is quarantined rather than\nstored: production accumulated 76 distinct values, 24 of them off-taxonomy,\nand nothing surfaced that until someone queried the table by hand. Anything\noutside this set now lands in telemetry_rejects with its raw payload intact,\nso it is visible and recoverable but never counted.\n\nMembership is the union of what every SUPPORTED client emits, NOT just the\nnewest build: deriving it from the current switch alone quarantines live\ntraffic from older clients. Verified against every distinct event_type in\nproduction \u2014 see tests/unit/test_telemetry_normalize.py.\n\nLegacy snake_case spellings are NOT members \u2014 api/telemetry_normalize.py\nrewrites those to their canonical form before validation. Names that fielded\nbuilds emit and which have no canonical equivalent to rewrite to (SDK_ERROR)\nare members here instead.",
         "enum": [
           "auth.device_registered",
           "auth.device_registration_failed",
@@ -5401,6 +5406,7 @@
           "rag.query.completed",
           "rag.query.failed",
           "rag.query.started",
+          "sdk.error",
           "sdk.init",
           "sdk.init.completed",
           "sdk.init.failed",

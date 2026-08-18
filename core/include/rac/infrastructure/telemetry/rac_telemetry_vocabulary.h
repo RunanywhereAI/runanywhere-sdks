@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 // Every event type the SDK may emit. Published as TelemetryEventType.
-#define RAC_TELEMETRY_EVENT_TYPE_COUNT 105
+#define RAC_TELEMETRY_EVENT_TYPE_COUNT 106
 static const char* const RAC_TELEMETRY_EVENT_TYPE_VALUES[] = {
     "auth.device_registered",
     "auth.device_registration_failed",
@@ -81,6 +81,7 @@ static const char* const RAC_TELEMETRY_EVENT_TYPE_VALUES[] = {
     "rag.query.completed",
     "rag.query.failed",
     "rag.query.started",
+    "sdk.error",
     "sdk.init",
     "sdk.init.completed",
     "sdk.init.failed",
