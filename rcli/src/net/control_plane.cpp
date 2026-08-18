@@ -239,6 +239,7 @@ rac_result_t login(LoginSummary* out, std::string* error) {
         out->persistent_device_id = persistent_device_id != nullptr ? persistent_device_id : "";
         out->token_expires_at = rac_auth_get_token_expires_at();
         out->has_completed_http_setup = result.has_completed_http_setup();
+        out->device_registered = rac_auth_get_device_registered();
         out->assignment_count = result.linked_models_count();
         out->warning = result.warning();
     }

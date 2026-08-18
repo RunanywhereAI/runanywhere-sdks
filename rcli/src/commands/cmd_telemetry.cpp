@@ -175,6 +175,48 @@ struct MetricOptions {
     double audio_duration_ms = -1.0;
 };
 
+// One representative metric per modality, so a blast exercises every child
+// table rather than only telemetry_events.
+//
+// Events carrying no metrics no longer write an all-NULL child row (that pattern
+// left 39% of llm_telemetry empty in production), so a probe that stamps only
+// LLM token counts would silently stop covering the other nine child tables.
+// These values are invented like the rest of the probe payload, which is exactly
+// why every blast row is marked is_probe and excluded from analytics.
+void stamp_probe_metrics(const ModalitySpec& spec, rac_telemetry_payload_t& payload) {
+    const std::string modality = spec.name;
+    if (modality == "stt") {
+        payload.audio_duration_ms = 1000.0;
+        payload.word_count = 3;
+    } else if (modality == "tts") {
+        payload.character_count = 42;
+        payload.output_duration_ms = 900.0;
+    } else if (modality == "vlm") {
+        payload.image_count = 1;
+        payload.vision_tokens = 64;
+    } else if (modality == "rag") {
+        payload.top_k = 5;
+        payload.retrieval_time_ms = 12.0;
+    } else if (modality == "imagegen") {
+        payload.image_width = 512;
+        payload.image_height = 512;
+    } else if (modality == "embeddings") {
+        payload.input_count = 1;
+        payload.embedding_dimension = 384;
+    } else if (modality == "voice") {
+        payload.voice_total_ms = 750.0;
+        payload.voice_stt_ms = 250.0;
+    } else if (modality == "vad") {
+        payload.speech_duration_ms = 400.0;
+        payload.segment_count = 1;
+    } else if (modality == "lora") {
+        payload.adapter_id = "probe-adapter";
+        payload.adapter_size_bytes = 1024;
+    }
+    // llm is covered by the caller-supplied token flags; system and model have
+    // no child table at all.
+}
+
 void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
                   const std::string& event_type, const std::string& session_id, int count,
                   const MetricOptions& metrics) {
@@ -211,6 +253,7 @@ void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
             payload.total_tokens = (metrics.input_tokens > 0 ? metrics.input_tokens : 0) +
                                    metrics.output_tokens;
         }
+        stamp_probe_metrics(spec, payload);
         // Emit only caller-supplied metrics. Do not fabricate TTFT/TPS/context
         // or STT audio-length/RTF/word-count from processing_ms.
         if (metrics.audio_duration_ms >= 0) {

@@ -65,6 +65,11 @@ struct LoginSummary {
     // cross-phase signal ("HTTP/auth setup completed", not literally "a
     // device row exists"), so it is what this now reports.
     bool has_completed_http_setup = false;
+    // From the authenticate response: 1 the backend holds a fully registered
+    // device row, 0 only the placeholder authenticate() creates, -1 the backend
+    // did not say. Surfacing it is what lets a test assert the registration
+    // actually ran, rather than trusting that it did.
+    int device_registered = -1;
     uint32_t assignment_count = 0;
     std::string warning;             // non-fatal phase-2 notes
 };

@@ -764,8 +764,41 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                     return "device";
             }
         }
+        case SDKEvent::kComponentLifecycle: {
+            // Model load/unload/evict state transitions. Deliberately NOT named
+            // "*.completed"/"*.failed": those suffixes define a counted request
+            // in the analytics filters, and a lifecycle transition is not an
+            // inference. Naming them this way makes them observable without
+            // inflating request counts.
+            switch (ev.component_lifecycle().kind()) {
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED:
+                    return "component.model.loaded";
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED:
+                    return "component.model.unloaded";
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED:
+                    return "component.state.changed";
+                default:
+                    return "component";
+            }
+        }
         case SDKEvent::kNetwork:
-            return "network.connectivity.changed";
+            // This arm ignored kind() entirely, so request started/completed/
+            // failed/timeout were all recorded as connectivity changes — four of
+            // the five kinds mislabelled.
+            switch (ev.network().kind()) {
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_STARTED:
+                    return "network.request.started";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_COMPLETED:
+                    return "network.request.completed";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_FAILED:
+                    return "network.request.failed";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_TIMEOUT:
+                    return "network.request.timeout";
+                case runanywhere::v1::NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED:
+                    return "network.connectivity.changed";
+                default:
+                    return "network";
+            }
         case SDKEvent::kVoicePipeline: {
             if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
                 return "vad.process";
