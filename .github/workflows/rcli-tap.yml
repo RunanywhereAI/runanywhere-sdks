@@ -24,10 +24,24 @@ on:
 permissions:
   contents: read
 
+# update-tap.sh clones, commits and pushes with no rebase and no retry, so two
+# runs racing (a release publish alongside a manual dispatch) can have one push
+# rejected and leave the tap pointing at the older release. Queue them instead.
+# cancel-in-progress stays false: a cancelled run here means a tap that never
+# got updated, which is the exact failure this workflow exists to prevent.
+concurrency:
+  group: rcli-homebrew-tap
+  cancel-in-progress: false
+
 jobs:
   update-tap:
     name: Point the tap at the published release
     runs-on: ubuntu-latest
+    # Job level, not step level: a step's `if` cannot read the `secrets` context
+    # at all, and cannot read env declared on that same step either. Hoisting it
+    # here is what makes the token-presence check below actually evaluate.
+    env:
+      TAP_TOKEN: ${{ secrets.RCLI_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,7 +66,6 @@ jobs:
       # fork or a release cut before the secret exists stays green.
       - name: Update the tap
         env:
-          TAP_TOKEN: ${{ secrets.RCLI_TAP_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "${TAP_TOKEN}" ]; then
@@ -67,11 +80,11 @@ jobs:
       # Proves the formula the tap now serves actually installs and runs, on the
       # same OS a user would install from. `brew test` runs the formula's own
       # test block, which checks `rcli version` and `rcli backends`.
+      # No continue-on-error: this step exists to catch a formula that does not
+      # install, and a check that cannot fail would report a broken tap as
+      # healthy — which is how the tap sat broken for a month in the first place.
       - name: Verify brew install from the tap
-        if: ${{ secrets.RCLI_TAP_TOKEN != '' }}
-        env:
-          TAP_TOKEN: ${{ secrets.RCLI_TAP_TOKEN }}
-        continue-on-error: true
+        if: ${{ env.TAP_TOKEN != '' }}
         run: |
           brew tap runanywhereai/tap
           brew install runanywhereai/tap/rcli
