@@ -1648,9 +1648,10 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
 
         // Return original text as clean_text
         out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-        if (out_result->clean_text) {
-            std::memcpy(out_result->clean_text, llm_output, output_len + 1);
+        if (out_result->clean_text == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        std::memcpy(out_result->clean_text, llm_output, output_len + 1);
     }
 
     return RAC_SUCCESS;
@@ -3137,9 +3138,10 @@ rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions
 
     if (!definitions || num_definitions == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
-        if (*out_prompt) {
-            (*out_prompt)[0] = '\0';
+        if (*out_prompt == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        (*out_prompt)[0] = '\0';
         return RAC_SUCCESS;
     }
 
@@ -3203,9 +3205,10 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
 
     if (!tools_json || strlen(tools_json) == 0 || strcmp(tools_json, "[]") == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
-        if (*out_prompt) {
-            (*out_prompt)[0] = '\0';
+        if (*out_prompt == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        (*out_prompt)[0] = '\0';
         return RAC_SUCCESS;
     }
 
@@ -3510,9 +3513,10 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
 
     if (!definitions || num_definitions == 0) {
         *out_json = static_cast<char*>(malloc(3));
-        if (*out_json) {
-            std::memcpy(*out_json, "[]", 3);
+        if (*out_json == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        std::memcpy(*out_json, "[]", 3);
         return RAC_SUCCESS;
     }
 
