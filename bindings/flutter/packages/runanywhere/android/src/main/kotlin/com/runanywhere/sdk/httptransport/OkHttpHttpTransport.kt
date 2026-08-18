@@ -408,11 +408,13 @@ object OkHttpHttpTransport {
         // the teardown signal.
         val slot = StreamSlot()
         inFlightStreams[streamId] = slot
+        var activeCall: Call? = null
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
 
             val call = clientForCall.newCall(request)
+            activeCall = call
             // Publish the Call into the slot. If cancelAllStreams() landed
             // between slot pre-registration and now, `cancelRequested` is
             // already set; cancel the call immediately so execute() races
@@ -461,7 +463,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = false,
+                cancelled = activeCall?.isCanceled() == true,
             )
         } finally {
             inFlightStreams.remove(streamId)

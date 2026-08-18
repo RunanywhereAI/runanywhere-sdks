@@ -368,6 +368,7 @@ object OkHttpHttpTransport {
         // that lands during startup observes this stream.
         val slot = StreamSlot()
         inFlightStreams[streamId] = slot
+        var activeCall: Call? = null
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
@@ -376,6 +377,7 @@ object OkHttpHttpTransport {
             val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
 
             val call = clientForCall.newCall(request)
+            activeCall = call
             // Publish the Call into the slot. If cancelAllStreams() landed
             // between slot pre-registration and now, cancel immediately.
             val cancelImmediately = synchronized(slot) {
@@ -423,7 +425,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = false,
+                cancelled = activeCall?.isCanceled() == true,
             )
         } finally {
             inFlightStreams.remove(streamId)
