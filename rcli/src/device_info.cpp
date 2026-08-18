@@ -530,6 +530,11 @@ void device_get_info(rac_device_registration_info_t *out_info,
   info.battery_level = -1.0;
   info.battery_state.clear();
   collect_device_info(info);
+  // Hash of the hardware CLASS, not of this unit: every machine with the same
+  // model, chip, RAM and core count produces the same value. Useful as an
+  // attribute, fatal as an identity — it used to be sent as device_fingerprint,
+  // which made every re-authenticate mint a duplicate device row and let two
+  // identical machines in one org share a row and its refresh-token chain.
   info.fingerprint = runanywhere::sha256_hex(
       info.model + "|" + info.chip + "|" + std::to_string(info.total_memory) +
       "|" + std::to_string(info.core_count));
@@ -555,7 +560,10 @@ void device_get_info(rac_device_registration_info_t *out_info,
   out_info->core_count = info.core_count;
   out_info->performance_cores = info.performance_cores;
   out_info->efficiency_cores = info.efficiency_cores;
-  out_info->device_fingerprint = info.fingerprint.c_str();
+  // Identity is the persistent per-install id; the hardware hash rides its own
+  // field so it can be recorded without being mistaken for identity.
+  out_info->device_fingerprint = info.device_id.c_str();
+  out_info->hardware_class_fingerprint = info.fingerprint.c_str();
 }
 
 const char *device_get_id(void * /*user_data*/) {

@@ -293,7 +293,15 @@ typedef struct rac_device_registration_info {
     int32_t core_count;              // Total CPU cores
     int32_t performance_cores;       // Performance (P) cores
     int32_t efficiency_cores;        // Efficiency (E) cores
-    const char* device_fingerprint;  // Unique device fingerprint (may be same as device_id)
+    // Device IDENTITY: the SDK's persistent per-install UUID. This is what the
+    // backend matches on, so it must never carry anything else. Bindings that
+    // used to put a hardware hash here made every re-authenticate mint a
+    // duplicate device row.
+    const char* device_fingerprint;
+    // Hash of the hardware CLASS (model + chip + RAM + core count). An
+    // attribute, never an identity: every device of the same spec hashes
+    // identically, so two phones in one org would collide onto one row.
+    const char* hardware_class_fingerprint;
 } rac_device_registration_info_t;
 
 /**

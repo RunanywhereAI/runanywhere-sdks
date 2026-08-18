@@ -54,6 +54,7 @@ struct DeviceCallbackStrings {
   std::string gpuFamily;
   std::string batteryState;
   std::string deviceFingerprint;
+  std::string hardwareClassFingerprint;
   std::string responseBody;
   std::string errorMessage;
 
@@ -69,6 +70,7 @@ struct DeviceCallbackStrings {
     wipeAndClear(gpuFamily);
     wipeAndClear(batteryState);
     wipeAndClear(deviceFingerprint);
+    wipeAndClear(hardwareClassFingerprint);
     wipeAndClear(responseBody);
     wipeAndClear(errorMessage);
   }
@@ -101,8 +103,13 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     g_deviceCallbackStrings.chipName = info.chipName;
     g_deviceCallbackStrings.gpuFamily = info.gpuFamily;
     g_deviceCallbackStrings.batteryState = info.batteryState;
-    g_deviceCallbackStrings.deviceFingerprint =
-        info.deviceFingerprint.empty() ? info.deviceId : info.deviceFingerprint;
+    // Identity is the persistent per-install id. info.deviceFingerprint holds a
+    // hash of the hardware CLASS (model + chip + RAM + cores), which is
+    // identical for every unit of the same spec — sending it as identity let
+    // registration overwrite the row's key, so the next authenticate minted a
+    // duplicate, and let two identical devices in one org share a row.
+    g_deviceCallbackStrings.deviceFingerprint = info.deviceId;
+    g_deviceCallbackStrings.hardwareClassFingerprint = info.deviceFingerprint;
 
     // Fill out the struct - matches Swift's implementation
     outInfo->device_id = g_deviceCallbackStrings.deviceId.c_str();
@@ -128,6 +135,10 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     outInfo->efficiency_cores = info.efficiencyCores;
     outInfo->device_fingerprint =
         g_deviceCallbackStrings.deviceFingerprint.c_str();
+    outInfo->hardware_class_fingerprint =
+        g_deviceCallbackStrings.hardwareClassFingerprint.empty()
+            ? nullptr
+            : g_deviceCallbackStrings.hardwareClassFingerprint.c_str();
 
     LOGD("Device info populated: model=%s, platform=%s",
          g_deviceCallbackStrings.deviceModel.c_str(),

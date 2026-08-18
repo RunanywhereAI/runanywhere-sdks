@@ -979,7 +979,12 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       coreCount: coreCount,
       performanceCores: coreSplit.$1,
       efficiencyCores: coreSplit.$2,
-      deviceFingerprint: _nonEmpty(info.fingerprint) ?? deviceId,
+      // Build.FINGERPRINT is the OS BUILD string: identical across every device
+      // running that ROM, and it changes on every OTA update. It was never a
+      // device identifier, and sending it as identity meant registration
+      // overwrote the row's key so the next authenticate minted a duplicate.
+      // Identity is the persistent per-install id.
+      deviceFingerprint: deviceId,
     );
   }
 

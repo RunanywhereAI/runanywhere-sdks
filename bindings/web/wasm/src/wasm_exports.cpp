@@ -743,6 +743,11 @@ EMSCRIPTEN_KEEPALIVE int
 rac_wasm_offsetof_device_registration_info_device_fingerprint(void) {
   return (int)offsetof(rac_device_registration_info_t, device_fingerprint);
 }
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint(void) {
+  return (int)offsetof(rac_device_registration_info_t,
+                       hardware_class_fingerprint);
+}
 
 // ---- rac_device_http_response_t ----
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_device_http_response(void) {

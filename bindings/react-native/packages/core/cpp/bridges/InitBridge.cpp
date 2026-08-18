@@ -1841,8 +1841,10 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
             info.performanceCores = perfCores;
             info.efficiencyCores = totalCores - perfCores;
         }
-        // Stable hardware fingerprint: SHA-256 of the invariant hardware
-        // tuple, distinct from the per-install persistent device UUID.
+        // Hardware CLASS hash: SHA-256 of the invariant hardware tuple. NOT a
+        // per-unit identifier — every device of the same model + chip + RAM +
+        // core count produces this same value. DeviceBridge routes it to
+        // hardware_class_fingerprint; identity is the persistent device UUID.
         info.deviceFingerprint = ::runanywhere::sha256_hex(
             info.deviceModel + "|" + info.chipName + "|" +
             std::to_string(info.totalMemory) + "|" +

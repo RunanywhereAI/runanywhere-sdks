@@ -216,8 +216,12 @@ public enum DeviceInfoFactory {
         }
     }
 
-    /// Stable hardware fingerprint: deterministic per physical device,
-    /// survives reinstalls (derived only from hardware attributes).
+    /// Hardware CLASS fingerprint: deterministic for a model + chip + RAM +
+    /// core-count combination, NOT for a physical unit — every device of the
+    /// same spec produces the same value. Useful for "how many distinct SKUs
+    /// does this org run"; never usable as device identity.
+    /// (It was previously sent as `device_fingerprint`, which is exactly how
+    /// duplicate device rows and cross-device row sharing happened.)
     static let hardwareFingerprint: String = {
         let modelId = getModelIdentifier()
         let chipName = getChipSpec(for: modelId).name

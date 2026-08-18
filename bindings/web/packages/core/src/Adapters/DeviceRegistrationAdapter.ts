@@ -102,6 +102,7 @@ export interface DeviceRegistrationModule extends EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_device_registration_info_performance_cores?(): number;
   _rac_wasm_offsetof_device_registration_info_efficiency_cores?(): number;
   _rac_wasm_offsetof_device_registration_info_device_fingerprint?(): number;
+  _rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint?(): number;
 
   _rac_wasm_sizeof_device_http_response?(): number;
   _rac_wasm_offsetof_device_http_response_result?(): number;
@@ -150,6 +151,7 @@ interface DeviceInfoLayout {
   performanceCores: number;
   efficiencyCores: number;
   deviceFingerprint: number;
+  hardwareClassFingerprint: number;
 }
 
 interface HTTPResponseLayout {
@@ -175,6 +177,7 @@ interface DeviceProfile {
   batteryLevel: number;
   batteryState: string | null;
   deviceFingerprint: string | null;
+  hardwareClassFingerprint: string | null;
   coreCount: number;
 }
 
@@ -445,7 +448,12 @@ function browserDeviceProfile(): DeviceProfile {
     gpuFamily: hardware.gpuFamily,
     batteryLevel: hardware.batteryLevel,
     batteryState: hardware.batteryState,
-    deviceFingerprint: hardware.fingerprint || null,
+    // Identity is left to commons, which falls back to the persistent
+    // per-install id. hardware.fingerprint hashes browser/hardware traits that
+    // are shared by every identical machine and change across driver updates —
+    // an attribute, never an identity.
+    deviceFingerprint: null,
+    hardwareClassFingerprint: hardware.fingerprint || null,
     coreCount,
   };
 }
@@ -694,10 +702,18 @@ export class DeviceRegistrationAdapter {
     if (profile.deviceFingerprint) {
       writeString(this.deviceInfoLayout.deviceFingerprint, profile.deviceFingerprint);
     } else {
+      // Identity falls back to the persistent per-install id, which is the only
+      // value that is actually unique to this install.
       this.module.setValue(
         outInfoPtr + this.deviceInfoLayout.deviceFingerprint,
         deviceIdPtr,
         '*',
+      );
+    }
+    if (profile.hardwareClassFingerprint) {
+      writeString(
+        this.deviceInfoLayout.hardwareClassFingerprint,
+        profile.hardwareClassFingerprint,
       );
     }
   }
@@ -996,6 +1012,7 @@ export class DeviceRegistrationAdapter {
       performanceCores: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_performance_cores, 'rac_wasm_offsetof_device_registration_info_performance_cores'),
       efficiencyCores: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_efficiency_cores, 'rac_wasm_offsetof_device_registration_info_efficiency_cores'),
       deviceFingerprint: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_device_fingerprint, 'rac_wasm_offsetof_device_registration_info_device_fingerprint'),
+      hardwareClassFingerprint: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint, 'rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint'),
     };
   }
 

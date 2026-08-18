@@ -576,11 +576,16 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_int_always("performance_cores", info->performance_cores);
         json.add_int_always("efficiency_cores", info->efficiency_cores);
 
-        // Device fingerprint (fallback to device_id if not set)
+        // Identity, with the persistent id as the fallback. A platform callback
+        // that leaves this empty is correct; one that fills it with a hardware
+        // hash is what caused duplicate device rows.
         const char* fingerprint = info->device_fingerprint
                                       ? info->device_fingerprint
                                       : (info->device_id ? info->device_id : "");
         json.add_string_always("device_fingerprint", fingerprint);
+        // Hardware class travels separately so it can be recorded without ever
+        // being mistaken for identity.
+        json.add_string("hardware_class_fingerprint", info->hardware_class_fingerprint);
 
         json.end_object();  // Close device_info
 
