@@ -127,9 +127,9 @@ static const char* const RAC_TELEMETRY_EVENT_TYPE_VALUES[] = {
     "voice.turn.metrics",
 };
 
-// Backend (engine) that actually executed the work. Published as TelemetryBackend.
-#define RAC_TELEMETRY_BACKEND_COUNT 22
-static const char* const RAC_TELEMETRY_BACKEND_VALUES[] = {
+// Framework (engine) that actually executed the work. Published as TelemetryFramework.
+#define RAC_TELEMETRY_FRAMEWORK_COUNT 22
+static const char* const RAC_TELEMETRY_FRAMEWORK_VALUES[] = {
     "onnx",
     "sherpa",
     "llamacpp",
@@ -152,14 +152,6 @@ static const char* const RAC_TELEMETRY_BACKEND_VALUES[] = {
     "builtin",
     "none",
     "unknown",
-};
-
-// Where the model came from. Published as TelemetryModelSource.
-#define RAC_TELEMETRY_MODEL_SOURCE_COUNT 3
-static const char* const RAC_TELEMETRY_MODEL_SOURCE_VALUES[] = {
-    "catalog",
-    "builtin",
-    "user",
 };
 
 // OS family — never the binding. Published as TelemetryPlatform.

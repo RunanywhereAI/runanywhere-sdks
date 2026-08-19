@@ -288,13 +288,11 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("session_id", payload->session_id);
     json.add_string("model_id", payload->model_id);
     json.add_string("model_name", payload->model_name);
-    // "backend" is the canonical key. "framework" is emitted alongside it so a
-    // backend deployment that predates the rename still records the value; the
-    // ingest schema accepts either and stores one column.
-    add_vocabulary_string(json, "backend", payload->framework, RAC_TELEMETRY_BACKEND_VALUES,
-                          RAC_TELEMETRY_BACKEND_COUNT);
-    add_vocabulary_string(json, "framework", payload->framework, RAC_TELEMETRY_BACKEND_VALUES,
-                          RAC_TELEMETRY_BACKEND_COUNT);
+    // Which engine executed the work. One key, one closed vocabulary, shared
+    // with model_catalog.framework and models.framework server-side. Matches
+    // this proto's own InferenceFramework naming.
+    add_vocabulary_string(json, "framework", payload->framework, RAC_TELEMETRY_FRAMEWORK_VALUES,
+                          RAC_TELEMETRY_FRAMEWORK_COUNT);
 
     json.add_string("device", payload->device);
     json.add_string("os_version", payload->os_version);

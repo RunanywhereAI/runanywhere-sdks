@@ -452,16 +452,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "batch_size": {
             "anyOf": [
               {
@@ -579,6 +569,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -652,16 +652,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -809,10 +799,6 @@
       "ForSDKModelEntry": {
         "description": "One model entry in the SDK assignments payload.\n\nSDK-FROZEN: C++ commons (model_assignment.cpp) parses these exact keys \u2014\nfield names and order mirror the dict services/assignments.py builds.\nSee tests/contract/test_sdk_contract_freeze.py.",
         "properties": {
-          "backend": {
-            "title": "Backend",
-            "type": "string"
-          },
           "category": {
             "title": "Category",
             "type": "string"
@@ -834,6 +820,10 @@
           },
           "format": {
             "title": "Format",
+            "type": "string"
+          },
+          "framework": {
+            "title": "Framework",
             "type": "string"
           },
           "id": {
@@ -858,7 +848,7 @@
           "name",
           "category",
           "format",
-          "backend",
+          "framework",
           "preferred_framework",
           "download_url",
           "size",
@@ -987,16 +977,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -1077,6 +1057,16 @@
           },
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "guidance_scale": {
             "anyOf": [
@@ -1175,16 +1165,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "negative_prompt_length": {
             "anyOf": [
@@ -1490,16 +1470,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -1592,6 +1562,16 @@
           },
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "generation_time_ms": {
             "anyOf": [
@@ -1690,16 +1670,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -2007,16 +1977,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "base_model_id": {
             "anyOf": [
               {
@@ -2110,6 +2070,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -2171,16 +2141,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -2415,16 +2375,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -2506,6 +2456,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -2579,16 +2539,6 @@
               }
             ],
             "title": "Model Size Bytes"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -2827,16 +2777,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -2942,6 +2882,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -3003,16 +2953,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -3476,19 +3416,6 @@
             "description": "Output audio size",
             "title": "Audio Size Bytes"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "AI framework",
-            "title": "Backend"
-          },
           "character_count": {
             "anyOf": [
               {
@@ -3593,6 +3520,19 @@
             "minLength": 1,
             "title": "Event Type",
             "type": "string"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "AI framework",
+            "title": "Framework"
           },
           "generation_time_ms": {
             "anyOf": [
@@ -4084,16 +4024,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -4188,6 +4118,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -4261,16 +4201,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -4540,16 +4470,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -4643,6 +4563,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "freed_bytes": {
             "anyOf": [
               {
@@ -4727,16 +4657,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -4959,16 +4879,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -5074,6 +4984,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -5135,16 +5055,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -5301,35 +5211,6 @@
         "title": "TTSIngestEvent",
         "type": "object"
       },
-      "TelemetryBackend": {
-        "description": "The backend (engine) that actually executed the work.\n\nNot the engine the caller asked for: production shows\n`foundation-models-default` reporting `llamacpp` on 12,422 events because\nthe requested framework was recorded instead of the selected one.",
-        "enum": [
-          "onnx",
-          "sherpa",
-          "llamacpp",
-          "foundation_models",
-          "system_tts",
-          "fluid_audio",
-          "coreml",
-          "whisperkit_coreml",
-          "mlx",
-          "qhexrt",
-          "neurt",
-          "tflite",
-          "executorch",
-          "mediapipe",
-          "mlc",
-          "pico_llm",
-          "piper_tts",
-          "swift_transformers",
-          "cloud",
-          "builtin",
-          "none",
-          "unknown"
-        ],
-        "title": "TelemetryBackend",
-        "type": "string"
-      },
       "TelemetryBatteryState": {
         "description": "Battery state at event time.",
         "enum": [
@@ -5454,14 +5335,33 @@
         "title": "TelemetryEventType",
         "type": "string"
       },
-      "TelemetryModelSource": {
-        "description": "Where the model came from.\n\nConsole-served models must be countable separately from what ships inside\nthe SDK. Without this dimension `foundation-models-default` (15,008\nproduction events) and `system-tts` (2,295) are indistinguishable from a\nmodel a customer deployed from the console \u2014 they are built into the\nplatform and have no download at all.",
+      "TelemetryFramework": {
+        "description": "The backend (engine) that actually executed the work.\n\nNot the engine the caller asked for: production shows\n`foundation-models-default` reporting `llamacpp` on 12,422 events because\nthe requested framework was recorded instead of the selected one.",
         "enum": [
-          "catalog",
+          "onnx",
+          "sherpa",
+          "llamacpp",
+          "foundation_models",
+          "system_tts",
+          "fluid_audio",
+          "coreml",
+          "whisperkit_coreml",
+          "mlx",
+          "qhexrt",
+          "neurt",
+          "tflite",
+          "executorch",
+          "mediapipe",
+          "mlc",
+          "pico_llm",
+          "piper_tts",
+          "swift_transformers",
+          "cloud",
           "builtin",
-          "user"
+          "none",
+          "unknown"
         ],
-        "title": "TelemetryModelSource",
+        "title": "TelemetryFramework",
         "type": "string"
       },
       "TelemetryPlatform": {
@@ -5653,16 +5553,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -5755,6 +5645,16 @@
           },
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "generation_time_ms": {
             "anyOf": [
@@ -5877,16 +5777,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -6194,16 +6084,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -6285,6 +6165,16 @@
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
           },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "description": "Unique event ID (UUID v4)",
             "title": "Id",
@@ -6346,16 +6236,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [
@@ -6654,16 +6534,6 @@
             ],
             "title": "Available Memory"
           },
-          "backend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryBackend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "battery_level": {
             "anyOf": [
               {
@@ -6744,6 +6614,16 @@
           },
           "event_type": {
             "$ref": "#/components/schemas/TelemetryEventType"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryFramework"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "description": "Unique event ID (UUID v4)",
@@ -6829,16 +6709,6 @@
               }
             ],
             "title": "Model Name"
-          },
-          "model_source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TelemetryModelSource"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "online_core_count": {
             "anyOf": [

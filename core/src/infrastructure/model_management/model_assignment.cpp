@@ -169,10 +169,11 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
         const std::string name = json_first_string(obj, {"name"});
         const std::string category = json_first_string(obj, {"category"});
         const std::string format = json_first_string(obj, {"format"});
-        // "backend" is the canonical key; "preferred_framework" is the older
-        // spelling the backend still emits alongside it for fielded builds.
+        // "framework" is the canonical key. "preferred_framework" carries the
+        // same value and is what every released build through 0.20.24 reads, so
+        // the server emits both; prefer the canonical one when present.
         const std::string framework =
-            json_first_string(obj, {"backend", "preferred_framework"});
+            json_first_string(obj, {"framework", "preferred_framework"});
         const std::string download_url = json_first_string(obj, {"download_url"});
         const std::string description = json_first_string(obj, {"description"});
         const int64_t size = json_first_int(obj, 0, {"size"});
