@@ -118,7 +118,13 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
             if (file.good()) {
                 reply_path = output;
             } else {
-                out::status_line("warning: cannot write " + output);
+                // A requested --output that cannot be written is a runtime error,
+                // not a warning: `rcli tts --output` already exits 1 for exactly
+                // this (cmd_tts.cpp), and a caller doing
+                // `rcli voice --output reply.wav && play reply.wav` otherwise
+                // proceeds against a file that is not there.
+                out::error_line("cannot write " + output);
+                exit_code = 1;
             }
         }
 
