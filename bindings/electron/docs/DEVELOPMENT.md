@@ -307,3 +307,54 @@ When bundling into an Electron app, unpack native artifacts from the asar:
 // electron-builder config
 "asarUnpack": ["**/node_modules/@runanywhere/electron/prebuilds/**"]
 ```
+
+## Handle Leak Detection (RAC_HANDLE_AUDIT)
+
+When `RAC_HANDLE_AUDIT` is set to `warn` or `debug`, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (i.e., were never properly unloaded) are reported as leaks. Any other value (including an empty string) disables tracking with zero runtime overhead.
+
+### Usage
+
+```bash
+# Enable warning-level leak reporting at shutdown
+RAC_HANDLE_AUDIT=warn node dist/main.js
+
+# Enable periodic delta logging to stdout/stderr
+RAC_HANDLE_AUDIT=debug node dist/main.js
+```
+
+### Environment Values
+
+| Value | Behavior |
+|---|---|
+| `off` (default) | Zero runtime overhead — no audit table, no extra mutex contention. |
+| `warn` | Records every handle ID + category at load time; erases at unload. Logs leaked handles during `Shutdown()`. |
+| `debug` | Same as `warn`, plus the TS `HandleAuditor` prints periodic delta reports (`+N / -M`) to stderr every 5 seconds. |
+
+### Audit Data Shape
+
+The native addon exposes `handleAudit()` returning:
+
+```typescript
+interface HandleAuditEntry {
+  id: number;           // globally unique integer handle ID
+  category: string;     // 'llm' | 'vlm' | 'embedding' | 'stt' | 'tts' | 'vad' | 'rag' | 'rerank' | 'diarization' | 'segmentation'
+  model?: string;       // model id or path passed to the load function
+}
+```
+
+### Integration with Feature Tests
+
+Feature tests that exercise unload paths will surface leaks when run under `RAC_HANDLE_AUDIT=warn`:
+
+```bash
+# Replace <arch> with your target: darwin-arm64, win32-x64, etc.
+RAC_HANDLE_AUDIT=warn RUNANYWHERE_NATIVE_PATH=prebuilds/<arch>/runanywhere_native.node node dist-test/feature/lifecycle.feature.test.js
+```
+
+A green test run should show zero leaked handles. Any reported leak indicates the unload function for that slot type did not properly destroy and erase its handle before returning.
+
+### Implementation Details
+
+- Overhead: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy (node allocation proportional to the implementation's internal tree structure), plus `model_source` string allocation (typically small-string optimized on 40–55 bytes; heap-allocated for longer paths), plus mutex lock on each operation.
+- The audit table is guarded by `g_handles_mutex` — the same mutex that protects all handle maps — so no additional locking is needed.
+- When `RAC_HANDLE_AUDIT=off`, a static flag evaluated once at module init avoids per-call `getenv()` overhead.
