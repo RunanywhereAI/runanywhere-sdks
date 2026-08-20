@@ -172,7 +172,11 @@ jobs:
       # do not reuse it verbatim on this runner.
       - name: Fetch node-gyp headers (Windows ARM64 N-API link)
         id: nodedev
-        shell: pwsh
+        # This self-hosted runner has only Windows PowerShell (5.1), not
+        # PowerShell Core (`pwsh`) — confirmed by actually running commands
+        # on it, unlike the GH-hosted windows-2022 runners the x64 job below
+        # uses, where `pwsh` is preinstalled. Do not "fix" this back to pwsh.
+        shell: powershell
         run: |
           npx --yes node-gyp install
           $ver = (node -p "process.versions.node")
