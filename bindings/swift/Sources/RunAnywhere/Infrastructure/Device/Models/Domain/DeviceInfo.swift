@@ -6,7 +6,6 @@
 //  `RADeviceInfo` telemetry schema from sysctl / UIKit / ProcessInfo.
 //
 
-import CryptoKit
 import Foundation
 
 #if canImport(Metal)
@@ -215,22 +214,6 @@ public enum DeviceInfoFactory {
         default: return "unspecified"
         }
     }
-
-    /// Hardware CLASS fingerprint: deterministic for a model + chip + RAM +
-    /// core-count combination, NOT for a physical unit — every device of the
-    /// same spec produces the same value. Useful for "how many distinct SKUs
-    /// does this org run"; never usable as device identity.
-    /// (It was previously sent as `device_fingerprint`, which is exactly how
-    /// duplicate device rows and cross-device row sharing happened.)
-    static let hardwareFingerprint: String = {
-        let modelId = getModelIdentifier()
-        let chipName = getChipSpec(for: modelId).name
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let coreCount = ProcessInfo.processInfo.processorCount
-        let composite = "\(modelId)|\(chipName)|\(totalMemory)|\(coreCount)"
-        let digest = SHA256.hash(data: Data(composite.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
-    }()
 
     // MARK: - GPU Family
 

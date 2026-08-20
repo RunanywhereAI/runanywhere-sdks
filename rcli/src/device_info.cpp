@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "rac/core/rac_sdk_state.h"
-#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -48,7 +47,6 @@ struct DeviceInfoState {
   std::string chip;
   std::string gpu_family;
   std::string battery_state;
-  std::string fingerprint;
   double battery_level = -1.0;
   int64_t total_memory = 0;
   int64_t available_memory = 0;
@@ -530,14 +528,6 @@ void device_get_info(rac_device_registration_info_t *out_info,
   info.battery_level = -1.0;
   info.battery_state.clear();
   collect_device_info(info);
-  // Hash of the hardware CLASS, not of this unit: every machine with the same
-  // model, chip, RAM and core count produces the same value. Useful as an
-  // attribute, fatal as an identity — it used to be sent as device_fingerprint,
-  // which made every re-authenticate mint a duplicate device row and let two
-  // identical machines in one org share a row and its refresh-token chain.
-  info.fingerprint = runanywhere::sha256_hex(
-      info.model + "|" + info.chip + "|" + std::to_string(info.total_memory) +
-      "|" + std::to_string(info.core_count));
 
   *out_info = {};
   out_info->device_id = info.device_id.c_str();
@@ -560,10 +550,8 @@ void device_get_info(rac_device_registration_info_t *out_info,
   out_info->core_count = info.core_count;
   out_info->performance_cores = info.performance_cores;
   out_info->efficiency_cores = info.efficiency_cores;
-  // Identity is the persistent per-install id; the hardware hash rides its own
-  // field so it can be recorded without being mistaken for identity.
+  // Identity is the persistent per-install id, and nothing else.
   out_info->device_fingerprint = info.device_id.c_str();
-  out_info->hardware_class_fingerprint = info.fingerprint.c_str();
 }
 
 const char *device_get_id(void * /*user_data*/) {

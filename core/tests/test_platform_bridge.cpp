@@ -18,7 +18,9 @@
  * It exists because that is precisely how these were lost before:
  *   - app_identifier / app_name / app_version were collected by every binding
  *     and never put on a telemetry event at all;
- *   - device_fingerprint carried a hardware-class hash instead of identity;
+ *   - device_fingerprint carried a hardware-class hash instead of identity
+ *     (the hash itself is gone now: it was identical for every unit of a spec,
+ *     so it identified nothing and no server query ever read it);
  *   - platform carried the binding name ("flutter", "react-native") instead of
  *     the OS.
  */
@@ -62,8 +64,6 @@ constexpr const char* kFormFactor = "desktop";
 constexpr const char* kArchitecture = "arm64";
 constexpr const char* kChipName = "SentinelChip";
 constexpr const char* kGpuFamily = "SentinelGPU";
-constexpr const char* kHardwareClass = "aaaabbbbccccddddeeeeffff00001111"
-                                      "22223333444455556666777788889999";
 
 struct Capture {
     bool posted = false;
@@ -90,10 +90,9 @@ void fake_get_device_info(rac_device_registration_info_t* out, void* /*user_data
     out->performance_cores = 8;
     out->efficiency_cores = 4;
     out->battery_level = -1.0;  // no battery on this form factor
-    // Identity is the persistent per-install id; the hardware-class hash is a
-    // separate attribute and must not be mistaken for it.
+    // Identity is the persistent per-install id, and it is the only device
+    // hash the struct can carry.
     out->device_fingerprint = kDeviceId;
-    out->hardware_class_fingerprint = kHardwareClass;
 }
 
 const char* fake_get_device_id(void* /*user_data*/) {
@@ -173,12 +172,11 @@ int main() {
     CHECK(has(cap.body, "\"efficiency_cores\":4"), "efficiency_cores reached the wire");
     CHECK(has(cap.body, "\"neural_engine_cores\":16"), "neural_engine_cores reached the wire");
 
-    // --- Identity is identity, and the hardware hash is not ----------------
+    // --- Identity is identity, and no hardware hash rides along -------------
     CHECK(has(cap.body, std::string("\"device_fingerprint\":\"") + kDeviceId + "\""),
           "device_fingerprint carries the persistent id, not a hardware hash");
-    CHECK(has(cap.body, kHardwareClass), "hardware_class_fingerprint reached the wire");
-    CHECK(!has(cap.body, std::string("\"device_fingerprint\":\"") + kHardwareClass + "\""),
-          "the hardware-class hash is never sent as identity");
+    CHECK(!has(cap.body, "hardware_class_fingerprint"),
+          "the hardware-class hash is no longer sent at all");
 
     // --- App identity survives the bridge ----------------------------------
     CHECK(has(cap.body, "ai.runanywhere.sentinel"), "app_identifier reached the wire");

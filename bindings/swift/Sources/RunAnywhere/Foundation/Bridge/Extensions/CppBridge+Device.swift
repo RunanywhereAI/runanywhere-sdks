@@ -132,14 +132,6 @@ extension CppBridge {
                     if deviceInfo.hasBatteryState {
                         outInfo.pointee.battery_state = store.dup(DeviceInfoFactory.wireString(deviceInfo.batteryState))
                     }
-                    // Hardware CLASS, not this unit: every iPhone of the same
-                    // model + RAM + core count hashes identically. Sending it as
-                    // device_fingerprint let registration overwrite identity, so
-                    // the next authenticate minted a duplicate row — and let two
-                    // identical phones in one org share a row and its refresh
-                    // tokens. Identity is left to commons, which falls back to
-                    // the persistent per-install id.
-                    outInfo.pointee.hardware_class_fingerprint = store.dup(DeviceInfoFactory.hardwareFingerprint)
                 }
 
                 outInfo.pointee.total_memory = deviceInfo.totalMemoryBytes

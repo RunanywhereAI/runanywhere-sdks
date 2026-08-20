@@ -13,7 +13,6 @@
 #include "HTTPBridge.hpp"
 #include "PlatformDownloadBridge.h"
 #include "rac/foundation/rac_proto_buffer.h"
-#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
 #include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -1841,14 +1840,6 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
             info.performanceCores = perfCores;
             info.efficiencyCores = totalCores - perfCores;
         }
-        // Hardware CLASS hash: SHA-256 of the invariant hardware tuple. NOT a
-        // per-unit identifier — every device of the same model + chip + RAM +
-        // core count produces this same value. DeviceBridge routes it to
-        // hardware_class_fingerprint; identity is the persistent device UUID.
-        info.deviceFingerprint = ::runanywhere::sha256_hex(
-            info.deviceModel + "|" + info.chipName + "|" +
-            std::to_string(info.totalMemory) + "|" +
-            std::to_string(info.coreCount));
         return info;
     };
 

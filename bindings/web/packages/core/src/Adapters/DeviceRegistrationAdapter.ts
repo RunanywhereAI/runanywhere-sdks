@@ -102,7 +102,6 @@ export interface DeviceRegistrationModule extends EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_device_registration_info_performance_cores?(): number;
   _rac_wasm_offsetof_device_registration_info_efficiency_cores?(): number;
   _rac_wasm_offsetof_device_registration_info_device_fingerprint?(): number;
-  _rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint?(): number;
 
   _rac_wasm_sizeof_device_http_response?(): number;
   _rac_wasm_offsetof_device_http_response_result?(): number;
@@ -151,7 +150,6 @@ interface DeviceInfoLayout {
   performanceCores: number;
   efficiencyCores: number;
   deviceFingerprint: number;
-  hardwareClassFingerprint: number;
 }
 
 interface HTTPResponseLayout {
@@ -177,21 +175,19 @@ interface DeviceProfile {
   batteryLevel: number;
   batteryState: string | null;
   deviceFingerprint: string | null;
-  hardwareClassFingerprint: string | null;
   coreCount: number;
 }
 
 /**
  * Hardware facts that only async browser APIs can produce (WebGPU adapter,
- * Battery Status, WebCrypto digest). Pre-fetched once per page so the
- * synchronous native `get_device_info` callback can consume cached values.
+ * Battery Status). Pre-fetched once per page so the synchronous native
+ * `get_device_info` callback can consume cached values.
  */
 interface HardwareSnapshot {
   gpuFamily: string;
   chipName: string;
   batteryLevel: number;
   batteryState: string | null;
-  fingerprint: string;
 }
 
 const DEFAULT_HARDWARE_SNAPSHOT: HardwareSnapshot = {
@@ -199,7 +195,6 @@ const DEFAULT_HARDWARE_SNAPSHOT: HardwareSnapshot = {
   chipName: 'unknown',
   batteryLevel: -1,
   batteryState: null,
-  fingerprint: '',
 };
 
 let hardwareSnapshot: HardwareSnapshot = DEFAULT_HARDWARE_SNAPSHOT;
@@ -377,36 +372,17 @@ async function batteryStatus(): Promise<{ level: number; state: string | null }>
   }
 }
 
-/** Stable composite hardware fingerprint (SHA-256 hex over coarse hardware facts). */
-async function computeDeviceFingerprint(renderer: string): Promise<string> {
-  try {
-    const nav = navigator as BrowserNavigator;
-    const material = [
-      nav.userAgentData?.platform?.trim() || nav.platform?.trim() || '',
-      String(nav.hardwareConcurrency ?? 0),
-      String(nav.deviceMemory ?? 0),
-      renderer,
-    ].join('|');
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material));
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  } catch {
-    return '';
-  }
-}
-
 async function collectHardwareSnapshot(): Promise<HardwareSnapshot> {
   const renderer = webglRendererString();
-  const [gpu, battery, fingerprint] = await Promise.all([
+  const [gpu, battery] = await Promise.all([
     webgpuAdapterInfo(),
     batteryStatus(),
-    computeDeviceFingerprint(renderer),
   ]);
   return {
     gpuFamily: gpu.family || normalizeGPUFamily(renderer) || 'unknown',
     chipName: renderer || gpu.description || 'unknown',
     batteryLevel: battery.level,
     batteryState: battery.state,
-    fingerprint,
   };
 }
 
@@ -449,11 +425,8 @@ function browserDeviceProfile(): DeviceProfile {
     batteryLevel: hardware.batteryLevel,
     batteryState: hardware.batteryState,
     // Identity is left to commons, which falls back to the persistent
-    // per-install id. hardware.fingerprint hashes browser/hardware traits that
-    // are shared by every identical machine and change across driver updates —
-    // an attribute, never an identity.
+    // per-install id.
     deviceFingerprint: null,
-    hardwareClassFingerprint: hardware.fingerprint || null,
     coreCount,
   };
 }
@@ -505,8 +478,8 @@ export class DeviceRegistrationAdapter {
     module: DeviceRegistrationModule,
     configuration: DeviceRegistrationConfiguration,
   ): DeviceRegistrationAdapter {
-    // Async hardware facts (GPU adapter, battery, fingerprint digest) are cached
-    // before native registration retries so the sync callback can use them.
+    // Async hardware facts (GPU adapter, battery) are cached before native
+    // registration retries so the sync callback can use them.
     void prefetchHardwareSnapshot();
     const adapter = new DeviceRegistrationAdapter(module, configuration);
     adapter.register();
@@ -708,12 +681,6 @@ export class DeviceRegistrationAdapter {
         outInfoPtr + this.deviceInfoLayout.deviceFingerprint,
         deviceIdPtr,
         '*',
-      );
-    }
-    if (profile.hardwareClassFingerprint) {
-      writeString(
-        this.deviceInfoLayout.hardwareClassFingerprint,
-        profile.hardwareClassFingerprint,
       );
     }
   }
@@ -1012,7 +979,6 @@ export class DeviceRegistrationAdapter {
       performanceCores: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_performance_cores, 'rac_wasm_offsetof_device_registration_info_performance_cores'),
       efficiencyCores: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_efficiency_cores, 'rac_wasm_offsetof_device_registration_info_efficiency_cores'),
       deviceFingerprint: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_device_fingerprint, 'rac_wasm_offsetof_device_registration_info_device_fingerprint'),
-      hardwareClassFingerprint: requiredLayoutHelper(m._rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint, 'rac_wasm_offsetof_device_registration_info_hardware_class_fingerprint'),
     };
   }
 
