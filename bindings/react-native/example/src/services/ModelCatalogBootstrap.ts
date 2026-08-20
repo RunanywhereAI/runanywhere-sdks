@@ -57,60 +57,6 @@ export async function registerAll(
   // =========================================================================
   if (llamaRegistered) {
     await Promise.all([
-      // SmolLM (HuggingFace)
-      registerModel({
-        id: 'smollm2-360m-q8_0',
-        name: 'SmolLM2 360M Q8_0',
-        url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 386_404_416,
-      }),
-      // Qwen 2.5 (Alibaba)
-      registerModel({
-        id: 'qwen2.5-0.5b-instruct-q6_k',
-        name: 'Qwen 2.5 0.5B Instruct Q6_K',
-        url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 650_379_104,
-        // Base model of the seeded abliterated adapter
-        // (qwen2.5-0.5b-abliterated-lora-f16.gguf) — matches iOS/Android.
-        supportsLora: true,
-      }),
-      registerModel({
-        id: 'qwen2.5-1.5b-instruct-q4_k_m',
-        name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
-        url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Q4_K_M artifact is ~1.1 GB; keep the catalog estimate close to the
-        // real transfer size for UI/storage planning.
-        memoryRequirementBytes: 1_117_320_736,
-      }),
-      // Qwen3 (Alibaba) — thinking-capable
-      registerModel({
-        id: 'qwen3-0.6b-q4_k_m',
-        name: 'Qwen3 0.6B Q4_K_M',
-        url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Actual Qwen3-0.6B-Q4_K_M.gguf Content-Length for catalog display.
-        memoryRequirementBytes: 396_705_472,
-        supportsThinking: true,
-      }),
-      registerModel({
-        id: 'qwen3-1.7b-q4_k_m',
-        name: 'Qwen3 1.7B Q4_K_M',
-        url: 'https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 1_107_409_472,
-        supportsThinking: true,
-      }),
-      registerModel({
-        id: 'qwen3-4b-q4_k_m',
-        name: 'Qwen3 4B Q4_K_M',
-        url: 'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 2_497_281_312,
-        supportsThinking: true,
-      }),
       registerModel({
         id: 'qwen3.5-0.8b-q4_k_m',
         name: 'Qwen3.5 0.8B Q4_K_M',
@@ -135,6 +81,59 @@ export async function registerAll(
         memoryRequirementBytes: 3_200_000_000,
         supportsThinking: true,
       }),
+      // Added from the verified model list
+      registerModel({
+        id: 'lfm2.5-1.2b-thinking-q4_k_m',
+        name: 'LFM2.5 1.2B Thinking Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 900_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'lfm2.5-2.6b-q4_k_m',
+        name: 'LFM2.5 2.6B Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 2_050_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'granite-4.1-8b-q4_k_m',
+        name: 'IBM Granite 4.1 8B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/granite-4.1-8b-GGUF/resolve/main/granite-4.1-8b-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 6_500_000_000,
+      }),
+      registerModel({
+        id: 'qwen3.5-9b-q4_k_m',
+        name: 'Qwen3.5 9B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 6_950_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'bonsai-1.7b-q1_0',
+        name: 'PrismML Bonsai 1.7B (1-bit)',
+        url: 'https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 300_000_000,
+      }),
+      registerModel({
+        id: 'bonsai-4b-q1_0',
+        name: 'PrismML Bonsai 4B (1-bit)',
+        url: 'https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 700_000_000,
+      }),
+      registerModel({
+        id: 'bonsai-8b-q1_0',
+        name: 'PrismML Bonsai 8B (1-bit)',
+        url: 'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 1_400_000_000,
+      }),
       // LFM2 / LFM2.5 (Liquid AI)
       // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
       // (153 MB vs 149 MB): 4 MB buys K-quant mixed precision on the
@@ -152,57 +151,12 @@ export async function registerAll(
         // follows the local convention.
         memoryRequirementBytes: 153_406_304,
       }),
-      // ONE quantization per model. The Q8_0 sibling of this row was removed
-      // deliberately: two quants of the same 350M model differ only in bytes
-      // (229 MB vs 379 MB), so the second row costs a catalog slot and a
-      // "which one do I pick?" decision without adding a capability.
-      registerModel({
-        id: 'lfm2-350m-q4_k_m',
-        name: 'LiquidAI LFM2 350M Q4_K_M',
-        url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 229_309_376,
-      }),
       registerModel({
         id: 'lfm2.5-1.2b-instruct-q4_k_m',
         name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
         url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirementBytes: 730_895_168,
-      }),
-      // Same ONE-quantization-per-model rule as the 350M row above: the Q8_0
-      // sibling (1.25 GB against this row's 731 MB) was the same model at a
-      // different size, so it was dropped rather than kept as a second pick.
-      registerModel({
-        id: 'lfm2-1.2b-tool-q4_k_m',
-        name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
-        url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 730_894_048,
-      }),
-      // Llama (Meta)
-      registerModel({
-        id: 'llama-3.2-3b-instruct-q4_k_m',
-        name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
-        url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 2_019_377_696,
-      }),
-      registerModel({
-        id: 'llama-2-7b-chat-q4_k_m',
-        name: 'Llama 2 7B Chat Q4_K_M',
-        url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Exact artifact Content-Length for catalog display/storage planning.
-        memoryRequirementBytes: 4_081_004_224,
-      }),
-      // Mistral
-      registerModel({
-        id: 'mistral-7b-instruct-q4_k_m',
-        name: 'Mistral 7B Instruct Q4_K_M',
-        url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 4_368_438_944,
       }),
       // Gemma (Google)
       // Gemma 4 is Apache 2.0. Preserve the license and applicable attribution
@@ -263,24 +217,6 @@ export async function registerAll(
   // =========================================================================
   if (mlxRegistered) {
     await Promise.all([
-      // Qwen (Alibaba) — Qwen2-VL vision, then the Qwen3 0.6B trio
-      // (LLM / ASR / embedding)
-      registerModel({
-        id: 'mlx-qwen2-vl-2b-instruct-4bit',
-        name: 'MLX Qwen2-VL 2B Instruct 4bit',
-        url: 'https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirementBytes: 2_200_000_000,
-      }),
-      registerModel({
-        id: 'mlx-qwen3-0.6b-4bit',
-        name: 'MLX Qwen3 0.6B 4bit',
-        url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-        memoryRequirementBytes: 650_000_000,
-        supportsThinking: true,
-      }),
       registerModel({
         id: 'mlx-qwen3-asr-0.6b-8bit',
         name: 'MLX Qwen3-ASR 0.6B 8bit',
@@ -397,51 +333,6 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirementBytes: 600_000_000,
-      }),
-      // Qwen (Alibaba)
-      // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
-      // Uses multi-file download: main model (986MB) + mmproj (710MB)
-      registerModel({
-        id: 'qwen2-vl-2b-instruct-q4_k_m',
-        name: 'Qwen2-VL 2B Instruct',
-        files: [
-          {
-            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
-            filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
-            filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        // Sum of file Content-Lengths: main (986 MB) + mmproj (710 MB).
-        memoryRequirementBytes: 1_695_930_304,
-      }),
-      // LFM2-VL (Liquid AI)
-      // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
-      registerModel({
-        id: 'lfm2-vl-450m-q8_0',
-        name: 'LFM2-VL 450M',
-        files: [
-          {
-            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
-            filename: 'LFM2-VL-450M-Q8_0.gguf',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
-            filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        // Sum of file Content-Lengths: main (379 MB) + mmproj (104 MB).
-        memoryRequirementBytes: 483_105_280,
       }),
       // Fara (Microsoft)
       // Fara1.5-4B - Microsoft Qwen3.5-VL computer-use agent VLM (~3300MB total)
@@ -622,9 +513,8 @@ export async function registerAll(
   // =========================================================================
   // LoRA adapters — mirrors iOS registerLoraAdapters() / Android seedLora.
   // =========================================================================
-  if (llamaRegistered) {
-    await registerLoraAdapters();
-  }
+  // Not registered: the only adapter shipped is trained for qwen2.5-0.5b, which
+  // this catalog no longer carries. Re-add both together.
 
   // =========================================================================
   // Diffusion (CoreML / Apple platform backend) — image generation
@@ -667,34 +557,6 @@ export async function registerAll(
   }
 
   logDiagnostic('[App] All models registered');
-}
-
-async function registerLoraAdapters(): Promise<void> {
-  const id = 'abliterated-lora';
-  const name = 'Abliterated LoRA (F16)';
-  try {
-    // `LoraAdapterCatalogEntry` no longer carries url/filename/size/
-    // description metadata (idl/lora_options.proto: "everything generic
-    // about the artifact ... lives on the ModelInfo record for this
-    // adapter") — register the catalog entry (compatibility/scale only)
-    // and the downloadable artifact (url/size) separately.
-    await RunAnywhere.lora.catalog.register(
-      LoraAdapterCatalogEntry.fromPartial({
-        id,
-        name,
-        compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
-        defaultScale: 1.0,
-      })
-    );
-    await registerLoraArtifact({
-      catalogEntryId: id,
-      name,
-      url: 'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf',
-      sizeBytes: 17_620_224,
-    });
-  } catch (error) {
-    logDiagnostic(`[App] Failed to register LoRA adapter: ${String(error)}`);
-  }
 }
 
 type NpuSeedResult = Readonly<{

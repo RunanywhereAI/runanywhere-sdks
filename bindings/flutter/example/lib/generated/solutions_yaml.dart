@@ -21,7 +21,7 @@ abstract final class SolutionsYaml {
 # the model identifiers inline.
 
 voice_agent:
-  llm_model_id: "smollm2-360m-q8_0"
+  llm_model_id: "lfm2.5-230m-q4_k_m"
   stt_model_id: "sherpa-onnx-whisper-tiny.en"
   tts_model_id: "vits-piper-en_US-lessac-medium"
   vad_model_id: "silero-vad"
@@ -58,7 +58,7 @@ voice_agent:
 
 rag:
   embed_model_id: "all-minilm-l6-v2"
-  llm_model_id: "smollm2-360m-q8_0"
+  llm_model_id: "lfm2.5-230m-q4_k_m"
 
   vector_store: "usearch"
   vector_store_path: "/tmp/ra-rag.usearch"
