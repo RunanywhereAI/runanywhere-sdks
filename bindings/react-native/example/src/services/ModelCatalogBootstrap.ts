@@ -511,10 +511,9 @@ export async function registerAll(
   }
 
   // =========================================================================
-  // LoRA adapters — mirrors iOS registerLoraAdapters() / Android seedLora.
+  // LoRA adapters are not registered: the only adapter shipped was trained for
+  // qwen2.5-0.5b, which this catalog no longer carries. Re-add both together.
   // =========================================================================
-  // Not registered: the only adapter shipped is trained for qwen2.5-0.5b, which
-  // this catalog no longer carries. Re-add both together.
 
   // =========================================================================
   // Diffusion (CoreML / Apple platform backend) — image generation
