@@ -59,6 +59,27 @@ Exit 0 when every plugin found is routable, 1 otherwise. A tarball whose name
 is a known backend package (electron-llamacpp/onnx/sherpa/qhexrt) with ZERO
 plugin natives is a failure — that is how @runanywhere/electron-qhexrt 0.20.17
 shipped as JS-only. Core / proto-ts tarballs with no plugins still pass.
+
+ALSO CHECKED: THE STAGING-URL PLACEHOLDER
+-------------------------------------------
+core/CMakeLists.txt substitutes $ENV{STAGING_BASE_URL} into a generated
+development_config.cpp at cmake-configure time; an unset/empty env var at
+configure time leaves the tracked placeholder, "YOUR_STAGING_BASE_URL",
+compiled straight into rac_commons. rac_dev_config_is_usable_http_url then
+rejects it, so the SDK cannot keyless-resolve a development backend and the
+release ships with no telemetry at all — invisible to every check above,
+because the binary is the right size, exports the right symbols, and every
+carrier still references its ops tables correctly.
+
+This shipped for real: @runanywhere/electron{,-llamacpp,-onnx,-sherpa} 0.20.19
+shipped this way, and darwin-arm64/win32-arm64 rac_commons in every Electron
+package still carried it through 0.20.24 — three releases after
+scripts/release/prepublish_check.py's check_tracking() already knew how to
+catch it, because that script is advisory and nothing calls it automatically.
+This script IS called automatically (package-sdk.sh runs it right before
+printing the publish order), so the same check lives here too — the one
+place a future regression cannot ship without someone deliberately deleting
+this code.
 """
 
 from __future__ import annotations
@@ -132,11 +153,27 @@ LITERAL_CONTRACTS = frozenset({"qhexrt"})
 # the extension. The plugin FILE NAME is a load-bearing contract (the loader
 # derives `rac_plugin_entry_<id>` from it), so parsing it here is legitimate.
 PLUGIN_NAME_RE = re.compile(r"^(?:lib)?runanywhere_(?P<id>[A-Za-z0-9_]+)\.(?:so|dylib|dll)$")
-COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll)$")
+COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll|a)$")
+WASM_NAME_RE = re.compile(r".*\.wasm$")
 # npm pack names: runanywhere-electron-sherpa-0.20.17.tgz
 BACKEND_TARBALL_RE = re.compile(
     r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt)-"
 )
+
+# See "ALSO CHECKED: THE STAGING-URL PLACEHOLDER" in the module docstring.
+PLACEHOLDER_STAGING_URL = b"YOUR_STAGING_BASE_URL"
+
+
+def check_tracking_bytes(payload: bytes, display: str) -> str | None:
+    """None if `payload` is clean; a failure message if it carries the placeholder."""
+    if PLACEHOLDER_STAGING_URL in payload:
+        return (
+            f"{display}: NO TELEMETRY — built with the placeholder staging URL "
+            f"(YOUR_STAGING_BASE_URL). rac_dev_config rejects this, so the SDK "
+            f"cannot keyless-resolve a development backend. Rebuild with "
+            f"STAGING_BASE_URL set in the environment at cmake-configure time."
+        )
+    return None
 
 # QHexRT has no carrier: the engine IS the plugin, renamed via OUTPUT_NAME on
 # shared builds, so it matches the pattern above. Its Android/JNI form keeps the
@@ -229,7 +266,11 @@ def collect(paths: list[Path]) -> list[tuple[Path, str]]:
     for path in paths:
         if path.is_dir():
             for child in sorted(path.rglob("*")):
-                if child.is_file() and PLUGIN_NAME_RE.match(child.name):
+                if child.is_file() and (
+                    PLUGIN_NAME_RE.match(child.name)
+                    or COMMONS_NAME_RE.match(child.name)
+                    or WASM_NAME_RE.match(child.name)
+                ):
                     found.append((child, str(child)))
         elif path.is_file():
             found.append((path, str(path)))
@@ -280,6 +321,7 @@ def main() -> int:
     empty_backends: list[str] = []
     version_mismatches: list[str] = []
     unsafe_members: list[str] = []
+    telemetry_failures: list[str] = []
     checked = 0
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -313,15 +355,25 @@ def main() -> int:
                         out.write_bytes(payload)
                         targets.append((out, f"{archive.name}:{member.name}"))
                         plugin_count += 1
-                    elif args.expect_version and COMMONS_NAME_RE.match(leaf):
-                        if args.expect_version.encode("ascii") not in payload:
-                            version_mismatches.append(
-                                f"{archive.name}: {member.name} does not embed "
-                                f"{args.expect_version!r}"
-                            )
+                    elif COMMONS_NAME_RE.match(leaf) or WASM_NAME_RE.match(leaf):
+                        if args.expect_version:
+                            if args.expect_version.encode("ascii") not in payload:
+                                version_mismatches.append(
+                                    f"{archive.name}: {member.name} does not embed "
+                                    f"{args.expect_version!r}"
+                                )
+                            else:
+                                print(f"  ok    version  {member.name}  "
+                                      f"embeds {args.expect_version}")
+                        track_fail = check_tracking_bytes(payload, f"{archive.name}:{member.name}")
+                        checked += 1
+                        if track_fail:
+                            print(f"  FAIL  telemetry  {archive.name}:{member.name}  "
+                                  f"placeholder staging URL baked in")
+                            telemetry_failures.append(track_fail)
                         else:
-                            print(f"  ok    version  {member.name}  "
-                                  f"embeds {args.expect_version}")
+                            print(f"  ok    telemetry  {archive.name}:{member.name}  "
+                                  f"real staging URL baked in (no placeholder)")
             required_id = tarball_backend_id(archive.name)
             if required_id is not None and plugin_count == 0:
                 print(f"  FAIL  {archive.name}  no runanywhere_{required_id} native in tarball")
@@ -330,6 +382,15 @@ def main() -> int:
                 )
 
         for target, display in targets:
+            if COMMONS_NAME_RE.match(target.name) or WASM_NAME_RE.match(target.name):
+                checked += 1
+                track_fail = check_tracking_bytes(target.read_bytes(), display)
+                if track_fail:
+                    print(f"  FAIL  telemetry  {display}  placeholder staging URL baked in")
+                    telemetry_failures.append(track_fail)
+                else:
+                    print(f"  ok    telemetry  {display}  real staging URL baked in (no placeholder)")
+                continue
             finding = check_plugin(target, display)
             if finding is None:
                 continue
@@ -342,7 +403,9 @@ def main() -> int:
                 print(f"  ok    {label}  [{finding.method}]  satisfies its "
                       f"routability contract: {', '.join(REQUIRED_OPS[finding.backend])}")
 
-    failed = bool(findings or empty_backends or version_mismatches or unsafe_members)
+    failed = bool(
+        findings or empty_backends or version_mismatches or unsafe_members or telemetry_failures
+    )
     if not failed and checked == 0:
         print("  no backend plugin natives found (nothing to verify)")
         return 0
@@ -358,6 +421,8 @@ def main() -> int:
             print(f"  - {line}")
         for line in unsafe_members:
             print(f"  - {line}")
+        for line in telemetry_failures:
+            print(f"  - {line}")
         print(
             "\nA plugin missing its ops tables was compiled with its engine\n"
             "unavailable: capability_check() will decline registration and the\n"
@@ -369,7 +434,8 @@ def main() -> int:
         )
         return 1
 
-    print(f"\nAll {checked} backend plugin native(s) are routable.")
+    print(f"\nAll {checked} check(s) passed: plugin natives are routable and no "
+          f"staging-URL placeholder was found.")
     return 0
 
 
