@@ -78,16 +78,16 @@ has_native_prebuilds() {
         -print -quit | grep -q .
 }
 
-for pkg in llamacpp onnx qhexrt sherpa; do
+for pkg in llamacpp onnx qhexrt sherpa neurt; do
     pkg_dir="${ELECTRON_ROOT}/packages/${pkg}"
     [ -d "${pkg_dir}" ] || { echo "ERROR: missing package dir ${pkg_dir}" >&2; exit 1; }
-    # QHexRT is Windows ARM64 only. Packing it from a Mac with no prebuilds is
-    # how 0.20.17 shipped a 4 KB JS-only tarball that advertised a DLL. Skip
-    # rather than publish an empty NPU package. llamacpp/onnx/sherpa have no
-    # such excuse — missing natives is a hard fail.
+    # QHexRT is Windows ARM64 only and NeuRT is macOS only. Packing either from a
+    # host with no prebuilds is how 0.20.17 shipped a 4 KB JS-only tarball that
+    # advertised a DLL. Skip rather than publish an empty package for either.
+    # llamacpp/onnx/sherpa have no such excuse — missing natives is a hard fail.
     if ! has_native_prebuilds "${pkg_dir}"; then
-        if [ "${pkg}" = qhexrt ]; then
-            echo ">> skipping qhexrt: no native prebuilds (refusing to publish an empty NPU package)"
+        if [ "${pkg}" = qhexrt ] || [ "${pkg}" = neurt ]; then
+            echo ">> skipping ${pkg}: no native prebuilds (refusing to publish an empty package)"
             continue
         fi
         echo "ERROR: packages/${pkg} has no native prebuilds under prebuilds/" >&2
@@ -221,4 +221,5 @@ echo ""
 echo ">> Publish in this order:"
 echo "     runanywhere-proto-ts-${PACKAGE_VERSION}.tgz"
 echo "     runanywhere-electron-${PACKAGE_VERSION}.tgz"
-echo "     runanywhere-electron-{llamacpp,onnx,qhexrt,sherpa}-${PACKAGE_VERSION}.tgz"
+echo "     runanywhere-electron-{llamacpp,onnx,qhexrt,sherpa,neurt}-${PACKAGE_VERSION}.tgz"
+echo "     (qhexrt/neurt only if this run actually had their native prebuilds)"
