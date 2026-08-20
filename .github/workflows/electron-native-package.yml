@@ -212,6 +212,16 @@ jobs:
           Write-Host "adding $(Split-Path $pythonExe) to PATH for this job (python)"
           Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $pythonExe)
 
+      # bindings/electron/native/CMakeLists.txt checks for node-addon-api /
+      # node-api-headers at CONFIGURE time, not build time — the macOS and
+      # x64 jobs both install this before configuring; this job needs the
+      # same step (found only by actually running it: "node deps missing —
+      # run `npm install` in bindings/electron/native").
+      - name: Install electron native addon node deps
+        working-directory: bindings/electron/native
+        shell: powershell
+        run: npm install
+
       # node-gyp downloads headers/import-lib for the CURRENT process arch —
       # arm64 here, not x64. The x64 job's own step hardcodes `x64/node.lib`;
       # do not reuse it verbatim on this runner.
