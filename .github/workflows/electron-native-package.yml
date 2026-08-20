@@ -176,33 +176,41 @@ jobs:
           persist-credentials: false
 
       # The runner service on this box runs as NT AUTHORITY\NETWORK SERVICE,
-      # not the interactive account cmake/python/vcpkg were set up under — a
-      # different account with its own PATH, which is why a command that
-      # works perfectly over an interactive SSH session ("cmake --version")
-      # still comes back "not recognized" here. cmake is a pip-installed shim
-      # under a user profile, not a machine-wide Program Files install (unlike
-      # node/git, which is why those didn't need this); the only `python3` on
-      # this box resolves to a per-user Windows Store App Execution Alias,
-      # which is unreliable from a different account, so this discovers the
-      # real python.exe living beside cmake in the same install instead.
-      # Discovered by actually running the job and reading its real failure,
-      # not by assuming the interactive shell's PATH carries over.
+      # not the interactive account (san) cmake/python/vcpkg were set up
+      # under — a different account with its own PATH AND its own NTFS
+      # permissions, which is why a command that works perfectly over an
+      # interactive SSH session ("cmake --version") still comes back "not
+      # recognized" here, and why a wildcard `Get-ChildItem` under
+      # C:\Users\san\... silently finds nothing (access denied on
+      # enumeration is swallowed by -ErrorAction SilentlyContinue) even after
+      # cmake/python are confirmed to exist at that exact path. NETWORK
+      # SERVICE has been granted read+execute on this one directory tree
+      # (icacls ... /grant "NT AUTHORITY\NETWORK SERVICE:(OI)(CI)RX" /T) —
+      # traversal into ancestor folders needs no separate grant (Windows
+      # grants "bypass traverse checking" to Network Service by default), so
+      # a concrete, non-wildcard path works once that one ACL is in place.
+      # cmake is a pip-installed shim under this profile, not a machine-wide
+      # Program Files install (unlike node/git, which is why those didn't
+      # need this); the only `python3` on this box resolves to a per-user
+      # Windows Store App Execution Alias, unreliable from a different
+      # account, so this uses the real python.exe living beside cmake
+      # instead. Every part of this was found by actually running the job
+      # and reading its real failures, not by assuming the interactive
+      # shell's environment carries over.
       - name: Add cmake + python to PATH for this job (self-hosted account gap)
         shell: powershell
+        env:
+          PY_INSTALL_DIR: 'C:\Users\san\AppData\Local\Programs\Python\Python312-arm64'
         run: |
-          $cmake = Get-Command cmake -ErrorAction SilentlyContinue
-          if ($cmake) {
-            Write-Host "cmake already on PATH: $($cmake.Source)"
-          } else {
-            $found = Get-ChildItem -Path "C:\Users\*\AppData\Local\Programs\Python\*\Scripts\cmake.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $found) { throw "cmake.exe not found under any user's pip Scripts dir" }
-            Write-Host "adding $($found.DirectoryName) to PATH for this job (cmake)"
-            Add-Content -Path $env:GITHUB_PATH -Value $found.DirectoryName
-          }
-          $py = Get-ChildItem -Path "C:\Users\*\AppData\Local\Programs\Python\*\python.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $py) { throw "python.exe not found under any user's Python install dir" }
-          Write-Host "adding $($py.DirectoryName) to PATH for this job (python)"
-          Add-Content -Path $env:GITHUB_PATH -Value $py.DirectoryName
+          $cmakeExe = Join-Path $env:PY_INSTALL_DIR 'Scripts\cmake.exe'
+          if (-not (Test-Path $cmakeExe)) { throw "cmake.exe not found at $cmakeExe" }
+          Write-Host "adding $(Split-Path $cmakeExe) to PATH for this job (cmake)"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $cmakeExe)
+
+          $pythonExe = Join-Path $env:PY_INSTALL_DIR 'python.exe'
+          if (-not (Test-Path $pythonExe)) { throw "python.exe not found at $pythonExe" }
+          Write-Host "adding $(Split-Path $pythonExe) to PATH for this job (python)"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $pythonExe)
 
       # node-gyp downloads headers/import-lib for the CURRENT process arch —
       # arm64 here, not x64. The x64 job's own step hardcodes `x64/node.lib`;
