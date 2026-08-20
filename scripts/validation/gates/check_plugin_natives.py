@@ -119,6 +119,15 @@ REQUIRED_OPS: dict[str, tuple[str, ...]] = {
     # Not an ops name: QHexRT has no carrier, so its tables are internal and a PE
     # keeps none of them. See "THE ENGINE THAT HAS NO CARRIER" above.
     "qhexrt": ("qhexrt:engine-available",),
+    # engines/neurt/rac_plugin_entry_neurt.cpp gates &g_neurt_{llm,stt}_ops behind
+    # #if RAC_NEURT_ROUTABLE, exactly like sherpa/onnx/llamacpp: the addresses are
+    # only taken (an undefined reference in the carrier) when the private neurun
+    # checkout was actually present at build time (NEURT_ROOT resolved). Without
+    # it, engines/neurt/CMakeLists.txt builds the documented non-routable shell
+    # (registration refused with RAC_ERROR_BACKEND_UNAVAILABLE) instead of hard
+    # failing configure — legitimate on any host that can't clone the private
+    # repo, but not something that may ship as @runanywhere/electron-neurt.
+    "neurt": ("g_neurt_llm_ops", "g_neurt_stt_ops"),
 }
 
 # A token whose PRESENCE disproves routability, per backend. Requiring the
@@ -157,8 +166,23 @@ COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll|a)$")
 WASM_NAME_RE = re.compile(r".*\.wasm$")
 # npm pack names: runanywhere-electron-sherpa-0.20.17.tgz
 BACKEND_TARBALL_RE = re.compile(
-    r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt)-"
+    r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt|neurt)-"
 )
+
+# rac_backend_<id> is normally the sibling ENGINE library that a carrier links
+# against, not itself gated here. NeuRT is the exception: verified by building
+# it for real (macOS, with the actual neurun checkout) and reading `nm -a` on
+# both files —
+#
+#   librunanywhere_neurt.dylib (the carrier, rac_static_register_neurt.cpp only): no symbols at all
+#   librac_backend_neurt.dylib (rac_backend_neurt, compiles rac_plugin_entry_neurt.cpp): DEFINED g_neurt_llm_ops / g_neurt_stt_ops
+#
+# Unlike sherpa/onnx/llamacpp, engines/neurt/CMakeLists.txt's rac_add_engine_plugin()
+# call puts rac_plugin_entry_neurt.cpp's SOURCES on the rac_backend_neurt target,
+# not on the runanywhere_neurt carrier — so the carrier has nothing to check, and
+# the real evidence is a DEFINED (not undefined) symbol in the backend file.
+EVIDENCE_IN_BACKEND_FILE = frozenset({"neurt"})
+BACKEND_ENGINE_NAME_RE = re.compile(r"^(?:lib)?rac_backend_(?P<id>[A-Za-z0-9_]+)\.(?:so|dylib|dll)$")
 
 # See "ALSO CHECKED: THE STAGING-URL PLACEHOLDER" in the module docstring.
 PLACEHOLDER_STAGING_URL = b"YOUR_STAGING_BASE_URL"
@@ -245,9 +269,22 @@ def symbol_text(path: Path) -> tuple[str, str]:
 
 def check_plugin(path: Path, display: str) -> Finding | None:
     match = PLUGIN_NAME_RE.match(path.name)
-    if match is None:
-        return None
-    backend = match.group("id")
+    if match is not None:
+        backend = match.group("id")
+        if backend in EVIDENCE_IN_BACKEND_FILE:
+            # The carrier itself has nothing to check for this backend — see
+            # EVIDENCE_IN_BACKEND_FILE above. The sibling rac_backend_<id> file,
+            # matched below, is the real evidence.
+            return None
+    else:
+        match = BACKEND_ENGINE_NAME_RE.match(path.name)
+        if match is None:
+            return None
+        backend = match.group("id")
+        if backend not in EVIDENCE_IN_BACKEND_FILE:
+            # A normal sibling engine library (e.g. rac_backend_sherpa) that a
+            # carrier links against — its own carrier is the gated file, not this.
+            return None
     required = REQUIRED_OPS.get(backend)
     if required is None:
         # An out-of-tree plugin we have no contract for. Not our call to fail.
@@ -268,6 +305,7 @@ def collect(paths: list[Path]) -> list[tuple[Path, str]]:
             for child in sorted(path.rglob("*")):
                 if child.is_file() and (
                     PLUGIN_NAME_RE.match(child.name)
+                    or BACKEND_ENGINE_NAME_RE.match(child.name)
                     or COMMONS_NAME_RE.match(child.name)
                     or WASM_NAME_RE.match(child.name)
                 ):
@@ -355,6 +393,22 @@ def main() -> int:
                         out.write_bytes(payload)
                         targets.append((out, f"{archive.name}:{member.name}"))
                         plugin_count += 1
+                    elif BACKEND_ENGINE_NAME_RE.match(leaf):
+                        # Only extracted for backends whose evidence lives here
+                        # instead of the carrier (EVIDENCE_IN_BACKEND_FILE) —
+                        # check_plugin() no-ops on any other rac_backend_<id>.
+                        out = member_dest(dest, member.name)
+                        if out is None:
+                            print(f"  FAIL  {archive.name}  member escapes the "
+                                  f"archive root: {member.name}")
+                            unsafe_members.append(
+                                f"{archive.name}: member {member.name!r} escapes "
+                                f"the archive root"
+                            )
+                            continue
+                        out.parent.mkdir(parents=True, exist_ok=True)
+                        out.write_bytes(payload)
+                        targets.append((out, f"{archive.name}:{member.name}"))
                     elif COMMONS_NAME_RE.match(leaf) or WASM_NAME_RE.match(leaf):
                         if args.expect_version:
                             if args.expect_version.encode("ascii") not in payload:
