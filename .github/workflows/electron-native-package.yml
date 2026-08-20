@@ -35,6 +35,14 @@ on:
 permissions:
   contents: read
 
+# This workflow builds native code on 3 real machines (one of them a
+# self-hosted, single-instance runner) — a stale run from an earlier push on
+# the same branch/PR is wasted compute, not just noise. Cancel it the moment a
+# newer commit lands, same reasoning as pr-build.yml's own concurrency group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Same fail-closed contract as release.yml: a build with this unset bakes
   # YOUR_STAGING_BASE_URL into rac_commons, which rac_dev_config rejects, so
