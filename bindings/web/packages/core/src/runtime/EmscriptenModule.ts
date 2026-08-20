@@ -680,6 +680,40 @@ export interface EmscriptenRunanywhereModule {
    * Returns the full length excluding NUL (>= out_size means truncated), or -1
    * for an unknown profile. Pass `out=0, out_size=0` to size the buffer first.
    */
+  /**
+   * `rac_result_t rac_cua_register_profile(const char* profile_id,
+   *    const char* system_prompt, uint32_t model_space_w, uint32_t model_space_h);`
+   *
+   * Adds (or replaces) a computer-use model profile at runtime, so a new model
+   * family needs no C++ change and no SDK release. Strings are copied.
+   * Returns 0 on success.
+   */
+  _rac_cua_register_profile?(
+    profileIdPtr: number,
+    systemPromptPtr: number,
+    modelSpaceW: number,
+    modelSpaceH: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_cua_unregister_profile(const char* profile_id);`
+   *
+   * Removes a runtime-registered profile, restoring the built-in if it was
+   * overriding one. Returns 0 when something was removed.
+   */
+  _rac_cua_unregister_profile?(profileIdPtr: number): number;
+
+  /** `size_t rac_cua_profile_count(void);` — built-in plus runtime profiles. */
+  _rac_cua_profile_count?(): number;
+
+  /**
+   * `int rac_cua_profile_id_at(size_t index, char* out, size_t out_size);`
+   *
+   * Runtime-registered profiles come first, then built-ins. Returns the id
+   * length excluding NUL, or -1 past the end. Pass `out=0, out_size=0` to size.
+   */
+  _rac_cua_profile_id_at?(index: number, outPtr: number, outSize: number): number;
+
   _rac_cua_system_prompt?(
     profileIdPtr: number,
     displayW: number,
