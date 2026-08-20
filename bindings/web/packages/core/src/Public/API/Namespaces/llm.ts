@@ -285,27 +285,22 @@ export const llm = {
    * Generate JSON that satisfies a schema, returning the parsed value with
    * the raw text alongside it.
    *
-   * @param mode `'validationOnly'` (default) parses and validates after
-   *   generation; `'repair'` additionally attempts to fix malformed JSON.
-   *   `'constrained'` fails preflight — Web has no grammar-constrained
-   *   decoding hook.
-   * @throws SDKException when the backend cannot parse structured output,
-   *   or `mode` is `'constrained'`.
+   * @param mode `'constrained'` compiles the schema to a GBNF grammar and
+   *   constrains decoding token-by-token so every generated token is legal
+   *   JSON. `'validationOnly'` (default) leaves decoding unconstrained and
+   *   parses/validates the free-text result after generation. `'repair'`
+   *   constrains like `'constrained'`, then attempts one repair retry if the
+   *   first answer still fails schema validation.
+   * @throws SDKException when the backend cannot parse structured output.
    */
   async generateStructured(
-    prompt: string,
+    input: string | readonly ChatMessage[],
     schema: JsonSchema,
     mode: StructuredOutputMode = 'validationOnly',
     options?: LlmOptions,
   ): Promise<StructuredResult> {
-    if (mode === 'constrained') {
-      throw SDKException.unsupportedCapability(
-        "llm.generateStructured(mode: 'constrained')",
-        'The Web SDK has no grammar-constrained decoding hook; use "validationOnly" or "repair".',
-      );
-    }
     const structuredOutput = toProtoStructuredOutputOptions(schema.json, mode);
-    const generation = await generateCore(prompt, options, structuredOutput);
+    const generation = await generateCore(input, options, structuredOutput);
     const adapter = StructuredOutputProtoAdapter.tryDefault();
     if (!adapter?.supportsProtoParse()) {
       throw SDKException.backendNotAvailable(
