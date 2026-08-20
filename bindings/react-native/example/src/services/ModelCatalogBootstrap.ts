@@ -111,6 +111,30 @@ export async function registerAll(
         memoryRequirementBytes: 2_497_281_312,
         supportsThinking: true,
       }),
+      registerModel({
+        id: 'qwen3.5-0.8b-q4_k_m',
+        name: 'Qwen3.5 0.8B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 900_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'qwen3.5-2b-q4_k_m',
+        name: 'Qwen3.5 2B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 1_800_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'qwen3.5-4b-q4_k_m',
+        name: 'Qwen3.5 4B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 3_200_000_000,
+        supportsThinking: true,
+      }),
       // LFM2 / LFM2.5 (Liquid AI)
       // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
       // (153 MB vs 149 MB): 4 MB buys K-quant mixed precision on the
