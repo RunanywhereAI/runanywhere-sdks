@@ -156,9 +156,12 @@ struct fetch_request_ctx {
 
 /// Parse the raw "Name: Value\r\nName2: Value2\r\n..." blob returned
 /// by emscripten_fetch_get_response_headers into individual kv pairs.
-void parse_response_headers(const char* raw, rac_http_response_t* out) {
+/// Returns RAC_ERROR_OUT_OF_MEMORY when an allocation fails (the partial
+/// headers array is freed so `out` never carries null entries),
+/// RAC_SUCCESS otherwise.
+rac_result_t parse_response_headers(const char* raw, rac_http_response_t* out) {
     if (!raw) {
-        return;
+        return RAC_SUCCESS;
     }
     std::vector<std::pair<std::string, std::string>> pairs;
     const char* p = raw;
@@ -186,19 +189,32 @@ void parse_response_headers(const char* raw, rac_http_response_t* out) {
     }
 
     if (pairs.empty()) {
-        return;
+        return RAC_SUCCESS;
     }
     out->header_count = pairs.size();
     out->headers =
         static_cast<rac_http_header_kv_t*>(std::calloc(pairs.size(), sizeof(rac_http_header_kv_t)));
     if (!out->headers) {
         out->header_count = 0;
-        return;
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
     for (size_t i = 0; i < pairs.size(); ++i) {
         out->headers[i].name = strdup(pairs[i].first.c_str());
         out->headers[i].value = strdup(pairs[i].second.c_str());
+        if (out->headers[i].name == nullptr || out->headers[i].value == nullptr) {
+            // headers is zero-initialised, so freeing every slot is safe even
+            // where a name/value was never assigned.
+            for (size_t j = 0; j < pairs.size(); ++j) {
+                std::free(const_cast<char*>(out->headers[j].name));
+                std::free(const_cast<char*>(out->headers[j].value));
+            }
+            std::free(out->headers);
+            out->headers = nullptr;
+            out->header_count = 0;
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
+    return RAC_SUCCESS;
 }
 
 /// Completion callback for the main-thread async path: flips the caller's
@@ -323,7 +339,13 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
         if (hdrs_len > 0) {
             std::string raw(hdrs_len + 1, '\0');
             emscripten_fetch_get_response_headers(fetch, raw.data(), raw.size());
-            parse_response_headers(raw.c_str(), out);
+            rac_result_t headers_rc = parse_response_headers(raw.c_str(), out);
+            if (headers_rc != RAC_SUCCESS) {
+                // Release the in-flight fetch before propagating so the
+                // allocation failure does not also leak fetch resources.
+                emscripten_fetch_close(fetch);
+                return headers_rc;
+            }
         }
     }
 
