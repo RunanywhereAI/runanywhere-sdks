@@ -109,17 +109,22 @@ for pkg in llamacpp onnx qhexrt sherpa neurt; do
     if [ ! -e "${link_dir}/electron" ]; then
         echo ">> linking @runanywhere/electron into packages/${pkg}"
         mkdir -p "${link_dir}"
-        # Absolute target, not relative (../../../..) — found only by actually
-        # running this on a real Windows CI runner for the first time: Git
-        # Bash's `ln -s` for a DIRECTORY target needs either
-        # SeCreateSymbolicLinkPrivilege (not granted on GH-hosted Windows
-        # runners) or falls back to an NTFS junction, and junctions can only
-        # hold absolute paths — a relative target makes that fallback
-        # misbehave ("cannot overwrite directory" on a path the preceding
-        # `-e` check just confirmed didn't exist). ELECTRON_ROOT is already
-        # the absolute equivalent of the old relative target, so this is a
-        # behavior-preserving change on macOS/Linux, not just a Windows patch.
-        ln -sfn "${ELECTRON_ROOT}" "${link_dir}/electron"
+        # Not `ln -sfn`: reproduced directly on a real Windows box (SSH,
+        # outside CI) that Git Bash's `ln -s` for a DIRECTORY target simply
+        # fails here ("No such file or directory" interactively; "cannot
+        # overwrite directory" is the shape it took in real CI — same root
+        # cause either way) because creating a real NTFS symlink needs
+        # SeCreateSymbolicLinkPrivilege, which a GH-hosted (or this
+        # self-hosted) Windows runner's process does not have. An absolute
+        # target alone does not fix this — confirmed by testing that too.
+        # node's fs.symlinkSync(..., 'junction') creates a Windows junction
+        # instead, which needs no special privilege at all (the same
+        # mechanism `npm link` itself relies on) — verified working on the
+        # same real Windows box this failed on. The 'junction' type hint is
+        # Windows-only; Node ignores it on macOS/Linux and creates a normal
+        # symlink there, so this is portable, not a Windows-only branch.
+        node -e "require('fs').symlinkSync(process.argv[1], process.argv[2], 'junction')" \
+            "${ELECTRON_ROOT}" "${link_dir}/electron"
     fi
 
     echo ">> build packages/${pkg}"
