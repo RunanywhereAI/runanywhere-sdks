@@ -431,7 +431,16 @@ def main() -> int:
                         or WASM_NAME_RE.match(leaf)
                         or NODE_ADDON_NAME_RE.match(leaf)
                     ):
-                        if args.expect_version:
+                        # The --expect-version embed check only ever applies
+                        # to rac_commons/.wasm (both compile in
+                        # RAC_VERSION_STRING) — the N-API addon never has,
+                        # and was never meant to; it is only here for the
+                        # placeholder/telemetry scan below. Learned by
+                        # actually running this: wiring the addon into the
+                        # same branch as commons/wasm made every real
+                        # @runanywhere/electron tarball fail with "does not
+                        # embed '<version>'".
+                        if args.expect_version and not NODE_ADDON_NAME_RE.match(leaf):
                             if args.expect_version.encode("ascii") not in payload:
                                 version_mismatches.append(
                                     f"{archive.name}: {member.name} does not embed "

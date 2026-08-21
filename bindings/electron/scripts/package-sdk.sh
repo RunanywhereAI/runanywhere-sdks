@@ -109,7 +109,17 @@ for pkg in llamacpp onnx qhexrt sherpa neurt; do
     if [ ! -e "${link_dir}/electron" ]; then
         echo ">> linking @runanywhere/electron into packages/${pkg}"
         mkdir -p "${link_dir}"
-        ln -sfn ../../../.. "${link_dir}/electron"
+        # Absolute target, not relative (../../../..) — found only by actually
+        # running this on a real Windows CI runner for the first time: Git
+        # Bash's `ln -s` for a DIRECTORY target needs either
+        # SeCreateSymbolicLinkPrivilege (not granted on GH-hosted Windows
+        # runners) or falls back to an NTFS junction, and junctions can only
+        # hold absolute paths — a relative target makes that fallback
+        # misbehave ("cannot overwrite directory" on a path the preceding
+        # `-e` check just confirmed didn't exist). ELECTRON_ROOT is already
+        # the absolute equivalent of the old relative target, so this is a
+        # behavior-preserving change on macOS/Linux, not just a Windows patch.
+        ln -sfn "${ELECTRON_ROOT}" "${link_dir}/electron"
     fi
 
     echo ">> build packages/${pkg}"
