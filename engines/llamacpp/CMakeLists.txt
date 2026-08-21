@@ -299,7 +299,7 @@ list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 # ../../core.
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 rac_add_engine_plugin(llamacpp
     TARGET_NAME         rac_backend_llamacpp

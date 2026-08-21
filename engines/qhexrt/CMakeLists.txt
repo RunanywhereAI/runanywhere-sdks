@@ -52,7 +52,7 @@ endif()
 
 message(STATUS "Configuring QHexRT (Qualcomm Hexagon NPU) backend...")
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 function(_qhexrt_require_json_keys json_variable label expected_csv)
     set(_json "${${json_variable}}")
@@ -556,7 +556,7 @@ if(_qhexrt_platform_supported AND _qhexrt_prebuilt_valid)
             find_file(QHEXRT_LIBCDSPRPC libcdsprpc.so
                 PATHS
                     "$ENV{HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship/android_aarch64"
-                    "${CMAKE_SOURCE_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
+                    "${RAC_ROOT_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
                     "${CMAKE_CURRENT_SOURCE_DIR}/../../bindings/kotlin/src/main/jniLibs/arm64-v8a"
                 NO_DEFAULT_PATH)
         endif()

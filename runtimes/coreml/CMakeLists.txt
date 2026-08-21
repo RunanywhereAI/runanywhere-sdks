@@ -19,7 +19,7 @@ set_target_properties(rac_runtime_coreml PROPERTIES
 
 target_include_directories(rac_runtime_coreml PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/core/include
+    ${RAC_ROOT_DIR}/core/include
 )
 
 target_link_libraries(rac_runtime_coreml PUBLIC
