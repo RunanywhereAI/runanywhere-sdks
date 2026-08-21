@@ -1,0 +1,109 @@
+# THROWAWAY test workflow — not part of the product. Exists only to prove the
+# new native_electron/sdk_electron job wiring in release.yml (workflow_call +
+# secrets: inherit + cross-job artifact download + workflow_call outputs)
+# actually works in real GitHub Actions CI, without paying for release.yml's
+# other 15 native/sdk/consumer-validation jobs. Delete this file once verified.
+name: _test-electron-release-wiring
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: parse
+        run: echo "version=$(tr -d '[:space:]' < core/VERSION)" >> "$GITHUB_OUTPUT"
+
+  native_electron:
+    needs: validate
+    uses: ./.github/workflows/electron-native-package.yml
+    secrets: inherit
+
+  sdk_electron:
+    needs: [validate, native_electron]
+    if: ${{ !cancelled() && needs.native_electron.outputs.package_result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download packaged Electron tarballs
+        uses: actions/download-artifact@v8
+        with:
+          name: electron-packaged-tarballs
+          path: electron-tarballs
+      - name: Prepublish gate (every Electron tarball, byte-level)
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/prepublish_check.py --version "$VERSION" electron-tarballs/*.tgz
+      - name: Checksum every Electron tarball
+        run: |
+          set -euo pipefail
+          cd electron-tarballs
+          for f in *.tgz; do sha256sum "$f" > "$f.sha256"; done
+          ls -la
+      - name: Split public vs. QHexRT-private Electron assets
+        run: |
+          set -euo pipefail
+          mkdir -p public private
+          shopt -s nullglob
+          for f in electron-tarballs/*.tgz electron-tarballs/*.tgz.sha256; do
+            base="$(basename "$f")"
+            case "$base" in
+              runanywhere-proto-ts-*) ;;
+              *qhexrt*) cp "$f" "private/$base" ;;
+              *) cp "$f" "public/$base" ;;
+            esac
+          done
+          echo "public:"; ls -la public
+          echo "private (QHexRT, not attached to any release):"; ls -la private
+      - name: Assert the wiring behaved as designed
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in runanywhere-electron runanywhere-electron-llamacpp runanywhere-electron-onnx runanywhere-electron-sherpa; do
+            if ! ls public/"${f}"-*.tgz >/dev/null 2>&1; then
+              echo "::error::expected public/${f}-*.tgz, not found"
+              fail=1
+            fi
+          done
+          if ls public/*qhexrt* >/dev/null 2>&1; then
+            echo "::error::a qhexrt-named file leaked into the PUBLIC set"
+            fail=1
+          fi
+          if ls public/runanywhere-proto-ts-* >/dev/null 2>&1; then
+            echo "::error::proto-ts leaked into the PUBLIC electron set (would collide with sdk_web's own copy)"
+            fail=1
+          fi
+          echo "native_electron.outputs.qhexrt_result = ${{ needs.native_electron.outputs.qhexrt_result }}"
+          echo "native_electron.outputs.package_result = ${{ needs.native_electron.outputs.package_result }}"
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::wiring assertion failed"
+            exit 1
+          fi
+          echo "ALL WIRING ASSERTIONS PASSED"
+      - name: Upload public Electron SDK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron
+          path: public/**
+          retention-days: 1
+          if-no-files-found: error
+      - name: Upload private Electron QHexRT artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron-qhexrt-private
+          path: private/**
+          retention-days: 1
+          if-no-files-found: warn
