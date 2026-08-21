@@ -80,6 +80,12 @@ This script IS called automatically (package-sdk.sh runs it right before
 printing the publish order), so the same check lives here too — the one
 place a future regression cannot ship without someone deliberately deleting
 this code.
+
+The same scan also covers runanywhere_native.node: every preset this repo's
+CI actually builds ships it thin (a separate rac_commons alongside it), but a
+FAT Electron build links rac_commons statically straight into the addon with
+no separate commons file to catch — this script's contract is general-purpose,
+not scoped to only the presets currently wired into CI.
 """
 
 from __future__ import annotations
@@ -164,6 +170,16 @@ LITERAL_CONTRACTS = frozenset({"qhexrt"})
 PLUGIN_NAME_RE = re.compile(r"^(?:lib)?runanywhere_(?P<id>[A-Za-z0-9_]+)\.(?:so|dylib|dll)$")
 COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll|a)$")
 WASM_NAME_RE = re.compile(r".*\.wasm$")
+# A FAT Electron build (RAC_BUILD_ELECTRON_ADDON=ON without the thin split —
+# see the electron-macos preset's own doc comment) links rac_commons
+# statically straight into the N-API addon, with no separate commons file to
+# catch the staging-URL placeholder. Every preset this repo's CI actually
+# wires in today builds thin (a separate rac_commons ships alongside), so
+# this is defense in depth for the gate's shared, general-purpose contract,
+# not a fix to a currently-exploitable path. Telemetry/placeholder scan only
+# — the addon itself carries no engine ops table in either mode, so it is
+# deliberately never added to REQUIRED_OPS.
+NODE_ADDON_NAME_RE = re.compile(r"^runanywhere_native\.node$")
 # npm pack names: runanywhere-electron-sherpa-0.20.17.tgz
 BACKEND_TARBALL_RE = re.compile(
     r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt|neurt)-"
@@ -308,6 +324,7 @@ def collect(paths: list[Path]) -> list[tuple[Path, str]]:
                     or BACKEND_ENGINE_NAME_RE.match(child.name)
                     or COMMONS_NAME_RE.match(child.name)
                     or WASM_NAME_RE.match(child.name)
+                    or NODE_ADDON_NAME_RE.match(child.name)
                 ):
                     found.append((child, str(child)))
         elif path.is_file():
@@ -409,7 +426,11 @@ def main() -> int:
                         out.parent.mkdir(parents=True, exist_ok=True)
                         out.write_bytes(payload)
                         targets.append((out, f"{archive.name}:{member.name}"))
-                    elif COMMONS_NAME_RE.match(leaf) or WASM_NAME_RE.match(leaf):
+                    elif (
+                        COMMONS_NAME_RE.match(leaf)
+                        or WASM_NAME_RE.match(leaf)
+                        or NODE_ADDON_NAME_RE.match(leaf)
+                    ):
                         if args.expect_version:
                             if args.expect_version.encode("ascii") not in payload:
                                 version_mismatches.append(
@@ -436,7 +457,11 @@ def main() -> int:
                 )
 
         for target, display in targets:
-            if COMMONS_NAME_RE.match(target.name) or WASM_NAME_RE.match(target.name):
+            if (
+                COMMONS_NAME_RE.match(target.name)
+                or WASM_NAME_RE.match(target.name)
+                or NODE_ADDON_NAME_RE.match(target.name)
+            ):
                 checked += 1
                 track_fail = check_tracking_bytes(target.read_bytes(), display)
                 if track_fail:

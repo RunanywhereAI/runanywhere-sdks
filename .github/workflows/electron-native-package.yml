@@ -52,7 +52,14 @@ env:
   STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
 
 jobs:
+  # Fork PRs never have repo secrets (STAGING_BASE_URL, NEURUN_TOKEN) — this
+  # repo is public, so any GitHub user can open one. Without this guard a
+  # fork PR gets a red "validate" X for a reason the contributor cannot fix;
+  # with it, `needs: validate` propagates the skip through native_macos too.
+  # A same-repo (non-fork) pull_request still runs normally — this is a
+  # no-op for `push`, which can never originate from a fork by definition.
   validate:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Require usable STAGING_BASE_URL
@@ -98,6 +105,7 @@ jobs:
           ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
           token: ${{ secrets.NEURUN_TOKEN }}
           path: neurun
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-toolchain
         with:
@@ -147,6 +155,19 @@ jobs:
             bindings/electron/packages/sherpa/prebuilds/darwin-arm64 \
             bindings/electron/packages/neurt/prebuilds/darwin-arm64
 
+          # check_plugin_natives.py treats an absent/empty NeuRT directory as
+          # "nothing to verify" and exits 0 — correct on platforms where
+          # NeuRT legitimately never builds, but on THIS job specifically (a
+          # real NEURUN_TOKEN, a real neurun checkout) it must always produce
+          # a routable plugin. A silent empty pass here would hide a real
+          # regression (e.g. the neurun checkout failing) instead of failing
+          # the build.
+          neurt_backend="bindings/electron/packages/neurt/prebuilds/darwin-arm64/librac_backend_neurt.dylib"
+          if [ ! -f "$neurt_backend" ]; then
+            echo "::error::NeuRT did not produce $neurt_backend on macOS — the neurun checkout or build silently failed."
+            exit 1
+          fi
+
       - name: Upload staged darwin-arm64 prebuilds
         uses: actions/upload-artifact@v4
         with:
@@ -167,6 +188,14 @@ jobs:
   # ---------------------------------------------------------------------------
   native_win_arm64_qhexrt:
     needs: validate
+    # NEVER run on pull_request, fork or not: this is a persistent, personally
+    # -owned self-hosted runner, and a pull_request run checks out and runs
+    # `npm install` (arbitrary install-script execution) against PR-controlled
+    # code before any secret-gated step could even fail. `push` cannot
+    # originate from a fork (it only fires for commits landing directly in
+    # this repository, which requires write access), so gating on event name
+    # alone — no org-membership/approval logic needed — fully closes this.
+    if: github.event_name != 'pull_request'
     runs-on: [self-hosted, Windows, ARM64, qhexrt]
     timeout-minutes: 90
     steps:
@@ -330,6 +359,11 @@ jobs:
   # ---------------------------------------------------------------------------
   native_win_x64_and_package:
     needs: [validate, native_macos, native_win_arm64_qhexrt]
+    # Same reasoning as native_win_arm64_qhexrt: this job needs that job's
+    # artifact, so it would be implicitly skipped on pull_request anyway
+    # once that job is skipped — made explicit here for clarity rather than
+    # relying on the implicit needs-skip propagation.
+    if: github.event_name != 'pull_request'
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
