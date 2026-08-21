@@ -67,6 +67,7 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/fetch.h>
 #include <emscripten/threading.h>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -287,17 +288,21 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     // Build headers + optional Range header (resume). The header
     // pointer array must outlive the call, so we stash it on the stack.
     fetch_request_ctx rctx;
-    rctx.build_headers(req, resume_from_byte);
-    if (!rctx.header_ptrs.empty() && rctx.header_ptrs.front() != nullptr) {
-        attr.requestHeaders = rctx.header_ptrs.data();
-    }
+    try {
+        rctx.build_headers(req, resume_from_byte);
+        if (!rctx.header_ptrs.empty() && rctx.header_ptrs.front() != nullptr) {
+            attr.requestHeaders = rctx.header_ptrs.data();
+        }
 
-    // Request body (copy into a stable buffer since Emscripten expects
-    // NUL-terminated semantics for `requestData`).
-    if (req->body_bytes && req->body_len > 0) {
-        rctx.body_copy.assign(reinterpret_cast<const char*>(req->body_bytes), req->body_len);
-        attr.requestData = rctx.body_copy.data();
-        attr.requestDataSize = rctx.body_copy.size();
+        // Request body (copy into a stable buffer since Emscripten expects
+        // NUL-terminated semantics for `requestData`).
+        if (req->body_bytes && req->body_len > 0) {
+            rctx.body_copy.assign(reinterpret_cast<const char*>(req->body_bytes), req->body_len);
+            attr.requestData = rctx.body_copy.data();
+            attr.requestDataSize = rctx.body_copy.size();
+        }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
 
     const auto t_start = std::chrono::steady_clock::now();
@@ -337,14 +342,20 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     if (fetch->id != 0) {
         size_t hdrs_len = emscripten_fetch_get_response_headers_length(fetch);
         if (hdrs_len > 0) {
-            std::string raw(hdrs_len + 1, '\0');
-            emscripten_fetch_get_response_headers(fetch, raw.data(), raw.size());
-            rac_result_t headers_rc = parse_response_headers(raw.c_str(), out);
-            if (headers_rc != RAC_SUCCESS) {
-                // Release the in-flight fetch before propagating so the
-                // allocation failure does not also leak fetch resources.
+            try {
+                std::string raw(hdrs_len + 1, '\0');
+                emscripten_fetch_get_response_headers(fetch, raw.data(), raw.size());
+                rac_result_t headers_rc = parse_response_headers(raw.c_str(), out);
+                if (headers_rc != RAC_SUCCESS) {
+                    // Release the in-flight fetch before propagating so the
+                    // allocation failure does not also leak fetch resources.
+                    emscripten_fetch_close(fetch);
+                    return headers_rc;
+                }
+            } catch (const std::bad_alloc&) {
+                rac_http_response_free(out);
                 emscripten_fetch_close(fetch);
-                return headers_rc;
+                return RAC_ERROR_OUT_OF_MEMORY;
             }
         }
     }
