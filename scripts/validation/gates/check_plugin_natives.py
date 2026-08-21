@@ -59,6 +59,33 @@ Exit 0 when every plugin found is routable, 1 otherwise. A tarball whose name
 is a known backend package (electron-llamacpp/onnx/sherpa/qhexrt) with ZERO
 plugin natives is a failure — that is how @runanywhere/electron-qhexrt 0.20.17
 shipped as JS-only. Core / proto-ts tarballs with no plugins still pass.
+
+ALSO CHECKED: THE STAGING-URL PLACEHOLDER
+-------------------------------------------
+core/CMakeLists.txt substitutes $ENV{STAGING_BASE_URL} into a generated
+development_config.cpp at cmake-configure time; an unset/empty env var at
+configure time leaves the tracked placeholder, "YOUR_STAGING_BASE_URL",
+compiled straight into rac_commons. rac_dev_config_is_usable_http_url then
+rejects it, so the SDK cannot keyless-resolve a development backend and the
+release ships with no telemetry at all — invisible to every check above,
+because the binary is the right size, exports the right symbols, and every
+carrier still references its ops tables correctly.
+
+This shipped for real: @runanywhere/electron{,-llamacpp,-onnx,-sherpa} 0.20.19
+shipped this way, and darwin-arm64/win32-arm64 rac_commons in every Electron
+package still carried it through 0.20.24 — three releases after
+scripts/release/prepublish_check.py's check_tracking() already knew how to
+catch it, because that script is advisory and nothing calls it automatically.
+This script IS called automatically (package-sdk.sh runs it right before
+printing the publish order), so the same check lives here too — the one
+place a future regression cannot ship without someone deliberately deleting
+this code.
+
+The same scan also covers runanywhere_native.node: every preset this repo's
+CI actually builds ships it thin (a separate rac_commons alongside it), but a
+FAT Electron build links rac_commons statically straight into the addon with
+no separate commons file to catch — this script's contract is general-purpose,
+not scoped to only the presets currently wired into CI.
 """
 
 from __future__ import annotations
@@ -98,6 +125,15 @@ REQUIRED_OPS: dict[str, tuple[str, ...]] = {
     # Not an ops name: QHexRT has no carrier, so its tables are internal and a PE
     # keeps none of them. See "THE ENGINE THAT HAS NO CARRIER" above.
     "qhexrt": ("qhexrt:engine-available",),
+    # engines/neurt/rac_plugin_entry_neurt.cpp gates &g_neurt_{llm,stt}_ops behind
+    # #if RAC_NEURT_ROUTABLE, exactly like sherpa/onnx/llamacpp: the addresses are
+    # only taken (an undefined reference in the carrier) when the private neurun
+    # checkout was actually present at build time (NEURT_ROOT resolved). Without
+    # it, engines/neurt/CMakeLists.txt builds the documented non-routable shell
+    # (registration refused with RAC_ERROR_BACKEND_UNAVAILABLE) instead of hard
+    # failing configure — legitimate on any host that can't clone the private
+    # repo, but not something that may ship as @runanywhere/electron-neurt.
+    "neurt": ("g_neurt_llm_ops", "g_neurt_stt_ops"),
 }
 
 # A token whose PRESENCE disproves routability, per backend. Requiring the
@@ -132,11 +168,52 @@ LITERAL_CONTRACTS = frozenset({"qhexrt"})
 # the extension. The plugin FILE NAME is a load-bearing contract (the loader
 # derives `rac_plugin_entry_<id>` from it), so parsing it here is legitimate.
 PLUGIN_NAME_RE = re.compile(r"^(?:lib)?runanywhere_(?P<id>[A-Za-z0-9_]+)\.(?:so|dylib|dll)$")
-COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll)$")
+COMMONS_NAME_RE = re.compile(r"^(?:lib)?rac_commons\.(?:so|dylib|dll|a)$")
+WASM_NAME_RE = re.compile(r".*\.wasm$")
+# A FAT Electron build (RAC_BUILD_ELECTRON_ADDON=ON without the thin split —
+# see the electron-macos preset's own doc comment) links rac_commons
+# statically straight into the N-API addon, with no separate commons file to
+# catch the staging-URL placeholder. Every preset this repo's CI actually
+# wires in today builds thin (a separate rac_commons ships alongside), so
+# this is defense in depth for the gate's shared, general-purpose contract,
+# not a fix to a currently-exploitable path. Telemetry/placeholder scan only
+# — the addon itself carries no engine ops table in either mode, so it is
+# deliberately never added to REQUIRED_OPS.
+NODE_ADDON_NAME_RE = re.compile(r"^runanywhere_native\.node$")
 # npm pack names: runanywhere-electron-sherpa-0.20.17.tgz
 BACKEND_TARBALL_RE = re.compile(
-    r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt)-"
+    r"electron-(?P<id>llamacpp|onnx|sherpa|qhexrt|neurt)-"
 )
+
+# rac_backend_<id> is normally the sibling ENGINE library that a carrier links
+# against, not itself gated here. NeuRT is the exception: verified by building
+# it for real (macOS, with the actual neurun checkout) and reading `nm -a` on
+# both files —
+#
+#   librunanywhere_neurt.dylib (the carrier, rac_static_register_neurt.cpp only): no symbols at all
+#   librac_backend_neurt.dylib (rac_backend_neurt, compiles rac_plugin_entry_neurt.cpp): DEFINED g_neurt_llm_ops / g_neurt_stt_ops
+#
+# Unlike sherpa/onnx/llamacpp, engines/neurt/CMakeLists.txt's rac_add_engine_plugin()
+# call puts rac_plugin_entry_neurt.cpp's SOURCES on the rac_backend_neurt target,
+# not on the runanywhere_neurt carrier — so the carrier has nothing to check, and
+# the real evidence is a DEFINED (not undefined) symbol in the backend file.
+EVIDENCE_IN_BACKEND_FILE = frozenset({"neurt"})
+BACKEND_ENGINE_NAME_RE = re.compile(r"^(?:lib)?rac_backend_(?P<id>[A-Za-z0-9_]+)\.(?:so|dylib|dll)$")
+
+# See "ALSO CHECKED: THE STAGING-URL PLACEHOLDER" in the module docstring.
+PLACEHOLDER_STAGING_URL = b"YOUR_STAGING_BASE_URL"
+
+
+def check_tracking_bytes(payload: bytes, display: str) -> str | None:
+    """None if `payload` is clean; a failure message if it carries the placeholder."""
+    if PLACEHOLDER_STAGING_URL in payload:
+        return (
+            f"{display}: NO TELEMETRY — built with the placeholder staging URL "
+            f"(YOUR_STAGING_BASE_URL). rac_dev_config rejects this, so the SDK "
+            f"cannot keyless-resolve a development backend. Rebuild with "
+            f"STAGING_BASE_URL set in the environment at cmake-configure time."
+        )
+    return None
 
 # QHexRT has no carrier: the engine IS the plugin, renamed via OUTPUT_NAME on
 # shared builds, so it matches the pattern above. Its Android/JNI form keeps the
@@ -208,9 +285,22 @@ def symbol_text(path: Path) -> tuple[str, str]:
 
 def check_plugin(path: Path, display: str) -> Finding | None:
     match = PLUGIN_NAME_RE.match(path.name)
-    if match is None:
-        return None
-    backend = match.group("id")
+    if match is not None:
+        backend = match.group("id")
+        if backend in EVIDENCE_IN_BACKEND_FILE:
+            # The carrier itself has nothing to check for this backend — see
+            # EVIDENCE_IN_BACKEND_FILE above. The sibling rac_backend_<id> file,
+            # matched below, is the real evidence.
+            return None
+    else:
+        match = BACKEND_ENGINE_NAME_RE.match(path.name)
+        if match is None:
+            return None
+        backend = match.group("id")
+        if backend not in EVIDENCE_IN_BACKEND_FILE:
+            # A normal sibling engine library (e.g. rac_backend_sherpa) that a
+            # carrier links against — its own carrier is the gated file, not this.
+            return None
     required = REQUIRED_OPS.get(backend)
     if required is None:
         # An out-of-tree plugin we have no contract for. Not our call to fail.
@@ -229,7 +319,13 @@ def collect(paths: list[Path]) -> list[tuple[Path, str]]:
     for path in paths:
         if path.is_dir():
             for child in sorted(path.rglob("*")):
-                if child.is_file() and PLUGIN_NAME_RE.match(child.name):
+                if child.is_file() and (
+                    PLUGIN_NAME_RE.match(child.name)
+                    or BACKEND_ENGINE_NAME_RE.match(child.name)
+                    or COMMONS_NAME_RE.match(child.name)
+                    or WASM_NAME_RE.match(child.name)
+                    or NODE_ADDON_NAME_RE.match(child.name)
+                ):
                     found.append((child, str(child)))
         elif path.is_file():
             found.append((path, str(path)))
@@ -280,6 +376,7 @@ def main() -> int:
     empty_backends: list[str] = []
     version_mismatches: list[str] = []
     unsafe_members: list[str] = []
+    telemetry_failures: list[str] = []
     checked = 0
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -313,15 +410,54 @@ def main() -> int:
                         out.write_bytes(payload)
                         targets.append((out, f"{archive.name}:{member.name}"))
                         plugin_count += 1
-                    elif args.expect_version and COMMONS_NAME_RE.match(leaf):
-                        if args.expect_version.encode("ascii") not in payload:
-                            version_mismatches.append(
-                                f"{archive.name}: {member.name} does not embed "
-                                f"{args.expect_version!r}"
+                    elif BACKEND_ENGINE_NAME_RE.match(leaf):
+                        # Only extracted for backends whose evidence lives here
+                        # instead of the carrier (EVIDENCE_IN_BACKEND_FILE) —
+                        # check_plugin() no-ops on any other rac_backend_<id>.
+                        out = member_dest(dest, member.name)
+                        if out is None:
+                            print(f"  FAIL  {archive.name}  member escapes the "
+                                  f"archive root: {member.name}")
+                            unsafe_members.append(
+                                f"{archive.name}: member {member.name!r} escapes "
+                                f"the archive root"
                             )
+                            continue
+                        out.parent.mkdir(parents=True, exist_ok=True)
+                        out.write_bytes(payload)
+                        targets.append((out, f"{archive.name}:{member.name}"))
+                    elif (
+                        COMMONS_NAME_RE.match(leaf)
+                        or WASM_NAME_RE.match(leaf)
+                        or NODE_ADDON_NAME_RE.match(leaf)
+                    ):
+                        # The --expect-version embed check only ever applies
+                        # to rac_commons/.wasm (both compile in
+                        # RAC_VERSION_STRING) — the N-API addon never has,
+                        # and was never meant to; it is only here for the
+                        # placeholder/telemetry scan below. Learned by
+                        # actually running this: wiring the addon into the
+                        # same branch as commons/wasm made every real
+                        # @runanywhere/electron tarball fail with "does not
+                        # embed '<version>'".
+                        if args.expect_version and not NODE_ADDON_NAME_RE.match(leaf):
+                            if args.expect_version.encode("ascii") not in payload:
+                                version_mismatches.append(
+                                    f"{archive.name}: {member.name} does not embed "
+                                    f"{args.expect_version!r}"
+                                )
+                            else:
+                                print(f"  ok    version  {member.name}  "
+                                      f"embeds {args.expect_version}")
+                        track_fail = check_tracking_bytes(payload, f"{archive.name}:{member.name}")
+                        checked += 1
+                        if track_fail:
+                            print(f"  FAIL  telemetry  {archive.name}:{member.name}  "
+                                  f"placeholder staging URL baked in")
+                            telemetry_failures.append(track_fail)
                         else:
-                            print(f"  ok    version  {member.name}  "
-                                  f"embeds {args.expect_version}")
+                            print(f"  ok    telemetry  {archive.name}:{member.name}  "
+                                  f"real staging URL baked in (no placeholder)")
             required_id = tarball_backend_id(archive.name)
             if required_id is not None and plugin_count == 0:
                 print(f"  FAIL  {archive.name}  no runanywhere_{required_id} native in tarball")
@@ -330,6 +466,19 @@ def main() -> int:
                 )
 
         for target, display in targets:
+            if (
+                COMMONS_NAME_RE.match(target.name)
+                or WASM_NAME_RE.match(target.name)
+                or NODE_ADDON_NAME_RE.match(target.name)
+            ):
+                checked += 1
+                track_fail = check_tracking_bytes(target.read_bytes(), display)
+                if track_fail:
+                    print(f"  FAIL  telemetry  {display}  placeholder staging URL baked in")
+                    telemetry_failures.append(track_fail)
+                else:
+                    print(f"  ok    telemetry  {display}  real staging URL baked in (no placeholder)")
+                continue
             finding = check_plugin(target, display)
             if finding is None:
                 continue
@@ -342,7 +491,9 @@ def main() -> int:
                 print(f"  ok    {label}  [{finding.method}]  satisfies its "
                       f"routability contract: {', '.join(REQUIRED_OPS[finding.backend])}")
 
-    failed = bool(findings or empty_backends or version_mismatches or unsafe_members)
+    failed = bool(
+        findings or empty_backends or version_mismatches or unsafe_members or telemetry_failures
+    )
     if not failed and checked == 0:
         print("  no backend plugin natives found (nothing to verify)")
         return 0
@@ -358,6 +509,8 @@ def main() -> int:
             print(f"  - {line}")
         for line in unsafe_members:
             print(f"  - {line}")
+        for line in telemetry_failures:
+            print(f"  - {line}")
         print(
             "\nA plugin missing its ops tables was compiled with its engine\n"
             "unavailable: capability_check() will decline registration and the\n"
@@ -369,7 +522,8 @@ def main() -> int:
         )
         return 1
 
-    print(f"\nAll {checked} backend plugin native(s) are routable.")
+    print(f"\nAll {checked} check(s) passed: plugin natives are routable and no "
+          f"staging-URL placeholder was found.")
     return 0
 
 

@@ -339,10 +339,6 @@ jobs:
     # clean interpreter, and runs the hermetic suite. ubuntu-22.04 keeps the manylinux tag low
     # (glibc 2.35) for a broadly-installable wheel.
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.9', '3.12']
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -353,7 +349,7 @@ jobs:
           platform: linux
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
       # runanywhere/_proto, _generated_errors.py and _generated_defaults.py are
       # IDL codegen output and are not tracked. `python -m build` runs them via
       # the in-tree PEP 517 backend, but only when protoc + grpcio-tools are on
@@ -366,8 +362,6 @@ jobs:
       # patchelf comes from PyPI, not apt. ubuntu-22.04 ships 0.14.3 and current
       # auditwheel requires >= 0.14.5, so `auditwheel repair` died with
       # "patchelf 0.14.3 found. auditwheel repair requires patchelf >= 0.14.5".
-      # Only 3.12 failed: 3.9 resolves an older auditwheel that still accepts
-      # 0.14.3, which is why this surfaced as one red cell rather than a red job.
       # Both tools now come from the same resolver, so they cannot drift apart
       # again the way an apt package and a pip package silently did.
       - name: Build tools (patchelf is required by auditwheel)

@@ -1,0 +1,528 @@
+# Electron real native packaging pipeline — builds every backend for real
+# (llamacpp, onnx, sherpa, neurt, qhexrt; no OFF flags, no stubs), bakes the
+# real STAGING_BASE_URL, and packages every publish-ready tarball. Separate
+# from electron-sdk-ci.yml on purpose: that workflow is a fast PR smoke test
+# (thin, llamacpp-only, RAC_BACKEND_SHERPA=OFF, no STAGING_BASE_URL, never
+# packages). This workflow is the one that actually produces what would ship.
+#
+# Does NOT publish anywhere (no npm publish) — packaging + verification only.
+# See thoughts/shared/plans/electron_cicd_staging_url_and_npu_ane_pipeline.md.
+#
+# Also callable as a reusable workflow (workflow_call): release.yml's
+# native_electron job invokes this directly so Electron gets the same
+# real, no-stub artifact it always has, feeding the same release train as
+# every other SDK — see that job and sdk_electron for how the resulting
+# `electron-packaged-tarballs` artifact is split into public vs.
+# QHexRT-private before anything reaches a GitHub Release asset.
+name: electron-native-package
+
+on:
+  push:
+    paths:
+      - 'bindings/electron/**'
+      - 'core/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - '.github/workflows/electron-native-package.yml'
+  pull_request:
+    paths:
+      - 'bindings/electron/**'
+      - 'core/**'
+      - 'engines/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - '.github/workflows/electron-native-package.yml'
+  workflow_dispatch: {}
+  workflow_call:
+    secrets:
+      STAGING_BASE_URL:
+        required: true
+      NEURUN_TOKEN:
+        required: true
+    outputs:
+      qhexrt_result:
+        description: >-
+          Conclusion of native_win_arm64_qhexrt (success/skipped/failure).
+          Advisory only: the self-hosted NPU runner is a single, personally
+          -owned machine, and @runanywhere/electron-qhexrt never becomes a
+          public GitHub Release asset anyway (npm public, Release private),
+          so an outage here should not hold the rest of the SDK release.
+        value: ${{ jobs.report.outputs.qhexrt_result }}
+      package_result:
+        description: >-
+          Conclusion of native_win_x64_and_package, the job that produces
+          the publish-ready `electron-packaged-tarballs` artifact. This is
+          the one that matters for gating a caller's release train.
+        value: ${{ jobs.report.outputs.package_result }}
+
+permissions:
+  contents: read
+
+# This workflow builds native code on 3 real machines (one of them a
+# self-hosted, single-instance runner) — a stale run from an earlier push on
+# the same branch/PR is wasted compute, not just noise. Cancel it the moment a
+# newer commit lands, same reasoning as pr-build.yml's own concurrency group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Same fail-closed contract as release.yml: a build with this unset bakes
+  # YOUR_STAGING_BASE_URL into rac_commons, which rac_dev_config rejects, so
+  # released binaries cannot keyless-resolve a development backend. This is
+  # the exact bug that shipped in every Electron package's darwin-arm64 /
+  # win32-arm64 rac_commons through 0.20.24.
+  STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+
+jobs:
+  # Fork PRs never have repo secrets (STAGING_BASE_URL, NEURUN_TOKEN) — this
+  # repo is public, so any GitHub user can open one. Without this guard a
+  # fork PR gets a red "validate" X for a reason the contributor cannot fix;
+  # with it, `needs: validate` propagates the skip through native_macos too.
+  # A same-repo (non-fork) pull_request still runs normally — this is a
+  # no-op for `push`, which can never originate from a fork by definition.
+  validate:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require usable STAGING_BASE_URL
+        run: |
+          set -euo pipefail
+          if [[ -z "${STAGING_BASE_URL:-}" ]]; then
+            echo "::error::Repository secret STAGING_BASE_URL is unset or empty."
+            exit 1
+          fi
+          case "${STAGING_BASE_URL}" in
+            YOUR_STAGING_BASE_URL|http://YOUR_*|https://YOUR_*|placeholder*|PLACEHOLDER*)
+              echo "::error::STAGING_BASE_URL looks like a placeholder ('${STAGING_BASE_URL}')."
+              exit 1
+              ;;
+          esac
+          if [[ ! "${STAGING_BASE_URL}" =~ ^https?://[^[:space:]]+$ ]]; then
+            echo "::error::STAGING_BASE_URL must be an http(s) origin without whitespace."
+            exit 1
+          fi
+          echo "STAGING_BASE_URL is set and looks usable."
+
+  # ---------------------------------------------------------------------------
+  # macOS: llamacpp + onnx + sherpa + neurt (Apple Neural Engine), all real —
+  # sherpa is ON (the PR-smoke lane turns it OFF; this lane must not), and
+  # neurt is built from the real private neurun checkout, not the shell.
+  # ---------------------------------------------------------------------------
+  native_macos:
+    needs: validate
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      # Same pin/rationale as release.yml's native_ios job: build the real
+      # engine, not the non-routable shell, and keep it reproducible.
+      - name: Checkout neurun (NeuRT engine source)
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/neurun
+          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
+          token: ${{ secrets.NEURUN_TOKEN }}
+          path: neurun
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download vendored Sherpa-ONNX (macOS)
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
+
+      - name: Install electron native addon node deps
+        working-directory: bindings/electron/native
+        run: npm install
+
+      - name: Configure electron-macos (all real backends + NeuRT)
+        env:
+          NEURT_ROOT: ${{ github.workspace }}/neurun
+        run: |
+          set -euo pipefail
+          cmake --preset electron-macos -B build/electron-macos -DNEURT_ROOT="${NEURT_ROOT}"
+
+      - name: Build commons + llamacpp + onnx + sherpa + neurt + addon
+        run: |
+          set -euo pipefail
+          cmake --build build/electron-macos -j "$(sysctl -n hw.logicalcpu)" \
+            --target rac_commons runanywhere_llamacpp runanywhere_onnx runanywhere_sherpa runanywhere_neurt runanywhere_native
+
+      - name: Stage native prebuilds (bundle:native, no pack yet)
+        working-directory: bindings/electron
+        run: |
+          set -euo pipefail
+          npm install
+          npm run bundle:native -- --package=all
+
+      # A fast, direct check right here — the same gate package-sdk.sh will
+      # run later on the merged tree, but catching it per-platform gives a
+      # clear signal about which platform's build regressed.
+      - name: Verify staging URL + routability on this platform's own build
+        run: |
+          set -euo pipefail
+          python3 scripts/validation/gates/check_plugin_natives.py \
+            bindings/electron/prebuilds/darwin-arm64 \
+            bindings/electron/packages/llamacpp/prebuilds/darwin-arm64 \
+            bindings/electron/packages/onnx/prebuilds/darwin-arm64 \
+            bindings/electron/packages/sherpa/prebuilds/darwin-arm64 \
+            bindings/electron/packages/neurt/prebuilds/darwin-arm64
+
+          # check_plugin_natives.py treats an absent/empty NeuRT directory as
+          # "nothing to verify" and exits 0 — correct on platforms where
+          # NeuRT legitimately never builds, but on THIS job specifically (a
+          # real NEURUN_TOKEN, a real neurun checkout) it must always produce
+          # a routable plugin. A silent empty pass here would hide a real
+          # regression (e.g. the neurun checkout failing) instead of failing
+          # the build.
+          neurt_backend="bindings/electron/packages/neurt/prebuilds/darwin-arm64/librac_backend_neurt.dylib"
+          if [ ! -f "$neurt_backend" ]; then
+            echo "::error::NeuRT did not produce $neurt_backend on macOS — the neurun checkout or build silently failed."
+            exit 1
+          fi
+
+      - name: Upload staged darwin-arm64 prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-staged-darwin-arm64
+          path: |
+            bindings/electron/prebuilds/darwin-arm64/**
+            bindings/electron/packages/*/prebuilds/darwin-arm64/**
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Windows ARM64: QHexRT (Hexagon NPU) only — llama.cpp/ONNX/Sherpa do not
+  # build on this target at all (ggml rejects MSVC for ARM; FetchONNXRuntime
+  # has no win-arm64 URL — see bindings/electron/AGENTS.md). Runs on the
+  # self-hosted runner registered on the real Snapdragon X2 Elite box, since
+  # this is the one lane no GitHub-hosted runner can do (real QAIRT/Hexagon
+  # toolchain + a receipt staged from the licensed QAIRT SDK).
+  # ---------------------------------------------------------------------------
+  native_win_arm64_qhexrt:
+    needs: validate
+    # NEVER run on pull_request, fork or not: this is a persistent, personally
+    # -owned self-hosted runner, and a pull_request run checks out and runs
+    # `npm install` (arbitrary install-script execution) against PR-controlled
+    # code before any secret-gated step could even fail. `push` cannot
+    # originate from a fork (it only fires for commits landing directly in
+    # this repository, which requires write access), so gating on event name
+    # alone — no org-membership/approval logic needed — fully closes this.
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, Windows, ARM64, qhexrt]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      # The runner service on this box runs as NT AUTHORITY\NETWORK SERVICE,
+      # not the interactive account (san) cmake/python/vcpkg were set up
+      # under — a different account with its own PATH AND its own NTFS
+      # permissions, which is why a command that works perfectly over an
+      # interactive SSH session ("cmake --version") still comes back "not
+      # recognized" here, and why a wildcard `Get-ChildItem` under
+      # C:\Users\san\... silently finds nothing (access denied on
+      # enumeration is swallowed by -ErrorAction SilentlyContinue) even after
+      # cmake/python are confirmed to exist at that exact path. NETWORK
+      # SERVICE has been granted read+execute on this one directory tree
+      # (icacls ... /grant "NT AUTHORITY\NETWORK SERVICE:(OI)(CI)RX" /T) —
+      # traversal into ancestor folders needs no separate grant (Windows
+      # grants "bypass traverse checking" to Network Service by default), so
+      # a concrete, non-wildcard path works once that one ACL is in place.
+      # cmake is a pip-installed shim under this profile, not a machine-wide
+      # Program Files install (unlike node/git, which is why those didn't
+      # need this); the only `python3` on this box resolves to a per-user
+      # Windows Store App Execution Alias, unreliable from a different
+      # account, so this uses the real python.exe living beside cmake
+      # instead. Every part of this was found by actually running the job
+      # and reading its real failures, not by assuming the interactive
+      # shell's environment carries over.
+      - name: Add cmake + python to PATH for this job (self-hosted account gap)
+        shell: powershell
+        env:
+          PY_INSTALL_DIR: 'C:\Users\san\AppData\Local\Programs\Python\Python312-arm64'
+        run: |
+          $cmakeExe = Join-Path $env:PY_INSTALL_DIR 'Scripts\cmake.exe'
+          if (-not (Test-Path $cmakeExe)) { throw "cmake.exe not found at $cmakeExe" }
+          Write-Host "adding $(Split-Path $cmakeExe) to PATH for this job (cmake)"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $cmakeExe)
+
+          $pythonExe = Join-Path $env:PY_INSTALL_DIR 'python.exe'
+          if (-not (Test-Path $pythonExe)) { throw "python.exe not found at $pythonExe" }
+          Write-Host "adding $(Split-Path $pythonExe) to PATH for this job (python)"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $pythonExe)
+
+      # bindings/electron/native/CMakeLists.txt checks for node-addon-api /
+      # node-api-headers at CONFIGURE time, not build time — the macOS and
+      # x64 jobs both install this before configuring; this job needs the
+      # same step (found only by actually running it: "node deps missing —
+      # run `npm install` in bindings/electron/native").
+      - name: Install electron native addon node deps
+        working-directory: bindings/electron/native
+        shell: powershell
+        run: npm install
+
+      # node-gyp downloads headers/import-lib for the CURRENT process arch —
+      # arm64 here, not x64. The x64 job's own step hardcodes `x64/node.lib`;
+      # do not reuse it verbatim on this runner.
+      - name: Fetch node-gyp headers (Windows ARM64 N-API link)
+        id: nodedev
+        # This self-hosted runner has only Windows PowerShell (5.1), not
+        # PowerShell Core (`pwsh`) — confirmed by actually running commands
+        # on it, unlike the GH-hosted windows-2022 runners the x64 job below
+        # uses, where `pwsh` is preinstalled. Do not "fix" this back to pwsh.
+        shell: powershell
+        run: |
+          npx --yes node-gyp install
+          $ver = (node -p "process.versions.node")
+          $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
+          if (!(Test-Path "$dir/arm64/node.lib")) { throw "node.lib missing under $dir/arm64" }
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Configure electron-win-arm64-vs2026 (QHexRT)
+        shell: powershell
+        env:
+          # Staged once on this machine from the licensed QAIRT SDK — see
+          # thoughts/shared/plans/electron_cicd_staging_url_and_npu_ane_pipeline.md
+          # for how it was produced. Persistent self-hosted state on purpose:
+          # re-deriving it from the raw QAIRT SDK on every ephemeral run is
+          # not the point of self-hosting a licensed-toolchain lane.
+          #
+          # The directory name MUST be the receipt's own build_receipt_sha256
+          # (engines/qhexrt/CMakeLists.txt verifies this self-identity check) —
+          # do not rename/alias this path to something friendlier, that is
+          # exactly the mistake that broke this the first time it was staged.
+          # If the receipt is ever regenerated with a new hash, this path must
+          # be updated to match.
+          QHEXRT_ROOT: 'C:\actions-runner-state\qhexrt-prebuilt\versions\f14ef0efb1da4b6a50e49f37a0ef55ac3b0bb7328aa7469edf78625ac4d79607'
+          # RAC_DESKTOP_ADAPTER=ON (the preset default) needs libcurl; crypt32
+          # is a system lib but curl is not, and there is no win-arm64 HTTP
+          # transport without it (no downloads, no telemetry, no auth). Already
+          # bootstrapped once on this machine — see the preset's own doc comment.
+          VCPKG_INSTALLATION_ROOT: 'C:\Users\san\vcpkg'
+          NODE_DEV_DIR: ${{ steps.nodedev.outputs.dir }}
+        run: |
+          cmake --preset electron-win-arm64-vs2026 -DQHEXRT_ROOT="$env:QHEXRT_ROOT" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=arm64-windows-static `
+            -DRAC_NODE_DEV_DIR="$env:NODE_DEV_DIR"
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+
+      - name: Build commons + qhexrt + addon
+        shell: powershell
+        run: |
+          # --config Release is required: Visual Studio is a multi-config
+          # generator, so CMAKE_BUILD_TYPE from the configure preset does
+          # nothing at build time — omitting this defaults to Debug and the
+          # link fails (LNK2038 CRT mismatch) against the Release-built
+          # qhexrt_core.lib prebuilt. The buildPresets in CMakePresets.json
+          # already carry "configuration": "Release" for exactly this reason;
+          # match it here since this step builds by raw path, not by preset.
+          cmake --build build/electron-win-arm64-vs2026 --config Release --target rac_commons rac_backend_qhexrt runanywhere_native -- /m
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+
+      - name: Stage native prebuilds (bundle:native, no pack yet)
+        working-directory: bindings/electron
+        shell: powershell
+        env:
+          RA_QNN_RUNTIME_DIR: 'C:\actions-runner-state\qhexrt-qnn-runtime-flat'
+          # bundle-native.ts's default win-arm64 lookup hardcodes
+          # build/electron-win-arm64 (the VS2022 preset's binary dir) — this
+          # preset's own doc comment warns its dir differs
+          # (electron-win-arm64-vs2026) and says to point RA_NATIVE_DIR here.
+          RA_NATIVE_DIR: '${{ github.workspace }}\build\electron-win-arm64-vs2026\bindings\electron\native\Release'
+        run: |
+          npm install
+          if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+          npm run bundle:native -- --package=all
+          if ($LASTEXITCODE -ne 0) { throw "bundle:native failed" }
+
+      - name: Verify staging URL + routability on this platform's own build
+        shell: powershell
+        run: |
+          # `python` here, not `python3` — the only python3 on this box is a
+          # per-user Windows Store App Execution Alias (unreliable from the
+          # runner service account); the PATH step above added a real
+          # python.exe that only answers to `python`.
+          python scripts/validation/gates/check_plugin_natives.py `
+            bindings/electron/prebuilds/win32-arm64 `
+            bindings/electron/packages/qhexrt/prebuilds/win32-arm64
+          if ($LASTEXITCODE -ne 0) { throw "check_plugin_natives.py failed" }
+
+      - name: Upload staged win32-arm64 prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-staged-win32-arm64
+          path: |
+            bindings/electron/prebuilds/win32-arm64/**
+            bindings/electron/packages/qhexrt/prebuilds/win32-arm64/**
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Windows x64: llamacpp + onnx + sherpa, all real. This is also the final
+  # packaging job — it merges in the other two platforms' already-staged
+  # prebuilds before running package-sdk.sh, so the resulting tarballs carry
+  # every platform together (exactly how the real published packages are
+  # shaped). npm pack's prepack hook re-runs bundle:native for win32-x64 only
+  # (packageOutDir() is scoped by platform-arch), so it cannot touch the
+  # merged-in darwin-arm64 / win32-arm64 directories.
+  # ---------------------------------------------------------------------------
+  native_win_x64_and_package:
+    needs: [validate, native_macos, native_win_arm64_qhexrt]
+    # native_macos (GH-hosted, no excuse to fail) is a hard requirement.
+    # native_win_arm64_qhexrt is a single self-hosted machine — tolerate it
+    # failing (not just being skipped on pull_request) so a runner outage
+    # costs only @runanywhere/electron-qhexrt for this run, not the other
+    # five real, already-built packages. package-sdk.sh already treats a
+    # missing qhexrt prebuild as "skip that one package", not a hard fail
+    # (see its own `has_native_prebuilds` handling) — this condition is what
+    # lets that tolerance actually take effect end to end.
+    if: github.event_name != 'pull_request' && !cancelled() && needs.native_macos.result == 'success'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: ./.github/actions/generate-idl
+        with:
+          languages: ts
+          ts-dist: 'true'
+
+      - name: Download vendored Sherpa-ONNX (Windows)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
+
+      - name: Fetch node-gyp headers (Windows N-API link)
+        id: nodedev
+        shell: pwsh
+        run: |
+          npx --yes node-gyp install
+          $ver = (node -p "process.versions.node")
+          $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
+          if (!(Test-Path "$dir/x64/node.lib")) { throw "node.lib missing under $dir" }
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Install static libcurl (Windows MSVC)
+        shell: pwsh
+        run: |
+          if (-not $env:VCPKG_INSTALLATION_ROOT) {
+            throw "VCPKG_INSTALLATION_ROOT is unset on this runner"
+          }
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl:x64-windows-static install failed" }
+
+      - name: Install electron native addon node deps
+        working-directory: bindings/electron/native
+        run: npm install
+
+      - name: Configure electron-windows (all real backends, sherpa ON)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset electron-windows -B build/electron-windows \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static \
+            -DRAC_NODE_DEV_DIR="${{ steps.nodedev.outputs.dir }}"
+
+      - name: Build commons + llamacpp + onnx + sherpa + addon
+        shell: bash
+        run: |
+          set -euo pipefail
+          # --config Release: see the win-arm64 job's identical comment — VS
+          # is multi-config, CMAKE_BUILD_TYPE is a no-op at build time here.
+          # MSYS_NO_PATHCONV=1: Git Bash's automatic POSIX-to-Windows path
+          # conversion mangles the bare "/m" MSBuild switch into a drive
+          # letter path ("M:/"), which fails with MSB1008 "Only one project
+          # can be specified" — found only by actually running this in CI
+          # (the win-arm64 job's identical flag never hit this because that
+          # job uses shell: powershell, not bash). Same class of fix the
+          # existing electron-sdk-ci.yml thin lane already applies to its own
+          # dumpbin /EXPORTS call for the same reason.
+          MSYS_NO_PATHCONV=1 cmake --build build/electron-windows --config Release --target rac_commons runanywhere_llamacpp runanywhere_onnx runanywhere_sherpa runanywhere_native -- /m
+
+      - name: Stage this platform's native prebuilds (bundle:native, no pack yet)
+        working-directory: bindings/electron
+        run: |
+          npm install
+          npm run bundle:native -- --package=all
+
+      - name: Download darwin-arm64 staged prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          name: electron-staged-darwin-arm64
+          path: bindings/electron
+
+      - name: Download win32-arm64 (QHexRT) staged prebuilds
+        # Absent whenever native_win_arm64_qhexrt failed or was skipped
+        # (pull_request event) — condition on its own result rather than
+        # letting a missing artifact hard-fail this download step.
+        if: needs.native_win_arm64_qhexrt.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: electron-staged-win32-arm64
+          path: bindings/electron
+
+      - name: Verify staging URL + routability on this platform's own build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validation/gates/check_plugin_natives.py \
+            bindings/electron/prebuilds/win32-x64 \
+            bindings/electron/packages/llamacpp/prebuilds/win32-x64 \
+            bindings/electron/packages/onnx/prebuilds/win32-x64 \
+            bindings/electron/packages/sherpa/prebuilds/win32-x64
+
+      - name: Package every Electron SDK tarball (all platforms merged)
+        shell: bash
+        run: bash bindings/electron/scripts/package-sdk.sh
+
+      - name: Upload packaged Electron tarballs (no publish)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-packaged-tarballs
+          path: bindings/electron/dist/sdk-electron/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  # Surfaces the two results a caller (release.yml) actually needs to make a
+  # gating decision on, as workflow_call outputs. `if: always()` so this
+  # still runs — and still reports — when an upstream job failed; without it
+  # a failed native_win_arm64_qhexrt would skip this job too and the caller
+  # would see an empty output instead of "failure".
+  report:
+    needs: [native_macos, native_win_arm64_qhexrt, native_win_x64_and_package]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      qhexrt_result: ${{ steps.collect.outputs.qhexrt_result }}
+      package_result: ${{ steps.collect.outputs.package_result }}
+    steps:
+      - id: collect
+        run: |
+          echo "qhexrt_result=${{ needs.native_win_arm64_qhexrt.result }}" >> "$GITHUB_OUTPUT"
+          echo "package_result=${{ needs.native_win_x64_and_package.result }}" >> "$GITHUB_OUTPUT"
