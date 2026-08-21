@@ -59,6 +59,8 @@ import Foundation
 // avoids committing a local-only manifest or hand-editing it around a tag.
 //
 // =============================================================================
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
+
 let localNativesMarkerPath = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
     .appendingPathComponent(".runanywhere-local-natives")
@@ -103,7 +105,11 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
         // the canonical ABI declarations without linking a second Commons
         // archive into the runtime artifact.
         .define("RUNANYWHERE_MLX_DISTRIBUTION"),
-        .unsafeFlags(["-Xcc", "-Icore/include"]),
+        // Absolute, because a relative path resolves against whatever package
+        // happens to be the root. It worked only while this package WAS the
+        // root; as a dependency the headers vanished and MLXBackend failed to
+        // build for the consumer.
+        .unsafeFlags(["-Xcc", "-I\(packageRoot)/core/include"]),
     ]
     : []
 

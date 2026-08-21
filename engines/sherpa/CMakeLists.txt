@@ -76,7 +76,7 @@
 #
 # Gate recipe (replace the current force-OFF):
 #   set(RAC_SHERPA_WASM_RUNTIME_DIR
-#       "${CMAKE_SOURCE_DIR}/core/third_party/sherpa-onnx-wasm")
+#       "${RAC_ROOT_DIR}/core/third_party/sherpa-onnx-wasm")
 #   if(EMSCRIPTEN AND NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
 #       set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
 #   endif()
@@ -92,7 +92,7 @@ option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONN
 # core/third_party/sherpa-onnx-wasm/lib/ to enable.
 if(EMSCRIPTEN)
     set(RAC_SHERPA_WASM_RUNTIME_DIR
-        "${CMAKE_SOURCE_DIR}/core/third_party/sherpa-onnx-wasm")
+        "${RAC_ROOT_DIR}/core/third_party/sherpa-onnx-wasm")
     if(NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
         message(STATUS "RAC_BACKEND_SHERPA: no WASM Sherpa archive at "
                        "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a; "
@@ -358,7 +358,7 @@ set(RAC_SHERPA_ONNX_AVAILABLE "${SHERPA_ONNX_AVAILABLE}" CACHE INTERNAL
 #   - the plugin registry gains a "sherpa" engine name that future
 #     router hints can target.
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 

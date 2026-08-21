@@ -176,6 +176,15 @@ endif()
 # Shared cmake/ helpers
 # =============================================================================
 
+# Where this repository's own tree starts.
+#
+# CMAKE_SOURCE_DIR is the TOP-LEVEL project, which is this repo only when it is
+# built directly. Embedded with add_subdirectory or FetchContent — the rcli
+# repo, the Electron addon, anything that consumes commons as a subproject —
+# it points at the consumer, and every path built from it resolves into their
+# tree instead of ours. Sub-CMakeLists use this variable instead.
+set(RAC_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "runanywhere-sdks source root")
+
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs

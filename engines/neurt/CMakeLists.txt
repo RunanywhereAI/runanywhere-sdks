@@ -34,7 +34,7 @@ endif()
 
 message(STATUS "Configuring neurt engine...")
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 if(NOT TARGET rac_runtime_coreml)
     message(FATAL_ERROR "RAC_BACKEND_NEURT requires rac_runtime_coreml.")
 endif()
