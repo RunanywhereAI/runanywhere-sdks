@@ -993,6 +993,92 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
+  # Electron: the real multi-backend native build (macOS llamacpp/onnx/sherpa
+  # /neurt, Windows x64 llamacpp/onnx/sherpa, Windows ARM64 QHexRT via the
+  # self-hosted NPU runner) and packaging pipeline lives in
+  # electron-native-package.yml — invoked here as a reusable workflow instead
+  # of duplicated inline so the two files can never drift apart. See that
+  # workflow's own header for why it is a separate file rather than jobs
+  # inlined here.
+  # ---------------------------------------------------------------------------
+  native_electron:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
+    uses: ./.github/workflows/electron-native-package.yml
+    secrets: inherit
+
+  sdk_electron:
+    needs: [validate, native_electron]
+    if: ${{ !inputs.publish_from_run_id && !cancelled() && needs.native_electron.outputs.package_result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Cross-run artifact download needs actions:read; harmless otherwise.
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download packaged Electron tarballs
+        uses: actions/download-artifact@v8
+        with:
+          name: electron-packaged-tarballs
+          path: electron-tarballs
+      - name: Prepublish gate (every Electron tarball, byte-level)
+        # Same script that would catch @runanywhere/electron-sherpa 0.20.17's
+        # NULL-vtable carrier or @runanywhere/qhexrt's workspace:* dependency
+        # (both cited in the script's own header) — run here, not just at
+        # `npm publish` time by hand, so a bad Electron tarball fails the
+        # release build itself rather than shipping and failing later.
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/prepublish_check.py --version "$VERSION" electron-tarballs/*.tgz
+      - name: Checksum every Electron tarball
+        run: |
+          set -euo pipefail
+          cd electron-tarballs
+          for f in *.tgz; do sha256sum "$f" > "$f.sha256"; done
+          ls -la
+      - name: Split public vs. QHexRT-private Electron assets
+        # npm public, GitHub Release private: @runanywhere/electron-qhexrt is
+        # a real, ready-to-publish npm package, but per standing policy it
+        # never becomes a public GitHub Release asset (mirrors the
+        # qhexrt_artifacts check in `publish`, applied here too so nothing
+        # relies on that check alone to keep it out). runanywhere-proto-ts is
+        # excluded from the public set for a different reason: sdk_web
+        # already packs and uploads that exact same tarball, and re-adding
+        # it here would trip the flatten step's collision detector.
+        run: |
+          set -euo pipefail
+          mkdir -p public private
+          shopt -s nullglob
+          for f in electron-tarballs/*.tgz electron-tarballs/*.tgz.sha256; do
+            base="$(basename "$f")"
+            case "$base" in
+              runanywhere-proto-ts-*) ;;
+              *qhexrt*) cp "$f" "private/$base" ;;
+              *) cp "$f" "public/$base" ;;
+            esac
+          done
+          echo "public:"; ls -la public
+          echo "private (QHexRT, not attached to the GitHub Release):"; ls -la private
+      - name: Upload public Electron SDK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron
+          path: public/**
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload private Electron QHexRT artifact (never flattened into the public release)
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron-qhexrt-private
+          path: private/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
   # Consumer validation — clone each starter-app repo in RunanywhereAI org
   # and build it against the freshly-produced artifacts. Catches "looked
   # right, actually broken" regressions before the release goes out.
@@ -1861,9 +1947,11 @@ jobs:
       - native_rcli_windows
       - native_windows
       - native_web
+      - native_electron
       - sdk_kotlin
       - sdk_web
       - sdk_react_native
+      - sdk_electron
       - validate_consumer_swift
       - validate_consumer_kotlin
       - validate_consumer_web
@@ -1875,6 +1963,15 @@ jobs:
     #   - native_windows / native_rcli_windows: no non-Windows package consumes
     #     these artifacts. Keep both jobs running so their failures remain
     #     visible, but do not block an otherwise complete non-Windows train.
+    #   - native_electron: its own `report` job already makes the one part
+    #     that matters (native_win_x64_and_package, which produces the
+    #     tarballs) a hard requirement of sdk_electron below. native_electron
+    #     itself is omitted here because its overall job result also folds in
+    #     native_win_arm64_qhexrt — a single, personally-owned self-hosted NPU
+    #     runner whose outage should cost only @runanywhere/electron-qhexrt
+    #     for this release, not the whole SDK train. sdk_electron IS a strict
+    #     gate below; it can only have succeeded if the real packaging step
+    #     did.
     #   - validate_consumer_{swift,kotlin,react_native}: these build EXTERNAL
     #     starter repos (RunanywhereAI/{swift,kotlin,react-native}-starter*) that
     #     version-lag the SDK API independently. Per policy, external-starter drift
@@ -1903,6 +2000,7 @@ jobs:
         needs.sdk_kotlin.result == 'success' &&
         needs.sdk_web.result == 'success' &&
         needs.sdk_react_native.result == 'success' &&
+        needs.sdk_electron.result == 'success' &&
         needs.validate_consumer_web.result == 'success' &&
         needs.validate_consumer_flutter.result == 'success'
       ))
@@ -1966,7 +2064,7 @@ jobs:
             -o -name "*.tgz" \
             -o -name "*.dmg" \
             -o -name "*.sha256" \
-          \) -print0)
+          \) -a ! -iname "*qhexrt*" -print0)
           if [ "$collisions" -ne 0 ]; then
             echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
             exit 1
@@ -2041,6 +2139,20 @@ jobs:
           assert_pair "React Native LlamaCPP package"  "runanywhere-llamacpp-${VERSION}.tgz"
           assert_pair "React Native MLX package"       "runanywhere-mlx-${VERSION}.tgz"
           assert_pair "React Native ONNX package"      "runanywhere-onnx-${VERSION}.tgz"
+          assert_pair "Electron core package"          "runanywhere-electron-${VERSION}.tgz"
+          assert_pair "Electron LlamaCPP package"      "runanywhere-electron-llamacpp-${VERSION}.tgz"
+          assert_pair "Electron ONNX package"          "runanywhere-electron-onnx-${VERSION}.tgz"
+          assert_pair "Electron Sherpa package"        "runanywhere-electron-sherpa-${VERSION}.tgz"
+          # NeuRT (Apple Neural Engine) is macOS-only, same shape as the iOS
+          # CoreML XCFramework above — required, not advisory, because
+          # native_macos (GH-hosted) is a hard requirement of sdk_electron.
+          assert_pair "Electron NeuRT package"         "runanywhere-electron-neurt-${VERSION}.tgz"
+          # @runanywhere/electron-qhexrt is deliberately NOT asserted here:
+          # per policy it never becomes a public GitHub Release asset (see
+          # the qhexrt_artifacts check just below, and sdk_electron's own
+          # public/private split). It still gets built and packaged — as the
+          # sdk-electron-qhexrt-private workflow artifact on this run — for
+          # a maintainer to `npm publish` by hand.
           qhexrt_artifacts="$(find release-flat -maxdepth 1 -type f -iname '*qhexrt*' -print)"
           if [ -n "$qhexrt_artifacts" ]; then
             echo "::error::Private QHexRT artifacts must not be present in the public release (any extension)"

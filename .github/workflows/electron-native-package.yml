@@ -8,9 +8,12 @@
 # Does NOT publish anywhere (no npm publish) — packaging + verification only.
 # See thoughts/shared/plans/electron_cicd_staging_url_and_npu_ane_pipeline.md.
 #
-# Deliberately NOT folded into release.yml: the sdk-release/sdk-publish
-# skills document that Electron packaging is intentionally a separate,
-# not-yet-automated-publish pipeline from every other SDK's release train.
+# Also callable as a reusable workflow (workflow_call): release.yml's
+# native_electron job invokes this directly so Electron gets the same
+# real, no-stub artifact it always has, feeding the same release train as
+# every other SDK — see that job and sdk_electron for how the resulting
+# `electron-packaged-tarballs` artifact is split into public vs.
+# QHexRT-private before anything reaches a GitHub Release asset.
 name: electron-native-package
 
 on:
@@ -31,6 +34,27 @@ on:
       - 'CMakePresets.json'
       - '.github/workflows/electron-native-package.yml'
   workflow_dispatch: {}
+  workflow_call:
+    secrets:
+      STAGING_BASE_URL:
+        required: true
+      NEURUN_TOKEN:
+        required: true
+    outputs:
+      qhexrt_result:
+        description: >-
+          Conclusion of native_win_arm64_qhexrt (success/skipped/failure).
+          Advisory only: the self-hosted NPU runner is a single, personally
+          -owned machine, and @runanywhere/electron-qhexrt never becomes a
+          public GitHub Release asset anyway (npm public, Release private),
+          so an outage here should not hold the rest of the SDK release.
+        value: ${{ jobs.report.outputs.qhexrt_result }}
+      package_result:
+        description: >-
+          Conclusion of native_win_x64_and_package, the job that produces
+          the publish-ready `electron-packaged-tarballs` artifact. This is
+          the one that matters for gating a caller's release train.
+        value: ${{ jobs.report.outputs.package_result }}
 
 permissions:
   contents: read
@@ -359,11 +383,15 @@ jobs:
   # ---------------------------------------------------------------------------
   native_win_x64_and_package:
     needs: [validate, native_macos, native_win_arm64_qhexrt]
-    # Same reasoning as native_win_arm64_qhexrt: this job needs that job's
-    # artifact, so it would be implicitly skipped on pull_request anyway
-    # once that job is skipped — made explicit here for clarity rather than
-    # relying on the implicit needs-skip propagation.
-    if: github.event_name != 'pull_request'
+    # native_macos (GH-hosted, no excuse to fail) is a hard requirement.
+    # native_win_arm64_qhexrt is a single self-hosted machine — tolerate it
+    # failing (not just being skipped on pull_request) so a runner outage
+    # costs only @runanywhere/electron-qhexrt for this run, not the other
+    # five real, already-built packages. package-sdk.sh already treats a
+    # missing qhexrt prebuild as "skip that one package", not a hard fail
+    # (see its own `has_native_prebuilds` handling) — this condition is what
+    # lets that tolerance actually take effect end to end.
+    if: github.event_name != 'pull_request' && !cancelled() && needs.native_macos.result == 'success'
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -450,6 +478,10 @@ jobs:
           path: bindings/electron
 
       - name: Download win32-arm64 (QHexRT) staged prebuilds
+        # Absent whenever native_win_arm64_qhexrt failed or was skipped
+        # (pull_request event) — condition on its own result rather than
+        # letting a missing artifact hard-fail this download step.
+        if: needs.native_win_arm64_qhexrt.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: electron-staged-win32-arm64
@@ -476,3 +508,21 @@ jobs:
           path: bindings/electron/dist/sdk-electron/*.tgz
           if-no-files-found: error
           retention-days: 14
+
+  # Surfaces the two results a caller (release.yml) actually needs to make a
+  # gating decision on, as workflow_call outputs. `if: always()` so this
+  # still runs — and still reports — when an upstream job failed; without it
+  # a failed native_win_arm64_qhexrt would skip this job too and the caller
+  # would see an empty output instead of "failure".
+  report:
+    needs: [native_macos, native_win_arm64_qhexrt, native_win_x64_and_package]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      qhexrt_result: ${{ steps.collect.outputs.qhexrt_result }}
+      package_result: ${{ steps.collect.outputs.package_result }}
+    steps:
+      - id: collect
+        run: |
+          echo "qhexrt_result=${{ needs.native_win_arm64_qhexrt.result }}" >> "$GITHUB_OUTPUT"
+          echo "package_result=${{ needs.native_win_x64_and_package.result }}" >> "$GITHUB_OUTPUT"
