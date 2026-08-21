@@ -64,7 +64,12 @@ typedef struct rac_server_config {
     /** Number of threads for inference (default: 4, 0 = auto) */
     int32_t threads;
 
-    /** Number of GPU layers to offload (default: 0 = CPU only) */
+    /**
+     * Number of GPU layers to offload. Defaults to
+     * RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO, which leaves placement to
+     * llama.cpp's own fitting pass; -1 offloads every layer and 0 pins the
+     * model to the CPU.
+     */
     int32_t gpu_layers;
 
     /** Enable CORS headers for browser access (default: true) */
