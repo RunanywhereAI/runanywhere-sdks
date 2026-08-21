@@ -393,7 +393,15 @@ jobs:
           set -euo pipefail
           # --config Release: see the win-arm64 job's identical comment — VS
           # is multi-config, CMAKE_BUILD_TYPE is a no-op at build time here.
-          cmake --build build/electron-windows --config Release --target rac_commons runanywhere_llamacpp runanywhere_onnx runanywhere_sherpa runanywhere_native -- /m
+          # MSYS_NO_PATHCONV=1: Git Bash's automatic POSIX-to-Windows path
+          # conversion mangles the bare "/m" MSBuild switch into a drive
+          # letter path ("M:/"), which fails with MSB1008 "Only one project
+          # can be specified" — found only by actually running this in CI
+          # (the win-arm64 job's identical flag never hit this because that
+          # job uses shell: powershell, not bash). Same class of fix the
+          # existing electron-sdk-ci.yml thin lane already applies to its own
+          # dumpbin /EXPORTS call for the same reason.
+          MSYS_NO_PATHCONV=1 cmake --build build/electron-windows --config Release --target rac_commons runanywhere_llamacpp runanywhere_onnx runanywhere_sherpa runanywhere_native -- /m
 
       - name: Stage this platform's native prebuilds (bundle:native, no pack yet)
         working-directory: bindings/electron
