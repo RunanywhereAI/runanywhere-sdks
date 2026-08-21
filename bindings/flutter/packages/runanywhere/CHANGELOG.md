@@ -5,6 +5,15 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.25] - 2026-08-21
+
+### Changed
+
+- Version-train bump only; no Flutter-facing changes. This release folds the
+  Electron binding's native build/package pipeline into the SDK's shared
+  release workflow (`release.yml`) for the first time — no effect on
+  Flutter.
+
 ## [0.20.24] - 2026-08-16
 
 ### Changed

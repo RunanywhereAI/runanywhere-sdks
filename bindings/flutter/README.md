@@ -40,36 +40,36 @@ ARM64 devices are recommended. Metal on iOS and NEON on Android provide signific
 
 ## Installation
 
-Add the packages you need to `pubspec.yaml`. Pin to **0.20.24**:
+Add the packages you need to `pubspec.yaml`. Pin to **0.20.25**:
 
 **Core + LlamaCpp (LLM):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.24
-  runanywhere_llamacpp: 0.20.24
+  runanywhere: 0.20.25
+  runanywhere_llamacpp: 0.20.25
 ```
 
 **Core + ONNX (STT / TTS / VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.24
-  runanywhere_onnx: 0.20.24
+  runanywhere: 0.20.25
+  runanywhere_onnx: 0.20.25
 ```
 
 **Core + MLX (Apple LLM / VLM / speech on physical iOS devices):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.24
-  runanywhere_mlx: 0.20.24
+  runanywhere: 0.20.25
+  runanywhere_mlx: 0.20.25
 ```
 
 **Optional NPU (Snapdragon Android):**
 
 ```yaml
-  runanywhere_qhexrt: 0.20.24
+  runanywhere_qhexrt: 0.20.25
 ```
 
 Then run:
@@ -187,16 +187,16 @@ try {
 
 ## FAQ
 
-**Do I need an internet connection?**  
+**Do I need an internet connection?**
 Only for initial model download. Inference runs entirely on-device afterward.
 
-**Is user data sent to the cloud?**  
+**Is user data sent to the cloud?**
 No. All inference is local. Production mode may collect anonymous telemetry (configurable).
 
-**Can I use custom models?**  
+**Can I use custom models?**
 Yes — register GGUF, ONNX/Sherpa, or MLX bundles via `RunAnywhere.models.register()`.
 
-**How do I test Apple MLX?**  
+**How do I test Apple MLX?**
 MLX execution requires a physical arm64 iOS device. The simulator slice is for compile/link validation only.
 
 ---
