@@ -6,6 +6,9 @@
 name: _test-electron-release-wiring
 
 on:
+  push:
+    paths:
+      - '.github/workflows/_test-electron-release-wiring.yml'
   workflow_dispatch: {}
 
 permissions:
