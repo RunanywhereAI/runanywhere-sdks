@@ -411,7 +411,8 @@ object OkHttpHttpTransport {
                     }
                 var totalRead = if (honoredRange) resumeFromByte else 0L
 
-                val cancelled = drainBody(body, call, contentLength, totalRead, nativeCallback, nativeUserData)
+                val cancelled =
+                    drainBody(body, call, slot, contentLength, totalRead, nativeCallback, nativeUserData)
 
                 StreamResponse(
                     statusCode = resp.code,
@@ -425,7 +426,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall?.isCanceled() == true,
+                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
             )
         } finally {
             inFlightStreams.remove(streamId)
@@ -435,6 +436,7 @@ object OkHttpHttpTransport {
     private fun drainBody(
         body: okhttp3.ResponseBody,
         call: Call,
+        slot: StreamSlot,
         contentLength: Long,
         initialTotalRead: Long,
         nativeCallback: Long,
@@ -449,7 +451,7 @@ object OkHttpHttpTransport {
                 val n = try {
                     input.read(buffer)
                 } catch (io: IOException) {
-                    if (call.isCanceled()) {
+                    if (synchronized(slot) { slot.cancelRequested }) {
                         cancelled = true
                         break
                     }
@@ -470,6 +472,9 @@ object OkHttpHttpTransport {
                 )
                 if (!keepGoing) {
                     cancelled = true
+                    synchronized(slot) {
+                        slot.cancelRequested = true
+                    }
                     call.cancel()
                     break
                 }

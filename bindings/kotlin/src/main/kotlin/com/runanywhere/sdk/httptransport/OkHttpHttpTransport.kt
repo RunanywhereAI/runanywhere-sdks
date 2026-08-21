@@ -253,8 +253,8 @@ object OkHttpHttpTransport {
      * Cancel every in-flight streaming / resume call. Each pending chunk
      * callback surfaces back to its caller with `cancelled = true` on the
      * returned [StreamResponse] (because [okhttp3.Call.cancel] surfaces as an
-     * `IOException` that [drainBody] maps to a clean cancellation when
-     * `call.isCanceled()` is true). Complements the per-callback
+     * `IOException` that [drainBody] maps to a clean cancellation through
+     * the SDK-owned [StreamSlot] marker). Complements the per-callback
      * `return false` cancel contract — use this when the SDK is tearing down
      * and there is no callback on the stack to signal.
      *
@@ -532,7 +532,8 @@ object OkHttpHttpTransport {
                     }
                 var totalRead = if (honoredRange) resumeFromByte else 0L
 
-                val cancelled = drainBody(body, call, contentLength, totalRead, nativeCallback, nativeUserData)
+                val cancelled =
+                    drainBody(body, call, slot, contentLength, totalRead, nativeCallback, nativeUserData)
 
                 StreamResponse(
                     statusCode = resp.code,
@@ -546,7 +547,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall?.isCanceled() == true,
+                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
             )
         } finally {
             inFlightStreams.remove(streamId)
@@ -561,6 +562,7 @@ object OkHttpHttpTransport {
     private fun drainBody(
         body: okhttp3.ResponseBody,
         call: Call,
+        slot: StreamSlot,
         contentLength: Long,
         initialTotalRead: Long,
         nativeCallback: Long,
@@ -579,7 +581,7 @@ object OkHttpHttpTransport {
                         // If the caller cancelled, OkHttp surfaces the abort
                         // as an IOException — treat that as a clean
                         // cancellation rather than a transport failure.
-                        if (call.isCanceled()) {
+                        if (synchronized(slot) { slot.cancelRequested }) {
                             cancelled = true
                             break
                         }
@@ -602,6 +604,9 @@ object OkHttpHttpTransport {
                     )
                 if (!keepGoing) {
                     cancelled = true
+                    synchronized(slot) {
+                        slot.cancelRequested = true
+                    }
                     call.cancel()
                     break
                 }
@@ -737,8 +742,10 @@ object OkHttpHttpTransport {
      * through [deliverChunkNative]; this struct only carries status + headers
      * metadata back to C++ for the `rac_http_response_t`.
      *
-     * [cancelled] is true iff the native side returned false from the chunk
-     * callback and we aborted the transfer via `Call.cancel()`.
+     * [cancelled] is true only for explicit SDK cancellation: either the native
+     * chunk callback returned false or [cancelAllStreams] requested teardown.
+     * OkHttp-triggered timeouts remain transport errors for JNI to map to
+     * `RAC_ERROR_TIMEOUT`.
      */
     class StreamResponse(
         @JvmField val statusCode: Int,
