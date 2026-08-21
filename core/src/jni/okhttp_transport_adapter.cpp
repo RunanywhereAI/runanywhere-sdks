@@ -39,6 +39,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -182,38 +183,20 @@ class ScopedJniEnv {
     bool did_attach_ = false;
 };
 
-// Helper: turn a std::string pair list into a jobjectArray<String> for
+// Helper: turn a string pair list into a jobjectArray<String> for
 // `OkHttpTransport.executeRequest(headersFlat=[k1,v1,...])`.
-jobjectArray build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers,
-                                size_t header_count) {
-    jclass strCls = env->FindClass("java/lang/String");
-    if (strCls == nullptr)
-        return nullptr;
-
-    jsize total = static_cast<jsize>(header_count * 2);
-    jobjectArray arr = env->NewObjectArray(total, strCls, nullptr);
-    if (arr == nullptr) {
-        env->DeleteLocalRef(strCls);
-        return nullptr;
+rac_result_t build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers,
+                                size_t header_count, jobjectArray* out_headers) {
+    if (env == nullptr || out_headers == nullptr || (header_count > 0 && headers == nullptr)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
-    for (size_t i = 0; i < header_count; ++i) {
-        jstring k = env->NewStringUTF(headers[i].name ? headers[i].name : "");
-        jstring v = env->NewStringUTF(headers[i].value ? headers[i].value : "");
-        env->SetObjectArrayElement(arr, static_cast<jsize>(i * 2), k);
-        env->SetObjectArrayElement(arr, static_cast<jsize>(i * 2 + 1), v);
-        env->DeleteLocalRef(k);
-        env->DeleteLocalRef(v);
-    }
-    env->DeleteLocalRef(strCls);
-    return arr;
-}
+    *out_headers = nullptr;
 
-// Guard the empty-headers fallback. FindClass can fail under
-// JVM shutdown / classloader pressure, so never hand a null class to
-// NewObjectArray (which throws NPE and would ship a malformed request).
-rac_result_t ensure_headers_array(JNIEnv* env, jobjectArray* headers) {
-    if (*headers != nullptr)
-        return RAC_SUCCESS;
+    constexpr size_t kMaxHeaderCount =
+        static_cast<size_t>(std::numeric_limits<jsize>::max()) / 2;
+    if (header_count > kMaxHeaderCount) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     jclass strCls = env->FindClass("java/lang/String");
     if (strCls == nullptr) {
@@ -222,14 +205,84 @@ rac_result_t ensure_headers_array(JNIEnv* env, jobjectArray* headers) {
         return RAC_ERROR_INTERNAL;
     }
 
-    *headers = env->NewObjectArray(0, strCls, nullptr);
+    const jsize total = static_cast<jsize>(header_count * 2);
+    jobjectArray arr = env->NewObjectArray(total, strCls, nullptr);
+    if (arr == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteLocalRef(strCls);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    for (size_t i = 0; i < header_count; ++i) {
+        jstring k = env->NewStringUTF(headers[i].name ? headers[i].name : "");
+        if (k == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE)
+                env->ExceptionClear();
+            env->DeleteLocalRef(arr);
+            env->DeleteLocalRef(strCls);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        jstring v = env->NewStringUTF(headers[i].value ? headers[i].value : "");
+        if (v == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE)
+                env->ExceptionClear();
+            env->DeleteLocalRef(k);
+            env->DeleteLocalRef(arr);
+            env->DeleteLocalRef(strCls);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+
+        const jsize key_index = static_cast<jsize>(i * 2);
+        env->SetObjectArrayElement(arr, key_index, k);
+        env->SetObjectArrayElement(arr, key_index + 1, v);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+            env->DeleteLocalRef(k);
+            env->DeleteLocalRef(v);
+            env->DeleteLocalRef(arr);
+            env->DeleteLocalRef(strCls);
+            return RAC_ERROR_INTERNAL;
+        }
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+    }
     env->DeleteLocalRef(strCls);
-    if (*headers == nullptr) {
+    *out_headers = arr;
+    return RAC_SUCCESS;
+}
+
+rac_result_t build_request_body(JNIEnv* env, const rac_http_request_t* req,
+                                jbyteArray* out_body) {
+    if (env == nullptr || req == nullptr || out_body == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    *out_body = nullptr;
+
+    if (req->body_len == 0) {
+        return RAC_SUCCESS;
+    }
+    if (req->body_bytes == nullptr ||
+        req->body_len > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const jsize body_len = static_cast<jsize>(req->body_len);
+    jbyteArray body = env->NewByteArray(body_len);
+    if (body == nullptr) {
         if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
+    env->SetByteArrayRegion(body, 0, body_len,
+                            reinterpret_cast<const jbyte*>(req->body_bytes));
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(body);
+        return RAC_ERROR_INTERNAL;
+    }
+
+    *out_body = body;
     return RAC_SUCCESS;
 }
 
@@ -377,8 +430,9 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
             env->DeleteLocalRef(j_url);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    jobjectArray j_headers = nullptr;
+    rac_result_t headers_rc =
+        build_headers_flat(env, req->headers, req->header_count, &j_headers);
     if (headers_rc != RAC_SUCCESS) {
         if (j_method)
             env->DeleteLocalRef(j_method);
@@ -388,19 +442,12 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     }
 
     jbyteArray j_body = nullptr;
-    if (req->body_bytes != nullptr && req->body_len > 0) {
-        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
-        if (j_body == nullptr) {
-            if (env->ExceptionCheck() == JNI_TRUE) {
-                env->ExceptionClear();
-            }
-            env->DeleteLocalRef(j_method);
-            env->DeleteLocalRef(j_url);
-            env->DeleteLocalRef(j_headers);
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
-                                reinterpret_cast<const jbyte*>(req->body_bytes));
+    rac_result_t body_rc = build_request_body(env, req, &j_body);
+    if (body_rc != RAC_SUCCESS) {
+        env->DeleteLocalRef(j_method);
+        env->DeleteLocalRef(j_url);
+        env->DeleteLocalRef(j_headers);
+        return body_rc;
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
@@ -554,8 +601,9 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
             env->DeleteLocalRef(j_url);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    jobjectArray j_headers = nullptr;
+    rac_result_t headers_rc =
+        build_headers_flat(env, req->headers, req->header_count, &j_headers);
     if (headers_rc != RAC_SUCCESS) {
         if (j_method)
             env->DeleteLocalRef(j_method);
@@ -565,19 +613,12 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     }
 
     jbyteArray j_body = nullptr;
-    if (req->body_bytes != nullptr && req->body_len > 0) {
-        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
-        if (j_body == nullptr) {
-            if (env->ExceptionCheck() == JNI_TRUE) {
-                env->ExceptionClear();
-            }
-            env->DeleteLocalRef(j_method);
-            env->DeleteLocalRef(j_url);
-            env->DeleteLocalRef(j_headers);
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
-                                reinterpret_cast<const jbyte*>(req->body_bytes));
+    rac_result_t body_rc = build_request_body(env, req, &j_body);
+    if (body_rc != RAC_SUCCESS) {
+        env->DeleteLocalRef(j_method);
+        env->DeleteLocalRef(j_url);
+        env->DeleteLocalRef(j_headers);
+        return body_rc;
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
@@ -716,8 +757,9 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
             env->DeleteLocalRef(j_url);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    jobjectArray j_headers = nullptr;
+    rac_result_t headers_rc =
+        build_headers_flat(env, req->headers, req->header_count, &j_headers);
     if (headers_rc != RAC_SUCCESS) {
         if (j_method)
             env->DeleteLocalRef(j_method);
@@ -727,19 +769,12 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     }
 
     jbyteArray j_body = nullptr;
-    if (req->body_bytes != nullptr && req->body_len > 0) {
-        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
-        if (j_body == nullptr) {
-            if (env->ExceptionCheck() == JNI_TRUE) {
-                env->ExceptionClear();
-            }
-            env->DeleteLocalRef(j_method);
-            env->DeleteLocalRef(j_url);
-            env->DeleteLocalRef(j_headers);
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
-                                reinterpret_cast<const jbyte*>(req->body_bytes));
+    rac_result_t body_rc = build_request_body(env, req, &j_body);
+    if (body_rc != RAC_SUCCESS) {
+        env->DeleteLocalRef(j_method);
+        env->DeleteLocalRef(j_url);
+        env->DeleteLocalRef(j_headers);
+        return body_rc;
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
