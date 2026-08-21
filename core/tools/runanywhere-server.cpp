@@ -11,7 +11,7 @@
  *   --port, -p <port>      Port to listen on (default: 8080)
  *   --threads, -t <n>      Number of threads (default: 4)
  *   --context, -c <n>      Context window size (default: 8192)
- *   --gpu-layers, -ngl <n> GPU layers to offload (default: 0)
+ *   --gpu-layers, -ngl <n> GPU layers to offload (default: automatic; -1 all, 0 CPU only)
  *   --cors                 Enable CORS (default: enabled)
  *   --no-cors              Disable CORS
  *   --verbose, -v          Enable verbose logging
@@ -84,7 +84,7 @@ static void printUsage(const char* programName) {
     printf("  --port, -p <port>      Port to listen on (default: 8080)\n");
     printf("  --threads, -t <n>      Number of threads (default: 4)\n");
     printf("  --context, -c <n>      Context window size (default: 8192)\n");
-    printf("  --gpu-layers, -ngl <n> GPU layers to offload (default: 0)\n");
+    printf("  --gpu-layers, -ngl <n> GPU layers to offload (default: automatic; -1 all, 0 CPU only)\n");
     printf("  --cors                 Enable CORS (default)\n");
     printf("  --no-cors              Disable CORS\n");
     printf("  --verbose, -v          Enable verbose logging\n");

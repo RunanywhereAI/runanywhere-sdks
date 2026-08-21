@@ -49,11 +49,15 @@ rac_handle_t legacy_handle(void* impl) {
     return runtime_impl ? runtime_impl->legacy_handle : nullptr;
 }
 
-// AcceleratorPolicy wire values (idl/public_api_v4.proto), mirrored the same way
-// core/src/core/model_lifecycle.cpp mirrors them rather than pulling the
-// generated enum in for three integers.
-constexpr int kAcceleratorPolicyCpu = 2;
-constexpr int kAcceleratorPolicyGpu = 3;
+// AcceleratorPolicy wire values, mirrored from idl/model_types.proto rather
+// than taken from the generated enum: these arrive here as JSON numbers over
+// the config_json ABI, and this engine links neither protobuf nor the generated
+// tree (only qhexrt does). Adding that dependency for two integers would put
+// protobuf into the llamacpp plugin on every platform it ships to.
+// core/src/core/model_lifecycle.cpp mirrors the same enum for the same reason.
+// Keep these in step with ACCELERATOR_POLICY_CPU and ACCELERATOR_POLICY_GPU.
+constexpr int kAcceleratorPolicyCpu = 2;  // ACCELERATOR_POLICY_CPU
+constexpr int kAcceleratorPolicyGpu = 3;  // ACCELERATOR_POLICY_GPU
 
 // Translate commons' advisory load JSON into llama.cpp's own knobs. Returns
 // false when there was nothing to say, so the caller can keep passing nullptr
