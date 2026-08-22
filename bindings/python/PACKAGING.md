@@ -23,8 +23,10 @@ wheel on `python-windows` and `python-macos`. The release just collects those ar
 1. **Version** — bump `core/VERSION`; `scripts/release/sync-versions.sh` propagates
    it into `pyproject.toml`. Confirm `pip show`/`__version__` match.
 2. **Build sdist** — `python -m build --sdist -o dist`.
-3. **Build + repair each wheel** on its platform (Win/Linux/macOS) via the CI recipe (build →
-   delvewheel/auditwheel/delocate).
+3. **Build + repair each wheel** on its platform (Win/Linux/macOS) (build →
+   delvewheel/auditwheel/delocate). Windows and macOS can follow the `python-windows` /
+   `python-macos` jobs in `pr-build.yml`; since #757 removed `python-linux` there is no CI recipe
+   left to copy for the manylinux wheel, so it has to be built and `auditwheel`-repaired by hand.
 4. **Validate the release boundary** — `python scripts/validate_public_packages.py --dist dist
    --expected-version <VERSION>` (asserts: `_core` + sidecar libs present in the right dir per
    platform, no host-path leaks in text/metadata members, the sdist has sources only, version matches).
