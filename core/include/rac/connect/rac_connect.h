@@ -102,6 +102,43 @@ RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* reque
                                                             size_t request_size,
                                                             rac_proto_buffer_t* out_validation);
 
+/* ===========================================================================
+ * Cluster Orchestration (Issue #541: Local AI Cluster / Pipeline Sharding)
+ * =========================================================================== */
+
+/**
+ * Start a local AI cluster coordinator session from a serialized
+ * runanywhere.v1.ClusterStartRequest. Validates peer assignments and returns
+ * the active ClusterState.
+ */
+RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
+ * Validates the peer's assigned layer range in the cluster and returns
+ * a ClusterStartResponse echoing the peer's capability.
+ */
+RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_response);
+
+/**
+ * Stop an active cluster coordinator session and clear peer states.
+ */
+RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Validate and route an intermediate activation tensor payload between
+ * pipeline stages. Accepts ClusterActivation and verifies cluster/session binding.
+ */
+RAC_API rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                                                   size_t request_size,
+                                                                   rac_proto_buffer_t* out_validation);
+
 #ifdef __cplusplus
 }
 #endif
