@@ -21,7 +21,18 @@ set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 
 :: Load versions
 call :load_versions
-if not defined SHERPA_ONNX_VERSION_WINDOWS set "SHERPA_ONNX_VERSION_WINDOWS=1.12.23"
+:: Fail closed rather than falling back. The old hardcoded default (1.12.23)
+:: had already drifted from core/VERSIONS (now 1.13.5), so an unreadable
+:: VERSIONS file would silently request a nonexistent release asset and the
+:: sherpa backend would then build as a non-routable stub.
+if not defined SHERPA_ONNX_VERSION_WINDOWS (
+    echo [ERROR] SHERPA_ONNX_VERSION_WINDOWS not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined SHERPA_ONNX_WINDOWS_X64_SHA256 (
+    echo [ERROR] SHERPA_ONNX_WINDOWS_X64_SHA256 not loaded from core\VERSIONS.
+    exit /b 1
+)
 set "VERSION=%SHERPA_ONNX_VERSION_WINDOWS%"
 set "REPOSITORY=%SHERPA_ONNX_REPO_DESKTOP%"
 set "RELEASE_TAG=%SHERPA_ONNX_RELEASE_TAG_DESKTOP%"
