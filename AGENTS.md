@@ -240,6 +240,14 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
 
 ## Non-obvious configuration details
 
+- **SDK environments and base-URL resolution** — there are exactly **two** (`DEVELOPMENT`,
+  `PRODUCTION`; slot `1`/`STAGING` is retired and folds into `PRODUCTION`). `DEVELOPMENT` with no
+  `base_url` substitutes a **build-time-baked staging origin**; with nothing baked, init still
+  succeeds and telemetry is **silently dropped**. Three hostnames in `idl/sdk_defaults.proto` no
+  longer resolve, and React Native substitutes one of them unconditionally. Never write a staging
+  Railway URL, a `*.supabase.co` URL, or a Supabase key into tracked source or docs — `.gitleaks.toml`
+  fails the build. Full rules, per-binding table, and verification commands:
+  [`docs/reference/environments.md`](docs/reference/environments.md).
 - **NDK pin**: `core/VERSIONS::NDK_VERSION` (27.3.13750724) is the single source of truth,
   mirrored into `bindings/kotlin/gradle.properties`. NDK 27 (r27d) gives 16 KB
   page-alignment required by Android 15+ — NDK 25.x's 4 KB-aligned `libc++_shared.so` /

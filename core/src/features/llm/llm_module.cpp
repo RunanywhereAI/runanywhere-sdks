@@ -108,7 +108,11 @@ struct rac_llm_component {
     /** Resolved inference framework (defaults to LlamaCPP, the primary LLM backend) */
     rac_inference_framework_t actual_framework;
 
-    rac_llm_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_LLAMACPP) {
+    // Default UNKNOWN, not LLAMACPP: the real engine is adopted from the
+    // lifecycle after a load. The old default silently attributed every
+    // non-llama.cpp engine to llama.cpp whenever the caller left
+    // preferred_framework unset.
+    rac_llm_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_UNKNOWN) {
         // Initialize with defaults - matches rac_llm_types.h rac_llm_config_t
         config = RAC_LLM_CONFIG_DEFAULT;
 
@@ -512,6 +516,18 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
                             component->actual_framework, load_duration_ms, "Model load failed");
 #endif
     } else {
+        // Report the engine that actually served the load, not the caller's
+        // preferred/catalog pin. actual_framework otherwise keeps its
+        // constructor default (RAC_FRAMEWORK_LLAMACPP) whenever the caller did
+        // not set preferred_framework — which is why `foundation-models-default`
+        // was recorded as `llamacpp` on 12,422 production events. Only adopt a
+        // resolved value; UNKNOWN means this build cannot tell, and overwriting
+        // with it would lose information.
+        const rac_inference_framework_t resolved =
+            rac_lifecycle_get_framework(component->lifecycle);
+        if (resolved != RAC_FRAMEWORK_UNKNOWN) {
+            component->actual_framework = resolved;
+        }
 #if defined(RAC_HAVE_PROTOBUF)
         emit_llm_model_load(runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED, model_id, model_name,
                             component->actual_framework, load_duration_ms, /*error=*/nullptr);

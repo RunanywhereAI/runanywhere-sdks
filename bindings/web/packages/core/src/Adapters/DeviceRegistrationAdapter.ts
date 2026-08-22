@@ -180,15 +180,14 @@ interface DeviceProfile {
 
 /**
  * Hardware facts that only async browser APIs can produce (WebGPU adapter,
- * Battery Status, WebCrypto digest). Pre-fetched once per page so the
- * synchronous native `get_device_info` callback can consume cached values.
+ * Battery Status). Pre-fetched once per page so the synchronous native
+ * `get_device_info` callback can consume cached values.
  */
 interface HardwareSnapshot {
   gpuFamily: string;
   chipName: string;
   batteryLevel: number;
   batteryState: string | null;
-  fingerprint: string;
 }
 
 const DEFAULT_HARDWARE_SNAPSHOT: HardwareSnapshot = {
@@ -196,7 +195,6 @@ const DEFAULT_HARDWARE_SNAPSHOT: HardwareSnapshot = {
   chipName: 'unknown',
   batteryLevel: -1,
   batteryState: null,
-  fingerprint: '',
 };
 
 let hardwareSnapshot: HardwareSnapshot = DEFAULT_HARDWARE_SNAPSHOT;
@@ -374,36 +372,17 @@ async function batteryStatus(): Promise<{ level: number; state: string | null }>
   }
 }
 
-/** Stable composite hardware fingerprint (SHA-256 hex over coarse hardware facts). */
-async function computeDeviceFingerprint(renderer: string): Promise<string> {
-  try {
-    const nav = navigator as BrowserNavigator;
-    const material = [
-      nav.userAgentData?.platform?.trim() || nav.platform?.trim() || '',
-      String(nav.hardwareConcurrency ?? 0),
-      String(nav.deviceMemory ?? 0),
-      renderer,
-    ].join('|');
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material));
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  } catch {
-    return '';
-  }
-}
-
 async function collectHardwareSnapshot(): Promise<HardwareSnapshot> {
   const renderer = webglRendererString();
-  const [gpu, battery, fingerprint] = await Promise.all([
+  const [gpu, battery] = await Promise.all([
     webgpuAdapterInfo(),
     batteryStatus(),
-    computeDeviceFingerprint(renderer),
   ]);
   return {
     gpuFamily: gpu.family || normalizeGPUFamily(renderer) || 'unknown',
     chipName: renderer || gpu.description || 'unknown',
     batteryLevel: battery.level,
     batteryState: battery.state,
-    fingerprint,
   };
 }
 
@@ -445,7 +424,9 @@ function browserDeviceProfile(): DeviceProfile {
     gpuFamily: hardware.gpuFamily,
     batteryLevel: hardware.batteryLevel,
     batteryState: hardware.batteryState,
-    deviceFingerprint: hardware.fingerprint || null,
+    // Identity is left to commons, which falls back to the persistent
+    // per-install id.
+    deviceFingerprint: null,
     coreCount,
   };
 }
@@ -497,8 +478,8 @@ export class DeviceRegistrationAdapter {
     module: DeviceRegistrationModule,
     configuration: DeviceRegistrationConfiguration,
   ): DeviceRegistrationAdapter {
-    // Async hardware facts (GPU adapter, battery, fingerprint digest) are cached
-    // before native registration retries so the sync callback can use them.
+    // Async hardware facts (GPU adapter, battery) are cached before native
+    // registration retries so the sync callback can use them.
     void prefetchHardwareSnapshot();
     const adapter = new DeviceRegistrationAdapter(module, configuration);
     adapter.register();
@@ -694,6 +675,8 @@ export class DeviceRegistrationAdapter {
     if (profile.deviceFingerprint) {
       writeString(this.deviceInfoLayout.deviceFingerprint, profile.deviceFingerprint);
     } else {
+      // Identity falls back to the persistent per-install id, which is the only
+      // value that is actually unique to this install.
       this.module.setValue(
         outInfoPtr + this.deviceInfoLayout.deviceFingerprint,
         deviceIdPtr,

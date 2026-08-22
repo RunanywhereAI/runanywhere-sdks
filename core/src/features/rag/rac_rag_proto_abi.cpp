@@ -96,6 +96,31 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
     (void)rac::events::publish_prebuilt(event);
 }
 
+// The engine a model is registered to run on, as the canonical proto enum name
+// that the telemetry manager's clean_framework() already canonicalizes.
+//
+// RAG builds its own LLM through rac_llm_create() rather than the shared
+// lifecycle store, so there is no LifecycleRef in scope to read framework_name
+// from — resolve it from the model registry instead. Without this every RAG row
+// landed with framework NULL: this module's publish_capability had no framework
+// parameter at all.
+std::string framework_name_for_model(const char* model_id) {
+    if (model_id == nullptr || model_id[0] == '\0') {
+        return {};
+    }
+    rac_model_info_t* info = nullptr;
+    if (rac_get_model(model_id, &info) != RAC_SUCCESS || info == nullptr) {
+        return {};
+    }
+    const int32_t proto_value = rac::events::framework_to_proto_int(info->framework);
+    rac_model_info_free(info);
+    if (proto_value == runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        return {};
+    }
+    return runanywhere::v1::InferenceFramework_Name(
+        static_cast<runanywhere::v1::InferenceFramework>(proto_value));
+}
+
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
@@ -117,6 +142,14 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_component(runanywhere::v1::SDK_COMPONENT_RAG);
     if (model_id != nullptr && model_id[0] != '\0') {
         cap->set_model_id(model_id);
+        // Derived here rather than added as a parameter: every call site already
+        // passes model_id, so this covers all of them without eight signature
+        // changes. These are milestone events, not per-token, so the registry
+        // lookup is not on a hot path.
+        const std::string framework = framework_name_for_model(model_id);
+        if (!framework.empty()) {
+            (*event.mutable_properties())["framework"] = framework;
+        }
     }
     if (operation) {
         event.set_operation_id(operation);

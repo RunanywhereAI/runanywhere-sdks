@@ -105,7 +105,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "ON",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
                 "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
@@ -132,7 +131,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
                 "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
             },
@@ -160,7 +158,6 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
@@ -243,6 +240,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
             },
@@ -256,6 +254,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
             },
@@ -353,6 +352,7 @@
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "ARM64", "strategy": "set" },
             "cacheVariables": {
+                "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF",
                 "_comment_llamacpp": "ggml hard-errors 'MSVC is not supported for ARM, use clang' (ggml-cpu/CMakeLists.txt). Switching the toolset to ClangCL clears that but then Abseil fails instead (AbseilDll.cmake:745), so neither toolset builds it here yet.",

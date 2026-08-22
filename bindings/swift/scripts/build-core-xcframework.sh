@@ -1011,7 +1011,6 @@ cmake_extra=(
     "-DCMAKE_OBJC_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DCMAKE_OBJCXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DRAC_ENABLE_PROTOBUF=ON"
-    "-DRAC_INCLUDE_LOCAL_DEV_CONFIG=OFF"
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"

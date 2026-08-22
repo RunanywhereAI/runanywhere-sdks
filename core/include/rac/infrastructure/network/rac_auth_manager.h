@@ -151,6 +151,17 @@ RAC_API int64_t rac_auth_get_token_expires_at(void);
 RAC_API const char* rac_auth_get_device_id(void);
 
 /**
+ * @brief Whether the backend holds a fully registered device row
+ *
+ * From the last authenticate response. Drives the phase-2 registration heal:
+ * the backend creates a placeholder row during authenticate and only fills it
+ * in once /devices/register runs.
+ *
+ * @return 1 registered, 0 placeholder only, -1 unknown (backend did not say)
+ */
+RAC_API int rac_auth_get_device_registered(void);
+
+/**
  * @brief Get current user ID
  * @return User ID string, or NULL if not set
  */

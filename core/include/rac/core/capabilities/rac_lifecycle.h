@@ -14,6 +14,8 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+// rac_inference_framework_t, returned by rac_lifecycle_get_framework().
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -215,6 +217,20 @@ RAC_API const char* rac_lifecycle_get_model_id(rac_handle_t handle);
  * @return Current model name (may be NULL if not loaded)
  */
 RAC_API const char* rac_lifecycle_get_model_name(rac_handle_t handle);
+
+/**
+ * @brief Get the framework that ACTUALLY executed the current load
+ *
+ * Resolved from the winning engine vtable, not the caller's preferred/catalog
+ * pin. Those two legitimately differ whenever engine selection falls back to
+ * priority order, and reporting the pin instead of the truth is how
+ * `foundation-models-default` came to be recorded as `llamacpp` on 12,422
+ * production telemetry events.
+ *
+ * @param handle Lifecycle manager handle
+ * @return Resolved framework, or RAC_FRAMEWORK_UNKNOWN if nothing is loaded
+ */
+RAC_API rac_inference_framework_t rac_lifecycle_get_framework(rac_handle_t handle);
 
 /**
  * @brief Get current service handle

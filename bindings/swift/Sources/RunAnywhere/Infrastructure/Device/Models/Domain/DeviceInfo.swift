@@ -6,7 +6,6 @@
 //  `RADeviceInfo` telemetry schema from sysctl / UIKit / ProcessInfo.
 //
 
-import CryptoKit
 import Foundation
 
 #if canImport(Metal)
@@ -215,18 +214,6 @@ public enum DeviceInfoFactory {
         default: return "unspecified"
         }
     }
-
-    /// Stable hardware fingerprint: deterministic per physical device,
-    /// survives reinstalls (derived only from hardware attributes).
-    static let hardwareFingerprint: String = {
-        let modelId = getModelIdentifier()
-        let chipName = getChipSpec(for: modelId).name
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let coreCount = ProcessInfo.processInfo.processorCount
-        let composite = "\(modelId)|\(chipName)|\(totalMemory)|\(coreCount)"
-        let digest = SHA256.hash(data: Data(composite.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
-    }()
 
     // MARK: - GPU Family
 

@@ -44,6 +44,12 @@ typedef struct {
     char* organization_id;
     char* token_type;    // Usually "bearer"
     int32_t expires_in;  // Seconds until expiry
+    // Whether the backend holds a fully registered device row, or only the
+    // placeholder authenticate() creates. Drives the phase-2 registration heal.
+    // Parsed from the response rather than scanned for with strstr on the raw
+    // JSON, so a reformatted body or a nested key cannot change the meaning.
+    rac_bool_t device_registered;
+    rac_bool_t has_device_registered;  // absent on older backends
 } rac_auth_response_t;
 
 /**

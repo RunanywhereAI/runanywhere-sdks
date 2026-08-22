@@ -71,8 +71,6 @@ struct rac_telemetry_manager {
     std::mutex queue_mutex;
 
     // Batching configuration
-    static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
-    static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
     static constexpr size_t MAX_QUEUE_SIZE = 256;        // Cap while flushes defer (e.g. pre-auth)
     // Cap the poll-path HTTP queue (drop-oldest) — it was unbounded, so a
     // platform that never drains (Flutter isolate gone) grew it without limit.
@@ -178,6 +176,9 @@ void free_payload_strings(rac_telemetry_payload_t& event) {
     free((void*)event.output_format);
     free((void*)event.routed_backend);
     free((void*)event.sdk_binding);
+    free((void*)event.app_identifier);
+    free((void*)event.app_name);
+    free((void*)event.app_version);
     free((void*)event.battery_state);
 }
 
@@ -427,9 +428,27 @@ namespace {
 // optional get_memory_info slot exists; CPU state is read in-process. Every
 // source degrades to unknown sentinels — tracking never fails on this path.
 void stamp_live_device_state(rac_telemetry_manager_t* manager, rac_telemetry_payload_t& copy) {
+    // These fields are manager-owned: free_payload_strings() frees them, so the
+    // manager must be the only thing that ever allocates them. Clearing first
+    // means a caller-provided pointer (a string literal, or memory the caller
+    // still owns) can never reach free() — previously battery_state was freed
+    // unconditionally but only ever dup'd when live device state happened to be
+    // available.
+    copy.sdk_binding = nullptr;
+    copy.app_identifier = nullptr;
+    copy.app_name = nullptr;
+    copy.app_version = nullptr;
+    copy.battery_state = nullptr;
+
     const rac_client_info_t* client_info = rac_sdk_get_client_info();
-    if (client_info && client_info->sdk_binding && client_info->sdk_binding[0] != '\0') {
-        copy.sdk_binding = dup_string(client_info->sdk_binding);
+    if (client_info) {
+        auto stamp = [](const char* value) -> const char* {
+            return (value && value[0] != '\0') ? dup_string(value) : nullptr;
+        };
+        copy.sdk_binding = stamp(client_info->sdk_binding);
+        copy.app_identifier = stamp(client_info->app_identifier);
+        copy.app_name = stamp(client_info->app_name);
+        copy.app_version = stamp(client_info->app_version);
     }
 
     rac_device_live_state_t state = {};
@@ -541,35 +560,26 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
 
     bool should_flush = false;
     size_t queue_size = 0;
-    int64_t current_time = get_current_timestamp_ms();
-
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
         queue_size = manager->queue.size();
     }
 
-    if (manager->environment == RAC_ENV_DEVELOPMENT) {
-        // Development: Immediate flush for real-time debugging
-        should_flush = true;
-        RAC_LOG_DEBUG("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
-                      queue_size);
-    } else {
-        // Production: Flush based on batch size or timeout
-        // (completion events trigger an immediate flush in rac_telemetry_manager_track_proto)
-        // Flush if queue reaches batch size
-        if (queue_size >= rac_telemetry_manager::BATCH_SIZE_PRODUCTION) {
-            should_flush = true;
-            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                          queue_size, rac_telemetry_manager::BATCH_SIZE_PRODUCTION);
-        }
-        // Flush if timeout reached (5 seconds since last flush)
-        else if (manager->last_flush_time_ms > 0 && (current_time - manager->last_flush_time_ms) >=
-                                                        rac_telemetry_manager::BATCH_TIMEOUT_MS) {
-            should_flush = true;
-            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
-                          current_time - manager->last_flush_time_ms);
-        }
-    }
+    // Flush on every event, in every environment.
+    //
+    // Production previously batched at 10 events or 5 seconds, with an extra
+    // immediate flush only for terminal events.
+    // A non-terminal milestone (model.download.started, stt.transcription
+    // .started, storage.cache.cleared) could therefore sit in memory for up to
+    // five seconds, and there is no disk persistence — a crash, force-quit or
+    // background kill in that window lost it outright.
+    //
+    // Losing telemetry on crash is accepted; leaving a window in which it can
+    // be lost is not. The queue is still bounded (MAX_QUEUE_SIZE) and the
+    // pre-auth gate in flush() still holds events until a token arrives, so
+    // this changes cadence only, not those constraints.
+    should_flush = true;
+    RAC_LOG_DEBUG("Telemetry", "Auto-flushing immediately (queue size: %zu)", queue_size);
 
     if (should_flush) {
         RAC_LOG_DEBUG("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
@@ -743,8 +753,41 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                     return "device";
             }
         }
+        case SDKEvent::kComponentLifecycle: {
+            // Model load/unload/evict state transitions. Deliberately NOT named
+            // "*.completed"/"*.failed": those suffixes define a counted request
+            // in the analytics filters, and a lifecycle transition is not an
+            // inference. Naming them this way makes them observable without
+            // inflating request counts.
+            switch (ev.component_lifecycle().kind()) {
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED:
+                    return "component.model.loaded";
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED:
+                    return "component.model.unloaded";
+                case runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED:
+                    return "component.state.changed";
+                default:
+                    return "component";
+            }
+        }
         case SDKEvent::kNetwork:
-            return "network.connectivity.changed";
+            // This arm ignored kind() entirely, so request started/completed/
+            // failed/timeout were all recorded as connectivity changes — four of
+            // the five kinds mislabelled.
+            switch (ev.network().kind()) {
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_STARTED:
+                    return "network.request.started";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_COMPLETED:
+                    return "network.request.completed";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_FAILED:
+                    return "network.request.failed";
+                case runanywhere::v1::NETWORK_EVENT_KIND_REQUEST_TIMEOUT:
+                    return "network.request.timeout";
+                case runanywhere::v1::NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED:
+                    return "network.connectivity.changed";
+                default:
+                    return "network";
+            }
         case SDKEvent::kVoicePipeline: {
             if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
                 return "vad.process";
@@ -1072,21 +1115,36 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.model_name = !g.model_name().empty()
                                      ? g.model_name().c_str()
                                      : (!g.model_id().empty() ? g.model_id().c_str() : nullptr);
-            payload.input_tokens = g.input_tokens();
+            // Only assign what the producer actually reported. These fields are
+            // `optional` in sdk_events.proto, so has_x() distinguishes "measured
+            // zero" from "never set"; anything not reported keeps the payload's
+            // negative sentinel and serializes as null rather than as a 0 that
+            // was never observed.
+            if (g.has_input_tokens())
+                payload.input_tokens = g.input_tokens();
             // tokens_used/tokens_count folded into output_tokens.
-            payload.output_tokens = g.output_tokens();
-            payload.total_tokens = payload.input_tokens + payload.output_tokens;
+            if (g.has_output_tokens())
+                payload.output_tokens = g.output_tokens();
+            // Derived, so it is only meaningful when both parts are present.
+            if (g.has_input_tokens() && g.has_output_tokens())
+                payload.total_tokens = g.input_tokens() + g.output_tokens();
             // duration_ms/latency_ms (two spellings) collapsed into
             // total_duration_ms; prefill_duration_ms is the new prompt-eval
             // spelling.
-            const double dur = static_cast<double>(g.total_duration_ms());
-            payload.processing_time_ms = dur;
-            payload.has_processing_time_ms = RAC_TRUE;
-            payload.generation_time_ms = dur;
-            payload.tokens_per_second = g.tokens_per_second();
-            payload.prompt_eval_time_ms = static_cast<double>(g.prefill_duration_ms());
+            if (g.has_total_duration_ms()) {
+                const double dur = static_cast<double>(g.total_duration_ms());
+                payload.processing_time_ms = dur;
+                payload.has_processing_time_ms = RAC_TRUE;
+                payload.generation_time_ms = dur;
+            }
+            if (g.has_tokens_per_second())
+                payload.tokens_per_second = g.tokens_per_second();
+            if (g.has_prefill_duration_ms())
+                payload.prompt_eval_time_ms = static_cast<double>(g.prefill_duration_ms());
             // first_token_latency_ms folded into time_to_first_token_ms.
-            payload.time_to_first_token_ms = static_cast<double>(g.time_to_first_token_ms());
+            if (g.has_time_to_first_token_ms())
+                payload.time_to_first_token_ms =
+                    static_cast<double>(g.time_to_first_token_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -1100,8 +1158,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 }
             }
             payload.temperature = g.temperature();
-            payload.max_tokens = g.max_tokens();
-            payload.context_length = g.context_length();
+            if (g.has_max_tokens())
+                payload.max_tokens = g.max_tokens();
+            if (g.has_context_length())
+                payload.context_length = g.context_length();
             // STREAM_COMPLETED deleted -- COMPLETED + is_streaming now covers
             // both the one-shot and streaming terminal case.
             if (ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED &&
@@ -1154,14 +1214,22 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.has_processing_time_ms = RAC_TRUE;
                 // audio_length_ms/audio_size_bytes renamed to
                 // input_audio_duration_ms/input_audio_bytes.
-                payload.audio_duration_ms = static_cast<double>(v.input_audio_duration_ms());
-                payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
-                payload.word_count = v.word_count();
-                payload.real_time_factor = v.real_time_factor();
+                // Presence-gated: word_count 0 on silence, or confidence 0.0, are
+                // real measurements and must not look like "never measured".
+                if (v.has_input_audio_duration_ms())
+                    payload.audio_duration_ms =
+                        static_cast<double>(v.input_audio_duration_ms());
+                if (v.has_input_audio_bytes())
+                    payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
+                if (v.has_word_count())
+                    payload.word_count = v.word_count();
+                if (v.has_real_time_factor())
+                    payload.real_time_factor = v.real_time_factor();
                 payload.confidence = v.confidence();
                 if (!v.language().empty())
                     payload.language = v.language().c_str();
-                payload.sample_rate = v.sample_rate();
+                if (v.has_sample_rate())
+                    payload.sample_rate = v.sample_rate();
                 payload.is_streaming = v.is_streaming() ? RAC_TRUE : RAC_FALSE;
                 payload.has_is_streaming = RAC_TRUE;
                 framework_str = framework_proto_to_string(v.framework());
@@ -1197,15 +1265,24 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.model_name = !v.model_name().empty()
                                          ? v.model_name().c_str()
                                          : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
-                payload.character_count = v.character_count();
+                if (v.has_character_count())
+                    payload.character_count = v.character_count();
                 // audio_duration_ms/audio_size_bytes_tts renamed to
                 // output_audio_duration_ms/output_audio_bytes.
-                payload.output_duration_ms = static_cast<double>(v.output_audio_duration_ms());
-                payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
-                payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
-                payload.has_processing_time_ms = RAC_TRUE;
-                payload.characters_per_second = v.characters_per_second();
-                payload.sample_rate = v.sample_rate();
+                if (v.has_output_audio_duration_ms())
+                    payload.output_duration_ms =
+                        static_cast<double>(v.output_audio_duration_ms());
+                if (v.has_output_audio_bytes())
+                    payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
+                if (v.has_processing_duration_ms()) {
+                    payload.processing_time_ms =
+                        static_cast<double>(v.processing_duration_ms());
+                    payload.has_processing_time_ms = RAC_TRUE;
+                }
+                if (v.has_characters_per_second())
+                    payload.characters_per_second = v.characters_per_second();
+                if (v.has_sample_rate())
+                    payload.sample_rate = v.sample_rate();
                 framework_str = framework_proto_to_string(v.framework());
                 payload.framework = framework_str.c_str();
                 if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED &&

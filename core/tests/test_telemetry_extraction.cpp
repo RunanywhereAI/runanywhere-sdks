@@ -256,7 +256,9 @@ int main() {
     // --- SDK origin + live device state stamped on every event --------------
     {
         rac_client_info_t ci = {};
-        ci.sdk_binding = "test-binding";
+        // Must be a real member of TelemetrySdkBinding: the serializer drops
+        // off-vocabulary values, so a made-up name would never reach the wire.
+        ci.sdk_binding = "swift";
         rac_sdk_set_client_info(&ci);
 
         v1::SDKEvent ev;
@@ -266,7 +268,7 @@ int main() {
         g->set_model_id("qwen3-0.6b");
         track(mgr, &cap, ev);
         CHECK(cap.called, "device-state: event delivered to sink");
-        CHECK(has(cap.body, "\"sdk_binding\":\"test-binding\""),
+        CHECK(has(cap.body, "\"sdk_binding\":\"swift\""),
               "device-state: sdk_binding stamped");
         // No device-manager callbacks registered here, so battery/memory stay
         // omitted; CPU core count is read in-process and must be present.
@@ -302,6 +304,81 @@ int main() {
         CHECK(cap.called, "retry: re-sent after backoff");
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/llm", "retry: same endpoint");
         CHECK(has(cap.body, "retry-model"), "retry: same batch body");
+        rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
+    }
+
+    // --- Presence: a measured zero is not the same as "never measured" -------
+    //
+    // These fields are `optional` in sdk_events.proto, so has_x() distinguishes
+    // the two. Before that, extractors read proto3 scalars (which report 0 for
+    // an unset field) and the serializer skipped zeros, so an empty generation
+    // and an unmeasured one both arrived as NULL.
+    {
+        cap.called = false;
+        v1::SDKEvent ev;
+        envelope(&ev, v1::SDK_COMPONENT_LLM);
+        auto* g = ev.mutable_generation();
+        g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
+        g->set_model_id("presence-model");
+        // Explicitly measured as zero: an empty completion.
+        g->set_output_tokens(0);
+        g->set_input_tokens(0);
+        // tokens_per_second / context_length / max_tokens deliberately unset.
+        const std::string bytes = ev.SerializeAsString();
+        rac_telemetry_manager_track_proto(mgr, reinterpret_cast<const uint8_t*>(bytes.data()),
+                                          bytes.size());
+        CHECK(cap.called, "presence: event sent");
+        CHECK(has(cap.body, "\"output_tokens\":0"), "presence: measured 0 output_tokens kept");
+        CHECK(has(cap.body, "\"input_tokens\":0"), "presence: measured 0 input_tokens kept");
+        CHECK(has(cap.body, "\"tokens_per_second\":null"),
+              "presence: unmeasured tokens_per_second is null, not 0");
+        CHECK(has(cap.body, "\"context_length\":null"),
+              "presence: unmeasured context_length is null, not 0");
+        rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
+    }
+
+    // --- Closed vocabularies: off-vocabulary values must never reach the wire -
+    //
+    // framework/platform/sdk_binding/battery_state are enums in the published
+    // contract (idl/http/sdk-openapi.json). A value outside the set is refused
+    // by the backend and the whole event is quarantined, so the serializer
+    // drops the field instead. This is the guard against the drift that put
+    // four spellings of llama.cpp and both "ios" and "iOS" into the stored rows.
+    {
+        cap.called = false;
+        rac_telemetry_payload_t p = rac_telemetry_payload_default();
+        p.id = "vocab-1";
+        p.event_type = "llm.generation.completed";
+        p.modality = "llm";
+        p.model_id = "vocab-model";
+        p.framework = "LlamaCpp";       // real production spelling, not canonical
+        // platform is taken from manager state (set at create time), never from
+        // the payload — so a caller cannot inject a binding name as a platform.
+        // battery_state is manager-owned (stamped at track time), so a caller
+        // cannot inject one; the vocabulary guard for it is exercised through
+        // the device-state block above.
+        rac_telemetry_manager_track(mgr, &p);
+        rac_telemetry_manager_flush(mgr);
+        CHECK(cap.called, "vocabulary: event still sent");
+        CHECK(!has(cap.body, "LlamaCpp"), "vocabulary: non-canonical framework not on the wire");
+        // Dropping a bad dimension must not cost the observation itself.
+        CHECK(has(cap.body, "vocab-model"), "vocabulary: event metrics survive the drop");
+        rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
+    }
+
+    // --- Canonical values pass through untouched -----------------------------
+    {
+        cap.called = false;
+        rac_telemetry_payload_t p = rac_telemetry_payload_default();
+        p.id = "vocab-2";
+        p.event_type = "llm.generation.completed";
+        p.modality = "llm";
+        p.framework = "llamacpp";
+        rac_telemetry_manager_track(mgr, &p);
+        rac_telemetry_manager_flush(mgr);
+        CHECK(has(cap.body, "\"framework\":\"llamacpp\""), "vocabulary: canonical framework kept");
+        CHECK(has(cap.body, "\"platform\":\"linux\""),
+              "vocabulary: canonical platform (from manager state) kept");
         rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
     }
 

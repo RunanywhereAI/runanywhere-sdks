@@ -17,6 +17,7 @@
  * proto catalog.
  */
 
+#include "rac/core/rac_core.h"  // rac_get_model — model_name for model events
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_emit.h"
@@ -176,12 +177,40 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
                          legacy_destination_public());
 }
 
+// Set model identity on a ModelEvent, filling in the display name from the
+// registry.
+//
+// None of the ten emit_model_* functions takes a model_name parameter — an
+// API-surface gap, not a caller bug — so every download / extraction / delete
+// event reached the backend with model_name NULL, and a model event that cannot
+// say which model it concerns is not much use. The registry already holds the
+// name; the download orchestrator even looks the record up for other fields and
+// simply never copied it.
+//
+// An empty model_id is logged rather than passed through silently: production
+// shows 100% NULL model_id on model.extraction.* and model.deleted, and a silent
+// drop is exactly why that went unnoticed.
+void set_model_identity(v1::ModelEvent* m, const char* model_id) {
+    if (model_id == nullptr || model_id[0] == '\0') {
+        RAC_LOG_WARNING("Events", "Model event emitted with no model_id — it cannot be attributed");
+        return;
+    }
+    m->set_model_id(model_id);
+
+    rac_model_info_t* info = nullptr;
+    if (rac_get_model(model_id, &info) == RAC_SUCCESS && info != nullptr) {
+        if (info->name != nullptr && info->name[0] != '\0') {
+            m->set_model_name(info->name);
+        }
+        rac_model_info_free(info);
+    }
+}
+
 void emit_llm_model_load_completed(const char* model_id, const char* model_name, double duration_ms,
                                    rac_inference_framework_t framework) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_LOAD_COMPLETED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     if (model_name)
         m.set_model_name(model_name);
     m.set_duration_ms(static_cast<int64_t>(duration_ms));
@@ -210,8 +239,7 @@ void emit_llm_model_load_failed(const char* model_id, const char* model_name, do
 void emit_llm_model_unloaded(const char* model_id) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_UNLOAD_COMPLETED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     publish(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_MODEL, std::move(m));
 }
 
@@ -408,8 +436,7 @@ void emit_model_download_started(const char* model_id, int64_t total_bytes,
                                  const char* archive_type) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_STARTED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_total_bytes(total_bytes);
     // ModelEvent has no archive_type field → carry it on the envelope
     // properties (read into payload.archive_type by the kModel extraction).
@@ -424,8 +451,7 @@ void emit_model_download_progress(const char* model_id, double progress, int64_t
                                   int64_t total_bytes) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_PROGRESS);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_progress(static_cast<float>(progress));
     m.set_bytes_downloaded(bytes_downloaded);
     m.set_total_bytes(total_bytes);
@@ -440,8 +466,7 @@ void emit_model_download_completed(const char* model_id, int64_t size_bytes, dou
                                    const char* archive_type) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_COMPLETED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_model_size_bytes(size_bytes);
     m.set_duration_ms(static_cast<int64_t>(duration_ms));
     m.set_progress(1.0f);
@@ -468,8 +493,7 @@ void emit_model_download_failed(const char* model_id, rac_result_t error_code,
 void emit_model_download_cancelled(const char* model_id) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_CANCELLED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
 }
 
@@ -481,16 +505,14 @@ void emit_model_extraction_started(const char* model_id, const char* archive_typ
     (void)archive_type;
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_EXTRACTION_STARTED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
 }
 
 void emit_model_extraction_progress(const char* model_id, double progress) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_EXTRACTION_PROGRESS);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_progress(static_cast<float>(progress));
     // Progress is too chatty for telemetry — public stream only.
     v1::SDKEvent event;
@@ -502,8 +524,7 @@ void emit_model_extraction_progress(const char* model_id, double progress) {
 void emit_model_extraction_completed(const char* model_id, int64_t size_bytes, double duration_ms) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_EXTRACTION_COMPLETED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_model_size_bytes(size_bytes);
     m.set_duration_ms(static_cast<int64_t>(duration_ms));
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
@@ -525,8 +546,7 @@ void emit_model_extraction_failed(const char* model_id, rac_result_t error_code,
 void emit_model_deleted(const char* model_id, int64_t size_bytes) {
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DELETE_COMPLETED);
-    if (model_id)
-        m.set_model_id(model_id);
+    set_model_identity(&m, model_id);
     m.set_model_size_bytes(size_bytes);
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_MODEL, std::move(m));
 }

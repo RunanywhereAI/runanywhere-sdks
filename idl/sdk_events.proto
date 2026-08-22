@@ -360,7 +360,7 @@ message GenerationEvent {
     string              streaming_text   = 5;
 
     // Output tokens so far on STREAMING_UPDATE; the final count on COMPLETED.
-    int32               output_tokens    = 6;
+    optional int32               output_tokens    = 6;
 
     // For COMPLETED — full response.
     string              response         = 7;
@@ -387,29 +387,29 @@ message GenerationEvent {
     string              thinking_text     = 20;
 
     // Prompt-token count on COMPLETED. Total = input_tokens + output_tokens.
-    int32               input_tokens     = 21;
+    optional int32               input_tokens     = 21;
 
     // Telemetry metrics carried on the canonical event stream so the C++
     // destination router can derive the full telemetry payload from the
     // proto SDKEvent alone (no parallel struct path).
-    double              tokens_per_second        = 22;
+    optional double              tokens_per_second        = 22;
 
     // Time to first token, whichever kind reports it.
-    int64               time_to_first_token_ms   = 23;
+    optional int64               time_to_first_token_ms   = 23;
 
     bool                is_streaming             = 24;
     float               temperature              = 25;
-    int32               max_tokens               = 26;
-    int32               context_length           = 27;
+    optional int32               max_tokens               = 26;
+    optional int32               context_length           = 27;
     string              model_name               = 28;
 
     // Whole-generation wall clock.
-    int64               total_duration_ms        = 29;
+    optional int64               total_duration_ms        = 29;
 
     InferenceFramework  framework                = 30;
 
     // Prefill (prompt eval) wall clock.
-    int64               prefill_duration_ms      = 31;
+    optional int64               prefill_duration_ms      = 31;
 }
 
 enum GenerationEventKind {
@@ -504,24 +504,24 @@ message VoiceLifecycleEvent {
     // -----------------------------------------------------------------------
     string              model_id                 = 13;
     string              model_name               = 14;
-    int64               input_audio_duration_ms  = 15;   // STT input audio
-    int64               input_audio_bytes        = 16;
-    int32               word_count               = 17;   // STT
-    double              real_time_factor         = 18;   // STT
+    optional int64               input_audio_duration_ms  = 15;   // STT input audio
+    optional int64               input_audio_bytes        = 16;
+    optional int32               word_count               = 17;   // STT
+    optional double              real_time_factor         = 18;   // STT
     string              language                 = 19;   // STT
-    int32               sample_rate              = 20;   // STT + TTS
+    optional int32               sample_rate              = 20;   // STT + TTS
     bool                is_streaming             = 21;   // STT
     InferenceFramework  framework                = 22;
 
     // TTS synthesis metrics.
-    int32               character_count          = 23;
-    int64               output_audio_duration_ms = 24;   // TTS output audio
-    int64               output_audio_bytes       = 25;
-    int64               processing_duration_ms   = 26;   // telemetry processing_time_ms
+    optional int32               character_count          = 23;
+    optional int64               output_audio_duration_ms = 24;   // TTS output audio
+    optional int64               output_audio_bytes       = 25;
+    optional int64               processing_duration_ms   = 26;   // telemetry processing_time_ms
     // The TTS counterpart to real_time_factor (18). rac_telemetry_tts_payload_t
     // has carried this field all along; without a home on the wire the value
     // emit_tts_synthesis_completed was handed had nowhere to go.
-    double              characters_per_second    = 27;   // TTS
+    optional double              characters_per_second    = 27;   // TTS
 }
 
 enum VoiceEventKind {

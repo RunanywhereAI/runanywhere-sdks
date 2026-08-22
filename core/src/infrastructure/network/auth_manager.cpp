@@ -32,6 +32,10 @@
 // callers, and concurrent writes corrupt the state struct.
 static std::mutex g_auth_mutex;
 static rac_auth_state_t g_auth_state = {};
+// Last authenticate's device_registered, as a tri-state: -1 unknown (older
+// backend that does not send the field), 0 placeholder row only, 1 fully
+// registered. Session signal, not persisted auth state.
+static int g_last_device_registered = -1;
 static rac_secure_storage_t g_storage = {};
 static bool g_storage_available = false;
 
@@ -250,6 +254,11 @@ int64_t rac_auth_get_token_expires_at(void) {
     return g_auth_state.token_expires_at;
 }
 
+int rac_auth_get_device_registered(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return g_last_device_registered;
+}
+
 const char* rac_auth_get_device_id(void) {
     static thread_local std::string tl_device_id;
     std::lock_guard<std::mutex> lock(g_auth_mutex);
@@ -373,9 +382,18 @@ static int handle_auth_response(const char* json, bool refresh) {
     // for this device. Flag the device manager so the phase-2 registration
     // runs even when the platform-persisted is_registered flag says otherwise.
     // Absent field (older backends) means no override.
-    const bool server_unregistered =
-        !refresh && (strstr(json, "\"device_registered\":false") != nullptr ||
-                     strstr(json, "\"device_registered\": false") != nullptr);
+    //
+    // Read from the parsed response rather than scanned for with strstr on the
+    // raw body: the old form matched two hand-written spellings and would have
+    // been defeated by any other whitespace, or fooled by the key appearing
+    // inside a nested object or a string.
+    if (!refresh) {
+        g_last_device_registered = response.has_device_registered == RAC_TRUE
+                                       ? (response.device_registered == RAC_TRUE ? 1 : 0)
+                                       : -1;
+    }
+    const bool server_unregistered = !refresh && response.has_device_registered == RAC_TRUE &&
+                                     response.device_registered == RAC_FALSE;
     if (server_unregistered) {
         rac_device_manager_notify_server_unregistered();
     }
