@@ -126,7 +126,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: RunanywhereAI/neurun
-          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
+          # Bumped 2026-08-22 to pick up "kernels: port Qwen3.8 IQ1 to Hexagon
+          # v81 (#62)". Keep this a PINNED SHA, never a branch: NeuRT is a
+          # private engine built from source here, and a floating ref would make
+          # released binaries irreproducible.
+          ref: 901c249833731d4e455f2aab4dff0c57139776d3
           token: ${{ secrets.NEURUN_TOKEN }}
           path: neurun
           persist-credentials: false
