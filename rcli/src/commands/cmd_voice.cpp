@@ -118,23 +118,37 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
             if (file.good()) {
                 reply_path = output;
             } else {
-                out::status_line("warning: cannot write " + output);
+                // A requested --output that cannot be written is a runtime error,
+                // not a warning: `rcli tts --output` already exits 1 for exactly
+                // this (cmd_tts.cpp), and a caller doing
+                // `rcli voice --output reply.wav && play reply.wav` otherwise
+                // proceeds against a file that is not there.
+                out::error_line("cannot write " + output);
+                exit_code = 1;
             }
         }
 
-        if (options.json) {
-            out::JsonWriter json;
-            json.begin_object()
-                .field("transcription", result.transcription())
-                .field("response", result.assistant_response())
-                .field("reply_audio", reply_path)
-                .end_object();
-            out::result_line(json.str());
-        } else {
-            out::result_line("you   " + result.transcription());
-            out::result_line("agent " + result.assistant_response());
-            if (!reply_path.empty()) {
-                out::result_line("audio " + reply_path);
+        // Only a turn that fully succeeded prints a result. cmd_tts.cpp emits
+        // its result in the `else if` branch of the same write check, so a
+        // failed --output write there produces an error and nothing else; a
+        // success-shaped line next to exit 1 would let
+        // `rcli voice --json -o reply.wav | jq -r .reply_audio` read an empty
+        // path as if the turn had produced no audio.
+        if (exit_code == 0) {
+            if (options.json) {
+                out::JsonWriter json;
+                json.begin_object()
+                    .field("transcription", result.transcription())
+                    .field("response", result.assistant_response())
+                    .field("reply_audio", reply_path)
+                    .end_object();
+                out::result_line(json.str());
+            } else {
+                out::result_line("you   " + result.transcription());
+                out::result_line("agent " + result.assistant_response());
+                if (!reply_path.empty()) {
+                    out::result_line("audio " + reply_path);
+                }
             }
         }
     }
