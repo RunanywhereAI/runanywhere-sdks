@@ -15,8 +15,8 @@ wheel. The sdist is source-only.
 | `runanywhere-*.tar.gz` (sdist) | scikit-build-core | — | source only (no binaries) |
 
 CI (`.github/workflows/pr-build.yml`) already builds + repairs + validates + hermetic-tests the
-wheel on `python-windows`, `python-linux`, and `python-macos`. The release just collects those
-artifacts.
+wheel on `python-windows` and `python-macos`. The release just collects those artifacts.
+`python-linux` was removed in #757, so the manylinux wheel above is not built by CI today.
 
 ## Dry-run checklist (before `twine upload`)
 
