@@ -284,7 +284,8 @@ RAC_API rac_result_t rac_diffusion_model_registry_unregister(const char* name);
  *
  * @param model_id Model identifier
  * @param out_def Output model definition (filled on success)
- * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND otherwise
+ * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND otherwise. Strategy
+ *         failures other than RAC_ERROR_NOT_FOUND are returned as-is.
  */
 RAC_API rac_result_t rac_diffusion_model_registry_get(const char* model_id,
                                                       rac_diffusion_model_def_t* out_def);
@@ -294,7 +295,8 @@ RAC_API rac_result_t rac_diffusion_model_registry_get(const char* model_id,
  *
  * @param out_models Output array (caller must free with free())
  * @param out_count Number of models
- * @return RAC_SUCCESS on success
+ * @return RAC_SUCCESS on success. Strategies that report RAC_ERROR_NOT_FOUND
+ *         are skipped; any other strategy error is returned as-is.
  */
 RAC_API rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
                                                        size_t* out_count);
@@ -327,7 +329,9 @@ RAC_API rac_bool_t rac_diffusion_model_registry_is_available(const char* model_i
  * the current platform.
  *
  * @param out_def Output model definition (filled on success)
- * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND if no recommendation
+ * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND if no recommendation,
+ *         RAC_ERROR_INVALID_ARGUMENT for a null output, or a strategy/listing
+ *         error returned as-is
  */
 RAC_API rac_result_t
 rac_diffusion_model_registry_get_recommended(rac_diffusion_model_def_t* out_def);

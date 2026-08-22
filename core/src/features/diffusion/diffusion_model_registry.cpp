@@ -339,6 +339,14 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
                 if (result == RAC_SUCCESS) {
                     return RAC_SUCCESS;
                 }
+                // Preserve genuine strategy failures (allocation, init,
+                // backend) instead of masking them as "model not found".
+                // Only RAC_ERROR_NOT_FOUND falls through to the next strategy.
+                if (result != RAC_ERROR_NOT_FOUND) {
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to resolve model '%s' (result %d)",
+                                    strategy.name, model_id, static_cast<int>(result));
+                    return result;
+                }
             }
         }
     }
@@ -364,12 +372,27 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
             rac_diffusion_model_def_t* models = nullptr;
             size_t count = 0;
 
-            if (strategy.list_models(&models, &count, strategy.user_data) == RAC_SUCCESS &&
-                models) {
-                for (size_t i = 0; i < count; i++) {
-                    all_models.push_back(models[i]);
+            rac_result_t list_result =
+                strategy.list_models(&models, &count, strategy.user_data);
+            if (list_result == RAC_SUCCESS) {
+                if (models) {
+                    for (size_t i = 0; i < count; i++) {
+                        all_models.push_back(models[i]);
+                    }
                 }
-                std::free(models);
+            }
+
+            // Strategies may allocate partial output before returning an error.
+            // The registry owns and releases any array returned by the callback.
+            std::free(models);
+
+            if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
+                // Preserve genuine strategy failures (allocation, init,
+                // backend) instead of reporting a successful empty/partial
+                // list. Only RAC_ERROR_NOT_FOUND falls through.
+                RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
+                                strategy.name, static_cast<int>(list_result));
+                return list_result;
             }
         }
     }
@@ -402,9 +425,11 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
     rac_diffusion_model_def_t model_def;
 
-    if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)",
-                      model_id ? model_id : "(null)");
+    rac_result_t result = rac_diffusion_model_registry_get(model_id, &model_def);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT,
+                      "Model lookup failed for '%s' (result %d), using CoreML (Apple only)",
+                      model_id ? model_id : "(null)", static_cast<int>(result));
         return RAC_DIFFUSION_BACKEND_COREML;
     }
 
@@ -448,7 +473,11 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
     size_t count = 0;
 
     rac_result_t result = rac_diffusion_model_registry_list(&models, &count);
-    if (result != RAC_SUCCESS || !models || count == 0) {
+    if (result != RAC_SUCCESS) {
+        std::free(models);
+        return result;
+    }
+    if (!models || count == 0) {
         std::free(models);
         return RAC_ERROR_NOT_FOUND;
     }
