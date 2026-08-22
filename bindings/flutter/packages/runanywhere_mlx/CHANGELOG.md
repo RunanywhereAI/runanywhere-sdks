@@ -1,3 +1,9 @@
+## [0.20.25] - 2026-08-21
+
+### Changed
+
+- Version-train bump only; no Flutter-facing changes.
+
 ## [0.20.24] - 2026-08-16
 
 ### Changed

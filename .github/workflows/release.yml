@@ -2050,6 +2050,17 @@ jobs:
             printf '%s\n' "$loose_android_artifacts" | sed 's/^/  /'
             exit 1
           fi
+          # `Download all artifacts` pulls EVERY artifact this run produced,
+          # which includes intermediate hand-off bundles that are not release
+          # assets. electron-packaged-tarballs is native_win_x64_and_package's
+          # raw output, consumed by sdk_electron, which then re-uploads only the
+          # curated public set as sdk-electron. Flattening both duplicates all 5
+          # public Electron tarballs AND drags in the raw bundle's own
+          # runanywhere-proto-ts tarball, which then collides with sdk_web's
+          # copy of the same file — 6 collisions, no release. Skip the
+          # intermediate bundle; sdk-electron (public) and
+          # sdk-electron-qhexrt-private (never flattened, see the qhexrt
+          # exclusion below) are the artifacts that carry release intent.
           while IFS= read -r -d '' src; do
             dest="release-flat/$(basename "$src")"
             if [ -e "$dest" ]; then
@@ -2058,7 +2069,9 @@ jobs:
               continue
             fi
             cp "$src" "$dest"
-          done < <(find release-artifacts -type f \( \
+          done < <(find release-artifacts \
+            -type d -name "electron-packaged-tarballs" -prune -o \
+            -type f \( \
             -name "*.zip" \
             -o -name "*.tar.gz" \
             -o -name "*.tgz" \
