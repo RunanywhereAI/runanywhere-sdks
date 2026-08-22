@@ -231,6 +231,34 @@ in the repo-root `core/VERSION`) are centralized in the `VERSIONS` file. Consume
 
 **Android**: one versioned `dist/RACommons-android-{abi}-v{version}.zip` plus checksum per invocation. The archive contains the public core, LlamaCPP, and ONNX/Sherpa native sets for that ABI. 16 KB ELF alignment is enforced before packaging.
 
+**Linux**: `scripts/build-linux.sh` drives the `linux-release` preset and stages every produced
+`.so` into `dist/linux/{lib,include}`, which `release.yml` tars as
+`RACommons-linux-x86_64-v{version}.tar.gz`. Run `scripts/linux/download-sherpa-onnx.sh` first or
+sherpa builds as a **non-routable stub** — that omission shipped a hollow Linux sherpa carrier
+through 0.20.25.
+
+**Windows** (`scripts/build-windows.bat` → the `windows-x64-shared-release` preset):
+`dist/windows/x64/lib` must contain `rac_commons.dll` + its import `.lib`, each enabled backend's
+`rac_backend_<id>.dll` **and** its `runanywhere_<id>.dll` carrier (the carrier is mandatory on
+Windows — `GetProcAddress` does not walk dependents), plus the vendor runtimes `onnxruntime.dll`,
+`onnxruntime_providers_shared.dll` and `sherpa-onnx-c-api.dll`; headers under
+`dist/windows/x64/include/rac/**`. Packaged as `RACommons-windows-x64-v{version}.zip`.
+
+Two hard rules here, both learned the expensive way:
+
+1. **Configure from the REPO ROOT, never `core/`.** `core/CMakeLists.txt` is a standalone
+   `project(RunAnywhereCommons)` that never calls `add_subdirectory(engines)` — only the
+   repo-root `CMakeLists.txt` does. Configuring `core/` creates *no engine targets at all*.
+2. **Never hardcode per-backend output paths, and never `if exist`-guard a staging copy.** The old
+   script copied from `build/.../src/backends/<id>/Release/`, a layout that stopped existing when
+   the engines moved to top-level `engines/`. Guarded copies turned that into six silent no-ops,
+   so `RACommons-windows-x64` shipped `rac_commons.lib` + headers and **zero engines** for
+   multiple releases while CI stayed green. Stage by glob and fail closed on any missing
+   artifact, as `build-linux.sh` does.
+
+Run `scripts/windows/download-sherpa-onnx.bat` before building, or sherpa is a non-routable stub
+and the script will (now) refuse to package.
+
 **JNI separation**: `librac_commons_jni.so` links only `rac_commons` (no backends). Each backend ships its own JNI `.so` that calls `rac_backend_*_register()`. Mirrors iOS XCFramework separation.
 
 ## Testing

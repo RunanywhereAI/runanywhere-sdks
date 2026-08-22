@@ -280,6 +280,16 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: linux
+      # WITHOUT this, sherpa still BUILDS but as a non-routable stub: the
+      # engine prebuilt is absent, so RAC_SHERPA_ROUTABLE=0 and
+      # sherpa_capability_check() returns RAC_ERROR_BACKEND_UNAVAILABLE. The
+      # bundle then ships a ~156 KB librac_backend_sherpa.so with no
+      # libsherpa-onnx-c-api.so beside it, and STT/TTS/VAD cannot work on
+      # Linux at all. Shipped that way through at least 0.20.24 and 0.20.25
+      # (byte-identical carriers) because nothing asserted routability here —
+      # native_rcli_linux already prefetched it, native_linux never did.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: ./core/scripts/linux/download-sherpa-onnx.sh
       - name: Build + package commons for Linux x86_64
         # build-linux.sh drives the linux-release CMake preset (same as PR-time),
         # then stages the .so set + headers and packs the versioned
@@ -287,6 +297,10 @@ jobs:
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: bash core/scripts/build-linux.sh
+      # Fail the build rather than shipping a hollow carrier again. This is the
+      # gate whose absence let the sherpa stub ship silently for two releases.
+      - name: Verify Linux plugin natives are routable
+        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/linux/lib
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -687,10 +701,25 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: windows
+      # Sherpa on Windows is a SHA-pinned prebuilt, not a source build. Without
+      # this, sherpa still "builds" but as a non-routable stub
+      # (RAC_SHERPA_ROUTABLE=0), and build-windows.bat now hard-fails instead of
+      # quietly shipping it. native_rcli_windows already did this; this job never
+      # did, which is part of why the bundle shipped hollow.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Build commons + backends for Windows x64
         working-directory: core
         shell: cmd
         run: scripts\build-windows.bat
+      # The build script asserts the DLL set exists in its staging dir; this
+      # asserts they are actually ROUTABLE (real op tables, not hollow carriers).
+      # check_plugin_natives.py understands PE. Prefer llvm-nm/dumpbin on PATH:
+      # plain `nm` cannot read PE and the script degrades to a byte scan.
+      - name: Verify Windows plugin natives are routable
+        shell: bash
+        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/windows/x64/lib
       - name: Package Windows outputs
         working-directory: core
         shell: bash
@@ -715,6 +744,29 @@ jobs:
             sha256sum "RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
               > "RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
           )
+          # Assert the SHIPPED ZIP, not just the build tree. Through 0.20.25 this
+          # zip contained only rac_commons.lib + headers — zero engines — and
+          # nothing here noticed, because the only checks were "dir exists" and
+          # "zip exists". Both were true.
+          zip="dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip"
+          listing="$(7z l -ba -slt "$zip" | sed -n 's/^Path = //p')"
+          missing=0
+          for want in \
+              rac_commons.dll \
+              rac_backend_llamacpp.dll runanywhere_llamacpp.dll \
+              rac_backend_onnx.dll runanywhere_onnx.dll onnxruntime.dll \
+              rac_backend_sherpa.dll runanywhere_sherpa.dll sherpa-onnx-c-api.dll; do
+            if ! printf '%s\n' "$listing" | grep -Eqi "(^|/)${want}$"; then
+              echo "::error::shipped Windows zip is missing $want"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::$missing required native(s) absent from the Windows release zip — refusing to ship an engine-less bundle"
+            printf '%s\n' "$listing" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "Windows zip carries commons + all three backend pairs + vendor runtimes."
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -126,7 +126,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: RunanywhereAI/neurun
-          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
+          # Bumped 2026-08-22 to pick up "kernels: port Qwen3.8 IQ1 to Hexagon
+          # v81 (#62)". Keep this a PINNED SHA, never a branch: NeuRT is a
+          # private engine built from source here, and a floating ref would make
+          # released binaries irreproducible.
+          ref: 901c249833731d4e455f2aab4dff0c57139776d3
           token: ${{ secrets.NEURUN_TOKEN }}
           path: neurun
           persist-credentials: false
@@ -291,6 +295,22 @@ jobs:
           $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
           if (!(Test-Path "$dir/arm64/node.lib")) { throw "node.lib missing under $dir/arm64" }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      # The staged QHexRT prebuilt is hand-made on this machine and CANNOT be
+      # rebuilt in CI today (neurun gates its receipt target behind if(ANDROID),
+      # its staging script is POSIX-only, and QAIRT is licence-gated). So the
+      # risk is not a bad build — it is silent STALENESS: shipping NPU kernels
+      # from an arbitrarily old neurun commit with nothing saying so. This gate
+      # hard-fails if the staged tree stops matching what we recorded, and warns
+      # (never fails) when it falls behind neurun HEAD. See
+      # engines/qhexrt/PREBUILT_PROVENANCE.json.
+      - name: Verify QHexRT prebuilt provenance (fails on drift, warns on staleness)
+        shell: powershell
+        env:
+          QHEXRT_ROOT: 'C:\actions-runner-state\qhexrt-prebuilt\versions\f14ef0efb1da4b6a50e49f37a0ef55ac3b0bb7328aa7469edf78625ac4d79607'
+        run: |
+          python scripts\validation\gates\check_qhexrt_provenance.py --qhexrt-root "$env:QHEXRT_ROOT"
+          if ($LASTEXITCODE -ne 0) { throw "QHexRT provenance check failed" }
 
       - name: Configure electron-win-arm64-vs2026 (QHexRT)
         shell: powershell
