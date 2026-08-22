@@ -365,6 +365,16 @@ def main() -> int:
     parser.add_argument("paths", nargs="*", type=Path, help="plugin files or directories")
     parser.add_argument("--tarball", type=Path, action="append", default=[],
                         help="npm tarball to inspect (repeatable)")
+    parser.add_argument(
+        "--allow-placeholder-staging-url", action="store_true",
+        help=(
+            "Report the staging-URL placeholder as a note instead of a failure. "
+            "ONLY for PR-time builds, which legitimately have no STAGING_BASE_URL: "
+            "the secret is unavailable to fork PRs, so a PR build necessarily bakes "
+            "the placeholder. Routability is still enforced. NEVER pass this in a "
+            "release job — that is the exact defect that shipped a placeholder "
+            "staging URL through 0.20.24."
+        ))
     parser.add_argument("--expect-version", default="",
                         help="RAC_VERSION_STRING that every bundled rac_commons must embed")
     args = parser.parse_args()
@@ -450,6 +460,10 @@ def main() -> int:
                                 print(f"  ok    version  {member.name}  "
                                       f"embeds {args.expect_version}")
                         track_fail = check_tracking_bytes(payload, f"{archive.name}:{member.name}")
+                        if track_fail and args.allow_placeholder_staging_url:
+                            print(f"  note  telemetry  {archive.name}:{member.name}  "
+                                  f"placeholder staging URL — ALLOWED (PR-time build, no secret)")
+                            track_fail = None
                         checked += 1
                         if track_fail:
                             print(f"  FAIL  telemetry  {archive.name}:{member.name}  "
@@ -473,6 +487,10 @@ def main() -> int:
             ):
                 checked += 1
                 track_fail = check_tracking_bytes(target.read_bytes(), display)
+                if track_fail and args.allow_placeholder_staging_url:
+                    print(f"  note  telemetry  {display}  "
+                          f"placeholder staging URL — ALLOWED (PR-time build, no secret)")
+                    continue
                 if track_fail:
                     print(f"  FAIL  telemetry  {display}  placeholder staging URL baked in")
                     telemetry_failures.append(track_fail)
@@ -522,8 +540,16 @@ def main() -> int:
         )
         return 1
 
-    print(f"\nAll {checked} check(s) passed: plugin natives are routable and no "
-          f"staging-URL placeholder was found.")
+    if args.allow_placeholder_staging_url:
+        # Never claim "no placeholder was found" when the caller asked us to
+        # tolerate one — a gate that overstates its own coverage is worse than
+        # no gate.
+        print(f"\nAll {checked} check(s) passed: plugin natives are routable; "
+              f"staging-URL placeholder TOLERATED (--allow-placeholder-staging-url, "
+              f"PR-time build). A release build must NOT pass this flag.")
+    else:
+        print(f"\nAll {checked} check(s) passed: plugin natives are routable and no "
+              f"staging-URL placeholder was found.")
     return 0
 
 

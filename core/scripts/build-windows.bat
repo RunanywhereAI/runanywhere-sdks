@@ -267,7 +267,7 @@ if "%BUILD_SHERPA%"=="ON" (
 :: `copy /y` silently keeps the last. Warning rather than failing because CMake
 :: legitimately copies vendor runtimes beside targets, and a false hard-fail here
 :: would block the whole release train.
-for /f %%n in ('powershell -NoProfile -Command "$d=Get-ChildItem -Path '%BUILD_DIR%' -Recurse -File -Include rac_commons*.dll,rac_backend_*.dll,runanywhere_*.dll,onnxruntime*.dll ^| Group-Object Name ^| Where-Object Count -gt 1; if ($d) { $d ^| ForEach-Object { Write-Host ('  DUPLICATE: ' + $_.Name + ' x' + $_.Count) } }; ($d ^| Measure-Object).Count"') do set "DUPES=%%n"
+for /f %%n in ('powershell -NoProfile -Command "$f=Get-ChildItem -Path '%BUILD_DIR%' -Recurse -File -Include rac_commons*.dll,rac_backend_*.dll,runanywhere_*.dll,onnxruntime*.dll; $g=$f | Group-Object Name | Where-Object {$_.Count -gt 1}; $g | ForEach-Object { Write-Host ('  DUPLICATE: ' + $_.Name + ' x' + $_.Count) }; @($g).Count"') do set "DUPES=%%n"
 if not "!DUPES!"=="0" (
     echo [WARN]  !DUPES! duplicate basename^(s^) above; `copy /y` keeps the last one.
     echo         Expected for vendor runtimes CMake copies beside targets. Promote this

@@ -307,9 +307,16 @@ jobs:
           done
           ls -la "$lib"
           [ "$missing" -eq 0 ] || { echo "::error::$missing native(s) missing"; exit 1; }
+      # --allow-placeholder-staging-url: a PR build has no STAGING_BASE_URL by
+      # design (the secret is unavailable to fork PRs), so rac_commons.dll here
+      # necessarily carries the placeholder. Routability is still fully enforced,
+      # which is what this job is for. release.yml runs the SAME gate WITHOUT the
+      # flag, so a real release still cannot ship the placeholder.
       - name: Verify Windows plugin natives are routable
         shell: bash
-        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/windows/x64/lib
+        run: |
+          python3 scripts/validation/gates/check_plugin_natives.py \
+            --allow-placeholder-staging-url core/dist/windows/x64/lib
 
   python-windows:
     # Builds the runanywhere-python wheel (pybind11 _core over the C ABI) via
