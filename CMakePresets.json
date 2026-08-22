@@ -325,6 +325,7 @@
                 "RAC_BACKEND_SHERPA": "ON",
                 "RAC_BACKEND_MLX": "OFF",
                 "RAC_BACKEND_NEURT": "OFF",
+                "RAC_BACKEND_CLOUD": "OFF",
                 "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }

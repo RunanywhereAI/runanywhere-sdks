@@ -204,7 +204,19 @@ echo  Building
 echo ========================================
 echo.
 
-cmake --build "%BUILD_DIR%" --config Release -- /m
+:: Named targets, mirroring the proven electron-windows job — NOT the default ALL
+:: target. Building ALL also builds runanywhere_cloud, which does not link on
+:: MSVC: "unresolved external symbol g_cloud_stt_ops". That is the same PE
+:: data-symbol problem documented for QHexRT in bindings/electron/AGENTS.md
+:: (a carrier referencing an op table as DATA needs __declspec(dllimport) on the
+:: shared declaration). Linux gets cloud for free; Windows cannot ship it until
+:: that is fixed, so RAC_BACKEND_CLOUD=OFF in the preset and cloud is absent here.
+set "BUILD_TARGETS=rac_commons"
+if "%BUILD_LLAMACPP%"=="ON" set "BUILD_TARGETS=!BUILD_TARGETS! runanywhere_llamacpp"
+if "%BUILD_ONNX%"=="ON"     set "BUILD_TARGETS=!BUILD_TARGETS! runanywhere_onnx"
+if "%BUILD_SHERPA%"=="ON"   set "BUILD_TARGETS=!BUILD_TARGETS! runanywhere_sherpa"
+echo [BUILD] targets: !BUILD_TARGETS!
+cmake --build "%BUILD_DIR%" --config Release --target !BUILD_TARGETS! -- /m
 if errorlevel 1 (
     echo [ERROR] Build failed.
     exit /b 1
