@@ -331,6 +331,8 @@ static size_t skip_whitespace(const char* str, size_t pos, size_t len) {
     return pos;
 }
 
+enum class ToolParseStatus { kNoMatch, kSuccess, kOutOfMemory };
+
 /**
  * @brief Extract a JSON string value starting at the given position (must be after opening quote)
  *
@@ -339,10 +341,10 @@ static size_t skip_whitespace(const char* str, size_t pos, size_t len) {
  * @param len Length of input string
  * @param out_value Output: Allocated string value (caller must free)
  * @param out_end_pos Output: Position after closing quote
- * @return true if successful
+ * @return Structured parse status distinguishing malformed input from allocation failure
  */
-static bool extract_json_string(const char* str, size_t pos, size_t len, char** out_value,
-                                size_t* out_end_pos) {
+static ToolParseStatus extract_json_string(const char* str, size_t pos, size_t len,
+                                           char** out_value, size_t* out_end_pos) {
     std::string result;
     bool escaped = false;
 
@@ -383,43 +385,44 @@ static bool extract_json_string(const char* str, size_t pos, size_t len, char** 
             // End of string
             *out_value = static_cast<char*>(malloc(result.size() + 1));
             if (!*out_value) {
-                return false;
+                return ToolParseStatus::kOutOfMemory;
             }
             memcpy(*out_value, result.c_str(), result.size() + 1);
             *out_end_pos = i + 1;
-            return true;
+            return ToolParseStatus::kSuccess;
         }
 
         result += ch;
     }
 
-    return false;
+    return ToolParseStatus::kNoMatch;
 }
 
 /**
  * @brief Extract a JSON object as a raw string (including braces)
  */
-static bool extract_json_object_raw(const char* str, size_t pos, [[maybe_unused]] size_t len,
-                                    char** out_value, size_t* out_end_pos) {
+static ToolParseStatus extract_json_object_raw(const char* str, size_t pos,
+                                               [[maybe_unused]] size_t len, char** out_value,
+                                               size_t* out_end_pos) {
     if (str[pos] != '{') {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     size_t end_brace;
     if (!find_matching_brace(str, pos, &end_brace)) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     size_t obj_len = end_brace - pos + 1;
     *out_value = static_cast<char*>(malloc(obj_len + 1));
     if (!*out_value) {
-        return false;
+        return ToolParseStatus::kOutOfMemory;
     }
 
     memcpy(*out_value, str + pos, obj_len);
     (*out_value)[obj_len] = '\0';
     *out_end_pos = end_brace + 1;
-    return true;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -479,27 +482,28 @@ static bool find_matching_bracket(const char* str, size_t start_pos, size_t* out
 /**
  * @brief Extract a JSON array as a raw string (including brackets)
  */
-static bool extract_json_array_raw(const char* str, size_t pos, [[maybe_unused]] size_t len,
-                                   char** out_value, size_t* out_end_pos) {
+static ToolParseStatus extract_json_array_raw(const char* str, size_t pos,
+                                              [[maybe_unused]] size_t len, char** out_value,
+                                              size_t* out_end_pos) {
     if (str[pos] != '[') {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     size_t end_bracket;
     if (!find_matching_bracket(str, pos, &end_bracket)) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     size_t arr_len = end_bracket - pos + 1;
     *out_value = static_cast<char*>(malloc(arr_len + 1));
     if (!*out_value) {
-        return false;
+        return ToolParseStatus::kOutOfMemory;
     }
 
     memcpy(*out_value, str + pos, arr_len);
     (*out_value)[arr_len] = '\0';
     *out_end_pos = end_bracket + 1;
-    return true;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -526,12 +530,12 @@ enum json_value_kind_t {
  * @param key Key to find (case-insensitive)
  * @param out_value Output: Allocated value string (caller must free)
  * @param out_kind Output: Kind of the extracted value (string/object/literal/array)
- * @return true if found
+ * @return Structured parse status distinguishing a missing key from allocation failure
  */
-static bool extract_json_value(const char* json_obj, const char* key, char** out_value,
-                               json_value_kind_t* out_kind) {
+static ToolParseStatus extract_json_value(const char* json_obj, const char* key, char** out_value,
+                                          json_value_kind_t* out_kind) {
     if (!json_obj || !key || !out_value || !out_kind) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     *out_value = nullptr;
@@ -561,7 +565,12 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                 char* found_key = nullptr;
                 size_t key_end;
 
-                if (extract_json_string(json_obj, key_start, len, &found_key, &key_end)) {
+                const ToolParseStatus key_status =
+                    extract_json_string(json_obj, key_start, len, &found_key, &key_end);
+                if (key_status == ToolParseStatus::kOutOfMemory) {
+                    return key_status;
+                }
+                if (key_status == ToolParseStatus::kSuccess) {
                     // Check if this key matches
                     bool matches = str_equals_ignore_case(found_key, key);
                     free(found_key);
@@ -578,26 +587,38 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                 if (json_obj[pos] == '"') {
                                     // String value
                                     size_t value_end;
-                                    if (extract_json_string(json_obj, pos + 1, len, out_value,
-                                                            &value_end)) {
+                                    const ToolParseStatus value_status = extract_json_string(
+                                        json_obj, pos + 1, len, out_value, &value_end);
+                                    if (value_status == ToolParseStatus::kOutOfMemory) {
+                                        return value_status;
+                                    }
+                                    if (value_status == ToolParseStatus::kSuccess) {
                                         *out_kind = JSON_VALUE_STRING;
-                                        return true;
+                                        return ToolParseStatus::kSuccess;
                                     }
                                 } else if (json_obj[pos] == '{') {
                                     // Object value
                                     size_t value_end;
-                                    if (extract_json_object_raw(json_obj, pos, len, out_value,
-                                                                &value_end)) {
+                                    const ToolParseStatus value_status = extract_json_object_raw(
+                                        json_obj, pos, len, out_value, &value_end);
+                                    if (value_status == ToolParseStatus::kOutOfMemory) {
+                                        return value_status;
+                                    }
+                                    if (value_status == ToolParseStatus::kSuccess) {
                                         *out_kind = JSON_VALUE_OBJECT;
-                                        return true;
+                                        return ToolParseStatus::kSuccess;
                                     }
                                 } else if (json_obj[pos] == '[') {
                                     // Array value
                                     size_t value_end;
-                                    if (extract_json_array_raw(json_obj, pos, len, out_value,
-                                                               &value_end)) {
+                                    const ToolParseStatus value_status = extract_json_array_raw(
+                                        json_obj, pos, len, out_value, &value_end);
+                                    if (value_status == ToolParseStatus::kOutOfMemory) {
+                                        return value_status;
+                                    }
+                                    if (value_status == ToolParseStatus::kSuccess) {
                                         *out_kind = JSON_VALUE_ARRAY;
-                                        return true;
+                                        return ToolParseStatus::kSuccess;
                                     }
                                 } else {
                                     // Scalar literal value (number, boolean, null)
@@ -617,12 +638,13 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                     if (val_end > val_start) {
                                         size_t val_len = val_end - val_start;
                                         *out_value = static_cast<char*>(malloc(val_len + 1));
-                                        if (*out_value) {
-                                            memcpy(*out_value, json_obj + val_start, val_len);
-                                            (*out_value)[val_len] = '\0';
+                                        if (!*out_value) {
+                                            return ToolParseStatus::kOutOfMemory;
                                         }
+                                        memcpy(*out_value, json_obj + val_start, val_len);
+                                        (*out_value)[val_len] = '\0';
                                         *out_kind = JSON_VALUE_LITERAL;
-                                        return true;
+                                        return ToolParseStatus::kSuccess;
                                     }
                                 }
                             }
@@ -640,17 +662,18 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
         }
     }
 
-    return false;
+    return ToolParseStatus::kNoMatch;
 }
 
 /**
  * @brief Get all keys from a JSON object (for fallback strategy)
  */
-static std::vector<std::string> get_json_keys(const char* json_obj) {
-    std::vector<std::string> keys;
-    if (!json_obj) {
-        return keys;
+static ToolParseStatus get_json_keys(const char* json_obj, std::vector<std::string>* out_keys) {
+    if (!json_obj || !out_keys) {
+        return ToolParseStatus::kNoMatch;
     }
+
+    out_keys->clear();
 
     size_t len = strlen(json_obj);
     bool in_string = false;
@@ -677,11 +700,16 @@ static std::vector<std::string> get_json_keys(const char* json_obj) {
                 char* found_key = nullptr;
                 size_t key_end;
 
-                if (extract_json_string(json_obj, key_start, len, &found_key, &key_end)) {
+                const ToolParseStatus key_status =
+                    extract_json_string(json_obj, key_start, len, &found_key, &key_end);
+                if (key_status == ToolParseStatus::kOutOfMemory) {
+                    return key_status;
+                }
+                if (key_status == ToolParseStatus::kSuccess) {
                     // Verify it's followed by colon
                     size_t pos = skip_whitespace(json_obj, key_end, len);
                     if (pos < len && json_obj[pos] == ':') {
-                        keys.emplace_back(found_key);
+                        out_keys->emplace_back(found_key);
                     }
                     free(found_key);
                     i = key_end - 1;
@@ -701,7 +729,7 @@ static std::vector<std::string> get_json_keys(const char* json_obj) {
         }
     }
 
-    return keys;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -907,8 +935,8 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str, char*
  * 3. Placeholder key with value being tool name
  * 4. Tool name as key: {"calculate": "5 * 100"}
  */
-static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_name,
-                                       char** out_args_json) {
+static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** out_tool_name,
+                                                  char** out_args_json) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
 
@@ -916,7 +944,12 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
     for (int i = 0; TOOL_NAME_KEYS[i] != nullptr; i++) {
         char* value = nullptr;
         json_value_kind_t kind = JSON_VALUE_STRING;
-        if (extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind)) {
+        const ToolParseStatus name_status =
+            extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind);
+        if (name_status == ToolParseStatus::kOutOfMemory) {
+            return name_status;
+        }
+        if (name_status == ToolParseStatus::kSuccess) {
             // Tool name must be a string literal (not object/array/raw literal)
             if (kind == JSON_VALUE_STRING && value && strlen(value) > 0) {
                 *out_tool_name = value;
@@ -929,7 +962,14 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 for (int j = 0; ARGUMENT_KEYS[j] != nullptr; j++) {
                     char* args_value = nullptr;
                     json_value_kind_t args_kind = JSON_VALUE_STRING;
-                    if (extract_json_value(json_obj, ARGUMENT_KEYS[j], &args_value, &args_kind)) {
+                    const ToolParseStatus args_status =
+                        extract_json_value(json_obj, ARGUMENT_KEYS[j], &args_value, &args_kind);
+                    if (args_status == ToolParseStatus::kOutOfMemory) {
+                        free(*out_tool_name);
+                        *out_tool_name = nullptr;
+                        return args_status;
+                    }
+                    if (args_status == ToolParseStatus::kSuccess) {
                         if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = args_value;
                         } else {
@@ -938,13 +978,17 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                             std::string escaped_args = escape_json_string(args_value);
                             size_t wrap_len = escaped_args.size() + 14;  // {"input":"" } + null
                             *out_args_json = static_cast<char*>(malloc(wrap_len));
-                            if (*out_args_json) {
-                                snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
-                                         escaped_args.c_str());
+                            if (!*out_args_json) {
+                                free(args_value);
+                                free(*out_tool_name);
+                                *out_tool_name = nullptr;
+                                return ToolParseStatus::kOutOfMemory;
                             }
+                            snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
+                                     escaped_args.c_str());
                             free(args_value);
                         }
-                        return true;
+                        return ToolParseStatus::kSuccess;
                     }
                 }
 
@@ -956,7 +1000,13 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 // Only the exact matched alias is skipped, so a later tool
                 // that accepts a `name` argument still sees `name` preserved.
                 {
-                    std::vector<std::string> all_keys = get_json_keys(json_obj);
+                    std::vector<std::string> all_keys;
+                    const ToolParseStatus keys_status = get_json_keys(json_obj, &all_keys);
+                    if (keys_status == ToolParseStatus::kOutOfMemory) {
+                        free(*out_tool_name);
+                        *out_tool_name = nullptr;
+                        return keys_status;
+                    }
                     std::string flat_args = "{";
                     bool first = true;
                     for (const auto& k : all_keys) {
@@ -967,7 +1017,14 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
 
                         char* kval = nullptr;
                         json_value_kind_t kval_kind = JSON_VALUE_STRING;
-                        if (extract_json_value(json_obj, k.c_str(), &kval, &kval_kind)) {
+                        const ToolParseStatus value_status =
+                            extract_json_value(json_obj, k.c_str(), &kval, &kval_kind);
+                        if (value_status == ToolParseStatus::kOutOfMemory) {
+                            free(*out_tool_name);
+                            *out_tool_name = nullptr;
+                            return value_status;
+                        }
+                        if (value_status == ToolParseStatus::kSuccess) {
                             if (!first)
                                 flat_args += ",";
                             std::string escaped_key = escape_json_string(k.c_str());
@@ -1009,28 +1066,39 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                         // fully-cleared failure rather than a dangling *out_tool_name.
                         free(*out_tool_name);
                         *out_tool_name = nullptr;
-                        return false;
+                        return ToolParseStatus::kOutOfMemory;
                     }
                     std::memcpy(*out_args_json, flat_args.c_str(), flat_args.size() + 1);
                 }
-                return true;
+                return ToolParseStatus::kSuccess;
             }
             free(value);
         }
     }
 
     // Strategy 3 & 4: Tool name as key (non-standard key)
-    std::vector<std::string> keys = get_json_keys(json_obj);
+    std::vector<std::string> keys;
+    const ToolParseStatus keys_status = get_json_keys(json_obj, &keys);
+    if (keys_status == ToolParseStatus::kOutOfMemory) {
+        return keys_status;
+    }
     for (const auto& key : keys) {
         if (!is_standard_key(key.c_str())) {
             // Found a non-standard key - treat it as tool name
             char* value = nullptr;
             json_value_kind_t kind = JSON_VALUE_STRING;
-            if (extract_json_value(json_obj, key.c_str(), &value, &kind)) {
+            const ToolParseStatus value_status =
+                extract_json_value(json_obj, key.c_str(), &value, &kind);
+            if (value_status == ToolParseStatus::kOutOfMemory) {
+                return value_status;
+            }
+            if (value_status == ToolParseStatus::kSuccess) {
                 *out_tool_name = static_cast<char*>(malloc(key.size() + 1));
-                if (*out_tool_name) {
-                    std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
+                if (!*out_tool_name) {
+                    free(value);
+                    return ToolParseStatus::kOutOfMemory;
                 }
+                std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
 
                 if (kind == JSON_VALUE_OBJECT) {
                     // Value is object - use as arguments verbatim
@@ -1040,23 +1108,30 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                     std::string escaped_value = escape_json_string(value);
                     size_t wrap_len = escaped_value.size() + 14;  // {"input":"" } + null
                     *out_args_json = static_cast<char*>(malloc(wrap_len));
-                    if (*out_args_json) {
-                        snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
-                                 escaped_value.c_str());
+                    if (!*out_args_json) {
+                        free(value);
+                        free(*out_tool_name);
+                        *out_tool_name = nullptr;
+                        return ToolParseStatus::kOutOfMemory;
                     }
+                    snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
+                             escaped_value.c_str());
                     free(value);
                 } else {
                     *out_args_json = static_cast<char*>(malloc(3));
-                    if (*out_args_json) {
-                        std::memcpy(*out_args_json, "{}", 3);
+                    if (!*out_args_json) {
+                        free(*out_tool_name);
+                        *out_tool_name = nullptr;
+                        return ToolParseStatus::kOutOfMemory;
                     }
+                    std::memcpy(*out_args_json, "{}", 3);
                 }
-                return true;
+                return ToolParseStatus::kSuccess;
             }
         }
     }
 
-    return false;
+    return ToolParseStatus::kNoMatch;
 }
 
 // =============================================================================
@@ -1234,8 +1309,8 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
 // into an owned tool_name + args_json. Shared by the LFM2 parser (tag-wrapped) and the
 // bare-Pythonic parser (QHexRT grammar output, RUN-80). On failure, leaves the out params
 // untouched-null and allocates nothing (so callers need no partial cleanup).
-static bool parse_pythonic_call(const std::string& content, char** out_tool_name,
-                                char** out_args_json) {
+static ToolParseStatus parse_pythonic_call(const std::string& content, char** out_tool_name,
+                                           char** out_args_json) {
     size_t start = 0, end = content.size();
     while (start < end &&
            (content[start] == ' ' || content[start] == '\n' || content[start] == '[')) {
@@ -1246,7 +1321,7 @@ static bool parse_pythonic_call(const std::string& content, char** out_tool_name
         end--;
     }
     if (start >= end) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
     const std::string call_str = content.substr(start, end - start);
 
@@ -1263,7 +1338,7 @@ static bool parse_pythonic_call(const std::string& content, char** out_tool_name
             func_name.pop_back();
         }
         if (func_name.empty()) {
-            return false;
+            return ToolParseStatus::kNoMatch;
         }
         const size_t args_start = paren_pos + 1;
         size_t args_end = call_str.rfind(')');
@@ -1272,24 +1347,24 @@ static bool parse_pythonic_call(const std::string& content, char** out_tool_name
         }
         const std::string args_str = call_str.substr(args_start, args_end - args_start);
         if (!lfm2_arguments_to_json(args_str, &json_args)) {
-            return false;  // malformed args (e.g. a markdown link mis-fed here) -> no call
+            return ToolParseStatus::kNoMatch;
         }
     }
 
     // Allocate ATOMICALLY: both succeed or neither is handed back (honors the contract so
-    // callers need no partial cleanup; never returns true with a null out param).
+    // callers need no partial cleanup; never reports success with a null out param).
     char* name_buf = static_cast<char*>(malloc(func_name.size() + 1));
     char* args_buf = static_cast<char*>(malloc(json_args.size() + 1));
     if (!name_buf || !args_buf) {
         free(name_buf);
         free(args_buf);
-        return false;
+        return ToolParseStatus::kOutOfMemory;
     }
     std::memcpy(name_buf, func_name.c_str(), func_name.size() + 1);
     std::memcpy(args_buf, json_args.c_str(), json_args.size() + 1);
     *out_tool_name = name_buf;
     *out_args_json = args_buf;
-    return true;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -1298,10 +1373,10 @@ static bool parse_pythonic_call(const std::string& content, char** out_tool_name
  * LFM2 uses Pythonic function call syntax:
  * [func_name(arg1="value1", arg2="value2")]
  *
- * @return true if successfully parsed, false otherwise
+ * @return Structured parse status distinguishing no match from allocation failure
  */
-static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char** out_args_json,
-                              char** out_clean_text) {
+static ToolParseStatus parse_lfm2_format(const char* llm_output, char** out_tool_name,
+                                         char** out_args_json, char** out_clean_text) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
     *out_clean_text = nullptr;
@@ -1313,7 +1388,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
     const char* start_tag = strstr(llm_output, TAG_LFM2_START);
     if (!start_tag) {
         RAC_LOG_INFO("ToolCalling", "LFM2 start tag '%s' not found in output", TAG_LFM2_START);
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     RAC_LOG_INFO("ToolCalling", "Found LFM2 start tag at position: %zu",
@@ -1339,8 +1414,10 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
     std::string content(content_start, content_len);
 
     // Parse the inner Pythonic call `[func(arg="v", ...)]` (shared with the bare parser).
-    if (!parse_pythonic_call(content, out_tool_name, out_args_json)) {
-        return false;
+    const ToolParseStatus call_status =
+        parse_pythonic_call(content, out_tool_name, out_args_json);
+    if (call_status != ToolParseStatus::kSuccess) {
+        return call_status;
     }
 
     RAC_LOG_INFO("ToolCalling", "LFM2 RESULT: tool='%s', args='%s'",
@@ -1371,12 +1448,17 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
     }
 
     *out_clean_text = static_cast<char*>(malloc(trim_end - trim_start + 1));
-    if (*out_clean_text) {
-        memcpy(*out_clean_text, clean_text.c_str() + trim_start, trim_end - trim_start);
-        (*out_clean_text)[trim_end - trim_start] = '\0';
+    if (!*out_clean_text) {
+        free(*out_tool_name);
+        free(*out_args_json);
+        *out_tool_name = nullptr;
+        *out_args_json = nullptr;
+        return ToolParseStatus::kOutOfMemory;
     }
+    memcpy(*out_clean_text, clean_text.c_str() + trim_start, trim_end - trim_start);
+    (*out_clean_text)[trim_end - trim_start] = '\0';
 
-    return *out_tool_name != nullptr;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -1388,15 +1470,15 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
  * clean_text. Reuses the shared Pythonic-call parser. detect_format() only routes here on
  * a strict `[ident(...)]` prefix, so free-text answers (abstentions) never reach this path.
  */
-static bool parse_pythonic_format(const char* llm_output, char** out_tool_name,
-                                  char** out_args_json, char** out_clean_text) {
+static ToolParseStatus parse_pythonic_format(const char* llm_output, char** out_tool_name,
+                                             char** out_args_json, char** out_clean_text) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
     *out_clean_text = nullptr;
 
     const char* open = strchr(llm_output, '[');
     if (!open) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
     // Find the ']' that closes `open`: skip quoted strings (single/double, with escapes)
     // and track '[' nesting so trailing text or a second bracket group can't be captured.
@@ -1426,12 +1508,14 @@ static bool parse_pythonic_format(const char* llm_output, char** out_tool_name,
         }
     }
     if (!close) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     const std::string content(open, static_cast<size_t>(close - open) + 1);
-    if (!parse_pythonic_call(content, out_tool_name, out_args_json)) {
-        return false;
+    const ToolParseStatus call_status =
+        parse_pythonic_call(content, out_tool_name, out_args_json);
+    if (call_status != ToolParseStatus::kSuccess) {
+        return call_status;
     }
 
     // clean_text = text before '[' + text after ']' (a pure grammar call yields "").
@@ -1456,13 +1540,13 @@ static bool parse_pythonic_format(const char* llm_output, char** out_tool_name,
         free(*out_args_json);
         *out_tool_name = nullptr;
         *out_args_json = nullptr;
-        return false;
+        return ToolParseStatus::kOutOfMemory;
     }
     memcpy(clean_buf, clean_text.c_str() + trim_start, trim_end - trim_start);
     clean_buf[trim_end - trim_start] = '\0';
     *out_clean_text = clean_buf;
 
-    return true;
+    return ToolParseStatus::kSuccess;
 }
 
 /**
@@ -1471,10 +1555,10 @@ static bool parse_pythonic_format(const char* llm_output, char** out_tool_name,
  * This is the original SDK format with JSON inside the tags.
  * Handles edge cases like missing closing tags, unquoted keys, etc.
  *
- * @return true if successfully parsed, false otherwise
+ * @return Structured parse status distinguishing no match from allocation failure
  */
-static bool parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
-                                 char** out_clean_text);
+static ToolParseStatus parse_default_format(const char* llm_output, char** out_tool_name,
+                                            char** out_args_json, char** out_clean_text);
 
 // =============================================================================
 // PARSE TOOL CALL - Main entry points
@@ -1491,8 +1575,8 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
  *
  * Parses the default <tool_call>JSON</tool_call> format.
  */
-static bool parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
-                                 char** out_clean_text) {
+static ToolParseStatus parse_default_format(const char* llm_output, char** out_tool_name,
+                                            char** out_args_json, char** out_clean_text) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
     *out_clean_text = nullptr;
@@ -1502,7 +1586,7 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
     // Find <tool_call> tag
     const char* tag_start = find_str(llm_output, TAG_DEFAULT_START);
     if (!tag_start) {
-        return false;
+        return ToolParseStatus::kNoMatch;
     }
 
     size_t tag_start_pos = tag_start - llm_output;
@@ -1520,7 +1604,7 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
         // No closing tag - find JSON by matching braces
         size_t brace_end;
         if (!find_matching_brace(llm_output, json_start_pos, &brace_end)) {
-            return false;
+            return ToolParseStatus::kNoMatch;
         }
         json_end_pos = brace_end + 1;
         has_closing_tag = false;
@@ -1530,7 +1614,7 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
     size_t json_len = json_end_pos - json_start_pos;
     char* tool_json_str = static_cast<char*>(malloc(json_len + 1));
     if (!tool_json_str) {
-        return false;
+        return ToolParseStatus::kOutOfMemory;
     }
     memcpy(tool_json_str, llm_output + json_start_pos, json_len);
     tool_json_str[json_len] = '\0';
@@ -1540,17 +1624,21 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
     rac_result_t norm_result = rac_tool_call_normalize_json(tool_json_str, &normalized_json);
     free(tool_json_str);
 
-    if (norm_result != RAC_SUCCESS || !normalized_json) {
-        return false;
+    if (norm_result == RAC_ERROR_OUT_OF_MEMORY ||
+        (norm_result == RAC_SUCCESS && !normalized_json)) {
+        return ToolParseStatus::kOutOfMemory;
+    }
+    if (norm_result != RAC_SUCCESS) {
+        return ToolParseStatus::kNoMatch;
     }
 
     // Extract tool name and arguments
-    if (!extract_tool_name_and_args(normalized_json, out_tool_name, out_args_json)) {
-        free(normalized_json);
-        return false;
-    }
-
+    const ToolParseStatus extract_status =
+        extract_tool_name_and_args(normalized_json, out_tool_name, out_args_json);
     free(normalized_json);
+    if (extract_status != ToolParseStatus::kSuccess) {
+        return extract_status;
+    }
 
     // Build clean text (everything except the tool call tags)
     std::string clean_text;
@@ -1573,12 +1661,17 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
 
     size_t clean_len = trim_end - trim_start;
     *out_clean_text = static_cast<char*>(malloc(clean_len + 1));
-    if (*out_clean_text) {
-        memcpy(*out_clean_text, clean_text.c_str() + trim_start, clean_len);
-        (*out_clean_text)[clean_len] = '\0';
+    if (!*out_clean_text) {
+        free(*out_tool_name);
+        free(*out_args_json);
+        *out_tool_name = nullptr;
+        *out_args_json = nullptr;
+        return ToolParseStatus::kOutOfMemory;
     }
+    memcpy(*out_clean_text, clean_text.c_str() + trim_start, clean_len);
+    (*out_clean_text)[clean_len] = '\0';
 
-    return *out_tool_name != nullptr;
+    return ToolParseStatus::kSuccess;
 }
 
 extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
@@ -1602,35 +1695,45 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     char* tool_name = nullptr;
     char* args_json = nullptr;
     char* clean_text = nullptr;
-    bool parsed = false;
+    ToolParseStatus parse_status = ToolParseStatus::kNoMatch;
 
     switch (format) {
         case RAC_TOOL_FORMAT_DEFAULT:
-            parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+            parse_status =
+                parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
             break;
 
         case RAC_TOOL_FORMAT_LFM2:
-            parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+            parse_status = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
             // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
             // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
             // outputs and bails without allocating when the LFM2 tag is absent, so a
             // fall-through to the default parser recovers a well-formed call in that shape
             // rather than silently dropping it.
-            if (!parsed) {
-                parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+            if (parse_status == ToolParseStatus::kNoMatch) {
+                parse_status =
+                    parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
             }
             break;
 
         case RAC_TOOL_FORMAT_PYTHONIC:
-            parsed = parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
+            parse_status =
+                parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
             break;
 
         default:
-            parsed = false;
+            parse_status = ToolParseStatus::kNoMatch;
             break;
     }
 
-    if (parsed && tool_name) {
+    if (parse_status == ToolParseStatus::kOutOfMemory) {
+        free(tool_name);
+        free(args_json);
+        free(clean_text);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (parse_status == ToolParseStatus::kSuccess && tool_name && args_json && clean_text) {
         out_result->has_tool_call = RAC_TRUE;
         out_result->tool_name = tool_name;
         out_result->arguments_json = args_json;
@@ -1638,6 +1741,13 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
         out_result->format = format;
         out_result->call_id = next_tool_call_id();
     } else {
+        if (parse_status == ToolParseStatus::kSuccess) {
+            free(tool_name);
+            free(args_json);
+            free(clean_text);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+
         // Parsing failed - clean up any partial results
         if (tool_name)
             free(tool_name);
@@ -1648,9 +1758,10 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
 
         // Return original text as clean_text
         out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-        if (out_result->clean_text) {
-            std::memcpy(out_result->clean_text, llm_output, output_len + 1);
+        if (out_result->clean_text == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        std::memcpy(out_result->clean_text, llm_output, output_len + 1);
     }
 
     return RAC_SUCCESS;
@@ -3137,9 +3248,10 @@ rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions
 
     if (!definitions || num_definitions == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
-        if (*out_prompt) {
-            (*out_prompt)[0] = '\0';
+        if (*out_prompt == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        (*out_prompt)[0] = '\0';
         return RAC_SUCCESS;
     }
 
@@ -3203,9 +3315,10 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
 
     if (!tools_json || strlen(tools_json) == 0 || strcmp(tools_json, "[]") == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
-        if (*out_prompt) {
-            (*out_prompt)[0] = '\0';
+        if (*out_prompt == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        (*out_prompt)[0] = '\0';
         return RAC_SUCCESS;
     }
 
@@ -3510,9 +3623,10 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
 
     if (!definitions || num_definitions == 0) {
         *out_json = static_cast<char*>(malloc(3));
-        if (*out_json) {
-            std::memcpy(*out_json, "[]", 3);
+        if (*out_json == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        std::memcpy(*out_json, "[]", 3);
         return RAC_SUCCESS;
     }
 
