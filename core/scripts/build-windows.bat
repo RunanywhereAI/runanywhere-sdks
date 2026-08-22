@@ -5,31 +5,29 @@ setlocal enabledelayedexpansion
 :: build-windows.bat
 :: Windows build script for runanywhere-commons (x64, MSVC)
 ::
-:: KNOWN LIMITATION (v0.20.0): the CI native_windows job is currently ADVISORY
-:: (non-blocking). Two MSVC-only compile bugs surfaced that could not be verified
-:: on a non-Windows dev machine; both have best-effort fixes committed (strcasecmp
-:: shim in rac_http_client_default.cpp + NOGDI/ERROR guard in platform_compat.h).
-:: If you build this on a real Windows box: verify it compiles clean, then
-:: re-enable the strict gate in .github/workflows/release.yml. Exact errors + fixes:
-:: thoughts/shared/issues/sdk-release-bugs.md (section F).
+:: Produces the SHARED release shape via the windows-x64-shared-release preset:
+:: rac_commons.dll + rac_backend_<id>.dll + runanywhere_<id>.dll carriers, staged
+:: into core/dist/windows/x64/{lib,include}. Fails closed if any expected
+:: artifact is missing.
 ::
 :: Usage: build-windows.bat [options] [backends]
-::        backends: onnx | llamacpp | all (default: all)
-::                  - onnx: STT/TTS/VAD (ONNX Runtime)
-::                  - llamacpp: LLM text generation (GGUF models)
-::                  - all: onnx + llamacpp (default)
+::        backends: onnx | llamacpp | sherpa | all (default: all)
+::                  - onnx:     embeddings / segmentation / diarization
+::                  - llamacpp: LLM + VLM text generation (GGUF models)
+::                  - sherpa:   STT / TTS / VAD  (needs the prefetched prebuilt,
+::                              see core\scripts\windows\download-sherpa-onnx.bat)
+::                  - all: onnx + llamacpp + sherpa (default)
 ::
 :: Options:
 ::   --clean     Clean build directory before building
-::   --shared    Build shared libraries (default: static)
 ::   --test      Build and run tests
 ::   --help      Show this help message
 ::
 :: Examples:
-::   build-windows.bat                    Build all backends (static)
-::   build-windows.bat --shared           Build all backends (shared)
+::   build-windows.bat                    Build all backends (shared)
 ::   build-windows.bat llamacpp           Build only LlamaCPP
-::   build-windows.bat onnx              Build only ONNX backend
+::   build-windows.bat onnx               Build only ONNX backend
+::   build-windows.bat sherpa             Build only Sherpa (STT/TTS/VAD)
 ::   build-windows.bat --clean all        Clean build, all backends
 ::   build-windows.bat --test             Build all + run tests
 ::
@@ -38,10 +36,19 @@ setlocal enabledelayedexpansion
 ::   - Visual Studio 2022 (or Build Tools) with C++ workload
 :: =============================================================================
 
+:: REPO_ROOT, not core/. This is THE bug that shipped a commons-only Windows
+:: bundle with zero engines through 0.20.25: this script used to configure
+:: core/CMakeLists.txt, which is a standalone project(RunAnywhereCommons) that
+:: never calls add_subdirectory(engines) — only the REPO-ROOT CMakeLists.txt
+:: does. So no engine target was ever created, every backend copy below was a
+:: silent no-op, and the script still exited 0.
 set "SCRIPT_DIR=%~dp0"
-set "ROOT_DIR=%SCRIPT_DIR%.."
-set "BUILD_DIR=%ROOT_DIR%\build\windows-x64"
-set "DIST_DIR=%ROOT_DIR%\dist\windows\x64"
+set "COMMONS_DIR=%SCRIPT_DIR%.."
+set "REPO_ROOT=%SCRIPT_DIR%..\.."
+:: Owned by the windows-x64-shared-release preset's binaryDir.
+set "BUILD_DIR=%REPO_ROOT%\build\windows-x64-shared-release"
+:: Stays under core/ — release.yml zips core/dist/windows.
+set "DIST_DIR=%COMMONS_DIR%\dist\windows\x64"
 
 :: =============================================================================
 :: Load Versions
@@ -52,11 +59,11 @@ call :load_versions
 :: Defaults
 :: =============================================================================
 set "CLEAN_BUILD=0"
-set "BUILD_SHARED=OFF"
 set "BUILD_TESTS=OFF"
 set "RUN_TESTS=0"
 set "BUILD_ONNX=OFF"
 set "BUILD_LLAMACPP=OFF"
+set "BUILD_SHERPA=OFF"
 set "BACKENDS="
 
 :: =============================================================================
@@ -66,11 +73,6 @@ set "BACKENDS="
 if "%~1"=="" goto :done_args
 if "%~1"=="--clean" (
     set "CLEAN_BUILD=1"
-    shift
-    goto :parse_args
-)
-if "%~1"=="--shared" (
-    set "BUILD_SHARED=ON"
     shift
     goto :parse_args
 )
@@ -96,13 +98,16 @@ if "%BACKENDS%"=="" set "BACKENDS=all"
 if "%BACKENDS%"=="all" (
     set "BUILD_ONNX=ON"
     set "BUILD_LLAMACPP=ON"
+    set "BUILD_SHERPA=ON"
 ) else if "%BACKENDS%"=="onnx" (
     set "BUILD_ONNX=ON"
 ) else if "%BACKENDS%"=="llamacpp" (
     set "BUILD_LLAMACPP=ON"
+) else if "%BACKENDS%"=="sherpa" (
+    set "BUILD_SHERPA=ON"
 ) else (
     echo [ERROR] Unknown backend: %BACKENDS%
-    echo Usage: %~nx0 [options] [onnx ^| llamacpp ^| all]
+    echo Usage: %~nx0 [options] [onnx ^| llamacpp ^| sherpa ^| all]
     exit /b 1
 )
 
@@ -115,8 +120,8 @@ echo  RunAnywhere Windows Build
 echo ========================================
 echo.
 echo  Architecture:  x64
-echo  Backends:      ONNX=%BUILD_ONNX%, LlamaCPP=%BUILD_LLAMACPP%
-if "%BUILD_SHARED%"=="ON" (echo  Library type:  Shared) else (echo  Library type:  Static)
+echo  Backends:      ONNX=%BUILD_ONNX%, LlamaCPP=%BUILD_LLAMACPP%, Sherpa=%BUILD_SHERPA%
+echo  Library type:  Shared ^(rac_commons.dll + plugin DLLs^)
 echo  Tests:         %BUILD_TESTS%
 echo  Build dir:     %BUILD_DIR%
 echo  Dist dir:      %DIST_DIR%
@@ -170,25 +175,24 @@ echo  Configuring CMake
 echo ========================================
 echo.
 
-cmake -B "%BUILD_DIR%" ^
-    -G "Visual Studio 17 2022" -A x64 ^
-    -DRAC_BUILD_BACKENDS=ON ^
+:: Drive the preset rather than hand-rolling flags. The preset is rooted at the
+:: repo root (so add_subdirectory(engines) runs) and carries the proven
+:: electron-windows flag set: RAC_BUILD_SHARED=ON + RAC_STATIC_PLUGINS=OFF,
+:: which is what produces rac_backend_<id>.dll AND the runanywhere_<id>.dll
+:: carriers. Narrowed backend selections are expressed as -D overrides ON TOP
+:: of the preset, never by dropping it.
+pushd "%REPO_ROOT%" >nul
+cmake --preset windows-x64-shared-release ^
     -DRAC_BACKEND_ONNX=%BUILD_ONNX% ^
     -DRAC_BACKEND_LLAMACPP=%BUILD_LLAMACPP% ^
-    -DRAC_BACKEND_RAG=OFF ^
-    -DRAC_BUILD_TESTS=%BUILD_TESTS% ^
-    -DRAC_BUILD_SHARED=%BUILD_SHARED% ^
-    -DRAC_BUILD_PLATFORM=OFF ^
-    "%ROOT_DIR%"
-::
-:: NOTE: RAC_BACKEND_RAG is disabled here because the RAG backend has known
-:: Windows build issues (tracked separately). Enable it manually once those
-:: are fixed.
-
+    -DRAC_BACKEND_SHERPA=%BUILD_SHERPA% ^
+    -DRAC_BUILD_TESTS=%BUILD_TESTS%
 if errorlevel 1 (
+    popd >nul
     echo [ERROR] CMake configure failed.
     exit /b 1
 )
+popd >nul
 echo [OK] CMake configure complete
 
 :: =============================================================================
@@ -213,47 +217,92 @@ echo [OK] Build complete
 echo.
 echo [DIST] Copying libraries to distribution directory...
 
-if "%BUILD_SHARED%"=="ON" (set "LIB_EXT=dll") else (set "LIB_EXT=lib")
+:: Blanket glob + hard gates, ported from core/scripts/build-linux.sh:43-73.
+:: NEVER name a per-backend output path again: the previous version hardcoded
+:: %BUILD_DIR%\src\backends\<id>\Release\, a layout that stopped existing when
+:: the engines moved to the top-level engines/ tree. Every copy was `if exist`
+:: -guarded, so all six became silent no-ops and the release shipped a
+:: commons-only zip for multiple versions with CI fully green.
+rmdir /s /q "%DIST_DIR%" 2>nul
+mkdir "%DIST_DIR%\lib" 2>nul
+mkdir "%DIST_DIR%\include" 2>nul
 
-:: Core library (copy .lib import lib + .dll runtime lib for shared builds)
-if exist "%BUILD_DIR%\Release\rac_commons.lib" (
-    copy /y "%BUILD_DIR%\Release\rac_commons.lib" "%DIST_DIR%\" >nul
-    echo [OK] Copied rac_commons.lib
+echo [DIST] Staging DLLs + import libs from the build tree...
+for /r "%BUILD_DIR%" %%f in (rac_commons*.dll rac_backend_*.dll runanywhere_*.dll) do (
+    copy /y "%%f" "%DIST_DIR%\lib\" >nul && echo   + %%~nxf
 )
-if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\Release\rac_commons.dll" (
-    copy /y "%BUILD_DIR%\Release\rac_commons.dll" "%DIST_DIR%\" >nul
-    echo [OK] Copied rac_commons.dll
+for /r "%BUILD_DIR%" %%f in (rac_commons*.lib rac_backend_*.lib runanywhere_*.lib) do (
+    copy /y "%%f" "%DIST_DIR%\lib\" >nul && echo   + %%~nxf
+)
+:: onnxruntime*.dll live under %BUILD_DIR%\_deps\onnxruntime-src\lib and are
+:: swept by this same glob; sherpa's vendor runtime is NOT in the build tree.
+for /r "%BUILD_DIR%" %%f in (onnxruntime*.dll) do (
+    copy /y "%%f" "%DIST_DIR%\lib\" >nul && echo   + %%~nxf
+)
+if "%BUILD_SHERPA%"=="ON" (
+    if exist "%COMMONS_DIR%\third_party\sherpa-onnx-windows\lib\sherpa-onnx-c-api.dll" (
+        copy /y "%COMMONS_DIR%\third_party\sherpa-onnx-windows\lib\sherpa-onnx-c-api.dll" "%DIST_DIR%\lib\" >nul
+        echo   + sherpa-onnx-c-api.dll
+    ) else (
+        echo [ERROR] sherpa-onnx-c-api.dll missing. Run core\scripts\windows\download-sherpa-onnx.bat
+        echo         first, or sherpa builds as a NON-ROUTABLE stub.
+        exit /b 1
+    )
 )
 
-:: ONNX backend
-if "%BUILD_ONNX%"=="ON" (
-    if exist "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.lib" (
-        copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.lib" "%DIST_DIR%\" >nul
-        echo [OK] Copied rac_backend_onnx.lib
-    )
-    if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" (
-        copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" "%DIST_DIR%\" >nul
-        echo [OK] Copied rac_backend_onnx.dll
-    )
+:: Duplicate-basename visibility (build-linux.sh hard-fails here; this only warns).
+:: The recursive glob can find the same file name in two build subtrees and
+:: `copy /y` silently keeps the last. Warning rather than failing because CMake
+:: legitimately copies vendor runtimes beside targets, and a false hard-fail here
+:: would block the whole release train.
+for /f %%n in ('powershell -NoProfile -Command "$d=Get-ChildItem -Path '%BUILD_DIR%' -Recurse -File -Include rac_commons*.dll,rac_backend_*.dll,runanywhere_*.dll,onnxruntime*.dll ^| Group-Object Name ^| Where-Object Count -gt 1; if ($d) { $d ^| ForEach-Object { Write-Host ('  DUPLICATE: ' + $_.Name + ' x' + $_.Count) } }; ($d ^| Measure-Object).Count"') do set "DUPES=%%n"
+if not "!DUPES!"=="0" (
+    echo [WARN]  !DUPES! duplicate basename^(s^) above; `copy /y` keeps the last one.
+    echo         Expected for vendor runtimes CMake copies beside targets. Promote this
+    echo         to a hard failure once real CI output confirms which are benign.
 )
 
-:: LlamaCPP backend
-if "%BUILD_LLAMACPP%"=="ON" (
-    if exist "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.lib" (
-        copy /y "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.lib" "%DIST_DIR%\" >nul
-        echo [OK] Copied rac_backend_llamacpp.lib
-    )
-    if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.dll" (
-        copy /y "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.dll" "%DIST_DIR%\" >nul
-        echo [OK] Copied rac_backend_llamacpp.dll
-    )
+:: Private-engine leak guard (mirrors build-linux.sh) — qhexrt/QNN must never
+:: reach a public bundle.
+for /r "%DIST_DIR%\lib" %%f in (*qhexrt* *qnn* *Qnn*) do (
+    echo [ERROR] private engine artifact leaked into the public bundle: %%~nxf
+    exit /b 1
 )
 
 :: Headers
 echo [DIST] Copying headers...
-if not exist "%DIST_DIR%\include" mkdir "%DIST_DIR%\include"
-xcopy /s /y /q "%ROOT_DIR%\include\rac" "%DIST_DIR%\include\rac\" >nul
+xcopy /s /y /q "%COMMONS_DIR%\include\rac" "%DIST_DIR%\include\rac\" >nul
 echo [OK] Copied headers
+
+:: =============================================================================
+:: FAIL CLOSED — assert every expected artifact is present.
+:: Without this the bundle can ship hollow and nothing notices (see above).
+:: =============================================================================
+echo.
+echo [VERIFY] Asserting required artifacts...
+set "MISSING=0"
+call :require rac_commons.dll
+if "%BUILD_LLAMACPP%"=="ON" (
+    call :require rac_backend_llamacpp.dll
+    call :require runanywhere_llamacpp.dll
+)
+if "%BUILD_ONNX%"=="ON" (
+    call :require rac_backend_onnx.dll
+    call :require runanywhere_onnx.dll
+    call :require onnxruntime.dll
+)
+if "%BUILD_SHERPA%"=="ON" (
+    call :require rac_backend_sherpa.dll
+    call :require runanywhere_sherpa.dll
+    call :require sherpa-onnx-c-api.dll
+)
+if not "!MISSING!"=="0" (
+    echo [ERROR] !MISSING! required artifact^(s^) missing from %DIST_DIR%\lib — refusing to
+    echo         produce a hollow Windows bundle. This is the failure the release
+    echo         pipeline silently shipped before this gate existed.
+    exit /b 1
+)
+echo [OK] all required artifacts present
 
 :: =============================================================================
 :: Run Tests
@@ -302,11 +351,12 @@ echo ========================================
 echo.
 echo  Distribution: %DIST_DIR%
 echo.
-dir /b "%DIST_DIR%\*.lib" 2>nul
+dir /b "%DIST_DIR%\lib" 2>nul
 echo.
 echo  To use in your project:
 echo    Include: /I"%DIST_DIR%\include"
-echo    Link:    /LIBPATH:"%DIST_DIR%" rac_commons.lib
+echo    Link:    /LIBPATH:"%DIST_DIR%\lib" rac_commons.lib
+echo    Runtime: copy %DIST_DIR%\lib\*.dll beside your executable
 echo.
 
 exit /b 0
@@ -319,26 +369,37 @@ exit /b 0
 echo Usage: %~nx0 [options] [backends]
 echo.
 echo Backends:
-echo   onnx        STT/TTS/VAD (ONNX Runtime + Sherpa-ONNX)
-echo   llamacpp    LLM text generation (GGUF models via llama.cpp)
-echo   all         onnx + llamacpp (default)
+echo   onnx        embeddings / segmentation / diarization (ONNX Runtime)
+echo   llamacpp    LLM + VLM text generation (GGUF models via llama.cpp)
+echo   sherpa      STT / TTS / VAD (needs download-sherpa-onnx.bat first)
+echo   all         onnx + llamacpp + sherpa (default)
 echo.
 echo Options:
 echo   --clean     Clean build directory before building
-echo   --shared    Build shared libraries (default: static)
 echo   --test      Build and run tests
 echo   --help      Show this help message
 echo.
 echo Examples:
-echo   %~nx0                        Build all backends (static)
-echo   %~nx0 --shared               Build all backends (shared)
+echo   %~nx0                        Build all backends (shared)
 echo   %~nx0 llamacpp               Build only LlamaCPP
 echo   %~nx0 --clean --test all     Clean build, all backends, run tests
 exit /b 0
 
+:require
+:: Assert one artifact exists in DIST_DIR\lib; increments MISSING if not.
+:: Called only from the fail-closed verify block.
+if not exist "%DIST_DIR%\lib\%~1" (
+    echo   [MISSING] %~1
+    set /a MISSING+=1
+) else (
+    echo   [ok] %~1
+)
+goto :eof
+
 :load_versions
 :: Read VERSIONS file and set variables
-set "VERSIONS_FILE=%ROOT_DIR%\VERSIONS"
+:: core/VERSIONS — COMMONS_DIR, not REPO_ROOT (ROOT_DIR was split into the two).
+set "VERSIONS_FILE=%COMMONS_DIR%\VERSIONS"
 if not exist "%VERSIONS_FILE%" (
     echo [ERROR] VERSIONS file not found at %VERSIONS_FILE%
     exit /b 1

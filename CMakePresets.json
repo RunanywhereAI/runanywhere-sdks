@@ -308,6 +308,28 @@
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
         {
+            "name": "windows-x64-shared-release",
+            "displayName": "Windows x64 — Release (shared commons + dynamic plugin DLLs) — the RELEASE bundle",
+            "description": "Produces the shape RACommons-windows-x64-v<version>.zip is supposed to ship: rac_commons.dll plus rac_backend_<id>.dll and their runanywhere_<id>.dll carriers. Mirrors electron-windows — the only Windows configuration with live CI evidence of building all three CPU backends on MSVC — minus the Electron N-API addon (needs RAC_NODE_DEV_DIR) and minus RAC_DESKTOP_ADAPTER (which makes libcurl a hard requirement that native_windows has no vcpkg step for). Sherpa needs core/scripts/windows/download-sherpa-onnx.bat to have run first, or it builds as a NON-ROUTABLE stub. Do NOT swap this back to windows-release: that preset sets no backend flags and RAC_BUILD_SHARED=OFF, which is exactly how the release bundle shipped commons-only with zero engines through 0.20.25.",
+            "inherits": "base-release",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "x64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_STATIC_PLUGINS": "OFF",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "ON",
+                "RAC_BACKEND_ONNX": "ON",
+                "RAC_RUNTIME_ONNXRT": "ON",
+                "RAC_BACKEND_SHERPA": "ON",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_NEURT": "OFF",
+                "GGML_METAL": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
             "name": "electron-win-arm64",
             "displayName": "Electron \u2014 Windows ARM64 thin addon (Hexagon NPU, QHexRT only)",
             "description": "Option A packaging for Snapdragon X / X2 Elite: rac_commons.dll + runanywhere_qhexrt.dll + thin runanywhere_native.node, built ARM64-native. This is the NPU lane and it is mutually exclusive with electron-windows — QAIRT ships no QnnHtp*Stub for x86_64, so x64 can never reach the DSP, and the three CPU engines cannot compile for ARM64 (see the per-option comments). Requires an ARM64 Windows host and the ARM64 Native Tools prompt; MSVC's arm64_x64 cross toolset builds the OTHER lane, not this one. Pass, as electron-windows does, -DRAC_NODE_DEV_DIR=<node-gyp cache> and -DQHEXRT_ROOT=<engines/qhexrt/prebuilt/versions/<receipt>> (the global prebuilt/current symlink cannot name an Android and a Windows payload at once). RAC_DESKTOP_ADAPTER=ON needs libcurl and crypt32: crypt32 is a system library, but curl is not, so also pass -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-windows-static after `vcpkg install curl:arm64-windows-static`. Without the adapter this lane has no HTTP transport at all — no model downloads, no telemetry, no auth.",
@@ -395,6 +417,7 @@
         { "name": "windows-release",  "configurePreset": "windows-release" },
         { "name": "electron-macos",   "configurePreset": "electron-macos" },
         { "name": "electron-windows", "configurePreset": "electron-windows", "configuration": "Release" },
+        { "name": "windows-x64-shared-release", "configurePreset": "windows-x64-shared-release", "configuration": "Release" },
         { "name": "electron-win-arm64", "configurePreset": "electron-win-arm64", "configuration": "Release" },
         { "name": "electron-win-arm64-vs2026", "configurePreset": "electron-win-arm64-vs2026", "configuration": "Release" },
         { "name": "windows-arm64-release", "configurePreset": "windows-arm64-release", "configuration": "Release" },

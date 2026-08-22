@@ -262,6 +262,55 @@ jobs:
           ./rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
 
+  windows-commons-release:
+    # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
+    # release.yml's native_windows job ships as RACommons-windows-x64-v*.zip.
+    #
+    # WHY THIS JOB EXISTS: nothing in pr-build.yml ever ran that script, so it
+    # rotted invisibly. It configured core/ (a standalone project that never
+    # does add_subdirectory(engines)), so no engine target was ever created;
+    # its backend copies pointed at a pre-engine-split core/src/backends/ layout
+    # that no longer exists; and every copy was `if exist`-guarded, so all of
+    # them silently no-oped while the script exited 0. Result: the release
+    # bundle shipped commons-only with ZERO engines for multiple versions with
+    # CI fully green. Keep this job green and that cannot recur.
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
+      - name: Build commons + all backends (windows-x64-shared-release preset)
+        working-directory: core
+        shell: cmd
+        run: scripts\build-windows.bat
+      # build-windows.bat already fails closed on a missing artifact; assert it
+      # again here so a regression in the script's own gate is also caught.
+      - name: Assert the full DLL set was staged
+        shell: bash
+        run: |
+          set -euo pipefail
+          lib=core/dist/windows/x64/lib
+          missing=0
+          for want in rac_commons.dll \
+              rac_backend_llamacpp.dll runanywhere_llamacpp.dll \
+              rac_backend_onnx.dll runanywhere_onnx.dll onnxruntime.dll \
+              rac_backend_sherpa.dll runanywhere_sherpa.dll sherpa-onnx-c-api.dll; do
+            if [ ! -f "$lib/$want" ]; then
+              echo "::error::missing $want in $lib"
+              missing=$((missing + 1))
+            fi
+          done
+          ls -la "$lib"
+          [ "$missing" -eq 0 ] || { echo "::error::$missing native(s) missing"; exit 1; }
+      - name: Verify Windows plugin natives are routable
+        shell: bash
+        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/windows/x64/lib
+
   python-windows:
     # Builds the runanywhere-python wheel (pybind11 _core over the C ABI) via
     # scikit-build-core, repairs it with delvewheel (vendors the onnxruntime/sherpa
