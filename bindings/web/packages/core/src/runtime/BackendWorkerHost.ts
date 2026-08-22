@@ -73,6 +73,13 @@ interface StreamPending {
     reject(reason: unknown): void;
   }>;
   finished: boolean;
+  /**
+   * Set by whichever path failed the stream. Rejecting the parked waiters is
+   * not enough on its own: a worker that dies while the consumer is running its
+   * loop body has no waiter to reject, and `next()` would otherwise read
+   * `finished` as a clean end of stream.
+   */
+  failure?: unknown;
 }
 
 type PendingRequest = UnaryPending | StreamPending;
@@ -223,6 +230,7 @@ export class BackendWorkerHost {
     const fail = (error: unknown): void => {
       if (state.finished) return;
       state.finished = true;
+      state.failure = error;
       this.pending.delete(requestId);
       this.activeStreamIds.delete(requestId);
       while (state.waiters.length) state.waiters.shift()!.reject(error);
@@ -244,11 +252,19 @@ export class BackendWorkerHost {
           if (state.events.length) {
             return Promise.resolve({ value: state.events.shift(), done: false });
           }
+          if (state.failure !== undefined) {
+            const error = state.failure;
+            state.failure = undefined;
+            return Promise.reject(error);
+          }
           if (state.finished) return Promise.resolve({ value: undefined, done: true });
           return new Promise((resolve, reject) => state.waiters.push({ resolve, reject }));
         },
         return: (): Promise<IteratorResult<unknown>> => {
           if (started && !state.finished) this.cancel(requestId);
+          // An explicit cancel outranks an error the consumer never asked
+          // about, matching the other two iterators.
+          state.failure = undefined;
           finish();
           return Promise.resolve({ value: undefined, done: true });
         },
@@ -380,6 +396,7 @@ export class BackendWorkerHost {
       return;
     }
     pending.finished = true;
+    pending.failure = error;
     while (pending.waiters.length) pending.waiters.shift()!.reject(error);
   }
 
