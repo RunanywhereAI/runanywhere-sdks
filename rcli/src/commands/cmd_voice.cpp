@@ -128,19 +128,27 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
             }
         }
 
-        if (options.json) {
-            out::JsonWriter json;
-            json.begin_object()
-                .field("transcription", result.transcription())
-                .field("response", result.assistant_response())
-                .field("reply_audio", reply_path)
-                .end_object();
-            out::result_line(json.str());
-        } else {
-            out::result_line("you   " + result.transcription());
-            out::result_line("agent " + result.assistant_response());
-            if (!reply_path.empty()) {
-                out::result_line("audio " + reply_path);
+        // Only a turn that fully succeeded prints a result. cmd_tts.cpp emits
+        // its result in the `else if` branch of the same write check, so a
+        // failed --output write there produces an error and nothing else; a
+        // success-shaped line next to exit 1 would let
+        // `rcli voice --json -o reply.wav | jq -r .reply_audio` read an empty
+        // path as if the turn had produced no audio.
+        if (exit_code == 0) {
+            if (options.json) {
+                out::JsonWriter json;
+                json.begin_object()
+                    .field("transcription", result.transcription())
+                    .field("response", result.assistant_response())
+                    .field("reply_audio", reply_path)
+                    .end_object();
+                out::result_line(json.str());
+            } else {
+                out::result_line("you   " + result.transcription());
+                out::result_line("agent " + result.assistant_response());
+                if (!reply_path.empty()) {
+                    out::result_line("audio " + reply_path);
+                }
             }
         }
     }
