@@ -311,8 +311,7 @@ endif()
 set(QHEXRT_SOURCES
     rac_plugin_entry_qhexrt.cpp
     rac_backend_qhexrt_register.cpp
-    qhexrt_device_capability.cpp
-    qhexrt_model_catalog.cpp)
+    qhexrt_device_capability.cpp)
 set(QHEXRT_LINK_LIBS "")
 set(QHEXRT_COMPILE_DEFS RAC_QHEXRT_BUILDING)
 set(QHEXRT_INCLUDE_DIRS

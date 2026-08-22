@@ -5,9 +5,7 @@
  * Native SDK. Provides backend registration and a pre-flight NPU capability
  * probe so apps can warn unsupported devices before loading a model.
  *
- * App-owned model URLs and metadata cross the QHexRT catalog facade, which
- * selects the matching device architecture before composing core lifecycle
- * registration and download services.
+ * Model registration, download, and lifecycle remain in @runanywhere/core.
  *
  * QHexRT is Qualcomm-only (Snapdragon Hexagon NPU): Android arm64 exclusively.
  * On non-Snapdragon or non-Android devices the probe reports an unsupported,
@@ -20,11 +18,6 @@ import {
   NpuCapability,
   HexagonArch,
 } from '@runanywhere/proto-ts/hardware_profile';
-import {
-  type ModelInfo,
-  type RegisterModelFromUrlRequest,
-} from '@runanywhere/proto-ts/model_types';
-import { QHexRTCatalogWire } from './QHexRTCatalogWire';
 
 const log = new SDKLogger('NPU.QHexRT');
 
@@ -62,8 +55,7 @@ function decodeNpuCapability(buffer: ArrayBuffer | null): NpuCapability {
 /**
  * QHexRT Module
  *
- * Provides backend registration, the NPU capability probe, and device-aware
- * registration for app-owned QHexRT catalog definitions.
+ * Provides backend registration and the NPU capability probe.
  *
  * ## Usage
  *
@@ -125,30 +117,5 @@ export const QHexRT = {
   /** The native QHexRT support policy; no V75/V79/V81 set is copied in TS. */
   isArchitectureSupported(arch: HexagonArch): boolean {
     return QHexRTProvider.isArchitectureSupported(arch);
-  },
-
-  /** Match QHexRT native product policy for a model against an architecture. */
-  modelSupportsArchitecture(modelId: string, arch: HexagonArch): boolean {
-    return QHexRTProvider.modelSupportsArchitecture(modelId, arch);
-  },
-
-  /** Whether QHexRT native product policy marks a model HF-authenticated. */
-  modelRequiresHfAuth(modelId: string): boolean {
-    return QHexRTProvider.modelRequiresHfAuth(modelId);
-  },
-
-  /**
-   * Register an app-owned URL/model definition only when it matches the
-   * current device. Native QHexRT owns probing and chip selection, then
-   * composes commons' shared registration/download pipeline. `null` is the
-   * normal ineligible model/device outcome.
-   */
-  async registerModelForDevice(
-    request: RegisterModelFromUrlRequest
-  ): Promise<ModelInfo | null> {
-    const raw = await QHexRTProvider.registerModelForDeviceRaw(
-      QHexRTCatalogWire.encodeRequest(request)
-    );
-    return raw ? QHexRTCatalogWire.decodeModel(raw) : null;
   },
 };
