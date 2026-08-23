@@ -957,14 +957,27 @@ private final class MLXSession: @unchecked Sendable {
                 metrics.completionTokens = info.generationTokenCount
                 metrics.tokensPerSecond = Float(info.tokensPerSecond)
                 metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
-            case .toolCall:
-                break
+            case .toolCall(let call):
+                // MLX-LM's processor swallows the `<tool_call>` text it parsed,
+                // so commons' run loop saw output with no call in it and failed
+                // the turn. Re-emit the wire form it expects; commons owns the
+                // parse for every other engine and now owns it here too.
+                onToken(toolCallWireText(call))
             case .rejectedToolCall(let rejection):
-                // The commons token callback cannot represent structured tool
-                // rejection events. Preserve MLX-LM's fail-closed contract
-                // instead of silently returning an incomplete response. The
-                // public error deliberately excludes rawTextPreview.
-                throw RejectedToolCallError(rejection)
+                // A rejection only means MLX-LM could not match the call against
+                // tools *it* was told about, and commons never declares them to
+                // MLX: it renders the schema into the prompt instead. When the
+                // raw text survived intact, hand it to commons and let commons
+                // decide. A truncated preview stays fail-closed, because half a
+                // call is worse than none.
+                if !rejection.isPreviewTruncated, !rejection.rawTextPreview.isEmpty {
+                    mlxRuntimeLogger.debug(
+                        "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
+                    )
+                    onToken(rejection.rawTextPreview)
+                } else {
+                    throw RejectedToolCallError(rejection)
+                }
             }
         }
 
@@ -1026,13 +1039,27 @@ private final class MLXSession: @unchecked Sendable {
                 metrics.completionTokens = info.generationTokenCount
                 metrics.tokensPerSecond = Float(info.tokensPerSecond)
                 metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
-            case .toolCall:
-                break
+            case .toolCall(let call):
+                // MLX-LM's processor swallows the `<tool_call>` text it parsed,
+                // so commons' run loop saw output with no call in it and failed
+                // the turn. Re-emit the wire form it expects; commons owns the
+                // parse for every other engine and now owns it here too.
+                onToken(toolCallWireText(call))
             case .rejectedToolCall(let rejection):
-                // Do not leak the rejection's raw model output through logs or
-                // flatten it into ordinary response text. Callers receive the
-                // non-sensitive LocalizedError provided by MLX-LM.
-                throw RejectedToolCallError(rejection)
+                // A rejection only means MLX-LM could not match the call against
+                // tools *it* was told about, and commons never declares them to
+                // MLX: it renders the schema into the prompt instead. When the
+                // raw text survived intact, hand it to commons and let commons
+                // decide. A truncated preview stays fail-closed, because half a
+                // call is worse than none.
+                if !rejection.isPreviewTruncated, !rejection.rawTextPreview.isEmpty {
+                    mlxRuntimeLogger.debug(
+                        "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
+                    )
+                    onToken(rejection.rawTextPreview)
+                } else {
+                    throw RejectedToolCallError(rejection)
+                }
             }
         }
 
@@ -2108,4 +2135,25 @@ private let mlxDestroy: rac_mlx_destroy_fn = { handle, _ in
     let session = unmanaged.takeUnretainedValue()
     MLXSessionCoordinator.unregister(session)
     unmanaged.release()
+}
+
+/// Commons parses tool calls out of the model's text, in the DEFAULT wire form
+/// documented in core/src/features/llm/tool_calling.cpp:
+/// `<tool_call>{"tool":"name","arguments":{}}</tool_call>`.
+///
+/// MLX-LM hands back a structured `ToolCall` instead, so this puts it back on
+/// the wire rather than teaching commons a second, MLX-only representation.
+private func toolCallWireText(_ call: ToolCall) -> String {
+    var payload: [String: Any] = ["tool": call.function.name]
+    if let data = try? JSONEncoder().encode(call.function.arguments),
+       let arguments = try? JSONSerialization.jsonObject(with: data) {
+        payload["arguments"] = arguments
+    } else {
+        payload["arguments"] = [String: Any]()
+    }
+    guard let encoded = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+          let json = String(data: encoded, encoding: .utf8) else {
+        return ""
+    }
+    return "<tool_call>\(json)</tool_call>"
 }
