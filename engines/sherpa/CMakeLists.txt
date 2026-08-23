@@ -255,7 +255,8 @@ elseif(RAC_PLATFORM_LINUX)
 
         message(STATUS "Found Sherpa-ONNX Linux: ${SHERPA_LIB_PATH}")
     else()
-        message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
+        message(STATUS "Sherpa-ONNX not found. Run, from the repo root: "
+                   "bash core/scripts/linux/download-sherpa-onnx.sh")
     endif()
 
 elseif(RAC_PLATFORM_WINDOWS)
