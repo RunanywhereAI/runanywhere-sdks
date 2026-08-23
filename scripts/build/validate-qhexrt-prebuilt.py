@@ -177,8 +177,8 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     if not isinstance(system, dict) or set(system) != {
         "name", "processor", "crosscompiling", "state_file_sha256"
     } or system.get("name") != ("Windows" if _is_win else "Android") \
-         or system.get("processor") not in ({"ARM64", "arm64", "aarch64"} if _is_win
-                                            else {"aarch64", "arm64"}):
+         or (system.get("processor") or "").lower() not in ({"arm64", "aarch64"} if _is_win
+                                                            else {"aarch64", "arm64"}):
         raise RuntimeError(
             f"QHexRT current selection has an invalid "
             f"{'Windows' if _is_win else 'Android'} system identity")

@@ -63,22 +63,37 @@ fi
 #
 # CI sets RAC_ALLOW_NEURT_STUB=1 when it only needs to prove the build compiles.
 if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
+    # Deliberately per-slice with NO override. NEURT_PREBUILT_ROOT is a SINGLE-slice
+    # root in engines/neurt/CMakeLists.txt, but packaging needs all three slices, so
+    # honouring it here would let one staged slice satisfy the guard for all three
+    # and silently package two non-routable stubs. The two meanings do not compose.
+    #
+    # Probe the COMPLETE set the engine requires, not a sentinel pair: a tree missing
+    # only one archive would otherwise pass here and fail later at link.
     _neurt_missing=()
     for _slice in macos-arm64 ios-arm64 ios-arm64-simulator; do
-        _root="${NEURT_PREBUILT_ROOT:-${REPO_ROOT}/core/third_party/neurt/${_slice}}"
-        for _p in "${_root}/RECEIPT.json" "${_root}/lib/libneurt_core.a"; do
-            [ -f "${_p}" ] || _neurt_missing+=("${_p}")
+        _root="${REPO_ROOT}/core/third_party/neurt/${_slice}"
+        for _rel in \
+            RECEIPT.json \
+            include/rac_diffusion_coreml.h \
+            lib/libneurt_core.a \
+            lib/libneurt_rac_llm_ops.a \
+            lib/libneurt_rac_stt_ops.a \
+            lib/libneurt_rac_diffusion.a
+        do
+            [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
         done
     done
     if [ "${#_neurt_missing[@]}" -ne 0 ]; then
-        echo "error: packaging the Swift SDK requires the NeuRT prebuilt slices." >&2
-        printf '    %s\n' "${_neurt_missing[@]}" >&2
+        echo "error: packaging the Swift SDK requires all three complete NeuRT slices." >&2
+        printf '    missing: %s\n' "${_neurt_missing[@]}" >&2
         echo "  Run: scripts/build/download-neurt.sh --all   (needs NEURUN_TOKEN)" >&2
         echo "  Or set RAC_ALLOW_NEURT_STUB=1 to package a non-routable stub on" >&2
-        echo "  purpose (build verification only — NOT shippable)." >&2
+        echo "  purpose (build verification only - NOT shippable)." >&2
         exit 1
     fi
 fi
+
 COMMONS_HEADERS="${REPO_ROOT}/core/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"

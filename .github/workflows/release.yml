@@ -166,7 +166,11 @@ jobs:
     # skipping publish). Raised to 150 to absorb runner variance.
     timeout-minutes: 150
     steps:
+      # This job holds NEURUN_TOKEN and runs gh plus build scripts; do not leave
+      # GITHUB_TOKEN in .git/config for every later step.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # NeuRT arrives as prebuilt archives pinned in core/VERSIONS. Exit 3 means
       # "no token", which is right for a fork PR and catastrophic for a release:
       # a stub registers, claims Apple availability and serves nothing.
@@ -179,14 +183,17 @@ jobs:
           # degrades to the non-routable shell. A RELEASE must never do that: a
           # stub would ship an engine that registers, claims Apple availability and
           # serves nothing. Treat 3 as fatal here specifically.
-          if ! bash scripts/build/download-neurt.sh --all; then
-            rc=$?
-            if [[ $rc -eq 3 ]]; then
-              echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
-              echo "::error::A release must ship the real Apple engine. Refusing."
-            fi
+          # Capture the status directly. Inside `if ! cmd`, $? is the status of the
+          # NEGATION, so it is always 0 and the exit-3 branch was dead code -- the
+          # job failed but never printed why.
+          rc=0
+          bash scripts/build/download-neurt.sh --all || rc=$?
+          if [[ "$rc" -eq 3 ]]; then
+            echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
+            echo "::error::A release must ship the real Apple engine. Refusing."
             exit 1
           fi
+          [[ "$rc" -eq 0 ]] || exit "$rc"
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios

@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
 # check_engine_prebuilt_pins.sh — assert the private-engine prebuilt boundary is
-# whole: the pinned release really has every artifact, the pins really describe
-# those bytes, and every consumer that needs a payload really fetches one.
+# whole: pins well-formed and matching the published bytes, the ABI pin equal to
+# the header, no consumer silently building without a payload, and no workflow
+# pinning a payload by absolute path.
 #
-# Exists because each of these has already been wrong in a way nothing caught:
-#
-#   * Android released the non-routable QHexRT shell for months, because
-#     build-core-android.sh enables the engine only when a payload is selected
-#     and nothing in CI ever fetched one. "Nothing selected" is a legitimate
-#     public-build outcome, so it never failed anything.
-#   * The Electron win-arm64 lane pinned a hand-staged payload by absolute path
-#     and drifted from the published one.
-#   * NeuRT's pins had to be refreshed by hand after every rebuild; a stale one
-#     fails at download time, deep in a native job.
-#
-# Read-only and offline by default. With a token it also verifies the pins
-# against the real release; without one it checks everything local and says
-# which parts it skipped.
+# Read-only. Offline by default; with a token it also verifies the release itself.
 #
 # Usage: check_engine_prebuilt_pins.sh [--offline]
 # =============================================================================
@@ -154,11 +142,25 @@ ABI_HEADERS=(
     core/include/rac/features/diffusion/rac_diffusion_types.h
     core/include/rac/core/rac_error.h
 )
-receipt=""
+# Check EVERY downloaded slice, not just the first: one stale slice among three is
+# exactly the drift this is for, and slices must agree on the commit they were
+# built against or they are not from one release.
+receipts=(); commits=()
 for s in "${NEURT_SLICES[@]}"; do
     cand="${REPO_ROOT}/core/third_party/neurt/${s}/RECEIPT.json"
-    [[ -f "$cand" ]] && { receipt="$cand"; break; }
+    [[ -f "$cand" ]] && receipts+=("$cand")
 done
+for r in "${receipts[@]:-}"; do
+    [[ -n "$r" ]] || continue
+    c="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$r" 2>/dev/null || true)"
+    commits+=("$c")
+done
+uniq_commits="$(printf '%s\n' "${commits[@]:-}" | sort -u | grep -v '^$' | wc -l | tr -d ' ')"
+if [[ "${uniq_commits:-0}" -gt 1 ]]; then
+    bad "downloaded slices disagree on sdks_commit; they are not from one release:"
+    printf '         %s\n' "${commits[@]}" >&2
+fi
+receipt="${receipts[0]:-}"
 if [[ -z "$receipt" ]]; then
     note "SKIPPED: no downloaded receipt locally (run download-neurt.sh to enable)."
 else
@@ -199,10 +201,13 @@ else
     if [[ -z "$listing" ]]; then
         bad "could not read release $NEURT_RELEASE_TAG from $repo"
     else
-        v="${NEURT_RELEASE_TAG#v}"
+        nv="${NEURT_RELEASE_TAG#v}"
+        qv="${QHEXRT_RELEASE_TAG#v}"
         want=()
-        for s in "${NEURT_SLICES[@]}"; do want+=("neurt-${s}-v${v}.tar.gz"); done
-        for a in "${QHEXRT_ABIS[@]}"; do want+=("qhexrt-${a}-v${v}.tar.gz"); done
+        for s in "${NEURT_SLICES[@]}"; do want+=("neurt-${s}-v${nv}.tar.gz"); done
+        # QHexRT has its OWN repo and tag pins; reusing NeuRT's would check the
+        # wrong release the moment the two diverge.
+        for a in "${QHEXRT_ABIS[@]}"; do want+=("qhexrt-${a}-v${qv}.tar.gz"); done
         for w in "${want[@]}"; do
             if ! grep -qx "$w" <<<"$listing"; then bad "release is missing $w"
             elif ! grep -qx "${w}.sha256" <<<"$listing"; then bad "release is missing ${w}.sha256"
@@ -216,17 +221,22 @@ else
         tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
         for s in "${NEURT_SLICES[@]}"; do
             var="NEURT_$(echo "$s" | tr 'a-z-' 'A-Z_')_SHA256"
-            GH_TOKEN="$TOKEN" gh release download "$NEURT_RELEASE_TAG" --repo "$repo" \
-                --pattern "neurt-${s}-v${v}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null || continue
-            pub="$(cat "$tmp/neurt-${s}-v${v}.tar.gz.sha256")"
+            if ! GH_TOKEN="$TOKEN" gh release download "$NEURT_RELEASE_TAG" --repo "$repo" \
+                    --pattern "neurt-${s}-v${nv}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null; then
+                bad "could not download the published checksum for neurt-${s}"; continue
+            fi
+            pub="$(cat "$tmp/neurt-${s}-v${nv}.tar.gz.sha256")"
             [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
                                       || bad "$var=${!var} but the release publishes $pub"
         done
         for a in "${QHEXRT_ABIS[@]}"; do
             var="QHEXRT_$(echo "$a" | tr 'a-z-' 'A-Z_')_SHA256"
-            GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" --repo "$repo" \
-                --pattern "qhexrt-${a}-v${v}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null || continue
-            pub="$(cat "$tmp/qhexrt-${a}-v${v}.tar.gz.sha256")"
+            qrepo="${QHEXRT_REPO:-$repo}"
+            if ! GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" --repo "$qrepo" \
+                    --pattern "qhexrt-${a}-v${qv}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null; then
+                bad "could not download the published checksum for qhexrt-${a}"; continue
+            fi
+            pub="$(cat "$tmp/qhexrt-${a}-v${qv}.tar.gz.sha256")"
             [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
                                       || bad "$var=${!var} but the release publishes $pub"
         done

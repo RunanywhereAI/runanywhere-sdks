@@ -35,7 +35,8 @@ ABI=""
 FORCE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --abi)   ABI="$2"; shift 2 ;;
+        --abi)   [[ $# -ge 2 ]] || { echo "[ERROR] --abi requires a value" >&2; exit 2; }
+                 ABI="$2"; shift 2 ;;
         --force) FORCE=1; shift ;;
         -h|--help) sed -n '2,28p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "[ERROR] unknown argument: $1" >&2; exit 2 ;;
@@ -72,6 +73,16 @@ if [[ -z "$TOKEN" ]]; then
 fi
 
 sha256_of() { shasum -a 256 "$1" 2>/dev/null | awk '{print $1}' || sha256sum "$1" | awk '{print $1}'; }
+
+# `python3` does not exist on Windows. `|| true` so a failed lookup cannot abort
+# under `set -e` before the message below explains itself.
+PY_BIN="$(command -v python3 || command -v python || true)"
+if [[ -z "$PY_BIN" ]]; then
+    echo "[ERROR] no python3/python on PATH." >&2
+    echo "        A self-hosted Windows service account may not see a per-user" >&2
+    echo "        install; put its directory on PATH for the job." >&2
+    exit 1
+fi
 
 VERSION="${QHEXRT_RELEASE_TAG#v}"
 ASSET="qhexrt-${ABI}-v${VERSION}.tar.gz"
@@ -119,10 +130,28 @@ else
         exit 1
     fi
 
+    # Validate the STAGED tree before anything live is touched. Publishing first
+    # and validating after meant a rejected payload could end up selected, and with
+    # --force the `rm -rf "$DEST"` could delete the directory `current` still
+    # pointed at, leaving readers on a broken link.
+    probe="${tmp}/probe"; mkdir -p "${probe}/versions"
+    cp -R "$inner" "${probe}/versions/${EXPECTED_RECEIPT}"
+    ln -s "versions/${EXPECTED_RECEIPT}" "${probe}/current"
+    if ! staged="$("$PY_BIN" "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
+            --prebuilt "$probe" --android-abi "$ABI" 2>&1)"; then
+        echo "[ERROR] payload failed the SDK validator; nothing was changed:" >&2
+        echo "$staged" | sed 's/^/        /' >&2
+        exit 1
+    fi
+
+    # Only now publish. The directory is content-addressed, so an identical
+    # receipt means identical bytes and replacing it is a no-op.
     mkdir -p "${PREBUILT}/versions"
+    rm -rf "${DEST}.incoming"
+    cp -R "$inner" "${DEST}.incoming"
     rm -rf "$DEST"
-    mv "$inner" "$DEST"
-    echo "[OK] staged ${EXPECTED_RECEIPT}"
+    mv "${DEST}.incoming" "$DEST"
+    echo "[OK] staged and validated ${EXPECTED_RECEIPT}"
 fi
 
 # ---- select it atomically ----------------------------------------------------
@@ -137,7 +166,7 @@ fi
 # and moves the temp link INSIDE the old target, leaving `current` unchanged. That
 # silently kept the previously selected ABI while reporting success. os.replace
 # operates on the link itself and is atomic, so a reader never sees no selection.
-python3 - "$PREBUILT" "$EXPECTED_RECEIPT" <<'PYSWAP'
+"$PY_BIN" - "$PREBUILT" "$EXPECTED_RECEIPT" <<'PYSWAP'
 import os, sys
 prebuilt, receipt = sys.argv[1], sys.argv[2]
 tmp = os.path.join(prebuilt, f".current.{os.getpid()}")
@@ -150,7 +179,7 @@ PYSWAP
 # ---- prove the SDK will accept it -------------------------------------------
 # The same validator the build preflight runs. Catching a bad payload here beats
 # catching it mid-build, where the error names a CMake target rather than a pin.
-if ! resolved="$(python3 "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
+if ! resolved="$("$PY_BIN" "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
         --prebuilt "$PREBUILT" --android-abi "$ABI" 2>&1)"; then
     echo "[ERROR] the downloaded payload failed the SDK's own validator:" >&2
     echo "$resolved" | sed 's/^/        /' >&2
