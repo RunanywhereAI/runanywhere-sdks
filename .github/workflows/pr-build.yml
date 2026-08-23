@@ -305,7 +305,12 @@ jobs:
         if: steps.neurun.outcome == 'success'
         run: |
           set -euo pipefail
+          # The emitter shells out to a BARE `protoc`
+          # (idl/codegen/_convenience_common.py:235) with no env override, so it
+          # must be ON PATH, not merely resolvable.
           py="$(idl/codegen/bootstrap_pyproto.sh)"
+          protoc_dir="$(idl/codegen/bootstrap_protoc.sh --print-dir)"
+          export PATH="$protoc_dir:$PATH"
           "$py" idl/codegen/generate_cpp_defaults.py
 
       - name: Compile the NeuRT op tables against THIS PR's headers
