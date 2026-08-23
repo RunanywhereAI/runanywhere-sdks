@@ -296,6 +296,20 @@ jobs:
       # here. This replaced a hardcoded path to a hand-staged tree on this machine,
       # which had to be edited by hand whenever the receipt changed -- and had
       # drifted from the published payload.
+      # PowerShell, because this step's job is to prove `bash` EXISTS. Installing Git
+      # for Windows puts Git\cmd (git.exe) on PATH but not Git\bin (bash.exe), so
+      # actions/checkout works while every `shell: bash` step dies with a bare
+      # "bash: command not found". The runner also caches its environment at start,
+      # so a machine PATH fix needs a service restart before any job sees it.
+      - name: Preflight the runner shell
+        shell: powershell
+        run: |
+          if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
+            Write-Output "::error::No bash on PATH. Add 'C:\Program Files\Git\bin' to the MACHINE Path, then RESTART the runner service (it caches its environment at start)."
+            exit 1
+          }
+          Write-Output "bash: $((Get-Command bash).Source)"
+
       - name: Download the pinned QHexRT payload (win-arm64)
         shell: bash
         env:
