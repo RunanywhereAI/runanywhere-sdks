@@ -111,8 +111,10 @@ expect_requires "rcli macOS (asserts neurt registers)" \
 # Android: QHexRT .so is staged into all three Android SDKs from one build.
 expect_requires "android packaging (QHexRT jniLibs, all 3 SDKs)" \
     "scripts/build/build-core-android.sh" "KOTLIN_QHEXRT_DEST"
-expect_requires "android release asserts the QHexRT carrier ships" \
-    ".github/workflows/release.yml" "librunanywhere_qhexrt.so"
+# Single-quoted: the pattern must reach grep literally. Double quotes would let
+# bash expand $jni here and abort under `set -u`.
+expect_requires "android release asserts the QHexRT carrier is routable" \
+    ".github/workflows/release.yml" 'check_plugin_natives.py "$jni"'
 
 # No consumer may point at a hand-staged payload by absolute path again.
 echo "== no hand-staged payload paths =="
