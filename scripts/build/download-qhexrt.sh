@@ -133,9 +133,19 @@ if [[ -e "${PREBUILT}/current" && ! -L "${PREBUILT}/current" ]]; then
     echo "[ERROR] ${PREBUILT}/current exists and is not a symlink; refusing to replace it." >&2
     exit 1
 fi
-tmplink="${PREBUILT}/.current.$$"
-ln -s "versions/${EXPECTED_RECEIPT}" "$tmplink"
-mv -f "$tmplink" "${PREBUILT}/current"
+# os.replace, not `mv`: `mv tmp current` FOLLOWS an existing symlink-to-directory
+# and moves the temp link INSIDE the old target, leaving `current` unchanged. That
+# silently kept the previously selected ABI while reporting success. os.replace
+# operates on the link itself and is atomic, so a reader never sees no selection.
+python3 - "$PREBUILT" "$EXPECTED_RECEIPT" <<'PYSWAP'
+import os, sys
+prebuilt, receipt = sys.argv[1], sys.argv[2]
+tmp = os.path.join(prebuilt, f".current.{os.getpid()}")
+if os.path.lexists(tmp):
+    os.remove(tmp)
+os.symlink(os.path.join("versions", receipt), tmp, target_is_directory=True)
+os.replace(tmp, os.path.join(prebuilt, "current"))
+PYSWAP
 
 # ---- prove the SDK will accept it -------------------------------------------
 # The same validator the build preflight runs. Catching a bad payload here beats
