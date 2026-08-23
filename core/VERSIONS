@@ -307,3 +307,31 @@ LIBARCHIVE_VERSION=3.8.7
 # RAC Commons Version (for remote builds/CI)
 # =============================================================================
 RAC_COMMONS_VERSION=0.1.1
+
+# =============================================================================
+# NeuRT (the Apple Neural Engine engine — built and published by the PRIVATE
+# `neurun` repo, consumed here as prebuilt archives)
+# =============================================================================
+# This is a repo boundary, pinned the same way sherpa-onnx is: a release tag plus
+# a SHA-256 per artifact. Nothing here needs neurun's source.
+#
+# It used to. engines/neurt/CMakeLists.txt resolved a NEURT_ROOT checkout of that
+# PRIVATE repo and regex-parsed its root CMakeLists.txt to recover a source list —
+# so this repo's Apple release could only be built by someone holding it, and a
+# stray `)` in a comment over there silently dropped a source file here.
+#
+# NEURT_RAC_ABI_VERSION must equal RAC_PLUGIN_API_VERSION in
+# core/include/rac/plugin/rac_plugin_entry.h. The downloader enforces it against
+# each archive's RECEIPT.json. That check is the whole safety argument for linking
+# binaries built in another repo: a vtable-layout change relinks cleanly and
+# corrupts dispatch at runtime, and a static archive resolves no symbols, so
+# nothing else would catch it.
+#
+# To bump: cut a neurun release, then copy the pin block from its release notes
+# (neurun's package-rac-dist.sh prints exactly these lines).
+NEURT_REPO=RunanywhereAI/neurun
+NEURT_RELEASE_TAG=v0.20.26
+NEURT_RAC_ABI_VERSION=9
+NEURT_MACOS_ARM64_SHA256=cde625d0d521d202634a0709a9228edf940fe73e1b640782f707efd465eb4e42
+NEURT_IOS_ARM64_SHA256=afc21c4fd448d1593d4c411f90f48d113cedcc6f65c090e4d3a75141b70aef2b
+NEURT_IOS_ARM64_SIMULATOR_SHA256=43f245b110e820dd839f29d10691b5cda5da671de74289f6fe479053aa046a38
