@@ -16,6 +16,9 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _selection  # noqa: E402  (path set above so this works when run directly)
+
 
 ABSENT = 3
 # neurun names the MSVC/Windows-on-ARM ABI dir "win-arm64" (see its
@@ -48,7 +51,7 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     if prebuilt.exists() and not prebuilt.is_dir():
         raise RuntimeError(f"QHexRT prebuilt root must be a directory: {prebuilt}")
     current = prebuilt / "current"
-    if not current.exists() and not current.is_symlink():
+    if not current.exists() and not _selection.is_selection(current):
         legacy = [prebuilt / "include", prebuilt / "lib", prebuilt / "qhexrt-prebuilt.json"]
         if any(path.exists() or path.is_symlink() for path in legacy):
             raise RuntimeError(
@@ -58,9 +61,13 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
         # Immutable versions without `current` are retained history, not a
         # selected build input; public/stub mode is intentional.
         return None
-    if not current.is_symlink():
-        raise RuntimeError(f"QHexRT prebuilt/current must be an atomic symlink: {current}")
-    raw_target = os.readlink(current)
+    # Windows selects with a junction, not a symlink -- the runner service
+    # account cannot create symlinks. See scripts/build/_selection.py.
+    if not _selection.is_selection(current):
+        raise RuntimeError(
+            f"QHexRT prebuilt/current must be an atomic {_selection.describe_kind()}: {current}"
+        )
+    raw_target = _selection.read_target(prebuilt, current)
     target_parts = PurePosixPath(raw_target).parts
     if (
         len(target_parts) != 2
@@ -69,7 +76,7 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     ):
         raise RuntimeError("QHexRT prebuilt/current must directly name versions/<64-hex-receipt>")
     selected_entry = prebuilt / raw_target
-    if selected_entry.is_symlink():
+    if _selection.is_selection(selected_entry):
         raise RuntimeError("QHexRT selected immutable version must not be a symlink")
     try:
         selected = current.resolve(strict=True)
@@ -177,8 +184,8 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     if not isinstance(system, dict) or set(system) != {
         "name", "processor", "crosscompiling", "state_file_sha256"
     } or system.get("name") != ("Windows" if _is_win else "Android") \
-         or system.get("processor") not in ({"ARM64", "arm64", "aarch64"} if _is_win
-                                            else {"aarch64", "arm64"}):
+         or (system.get("processor") or "").lower() not in ({"arm64", "aarch64"} if _is_win
+                                                            else {"aarch64", "arm64"}):
         raise RuntimeError(
             f"QHexRT current selection has an invalid "
             f"{'Windows' if _is_win else 'Android'} system identity")

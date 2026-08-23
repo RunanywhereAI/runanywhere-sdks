@@ -56,37 +56,44 @@ if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_NEURT}" != "ON" ]; th
     exit 1
 fi
 
-# RAC_BACKEND_NEURT=ON no longer implies a WORKING engine. Without the sibling `neurun` checkout
-# the engine now builds as a non-routable shell (engines/neurt/CMakeLists.txt) instead of failing
-# configure — which is what lets CI build the Apple targets at all, since neurun is a separate
-# PRIVATE repo. But PACKAGING that shell would ship a Swift SDK whose ANE engine refuses every
-# registration, silently and with no build error. That is the one place the old hard failure was
-# genuinely protecting something, so the check moves here rather than disappearing.
+# RAC_BACKEND_NEURT=ON does not imply a WORKING engine: without a prebuilt slice the
+# engine builds as a non-routable shell. Packaging that shell would ship a Swift SDK
+# whose ANE engine refuses every registration, silently and with no build error — so
+# the check lives here, at the packaging step, rather than failing configure.
 #
-# CI sets RAC_ALLOW_NEURT_STUB=1: it only needs to prove the build compiles and links.
+# CI sets RAC_ALLOW_NEURT_STUB=1 when it only needs to prove the build compiles.
 if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
-    _neurt_root_probe="${NEURT_ROOT:-${REPO_ROOT}/../neurun}"
-    _neurt_required_paths=(
-        "${_neurt_root_probe}/CMakeLists.txt"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_stt_ops_neurt.cpp"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_diffusion_coreml.mm"
-    )
-    _neurt_missing_paths=()
-    for _neurt_required_path in "${_neurt_required_paths[@]}"; do
-        [ -f "${_neurt_required_path}" ] || _neurt_missing_paths+=("${_neurt_required_path}")
-    done
-    if [ "${#_neurt_missing_paths[@]}" -ne 0 ]; then
-        echo "error: packaging the Swift SDK requires a complete, routable NeuRT engine checkout." >&2
-        echo "  missing required path(s):" >&2
-        for _neurt_missing_path in "${_neurt_missing_paths[@]}"; do
-            echo "    ${_neurt_missing_path}" >&2
+    # Deliberately per-slice with NO override. NEURT_PREBUILT_ROOT is a SINGLE-slice
+    # root in engines/neurt/CMakeLists.txt, but packaging needs all three slices, so
+    # honouring it here would let one staged slice satisfy the guard for all three
+    # and silently package two non-routable stubs. The two meanings do not compose.
+    #
+    # Probe the COMPLETE set the engine requires, not a sentinel pair: a tree missing
+    # only one archive would otherwise pass here and fail later at link.
+    _neurt_missing=()
+    for _slice in macos-arm64 ios-arm64 ios-arm64-simulator; do
+        _root="${REPO_ROOT}/core/third_party/neurt/${_slice}"
+        for _rel in \
+            RECEIPT.json \
+            include/rac_diffusion_coreml.h \
+            lib/libneurt_core.a \
+            lib/libneurt_rac_llm_ops.a \
+            lib/libneurt_rac_stt_ops.a \
+            lib/libneurt_rac_diffusion.a
+        do
+            [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
         done
-        echo "  Set NEURT_ROOT=/path/to/neurun, or set RAC_ALLOW_NEURT_STUB=1 to package a" >&2
-        echo "  non-routable stub on purpose (build verification only — NOT shippable)." >&2
+    done
+    if [ "${#_neurt_missing[@]}" -ne 0 ]; then
+        echo "error: packaging the Swift SDK requires all three complete NeuRT slices." >&2
+        printf '    missing: %s\n' "${_neurt_missing[@]}" >&2
+        echo "  Run: scripts/build/download-neurt.sh --all   (needs NEURUN_TOKEN)" >&2
+        echo "  Or set RAC_ALLOW_NEURT_STUB=1 to package a non-routable stub on" >&2
+        echo "  purpose (build verification only - NOT shippable)." >&2
         exit 1
     fi
 fi
+
 COMMONS_HEADERS="${REPO_ROOT}/core/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"
@@ -855,7 +862,7 @@ merge_neurt_backend_slice() {
     # registers, but the ANE GENERATE_TEXT vtable slot cannot resolve at the
     # consumer's link. Nothing in this build reports it: every CMake target
     # compiles, the xcframework packages, and only an executable link fails.
-    # The two private archives exist ONLY in the routable build: without the neurun checkout
+    # The two private archives exist ONLY in the routable build: without the prebuilt
     # engines/neurt builds a non-routable shell and never creates rac_neurt_llm_ops /
     # rac_neurt_core. Listing them unconditionally makes prepare_archive_input() fail on a
     # missing file, which is precisely the stub build RAC_ALLOW_NEURT_STUB=1 exists to allow.

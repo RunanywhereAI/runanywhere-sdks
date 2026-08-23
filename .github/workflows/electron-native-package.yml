@@ -24,6 +24,9 @@ on:
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
+      # This workflow CALLS these: without them a fix to a downloader never
+      # triggers the lane that consumes it, and lands unverified.
+      - 'scripts/build/**'
       - '.github/workflows/electron-native-package.yml'
   pull_request:
     paths:
@@ -32,6 +35,7 @@ on:
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
+      - 'scripts/build/**'
       - '.github/workflows/electron-native-package.yml'
   workflow_dispatch: {}
   workflow_call:
@@ -108,7 +112,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # macOS: llamacpp + onnx + sherpa + neurt (Apple Neural Engine), all real —
   # sherpa is ON (the PR-smoke lane turns it OFF; this lane must not), and
-  # neurt is built from the real private neurun checkout, not the shell.
+  # neurt comes from the pinned prebuilt, not the shell.
   # ---------------------------------------------------------------------------
   native_macos:
     needs: validate
@@ -182,13 +186,13 @@ jobs:
           # check_plugin_natives.py treats an absent/empty NeuRT directory as
           # "nothing to verify" and exits 0 — correct on platforms where
           # NeuRT legitimately never builds, but on THIS job specifically (a
-          # real NEURUN_TOKEN, a real neurun checkout) it must always produce
+          # real NEURUN_TOKEN, a real prebuilt) it must always produce
           # a routable plugin. A silent empty pass here would hide a real
-          # regression (e.g. the neurun checkout failing) instead of failing
+          # regression (e.g. the NeuRT download failing) instead of failing
           # the build.
           neurt_backend="bindings/electron/packages/neurt/prebuilds/darwin-arm64/librac_backend_neurt.dylib"
           if [ ! -f "$neurt_backend" ]; then
-            echo "::error::NeuRT did not produce $neurt_backend on macOS — the neurun checkout or build silently failed."
+            echo "::error::NeuRT did not produce $neurt_backend on macOS — the prebuilt download or build silently failed."
             exit 1
           fi
 
@@ -292,22 +296,41 @@ jobs:
           if (!(Test-Path "$dir/arm64/node.lib")) { throw "node.lib missing under $dir/arm64" }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      # QHexRT arrives as a payload pinned in core/VERSIONS, fetched and verified
+      # here. This replaced a hardcoded path to a hand-staged tree on this machine,
+      # which had to be edited by hand whenever the receipt changed -- and had
+      # drifted from the published payload.
+      # PowerShell, because this step's job is to prove `bash` EXISTS. Installing Git
+      # for Windows puts Git\cmd (git.exe) on PATH but not Git\bin (bash.exe), so
+      # actions/checkout works while every `shell: bash` step dies with a bare
+      # "bash: command not found". The runner also caches its environment at start,
+      # so a machine PATH fix needs a service restart before any job sees it.
+      - name: Preflight the runner shell
+        shell: powershell
+        run: |
+          if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
+            Write-Output "::error::No bash on PATH. Add 'C:\Program Files\Git\bin' to the MACHINE Path, then RESTART the runner service (it caches its environment at start)."
+            exit 1
+          }
+          Write-Output "bash: $((Get-Command bash).Source)"
+
+      - name: Download the pinned QHexRT payload (win-arm64)
+        shell: bash
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/build/download-qhexrt.sh --abi win-arm64 || {
+            echo "::error::QHexRT payload unavailable; refusing to package a stub."
+            exit 1
+          }
+
       - name: Configure electron-win-arm64-vs2026 (QHexRT)
         shell: powershell
         env:
           # Staged once on this machine from the licensed QAIRT SDK — see
           # thoughts/shared/plans/electron_cicd_staging_url_and_npu_ane_pipeline.md
           # for how it was produced. Persistent self-hosted state on purpose:
-          # re-deriving it from the raw QAIRT SDK on every ephemeral run is
-          # not the point of self-hosting a licensed-toolchain lane.
-          #
-          # The directory name MUST be the receipt's own build_receipt_sha256
-          # (engines/qhexrt/CMakeLists.txt verifies this self-identity check) —
-          # do not rename/alias this path to something friendlier, that is
-          # exactly the mistake that broke this the first time it was staged.
-          # If the receipt is ever regenerated with a new hash, this path must
-          # be updated to match.
-          QHEXRT_ROOT: 'C:\actions-runner-state\qhexrt-prebuilt\versions\f14ef0efb1da4b6a50e49f37a0ef55ac3b0bb7328aa7469edf78625ac4d79607'
           # RAC_DESKTOP_ADAPTER=ON (the preset default) needs libcurl; crypt32
           # is a system lib but curl is not, and there is no win-arm64 HTTP
           # transport without it (no downloads, no telemetry, no auth). Already
@@ -315,7 +338,7 @@ jobs:
           VCPKG_INSTALLATION_ROOT: 'C:\Users\san\vcpkg'
           NODE_DEV_DIR: ${{ steps.nodedev.outputs.dir }}
         run: |
-          cmake --preset electron-win-arm64-vs2026 -DQHEXRT_ROOT="$env:QHEXRT_ROOT" `
+          cmake --preset electron-win-arm64-vs2026 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=arm64-windows-static `
             -DRAC_NODE_DEV_DIR="$env:NODE_DEV_DIR"

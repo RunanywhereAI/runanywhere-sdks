@@ -89,7 +89,7 @@ all-NULL not-routable shell from `RAC_ENGINE_UNAVAILABLE_PLUGIN` (see below),
 whose `capability_check` returns `RAC_ERROR_BACKEND_UNAVAILABLE` so registration
 is *refused* rather than accepted-and-useless. This is what lets public CI build
 Android/Windows-ARM64 and Apple targets at all, since the QHexRT archive and the
-neurun checkout are both private repos/artifacts. Packaging still double-guards
+NeuRT prebuilt are both private artifacts. Packaging still double-guards
 neurt: `build-core-xcframework.sh` refuses to ship a stub unless
 `RAC_ALLOW_NEURT_STUB=1`.
 

@@ -166,7 +166,11 @@ jobs:
     # skipping publish). Raised to 150 to absorb runner variance.
     timeout-minutes: 150
     steps:
+      # This job holds NEURUN_TOKEN and runs gh plus build scripts; do not leave
+      # GITHUB_TOKEN in .git/config for every later step.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # NeuRT arrives as prebuilt archives pinned in core/VERSIONS. Exit 3 means
       # "no token", which is right for a fork PR and catastrophic for a release:
       # a stub registers, claims Apple availability and serves nothing.
@@ -179,14 +183,17 @@ jobs:
           # degrades to the non-routable shell. A RELEASE must never do that: a
           # stub would ship an engine that registers, claims Apple availability and
           # serves nothing. Treat 3 as fatal here specifically.
-          if ! bash scripts/build/download-neurt.sh --all; then
-            rc=$?
-            if [[ $rc -eq 3 ]]; then
-              echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
-              echo "::error::A release must ship the real Apple engine. Refusing."
-            fi
+          # Capture the status directly. Inside `if ! cmd`, $? is the status of the
+          # NEGATION, so it is always 0 and the exit-3 branch was dead code -- the
+          # job failed but never printed why.
+          rc=0
+          bash scripts/build/download-neurt.sh --all || rc=$?
+          if [[ "$rc" -eq 3 ]]; then
+            echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
+            echo "::error::A release must ship the real Apple engine. Refusing."
             exit 1
           fi
+          [[ "$rc" -eq 0 ]] || exit "$rc"
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -238,6 +245,26 @@ jobs:
       # missing it, which failed configure with "Sherpa-ONNX not found".
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash core/scripts/android/download-sherpa-onnx.sh
+      # arm64-v8a is the only Android ABI with a Hexagon NPU, so it is the only
+      # one with a QHexRT payload. build-core-android.sh runs
+      # validate-qhexrt-prebuilt.py and enables the engine only when a valid
+      # payload is selected; exit 3 (nothing selected) leaves it OFF, which is
+      # the correct public-build outcome. Without this fetch that was ALWAYS the
+      # outcome, so released Android artifacts carried the non-routable shell.
+      - name: Download the pinned QHexRT payload (arm64-v8a only)
+        if: matrix.abi == 'arm64-v8a'
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          rc=0
+          bash scripts/build/download-qhexrt.sh --abi arm64-v8a || rc=$?
+          if [[ "$rc" -eq 3 ]]; then
+            echo "::error::No NEURUN_TOKEN, so Android would ship the QHexRT shell."
+            exit 1
+          fi
+          [[ "$rc" -eq 0 ]] || exit "$rc"
+
       - name: Build + package commons for Android (${{ matrix.abi }})
         # build-android.sh delegates the build to build-core-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
@@ -246,6 +273,32 @@ jobs:
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: bash core/scripts/build-android.sh ${{ matrix.abi }}
+      # build-core-android.sh stages engine .so files with copy_if_exists, which
+      # SILENTLY no-ops when the lib was never built -- the same guarded-copy pattern
+      # that shipped Windows with zero engines for several releases. A failed QHexRT
+      # fetch would otherwise produce a green Android release with no NPU engine.
+      #
+      # Assert against the KOTLIN MODULE jniLibs, not the public RACommons zip:
+      # QHexRT is deliberately absent from the public asset set (this workflow
+      # hard-fails on any *qhexrt* file reaching release-flat) and ships through the
+      # Maven publication instead.
+      - name: Assert the QHexRT carrier is present and routable (arm64-v8a)
+        if: matrix.abi == 'arm64-v8a'
+        run: |
+          set -euo pipefail
+          jni="bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a"
+          if [[ ! -f "$jni/librunanywhere_qhexrt.so" ]]; then
+            echo "::error::librunanywhere_qhexrt.so is absent from $jni."
+            echo "::error::Android would ship without the Hexagon NPU engine. Check the"
+            echo "::error::QHexRT download step and validate-qhexrt-prebuilt.py's verdict."
+            ls -la "$(dirname "$jni")" 2>/dev/null || true
+            exit 1
+          fi
+          # Presence is not routability: a stub carrier has the same filename. This
+          # is the same detector the Linux/Windows/Electron lanes use.
+          python3 scripts/validation/gates/check_plugin_natives.py "$jni"
+          echo "QHexRT carrier present and routable in $jni"
+
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v7
         with:

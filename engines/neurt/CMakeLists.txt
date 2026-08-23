@@ -76,11 +76,22 @@ if(NEURT_PREBUILT_ROOT)
     # The receipt check is the safety argument for linking binaries built
     # elsewhere: a vtable-layout change relinks cleanly and corrupts dispatch at
     # runtime, and a static archive resolves no symbols, so nothing else catches it.
+    # CMAKE_MATCH_1 is GLOBAL and STALE on a failed match: it keeps the previous
+    # match's capture. Reading it without checking the match variable would let a
+    # failed second regex silently reuse the first one's value -- and since both
+    # patterns capture the same ABI number, that produces a FALSE PASS rather than
+    # an error. Check each match before using its capture.
     file(READ "${NEURT_PREBUILT_ROOT}/RECEIPT.json" _neurt_receipt)
     string(REGEX MATCH "\"rac_plugin_api_version\"[ \t]*:[ \t]*([0-9]+)" _m "${_neurt_receipt}")
+    if(_m STREQUAL "")
+        message(FATAL_ERROR "NeuRT receipt has no rac_plugin_api_version: ${NEURT_PREBUILT_ROOT}/RECEIPT.json")
+    endif()
     set(_neurt_receipt_abi "${CMAKE_MATCH_1}")
     file(READ "${RAC_COMMONS_ROOT_DIR}/include/rac/plugin/rac_plugin_entry.h" _rac_entry_hdr)
     string(REGEX MATCH "#define[ \t]+RAC_PLUGIN_API_VERSION[ \t]+([0-9]+)" _m2 "${_rac_entry_hdr}")
+    if(_m2 STREQUAL "")
+        message(FATAL_ERROR "Could not find RAC_PLUGIN_API_VERSION in rac_plugin_entry.h")
+    endif()
     set(_neurt_local_abi "${CMAKE_MATCH_1}")
     if(NOT _neurt_receipt_abi OR NOT _neurt_local_abi)
         message(FATAL_ERROR "Could not read the plugin ABI version from the NeuRT receipt "

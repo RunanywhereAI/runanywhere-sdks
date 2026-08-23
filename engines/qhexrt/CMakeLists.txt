@@ -238,14 +238,33 @@ if(NOT _qhexrt_root_explicit AND EXISTS "${QHEXRT_ROOT}" AND NOT IS_SYMLINK "${Q
 endif()
 if(NOT _qhexrt_root_explicit AND IS_SYMLINK "${QHEXRT_ROOT}")
     file(READ_SYMLINK "${QHEXRT_ROOT}" _qhexrt_current_target)
-    get_filename_component(_qhexrt_current_name "${_qhexrt_current_target}" NAME)
-    string(LENGTH "${_qhexrt_current_name}" _qhexrt_current_name_length)
-    if(NOT _qhexrt_current_target MATCHES "^versions/[0-9a-f]+$" OR
-       NOT _qhexrt_current_name_length EQUAL 64)
-        message(FATAL_ERROR "QHexRT current must directly name versions/<64-hex-receipt>")
-    endif()
     get_filename_component(_qhexrt_current_parent "${QHEXRT_ROOT}" DIRECTORY)
-    set(_qhexrt_selected_entry "${_qhexrt_current_parent}/${_qhexrt_current_target}")
+    # Windows selects with a junction, because the runner service account cannot
+    # create symlinks. CMake does report a junction as IS_SYMLINK, but
+    # READ_SYMLINK hands back its ABSOLUTE target (optionally \\?\-prefixed),
+    # so normalize to the relative form both platforms then share.
+    # scripts/build/_selection.py is the reference implementation.
+    string(REPLACE "\\" "/" _qhexrt_current_target "${_qhexrt_current_target}")
+    string(REGEX REPLACE "^//[?.]/" "" _qhexrt_current_target "${_qhexrt_current_target}")
+    # Check the last two components rather than converting to a relative path:
+    # file(RELATIVE_PATH) rejects a drive-letter path on a POSIX host, and
+    # IS_ABSOLUTE is host-relative too, so either would leave this branch
+    # untestable off-Windows. The path actually used below is REBUILT from
+    # _qhexrt_current_parent and the receipt name, never the raw link text, so a
+    # target pointing outside this tree cannot smuggle in a different payload.
+    get_filename_component(_qhexrt_current_name "${_qhexrt_current_target}" NAME)
+    get_filename_component(_qhexrt_current_dir "${_qhexrt_current_target}" DIRECTORY)
+    get_filename_component(_qhexrt_current_dir_name "${_qhexrt_current_dir}" NAME)
+    string(LENGTH "${_qhexrt_current_name}" _qhexrt_current_name_length)
+    if(NOT _qhexrt_current_dir_name STREQUAL "versions" OR
+       NOT _qhexrt_current_name MATCHES "^[0-9a-f]+$" OR
+       NOT _qhexrt_current_name_length EQUAL 64)
+        message(FATAL_ERROR
+            "QHexRT current must directly name versions/<64-hex-receipt>, got: "
+            "${_qhexrt_current_target}")
+    endif()
+    set(_qhexrt_selected_entry
+        "${_qhexrt_current_parent}/versions/${_qhexrt_current_name}")
     if(IS_SYMLINK "${_qhexrt_selected_entry}" OR NOT IS_DIRECTORY "${_qhexrt_selected_entry}")
         message(FATAL_ERROR "QHexRT current target must be a real immutable version directory")
     endif()
