@@ -45,20 +45,102 @@ endif()
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
 # ---------------------------------------------------------------------------
+# PREBUILT MODE — the normal path. Link archives published by the private
+# `neurun` repo instead of compiling its source.
+#
+# This is the boundary described in core/VERSIONS::NEURT_*. neurun builds its own
+# code and publishes per-slice archives to a private GitHub Release;
+# scripts/build/download-neurt.sh fetches and verifies them into
+# third_party/neurt/<slice>/. Nothing here needs neurun's source or its checkout.
+#
+# WHY THIS REPLACED SOURCE MODE. Source mode resolved a NEURT_ROOT checkout of a
+# PRIVATE repo and then REGEX-PARSED neurun's root CMakeLists.txt to recover
+# neurt_core's source list. Two consequences: only someone holding that private
+# repo could build this repo's Apple release, and a stray `)` inside a comment
+# over there silently dropped NeuRT/src/neurt_c.cpp from this build. Source mode
+# is kept below for local engine development, but it is no longer how releases
+# are built.
+# ---------------------------------------------------------------------------
+set(_neurt_slice "")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # macOS-arm64 and the iOS simulator are BOTH arm64 but carry different
+    # platform load commands; the linker rejects a mismatch. Never collapse them.
+    if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+        set(_neurt_slice "ios-arm64-simulator")
+    else()
+        set(_neurt_slice "ios-arm64")
+    endif()
+elseif(APPLE)
+    set(_neurt_slice "macos-arm64")
+endif()
+
+if(NOT DEFINED NEURT_PREBUILT_ROOT AND DEFINED ENV{NEURT_PREBUILT_ROOT})
+    set(NEURT_PREBUILT_ROOT "$ENV{NEURT_PREBUILT_ROOT}")
+endif()
+if(NOT DEFINED NEURT_PREBUILT_ROOT AND _neurt_slice)
+    # core/third_party/ — already gitignored, and where every other vendored download
+    # lands (sherpa-onnx, onnxruntime). Kept in sync with download-neurt.sh's DEST_ROOT.
+    set(_neurt_prebuilt_candidate "${RAC_COMMONS_ROOT_DIR}/third_party/neurt/${_neurt_slice}")
+    if(EXISTS "${_neurt_prebuilt_candidate}/RECEIPT.json")
+        set(NEURT_PREBUILT_ROOT "${_neurt_prebuilt_candidate}")
+    endif()
+endif()
+
+set(_neurt_prebuilt FALSE)
+if(NEURT_PREBUILT_ROOT)
+    set(_neurt_prebuilt TRUE)
+    foreach(_probe
+            "${NEURT_PREBUILT_ROOT}/RECEIPT.json"
+            "${NEURT_PREBUILT_ROOT}/include/rac_diffusion_coreml.h"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_core.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_llm_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_stt_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_diffusion.a")
+        if(NOT EXISTS "${_probe}")
+            message(FATAL_ERROR
+                "NEURT_PREBUILT_ROOT=${NEURT_PREBUILT_ROOT} is incomplete: ${_probe} is missing. "
+                "Re-run scripts/build/download-neurt.sh --slice ${_neurt_slice} --force.")
+        endif()
+    endforeach()
+
+    # Re-check the ABI receipt HERE as well as in the downloader. The downloader is
+    # the normal path, but a hand-placed or hand-edited tree never passed through it,
+    # and this is the last point before the archives are linked. A vtable-layout
+    # mismatch links cleanly and corrupts dispatch at runtime — a static archive
+    # resolves no symbols, so nothing downstream would catch it.
+    file(READ "${NEURT_PREBUILT_ROOT}/RECEIPT.json" _neurt_receipt)
+    string(REGEX MATCH "\"rac_plugin_api_version\"[ \t]*:[ \t]*([0-9]+)" _m "${_neurt_receipt}")
+    set(_neurt_receipt_abi "${CMAKE_MATCH_1}")
+    file(READ "${RAC_COMMONS_ROOT_DIR}/include/rac/plugin/rac_plugin_entry.h" _rac_entry_hdr)
+    string(REGEX MATCH "#define[ \t]+RAC_PLUGIN_API_VERSION[ \t]+([0-9]+)" _m2 "${_rac_entry_hdr}")
+    set(_neurt_local_abi "${CMAKE_MATCH_1}")
+    if(NOT _neurt_receipt_abi OR NOT _neurt_local_abi)
+        message(FATAL_ERROR
+            "Could not read the plugin ABI version from the NeuRT receipt "
+            "(${_neurt_receipt_abi}) or rac_plugin_entry.h (${_neurt_local_abi}).")
+    endif()
+    if(NOT _neurt_receipt_abi STREQUAL _neurt_local_abi)
+        message(FATAL_ERROR
+            "NeuRT prebuilt was compiled against RAC_PLUGIN_API_VERSION=${_neurt_receipt_abi}, "
+            "but this repo is at ${_neurt_local_abi}. Cut a new neurun release and re-pin "
+            "core/VERSIONS::NEURT_RELEASE_TAG.")
+    endif()
+
+    message(STATUS "  neurt: PREBUILT ${_neurt_slice} (ABI ${_neurt_receipt_abi}) from ${NEURT_PREBUILT_ROOT}")
+endif()
+
+# ---------------------------------------------------------------------------
 # NEURT_ROOT — the sibling `neurun` checkout that implements this engine.
+#
+# LOCAL ENGINE DEVELOPMENT ONLY. Releases use prebuilt mode above. This path is
+# what you want when changing NeuRT itself and iterating without cutting a
+# neurun release each time.
 #
 # Discovery is by PATH, not by a hardcoded sibling: set -DNEURT_ROOT=<neurun>
 # (or export NEURT_ROOT). Walk to it by MARKER (Makefile + CMakeLists.txt),
 # never by counting `../` hops — a hop count silently resolves to the wrong
 # directory the moment a level is inserted (neurun KB:
 # depth-1-globs-break-on-reorg).
-#
-# Unlike the previous `coreml` engine, a MISSING neurun is now a hard error
-# rather than a silent degrade. It has to be: BOTH of this engine's modalities
-# are implemented over there now, so without it there is no engine left to
-# build — and a silent degrade would produce an engine that registers, claims
-# Apple availability, and then serves nothing. Build without the Apple engine
-# explicitly (-DRAC_BACKEND_NEURT=OFF) if you do not have the checkout.
 # ---------------------------------------------------------------------------
 if(NOT DEFINED NEURT_ROOT AND DEFINED ENV{NEURT_ROOT})
     set(NEURT_ROOT "$ENV{NEURT_ROOT}")
@@ -77,17 +159,26 @@ set(_neurt_required_paths
     "${_neurt_sdk_dir}/rac_stt_ops_neurt.cpp"
     "${_neurt_sdk_dir}/rac_diffusion_coreml.mm")
 
-set(_neurt_available FALSE)
+# Source mode is only consulted when there is no prebuilt. Prebuilt WINS: it is the
+# release path, and silently preferring a developer's local checkout over the pinned,
+# checksum-verified archives would make a release depend on whatever happened to be on
+# the build machine.
+set(_neurt_from_source FALSE)
 set(_neurt_missing_required_path "")
-if(NEURT_ROOT)
-    set(_neurt_available TRUE)
+if(NOT _neurt_prebuilt AND NEURT_ROOT)
+    set(_neurt_from_source TRUE)
     foreach(_neurt_required_path IN LISTS _neurt_required_paths)
         if(NOT EXISTS "${_neurt_required_path}")
-            set(_neurt_available FALSE)
+            set(_neurt_from_source FALSE)
             set(_neurt_missing_required_path "${_neurt_required_path}")
             break()
         endif()
     endforeach()
+endif()
+
+set(_neurt_available FALSE)
+if(_neurt_prebuilt OR _neurt_from_source)
+    set(_neurt_available TRUE)
 endif()
 
 # Exported because consumers OUTSIDE this directory must distinguish "the engine target exists"
@@ -127,13 +218,55 @@ if(NOT _neurt_available)
         message(STATUS "  neurt: missing required path: ${_neurt_missing_required_path}")
     endif()
     message(STATUS
-        "  neurt: pass -DNEURT_ROOT=/path/to/neurun for the full Apple engine.")
+        "  neurt: run scripts/build/download-neurt.sh --slice ${_neurt_slice} for the real "
+        "engine (needs NEURUN_TOKEN), or pass -DNEURT_ROOT=/path/to/neurun to build it "
+        "from source.")
 endif()
 
-if(_neurt_available)
+if(_neurt_prebuilt)
+
+# ---------------------------------------------------------------------------
+# Prebuilt: import the published archives as IMPORTED targets.
+#
+# The target NAMES are identical to source mode's, so everything below this block
+# — the plugin target, its link list, the packaging — is mode-agnostic and there
+# is no second code path to keep in sync.
+#
+# No prefix-maps are needed: neurun applies them at compile time, and its
+# packaging script refuses to publish an archive that leaks a host path. That is
+# load-bearing for this repo, whose xcframework packaging runs
+# sanitize_and_validate_archive_host_paths and rejects any `/Users/` marker.
+# ---------------------------------------------------------------------------
+add_library(rac_neurt_core STATIC IMPORTED GLOBAL)
+set_target_properties(rac_neurt_core PROPERTIES
+    IMPORTED_LOCATION "${NEURT_PREBUILT_ROOT}/lib/libneurt_core.a"
+    INTERFACE_COMPILE_DEFINITIONS "QHEXRT_HAVE_COREML=1")
+target_link_libraries(rac_neurt_core INTERFACE "-framework CoreML" "-framework Foundation")
+
+foreach(_pair "rac_neurt_llm_ops:libneurt_rac_llm_ops.a"
+              "rac_neurt_stt_ops:libneurt_rac_stt_ops.a"
+              "rac_neurt_diffusion:libneurt_rac_diffusion.a")
+    string(REPLACE ":" ";" _parts "${_pair}")
+    list(GET _parts 0 _tgt)
+    list(GET _parts 1 _archive)
+    add_library(${_tgt} STATIC IMPORTED GLOBAL)
+    set_target_properties(${_tgt} PROPERTIES
+        IMPORTED_LOCATION "${NEURT_PREBUILT_ROOT}/lib/${_archive}")
+    target_link_libraries(${_tgt} INTERFACE rac_neurt_core)
+endforeach()
+
+# Source mode compiles rac_diffusion_coreml.mm into rac_backend_neurt itself; in
+# prebuilt mode it arrives as its own archive, so the plugin links it instead.
+set(_neurt_prefix_maps "")
+
+elseif(_neurt_from_source)
 
 # ---------------------------------------------------------------------------
 # rac_neurt_core — NeuRT's runtime, compiled from neurun's own source list.
+#
+# LOCAL DEVELOPMENT PATH. Releases take the prebuilt branch above. Everything in
+# this branch — including the CMakeLists parse below — exists so a NeuRT change
+# can be iterated on without cutting a neurun release first.
 #
 # The list is DERIVED from neurun's root CMakeLists.txt rather than copied, so
 # the two cannot drift: neurun owns `neurt_core` (its `add_library(neurt_core
@@ -288,7 +421,15 @@ endif()  # _neurt_available
 #         `rac_registry_load_plugin(librunanywhere_neurt.*)` actually installs
 #         the vtable into the registry.
 # ---------------------------------------------------------------------------
-if(_neurt_available)
+if(_neurt_prebuilt)
+    # Only the public plugin entry compiles here. rac_diffusion_coreml.mm arrives
+    # as an archive, and its header comes from the prebuilt include dir — the ONE
+    # private header this repo needs, and it includes nothing but public SDK headers.
+    set(NEURT_SOURCES rac_plugin_entry_neurt.cpp)
+    set(_neurt_extra_includes ${NEURT_PREBUILT_ROOT}/include)
+    set(_neurt_generate_available 1)
+    set(_neurt_extra_links rac_neurt_llm_ops rac_neurt_stt_ops rac_neurt_diffusion)
+elseif(_neurt_from_source)
     set(NEURT_SOURCES
         ${_neurt_sdk_dir}/rac_diffusion_coreml.mm
         rac_plugin_entry_neurt.cpp
@@ -366,6 +507,14 @@ endif()
 
 message(STATUS "neurt engine Configuration:")
 message(STATUS "  Engine: neurt (ANE LLM + CoreML diffusion, both implemented in NeuRT)")
-message(STATUS "  NEURT_ROOT:   ${NEURT_ROOT}")
-message(STATUS "  NeuRT core:   ${_neurt_core_sources}")
+if(_neurt_prebuilt)
+    message(STATUS "  Mode:     PREBUILT (${_neurt_slice}, ABI ${_neurt_receipt_abi})")
+    message(STATUS "  Archives: ${NEURT_PREBUILT_ROOT}/lib")
+elseif(_neurt_from_source)
+    message(STATUS "  Mode:       SOURCE (local development)")
+    message(STATUS "  NEURT_ROOT: ${NEURT_ROOT}")
+    message(STATUS "  NeuRT core: ${_neurt_core_sources}")
+else()
+    message(STATUS "  Mode:     SHELL (not routable)")
+endif()
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME} (Apple-only)")

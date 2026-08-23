@@ -309,6 +309,34 @@ LIBARCHIVE_VERSION=3.8.7
 RAC_COMMONS_VERSION=0.1.1
 
 # =============================================================================
+# NeuRT (the Apple Neural Engine engine — built and published by the PRIVATE
+# `neurun` repo, consumed here as prebuilt archives)
+# =============================================================================
+# This is a repo boundary, pinned the same way sherpa-onnx is: a release tag plus
+# a SHA-256 per artifact. Nothing here needs neurun's source.
+#
+# It used to. engines/neurt/CMakeLists.txt resolved a NEURT_ROOT checkout of that
+# PRIVATE repo and regex-parsed its root CMakeLists.txt to recover a source list —
+# so this repo's Apple release could only be built by someone holding it, and a
+# stray `)` in a comment over there silently dropped a source file here.
+#
+# NEURT_RAC_ABI_VERSION must equal RAC_PLUGIN_API_VERSION in
+# core/include/rac/plugin/rac_plugin_entry.h. The downloader enforces it against
+# each archive's RECEIPT.json. That check is the whole safety argument for linking
+# binaries built in another repo: a vtable-layout change relinks cleanly and
+# corrupts dispatch at runtime, and a static archive resolves no symbols, so
+# nothing else would catch it.
+#
+# To bump: cut a neurun release, then copy the pin block from its release notes
+# (neurun's package-rac-dist.sh prints exactly these lines).
+NEURT_REPO=RunanywhereAI/neurun
+NEURT_RELEASE_TAG=v0.20.26
+NEURT_RAC_ABI_VERSION=9
+NEURT_MACOS_ARM64_SHA256=cde625d0d521d202634a0709a9228edf940fe73e1b640782f707efd465eb4e42
+NEURT_IOS_ARM64_SHA256=afc21c4fd448d1593d4c411f90f48d113cedcc6f65c090e4d3a75141b70aef2b
+NEURT_IOS_ARM64_SIMULATOR_SHA256=43f245b110e820dd839f29d10691b5cda5da671de74289f6fe479053aa046a38
+
+# =============================================================================
 # QHexRT (the Qualcomm Hexagon NPU engine — built and published by the PRIVATE
 # `neurun` repo, consumed here as a prebuilt payload)
 # =============================================================================
@@ -331,5 +359,5 @@ QHEXRT_REPO=RunanywhereAI/neurun
 QHEXRT_RELEASE_TAG=v0.20.26
 QHEXRT_ARM64_V8A_SHA256=677730d8fc609535e1ddc81862f655776694a8a1e1dc9490cb5bb75522dcc77b
 QHEXRT_ARM64_V8A_RECEIPT=96dac84e1789bc1091d39d721500f73fef8bd37620ab55b14e62bb8002be476e
-QHEXRT_WIN_ARM64_SHA256=4baf0b40cefed3d96f0cd5710612e8725fd91f3c2221967a01b3c757cd0c68bd
-QHEXRT_WIN_ARM64_RECEIPT=1d19beb725d5cc24e3124ac85bae0f7c901c22e26fe31808349536629de73f14
+QHEXRT_WIN_ARM64_SHA256=a7c7dc3e03f89de5f7a61b7676d8859db183ae893e5ad4aa5304d0221a564754
+QHEXRT_WIN_ARM64_RECEIPT=613e23d3bbfc8d51cddb2d826b9568f8bb9210cf3e573c6d913e5c5b967b20e3

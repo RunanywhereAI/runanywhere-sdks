@@ -66,7 +66,7 @@ this tree — don't resurrect one from old docs/memory.
 | **sherpa** | STT + TTS + VAD | Sherpa-ONNX C API (prebuilt, bundles its own ORT) | 3 (bundled-lib) | ON | priority 90. Declares `RAC_RUNTIME_CPU`. Offline recognizer; VAD is Silero-style. Routable only when `SHERPA_ONNX_AVAILABLE` + `RAC_SHERPA_SPEECH_OPS_AVAILABLE`. |
 | **onnx** | SEGMENT + DIARIZE (always) + EMBED (when `RAC_BACKEND_RAG`) | ONNX Runtime via `runtimes/onnxrt`'s `Session` class | 2 | ON | priority 50. Declares `RAC_RUNTIME_ONNXRT`. STT/TTS/VAD are sherpa's, not onnx's. |
 | **cloud** | STT | none — HTTP to a provider (Sarvam today) | 3 (no runtime) | ON | priority 50, modality-agnostic name. `runtimes = NULL` → never runtime-rejected. Provider chosen via `config_json["provider"]`. Multi-modality-ready. |
-| **neurt** | LLM + STT + DIFFUSION | **NeuRT** (sibling `neurun` repo): prebuilt Core ML LLM + ASR graphs on the Apple Neural Engine, plus our Stable-Diffusion pipeline on `MLModel` | 3 | ON (Apple) | priority 100, Apple-only, identity-named. Kept **below** mlx's 110 on purpose: ANE models arrive by `rac_plugin_find_for_engine` name pin, not priority. Needs the neurun checkout (`NEURT_ROOT`) to be ROUTABLE — see the shell pattern below. |
+| **neurt** | LLM + STT + DIFFUSION | **NeuRT** (sibling `neurun` repo): prebuilt Core ML LLM + ASR graphs on the Apple Neural Engine, plus our Stable-Diffusion pipeline on `MLModel` | 3 | ON (Apple) | priority 100, Apple-only, identity-named. Kept **below** mlx's 110 on purpose: ANE models arrive by `rac_plugin_find_for_engine` name pin, not priority. ROUTABLE from **prebuilt archives** published by `neurun` and pinned in `core/VERSIONS` (`scripts/build/download-neurt.sh`); a `NEURT_ROOT` checkout is a local-development fallback and prebuilt deliberately wins over it. See the shell pattern below. |
 | **mlx** | LLM + STT + TTS + EMBED + VLM | our Swift `mlx-swift-lm` callback bridge (Apple MLX) | 1 | ON (Apple) | priority 110. PUBLIC availability but Apple-gated: `mlx_capability_check` silent-rejects non-Apple. Declares `RAC_RUNTIME_CPU` + `RAC_RUNTIME_METAL` as hints. `SHARED_ONLY`. |
 | **qhexrt** | LLM, VLM, STT, TTS, EMBED, DIFFUSION (six) when linked | private RunAnywhere QHexRT prebuilt archive | 1 (QNN-context bundles) | OFF | priority 150 when routable. Diffusion here is inpainting-only (LaMa) with host preprocessing around one QNN graph. Authorized Android arm64-v8a / Windows ARM64 builds link the archive under `QHEXRT_ROOT`. |
 
@@ -81,8 +81,10 @@ retired — the registry still rejects a manifest that declares wire value 6.
 ### Private/optional engines: the ROUTABLE-vs-STUB shell
 
 `qhexrt` and `neurt` both compile the **same public entry symbol** two ways,
-selected by a build-time availability macro (linked archive present, or
-`NEURT_ROOT` set): **ROUTABLE** (manifest + vtable filled for real) or **STUB**
+selected by a build-time availability macro (the private prebuilt archives are
+present — for `neurt`, downloaded to `core/third_party/neurt/<slice>/`; or, for
+local development only, `NEURT_ROOT` points at a neurun checkout):
+**ROUTABLE** (manifest + vtable filled for real) or **STUB**
 (the public default when the private archive/checkout is absent) — the shared
 all-NULL not-routable shell from `RAC_ENGINE_UNAVAILABLE_PLUGIN` (see below),
 whose `capability_check` returns `RAC_ERROR_BACKEND_UNAVAILABLE` so registration

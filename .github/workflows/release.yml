@@ -167,38 +167,42 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
-      # The NeuRT (Apple ANE) engine is implemented in the sibling private
-      # `neurun` repo. Unlike pr-build.yml (which sets RAC_ALLOW_NEURT_STUB=1 to
-      # prove compile/link), the release must build the REAL engine, so we check
-      # neurun out here and point NEURT_ROOT at it. Pinned to a commit so the
-      # published binaries stay reproducible and match the committed checksums.
-      # Requires a NEURUN_TOKEN secret (PAT/app token with read on RunanywhereAI/neurun).
-      - name: Checkout neurun (NeuRT engine source)
-        uses: actions/checkout@v7
-        with:
-          repository: RunanywhereAI/neurun
-          # Bumped from 1c44fd15 (2026-08-09), which no longer compiles: commons
-          # widened rac_llm_stream_callback_fn with `tokens_in_delta`, and that
-          # pin still passes 4 arguments. It failed `native_ios` at
-          # rac_llm_ops_neurt.cpp:301 and :325 with "too few arguments to
-          # function call, expected 5, have 4" for v0.20.15, v0.20.16 AND
-          # v0.20.17 — and because every packaging job needs native_ios, all
-          # three releases shipped ONLY the 9 hand-uploaded iOS zips. The
-          # Android/Linux/Windows/WASM commons, the rcli tarballs, the Kotlin
-          # Maven zip and the npm tgz assets were simply absent, which is why
-          # Flutter's `downloadNativeLibs` 404s on RACommons-android-*.zip.
-          # Verify a bump with a syntax-only compile before changing this:
-          #   clang++ -std=c++20 -fsyntax-only -DNEURT_WITH_RAC_HEADERS \
-          #     -Icore/include -I<neurun>/NeuRT/include -I<neurun>/NeuRT/src \
-          #     <neurun>/NeuRT/src/sdk/rac_llm_ops_neurt.cpp
-          # NEURT_WITH_RAC_HEADERS is required: without it the file compiles
-          # against its own mirrored typedefs and passes even when broken.
-          # Includes the NeuRT STT op table paired with SDK PR #710. Keeping
-          # the older LLM-only pin would make the release build fall back to a
-          # non-routable shell for TRANSCRIBE even though the SDK advertises it.
-          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
-          token: ${{ secrets.NEURUN_TOKEN }}
-          path: neurun
+      # The NeuRT (Apple ANE) engine is built and published by the sibling PRIVATE
+      # `neurun` repo. We link its published archives; we do not compile its source.
+      #
+      # This replaced a `checkout` of neurun pinned to a commit, plus a build that
+      # regex-parsed that repo's CMakeLists.txt for a source list. That arrangement
+      # broke three releases in a row: commons widened rac_llm_stream_callback_fn
+      # with `tokens_in_delta`, the pinned neurun commit still passed 4 arguments,
+      # and native_ios died at rac_llm_ops_neurt.cpp with "too few arguments to
+      # function call, expected 5, have 4" for v0.20.15, v0.20.16 AND v0.20.17.
+      # Because every packaging job needs native_ios, all three shipped iOS-only —
+      # 18 assets where a healthy release has 55+.
+      #
+      # A prebuilt cannot fail that way: neurun compiles the adapters against these
+      # headers in ITS OWN CI before publishing, and the archive carries a receipt
+      # naming the RAC_PLUGIN_API_VERSION it saw. The downloader refuses a mismatch
+      # here rather than discovering it mid-build.
+      #
+      # Pinned by tag + SHA-256 in core/VERSIONS (NEURT_RELEASE_TAG, NEURT_*_SHA256),
+      # exactly like sherpa-onnx. Needs NEURUN_TOKEN (read on RunanywhereAI/neurun).
+      - name: Download prebuilt NeuRT archives (all Apple slices)
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The downloader exits 3 when no token is present, so a public/fork build
+          # degrades to the non-routable shell. A RELEASE must never do that: a
+          # stub would ship an engine that registers, claims Apple availability and
+          # serves nothing. Treat 3 as fatal here specifically.
+          if ! bash scripts/build/download-neurt.sh --all; then
+            rc=$?
+            if [[ $rc -eq 3 ]]; then
+              echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
+              echo "::error::A release must ship the real Apple engine. Refusing."
+            fi
+            exit 1
+          fi
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -216,8 +220,10 @@ jobs:
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          # Build the real NeuRT engine from the checked-out neurun source.
-          NEURT_ROOT: ${{ github.workspace }}/neurun
+          # No NEURT_ROOT: the engine discovers the downloaded archives under
+          # core/third_party/neurt/<slice>/ and links them. Setting NEURT_ROOT here
+          # would be ignored anyway — prebuilt deliberately wins over source, so a
+          # release cannot silently depend on whatever checkout is on the runner.
         run: bash core/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7
