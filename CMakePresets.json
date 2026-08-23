@@ -285,7 +285,7 @@
         {
             "name": "electron-windows",
             "displayName": "Electron \u2014 Windows x64 thin addon (shared commons + dynamic plugins)",
-            "description": "Option A packaging on MSVC: rac_commons.dll + runanywhere_*.dll + thin runanywhere_native.node. Requires a Windows host (or CI windows-2022 runner) — not cross-compilable from macOS. Pass -DRAC_NODE_DEV_DIR=<node-gyp cache> after `npx node-gyp install`. Sherpa needs the Windows Sherpa-ONNX prebuilt; CI may override -DRAC_BACKEND_SHERPA=OFF when that archive is absent. See bindings/electron/docs/DEVELOPMENT.md (DELAYLOAD notes).",
+            "description": "Option A packaging on MSVC: rac_commons.dll + runanywhere_*.dll + thin runanywhere_native.node. Requires a Windows host (or CI windows-2022 runner) — not cross-compilable from macOS. Pass -DRAC_NODE_DEV_DIR=<node-gyp cache> after `npx node-gyp install`. Sherpa needs the Windows Sherpa-ONNX prebuilt; CI may override -DRAC_BACKEND_SHERPA=OFF when that archive is absent. DELAYLOAD, inlined here because the doc that held it is gone: the thin .node delay-loads ONLY node.exe (win_delay_load_hook.cc rewrites that to the running process / node.dll). Do NOT extend it. Delay-loading rac_commons.dll is FORBIDDEN - commons is an eager IAT import, so stage the DLL beside the .node. Never /DELAYLOAD the plugin or the onnx/sherpa sidecars through that hook; plugins resolve rac_commons.dll via PATH / same-dir search, so stage the sidecars together. Keep the hook's GetModuleHandle(NULL) fallback - do not hard-code electron.exe, or a Node host breaks.",
             "inherits": "base-release",
             "generator": "Visual Studio 17 2022",
             "architecture": { "value": "x64", "strategy": "set" },

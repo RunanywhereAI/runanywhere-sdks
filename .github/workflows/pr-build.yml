@@ -262,6 +262,89 @@ jobs:
           ./rcli/scripts/package-rcli-windows.ps1
           -BuildDir build/rcli-windows-release
 
+  neurt-abi-drift:
+    # The OTHER half of the drift loop. neurun's own CI (job `neurt-sdk-abi`)
+    # catches neurun's adapter drifting from these headers. This job catches the
+    # reverse -- THIS repo widening a rac_* signature under a private engine that
+    # cannot see the change until release time.
+    #
+    # That direction is the one that actually bit: commons widened
+    # rac_llm_stream_callback_fn with `tokens_in_delta`, NeuRT kept passing 4
+    # arguments, and native_ios failed with "too few arguments to function call,
+    # expected 5, have 4" on v0.20.15, v0.20.16 AND v0.20.17. Because every
+    # packaging job needs native_ios, all three shipped iOS-ONLY: 18 assets each,
+    # where 0.20.19+ ship 55+. Nothing Android, Linux, Windows, WASM, npm or Maven.
+    #
+    # Deliberately SKIPS instead of failing when NEURUN_TOKEN is unavailable: the
+    # engine source is private, so a fork PR can never run this. Skipping is
+    # correct there -- the same check runs unconditionally in neurun's own CI, and
+    # release.yml still builds the real thing.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check out the private NeuRT engine (skips on forks — no secret)
+        id: neurun
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/neurun
+          path: neurun
+          token: ${{ secrets.NEURUN_TOKEN }}
+          persist-credentials: false
+      # rac/rac_defaults_generated.h is gitignored codegen output (.gitignore:548)
+      # that the rac_*_types.h headers all #include, so a checkout alone cannot
+      # compile against them. Pure Python, no protoc. Without this the ABI check
+      # reports "ABI DRIFT" for a missing prerequisite -- a false alarm, which is
+      # how guards get muted.
+      - name: Generate the gitignored C defaults header
+        # Needs no protoc, but does `import google.protobuf` (a pip package).
+        # bootstrap_pyproto.sh keeps the version pinned in one place
+        # (core/VERSIONS::PYTHON_PROTOBUF_VERSION) and prints an interpreter path.
+        if: steps.neurun.outcome == 'success'
+        run: |
+          set -euo pipefail
+          # The emitter shells out to a BARE `protoc`
+          # (idl/codegen/_convenience_common.py:235) with no env override, so it
+          # must be ON PATH, not merely resolvable.
+          py="$(idl/codegen/bootstrap_pyproto.sh)"
+          protoc_dir="$(idl/codegen/bootstrap_protoc.sh --print-dir)"
+          export PATH="$protoc_dir:$PATH"
+          "$py" idl/codegen/generate_cpp_defaults.py
+
+      - name: Compile the NeuRT op tables against THIS PR's headers
+        if: steps.neurun.outcome == 'success'
+        env:
+          # Turn "SDK headers not found" into a hard failure. The checkout is
+          # always present here, so a skip could only mean the script's path
+          # resolution broke -- which is exactly how this guard silently did
+          # nothing for three releases (neurun PR #67).
+          NEURT_ABI_REQUIRE_SDK: '1'
+        run: |
+          set -euo pipefail
+          script=neurun/NeuRT/tools/scripts/check_sdk_abi.sh
+          if [ ! -x "$script" ] && [ ! -f "$script" ]; then
+            echo "::error::$script missing — the NeuRT ABI guard moved or was deleted"
+            exit 1
+          fi
+          set +e
+          bash "$script" "$GITHUB_WORKSPACE"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 3 ]; then
+            echo "::error::The NeuRT ABI guard SKIPPED (exit 3) instead of running."
+            echo "::error::Its SDK include-path probe found nothing — almost certainly this"
+            echo "::error::checkout of neurun predates RunanywhereAI/neurun#67, which fixed a"
+            echo "::error::stale hardcoded path that made the guard skip on every run."
+            exit 1
+          fi
+          exit "$rc"
+      - name: Note why it was skipped
+        if: steps.neurun.outcome != 'success'
+        run: |
+          echo "::notice::NeuRT ABI check skipped — no NEURUN_TOKEN (expected on fork PRs)."
+
   windows-commons-release:
     # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
     # release.yml's native_windows job ships as RACommons-windows-x64-v*.zip.
