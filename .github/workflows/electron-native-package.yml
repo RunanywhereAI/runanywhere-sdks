@@ -24,6 +24,9 @@ on:
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
+      # This workflow CALLS these: without them a fix to a downloader never
+      # triggers the lane that consumes it, and lands unverified.
+      - 'scripts/build/**'
       - '.github/workflows/electron-native-package.yml'
   pull_request:
     paths:
@@ -32,6 +35,7 @@ on:
       - 'engines/**'
       - 'cmake/**'
       - 'CMakePresets.json'
+      - 'scripts/build/**'
       - '.github/workflows/electron-native-package.yml'
   workflow_dispatch: {}
   workflow_call:

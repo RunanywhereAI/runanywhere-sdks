@@ -133,7 +133,13 @@ else
     # pointed at, leaving readers on a broken link.
     probe="${tmp}/probe"; mkdir -p "${probe}/versions"
     cp -R "$inner" "${probe}/versions/${EXPECTED_RECEIPT}"
-    ln -s "versions/${EXPECTED_RECEIPT}" "${probe}/current"
+    # NOT `ln -s`: under Git-Bash that COPIES the directory unless
+    # MSYS=winsymlinks:nativestrict, so the probe looked like real content and
+    # the validator rejected a payload that was actually fine. The helper picks
+    # the right mechanism per platform (symlink on POSIX, junction on Windows).
+    "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection;
+_selection.create(sys.argv[2], sys.argv[3])' \
+        "${REPO_ROOT}/scripts/build" "$probe" "$EXPECTED_RECEIPT"
     if ! staged="$("$PY_BIN" "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
             --prebuilt "$probe" --android-abi "$ABI" 2>&1)"; then
         echo "[ERROR] payload failed the SDK validator; nothing was changed:" >&2
@@ -155,23 +161,16 @@ fi
 # Readers resolve `current` to one immutable version directory, so the swap must
 # be a rename, never a delete-then-create: a reader in the gap would otherwise
 # see no engine at all.
-if [[ -e "${PREBUILT}/current" && ! -L "${PREBUILT}/current" ]]; then
-    echo "[ERROR] ${PREBUILT}/current exists and is not a symlink; refusing to replace it." >&2
+if [[ -e "${PREBUILT}/current" && ! -L "${PREBUILT}/current" ]] \
+    && ! "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection, pathlib;
+sys.exit(0 if _selection.is_selection(pathlib.Path(sys.argv[2])) else 1)' \
+        "${REPO_ROOT}/scripts/build" "${PREBUILT}/current"; then
+    echo "[ERROR] ${PREBUILT}/current exists and is not a selection pointer; refusing to replace it." >&2
     exit 1
 fi
-# os.replace, not `mv`: `mv tmp current` FOLLOWS an existing symlink-to-directory
-# and moves the temp link INSIDE the old target, leaving `current` unchanged. That
-# silently kept the previously selected ABI while reporting success. os.replace
-# operates on the link itself and is atomic, so a reader never sees no selection.
-"$PY_BIN" - "$PREBUILT" "$EXPECTED_RECEIPT" <<'PYSWAP'
-import os, sys
-prebuilt, receipt = sys.argv[1], sys.argv[2]
-tmp = os.path.join(prebuilt, f".current.{os.getpid()}")
-if os.path.lexists(tmp):
-    os.remove(tmp)
-os.symlink(os.path.join("versions", receipt), tmp, target_is_directory=True)
-os.replace(tmp, os.path.join(prebuilt, "current"))
-PYSWAP
+"$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection;
+_selection.create(sys.argv[2], sys.argv[3])' \
+    "${REPO_ROOT}/scripts/build" "$PREBUILT" "$EXPECTED_RECEIPT"
 
 # ---- prove the SDK will accept it -------------------------------------------
 # The same validator the build preflight runs. Catching a bad payload here beats
