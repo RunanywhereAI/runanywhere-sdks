@@ -60,6 +60,12 @@ jobs:
         run: bash scripts/validation/gates/check_typescript_centralization.sh
       - name: WASM vendor provenance schema contract
         run: bash scripts/validation/gates/check_wasm_provenance_contract.sh
+      # Asserts the private-engine prebuilt boundary is whole: pins well-formed, the
+      # ABI pin equal to the header, and every consumer actually fetching a payload.
+      # Offline here -- the release-content half needs a token and runs at release time.
+      - name: Engine prebuilt pins and consumers
+        run: bash scripts/validation/gates/check_engine_prebuilt_pins.sh --offline
+
       - name: Release-train version coherence
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
