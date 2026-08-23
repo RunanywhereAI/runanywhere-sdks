@@ -23,7 +23,7 @@ export 'package:runanywhere/generated/hardware_profile.pbenum.dart'
 class QHexRT {
   QHexRT._();
 
-  static const String version = '0.20.25';
+  static const String version = '0.20.26';
 
   static bool _isRegistered = false;
   static QhexrtBindings? _bindings;

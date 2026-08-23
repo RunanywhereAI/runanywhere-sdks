@@ -5,6 +5,17 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.26] - 2026-08-23
+
+### Changed
+
+- The Hexagon NPU payload is now fetched from a pinned prebuilt release instead of
+  being staged by hand. Both the archive checksum and the payload's own build-receipt
+  hash are pinned, so the pin describes the bytes rather than trusting the archive's
+  claim about itself.
+- Fixes a case where a hand-staged payload could keep an old build selected while
+  reporting success. Selection is now atomic on every platform.
+
 ## [0.20.25] - 2026-08-21
 
 ### Changed
