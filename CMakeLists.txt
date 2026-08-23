@@ -653,7 +653,7 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(stt_tests PROPERTIES LABELS "native;sherpa;stt")
     endif()
 
-    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without the neurun checkout the engine
+    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without a prebuilt slice the engine
     # builds as a non-routable shell, so the target exists but rac_diffusion_coreml.h is on no
     # include path and this test cannot compile.
     if(APPLE AND RAC_BACKEND_NEURT
@@ -662,7 +662,7 @@ if(RAC_BUILD_TESTS)
        AND NOT TARGET test_diffusion_coreml_generate)
         add_executable(test_diffusion_coreml_generate
             core/tests/test_diffusion_coreml_generate.cpp)
-        # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/) and reaches
+        # rac_diffusion_coreml.h ships in the prebuilt include dir and reaches
         # this target transitively: rac_add_engine_plugin exports the engine's
         # INCLUDE_DIRECTORIES as PUBLIC on rac_backend_neurt, linked below.
         target_include_directories(test_diffusion_coreml_generate PRIVATE

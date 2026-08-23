@@ -108,7 +108,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # macOS: llamacpp + onnx + sherpa + neurt (Apple Neural Engine), all real —
   # sherpa is ON (the PR-smoke lane turns it OFF; this lane must not), and
-  # neurt is built from the real private neurun checkout, not the shell.
+  # neurt comes from the pinned prebuilt, not the shell.
   # ---------------------------------------------------------------------------
   native_macos:
     needs: validate
@@ -182,13 +182,13 @@ jobs:
           # check_plugin_natives.py treats an absent/empty NeuRT directory as
           # "nothing to verify" and exits 0 — correct on platforms where
           # NeuRT legitimately never builds, but on THIS job specifically (a
-          # real NEURUN_TOKEN, a real neurun checkout) it must always produce
+          # real NEURUN_TOKEN, a real prebuilt) it must always produce
           # a routable plugin. A silent empty pass here would hide a real
-          # regression (e.g. the neurun checkout failing) instead of failing
+          # regression (e.g. the NeuRT download failing) instead of failing
           # the build.
           neurt_backend="bindings/electron/packages/neurt/prebuilds/darwin-arm64/librac_backend_neurt.dylib"
           if [ ! -f "$neurt_backend" ]; then
-            echo "::error::NeuRT did not produce $neurt_backend on macOS — the neurun checkout or build silently failed."
+            echo "::error::NeuRT did not produce $neurt_backend on macOS — the prebuilt download or build silently failed."
             exit 1
           fi
 

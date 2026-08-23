@@ -108,6 +108,55 @@ else
     ok "no workflow hardcodes an engine payload path"
 fi
 
+# ---- 3b. the headers the prebuilt was compiled against have not moved -------
+# This REPLACES cloning neurun and recompiling its adapters on every SDK PR.
+#
+# The receipt records the sdks commit whose headers the published archives were
+# compiled against. If the ABI surface has changed since then, those archives may
+# no longer match this repo -- and the ABI-version check cannot see it, because a
+# widened signature does not necessarily bump RAC_PLUGIN_API_VERSION. Comparing
+# the headers is a pure git operation: no private checkout, no compiler.
+echo "== ABI headers vs the prebuilt receipt =="
+ABI_HEADERS=(
+    core/include/rac/plugin/rac_engine_vtable.h
+    core/include/rac/plugin/rac_plugin_entry.h
+    core/include/rac/features/llm/rac_llm_service.h
+    core/include/rac/features/stt/rac_stt_service.h
+    core/include/rac/features/diffusion/rac_diffusion_types.h
+    core/include/rac/core/rac_error.h
+)
+receipt=""
+for s in "${NEURT_SLICES[@]}"; do
+    cand="${REPO_ROOT}/core/third_party/neurt/${s}/RECEIPT.json"
+    [[ -f "$cand" ]] && { receipt="$cand"; break; }
+done
+if [[ -z "$receipt" ]]; then
+    note "SKIPPED: no downloaded receipt locally (run download-neurt.sh to enable)."
+else
+    built_at="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$receipt")"
+    if [[ -z "$built_at" || "$built_at" == "unknown" ]]; then
+        bad "the receipt records no sdks_commit; re-cut the neurun release"
+    elif ! git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+        # A shallow CI checkout will not have it. Try to fetch just that commit.
+        git -C "$REPO_ROOT" fetch -q --depth=1 origin "$built_at" 2>/dev/null || true
+        if ! git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+            note "SKIPPED: commit ${built_at:0:12} not available in this checkout."
+        fi
+    fi
+    if git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+        drifted="$(git -C "$REPO_ROOT" diff --name-only "$built_at" -- "${ABI_HEADERS[@]}" 2>/dev/null || true)"
+        if [[ -n "$drifted" ]]; then
+            bad "ABI headers changed since the prebuilt was built (${built_at:0:12}):"
+            printf '         %s\n' $drifted >&2
+            note "Re-cut a neurun release so its adapters compile against these headers,"
+            note "then re-pin. The ABI-version check cannot catch this on its own: a"
+            note "widened signature need not bump RAC_PLUGIN_API_VERSION."
+        else
+            ok "ABI headers unchanged since ${built_at:0:12}"
+        fi
+    fi
+fi
+
 # ---- 4. the pinned release really has all of it -----------------------------
 echo "== pinned release contents =="
 TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}"
