@@ -40,6 +40,8 @@ done
 # pin fails loudly rather than 404-ing on a nonexistent asset.
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/core/scripts/load-versions.sh"
+# shellcheck source=scripts/build/_release_asset.sh
+source "${REPO_ROOT}/scripts/build/_release_asset.sh"
 
 for required in NEURUN_REPO NEURT_RELEASE_TAG NEURT_RAC_ABI_VERSION; do
     if [[ -z "${!required:-}" ]]; then
@@ -69,6 +71,9 @@ if [[ -z "$TOKEN" ]]; then
     exit 3
 fi
 
+PY_BIN="$(command -v python3 || command -v python || true)"
+[[ -n "$PY_BIN" ]] || { echo "[ERROR] no python3/python on PATH" >&2; exit 1; }
+
 sha256_of() { shasum -a 256 "$1" | awk '{print $1}'; }
 
 fetch_slice() {
@@ -97,12 +102,7 @@ fetch_slice() {
     # shellcheck disable=SC2064
     trap "rm -rf '$tmp'" RETURN
 
-    if ! GH_TOKEN="$TOKEN" gh release download "$NEURT_RELEASE_TAG" \
-            --repo "$NEURUN_REPO" --pattern "$asset" --dir "$tmp" 2>"${tmp}/err"; then
-        echo "[ERROR] could not download ${asset} from ${NEURUN_REPO}@${NEURT_RELEASE_TAG}" >&2
-        sed 's/^/        /' "${tmp}/err" >&2 || true
-        return 1
-    fi
+    fetch_release_asset "$NEURUN_REPO" "$NEURT_RELEASE_TAG" "$asset" "$tmp" "$TOKEN" "$PY_BIN" || return 1
 
     local got; got="$(sha256_of "${tmp}/${asset}")"
     if [[ "$got" != "$expected" ]]; then
@@ -121,13 +121,13 @@ fetch_slice() {
     # symbols, so nothing else would catch it.
     local receipt="${dest}/RECEIPT.json"
     [[ -f "$receipt" ]] || { echo "[ERROR] ${slice}: RECEIPT.json missing from the archive" >&2; return 1; }
-    local got_abi; got_abi="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['rac_plugin_api_version'])" "$receipt")"
+    local got_abi; got_abi="$("$PY_BIN" -c "import json,sys;print(json.load(open(sys.argv[1]))['rac_plugin_api_version'])" "$receipt")"
     if [[ "$got_abi" != "$LOCAL_ABI" ]]; then
         echo "[ERROR] ${slice}: built against RAC_PLUGIN_API_VERSION=${got_abi}," >&2
         echo "        but this repo is at ${LOCAL_ABI}. Cut a new neurun release." >&2
         return 1
     fi
-    local got_slice; got_slice="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['slice'])" "$receipt")"
+    local got_slice; got_slice="$("$PY_BIN" -c "import json,sys;print(json.load(open(sys.argv[1]))['slice'])" "$receipt")"
     if [[ "$got_slice" != "$slice" ]]; then
         echo "[ERROR] ${slice}: receipt claims slice '${got_slice}' — mismatched asset." >&2
         return 1

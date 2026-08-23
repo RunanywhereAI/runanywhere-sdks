@@ -50,6 +50,8 @@ case "$ABI" in arm64-v8a|win-arm64) ;; *) echo "[ERROR] unknown abi '$ABI'" >&2;
 # which surfaces as a 404 rather than a version error.
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/core/scripts/load-versions.sh"
+# shellcheck source=scripts/build/_release_asset.sh
+source "${REPO_ROOT}/scripts/build/_release_asset.sh"
 
 KEY_UPPER="$(echo "$ABI" | tr 'a-z-' 'A-Z_')"
 SHA_VAR="QHEXRT_${KEY_UPPER}_SHA256"
@@ -98,12 +100,7 @@ else
     # shellcheck disable=SC2064
     trap "rm -rf '$tmp'" EXIT
 
-    if ! GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" \
-            --repo "$NEURUN_REPO" --pattern "$ASSET" --dir "$tmp" 2>"${tmp}/err"; then
-        echo "[ERROR] could not download ${ASSET} from ${NEURUN_REPO}@${QHEXRT_RELEASE_TAG}" >&2
-        sed 's/^/        /' "${tmp}/err" >&2 || true
-        exit 1
-    fi
+    fetch_release_asset "$NEURUN_REPO" "$QHEXRT_RELEASE_TAG" "$ASSET" "$tmp" "$TOKEN" "$PY_BIN" || exit 1
 
     got="$(sha256_of "${tmp}/${ASSET}")"
     if [[ "$got" != "$EXPECTED_SHA" ]]; then

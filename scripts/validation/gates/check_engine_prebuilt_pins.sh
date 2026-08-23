@@ -26,6 +26,8 @@ ok()   { printf '  [OK] %s\n' "$*"; }
 
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/core/scripts/load-versions.sh"
+# shellcheck source=scripts/build/_release_asset.sh
+source "${REPO_ROOT}/scripts/build/_release_asset.sh"
 
 # The engines, their ABIs/slices, and the asset basename each publishes.
 NEURT_SLICES=(macos-arm64 ios-arm64 ios-arm64-simulator)
@@ -209,8 +211,13 @@ if [[ "$OFFLINE" -eq 1 || -z "$TOKEN" ]]; then
     note "Local pin checks above still ran."
 else
     repo="${NEURUN_REPO:-RunanywhereAI/neurun}"
-    listing="$(GH_TOKEN="$TOKEN" gh release view "$NEURT_RELEASE_TAG" --repo "$repo" \
-                 --json assets --jq '.assets[].name' 2>/dev/null || true)"
+    # curl, not `gh`: a self-hosted runner may not have the CLI at all.
+    listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/${repo}/releases/tags/${NEURT_RELEASE_TAG}" \
+               | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
     if [[ -z "$listing" ]]; then
         bad "could not read release $NEURT_RELEASE_TAG from $repo"
     else
@@ -234,8 +241,8 @@ else
         tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
         for s in "${NEURT_SLICES[@]}"; do
             var="NEURT_$(echo "$s" | tr 'a-z-' 'A-Z_')_SHA256"
-            if ! GH_TOKEN="$TOKEN" gh release download "$NEURT_RELEASE_TAG" --repo "$repo" \
-                    --pattern "neurt-${s}-v${nv}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null; then
+            if ! fetch_release_asset "$repo" "$NEURT_RELEASE_TAG" \
+                    "neurt-${s}-v${nv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
                 bad "could not download the published checksum for neurt-${s}"; continue
             fi
             pub="$(cat "$tmp/neurt-${s}-v${nv}.tar.gz.sha256")"
@@ -245,8 +252,8 @@ else
         for a in "${QHEXRT_ABIS[@]}"; do
             var="QHEXRT_$(echo "$a" | tr 'a-z-' 'A-Z_')_SHA256"
             qrepo="${NEURUN_REPO:-$repo}"
-            if ! GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" --repo "$qrepo" \
-                    --pattern "qhexrt-${a}-v${qv}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null; then
+            if ! fetch_release_asset "$qrepo" "$QHEXRT_RELEASE_TAG" \
+                    "qhexrt-${a}-v${qv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
                 bad "could not download the published checksum for qhexrt-${a}"; continue
             fi
             pub="$(cat "$tmp/qhexrt-${a}-v${qv}.tar.gz.sha256")"
