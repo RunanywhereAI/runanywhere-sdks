@@ -510,7 +510,7 @@ rac_result_t cloud_stt_parse_flat_json(const rac_http_response_t* resp,
 // Engine ops vtable + C ABI factory
 // =============================================================================
 
-const rac_stt_service_ops_t g_cloud_stt_ops = {
+RAC_CLOUD_API const rac_stt_service_ops_t g_cloud_stt_ops = {
     /* initialize              */ rac::cloud_stt::ops_initialize,
     /* transcribe              */ rac::cloud_stt::ops_transcribe,
     /* transcribe_stream       */ nullptr,
