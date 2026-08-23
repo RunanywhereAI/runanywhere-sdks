@@ -10,7 +10,7 @@
 #   - engines/                 — engine plugins (llamacpp, onnx, sherpa,
 #                                qhexrt, neurt). Each publishes
 #                                a `rac_engine_vtable_t` at
-#                                `RAC_PLUGIN_API_VERSION=7u` via
+#                                `RAC_PLUGIN_API_VERSION=9u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
 #                                `rac_plugin_entry` symbol.
 #   - tools/plugin-loader-smoke/ — CLI smoke test for the plugin loader
