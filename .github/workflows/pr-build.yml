@@ -299,8 +299,14 @@ jobs:
       # reports "ABI DRIFT" for a missing prerequisite -- a false alarm, which is
       # how guards get muted.
       - name: Generate the gitignored C defaults header
+        # Needs no protoc, but does `import google.protobuf` (a pip package).
+        # bootstrap_pyproto.sh keeps the version pinned in one place
+        # (core/VERSIONS::PYTHON_PROTOBUF_VERSION) and prints an interpreter path.
         if: steps.neurun.outcome == 'success'
-        run: python3 idl/codegen/generate_cpp_defaults.py
+        run: |
+          set -euo pipefail
+          py="$(idl/codegen/bootstrap_pyproto.sh)"
+          "$py" idl/codegen/generate_cpp_defaults.py
 
       - name: Compile the NeuRT op tables against THIS PR's headers
         if: steps.neurun.outcome == 'success'
