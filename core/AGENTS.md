@@ -23,9 +23,12 @@ cmake --build build
 
 # Build with all backends enabled. engines/ is added by the repo-root
 # CMakeLists.txt, so this has to configure the ROOT (-S ..); a plain
-# `cmake -B build` here builds commons with no engines at all.
-cmake -S .. -B build -DRAC_BUILD_BACKENDS=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+# `cmake -B build` here builds commons with no engines at all. It also needs a
+# build dir of its own: CMake records the source dir in the cache, so reusing
+# the core-only `build/` above fails with "does not match the source ... used
+# to generate cache".
+cmake -S .. -B ../build/backends -DRAC_BUILD_BACKENDS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build ../build/backends
 
 # Build with tests
 cmake -B build -DRAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -278,10 +281,11 @@ ctest --test-dir build --output-on-failure
 ./build/tests/test_engine_vtable
 
 # Tests requiring backends (must enable the backend, and configure the repo
-# root so engines/ is in the build; test binaries then land under build/core/)
-cmake -S .. -B build -DRAC_BUILD_TESTS=ON -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON
-cmake --build build
-./build/core/tests/test_llm
+# root so engines/ is in the build, in its own build dir; test binaries then
+# land under <builddir>/core/tests/)
+cmake -S .. -B ../build/backends -DRAC_BUILD_TESTS=ON -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON
+cmake --build ../build/backends
+../build/backends/core/tests/test_llm
 
 # Plugin loader tests only work in SHARED plugin mode (not iOS/WASM)
 ```
