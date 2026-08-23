@@ -292,22 +292,27 @@ jobs:
           if (!(Test-Path "$dir/arm64/node.lib")) { throw "node.lib missing under $dir/arm64" }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      # QHexRT arrives as a payload pinned in core/VERSIONS, fetched and verified
+      # here. This replaced a hardcoded path to a hand-staged tree on this machine,
+      # which had to be edited by hand whenever the receipt changed -- and had
+      # drifted from the published payload.
+      - name: Download the pinned QHexRT payload (win-arm64)
+        shell: bash
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/build/download-qhexrt.sh --abi win-arm64 || {
+            echo "::error::QHexRT payload unavailable; refusing to package a stub."
+            exit 1
+          }
+
       - name: Configure electron-win-arm64-vs2026 (QHexRT)
         shell: powershell
         env:
           # Staged once on this machine from the licensed QAIRT SDK — see
           # thoughts/shared/plans/electron_cicd_staging_url_and_npu_ane_pipeline.md
           # for how it was produced. Persistent self-hosted state on purpose:
-          # re-deriving it from the raw QAIRT SDK on every ephemeral run is
-          # not the point of self-hosting a licensed-toolchain lane.
-          #
-          # The directory name MUST be the receipt's own build_receipt_sha256
-          # (engines/qhexrt/CMakeLists.txt verifies this self-identity check) —
-          # do not rename/alias this path to something friendlier, that is
-          # exactly the mistake that broke this the first time it was staged.
-          # If the receipt is ever regenerated with a new hash, this path must
-          # be updated to match.
-          QHEXRT_ROOT: 'C:\actions-runner-state\qhexrt-prebuilt\versions\f14ef0efb1da4b6a50e49f37a0ef55ac3b0bb7328aa7469edf78625ac4d79607'
           # RAC_DESKTOP_ADAPTER=ON (the preset default) needs libcurl; crypt32
           # is a system lib but curl is not, and there is no win-arm64 HTTP
           # transport without it (no downloads, no telemetry, no auth). Already
@@ -315,7 +320,7 @@ jobs:
           VCPKG_INSTALLATION_ROOT: 'C:\Users\san\vcpkg'
           NODE_DEV_DIR: ${{ steps.nodedev.outputs.dir }}
         run: |
-          cmake --preset electron-win-arm64-vs2026 -DQHEXRT_ROOT="$env:QHEXRT_ROOT" `
+          cmake --preset electron-win-arm64-vs2026 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=arm64-windows-static `
             -DRAC_NODE_DEV_DIR="$env:NODE_DEV_DIR"
