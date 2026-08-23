@@ -8,7 +8,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -367,34 +369,35 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     // Collect all models from all strategies
     std::vector<rac_diffusion_model_def_t> all_models;
 
-    for (const auto& strategy : state.strategies) {
-        if (strategy.list_models) {
-            rac_diffusion_model_def_t* models = nullptr;
-            size_t count = 0;
+    try {
+        for (const auto& strategy : state.strategies) {
+            if (strategy.list_models) {
+                rac_diffusion_model_def_t* models = nullptr;
+                size_t count = 0;
 
-            rac_result_t list_result =
-                strategy.list_models(&models, &count, strategy.user_data);
-            if (list_result == RAC_SUCCESS) {
-                if (models) {
+                rac_result_t list_result =
+                    strategy.list_models(&models, &count, strategy.user_data);
+                std::unique_ptr<rac_diffusion_model_def_t[], decltype(&std::free)> models_owner(
+                    models, &std::free);
+
+                if (list_result == RAC_SUCCESS && models_owner) {
                     for (size_t i = 0; i < count; i++) {
-                        all_models.push_back(models[i]);
+                        all_models.push_back(models_owner[i]);
                     }
                 }
-            }
 
-            // Strategies may allocate partial output before returning an error.
-            // The registry owns and releases any array returned by the callback.
-            std::free(models);
-
-            if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
-                // Preserve genuine strategy failures (allocation, init,
-                // backend) instead of reporting a successful empty/partial
-                // list. Only RAC_ERROR_NOT_FOUND falls through.
-                RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
-                                strategy.name, static_cast<int>(list_result));
-                return list_result;
+                if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
+                    // Preserve genuine strategy failures (allocation, init,
+                    // backend) instead of reporting a successful empty/partial
+                    // list. Only RAC_ERROR_NOT_FOUND falls through.
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
+                                    strategy.name, static_cast<int>(list_result));
+                    return list_result;
+                }
             }
         }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
 
     if (all_models.empty()) {

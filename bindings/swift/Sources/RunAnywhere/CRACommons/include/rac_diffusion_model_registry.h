@@ -279,8 +279,9 @@ RAC_API rac_result_t rac_diffusion_model_registry_unregister(const char* name);
  *
  * @param model_id Model identifier
  * @param out_def Output model definition (filled on success)
- * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND otherwise. Strategy
- *         failures other than RAC_ERROR_NOT_FOUND are returned as-is.
+ * @return RAC_SUCCESS if found, RAC_ERROR_INVALID_ARGUMENT if an argument is null,
+ *         RAC_ERROR_NOT_FOUND otherwise. Strategy failures other than RAC_ERROR_NOT_FOUND are
+ *         returned as-is.
  */
 RAC_API rac_result_t rac_diffusion_model_registry_get(const char* model_id,
                                                       rac_diffusion_model_def_t* out_def);
@@ -290,8 +291,9 @@ RAC_API rac_result_t rac_diffusion_model_registry_get(const char* model_id,
  *
  * @param out_models Output array (caller must free with free())
  * @param out_count Number of models
- * @return RAC_SUCCESS on success. Strategies that report RAC_ERROR_NOT_FOUND
- *         are skipped; any other strategy error is returned as-is.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if an argument is null, or
+ *         RAC_ERROR_OUT_OF_MEMORY if aggregation or output allocation fails. Strategies that
+ *         report RAC_ERROR_NOT_FOUND are skipped; any other strategy error is returned as-is.
  */
 RAC_API rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
                                                        size_t* out_count);
@@ -299,13 +301,11 @@ RAC_API rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t
 /**
  * @brief Select best backend for a model on current platform
  *
- * This function implements the fallback chain:
- * - iOS/macOS: CoreML (ANE → GPU → CPU automatic via CoreML)
- * - Android: ONNX with NNAPI EP (NPU → DSP → GPU → CPU automatic via NNAPI)
- * - Desktop: ONNX with CPU EP
+ * Registered strategies select the backend for recognized models. Diffusion is currently
+ * CoreML-only, so a failed model lookup falls back to CoreML.
  *
  * @param model_id Model identifier
- * @return Best backend, or RAC_DIFFUSION_BACKEND_ONNX as fallback
+ * @return Best backend, or RAC_DIFFUSION_BACKEND_COREML as fallback
  */
 RAC_API rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id);
 
